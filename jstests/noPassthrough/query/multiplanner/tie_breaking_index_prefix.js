@@ -4,19 +4,16 @@
 
 "use strict";
 
-import {
-    getEngine,
-    getPlanStages,
-    getWinningPlanFromExplain,
-} from "jstests/libs/query/analyze_plan.js";
-import {getPlanRankerMode, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 // Test initialization.
 
-const options = {};
-const conn = MongoRunner.runMongod();
-assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
+// Pin to multiPlanning: this test verifies multiplanner tie-breaking heuristics
+// (internalQueryPlanTieBreakingWithIndexHeuristics), which are irrelevant under CBR.
+// Without the explicit override the server default (kMixed) would invoke CBR sampling
+// for the zero-result query in preferShortestIndexWithComparisonsInFilter.
+const conn = MongoRunner.runMongod({setParameter: {internalQueryPlanRanker: "multiPlanning"}});
+assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("tie_breaking_index_prefix");
 
 const coll = db.index_prefix;
@@ -213,30 +210,10 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
         assertIndexScan(false, filter, [{a: 1, b: 1}]);
         assertIndexScan(true, filter, [{a: 1, b: 1}]);
     } else {
-        const explain = setParamsAndRunCommand(false, filter);
-
-        const abIndex = [{a: 1, b: 1}];
-        const abcIndex = [{a: 1, b: 1, c: 1}];
-
-        const isSBE = getEngine(explain) == "sbe";
-        const isCBR = getPlanRankerMode(db) !== "multiPlanning";
-
-        const [expectedWithoutTieBreaking, expectedWithTieBreaking] = (() => {
-            if (isSBE) {
-                // Without the tie-breaking heuristic, planning for SBE selects the longer index.
-                // With the heuristic enabled, the classic multiplanner (used regardless of SBE
-                // execution) prefers the shorter index prefix, same as classic multiplanning.
-                return [abcIndex, abIndex];
-            }
-            if (isCBR) {
-                // CBR costs the plan using the shorter index lower, as fewer seeks will be required.
-                return [abIndex, abIndex];
-            }
-
-            return [abcIndex, abIndex];
-        })();
-        assertIndexScan(false, filter, expectedWithoutTieBreaking, explain);
-        assertIndexScan(true, filter, expectedWithTieBreaking);
+        // Without the tie-breaking heuristic, the multiplanner selects the longer index.
+        // With the heuristic enabled, it prefers the shorter index prefix.
+        assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}]);
+        assertIndexScan(true, filter, [{a: 1, b: 1}]);
     }
 
     for (const index of indexes) {

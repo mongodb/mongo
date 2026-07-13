@@ -1,5 +1,9 @@
 /**
  * Verify CBR can estimate value $elemMatch MatchExpression using histograms.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {planEstimatedWithHistogram} from "jstests/libs/query/cbr_utils.js";
@@ -64,6 +68,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );

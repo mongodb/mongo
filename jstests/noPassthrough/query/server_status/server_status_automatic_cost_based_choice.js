@@ -34,12 +34,13 @@ const db = conn.getDB(dbName);
 let coll = db.getCollection(collName);
 coll.drop();
 
-// Make sure CBR is enabled in automaticCE mode with the CBRCostBasedRankerChoice strategy.
+// Make sure CBR is enabled in mixed mode with the CBRCostBasedRankerChoice strategy.
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
         internalQuerySamplingBySequentialScan: true,
         automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
     }),

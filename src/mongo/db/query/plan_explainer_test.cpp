@@ -665,6 +665,7 @@ TEST_F(PlanExplainerTest, PlanExplainerDataMergeFull) {
 TEST_F(PlanExplainerTest, CBRSamplingMetadataSerializedInExplain) {
     // Verify that when CBR uses sampling CE, the 'ceSamplingMetadata' section appears in the
     // queryPlanner explain output and contains the expected fields for each collection.
+    unittest::ServerParameterGuard planRankerController("internalQueryPlanRanker", "costBased");
     unittest::ServerParameterGuard samplingController("internalQueryCBRCEMode", "samplingCE");
 
     const auto verbosity = ExplainOptions::Verbosity::kQueryPlanner;
@@ -757,8 +758,7 @@ TEST_F(PlanExplainerTest, GenerateQueryKnobsOmitsKnobsWhenOutputNearlyFull) {
     auto* opCtx = operationContext();
     unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", true);
     query_settings::QuerySettingsGuardForTest settingsGuard(
-        opCtx,
-        fromjson(R"({queryKnobs: {samplingMarginOfError: 2.5, planRankerMode: "samplingCE"}})"));
+        opCtx, fromjson(R"({queryKnobs: {samplingMarginOfError: 2.5, cbrCEMode: "samplingCE"}})"));
     auto testExpCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
 
     int knobsSize = 0;

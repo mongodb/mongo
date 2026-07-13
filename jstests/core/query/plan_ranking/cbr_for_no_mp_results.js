@@ -13,6 +13,11 @@
  *    incompatible_with_initial_sync,
  *    # Explain calls will fail if a migration is going on.
  *    assumes_balancer_off,
+ *    # The test uses explain("allPlansExecution") with samplingCE and asserts on the exact number
+ *    # of costed vs. non-costed rejected plans per shard. In causally consistent sessions the
+ *    # session state interacts with how samplingCE estimates are propagated across shards,
+ *    # causing the explain output to differ from the expected plan structure.
+ *    does_not_support_causal_consistency,
  * ]
  */
 
@@ -29,8 +34,8 @@ import {
     assertPlanCosted,
     assertPlanNotCosted,
     isPlanCosted,
-    getCBRConfig,
-    setCBRConfigOnAllNonConfigNodes,
+    getPlanRankerConfig,
+    setPlanRankerConfigOnAllNonConfigNodes,
 } from "jstests/libs/query/cbr_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -299,11 +304,15 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
 }
 
 const mongodDb = getMongodDb(db);
-const prevCBRConfig = getCBRConfig(mongodDb);
+// TODO: SERVER-130178 Fix CBR-test utils to work in sharded environment.
+// This utility function assumes direct communication to mongod. Check and extend it to work in sharded environment.
+// Check if the tag does_not_support_causal_consistency is still needed after SERVER-130178 is fixed.
+const prevPlanRankerConfig = getPlanRankerConfig(mongodDb);
 
-setCBRConfigOnAllNonConfigNodes(db.getMongo(), {
+setPlanRankerConfigOnAllNonConfigNodes(db.getMongo(), {
     featureFlagCostBasedRanker: true,
-    internalQueryCBRCEMode: "automaticCE",
+    internalQueryPlanRanker: "mixed",
+    internalQueryCBRCEMode: "samplingCE",
     automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
 });
 
@@ -337,7 +346,7 @@ try {
     testReturnKeyIsPlannedWithMultiPlanner();
     // TODO SERVER-115714 For posterity add a test case for small collections that use MP only.
 } finally {
-    setCBRConfigOnAllNonConfigNodes(db.getMongo(), prevCBRConfig);
+    setPlanRankerConfigOnAllNonConfigNodes(db.getMongo(), prevPlanRankerConfig);
     setParameterOnAllNodes(db, {
         internalQuerySamplingBySequentialScan: prevSequentialSamplingScan,
         internalQueryExecYieldIterations: prevExecYieldIterations,

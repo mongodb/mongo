@@ -44,7 +44,8 @@ after(function () {
 
 describe("Query knobs set at startup via --setParameter", function () {
     const kKnobsUnderTest = [
-        "planRankerMode",
+        "planRanker",
+        "cbrCEMode",
         "samplingMarginOfError",
         "samplingCEMethod",
         "numWorksPerPlanForMPEstimation",
@@ -70,8 +71,11 @@ describe("Query knobs set at startup via --setParameter", function () {
     it("should register with correct default values", function () {
         const knobs = getListQueryKnobs();
 
-        assert.eq("automaticCE", knobs["planRankerMode"].default, "planRankerMode default", {
-            knob: knobs["planRankerMode"],
+        assert.eq("mixed", knobs["planRanker"].default, "planRanker default", {
+            knob: knobs["planRanker"],
+        });
+        assert.eq("samplingCE", knobs["cbrCEMode"].default, "cbrCEMode default", {
+            knob: knobs["cbrCEMode"],
         });
         assert.eq(5.0, knobs["samplingMarginOfError"].default, "samplingMarginOfError default", {
             knob: knobs["samplingMarginOfError"],

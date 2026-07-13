@@ -147,9 +147,9 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     };
 
     MultipleCollectionAccessor multiCollectionAccessor{collection()};
-    auto cbrEnabled = _query->getExpCtx()->getIfrContext()->getSavedFlagValue(
-        feature_flags::gFeatureFlagCostBasedRanker);
-    auto rankerMode = _query->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
+    auto planRanker = plannerParams.planRanker;
+    const bool cbrEnabled = plannerParams.isCBREnabled();
+    auto rankerMode = _query->getExpCtx()->getQueryKnobConfiguration().getCBRCEMode();
     // Populating the 'topLevelSampleFieldNames' requires 2 steps:
     //  1. Extract the set of top level fields from the filter, sort and project components of the
     //  CanonicalQuery.
@@ -159,7 +159,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
     std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
     if (cbrEnabled) {
-        if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        if (rankerMode == QueryCBRCEModeEnum::kSamplingCE) {
             using namespace cost_based_ranker;
             samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
                 *_query,
@@ -170,7 +170,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
                 multiCollectionAccessor);
             topLevelSampleFieldNames =
                 ce::extractTopLevelFieldsFromMatchExpression(_query->getPrimaryMatchExpression());
-        } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
+        } else if (rankerMode == QueryCBRCEModeEnum::kExactCE) {
             exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
                 collection(), *_query, expCtx()->getOperationContext());
         }
@@ -196,12 +196,13 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
                                        exactCardinality.get());
 
 
-    // If the plan ranking is a CBR strategy, plan each branch of the $or using the respective
-    // cost-based ranking. Multiplanning and automaticCE strategy plan each branch
+    // If the plan ranker is cost-based, plan each branch of the $or using the respective
+    // cost-based ranking. Multiplanning and Mixed plan rankers plan each branch
     // of the $or using multiplanning as defined in the multiplanCallback below.
-    bool useMultiplanner = !cbrEnabled || rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
+    bool useMultiplanner = planRanker == QueryPlanRankerEnum::kMultiPlanner ||
+        planRanker == QueryPlanRankerEnum::kMixed;
     if (!useMultiplanner && subplanningStatus.isOK()) {
-        if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        if (rankerMode == QueryCBRCEModeEnum::kSamplingCE) {
             // If we do not have any fields that we want to sample then we just include all the
             // fields in the sample. This can occur if we encounter a find all query with no
             // project or sort specified.
@@ -219,7 +220,8 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
                                                        samplingEstimator.get(),
                                                        exactCardinality.get(),
                                                        std::move(branchResult->solutions),
-                                                       *_query);
+                                                       *_query,
+                                                       rankerMode);
             if (!statusWithCBRSolns.isOK()) {
                 str::stream ss;
                 ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "

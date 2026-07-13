@@ -8381,7 +8381,7 @@
 
 ],
 ">>>totals": {"pipelines": 1043, "plans": 10395, "keys": 85039308, "docs": 52976779, "sorts": 78897837, "rows": 38020022, "errors":      0},
-">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
+">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryPlanRanker":"costBased","internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
 
 
 [jsTest] ----

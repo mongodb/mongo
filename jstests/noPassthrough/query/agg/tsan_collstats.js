@@ -10,6 +10,7 @@ const st = new ShardingTest({
     rs: {
         setParameter: {
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "heuristicCE",
         },
     },

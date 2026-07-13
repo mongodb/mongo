@@ -52,7 +52,7 @@ public:
     CardinalityEstimator(const CollectionInfo& collInfo,
                          const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
-                         QueryPlanRankerModeEnum rankerMode);
+                         QueryCBRCEModeEnum rankerMode);
 
     // Delete the copy and move constructors and assignment operator
     CardinalityEstimator(const CardinalityEstimator&) = delete;
@@ -237,7 +237,7 @@ protected:
     EstimateMap& _qsnEstimates;
 
     // The cardinality estimate mode we are using for estimates.
-    const QueryPlanRankerModeEnum _rankerMode;
+    const QueryCBRCEModeEnum _ceMode;
 
     // Set with the paths we know are multikey which is deduced from the catalog. Note that a field
     // may be multikey but not reflected in this set because there may not be an index over the

@@ -38,16 +38,16 @@ size_t totalIntervalCount(const IndexBounds& bounds) {
 CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
-                                           QueryPlanRankerModeEnum rankerMode)
+                                           QueryCBRCEModeEnum rankerMode)
     : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
       _inputCard{_collCard},
       _collInfo(collInfo),
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
-      _rankerMode(rankerMode) {
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+      _ceMode(rankerMode) {
+    // TODO SERVER-127563: Remove AutomaticCE.
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE || _ceMode == QueryCBRCEModeEnum::kAutomaticCE) {
         tassert(9746501,
                 "samplingEstimator cannot be null when ranker mode is samplingCE or automaticCE",
                 _samplingEstimator != nullptr);
@@ -272,7 +272,7 @@ std::string_view CardinalityEstimator::getPath(const MatchExpression* node) {
 }
 
 CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool isFilterRoot) {
-    if (isFilterRoot && _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    if (isFilterRoot && _ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         // Sample the entire filter and scale it to the child's input cardinality.
         // The sampling estimator returns cardinality estimates scaled to the collection
         // cardinality, however this MatchExpression maybe appear in the context of a plan fragment
@@ -288,10 +288,12 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
 
     CEResult ceRes(ErrorCodes::CEFailure, "Unable to estimate expression");
 
+    // TODO SERVER-127563: Revisit strict and fallback histogram when
+    // HistogramCEWithHeuristicFallback is removed.
     bool fallbackToHeuristicCE = true;
-    bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE;
-    bool useHistogram = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
+    bool strict = _ceMode == QueryCBRCEModeEnum::kHistogramCE;
+    bool useHistogram =
+        _ceMode == QueryCBRCEModeEnum::kHistogramCE || _ceMode == QueryCBRCEModeEnum::kAutomaticCE;
 
     /**
      * Sargable expressions are those that can be transformed into intervals. They can be estimated
@@ -313,8 +315,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
      * besides LeafMatchExpression subclasses. Heuristic CE doesn't estimate non-leaf nodes. This
      * is done be the switch statment below.
      */
-    bool useHeuristic =
-        _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE;
+    bool useHeuristic = _ceMode == QueryCBRCEModeEnum::kHeuristicCE || fallbackToHeuristicCE;
     if (useHeuristic && heuristicIsEstimable(node)) {
         tassert(9902901, "CE reestimation not allowed", !ceRes.isOK());
         const SelectivityEstimate sel = heuristicLeafMatchExpressionSel(node, _inputCard);
@@ -650,8 +651,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // Estimate the number of keys in the index scan interval.
     // We can avoid computing input selectivity for sampling CE on point queries over non-multikey
     // fields without residual filter, as input cardinality is equal to output cardinality.
-    if (_rankerMode != QueryPlanRankerModeEnum::kSamplingCE || node->index.multikey ||
-        node->filter) {
+    if (_ceMode != QueryCBRCEModeEnum::kSamplingCE || node->index.multikey || node->filter) {
         auto ceRes1 = estimate(&node->bounds);
         if (!ceRes1.isOK()) {
             return ceRes1;
@@ -660,7 +660,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     }
 
     // Estimate the output cardinality of IndexScan + Residual filter.
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         // Sampling will attempt to get an estimate for the number of RIDs that the scan returns
         // after deduplication and applying the filter. This approach does not combine selectivity
         // computed from the index scan.
@@ -731,7 +731,7 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         return ceRes1.getValue();
     }
 
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE &&
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE &&
         node->children[0]->getType() == STAGE_IXSCAN) {
         // If the FetchNode does not have a filter then its output cardinality will be unchanged
         // from its input cardinality.
@@ -1091,8 +1091,9 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     // TODO SERVER-122571: Suppose we have an AND with some predicates on 'a' that can answered with
     // a histogram and some predicates on 'b' that can't. Should we still try to use histogram for
     // 'a'? The code as written will not.
-    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+    // TODO SERVER-127563 Revisit the logic here when HistogramCEWithHeuristicFallback is removed.
+    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE ||
+        _ceMode == QueryCBRCEModeEnum::kAutomaticCE) {
         size_t selOffset = _conjSels.size();
         auto ceRes = tryHistogramAnd(node);
         if (ceRes.isOK()) {
@@ -1163,8 +1164,8 @@ CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* nod
     // Sampling and histogram handle this case higher up.
     uassert(9808601,
             "direct estimation of $elemMatch is currently only supported for heuristicCE",
-            _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE ||
-                _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE);
+            _ceMode == QueryCBRCEModeEnum::kHeuristicCE ||
+                _ceMode == QueryCBRCEModeEnum::kAutomaticCE);
 
     size_t selOffset = _conjSels.size();
 
@@ -1336,7 +1337,7 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* bounds) {
         return Status(ErrorCodes::UnsupportedCbrNode, "simple ranges unsupported");
     }
 
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         return _ceCache.getOrCompute(
             bounds, [&] { return _samplingEstimator->estimateKeysScanned(*bounds); });
     }
@@ -1391,19 +1392,19 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
         return zeroMetadataCE;
     }
 
-    auto localRankerMode = _rankerMode;
-    const bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE || forceHistogram;
+    auto localRankerMode = _ceMode;
+    const bool strict = _ceMode == QueryCBRCEModeEnum::kHistogramCE || forceHistogram;
     const stats::CEHistogram* histogram = nullptr;
 
-    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE || forceHistogram) {
+    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE ||
+        _ceMode == QueryCBRCEModeEnum::kAutomaticCE || forceHistogram) {
         histogram = _collInfo.collStats->getHistogram(node->name);
         if (!histogram) {
             if (strict) {
                 return CEResult(ErrorCodes::HistogramCEFailure,
                                 str::stream{} << "no histogram found for path: " << node->name);
             }
-            localRankerMode = QueryPlanRankerModeEnum::kHeuristicCE;
+            localRankerMode = QueryCBRCEModeEnum::kHeuristicCE;
         }
     }
 
@@ -1412,8 +1413,8 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
     CardinalityEstimate resultCard = minCE;
     for (const auto& interval : node->intervals) {
         bool fallbackToHeuristicCE = false;
-        if (localRankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-            localRankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        if (localRankerMode == QueryCBRCEModeEnum::kHistogramCE ||
+            localRankerMode == QueryCBRCEModeEnum::kAutomaticCE) {
             if (ce::HistogramEstimator::canEstimateInterval(*histogram, interval)) {
                 resultCard += ce::HistogramEstimator::estimateCardinality(
                     *histogram,
@@ -1430,7 +1431,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
                 fallbackToHeuristicCE = true;
             }
         }
-        if (localRankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE) {
+        if (localRankerMode == QueryCBRCEModeEnum::kHeuristicCE || fallbackToHeuristicCE) {
             SelectivityEstimate sel = estimateInterval(interval, _inputCard);
             resultCard += sel * _inputCard;
         }

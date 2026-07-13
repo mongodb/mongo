@@ -1,12 +1,17 @@
-/* Check the cardinality estimation of very simple predicates using histograms by running
-   the predicate itself and comparing the number of documents matched to the estimate.
-
-   In this test, we use distributions that allow for "perfect" histograms, that is,
-   histograms where, even with the information loss, perfect estimates can be made.
-
-   Simularily, the predicates used are those that can be estimated perfectly
-   (except for the occasional off-by-one errors)
-*/
+/**
+ * Check the cardinality estimation of very simple predicates using histograms by running
+ * the predicate itself and comparing the number of documents matched to the estimate.
+ *
+ * In this test, we use distributions that allow for "perfect" histograms, that is,
+ * histograms where, even with the information loss, perfect estimates can be made.
+ *
+ * Simularily, the predicates used are those that can be estimated perfectly
+ * (except for the occasional off-by-one errors)
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
+ */
 
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -46,6 +51,7 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "histogramCE",
             }),
         );

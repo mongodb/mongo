@@ -22,4 +22,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagCostBasedRanker: true
+        internalQueryPlanRanker: "costBased"
         internalQueryCBRCEMode: "samplingCE"

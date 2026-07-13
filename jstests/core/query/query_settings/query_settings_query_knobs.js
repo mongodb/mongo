@@ -58,7 +58,7 @@ describe("setQuerySettings with queryKnobs", function () {
     });
 
     it("Should reject unknown enum values", function () {
-        assertQueryKnobsNotSettable({planRankerMode: "notAValidPlanRankerMode"}, 12194501);
+        assertQueryKnobsNotSettable({planRanker: "notAValidPlanRankerMode"}, 12194501);
     });
 
     it("Should reject NaN knob values", function () {
@@ -91,7 +91,8 @@ describe("setQuerySettings with queryKnobs", function () {
     it("Should round trip correctly", function () {
         const queryKnobs = {
             samplingMarginOfError: 3.0,
-            planRankerMode: "histogramCE",
+            planRanker: "mixed",
+            cbrCEMode: "histogramCE",
             automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
             samplingConfidenceInterval: "99",
             samplingCEMethod: "random",
@@ -111,7 +112,11 @@ describe("setQuerySettings with queryKnobs", function () {
     it("Should coexist with other settings", function () {
         const settings = {
             queryFramework: "classic",
-            queryKnobs: {samplingMarginOfError: 5.0, planRankerMode: "samplingCE"},
+            queryKnobs: {
+                samplingMarginOfError: 5.0,
+                planRanker: "costBased",
+                cbrCEMode: "samplingCE",
+            },
         };
         const roundTrippedSettings = qsutils
             .withQuerySettings(representativeQuery, settings, () => {
@@ -126,10 +131,18 @@ describe("setQuerySettings with queryKnobs", function () {
 
     it("Should update an existing knob value without disturbing others", function () {
         const initialSettings = {
-            queryKnobs: {samplingMarginOfError: 3.0, planRankerMode: "histogramCE"},
+            queryKnobs: {
+                samplingMarginOfError: 3.0,
+                planRanker: "costBased",
+                cbrCEMode: "histogramCE",
+            },
         };
         const updateSettings = {queryKnobs: {samplingMarginOfError: 5.0}};
-        const expectedKnobs = {samplingMarginOfError: 5.0, planRankerMode: "histogramCE"};
+        const expectedKnobs = {
+            samplingMarginOfError: 5.0,
+            planRanker: "costBased",
+            cbrCEMode: "histogramCE",
+        };
         const actualKnobs = mergeQuerySettings(initialSettings, updateSettings)?.queryKnobs;
         assertEqWo(actualKnobs, expectedKnobs, {actualKnobs, expectedKnobs});
     });
@@ -148,15 +161,15 @@ describe("setQuerySettings with queryKnobs", function () {
         const initialSettings = {
             queryKnobs: {samplingMarginOfError: 3.0, samplingConfidenceInterval: "99"},
         };
-        // Remove samplingMarginOfError, update samplingConfidenceInterval, add planRankerMode.
+        // Remove samplingMarginOfError, update samplingConfidenceInterval, add planRanker.
         const updateSettings = {
             queryKnobs: {
                 samplingMarginOfError: null,
                 samplingConfidenceInterval: "95",
-                planRankerMode: "histogramCE",
+                planRanker: "costBased",
             },
         };
-        const expectedKnobs = {planRankerMode: "histogramCE", samplingConfidenceInterval: "95"};
+        const expectedKnobs = {planRanker: "costBased", samplingConfidenceInterval: "95"};
         const actualKnobs = mergeQuerySettings(initialSettings, updateSettings)?.queryKnobs;
         assertEqWo(actualKnobs, expectedKnobs, {actualKnobs, expectedKnobs});
     });

@@ -293,7 +293,7 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         return std::make_unique<SubPlanner>(makePlannerData(cachedPlanHash));
     }
 
-    if (plannerParams->cbrEnabled) {
+    if (plannerParams->isCBREnabled()) {
         return planWithCBR(opCtx, cq, plannerParams, yieldPolicy, collections, cachedPlanHash);
     }
 

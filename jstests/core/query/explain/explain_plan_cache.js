@@ -22,14 +22,11 @@
  */
 import {
     getAggPlanStage,
-    getEngine,
     getQueryPlanner,
     getRejectedPlan,
     getRejectedPlans,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
-import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 import {sbePlanCacheEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const shouldGenerateSbePlan = checkSbeFullyEnabled(db);

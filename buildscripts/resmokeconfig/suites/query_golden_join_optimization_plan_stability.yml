@@ -30,6 +30,10 @@ executor:
         # Concurrent index builds can also cause non-determinism
         # in the in-memory or on-disk representations.
         maxNumActiveUserIndexBuilds: 1
+        # Join optimization needs samplingCE for cardinality estimation
+        featureFlagCostBasedRanker: true
+        internalQueryPlanRanker: "costBased"
+        internalQueryCBRCEMode: "samplingCE"
       # Costs are sensitive to the size of the WT cache size,
       # which is computed dynamically. Set it to a fixed value to
       # ensure determinism.

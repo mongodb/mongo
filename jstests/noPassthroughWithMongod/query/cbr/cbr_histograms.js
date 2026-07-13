@@ -1,5 +1,9 @@
 /**
  * Ensure that the analyze command produces histograms which cost-based ranking is able to use.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -60,6 +64,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -126,6 +131,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -156,6 +162,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -204,6 +211,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -241,8 +249,8 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
-            internalQueryCBRCEMode: "automaticCE",
-            automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "heuristicCE",
         }),
     );
 

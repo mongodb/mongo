@@ -24,13 +24,11 @@ class PlanRankerTest : public plan_ranking::PlanRankingTestFixture {
 public:
     PlanRankerTest() : PlanRankingTestFixture(kNss) {}
 
-    std::shared_ptr<QueryPlannerParams> makePlannerParams(
-        bool cbrEnabled,
-        QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE) {
+    std::shared_ptr<QueryPlannerParams> makePlannerParams(bool cbrEnabled) {
         auto res = std::make_shared<QueryPlannerParams>(QueryPlannerParams::ArgsForTest{});
         res->mainCollectionInfo.indexes = indices;
-        res->cbrEnabled = cbrEnabled;
-        res->planRankerMode = planRankerMode;
+        res->planRanker =
+            cbrEnabled ? QueryPlanRankerEnum::kCostBased : QueryPlanRankerEnum::kMultiPlanner;
         return res;
     }
 
@@ -124,10 +122,11 @@ TEST_F(PlanRankerTest, SingleSolutionWithExplainIsCosted) {
     insertNDocuments(10);
     auto colls = getCollsAccessor();
 
+    unittest::ServerParameterGuard ceModeGuard{"internalQueryCBRCEMode", "heuristicCE"};
+
     // The fixture sets explain to kQueryPlanner by default.
     auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << 42 << "b" << 7));
-    plannerData.plannerParams =
-        makePlannerParams(/* cbrEnabled */ true, QueryPlanRankerModeEnum::kHeuristicCE);
+    plannerData.plannerParams = makePlannerParams(/* cbrEnabled */ true);
     plannerData.plannerParams->mainCollectionInfo.collStats =
         std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(10), kNss);
 

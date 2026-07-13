@@ -3,6 +3,7 @@
  * the winning plan: "cbr" when the cost-based ranker chose it, and "mp" when the multi-planner did.
  *
  * @tags: [
+ *   requires_fcv_90,
  *   requires_profiling,
  * ]
  */
@@ -10,7 +11,7 @@ import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -69,7 +70,10 @@ describe("planRanker in slow query log and profiler", function () {
             return;
         }
 
-        setCBRConfig(db, {internalQueryCBRCEMode: "samplingCE"});
+        setPlanRankerConfig(db, {
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "samplingCE",
+        });
         const {fromLog, fromProfiler} = runAndGetPlanRanker("planRankerMarkerCbr");
         assert.eq(fromLog, "cbr", "slow query log should report planRanker: cbr");
         assert.eq(fromProfiler, "cbr", "profiler should report planRanker: cbr");
@@ -77,14 +81,14 @@ describe("planRanker in slow query log and profiler", function () {
 
     it("reports 'mp' when the multi-planner chooses the winning plan", function () {
         // Disabling CBR forces the multi-planner to select the winning plan at runtime.
-        setCBRConfig(db, {featureFlagCostBasedRanker: false});
+        setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
         const {fromLog, fromProfiler} = runAndGetPlanRanker("planRankerMarkerMp");
         assert.eq(fromLog, "mp", "slow query log should report planRanker: mp");
         assert.eq(fromProfiler, "mp", "profiler should report planRanker: mp");
     });
 
     it("reports 'none' when a cached plan is used (no ranking took place)", function () {
-        setCBRConfig(db, {featureFlagCostBasedRanker: false});
+        setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
 
         const predicate = {a: 1, b: 6};
         coll.getPlanCache().clear();
@@ -118,7 +122,7 @@ describe("planRanker in slow query log and profiler", function () {
     });
 
     it("reports 'none' when only one candidate plan exists (no ranking needed)", function () {
-        setCBRConfig(db, {featureFlagCostBasedRanker: false});
+        setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
         coll.getPlanCache().clear();
 
         // Field 'c' has no index, so the planner produces only a COLLSCAN — a single candidate.

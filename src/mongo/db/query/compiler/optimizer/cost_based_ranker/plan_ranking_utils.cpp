@@ -126,8 +126,7 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
             .canonicalQuery = *cq,
             .collections = collectionsAccessor,
             .plannerOptions = QueryPlannerParams::DEFAULT,
-            .cbrEnabled = true,
-            .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
+            .planRanker = QueryPlanRankerEnum::kCostBased,
         },
     };
 
@@ -150,7 +149,8 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                                samplingEstimator.get(),
                                                nullptr,
                                                std::move(statusWithMultiPlanSolns.getValue()),
-                                               *cq);
+                                               *cq,
+                                               QueryCBRCEModeEnum::kSamplingCE);
     double planTimeMS = planningTimer.elapsed().count() / 1000.0;
 
     if (timeProfile.has_value()) {

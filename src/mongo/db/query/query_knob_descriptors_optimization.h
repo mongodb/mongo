@@ -244,10 +244,14 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          internalEnablePipelineOptimizationAdditionalTestingRules,                        \
          getEnablePipelineOptimizationAdditionalTestingRules)                             \
     /* cpp_class enum knobs */                                                            \
-    KNOB(kPlanRankerMode,                                                                 \
+    KNOB(kPlanRanker,                                                                     \
+         kInternalQueryPlanRankerName,                                                    \
+         QueryPlanRanker,                                                                 \
+         getPlanRanker)                                                                   \
+    KNOB(kCBRCEMode,                                                                      \
          kInternalQueryCBRCEModeName,                                                     \
-         QueryPlanRankerMode,                                                             \
-         getPlanRankerMode)                                                               \
+         QueryCBRCEMode,                                                                  \
+         getCBRCEMode)                                                                    \
     KNOB(kPlanRankingStrategyForAutomaticQueryPlanRankerMode,                             \
          kAutomaticCEPlanRankingStrategyName,                                             \
          QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode,                         \

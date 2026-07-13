@@ -34,6 +34,8 @@ selector:
     - jstests/core/index/index_filter_commands.js
     - jstests/core/query/explain/explain_multi_plan_count.js
     - jstests/sharding/query/explain/explain_find_transformed_query.js
+    # TODO SERVER-100610: CBR picks plan without blocking sort, but test asserts on a plan with sort.
+    - jstests/core/query/sort/sort_array.js
     # Plan cache failures unrelated to Join Optimization
     - jstests/**/plan_cache/**/*.js
     - jstests/sharding/query/sbe_plan_cache_does_not_block_range_deletion.js
@@ -57,3 +59,7 @@ executor:
         internalEnableJoinOptimization: true
         # Path arrayness is required for join optimization.
         featureFlagPathArrayness: true
+        # Join optimization needs samplingCE for cardinality estimation
+        featureFlagCostBasedRanker: true
+        internalQueryPlanRanker: "costBased"
+        internalQueryCBRCEMode: "samplingCE"

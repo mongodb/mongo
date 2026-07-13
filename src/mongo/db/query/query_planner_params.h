@@ -13,7 +13,9 @@
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -227,8 +229,7 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
         const MultipleCollectionAccessor& collections;
         size_t plannerOptions = DEFAULT;
         boost::optional<TraversalPreference> traversalPreference = boost::none;
-        bool cbrEnabled = false;
-        QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
+        QueryPlanRankerEnum planRanker = QueryPlanRankerEnum::kMixed;
     };
 
     /**
@@ -276,8 +277,11 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
     explicit QueryPlannerParams(ArgsForSingleCollectionQuery&& args)
         : providedOptions(args.plannerOptions),
           traversalPreference(std::move(args.traversalPreference)),
-          cbrEnabled(args.cbrEnabled),
-          planRankerMode(args.planRankerMode) {
+          planRanker(args.planRanker) {
+        // TODO: SERVER-129697: Remove when the featureFlagCostBasedRanker is removed.
+        if (!feature_flags::gFeatureFlagCostBasedRanker.checkEnabled()) {
+            planRanker = QueryPlanRankerEnum::kMultiPlanner;
+        }
         mainCollectionInfo.options = args.plannerOptions;
         if (!args.collections.hasMainCollection()) {
             return;
@@ -286,14 +290,17 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
         // histogramCE will cause queries to fail if the query contains a predicate on a field
         // without a histogram. We don't create histograms on internal collections. To prevent such
         // queries from failing, we use multiplanning in this case.
-        if (cbrEnabled && planRankerMode == QueryPlanRankerModeEnum::kHistogramCE &&
+        // TODO SERVER-127563 : Verify this check when HistogramCEWithHeuristicFallback is removed.
+        if (isCBREnabled() &&
+            args.canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getCBRCEMode() ==
+                QueryCBRCEModeEnum::kHistogramCE &&
             args.canonicalQuery.nss().dbName().isInternalDb()) {
-            cbrEnabled = false;
+            planRanker = QueryPlanRankerEnum::kMultiPlanner;
         }
         fillOutPlannerParamsForExpressQuery(
             args.opCtx, args.canonicalQuery, args.collections.getMainCollection());
         fillOutMainCollectionPlannerParams(
-            args.opCtx, args.canonicalQuery, args.collections, args.cbrEnabled);
+            args.opCtx, args.canonicalQuery, args.collections, isCBREnabled());
     }
 
     /**
@@ -324,6 +331,9 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
 
     explicit QueryPlannerParams(ArgsForTest&& args) {
         mainCollectionInfo.options = DEFAULT;
+        // ArgsForTest does not populate collStats or other CBR infrastructure, so CBR code
+        // paths must not be triggered.
+        planRanker = QueryPlanRankerEnum::kMultiPlanner;
     }
 
     QueryPlannerParams(const QueryPlannerParams&) = delete;
@@ -396,8 +406,11 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
     // Were query settings applied?
     bool querySettingsApplied{false};
 
-    bool cbrEnabled{false};
-    QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
+    QueryPlanRankerEnum planRanker{QueryPlanRankerEnum::kMixed};
+
+    bool isCBREnabled() const {
+        return planRanker != QueryPlanRankerEnum::kMultiPlanner;
+    }
 
     struct ReplanningData {
         std::string replanReason;

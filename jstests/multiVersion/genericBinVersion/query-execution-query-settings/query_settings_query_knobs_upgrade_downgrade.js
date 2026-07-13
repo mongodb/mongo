@@ -18,7 +18,7 @@ import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const findKnobs = {samplingMarginOfError: 3.0, planRankerMode: "histogramCE"};
+const findKnobs = {samplingMarginOfError: 3.0, cbrCEMode: "histogramCE"};
 const aggKnobs = {samplingConfidenceInterval: "99", samplingCEMethod: "random"};
 
 function setFCV(db, version) {

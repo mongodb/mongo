@@ -111,7 +111,8 @@ public:
         ce::SamplingEstimator* samplingEstimator,
         const ce::ExactCardinalityEstimator* exactCardinality,
         std::vector<std::unique_ptr<QuerySolution>> allSoln,
-        const CanonicalQuery& query);
+        const CanonicalQuery& query,
+        QueryCBRCEModeEnum ceMode);
 
     /**
      * Generates and returns a query solution, given data retrieved from the plan cache.

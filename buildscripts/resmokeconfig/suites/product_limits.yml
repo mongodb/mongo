@@ -27,3 +27,7 @@ executor:
         internalEnableJoinOptimization: true
         # Required for join optimization
         featureFlagPathArrayness: true
+        # Join optimization needs samplingCE for cardinality estimation
+        featureFlagCostBasedRanker: true
+        internalQueryPlanRanker: "costBased"
+        internalQueryCBRCEMode: "samplingCE"

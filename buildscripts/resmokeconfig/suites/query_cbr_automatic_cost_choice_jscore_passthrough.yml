@@ -60,6 +60,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagCostBasedRanker: true
-        internalQueryCBRCEMode: "automaticCE"
+        internalQueryPlanRanker: "mixed"
+        internalQueryCBRCEMode: "samplingCE"
         automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice"
         internalQuerySamplingBySequentialScan: true

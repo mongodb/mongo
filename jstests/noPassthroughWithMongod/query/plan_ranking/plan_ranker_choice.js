@@ -14,9 +14,9 @@ import {
     PlanRankerReason,
 } from "jstests/libs/query/analyze_plan.js";
 import {
-    getCBRConfig,
     getExpectedWorksPerPlan,
     getMultiplanningBatchSize,
+    getPlanRankerConfig,
 } from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {LcgRandom} from "jstests/libs/lcg_random.js";
@@ -120,12 +120,13 @@ function checkRanker({
 populateCollection("100", 100, nFields, compoundIndexes);
 populateCollection("20k", 20000, nFields, compoundIndexes);
 
-const prevCBRConfig = getCBRConfig(db);
+const prevCBRConfig = getPlanRankerConfig(db);
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
         automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
     }),
 );
@@ -421,7 +422,8 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
-            internalQueryCBRCEMode: "automaticCE",
+            internalQueryPlanRanker: "mixed",
+            internalQueryCBRCEMode: "samplingCE",
             automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
         }),
     );
@@ -522,6 +524,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
         }),
     );
@@ -561,6 +564,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: prevCBRConfig.featureFlagCostBasedRanker,
+            internalQueryPlanRanker: prevCBRConfig.internalQueryPlanRanker,
             internalQueryCBRCEMode: prevCBRConfig.internalQueryCBRCEMode,
             automaticCEPlanRankingStrategy: prevCBRConfig.automaticCEPlanRankingStrategy,
         }),

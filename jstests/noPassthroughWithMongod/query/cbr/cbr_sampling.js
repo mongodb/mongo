@@ -1,5 +1,9 @@
 /**
  * Test that cost-based ranking can use sampling to estimate filters.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {
@@ -8,7 +12,7 @@ import {
     getWinningPlanFromExplain,
     isCollscan,
 } from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -67,7 +71,7 @@ function assertAllPlansUseSampling(query, ce, allowedSources = ["Sampling"]) {
     });
 }
 
-const prevCBRConfig = getCBRConfig(db);
+const prevPlanRankerConfig = getPlanRankerConfig(db);
 const prevSamplingConfig = assert.commandWorked(
     db.adminCommand({
         getParameter: 1,
@@ -83,6 +87,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
         }),
     );
@@ -180,8 +185,9 @@ try {
     // exact count requested via the override.
     {
         const overrideSize = 50;
-        setCBRConfig(db, {
+        setPlanRankerConfig(db, {
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
             internalSamplingSizeOverride: overrideSize,
         });
@@ -195,8 +201,9 @@ try {
             "sampleRequestedDocCount should match internalSamplingSizeOverride",
             {meta},
         );
-        setCBRConfig(db, {
+        setPlanRankerConfig(db, {
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
             internalSamplingSizeOverride: 0,
         });
@@ -362,7 +369,7 @@ try {
         exactZeroColl.drop();
     }
 } finally {
-    setCBRConfig(db, prevCBRConfig);
+    setPlanRankerConfig(db, prevPlanRankerConfig);
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,

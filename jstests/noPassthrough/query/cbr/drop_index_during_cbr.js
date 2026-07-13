@@ -1,11 +1,15 @@
 /**
  * Dropping an index during a yield that happens during the CBR sampling query must produce
  * QueryPlanKilled.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getEngine, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
-import {isPlanCosted, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {isPlanCosted, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
@@ -33,16 +37,19 @@ import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
     assert.commandWorked(coll.insertMany(docs));
     assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
-    function runTestHelper(ceMode, autoStrategy, findFilter) {
+    function runTestHelper(planRanker, autoStrategy, findFilter) {
         jsTest.log.info(
-            `Running drop-index-during-CBR test: ceMode=${ceMode}, autoStrategy=${autoStrategy}, filter=${tojson(findFilter)}`,
+            `Running drop-index-during-CBR test: planRanker=${planRanker}, autoStrategy=${autoStrategy}, filter=${tojson(findFilter)}`,
         );
 
-        const cbrConfig = {internalQueryCBRCEMode: ceMode};
+        const cbrConfig = {
+            internalQueryPlanRanker: planRanker,
+            internalQueryCBRCEMode: "samplingCE",
+        };
         if (autoStrategy !== null) {
             cbrConfig.automaticCEPlanRankingStrategy = autoStrategy;
         }
-        setCBRConfig(db, cbrConfig);
+        setPlanRankerConfig(db, cbrConfig);
 
         // Pause just before generateSample() so we can set setYieldAllLocksHang after any multiplanning
         // trial phase has already completed. This ensures the subsequent setYieldAllLocksHang fires
@@ -83,22 +90,24 @@ import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
         assert.commandWorked(coll.createIndex({a: 1}));
     }
 
-    function runTest(ceMode, autoStrategy) {
+    function runTest(planRanker, autoStrategy) {
         const andFilter = {a: {$gte: 14999}, b: {$gte: 14999}};
         // Implicit AND: non-subplanning path (multiplanner then CBR sampling via cbr_plan_ranking.cpp).
-        runTestHelper(ceMode, autoStrategy, andFilter);
+        runTestHelper(planRanker, autoStrategy, andFilter);
 
         // Rooted $or: subplanning path. kSamplingCE calls generateSample() directly from
         // SubplanStage::pickBestPlan. kAutomaticCE delegates branch selection to the multiplanner
         // instead, so generateSample() is not reached on this path and this test does not apply.
-        if (ceMode === "samplingCE") {
-            runTestHelper(ceMode, autoStrategy, {$or: [{a: {$gte: 14999}}, {b: {$gte: 14999}}]});
+        if (planRanker === "costBased") {
+            runTestHelper(planRanker, autoStrategy, {
+                $or: [{a: {$gte: 14999}}, {b: {$gte: 14999}}],
+            });
         }
     }
 
-    runTest("samplingCE", null);
-    runTest("automaticCE", "CBRForNoMultiplanningResults");
-    runTest("automaticCE", "CBRCostBasedRankerChoice");
+    runTest("costBased", null);
+    runTest("mixed", "CBRForNoMultiplanningResults");
+    runTest("mixed", "CBRCostBasedRankerChoice");
 
     MongoRunner.stopMongod(conn);
 }
@@ -114,6 +123,7 @@ if (!checkSbeCompletelyDisabled(null)) {
         setParameter: {
             featureFlagGetExecutorDeferredEngineChoice: true,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQuerySamplingBySequentialScan: true,
             // Yield after every document so we reliably hit a yield window in the sampling query.
             internalQueryExecYieldIterations: 1,
@@ -206,7 +216,10 @@ if (!checkSbeCompletelyDisabled(null)) {
     assert.commandWorked(
         primaryAdminDB.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 0}),
     );
-    setCBRConfig(primaryAdminDB, {internalQueryCBRCEMode: "samplingCE"});
+    setPlanRankerConfig(primaryAdminDB, {
+        internalQueryPlanRanker: "costBased",
+        internalQueryCBRCEMode: "samplingCE",
+    });
 
     const snapshotDB = primary.getDB("snapshotCBRTest");
     const snapshotColl = snapshotDB["snapshotCBRTest"];

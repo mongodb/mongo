@@ -11,7 +11,7 @@
 import {after, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = jsTestName();
@@ -23,11 +23,14 @@ const rst = new ReplSetTest({
         setParameter: {
             featureFlagCostBasedRanker: true,
             featureFlagPersistentStats: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
             internalQuerySamplingCEMethod: "random",
             internalQuerySamplingBySequentialScan: false,
             // Explicitly disable for variants that enable this.
             internalQuerySamplingByStrides: false,
+            // TODO SERVER-117707: remove once CBR supports SBE.
+            internalQueryFrameworkControl: "forceClassicEngine",
         },
     },
 });
@@ -189,7 +192,7 @@ describe("analyze sample on replica sets", function () {
     });
 
     // TODO SERVER-92589: Remove once CBR supports SBE.
-    if (checkSbeFullyEnabled(primaryDB)) {
+    if (checkSbeRestrictedOrFullyEnabled(primaryDB)) {
         jsTest.log.info(`Skipping remaining tests: ${jsTestName()}: CBR does not support SBE`);
         rst.stopSet();
         quit();

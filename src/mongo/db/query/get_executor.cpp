@@ -392,7 +392,7 @@ public:
                                                  getCollections(),
                                                  makePlannerData(),
                                                  usingClassic());
-        if (_plannerParams->cbrEnabled && rankerResult.isOK() &&
+        if (_plannerParams->isCBREnabled() && rankerResult.isOK() &&
             !rankerResult.getValue().solutions.empty()) {
             // The plan ranker will place the best plan at index 0.
             captureCardinalityEstimationMethodForQueryStats(
@@ -1030,9 +1030,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                 .collections = collections,
                 .plannerOptions = options,
                 .traversalPreference = traversalPreference,
-                .cbrEnabled = cq.getExpCtx()->getIfrContext()->getSavedFlagValue(
-                    feature_flags::gFeatureFlagCostBasedRanker),
-                .planRankerMode = cq.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
+                .planRanker = cq.getExpCtx()->getQueryKnobConfiguration().getPlanRanker(),
             });
         result->replanningData = std::move(replanningData);
         return result;
@@ -1244,9 +1242,7 @@ auto makeQueryPlannerParamsFactory(OperationContext* opCtx,
                 .canonicalQuery = cq,
                 .collections = collections,
                 .plannerOptions = plannerOptions,
-                .cbrEnabled = cq.getExpCtx()->getIfrContext()->getSavedFlagValue(
-                    feature_flags::gFeatureFlagCostBasedRanker),
-                .planRankerMode = cq.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
+                .planRanker = cq.getExpCtx()->getQueryKnobConfiguration().getPlanRanker(),
             });
         result->replanningData = std::move(replanningData);
         return result;

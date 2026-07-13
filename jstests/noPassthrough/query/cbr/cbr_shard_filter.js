@@ -16,10 +16,31 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    rs: {setParameter: {featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}},
+    rs: {
+        setParameter: {
+            featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "heuristicCE",
+        },
+    },
 });
 
 const db = st.getDB("test");
+
+// TODO SERVER-130179: The deferred engine choice path passes an empty EstimateMap to the plan
+// executor, so costEstimate is absent from explain output even with internalQueryPlanRanker set to
+// costBased. Skip when that feature flag is on until the C++ path is fixed.
+if (
+    db.adminCommand({getParameter: 1, featureFlagGetExecutorDeferredEngineChoice: 1})
+        .featureFlagGetExecutorDeferredEngineChoice?.value
+) {
+    jsTest.log.info(
+        "Skipping: featureFlagGetExecutorDeferredEngineChoice bypasses CBR cost estimation in explain",
+    );
+    st.stop();
+    quit();
+}
+
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();

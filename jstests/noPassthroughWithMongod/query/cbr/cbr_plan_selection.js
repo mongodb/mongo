@@ -1,7 +1,11 @@
-/*
+/**
  * Test that, in the presence of multiple plans and perfect histograms, CBR is able to select
  * the intuitively best plan to answer simple common queries. The invariants tested in this
  * test should hold regardless of any future calibration of the constants in the cost model.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {
@@ -69,6 +73,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );

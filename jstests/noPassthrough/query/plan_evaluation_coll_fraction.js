@@ -1,7 +1,7 @@
 /**
  * Tests the behavior of the internalQueryPlanTotalEvaluationCollFraction parameter.
  */
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRanker} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {describe, it, beforeEach, after} from "jstests/libs/mochalite.js";
 
@@ -115,15 +115,17 @@ function getStoppingCondition(collFraction, limit = 0) {
     };
 }
 
-const planRankerMode = getPlanRankerMode(db);
+const planRanker = getPlanRanker(db);
 describe("MultiPlanner exit condition metrics get updated correctly", function () {
     beforeEach(function () {
         setUpCollection();
         resetKnobsForTest();
     });
 
-    if (planRankerMode === "automaticCE" && !sbeFeatureFlagFullEnabled) {
-        describe("automaticCE (CBR) mode", function () {
+    if (planRanker === "costBased") {
+        throw new Error(`This test does not support planRanker=costBased`);
+    } else if (planRanker === "mixed" && !sbeFeatureFlagFullEnabled) {
+        describe("Mixed plan ranker", function () {
             describe("fallback to CBR", function () {
                 it("does not update multi-planner metrics when plan cache is disabled", function () {
                     // We do not measure works for the chosen CBR plan, so MP metrics must not change.
@@ -241,8 +243,8 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
             });
         });
     } else {
-        // planRankerMode == "multiPlanning" or SBE is enabled
-        describe("multiPlanning mode (no CBR)", function () {
+        // planRanker == "multiPlanning" or SBE is enabled
+        describe("multiPlanner (no CBR)", function () {
             it("records hitWorksLimit for low collFraction", function () {
                 // With a low total collection fraction, multiplanning should stop due to works limit.
                 assert.docEq(

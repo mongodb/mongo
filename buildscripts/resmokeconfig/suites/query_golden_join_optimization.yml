@@ -32,6 +32,10 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalEnableJoinOptimization: true
+        # Join optimization needs samplingCE for cardinality estimation
+        featureFlagCostBasedRanker: true
+        internalQueryPlanRanker: "costBased"
+        internalQueryCBRCEMode: "samplingCE"
         # Path arrayness is required for join optimization.
         featureFlagPathArrayness: true
         internalQuerySamplingBySequentialScan: true

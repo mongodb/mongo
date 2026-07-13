@@ -1,4 +1,5 @@
 // @tags: [
+//   requires_fcv_90,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   requires_getmore,
@@ -10,7 +11,7 @@
  * Tests for sorting documents by fields that contain arrays.
  */
 import {aggPlanHasStage, isQueryPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 
 let coll = db.jstests_array_sort;
 
@@ -92,8 +93,16 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.insert({_id: 0, a: [3, 0, 1]}));
 assert.commandWorked(coll.insert({_id: 1, a: [0, 4, -1]}));
 
+function isHeuristicCE() {
+    const config = getPlanRankerConfig(db);
+    return (
+        config.internalQueryPlanRanker == "costBased" &&
+        config.internalQueryCBRCEMode == "heuristicCE"
+    );
+}
+
 // Descending sort, in the presence of an index.
-if (getPlanRankerMode(db) != "heuristicCE") {
+if (!isHeuristicCE()) {
     testAggAndFindSort({
         filter: {a: {$gte: 2}},
         sort: {a: -1},
@@ -200,7 +209,7 @@ testAggAndFindSort({
 });
 
 // Since there are bounds on "x.y" this index cannot provide the sort.
-if (getPlanRankerMode(db) != "heuristicCE") {
+if (!isHeuristicCE()) {
     testAggAndFindSort({
         filter: {"x.y": 1},
         sort: {"x.y": -1},

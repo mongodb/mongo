@@ -3,6 +3,7 @@
  * histogram-based plan ranking.
  *
  * @tags: [
+ *    requires_fcv_90,
  *    query_intensive_pbt,
  *    # Runs queries that may return many results, requiring getmores.
  *    requires_getmore,
@@ -59,6 +60,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );

@@ -27,7 +27,8 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
 
 // Maps PQS wire name → server parameter name.
 const kWireNameToServerParam = {
-    planRankerMode: "internalQueryCBRCEMode",
+    planRanker: "internalQueryPlanRanker",
+    cbrCEMode: "internalQueryCBRCEMode",
     automaticCEPlanRankingStrategy: "automaticCEPlanRankingStrategy",
     samplingConfidenceInterval: "samplingConfidenceInterval",
     samplingMarginOfError: "samplingMarginOfError",
@@ -36,7 +37,8 @@ const kWireNameToServerParam = {
 };
 
 const kPqsKnobsDefaults = {
-    planRankerMode: "automaticCE",
+    planRanker: "mixed",
+    cbrCEMode: "samplingCE",
     automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
     samplingConfidenceInterval: "95",
     samplingMarginOfError: 5.0,
@@ -45,7 +47,8 @@ const kPqsKnobsDefaults = {
 };
 
 const kPqsKnobsNonDefault = {
-    planRankerMode: "heuristicCE",
+    planRanker: "costBased",
+    cbrCEMode: "heuristicCE",
     automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
     samplingConfidenceInterval: "90",
     samplingMarginOfError: 2.5,

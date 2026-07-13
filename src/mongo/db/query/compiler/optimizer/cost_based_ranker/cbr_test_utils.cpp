@@ -228,7 +228,7 @@ IndexBounds makeRangeIntervalBounds(const BSONObj& range,
 
 CEResult getPlanCE(const QuerySolution& plan,
                    const CollectionInfo& collInfo,
-                   QueryPlanRankerModeEnum ceMode) {
+                   QueryCBRCEModeEnum ceMode) {
     EstimateMap qsnEstimates;
     CardinalityEstimator estimator{collInfo, nullptr /*samplingEstimator*/, qsnEstimates, ceMode};
     return estimator.estimatePlan(plan);
@@ -240,13 +240,13 @@ CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCar
 }
 
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, const CollectionInfo& collInfo) {
-    const auto ceRes = getPlanCE(plan, collInfo, QueryPlanRankerModeEnum::kHeuristicCE);
+    const auto ceRes = getPlanCE(plan, collInfo, QueryCBRCEModeEnum::kHeuristicCE);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();
 }
 
 CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const CollectionInfo& collInfo) {
-    const auto ceRes = getPlanCE(plan, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
+    const auto ceRes = getPlanCE(plan, collInfo, QueryCBRCEModeEnum::kHistogramCE);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();
 }
@@ -257,7 +257,7 @@ CardinalityEstimate getPlanSamplingCE(const QuerySolution& plan,
     EstimateMap qsnEstimates;
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
     CardinalityEstimator estimator{
-        collInfo, samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        collInfo, samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
     const auto ceRes = estimator.estimatePlan(plan);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();

@@ -106,18 +106,14 @@ StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
     CBRPlanRankingStrategy cbrStrategy;
-    auto origMode =
-        std::exchange(plannerParams.planRankerMode, QueryPlanRankerModeEnum::kSamplingCE);
-    auto result = cbrStrategy.rankPlans(opCtx,
-                                        query,
-                                        plannerParams,
-                                        yieldPolicy,
-                                        collections,
-                                        std::move(solutions),
-                                        std::move(topLevelSampleFieldNames),
-                                        hasRelevantMultikeyIndex);
-    plannerParams.planRankerMode = origMode;
-    return result;
+    return cbrStrategy.rankPlans(opCtx,
+                                 query,
+                                 plannerParams,
+                                 yieldPolicy,
+                                 collections,
+                                 std::move(solutions),
+                                 std::move(topLevelSampleFieldNames),
+                                 hasRelevantMultikeyIndex);
 }
 
 // TODO SERVER-117372. Populate explains output.
@@ -187,7 +183,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         // We choose MP in order to avoid planning time regressions.
         // Choosing MP due to full batch may miss good plans due to data skew or blocking plans.
         LOGV2_INFO(11306807,
-                   "AutomaticCE chooses MP (1)",
+                   "Mixed plan ranker chooses MP (1)",
                    "Reason"_attr = " because of EOF or full batch");
         return getBestMPPlan(opCtx, mp);
     }
@@ -201,7 +197,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     auto estResWithStatus = mp.estimateAllPlans();
     if (!estResWithStatus.isOK()) {
         LOGV2_INFO(12023300,
-                   "AutomaticCE chooses MP (2)",
+                   "Mixed plan ranker chooses MP (2)",
                    "Reason"_attr = " because plan contains inestimable node(s)");
         return getBestMPPlan(opCtx,
                              mp,
@@ -215,7 +211,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
             numResultsMP > estRes.bestPlanNumResults);
 
     LOGV2_INFO(11093900,
-               "AutomaticCE begin: ",
+               "Mixed plan ranker begin: ",
                "numWorksPerPlanMP"_attr = numWorksPerPlanMP,
                "numResultsMP"_attr = numResultsMP,
                "numWorksPerPlanEst"_attr = numWorksPerPlanEst,
@@ -229,7 +225,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const double minProductivityForMP = static_cast<double>(numResultsMP) / numWorksPerPlanMP;
     if (estRes.bestPlanProductivity <= minProductivityForMP) {
         LOGV2_INFO(11306804,
-                   "AutomaticCE chooses CBR (3)",
+                   "Mixed plan ranker chooses CBR (3)",
                    "Reason"_attr = "very low productivity",
                    "Condition"_attr = "estRes.bestPlanProductivity < minProductivityForMP",
                    "minProductivityForMPAdjusted"_attr = minProductivityForMP,
@@ -272,7 +268,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
 
     if (maxAchievableImprovementRatio < minRequiredImprovementRatio) {
         LOGV2_INFO(11306802,
-                   "AutomaticCE chooses MP (4)",
+                   "Mixed plan ranker chooses MP (4)",
                    "Reason"_attr = "the required improvement is not achievable",
                    "Condition"_attr =
                        "maxAchievableImprovementRatio < minRequiredImprovementRatio");
@@ -284,7 +280,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     }
 
     // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
-    LOGV2_INFO(11306800, "AutomaticCE chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
+    LOGV2_INFO(
+        11306800, "Mixed plan ranker chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
     mp.emitAccumulatedStats();
     return getBestCBRPlan(opCtx,
                           query,

@@ -11,7 +11,7 @@
  */
 
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
@@ -66,12 +66,13 @@ function getWinningPlanMetadata(query, expectedCeSource = "Sampling") {
     return meta;
 }
 
-const prevCBRConfig = getCBRConfig(db);
+const prevPlanRankerConfig = getPlanRankerConfig(db);
 const prevSamplingConfig = PersistentSamplesUtils.getPersistentSamplesConfig(db);
 
 try {
-    setCBRConfig(db, {
+    setPlanRankerConfig(db, {
         featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
         internalQueryCBRCEMode: "samplingCE",
     });
     assert.commandWorked(
@@ -468,7 +469,7 @@ try {
         );
     }
 } finally {
-    setCBRConfig(db, prevCBRConfig);
+    setPlanRankerConfig(db, prevPlanRankerConfig);
     PersistentSamplesUtils.setPersistentSamplesConfig(db, prevSamplingConfig);
     MongoRunner.stopMongod(conn);
 }

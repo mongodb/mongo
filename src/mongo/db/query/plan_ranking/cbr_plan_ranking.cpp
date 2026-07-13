@@ -100,6 +100,11 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
 
     size_t numSolutions = solutions.size();
 
+    // Make sure to use samplingCE when called from Mixed plan ranker.
+    QueryCBRCEModeEnum ceMode = plannerParams.planRanker == QueryPlanRankerEnum::kMixed
+        ? QueryCBRCEModeEnum::kSamplingCE
+        : query.getExpCtx()->getQueryKnobConfiguration().getCBRCEMode();
+
     const bool isTrivialQuery = isTriviallyEstimable(query);
 
     if (isTrivialQuery && !hasRelevantMultikeyIndex) {
@@ -108,11 +113,11 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         // We restrict this optimization to plans with no relevant multikey
         // indices, as we cannot estimate the number of keys a multikey index
         // scan would scan without sampling.
-        plannerParams.planRankerMode = QueryPlanRankerModeEnum::kHeuristicCE;
+        ceMode = QueryCBRCEModeEnum::kHeuristicCE;
     }
 
-    if (plannerParams.planRankerMode == QueryPlanRankerModeEnum::kAutomaticCE ||
-        plannerParams.planRankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    // TODO SERVER-127563: Remove AutomaticCE when HistogramCEWithHeuristicFallback is removed.
+    if (ceMode == QueryCBRCEModeEnum::kAutomaticCE || ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         auto meTopLevelFields =
             ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
         topLevelSampleFieldNames.merge(meTopLevelFields);
@@ -128,11 +133,12 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
 
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
     std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
-    if (plannerParams.planRankerMode == QueryPlanRankerModeEnum::kExactCE) {
+    if (ceMode == QueryCBRCEModeEnum::kExactCE) {
         exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
             collections.getMainCollectionAcquisition(), query, opCtx);
-    } else if (plannerParams.planRankerMode == QueryPlanRankerModeEnum::kAutomaticCE ||
-               plannerParams.planRankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        // TODO SERVER-127563: Remove AutomaticCE when HistogramCEWithHeuristicFallback is removed.
+    } else if (ceMode == QueryCBRCEModeEnum::kAutomaticCE ||
+               ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
             query,
             CardinalityEstimate{
@@ -166,7 +172,8 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
                                                                     samplingEstimator.get(),
                                                                     exactCardinality.get(),
                                                                     std::move(solutions),
-                                                                    query);
+                                                                    query,
+                                                                    ceMode);
 
     // Calculate duration for server status metrics
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);

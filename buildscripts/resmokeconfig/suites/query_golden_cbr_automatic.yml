@@ -25,6 +25,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagCostBasedRanker: true
-        internalQueryCBRCEMode: "automaticCE"
+        internalQueryPlanRanker: "mixed"
+        internalQueryCBRCEMode: "samplingCE"
         # We also have automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
         # see above.

@@ -25,6 +25,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -294,6 +295,40 @@ TEST_F(QueryPlannerParamsTest, isComponentOfProjectionMultikeyWithMetadata) {
         indexKey, true, multikeyInfo, "a", projectionFields, true));
     ASSERT_TRUE(isAnyComponentOfPathOrProjectionMultikey(
         indexKey, true, multikeyInfo, "b.c", projectionFields, false));
+}
+
+// ---------------------------------------------------------------------------
+// planRanker feature flag enforcement in ArgsForSingleCollectionQuery constructor
+// ---------------------------------------------------------------------------
+
+// When gFeatureFlagCostBasedRanker is disabled the constructor must override any configured
+// planRanker back to kMultiPlanner, regardless of what was passed in args.
+TEST_F(QueryPlannerParamsTest, PlanRankerForcedToMultiPlannerWhenFlagDisabled) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagCostBasedRanker", false};
+    auto cq = canonicalize("{}", "{}", "{}");
+    QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
+        .opCtx = _opCtx.get(),
+        .canonicalQuery = *cq,
+        .collections = MultipleCollectionAccessor{},
+        .plannerOptions = QueryPlannerParams::DEFAULT,
+        .planRanker = QueryPlanRankerEnum::kCostBased,
+    });
+    ASSERT_EQ(params.planRanker, QueryPlanRankerEnum::kMultiPlanner);
+    ASSERT_FALSE(params.isCBREnabled());
+}
+
+// When gFeatureFlagCostBasedRanker is enabled the configured planRanker is left untouched.
+TEST_F(QueryPlannerParamsTest, PlanRankerPreservedWhenFlagEnabled) {
+    auto cq = canonicalize("{}", "{}", "{}");
+    QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
+        .opCtx = _opCtx.get(),
+        .canonicalQuery = *cq,
+        .collections = MultipleCollectionAccessor{},
+        .plannerOptions = QueryPlannerParams::DEFAULT,
+        .planRanker = QueryPlanRankerEnum::kCostBased,
+    });
+    ASSERT_EQ(params.planRanker, QueryPlanRankerEnum::kCostBased);
+    ASSERT_TRUE(params.isCBREnabled());
 }
 
 }  // namespace

@@ -1,6 +1,10 @@
 /**
  * This test asserts that the logic in the CBR sampling estimator for determining if a document val
  * is within the index bounds is correct when the index intervals are ascending or descending.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -18,6 +22,7 @@ assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
         internalQueryCBRCEMode: "samplingCE",
     }),
 );

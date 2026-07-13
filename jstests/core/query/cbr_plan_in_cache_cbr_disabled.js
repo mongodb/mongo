@@ -13,7 +13,8 @@
  *   assumes_no_implicit_index_creation,
  *   # This test relies on $planCacheStats which must be the first stage in the pipeline
  *   exclude_from_timeseries_crud_passthrough,
- *   # Uses internalSamplingSizeOverride via cbr_utils.js, added in 9.0
+ *   # Uses internalSamplingSizeOverride via cbr_utils.js,
+ *   # internalQueryPlanRanker and related knobs that require FCV 9.0
  *   requires_fcv_90,
  *   # Aggregation stage $planCacheStats cannot run within a multi-document transaction.
  *   does_not_support_transactions,
@@ -24,7 +25,10 @@
  */
 
 import {getCachedPlanForQuery} from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, setCBRConfigOnAllNonConfigNodes} from "jstests/libs/query/cbr_utils.js";
+import {
+    getPlanRankerConfig,
+    setPlanRankerConfigOnAllNonConfigNodes,
+} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 if (checkSbeFullyEnabled(db)) {
@@ -65,11 +69,11 @@ function checkPlanCacheForQuery(targetColl, query, pickedByCBR) {
     assert.eq(entry.candidatePlanScores.length, pickedByCBR ? 1 : 2, entry);
 }
 
-const prevCBRConfig = getCBRConfig(db);
+const prevPlanRankerConfig = getPlanRankerConfig(db);
 
 try {
     // Ensure CBR is enabled.
-    setCBRConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: true});
+    setPlanRankerConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: true});
 
     coll.drop();
     const docs = [...baseDocs];
@@ -92,7 +96,7 @@ try {
     checkPlanCacheForQuery(coll, aIndexQuery, true /* pickedByCBR */);
 
     // Disable CBR and run a followup query.
-    setCBRConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: false});
+    setPlanRankerConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: false});
 
     // This query would use the existing plan cache entry. Assert that it succeeds.
     let res = coll.find(aIndexQuery).toArray();
@@ -153,14 +157,14 @@ try {
     assert.commandWorked(dropTestColl.insertMany(baseDocs));
 
     // Enable CBR and populate the cache with a CBR-chosen plan for aIndexQuery.
-    setCBRConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: true});
+    setPlanRankerConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: true});
     dropTestColl.find(aIndexQuery).toArray();
     dropTestColl.find(aIndexQuery).toArray();
 
     checkPlanCacheForQuery(dropTestColl, aIndexQuery, true /* pickedByCBR */);
 
     // Disable CBR before dropping the index.
-    setCBRConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: false});
+    setPlanRankerConfigOnAllNonConfigNodes(db, {featureFlagCostBasedRanker: false});
 
     // Drop one of the indexes, resulting in the entire plan cache clearing.
     assert.commandWorked(dropTestColl.dropIndex({a: 1}));
@@ -176,5 +180,5 @@ try {
     res = dropTestColl.find(aIndexQuery).toArray();
     assert.eq(2, res.length, res);
 } finally {
-    setCBRConfigOnAllNonConfigNodes(db, prevCBRConfig);
+    setPlanRankerConfigOnAllNonConfigNodes(db, prevPlanRankerConfig);
 }

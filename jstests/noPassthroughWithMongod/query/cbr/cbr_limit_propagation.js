@@ -1,5 +1,9 @@
 /**
  * Test that a $limit stage updates the cardinality estimates of child stages.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import helpers, {
@@ -19,6 +23,7 @@ assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
         internalQueryCBRCEMode: "samplingCE",
         internalQuerySamplingBySequentialScan: true,
     }),

@@ -4,7 +4,11 @@
  */
 
 const conn = MongoRunner.runMongod({
-    setParameter: {featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"},
+    setParameter: {
+        featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
+        internalQueryCBRCEMode: "histogramCE",
+    },
 });
 
 const db = conn.getDB("admin");

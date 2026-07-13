@@ -1,12 +1,20 @@
 /**
  * Test handling of queries with a single possible solution/plan, under CBR.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {
     getRejectedPlans,
     getWinningPlanFromExplain,
     getEngine,
 } from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {
+    assertPlanCosted,
+    getPlanRankerConfig,
+    setPlanRankerConfig,
+} from "jstests/libs/query/cbr_utils.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 describe("CBR single-solution early exit", function () {
@@ -20,21 +28,31 @@ describe("CBR single-solution early exit", function () {
     // trial-phase work budget), so it does not guarantee cost estimates.
     const configs = [
         {
-            internalQueryCBRCEMode: "automaticCE",
+            internalQueryPlanRanker: "mixed",
+            internalQueryCBRCEMode: "samplingCE",
             automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
             cbrAlwaysCosted: false,
         },
         {
-            internalQueryCBRCEMode: "automaticCE",
+            internalQueryPlanRanker: "mixed",
+            internalQueryCBRCEMode: "samplingCE",
             automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
             cbrAlwaysCosted: true,
         },
-        {internalQueryCBRCEMode: "samplingCE", cbrAlwaysCosted: true},
-        {internalQueryCBRCEMode: "heuristicCE", cbrAlwaysCosted: true},
+        {
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "samplingCE",
+            cbrAlwaysCosted: true,
+        },
+        {
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "heuristicCE",
+            cbrAlwaysCosted: true,
+        },
     ];
 
     before(function () {
-        savedConfig = getCBRConfig(db);
+        savedConfig = getPlanRankerConfig(db);
         coll.drop();
         const docs = [];
         for (let i = 0; i < 1000; i++) {
@@ -47,7 +65,7 @@ describe("CBR single-solution early exit", function () {
     });
 
     after(function () {
-        setCBRConfig(db, savedConfig);
+        setPlanRankerConfig(db, savedConfig);
         coll.drop();
     });
 
@@ -58,7 +76,7 @@ describe("CBR single-solution early exit", function () {
 
         describe(`with ${label}`, function () {
             before(function () {
-                setCBRConfig(db, Object.assign({featureFlagCostBasedRanker: true}, config));
+                setPlanRankerConfig(db, Object.assign({featureFlagCostBasedRanker: true}, config));
             });
 
             it("returns correct results for a single-solution query without explain", function () {

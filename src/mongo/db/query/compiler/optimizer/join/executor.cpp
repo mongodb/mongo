@@ -122,6 +122,13 @@ bool isCollectionOrViewEligibleForJoinOpt(const CollectionOrViewAcquisition& col
 bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
                                     const Pipeline& pipeline,
                                     const boost::optional<BSONObj>& queryHint) {
+    // The join optimizer unconditionally uses CBR, if the feature flag is disabled
+    // this also disables join ordering.
+    // TODO: SERVER-129697 Remove this check when the feature flag is removed.
+    if (!feature_flags::gFeatureFlagCostBasedRanker.checkEnabled()) {
+        return false;
+    }
+
     const auto& queryKnob = pipeline.getContext()->getQueryKnobConfiguration();
 
     if (!queryKnob.isJoinOrderingEnabled()) {

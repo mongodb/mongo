@@ -70,7 +70,7 @@ IndexBounds makeRangeIntervalBounds(const BSONObj& range,
 
 CEResult getPlanCE(const QuerySolution& plan,
                    const CollectionInfo& collInfo,
-                   QueryPlanRankerModeEnum ceMode);
+                   QueryCBRCEModeEnum ceMode);
 
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCard);
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, const CollectionInfo& collInfo);

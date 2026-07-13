@@ -2,7 +2,14 @@
  * Verifies that the MultipleCollectionPathArraynessChecker is registered for all CBR
  * sampling paths, killing queries when path arrayness assumptions are violated during a yield.
  *
- * @tags: [requires_fcv_90]
+ * @tags: [
+ *   requires_fcv_90,
+ *   # The execution_control_with_prioritization suite injects executionControlDeprioritizationGate
+ *   # via TestData.setParameters, which MongoRunner propagates to the mongod started by this test.
+ *   # The gate can throttle the internal CBR sampling query, causing ceSamplingMetadata to be
+ *   # absent from explain output and the assertions below to fail.
+ *   incompatible_with_execution_control_with_prioritization,
+ * ]
  */
 import {checkLog} from "src/mongo/shell/check_log.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -16,6 +23,7 @@ const conn = MongoRunner.runMongod({
         internalQueryExecYieldIterations: 1,
         internalQueryExecYieldPeriodMS: 0,
         featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
         internalQueryCBRCEMode: "samplingCE",
         // TODO SERVER-117707: remove once CBR supports SBE.
         internalQueryFrameworkControl: "forceClassicEngine",

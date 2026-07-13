@@ -30,7 +30,7 @@ CEResult estimateIndexSeeks(ce::SamplingEstimator& samplingEstimator,
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, 1000.0));
     EstimateMap qsnEstimates;
     CardinalityEstimatorForTest estimator{
-        collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
     return estimator.estimateIndexSeeks(bounds, multiKey);
 }
 
@@ -404,7 +404,7 @@ TEST(CardinalityEstimator, NoHistogramForPath) {
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto plan = makeCollScanPlan(parse(query));
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({"b"}, 1000.0));
-    const auto ceRes = getPlanCE(*plan, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
+    const auto ceRes = getPlanCE(*plan, collInfo, QueryCBRCEModeEnum::kHistogramCE);
     ASSERT(!ceRes.isOK() && ceRes.getStatus().code() == ErrorCodes::HistogramCEFailure);
 }
 
@@ -519,7 +519,7 @@ TEST(CardinalityEstimator, NAryXOR) {
     const auto ceRes2 = getPlanHeuristicCE(*xorPlan2, collInfo);
     ASSERT_EQ(ceRes2, makeCard(340.752));
 
-    const auto ceRes3 = getPlanCE(*xorPlan3, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
+    const auto ceRes3 = getPlanCE(*xorPlan3, collInfo, QueryCBRCEModeEnum::kHistogramCE);
     ASSERT(!ceRes3.isOK() && ceRes3.getStatus().code() == ErrorCodes::CEFailure);
 }
 
@@ -787,7 +787,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
         CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 
@@ -813,7 +813,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
         CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 
@@ -836,7 +836,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
         CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 
@@ -871,7 +871,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
         CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 }
@@ -1068,7 +1068,7 @@ TEST(CardinalityEstimator, CachesEstimateWhenTotalIntervalsAtOrBelowLimit) {
     const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
     EstimateMap qsnEstimates;
     CardinalityEstimator estimator{
-        collInfo, &mockEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        collInfo, &mockEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
 
     ASSERT(estimator.estimatePlan(*plan1).isOK());
     ASSERT(estimator.estimatePlan(*plan2).isOK());
@@ -1092,7 +1092,7 @@ TEST(CardinalityEstimator, DoesNotCacheEstimateWhenTotalIntervalsAboveLimit) {
     const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
     EstimateMap qsnEstimates;
     CardinalityEstimator estimator{
-        collInfo, &mockEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        collInfo, &mockEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
 
     ASSERT(estimator.estimatePlan(*plan1).isOK());
     ASSERT(estimator.estimatePlan(*plan2).isOK());
@@ -1149,13 +1149,13 @@ class EqualityPrefixHeuristicCETest : public unittest::Test {
 protected:
     void assertSkipScan(IndexBounds bounds) {
         auto plan = makeEqualityPrefixPlan(std::move(bounds));
-        const auto ceRes = getPlanCE(*plan, _collInfo, QueryPlanRankerModeEnum::kHeuristicCE);
+        const auto ceRes = getPlanCE(*plan, _collInfo, QueryCBRCEModeEnum::kHeuristicCE);
         ASSERT(ceRes.isOK());
     }
 
     void assertNotSkipScan(IndexBounds bounds) {
         auto plan = makeEqualityPrefixPlan(std::move(bounds));
-        const auto ceRes = getPlanCE(*plan, _collInfo, QueryPlanRankerModeEnum::kHeuristicCE);
+        const auto ceRes = getPlanCE(*plan, _collInfo, QueryCBRCEModeEnum::kHeuristicCE);
         ASSERT(ceRes.isOK());
     }
 
@@ -1177,7 +1177,7 @@ protected:
         EstimateMap qsnEstimates;
         auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, 100.0));
         CardinalityEstimator estimator{
-            collInfo, &*_samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+            collInfo, &*_samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
         const auto ceRes = estimator.estimatePlan(*plan);
         ASSERT(ceRes.isOK());
     }
@@ -1187,7 +1187,7 @@ protected:
         EstimateMap qsnEstimates;
         auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, 100.0));
         CardinalityEstimator estimator{
-            collInfo, &*_samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+            collInfo, &*_samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
         const auto ceRes = estimator.estimatePlan(*plan);
         ASSERT(ceRes.isOK());
     }

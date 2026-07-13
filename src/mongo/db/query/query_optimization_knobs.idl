@@ -42,7 +42,16 @@ global:
     mod_visibility: private
 
 enums:
-    QueryPlanRankerMode:
+    QueryPlanRanker:
+        mod_visibility: public
+        description: "Enum for possible values for internalQueryPlanRanker."
+        type: string
+        values:
+            kMultiPlanner: "multiPlanning"
+            kCostBased: "costBased"
+            kMixed: "mixed"
+
+    QueryCBRCEMode:
         mod_visibility: public
         description: "Enum for possible values for internalQueryCBRCEMode."
         type: string
@@ -1032,26 +1041,53 @@ server_parameters:
             query_knob:
                 wire_name: doNotOpenContainedOrsInSimplifier
 
-    internalQueryCBRCEMode:
+    internalQueryPlanRanker:
         mod_visibility: public
-        description: "Cardinality estimation mode for the cost-based ranker."
+        description: >-
+            Top-level parameter to control query plan ranker.
+            The featureFlagCostBasedRanker has a precedence: if it is false the only possible
+            ranker is the multiPlanner.
         set_at: [startup, runtime]
         cpp_class:
-            name: QueryPlanRankerMode
-            data: WithOnUpdateHook<synchronized_value<QueryPlanRankerModeEnum>>
+            name: QueryPlanRanker
+            data: WithOnUpdateHook<synchronized_value<QueryPlanRankerEnum>>
         default:
-            expr: QueryPlanRankerModeEnum::kAutomaticCE
+            expr: QueryPlanRankerEnum::kMixed
         redact: false
         annotations:
             query_knob:
-                wire_name: planRankerMode
+                wire_name: planRanker
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    internalQueryCBRCEMode:
+        mod_visibility: public
+        description: >-
+            Second-level parameter to control cardinality estimation (CE) mode when
+            the cost-based plan ranker is chosen by the internalQueryPlanRanker.
+            When the internalQueryPlanRanker is set to mixed, this parameter is overriden by the
+            samplingCE. The parameter has no effect for multiPlanner.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: QueryCBRCEMode
+            data: WithOnUpdateHook<synchronized_value<QueryCBRCEModeEnum>>
+        default:
+            expr: QueryCBRCEModeEnum::kSamplingCE
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: cbrCEMode
                 pqs_settable: true
                 fcv:
                     min: "9.0"
 
     automaticCEPlanRankingStrategy:
         mod_visibility: public
-        description: "Controls the plan ranking strategy to use when automaticCE is selected as internalQueryCBRCEMode"
+        description: >-
+            Second-level parameter to control the plan ranking strategy when
+            the top-level internalQueryPlanRanker is set to mixed. The parameter has
+            no effect for multiPlanner and costBased values of internalQueryPlanRanker.
         set_at: [startup, runtime]
         cpp_class:
             name: QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode

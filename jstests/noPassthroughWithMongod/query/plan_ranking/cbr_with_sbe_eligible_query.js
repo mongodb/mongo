@@ -1,10 +1,19 @@
+/**
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
+ */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {
     checkSbeStatus,
     kSbeDisabled,
     isDeferredGetExecutorEnabled,
 } from "jstests/libs/query/sbe_util.js";
-import {getCBRConfig, setCBRConfig, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
+import {
+    getPlanRankerConfig,
+    setPlanRankerConfig,
+    isPlanCosted,
+} from "jstests/libs/query/cbr_utils.js";
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
 
 // TODO SERVER-117707 after this ticket, we should always expect that CBR is supported for SBE-targeted queries.
@@ -47,7 +56,7 @@ function assertSbeWithCbrFallbackBehavior() {
         return;
     }
 
-    const config = getCBRConfig(db);
+    const config = getPlanRankerConfig(db);
     const cbrEnabled = config.featureFlagCostBasedRanker;
     const mpWithCbrFallbackEnabled =
         cbrEnabled && config.automaticCEPlanRankingStrategy === "CBRForNoMultiplanningResults";
@@ -112,7 +121,7 @@ function runTests() {
 }
 
 // TODO SERVER-117672: Improve handling of query knob setting and re-setting.
-const prevCBRConfig = getCBRConfig(db);
+const prevPlanRankerConfig = getPlanRankerConfig(db);
 
 try {
     // 1: Run with only MultiPlanning.
@@ -123,17 +132,14 @@ try {
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
     });
 
-    const cbrFallbackStrategies = [
-        "CBRForNoMultiplanningResults",
-        "CBRCostBasedRankerChoice",
-        "HistogramCEWithHeuristicFallback",
-    ];
+    const cbrFallbackStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
-        jsTest.log.info("Running tests with automaticCE.", {cbrFallbackStrategy});
+        jsTest.log.info("Running tests with mixed plan ranking.", {cbrFallbackStrategy});
         assert.commandWorked(
             db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}),
         );
@@ -141,8 +147,13 @@ try {
     }
 
     // 3: Run under pure sampling configuration.
-    db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "samplingCE"});
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
+        internalQueryCBRCEMode: "samplingCE",
+    });
     runTests();
 } finally {
-    setCBRConfig(db, prevCBRConfig);
+    setPlanRankerConfig(db, prevPlanRankerConfig);
 }

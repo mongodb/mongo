@@ -1,7 +1,4 @@
-import {
-    getPlanRankerMode,
-    getAutomaticCEPlanRankingStrategy,
-} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeStatus, checkJoinOptimizationStatus} from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
@@ -30,10 +27,14 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     // We may have different output files for different SBE or CBR configurations. If that is the
     // case, we need to pick the correct directory for the curent configuration.
     const sbeStatus = checkSbeStatus(typeof db === "undefined" ? null : db);
-    const planRankerMode = getPlanRankerMode(typeof db === "undefined" ? null : db);
-    const autoPlanRankingStrategy = getAutomaticCEPlanRankingStrategy(
-        typeof db === "undefined" ? null : db,
-    );
+    const config = getPlanRankerConfig(typeof db === "undefined" ? null : db);
+    // Ensure using multiplanning if the feature flag is false.
+    const planRanker = config.featureFlagCostBasedRanker
+        ? config.internalQueryPlanRanker
+        : "multiPlanning";
+    const ceMode = config.internalQueryCBRCEMode;
+    const autoPlanRankingStrategy = config.automaticCEPlanRankingStrategy;
+
     const joinOptimizationStatus = checkJoinOptimizationStatus(
         typeof db === "undefined" ? null : db,
     );
@@ -41,10 +42,18 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName,
     );
 
-    const outputDirPlanRanking =
-        planRankerMode != "automaticCE"
-            ? relativePathToExpectedOutput + "/" + planRankerMode
-            : relativePathToExpectedOutput + "/" + planRankerMode + "/" + autoPlanRankingStrategy;
+    const outputDirPlanRanking = (() => {
+        switch (planRanker) {
+            case "multiPlanning":
+                return relativePathToExpectedOutput;
+            case "mixed":
+                return (
+                    relativePathToExpectedOutput + "/" + planRanker + "/" + autoPlanRankingStrategy
+                );
+            default:
+                return relativePathToExpectedOutput + "/" + ceMode;
+        }
+    })();
     const planRankerModeExpectedExists = fileExists(outputDirPlanRanking + "/" + outputName);
 
     const joinOptimizationExpectedExists = fileExists(

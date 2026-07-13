@@ -1,4 +1,5 @@
 // @tags: [
+//   requires_fcv_90,
 //   disables_test_commands,
 // ]
 
@@ -24,7 +25,7 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     mongo.getDB("admin").adminCommand({
         setParameter: 1,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
     }),
 );
 

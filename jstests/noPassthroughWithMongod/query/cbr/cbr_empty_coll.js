@@ -1,5 +1,9 @@
 /**
  * Test that CBR is able to properly estimate empty collections.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {
     getRejectedPlans,
@@ -95,6 +99,7 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: mode,
             }),
         );
@@ -106,7 +111,11 @@ try {
         createHistogram("a");
         createHistogram("b");
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "histogramCE"}),
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryPlanRanker: "costBased",
+                internalQueryCBRCEMode: "histogramCE",
+            }),
         );
         testEmptyColl();
     }

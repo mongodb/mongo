@@ -1,5 +1,9 @@
 /**
  * Ensure limit and skip stages in find queries are estimated correctly.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -31,6 +35,7 @@ function runTest({query, sort, skip, limit, expectedCard}) {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -98,6 +103,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );

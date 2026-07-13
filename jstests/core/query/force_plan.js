@@ -20,7 +20,6 @@
  */
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 
 // Enabling SBE affects plan enumeration under CBR.
 if (checkSbeFullyEnabled(db)) {

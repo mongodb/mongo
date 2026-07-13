@@ -5,6 +5,10 @@
  * but computes `childEst - skip` with exact double arithmetic. When skip > childEst in exact
  * arithmetic but the two are within the epsilon window, the subtraction produces a negative
  * cardinality, violating StrongDouble<Cardinality>::assertValid() (tassert 9274201).
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -37,6 +41,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
             // Force sequential scan so the sample is the first 384 docs (a=0..383), making
             // the matchCount for {a: {$gte: 341}} deterministically 43.

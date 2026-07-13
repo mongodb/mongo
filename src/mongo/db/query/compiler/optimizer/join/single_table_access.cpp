@@ -112,8 +112,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
             .canonicalQuery = *node.accessPath,
             .collections = singleMca,
             .plannerOptions = options,
-            .cbrEnabled = true,
-            .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
+            .planRanker = QueryPlanRankerEnum::kCostBased,
         });
 
         auto swSolns = QueryPlanner::plan(*node.accessPath, params);
@@ -124,7 +123,8 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
                                                                   samplingEstimator.get(),
                                                                   nullptr /*exactCardinality*/,
                                                                   std::move(swSolns.getValue()),
-                                                                  *node.accessPath);
+                                                                  *node.accessPath,
+                                                                  QueryCBRCEModeEnum::kSamplingCE);
         // Return bad status if CBR is unable to produce a plan
         if (!swCbrResult.isOK()) {
             return swCbrResult.getStatus();

@@ -98,6 +98,7 @@ executor:
         enableTestCommands: 1
         # Automatic mode will fallback when a predicate can't be estimated via histogram
         featureFlagCostBasedRanker: true
-        internalQueryCBRCEMode: "automaticCE"
+        internalQueryPlanRanker: "mixed"
+        # internalQueryCBRCEMode: "automaticCE"
         # We also have automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
         # see above.

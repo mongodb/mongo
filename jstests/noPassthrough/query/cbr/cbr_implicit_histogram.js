@@ -7,7 +7,11 @@ import {runCommandOverride} from "jstests/libs/override_methods/implicit_histogr
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const conn = MongoRunner.runMongod({
-    setParameter: {featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"},
+    setParameter: {
+        featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
+        internalQueryCBRCEMode: "histogramCE",
+    },
 });
 
 const db = conn.getDB("test");

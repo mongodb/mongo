@@ -1,4 +1,4 @@
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRanker} from "jstests/libs/query/cbr_utils.js";
 import {
     joinPlanToString,
     jsonifyMultilineString,
@@ -150,7 +150,7 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
     // knobs. Set them before starting the tests & restore them
     // after, as the query_golden_classic suite runs other
     // golden tests, which do not expect these knobs.
-    if (getPlanRankerMode(db) !== "multiPlanning") {
+    if (getPlanRanker(db) !== "multiPlanning") {
         // CBR enabled
         paramsToRestore = assert.commandWorked(
             db.adminCommand({
@@ -241,9 +241,22 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
                 `"errors": ${padNumber(totalErrors)}},`,
         );
 
-        const parameters = {
-            featureFlagCostBasedRanker: null,
-            internalQueryCBRCEMode: null,
+        const featureFlagCostBasedRanker = db.adminCommand({
+            getParameter: 1,
+            featureFlagCostBasedRanker: 1,
+        }).featureFlagCostBasedRanker;
+
+        let internalQueryPlanRanker = db.adminCommand({
+            getParameter: 1,
+            internalQueryPlanRanker: 1,
+        }).internalQueryPlanRanker;
+
+        // Override plan ranker with multiPlanning if feature flag is false.
+        if (!(featureFlagCostBasedRanker ?? {}).value) {
+            internalQueryPlanRanker = "multiPlanning";
+        }
+
+        const samplingParams = {
             samplingMarginOfError: null,
             samplingConfidenceInterval: null,
             internalQuerySamplingCEMethod: null,
@@ -251,20 +264,28 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
             internalQuerySamplingByStrides: null,
         };
 
-        for (const param in parameters) {
-            const result = db.adminCommand({getParameter: 1, [param]: 1});
-            parameters[param] = result[param];
-        }
+        let parameters = {featureFlagCostBasedRanker, internalQueryPlanRanker};
 
-        if (!(parameters["featureFlagCostBasedRanker"] ?? {})["value"]) {
-            // internalQueryCBRCEMode does not matter unless
-            // CBR is enabled, and is likely to confuse the
-            // reader.
-            delete parameters["internalQueryCBRCEMode"];
-        } else if (parameters["internalQueryCBRCEMode"] === "automaticCE") {
-            const param = "automaticCEPlanRankingStrategy";
-            const result = db.adminCommand({getParameter: 1, [param]: 1});
-            parameters[param] = result[param];
+        if (internalQueryPlanRanker !== "multiPlanning") {
+            const internalQueryCBRCEMode = db.adminCommand({
+                getParameter: 1,
+                internalQueryCBRCEMode: 1,
+            }).internalQueryCBRCEMode;
+            parameters["internalQueryCBRCEMode"] = internalQueryCBRCEMode;
+
+            if (internalQueryPlanRanker === "mixed") {
+                parameters["automaticCEPlanRankingStrategy"] = db.adminCommand({
+                    getParameter: 1,
+                    automaticCEPlanRankingStrategy: 1,
+                }).automaticCEPlanRankingStrategy;
+            }
+
+            if (internalQueryCBRCEMode === "samplingCE") {
+                for (const param in samplingParams) {
+                    samplingParams[param] = db.adminCommand({getParameter: 1, [param]: 1})[param];
+                }
+                Object.assign(parameters, samplingParams);
+            }
         }
 
         // Strip the FCV version from any server parameters that have it.

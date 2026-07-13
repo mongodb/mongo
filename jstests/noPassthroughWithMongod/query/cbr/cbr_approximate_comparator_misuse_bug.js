@@ -1,5 +1,9 @@
 /**
  * Regression test for AF-16798 and other occurrences of the same bug.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -42,6 +46,7 @@ if (checkSbeFullyEnabled(db)) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "samplingCE",
                 // Force sequential scan so the sample is the first 384 docs (a=0..383), making
                 // the matchCount for {a: {$gte: 341}} deterministically 43.
@@ -124,6 +129,7 @@ if (checkSbeFullyEnabled(db)) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "heuristicCE",
             }),
         );
@@ -183,6 +189,7 @@ if (checkSbeFullyEnabled(db)) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "samplingCE",
                 internalQuerySamplingBySequentialScan: true,
             }),

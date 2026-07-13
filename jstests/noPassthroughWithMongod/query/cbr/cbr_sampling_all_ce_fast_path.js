@@ -5,11 +5,14 @@
  * same field path (the shape produced by $all). It pre-sorts the required values and uses
  * std::includes() to check each sample document once instead of re-scanning the array once per value.
  *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 
 // TODO SERVER-92589: Remove this exemption.
 if (checkSbeFullyEnabled(db)) {
@@ -64,9 +67,10 @@ function getActualCount(query) {
 // Enable sampling CE with a full sequential scan so that estimates are
 // deterministic and the full collection is used as the sample. Force use of classic engine to ensure CBR will run.
 // ---------------------------------------------------------------------------
-const originalCBRParamValues = getCBRConfig(db);
-setCBRConfig(db, {
+const originalCBRParamValues = getPlanRankerConfig(db);
+setPlanRankerConfig(db, {
     featureFlagCostBasedRanker: true,
+    internalQueryPlanRanker: "costBased",
     internalQueryCBRCEMode: "samplingCE",
 });
 
@@ -130,7 +134,7 @@ try {
     );
 } finally {
     // Restore server parameter values
-    setCBRConfig(db, originalCBRParamValues);
+    setPlanRankerConfig(db, originalCBRParamValues);
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,

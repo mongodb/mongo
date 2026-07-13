@@ -1,5 +1,9 @@
 /**
  * Verify that collection, index and query types unsupported by CBR fallback to multiplanning.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {
     getAllPlans,
@@ -285,6 +289,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "heuristicCE",
         }),
     );

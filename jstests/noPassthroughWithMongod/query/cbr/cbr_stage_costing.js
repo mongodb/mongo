@@ -3,6 +3,9 @@
  * absolute costs, which may change on recalibration, we rather assert
  * on the general principles that should always hold.
  *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -116,6 +119,7 @@ function runTest(planRankerMode) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: planRankerMode,
             }),
         );

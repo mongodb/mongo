@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
+ */
 // Tests that count queries have their winning and rejected plans wrapped in CountStages.
 
 import {
@@ -8,7 +13,7 @@ import {
     isIxscan,
     isCountScan,
 } from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -54,12 +59,13 @@ function runTestFastScan() {
     assert(rejectedPlans.length == 0, {explain});
 }
 
-const prevCBRConfig = getCBRConfig(db);
+const prevPlanRankerConfig = getPlanRankerConfig(db);
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
     }),
 );
 
@@ -75,5 +81,5 @@ try {
         runTestFastScan();
     }
 } finally {
-    setCBRConfig(db, prevCBRConfig);
+    setPlanRankerConfig(db, prevPlanRankerConfig);
 }

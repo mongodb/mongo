@@ -28,7 +28,7 @@ public:
 };
 
 std::unique_ptr<PlanRankingStrategy> makeStrategy(
-    QueryPlanRankerModeEnum rankerMode,
+    QueryPlanRankerEnum planRanker,
     QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum autoStrategy);
 
 /**

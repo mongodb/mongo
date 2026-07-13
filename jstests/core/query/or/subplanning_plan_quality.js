@@ -20,7 +20,7 @@
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRanker} from "jstests/libs/query/cbr_utils.js";
 
 // Ensure that subplanning is enabled.
 if (
@@ -79,7 +79,7 @@ function indexesUsedByFindQuery(coll, query) {
 
     // Skip the subplanning-disabled test under CBR, because CBR does not suffer from the branch
     // bias issue.
-    if (getPlanRankerMode(db) === "multiPlanning") {
+    if (getPlanRanker(db) === "multiPlanning") {
         // Temporarily disable subplanning and show that the winning plan misses the ideal index "b"
         // on the second branch.
         try {

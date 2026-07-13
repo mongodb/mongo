@@ -2,6 +2,10 @@
  * Establish the multiplanning replanning behavior that we would like to preserve.
  * Verify that CBR is able to choose a plan that gets cached.
  * Verify that CBR is able to be invoked during replanning.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {
@@ -9,7 +13,7 @@ import {
     getCachedPlanForQuery,
     assertPlanHasIxScanStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -195,7 +199,7 @@ function runReplanningTest(isMultiplanning) {
     assert.eq(entry.works, isSbeEnabled ? 20000 : 10000);
 }
 
-const prevCBRConfig = getCBRConfig(db);
+const prevPlanRankerConfig = getPlanRankerConfig(db);
 
 const prevQueryKnobs = assert.commandWorked(
     db.adminCommand({
@@ -222,15 +226,11 @@ try {
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
     });
 
-    const cbrFallbackStrategies = [
-        "CBRForNoMultiplanningResults",
-        "CBRCostBasedRankerChoice",
-        // TODO SERVER-118487: Re-enable this fallback strategy, we pick the plan with index scan on 'a' for 'bIndexQuery'.
-        // "HistogramCEWithHeuristicFallback",
-    ];
+    const cbrFallbackStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running runInitialCacheTest", {cbrFallbackStrategy});
@@ -243,7 +243,7 @@ try {
 
     // TODO SERVER-116989: Run tests under the non-release CBR configurations (e.g. sampling).
 } finally {
-    setCBRConfig(db, prevCBRConfig);
+    setPlanRankerConfig(db, prevPlanRankerConfig);
 
     assert.commandWorked(
         db.adminCommand({

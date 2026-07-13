@@ -45,7 +45,7 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
 /**
  * Use the cost-based ranker (CBR) to find an optimal plan for the query 'cq'.
  * It is expected that the tests using this function ensure that CBR always
- * finds an optimal plan. In this case the method returns a pointer tp that
+ * finds an optimal plan. In this case the method returns a pointer to that
  * optimal plan.
  */
 const QuerySolution* bestCBRPlan(CanonicalQuery* cq,

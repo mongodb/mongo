@@ -1,5 +1,9 @@
 /**
  * Test exact cardinality mode of cost-based ranking.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {
@@ -310,6 +314,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "exactCE",
         }),
     );

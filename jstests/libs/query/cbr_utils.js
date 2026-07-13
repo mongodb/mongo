@@ -47,20 +47,20 @@ export function assertPlanCosted(plan) {
     assert(isPlanCosted(plan), plan);
 }
 
-export function getPlanRankerMode(db) {
+export function getPlanRanker(db) {
     if (db !== null) {
         const getParam = db.adminCommand({
             getParameter: 1,
             featureFlagCostBasedRanker: 1,
-            internalQueryCBRCEMode: 1,
+            internalQueryPlanRanker: 1,
         });
 
         return !getParam.featureFlagCostBasedRanker?.value
             ? "multiPlanning"
-            : getParam.internalQueryCBRCEMode;
+            : getParam.internalQueryPlanRanker;
     } else {
-        return TestData.setParameters.planRankerMode
-            ? TestData.setParameters.planRankerMode
+        return TestData.setParameters.planRanker
+            ? TestData.setParameters.planRanker
             : "multiPlanning";
     }
 }
@@ -117,11 +117,23 @@ export function getExpectedWorksPerPlan(db, coll, numPlans) {
     return Math.max(params.internalQueryPlanEvaluationWorks, collFraction * numRecords);
 }
 
-export function getCBRConfig(db) {
+export function getPlanRankerConfig(db) {
+    if (db === null) {
+        // In suites without db (e.g. sharding) fall back to TestData.
+        const params = TestData.setParameters;
+        return {
+            featureFlagCostBasedRanker: params.featureFlagCostBasedRanker ?? false,
+            internalQueryPlanRanker: params.internalQueryPlanRanker ?? "multiPlanning",
+            internalQueryCBRCEMode: params.internalQueryCBRCEMode ?? "",
+            automaticCEPlanRankingStrategy: params.automaticCEPlanRankingStrategy ?? "",
+        };
+    }
+
     const config = assert.commandWorked(
         db.adminCommand({
             getParameter: 1,
             featureFlagCostBasedRanker: 1,
+            internalQueryPlanRanker: 1,
             internalQueryCBRCEMode: 1,
             automaticCEPlanRankingStrategy: 1,
             internalSamplingSizeOverride: 1,
@@ -130,17 +142,19 @@ export function getCBRConfig(db) {
 
     return {
         featureFlagCostBasedRanker: config.featureFlagCostBasedRanker.value,
+        internalQueryPlanRanker: config.internalQueryPlanRanker,
         internalQueryCBRCEMode: config.internalQueryCBRCEMode,
         automaticCEPlanRankingStrategy: config.automaticCEPlanRankingStrategy,
         internalSamplingSizeOverride: config.internalSamplingSizeOverride,
     };
 }
 
-export function setCBRConfig(
+export function setPlanRankerConfig(
     db,
     {
         featureFlagCostBasedRanker = true,
-        internalQueryCBRCEMode = "automaticCE",
+        internalQueryPlanRanker = "mixed",
+        internalQueryCBRCEMode = "samplingCE",
         automaticCEPlanRankingStrategy = "CBRForNoMultiplanningResults",
         internalSamplingSizeOverride = 0,
     } = {},
@@ -149,6 +163,7 @@ export function setCBRConfig(
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker,
+            internalQueryPlanRanker,
             internalQueryCBRCEMode,
             automaticCEPlanRankingStrategy,
             internalSamplingSizeOverride,
@@ -156,8 +171,11 @@ export function setCBRConfig(
     );
 }
 
-export function setCBRConfigOnAllNonConfigNodes(conn, config) {
+/**
+ * @param {Parameters<typeof setPlanRankerConfig>[1]} config
+ */
+export function setPlanRankerConfigOnAllNonConfigNodes(conn, config) {
     for (const host of DiscoverTopology.findNonConfigNodes(conn)) {
-        setCBRConfig(new Mongo(host).getDB("admin"), config);
+        setPlanRankerConfig(new Mongo(host).getDB("admin"), config);
     }
 }
