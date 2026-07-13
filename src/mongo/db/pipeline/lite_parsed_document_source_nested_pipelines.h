@@ -148,6 +148,12 @@ protected:
     // Materializes a view's resolved pipeline into `_pipelines`, parsing and desugaring using the
     // ResolvedNamespace entry.
     void materializeViewSubpipeline(const ResolvedNamespace& viewEntry) {
+        // A re-bind of an already-materialized stage (e.g. a cloned copy from a resolved-namespace
+        // map copy) is a no-op: the first materialization is already correct within one aggregate
+        // execution's consistent catalog snapshot.
+        if (_viewSubpipelineMaterialized) {
+            return;
+        }
         // A stage only materializes a view subpipeline when it has no user-written subpipeline, so
         // `_pipelines` should always be empty here.
         tassert(12792401,
@@ -163,6 +169,7 @@ protected:
         // NSS (ResolvedNamespace::ns), which is not a view and would bypass the inProgress guard
         // without this tag.
         _pipelines.back().setViewNss(viewEntry.getNamespace());
+        _viewSubpipelineMaterialized = true;
     }
 
     /**
@@ -184,6 +191,14 @@ protected:
     // The most-resolved namespace this stage knows about: the resolved backing namespace its
     // subpipeline targets. Before view resolution, this just points to the user NSS.
     ResolvedNamespace _resolvedBackingNss;
+
+    // True once a view's pipeline has been materialized into `_pipelines` by
+    // materializeViewSubpipeline(). Once set, a later bindResolvedNamespace() call is a no-op
+    // rather than re-materializing, even if it's passed a different ResolvedNamespaceMap entry for
+    // the same foreign namespace. This is safe only because, within one aggregate execution, every
+    // ResolvedNamespaceMap the stage is bound against is derived from the same consistent catalog
+    // snapshot, so re-resolving the same view namespace always yields the same pipeline.
+    bool _viewSubpipelineMaterialized = false;
 };
 
 }  // namespace mongo

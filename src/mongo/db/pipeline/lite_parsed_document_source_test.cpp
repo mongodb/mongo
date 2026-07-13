@@ -617,6 +617,65 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     ASSERT_FALSE((*subPipelines)[0]->getStages().empty());
 }
 
+// bindResolvedNamespace() can run more than once against the same logical stage:
+// AggCatalogState::maybeProactivelyResolveInvolvedNamespaces copies the resolved-namespace map
+// (which owns the parsed view pipelines) and re-binds the copy. The copy carries the
+// already-materialized subpipeline, so a naive re-bind would call materializeViewSubpipeline() with
+// a non-empty _pipelines and trip the empty-list invariant. Cloning the stage after the first bind
+// mimics that map copy; the second bind must be a no-op.
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
+     LookupShorthandRebindOfMaterializedCopyIsIdempotent) {
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest("test", "viewColl");
+    const NamespaceString kBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "backingColl");
+
+    std::vector<BSONObj> flagValues{
+        BSON("name" << feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName() << "value"
+                    << true)};
+    LiteParserOptions options;
+    options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
+
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "viewColl"
+                                      << "localField"
+                                      << "a"
+                                      << "foreignField"
+                                      << "b"
+                                      << "as"
+                                      << "result")),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages, false, options);
+    auto& stage = lpp.getStages()[0];
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kForeignNss,
+                ResolvedNamespace(kForeignNss,
+                                  kBackingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("v" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    // First bind materializes the view pipeline.
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
+    ASSERT_EQ(stage->getMutableSubPipelines()->size(), 1u);
+
+    // Clone the stage the way copying the resolved-namespace map does. The clone carries the
+    // already-materialized subpipeline.
+    auto clonedStage = stage->clone();
+    ASSERT_EQ(clonedStage->getMutableSubPipelines()->size(), 1u);
+
+    // Re-binding the clone must not re-materialize (and must not trip tassert 12792401).
+    clonedStage->bindResolvedNamespace(ResolvedNamespace{}, map);
+    ASSERT_EQ(clonedStage->getMutableSubPipelines()->size(), 1u);
+    auto backingNss = clonedStage->getResolvedBackingNss();
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
+    ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
+}
+
 TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
      UnionWithShorthandAgainstPlainCollectionDoesNotMaterialize) {
     const NamespaceString kForeignNss =
