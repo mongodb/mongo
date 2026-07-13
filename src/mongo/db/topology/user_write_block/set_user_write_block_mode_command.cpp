@@ -120,7 +120,9 @@ public:
                             ActionType::setUserWriteBlockMode}));
         }
 
-        std::mutex _mutex;
+        // Shared across all invocations of the command so that two setUserWriteBlock commands
+        // cannot execute concurrently.
+        inline static std::mutex _mutex;
     };
 };
 MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand).forShard();
