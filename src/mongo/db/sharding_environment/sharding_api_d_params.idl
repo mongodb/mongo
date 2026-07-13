@@ -100,6 +100,18 @@ server_parameters:
         default: 10
         redact: false
 
+    enableIncomparableShardVersionRouterBounce:
+        description: >-
+            When enabled, a shard that detects an incomparable shard version and cannot advance
+            configTime via a noop write (e.g. no reachable primary, as on a readable-standby
+            cluster) surfaces a StaleConfig on the router's first attempt so the router refreshes and
+            retries, instead of blocking on the configTime wait.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableIncomparableShardVersionRouterBounce
+        default: false
+        redact: false
+
     # TODO (SERVER-112793) Remove once v9.0 branches out
     enableCompoundWildcardIndexLog:
         description: >-

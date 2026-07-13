@@ -8,6 +8,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/stats/external_client_on_router.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
@@ -87,6 +88,12 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
                 .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx),
                                                          fcvSnap)) {
             metadataBob->appendBool(kIsExternalClientOnRouterFieldName, true);
+        }
+
+        if (const auto& retryAttempt = staleConfigRetryAttempt(opCtx); retryAttempt.has_value() &&
+            feature_flags::gAuthoritativeShardsDDL.isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx), fcvSnap)) {
+            metadataBob->append(GenericArguments::kStaleConfigRetryAttemptFieldName, *retryAttempt);
         }
 
         // If the request is using the 'defaultMaxTimeMS' value, attaches the field so shards can

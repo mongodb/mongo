@@ -10,6 +10,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_participant_failed_unyield_exception.h"
@@ -497,6 +498,11 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
     auto future = launchAsync([&] {
         router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
             ASSERT_TRUE(cri.hasRoutingTable());
+
+            const auto& attempt = staleConfigRetryAttempt(opCtx);
+            ASSERT_TRUE(attempt.has_value());
+            ASSERT_EQ(*attempt, tries);
+
             tries++;
             if (tries == 1) {
                 uasserted(StaleConfigInfo(
@@ -512,6 +518,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
+    ASSERT_EQ(*staleConfigRetryAttempt(operationContext()), 1);
 }
 
 TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleDbVersionWithoutTxn) {

@@ -45,6 +45,7 @@
 #include "mongo/db/sharding_environment/sharding_api_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -94,6 +95,7 @@ MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUn
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 MONGO_FAIL_POINT_DEFINE(hangBeforePlacementVersionCriticalSectionWait);
 MONGO_FAIL_POINT_DEFINE(forceWaitForVersionOnly);
+MONGO_FAIL_POINT_DEFINE(forceNoopWriteToAdvanceConfigTimeToFail);
 MONGO_FAIL_POINT_DEFINE(avoidTassertForInconsistentMetadata);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAuthoritativeDbVersionMismatchWait);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshDbVersionThread);
@@ -239,6 +241,44 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                   "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
     }
 }
+
+/**
+ * During incomparable-version recovery, if the noop write to advance configTime failed and the
+ * router advertised retry counter 0, surface StaleConfig so the router can increment its counter
+ * and retry. On later attempts (counter > 0) or when the counter is unset, the caller falls
+ * through to the configTime wait instead.
+ *
+ * Gated by 'enableIncomparableShardVersionRouterBounce'.
+ */
+void maybeThrowStaleConfigOnNoopWriteFailure(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const ChunkVersion& chunkVersion,
+                                             const repl::OpTime& timeToWaitFor,
+                                             const Status& noopStatus) {
+    const auto& routerStaleConfigRetryAttempt = staleConfigRetryAttempt(opCtx);
+    if (!enableIncomparableShardVersionRouterBounce.load() || noopStatus.isOK() ||
+        !routerStaleConfigRetryAttempt.has_value() || *routerStaleConfigRetryAttempt != 0) {
+        return;
+    }
+
+    LOGV2_DEBUG(12503500,
+                2,
+                "Authoritative metadata recovery: noop write to advance configTime failed on the "
+                "first router attempt; surfacing StaleConfig so the router refreshes and retries",
+                logAttrs(nss),
+                "shardVersionReceived"_attr = chunkVersion,
+                "configTime"_attr = timeToWaitFor,
+                "noopWriteError"_attr = noopStatus);
+
+    uasserted(StaleConfigInfo(nss,
+                              ShardVersionFactory::make(chunkVersion),
+                              boost::none /* wantedVersion */,
+                              ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+              str::stream() << "Could not advance configTime to resolve an incomparable shard "
+                               "version for "
+                            << nss.toStringForErrorMsg()
+                            << "; the noop write failed: " << noopStatus.toString());
+}
 }  // namespace
 
 void FilteringMetadataCache::init(ServiceContext* serviceCtx,
@@ -378,6 +418,9 @@ bool runRefreshInChildOperationContext(OperationContext* parent,
         Grid::get(parent)->getExecutorPool()->getFixedExecutor());
     // Propagate metadata from the parent to the child.
     ForwardableOperationMetadata(parent).setOn(cancelableOpCtx.get());
+    if (const auto& retryAttempt = staleConfigRetryAttempt(parent); retryAttempt.has_value()) {
+        staleConfigRetryAttempt(cancelableOpCtx.get()) = *retryAttempt;
+    }
     // Propagate whether the parent OperationContext is in a multi-document transaction
     // to preserve the behavior associated with metadataRefreshInTransactionMaxWaitMS.
     if (parent->inMultiDocumentTransaction()) {
@@ -1382,6 +1425,17 @@ FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext*
                 "shardVersionReceived"_attr = chunkVersion,
                 "configTime"_attr = timeToWaitFor);
 
+    // Best-effort: the shared helper batches concurrent callers, waits briefly for replication to
+    // catch up on secondaries, and retries on failure. The majority commit point follows the
+    // last-written OpTime, so advancing it is sufficient to unblock the majority read concern wait
+    // below.
+    Status noopStatus = makeNoopWriteToAdvanceClusterTime(opCtx, configTime);
+    if (MONGO_unlikely(forceNoopWriteToAdvanceConfigTimeToFail.shouldFail())) {
+        noopStatus = Status(ErrorCodes::InternalError,
+                            "forceNoopWriteToAdvanceConfigTimeToFail fail point is enabled");
+    }
+    maybeThrowStaleConfigOnNoopWriteFailure(opCtx, nss, chunkVersion, timeToWaitFor, noopStatus);
+
     // Race two futures: (1) majority read concern reaching configTime, which proves all DDLs have
     // been applied and the router must be stale, or (2) the shard version matching the router's
     // via oplog application. Whichever completes first allows the caller to return authoritatively.
@@ -1399,12 +1453,6 @@ FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext*
                        majorityFuture.thenRunOn(fixedExecutor))
             .get(opCtx);
     };
-
-    // Best-effort: the shared helper batches concurrent callers, waits briefly for replication to
-    // catch up on secondaries, and retries on failure. The majority commit point follows the
-    // last-written OpTime, so advancing it is sufficient to unblock the majority read concern wait
-    // above.
-    makeNoopWriteToAdvanceClusterTime(opCtx, configTime).ignore();
 
     Status status = [&] {
         if (MONGO_unlikely(forceWaitForVersionOnly.shouldFail())) {

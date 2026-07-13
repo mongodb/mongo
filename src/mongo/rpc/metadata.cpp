@@ -19,6 +19,7 @@
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/stats/external_client_on_router.h"
 #include "mongo/db/tenant_id.h"
@@ -219,6 +220,10 @@ void readRequestMetadata(OperationContext* opCtx,
 
     if (requestArgs.getIsExternalClientOnRouter()) {
         isExternalClientOnRouter(opCtx) = true;
+    }
+
+    if (auto retryAttempt = requestArgs.getStaleConfigRetryAttempt()) {
+        staleConfigRetryAttempt(opCtx) = *retryAttempt;
     }
 }
 

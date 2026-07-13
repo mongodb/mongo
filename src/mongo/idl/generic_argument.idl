@@ -452,6 +452,16 @@ structs:
                 # command BSON. See also: rawData, isDirectSystemBucketsAccess.
                 forward_to_shards: false
                 stability: "internal"
+            # Set by the router on versioned requests to indicate how many times the router loop has
+            # retried this operation on a StaleConfig error.
+            staleConfigRetryAttempt:
+                type: safeInt
+                validator: {gte: 0}
+                # Manually appended by the egress metadata hook from an OperationContext decoration,
+                # not present in the original command BSON.
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
             # Contains context fields of the current transaction
             transactionRuntimeContext:
                 type: TransactionRuntimeContext

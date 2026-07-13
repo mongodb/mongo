@@ -9,6 +9,7 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -46,6 +47,15 @@ void RouterBase::_initTxnRouterIfNeeded() {
         invariant(opCtxTxnNum);
         txnRouter.beginOrContinueTxn(
             _opCtx, *opCtxTxnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+    }
+}
+
+void RouterBase::_armStaleConfigRetryAttemptTracking() {
+    // Only arm if not already armed: a nested router must not reset a counter that an enclosing
+    // router has already incremented while retrying a StaleConfig error.
+    auto& attempt = staleConfigRetryAttempt(_opCtx);
+    if (!attempt) {
+        attempt = 0;
     }
 }
 
@@ -187,6 +197,10 @@ void CollectionRouterCommon::_onException(RoutingRetryInfo* retryInfo, Status s)
             });
 
         _catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
+
+        if (auto& attempt = staleConfigRetryAttempt(_opCtx)) {
+            attempt = *attempt + 1;
+        }
     } else if (s == ErrorCodes::StaleEpoch) {
         if (auto si = s.extraInfo<StaleEpochInfo>()) {
             if (!isNssInvolvedInRouting(si->getNss())) {

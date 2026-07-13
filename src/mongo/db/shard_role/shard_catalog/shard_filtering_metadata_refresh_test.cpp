@@ -15,6 +15,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -342,6 +343,112 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
     ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 1);
     ASSERT_TRUE(stats.hasField("totalPostRecoveryWaitMillis"));
     ASSERT_GTE(stats["totalPostRecoveryWaitMillis"].safeNumberLong(), 0);
+}
+
+// Helper to drive an incomparable-version recovery that reaches the configTime wait: the router
+// sends a higher tracked version than what is recovered from disk, so the post-recovery
+// compatibility check falls through to _waitForConfigTimeOrChunkVersionChange.
+class IncomparableVersionNoopFailureFixture : public AuthoritativeRefreshFixture {
+protected:
+    ChunkVersion setupHigherRouterVersion(OperationContext* opCtx) {
+        const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
+        populateDiskCatalog(opCtx, collType, chunks);
+
+        auto higherVersion = chunks.back().getVersion();
+        higherVersion.incMajor();
+
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+        return higherVersion;
+    }
+};
+
+TEST_F(IncomparableVersionNoopFailureFixture,
+       FailedNoopWriteOnFirstRouterAttemptThrowsStaleConfig) {
+    auto* opCtx = operationContext();
+    auto higherVersion = setupHigherRouterVersion(opCtx);
+
+    unittest::ServerParameterGuard bounceEnabled("enableIncomparableShardVersionRouterBounce",
+                                                 true);
+
+    FailPointEnableBlock failNoopWrite{"forceNoopWriteToAdvanceConfigTimeToFail"};
+
+    // Router advertised that this is its first attempt (retry counter 0). Because the noop write
+    // fails, the shard surfaces StaleConfig so the router refreshes and retries, instead of
+    // blocking on the configTime wait.
+    staleConfigRetryAttempt(opCtx) = 0;
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, higherVersion);
+    ASSERT_EQ(status.code(), ErrorCodes::StaleConfig);
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 0);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByVersionChange"), 0);
+}
+
+TEST_F(IncomparableVersionNoopFailureFixture,
+       FailedNoopWriteOnLaterRouterAttemptFallsBackToConfigTimeWait) {
+    auto* opCtx = operationContext();
+    auto higherVersion = setupHigherRouterVersion(opCtx);
+
+    unittest::ServerParameterGuard bounceEnabled("enableIncomparableShardVersionRouterBounce",
+                                                 true);
+
+    FailPointEnableBlock failNoopWrite{"forceNoopWriteToAdvanceConfigTimeToFail"};
+
+    // Router advertised that it has already retried (retry counter > 0). Even though the noop write
+    // fails, the shard falls back to the configTime wait.
+    staleConfigRetryAttempt(opCtx) = 1;
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, higherVersion);
+    ASSERT_OK(status);
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 1);
+}
+
+TEST_F(IncomparableVersionNoopFailureFixture,
+       FailedNoopWriteWithoutRouterCounterFallsBackToConfigTimeWait) {
+    auto* opCtx = operationContext();
+    auto higherVersion = setupHigherRouterVersion(opCtx);
+
+    unittest::ServerParameterGuard bounceEnabled("enableIncomparableShardVersionRouterBounce",
+                                                 true);
+
+    FailPointEnableBlock failNoopWrite{"forceNoopWriteToAdvanceConfigTimeToFail"};
+
+    // The router did not advertise the retry counter (old or FCV-disabled router). The shard must
+    // never surface the StaleConfig bounce and instead falls back to the configTime wait,
+    // preserving mixed-version behavior.
+    ASSERT_FALSE(staleConfigRetryAttempt(opCtx).has_value());
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, higherVersion);
+    ASSERT_OK(status);
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 1);
+}
+
+TEST_F(IncomparableVersionNoopFailureFixture,
+       FailedNoopWriteWithBounceDisabledFallsBackToConfigTimeWait) {
+    auto* opCtx = operationContext();
+    auto higherVersion = setupHigherRouterVersion(opCtx);
+
+    // 'enableIncomparableShardVersionRouterBounce' is disabled (its default). Even though the
+    // router advertised its first attempt (retry counter 0) and the noop write fails, the shard
+    // must not surface StaleConfig; it falls back to the configTime wait.
+    unittest::ServerParameterGuard bounceDisabled("enableIncomparableShardVersionRouterBounce",
+                                                  false);
+
+    FailPointEnableBlock failNoopWrite{"forceNoopWriteToAdvanceConfigTimeToFail"};
+
+    staleConfigRetryAttempt(opCtx) = 0;
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, higherVersion);
+    ASSERT_OK(status);
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRecovery) {

@@ -34,6 +34,12 @@ protected:
 
     void _initTxnRouterIfNeeded();
 
+    // Arms the StaleConfig retry counter on the OperationContext (sets it to 0 if not already set)
+    // so that versioned requests issued by this router advertise that a protocol-aware router is
+    // driving the operation. Must be called once before the routing retry loop so that retries
+    // (which increment the counter in _onException) are not reset.
+    void _armStaleConfigRetryAttemptTracking();
+
     OperationContext* const _opCtx;
     CatalogCache* const _catalogCache;
 };
@@ -54,6 +60,7 @@ public:
     auto route(std::string_view comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
         _initTxnRouterIfNeeded();
+        _armStaleConfigRetryAttemptTracking();
 
         while (true) {
             auto cdb = _createDbIfRequestedAndGetRoutingInfo();
@@ -163,6 +170,7 @@ private:
     auto _routeImpl(std::string_view comment, F&& work) {
         RoutingRetryInfo retryInfo{std::string{comment}};
         _initTxnRouterIfNeeded();
+        _armStaleConfigRetryAttemptTracking();
 
         while (true) {
             try {
@@ -199,6 +207,7 @@ public:
     auto route(std::string_view comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
         _initTxnRouterIfNeeded();
+        _armStaleConfigRetryAttemptTracking();
 
         while (true) {
             stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
