@@ -36,6 +36,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/otel/traces/tracing_enablement.h"
 #include "mongo/rpc/factory.h"
@@ -201,13 +202,30 @@ auth::ValidatedTenancyScope DBClientBase::_createInnerRequestVTS(
     return auth::ValidatedTenancyScope::kNotRequired;
 }
 
+namespace {
+/** Starts a span for the given command name if it will not be executed locally. */
+boost::optional<otel::traces::Span> maybeStartSpan(OperationContext* opCtx,
+                                                   ConnectionString::ConnectionType connectionType,
+                                                   std::string_view commandName) {
+    // For local connections, we will maintain the same opCtx and start a span when the command
+    // starts, so we don't need to start a span here that would have the same name.
+    if (connectionType == ConnectionString::ConnectionType::kLocal) {
+        return boost::none;
+    }
+    const auto* spanName = otel::traces::lookupCommandSpanName(commandName);
+    return otel::traces::Span::start(opCtx,
+                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC);
+}
+}  // namespace
+
 DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request.
     ensureConnection();
 
-    // TODO(SERVER-130312): Start a span here if the type is not kLocal.
-
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
+    boost::optional<otel::traces::Span> span =
+        maybeStartSpan(opCtx, type(), request.getCommandName());
+
     appendMetadata(opCtx, _metadataWriter, _apiParameters, getMaxWireVersion(), type(), request);
     auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
@@ -220,12 +238,13 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     // Make sure to reconnect if needed before building our request.
     ensureConnection();
 
-    // TODO(SERVER-130312): Start a span here if the type is not kLocal.
-
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
+    boost::optional<otel::traces::Span> span =
+        maybeStartSpan(opCtx, type(), request.getCommandName());
+
     appendMetadata(opCtx, _metadataWriter, _apiParameters, getMaxWireVersion(), type(), request);
 
     auto requestMsg = request.serialize();
@@ -247,6 +266,10 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
                           << networkOpToString(requestMsg.operation()) << "' '"
                           << " but reply was '" << networkOpToString(replyMsg.operation()) << "' ",
             rpc::protocolForMessage(requestMsg) == commandReply->getProtocol());
+
+    if (span.has_value()) {
+        span->setStatus(getStatusFromCommandResult(commandReply->getCommandReply()));
+    }
 
     return {std::move(commandReply), this};
 }

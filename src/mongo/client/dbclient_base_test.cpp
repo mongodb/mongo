@@ -13,6 +13,7 @@
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/traces_test_util.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -24,8 +25,13 @@ namespace mongo {
 namespace {
 
 using otel::TelemetryContextHolder;
+using otel::traces::HasError;
 using otel::traces::OtelTracesCapturer;
 using otel::traces::Span;
+using ::testing::ElementsAre;
+using ::testing::IsEmpty;
+using ::testing::Not;
+using ::testing::SizeIs;
 namespace span_names = otel::traces::span_names;
 
 class FakeDBClient : public DBClientBase {
@@ -79,7 +85,14 @@ public:
              std::string* /*actualServer*/ = nullptr) override {
         _lastSent = toSend;
     }
-    Message _call(Message& /*toSend*/, std::string* /*actualServer*/) override {
+    Message _call(Message& toSend, std::string* /*actualServer*/) override {
+        _lastSent = toSend;
+        if (_throwStatus) {
+            uassertStatusOK(*_throwStatus);
+        }
+        if (_cannedReply) {
+            return *_cannedReply;
+        }
         MONGO_UNREACHABLE;
     }
 
@@ -87,11 +100,40 @@ public:
         return _lastSent;
     }
 
+    // Configures the reply that `_call` returns, so `runCommandWithTarget` can be exercised
+    // without a real network round-trip.
+    void setCannedReply(Message reply) {
+        _cannedReply = std::move(reply);
+    }
+
+    // Configures `_call` to throw, simulating a network-level failure.
+    void setThrowOnCall(Status status) {
+        _throwStatus = std::move(status);
+    }
+
 private:
     int _maxWireVersion;
     ConnectionString::ConnectionType _connectionType;
     boost::optional<Message> _lastSent;
+    boost::optional<Message> _cannedReply;
+    boost::optional<Status> _throwStatus;
 };
+
+// Builds a minimal OK OpMsg command reply message usable as a canned response for `_call`.
+Message makeOkOpMsgReply() {
+    rpc::OpMsgReplyBuilder replyBuilder;
+    replyBuilder.setCommandReply(BSON("ok" << 1));
+    return replyBuilder.done();
+}
+
+// Builds an OpMsg command reply message representing a failed command, usable as a canned
+// response for `_call`.
+Message makeErrorOpMsgReply(ErrorCodes::Error code, std::string_view errmsg) {
+    rpc::OpMsgReplyBuilder replyBuilder;
+    replyBuilder.setCommandReply(
+        BSON("ok" << 0 << "code" << int(code) << "errmsg" << std::string{errmsg}));
+    return replyBuilder.done();
+}
 
 // Base fixture for all dbclient_base tests. Does not require an OTel build.
 // Future tests that test non-OTel DBClientBase behavior should extend this directly.
@@ -100,7 +142,7 @@ class DBClientBaseTest : public ServiceContextTest {};
 // Fixture for tests that exercise telemetry metadata on the egress path.
 // Sets up a real TracerProvider so Span::start creates non-no-op spans.
 // If the binary was not built with OTel (build_otel=false), all tests in this fixture are skipped.
-class AppendMetadataTest : public DBClientBaseTest {
+class SpanTest : public DBClientBaseTest {
 public:
     void setUp() override {
         DBClientBaseTest::setUp();
@@ -109,14 +151,15 @@ public:
     }
 
 protected:
-    unittest::ServerParameterGuard _featureFlagTracing{"featureFlagTracing", true};
     OtelTracesCapturer _capturer;
 };
 
-OpMsgRequest makeRequest() {
+OpMsgRequest makeRequest(std::string_view commandName = "ping") {
     OpMsgRequest req;
-    req.body = BSON("ping" << 1 << "$db"
-                           << "admin");
+    BSONObjBuilder bob;
+    bob.append(commandName, 1);
+    bob.append("$db", "admin");
+    req.body = bob.obj();
     return req;
 }
 
@@ -131,6 +174,8 @@ boost::optional<TelemetryContextSection> sendAndGetTelemetryContext(
     invariant(client.lastSent().has_value());
     return OpMsgRequest::parse(*client.lastSent()).telemetryContext;
 }
+
+using AppendMetadataTest = SpanTest;
 
 TEST_F(AppendMetadataTest, ActiveSpanAndSupportedWireVersionSetsTelemetryContext) {
     auto opCtx = makeOperationContext();
@@ -147,18 +192,22 @@ TEST_F(AppendMetadataTest, ActiveSpanButOldWireVersionDoesNotSetTelemetryContext
     EXPECT_FALSE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90 - 1).has_value());
 }
 
-TEST_F(AppendMetadataTest, NoActiveSpanDoesNotSetTelemetryContext) {
+TEST_F(AppendMetadataTest, NoPreexistingActiveSpanStillSetsTelemetryContextViaDBClientSpan) {
     auto opCtx = makeOperationContext();
-    // Context exists in the holder but no span is started, so there is no active span.
+    // Context exists in the holder but no span has been started on it yet by the caller.
+    // `runFireAndForgetCommand` itself starts a span around the outgoing command, so the
+    // telemetry context ends up populated regardless.
     auto ctx = Span::createTelemetryContext();
     TelemetryContextHolder::getDecoration(opCtx.get()).setTelemetryContext(ctx);
 
-    EXPECT_FALSE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90).has_value());
+    EXPECT_TRUE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90).has_value());
 }
 
-TEST_F(AppendMetadataTest, NoTelemetryContextDoesNotSetTelemetrySection) {
+TEST_F(AppendMetadataTest, NoPreexistingTelemetryContextStillSetsTelemetrySection) {
     auto opCtx = makeOperationContext();
-    EXPECT_FALSE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90).has_value());
+    // `runFireAndForgetCommand` starts its own span around the outgoing command even when the
+    // opCtx had no telemetry context beforehand, so a telemetry section is still sent.
+    EXPECT_TRUE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90).has_value());
 }
 
 TEST_F(AppendMetadataTest, UnknownWireVersionSentinelDoesNotSetTelemetryContext) {
@@ -195,6 +244,109 @@ TEST_F(AppendMetadataTest, SamplingFlagChecksTargetFCVNotLocalFCV) {
     auto span = Span::start(opCtx.get(), span_names::kTest1);
 
     EXPECT_FALSE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90).has_value());
+}
+
+using RunFireAndForgetCommandSpanTest = SpanTest;
+using RunCommandWithTargetSpanTest = SpanTest;
+
+TEST_F(RunFireAndForgetCommandSpanTest, UsesRegisteredSpanNameForKnownCommand) {
+    static const auto& registeredSpan =
+        otel::traces::registerCommandSpanName("test_only.dbclient_fire_and_forget_known");
+
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.runFireAndForgetCommand(makeRequest("test_only.dbclient_fire_and_forget_known"));
+
+    EXPECT_THAT(_capturer.getSpans(registeredSpan), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
+}
+
+TEST_F(RunFireAndForgetCommandSpanTest, FallsBackToDefaultSpanNameForUnknownCommand) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.runFireAndForgetCommand(makeRequest("test_only.dbclient_fire_and_forget_unregistered"));
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
+}
+
+TEST_F(RunCommandWithTargetSpanTest, UsesRegisteredSpanNameForKnownCommand) {
+    static const auto& registeredSpan =
+        otel::traces::registerCommandSpanName("test_only.dbclient_run_command_known");
+
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.setCannedReply(makeOkOpMsgReply());
+    client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_known"));
+
+    EXPECT_THAT(_capturer.getSpans(registeredSpan), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
+}
+
+TEST_F(RunCommandWithTargetSpanTest, FallsBackToDefaultSpanNameForUnknownCommand) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.setCannedReply(makeOkOpMsgReply());
+    client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_unregistered"));
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
+}
+
+TEST_F(RunFireAndForgetCommandSpanTest, DoesNotStartSpanForLocalConnection) {
+    static const auto& registeredSpan =
+        otel::traces::registerCommandSpanName("test_only.dbclient_fire_and_forget_local");
+
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90, ConnectionString::ConnectionType::kLocal);
+    client.runFireAndForgetCommand(makeRequest("test_only.dbclient_fire_and_forget_local"));
+
+    EXPECT_THAT(_capturer.getSpans(registeredSpan), IsEmpty());
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
+}
+
+TEST_F(RunCommandWithTargetSpanTest, DoesNotStartSpanForLocalConnection) {
+    static const auto& registeredSpan =
+        otel::traces::registerCommandSpanName("test_only.dbclient_run_command_local");
+
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90, ConnectionString::ConnectionType::kLocal);
+    client.setCannedReply(makeOkOpMsgReply());
+    client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_local"));
+
+    EXPECT_THAT(_capturer.getSpans(registeredSpan), IsEmpty());
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
+}
+
+using RunCommandWithTargetSpanStatusTest = SpanTest;
+
+TEST_F(RunCommandWithTargetSpanStatusTest, OkReplyDoesNotMarkSpanAsError) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.setCannedReply(makeOkOpMsgReply());
+    client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_status_ok"));
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), ElementsAre(Not(HasError())));
+}
+
+TEST_F(RunCommandWithTargetSpanStatusTest, CommandErrorReplyMarksSpanAsError) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.setCannedReply(makeErrorOpMsgReply(ErrorCodes::BadValue, "some command error"));
+    client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_status_error"));
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), ElementsAre(HasError()));
+}
+
+TEST_F(RunCommandWithTargetSpanStatusTest, NetworkErrorMarksSpanAsError) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.setThrowOnCall(Status(ErrorCodes::HostUnreachable, "simulated network error"));
+
+    ASSERT_THROWS_CODE(
+        client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_status_network")),
+        DBException,
+        ErrorCodes::HostUnreachable);
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), ElementsAre(HasError()));
 }
 
 }  // namespace

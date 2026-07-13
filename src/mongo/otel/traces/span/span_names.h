@@ -22,6 +22,11 @@ namespace span_names {
     [[MONGO_MOD_PUBLIC]] inline constexpr auto id = \
         SpanName(SpanName::passkeyForNetworkingAndObservabilityOnly, name)
 
+// Generic RPC span name as a fallback if command name is unavailable. This is the name of the rpc
+// protocol per otel semantic conventions
+// (see https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#name).
+SPAN_NAME_(kMongoRPC, "mongorpc");
+
 // Resharding spans
 SPAN_NAME_(kReshardCollectionCmdInvocationTypedRun, "ReshardCollectionCmd::Invocation::typedRun");
 SPAN_NAME_(kReshardingCoordinatorRun, "ReshardingCoordinator::run");
