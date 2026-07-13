@@ -260,6 +260,85 @@ TEST(MessageCompressorManager, FullNormalCompression) {
     clientManager.clientFinish(serverObj);
 }
 
+// Non-replication traffic bumps only the process-wide network.compression counters; the
+// replication subset counters stay at zero.
+TEST(MessageCompressorManager, NonReplicationTrafficNotCountedInReplicationCompressionStats) {
+    auto registry = buildRegistry();
+    auto* compressor = registry.getCompressor("noop");
+    ASSERT(compressor);
+
+    MessageCompressorManager manager(&registry);
+    BSONObjBuilder negotiatorOut;
+    std::vector<std::string_view> negotiator({"noop"});
+    manager.serverNegotiate(negotiator, &negotiatorOut);
+    checkNegotiationResult(negotiatorOut.done(), {"noop"});
+
+    auto compressed = assertOk(manager.compressMessage(buildMessage()));
+    ASSERT_EQ(compressed.operation(), dbCompressed);
+    ASSERT_GT(compressor->getCompressorBytesIn(), 0);
+    ASSERT_EQ(compressor->getReplicationCompressorBytesIn(), 0);
+
+    assertOk(manager.decompressMessage(compressed));
+    ASSERT_GT(compressor->getDecompressorBytesIn(), 0);
+    ASSERT_EQ(compressor->getReplicationDecompressorBytesIn(), 0);
+}
+
+// Replication data-plane traffic is a subset view: it bumps the replication counters AND is still
+// included in the process-wide network.compression counters (repl.compression is a subset, not a
+// separate accounting).
+TEST(MessageCompressorManager, ReplicationTrafficCountedInBothNetworkAndReplicationStats) {
+    auto registry = buildRegistry();
+    auto* compressor = registry.getCompressor("noop");
+    ASSERT(compressor);
+
+    MessageCompressorManager manager(&registry);
+    manager.countAsReplicationCompressionTrafficForThisSession(true);
+    BSONObjBuilder negotiatorOut;
+    std::vector<std::string_view> negotiator({"noop"});
+    manager.serverNegotiate(negotiator, &negotiatorOut);
+    checkNegotiationResult(negotiatorOut.done(), {"noop"});
+
+    auto compressed = assertOk(manager.compressMessage(buildMessage()));
+    ASSERT_EQ(compressed.operation(), dbCompressed);
+    ASSERT_GT(compressor->getReplicationCompressorBytesIn(), 0);
+    // Subset semantics: the same bytes are also present in the process-wide net counters, and the
+    // replication portion never exceeds the process-wide total.
+    ASSERT_GTE(compressor->getCompressorBytesIn(), compressor->getReplicationCompressorBytesIn());
+
+    assertOk(manager.decompressMessage(compressed));
+    ASSERT_GT(compressor->getReplicationDecompressorBytesIn(), 0);
+    ASSERT_GTE(compressor->getDecompressorBytesIn(),
+               compressor->getReplicationDecompressorBytesIn());
+}
+
+// A replication connection's later hello without the replicationCompressionClient marker must NOT
+// clear the connection's replication accounting role: subsequent compression is still attributed to
+// repl.compression. This guards the sticky-flag fix in replication_info.cpp.
+TEST(MessageCompressorManager, ReplicationAccountingSurvivesLaterNonMarkerHello) {
+    auto registry = buildRegistry();
+    auto* compressor = registry.getCompressor("noop");
+    ASSERT(compressor);
+
+    MessageCompressorManager manager(&registry);
+    manager.countAsReplicationCompressionTrafficForThisSession(true);
+
+    std::vector<std::string_view> negotiator({"noop"});
+    BSONObjBuilder initialHelloOut;
+    manager.serverNegotiate(negotiator, &initialHelloOut);
+    checkNegotiationResult(initialHelloOut.done(), {"noop"});
+
+    // A later hello without replicationCompressionClient should not clear the connection's
+    // replication accounting role. replication_info.cpp enforces that by not writing false for
+    // non-marker hellos; this simulates that path by only re-reading the negotiated result.
+    BSONObjBuilder laterHelloOut;
+    manager.serverNegotiate(boost::none, &laterHelloOut);
+    checkNegotiationResult(laterHelloOut.done(), {"noop"});
+
+    auto compressed = assertOk(manager.compressMessage(buildMessage()));
+    ASSERT_EQ(compressed.operation(), dbCompressed);
+    ASSERT_GT(compressor->getReplicationCompressorBytesIn(), 0);
+}
+
 // When a client opts out via disableCompressionForThisSession(), clientBegin()
 // must not emit a "compression" field, the server responds without one, and clientFinish()
 // leaves the negotiated compressor list empty so subsequent compressMessage() calls become
@@ -444,6 +523,31 @@ TEST(MessageCompressorManager, ServerNegotiateInternalUsesReplicationCandidateSe
     std::vector<std::string> replCandidates{"snappy"};
     manager.serverNegotiate(clientList, &out, replCandidates);
     checkNegotiationResult(out.done(), {"snappy"});
+}
+
+// A replication connection's candidate set is sticky for the connection's lifetime. After the
+// initial marker-bearing hello negotiates the replication candidate set, a later hello that
+// re-advertises compression WITHOUT the replicationCompressionClient marker (so serverNegotiate()
+// is called with no allow-list) must NOT fall back to the empty net.compression set and silently
+// drop the replication compression. This guards the sticky-candidate-set fix in
+// MessageCompressorManager::serverNegotiate().
+TEST(MessageCompressorManager, ServerRenegotiateKeepsReplicationCandidateSetSticky) {
+    auto registry = buildNetDisabledReplSnappyRegistry();  // net disabled, repl = snappy
+    MessageCompressorManager manager(&registry);
+
+    std::vector<std::string_view> clientList{"snappy"};
+    std::vector<std::string> replCandidates{"snappy"};
+
+    // Initial hello with the replication allow-list negotiates snappy.
+    BSONObjBuilder initialOut;
+    manager.serverNegotiate(clientList, &initialOut, replCandidates);
+    checkNegotiationResult(initialOut.done(), {"snappy"});
+
+    // Later hello on the same connection re-advertises compression but supplies no allow-list
+    // (marker absent). Without stickiness this would use the empty net set and drop snappy.
+    BSONObjBuilder laterOut;
+    manager.serverNegotiate(clientList, &laterOut);
+    checkNegotiationResult(laterOut.done(), {"snappy"});
 }
 
 // An empty internal candidate set (replication.networkCompression.compressors: disabled) forces

@@ -393,7 +393,10 @@ server_parameters:
             This node-local startup-only policy applies both when this node fetches replication data
             and when another member fetches replication data from this node. It can be set via the
             command line, replication.networkCompression.compressors in YAML, or initial
-            --setParameter.
+            --setParameter. In a mixed-version replica set, an older binary's fetcher does not send
+            the replicationCompressionClient hello marker, so this node treats that connection as an
+            ordinary internal connection and negotiates it against net.compression.compressors
+            instead of this policy.
         set_at: [startup]
         cpp_vartype: synchronized_value<std::string>
         cpp_varname: gReplicationNetworkCompression

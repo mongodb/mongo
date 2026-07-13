@@ -223,6 +223,18 @@ private:
     std::vector<std::string> _advertisedCompressors;
     std::vector<MessageCompressorBase*> _negotiated;
     MessageCompressorRegistry* _registry;
+
+    // Server-side sticky candidate set for a replication data-plane session. serverNegotiate()
+    // records the replication allow-list whenever a hello supplies one (i.e. carries the
+    // replicationCompressionClient marker). Later hellos on the SAME connection may re-advertise
+    // compression without the marker (so no allow-list is supplied); without this stickiness such a
+    // renegotiation would fall back to net.compression.compressors and, when net is disabled,
+    // silently drop the replication compression already negotiated. Keeping the candidate set for
+    // the connection's lifetime mirrors the sticky accounting flag used for repl.compression and
+    // keeps the negotiated result stable. boost::none means this connection was never identified as
+    // a replication data-plane session and keeps the historical net-set behavior.
+    boost::optional<std::vector<std::string>> _serverReplicationCompressorAllowListForThisSession;
+
     // Note: _offerCompressionOnClientBegin and _allowListedCompressors are declared
     // near the top of the class so that inline member functions can see them without
     // relying on delayed parsing of class-body member initializers.

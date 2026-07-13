@@ -405,9 +405,10 @@ function runScenario({label, secondaryValue, expectCompressorGrew, extraForbid})
 })();
 
 // ---------------------------------------------------------------------------
-// 4. End-to-end functional scenarios on a 2-node replica set. These observe the sync source's
-//    decompressor counters to prove the fetcher's channel actually negotiated the expected
-//    algorithm (or no algorithm at all).
+// 4. End-to-end functional scenarios on a 2-node replica set. Oplog fetching pulls batches FROM
+//    the sync source, so the sync source COMPRESSES the responses and the fetcher decompresses
+//    them. These scenarios therefore observe the sync source's compressor counters to prove the
+//    fetcher's channel actually negotiated the expected algorithm (or no algorithm at all).
 // ---------------------------------------------------------------------------
 
 // Default (unset): inherit process-wide list -> some compression is negotiated. The exact

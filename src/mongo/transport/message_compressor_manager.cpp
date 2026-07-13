@@ -369,12 +369,21 @@ void MessageCompressorManager::serverNegotiate(
     const boost::optional<std::vector<std::string>>& serverCompressorAllowList) {
     LOGV2_DEBUG(22934, 3, "Starting server-side compression negotiation");
 
+    // Make the replication data-plane candidate set sticky for the connection's lifetime. A hello
+    // that supplies an explicit allow-list carries the replicationCompressionClient marker; a later
+    // hello on the same connection may re-advertise compression without the marker
+    // (serverCompressorAllowList == boost::none), and using the net set for that renegotiation would
+    // silently drop replication compression when net.compression is disabled. Only ever record it,
+    // never clear it, matching the sticky repl.compression accounting flag.
+    if (serverCompressorAllowList) {
+        _serverReplicationCompressorAllowListForThisSession = *serverCompressorAllowList;
+    }
+
     // No advertised compressions, just asking for the last negotiated result.
     if (!clientCompressors) {
         // If we haven't negotiated any compressors yet, then don't append anything to the
         // output - this makes this compatible with older versions of MongoDB that don't
         // support compression.
-        std::vector<std::string> ret;
         if (_negotiated.empty()) {
             LOGV2_DEBUG(22935, 3, "Compression negotiation not requested by client");
             // client didn't request compression and nothing was negotiated. Engage an empty
@@ -405,8 +414,11 @@ void MessageCompressorManager::serverNegotiate(
         return;
     }
 
-    const std::vector<std::string>& allowed = serverCompressorAllowList
-        ? *serverCompressorAllowList
+    // Prefer the sticky replication candidate set over the per-hello argument so a later
+    // marker-less renegotiation on a replication connection keeps its candidate set instead of
+    // falling back to net.compression.compressors.
+    const std::vector<std::string>& allowed = _serverReplicationCompressorAllowListForThisSession
+        ? *_serverReplicationCompressorAllowListForThisSession
         : _registry->getNetCompressorNames();
 
     // build this connection's compressor-id permit list from 'allowed', not from
@@ -462,11 +474,10 @@ void MessageCompressorManager::serverNegotiate(
         // When this is a replication connection (a candidate list was supplied) that
         // permitted at least one advertised algorithm but none of them are registered in this
         // build, the channel is silently uncompressed despite the operator having configured
-        // replicationNetworkCompression. Surface it at WARNING (rate-limited, since it recurs on
-        // every reconnect) so this is not only visible at DEBUG level 3. With uncompiled algorithms
-        // now rejected at startup, reaching this branch indicates an unexpected registry
-        // inconsistency rather than an ordinary misconfiguration.
-        if (serverCompressorAllowList && droppedPermittedButUnregistered) {
+        // replicationNetworkCompression. Surface it at WARNING so this is not only visible at
+        // DEBUG level 3. With uncompiled algorithms now rejected at startup, reaching this branch
+        // indicates an unexpected registry inconsistency rather than an ordinary misconfiguration.
+        if (_serverReplicationCompressorAllowListForThisSession && droppedPermittedButUnregistered) {
             LOGV2_WARNING(10130417,
                           "A replication connection advertised compressor(s) permitted by "
                           "replicationNetworkCompression, but none are available in this build; the "

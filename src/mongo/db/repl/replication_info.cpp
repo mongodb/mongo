@@ -471,7 +471,17 @@ public:
             // Count server-side compressed bytes for replication-marked connections under
             // serverStatus().repl.compression. This is accounting-only; the inbound server-side
             // manager does not emit client hello markers.
-            mgr.countAsReplicationCompressionTrafficForThisSession(isReplicationCompressionClient);
+            //
+            // The replicationCompressionClient marker is only present on the initial data-plane
+            // handshake hello. A replication connection's later hellos (topology monitoring /
+            // awaitable isMaster) do NOT carry the marker, so an unconditional assignment here would
+            // reset the flag to false on the very next monitoring hello and the sync source would
+            // stop attributing its oplog-response compression to repl.compression. The connection's
+            // role is fixed for its lifetime, so make the flag STICKY: only ever set it true, never
+            // clear it from a subsequent non-marker hello.
+            if (isReplicationCompressionClient) {
+                mgr.countAsReplicationCompressionTrafficForThisSession(true);
+            }
             mgr.serverNegotiate(cmd.getCompression(), &result, replCompressorAllowList);
         }
 
