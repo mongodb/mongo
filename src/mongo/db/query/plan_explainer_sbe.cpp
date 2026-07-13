@@ -720,6 +720,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
       _ceSamplingMetadata{maybeExplainData
                               ? boost::make_optional(maybeExplainData->ceSamplingMetadata)
                               : boost::none},
+      _joinPlanCacheKeyHash{maybeExplainData ? maybeExplainData->joinPlanCacheKeyHash
+                                             : boost::none},
       _classicRuntimePlannerExplainer{
           _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.
               ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(),
@@ -775,5 +777,10 @@ PlanExplainerClassicRuntimePlannerForSBE::getRejectedPlansStats(
 boost::optional<StringMap<cost_based_ranker::SamplingMetadata>>
 PlanExplainerClassicRuntimePlannerForSBE::getCeSamplingMetadata() const {
     return _ceSamplingMetadata;
+}
+
+boost::optional<uint32_t> PlanExplainerClassicRuntimePlannerForSBE::getJoinPlanCacheKeyHash()
+    const {
+    return _joinPlanCacheKeyHash;
 }
 }  // namespace mongo

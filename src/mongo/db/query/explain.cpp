@@ -126,6 +126,11 @@ void generatePlannerInfo(PlanExecutor* exec,
 
     auto&& explainer = exec->getPlanExplainer();
 
+    if (const auto joinPlanCacheKeyHash = explainer.getJoinPlanCacheKeyHash();
+        joinPlanCacheKeyHash.has_value()) {
+        plannerBob.append("joinPlanCacheKey", zeroPaddedHex(*joinPlanCacheKeyHash));
+    }
+
     if (const auto ceSamplingMeta = explainer.getCeSamplingMetadata(); ceSamplingMeta.has_value()) {
         BSONObjBuilder ceSamplingMetaBob(plannerBob.subobjStart("ceSamplingMetadata"));
         for (const auto& [ns, meta] : ceSamplingMeta.value()) {

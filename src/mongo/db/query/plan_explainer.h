@@ -15,6 +15,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
+#include <cstdint>
+
 namespace mongo {
 
 /**
@@ -38,6 +40,8 @@ struct PlanExplainerData {
     // Populated on the explain path when CBR used a sampling estimator.
     StringMap<cost_based_ranker::SamplingMetadata> ceSamplingMetadata;
     bool fromPlanCache = false;
+    // Hash of the join plan cache key. Populated on the explain path of a join eligible query.
+    boost::optional<uint32_t> joinPlanCacheKeyHash;
 };
 
 inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&& rhs) {
@@ -201,6 +205,14 @@ public:
      */
     virtual boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
         const {
+        return boost::none;
+    }
+
+    /**
+     * Returns a hash of the join plan cache key. Returns boost::none if the query is not eligible
+     * for join optimization.
+     */
+    virtual boost::optional<uint32_t> getJoinPlanCacheKeyHash() const {
         return boost::none;
     }
 

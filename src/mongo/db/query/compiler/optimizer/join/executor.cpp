@@ -10,6 +10,7 @@
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
@@ -620,6 +621,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext()),
                 estimator->getSamplingMetadata());
         }
+        // Compute the join plan cache key hash for explain regardless of whether the join plan
+        // cache is enabled.
+        if (!cacheKey.has_value()) {
+            cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
+        }
+        explainData.joinPlanCacheKeyHash = canonical_query_encoder::computeHash(*cacheKey);
         maybeExplainData = std::move(explainData);
     }
 
