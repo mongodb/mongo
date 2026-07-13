@@ -370,6 +370,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/query/query_knobs:query_knob",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
+        "//src/mongo/util:processinfo",
     ],
 )
 
@@ -903,6 +904,17 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
         "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_knob_expressions_test",
+    srcs = [
+        "query_knob_expressions_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "//src/mongo/util:processinfo",
     ],
 )
 
