@@ -77,12 +77,22 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
-// Use a large enough collection so that no plan can exhaust its per-plan trial budget
-// (internalQueryPlanEvaluationWorks / numPlans ≈ 3,333) before hitting EOF, even on a
-// single shard in a sharded fixture. With fewer documents, plans finish too quickly,
-// earlyExit is set to true, and CBRForNoMultiplanningResults falls back to multiplanning.
+// The multi-planner works each candidate plan up to a per-plan trial budget of
+// max(internalQueryPlanEvaluationWorks, internalQueryPlanEvaluationCollFraction * numRecords)
+// (the coll fraction is 0.3 for these two-plan queries). For CBRForNoMultiplanningResults to
+// engage on the no-results query below, no candidate plan may hit EOF (or return results) within
+// that budget on any single shard. If a plan finishes first, earlyExit is set to true and CBR is
+// not considered.
+//
+// We keep internalQueryPlanEvaluationWorks small (see kPlanEvaluationWorks below) so the budget
+// floor is low, then size the collection so that the number of matching index entries per shard
+// comfortably exceeds the budget even when the fixture spreads the data across many shards. With
+// docs-per-shard >> max(kPlanEvaluationWorks, 0.3 * docs-per-shard) the plans never exhaust their
+// index scan during the trial. 2000 docs keeps this true down to ~10 shards while being 50x
+// cheaper to load than the previous 100000.
+const kPlanEvaluationWorks = 100;
 const docs = [];
-for (let i = 0; i < 100000; i++) {
+for (let i = 0; i < 2000; i++) {
     docs.push({a: i, b: i});
 }
 assert.commandWorked(coll.insertMany(docs));
@@ -309,6 +319,16 @@ const prevExecYieldIterations = assert.commandWorked(
 ).was;
 setParameterOnAllNodes(db, {internalQueryExecYieldIterations: 1});
 
+// Keep the per-plan trial budget floor low so the collection above can stay small while still
+// preventing any plan from hitting EOF during the trial (see the comment on 'docs').
+const prevPlanEvaluationWorks = assert.commandWorked(
+    mongodDb.adminCommand({
+        setParameter: 1,
+        internalQueryPlanEvaluationWorks: kPlanEvaluationWorks,
+    }),
+).was;
+setParameterOnAllNodes(db, {internalQueryPlanEvaluationWorks: kPlanEvaluationWorks});
+
 try {
     testNoResultsQueryIsPlannedWithCBR();
     testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking();
@@ -321,5 +341,6 @@ try {
     setParameterOnAllNodes(db, {
         internalQuerySamplingBySequentialScan: prevSequentialSamplingScan,
         internalQueryExecYieldIterations: prevExecYieldIterations,
+        internalQueryPlanEvaluationWorks: prevPlanEvaluationWorks,
     });
 }
