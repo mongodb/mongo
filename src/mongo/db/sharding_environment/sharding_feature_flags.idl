@@ -214,12 +214,10 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection
         default: false
         fcv_gated: true
-    # TODO (SERVER-123007): remove feature flag once 9.0 becomes last LTS.
     featureFlagBlockReplicaSetWrites:
         description: "Feature flag to enable blocking writes on a specific replica set"
         cpp_varname: feature_flags::gFeatureFlagBlockReplicaSetWrites
-        default: true
-        version: 9.0
+        default: false
         fcv_gated: true
     # TODO (SERVER-126212): remove feature flag once 9.0 becomes last LTS.
     # TODO (SERVER-127411): keep default: false until all types and APIs have been migrated to ShardRef.
