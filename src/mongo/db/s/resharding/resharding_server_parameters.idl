@@ -445,6 +445,8 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        deprecated_name:
+            - reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds
 
     reshardingVerificationChangeStreamsSleepMS:
         description: >-
