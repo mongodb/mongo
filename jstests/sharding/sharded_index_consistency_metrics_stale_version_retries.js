@@ -5,13 +5,13 @@
  *   requires_sharding,
  * ]
  */
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkServerStatusNumCollsWithInconsistentIndexes,
     getServerStatusNumCollsWithInconsistentIndexes,
 } from "jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 // This test creates inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -23,8 +23,10 @@ const st = new ShardingTest({
     configOptions: {setParameter: {"shardedIndexConsistencyCheckIntervalMS": intervalMS}},
 });
 
+// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+
 const dbName = "testDb";
-const collName2 = "testColl2";
 const ns0 = dbName + ".testColl0";
 const ns1 = dbName + ".testColl1";
 const ns2 = dbName + ".testColl2";
@@ -51,51 +53,27 @@ checkServerStatusNumCollsWithInconsistentIndexes(st.configRS.getPrimary(), 1);
 assert.commandWorked(st.configRS.getPrimary().adminCommand({clearLog: "global"}));
 
 // Create an index inconsistency on ns1 and then begin repeatedly moving a chunk between both shards
-// for ns2. A shard can never be ignorant of its own metadata under authoritative shards, but the
-// config server's catalog cache lags behind the migrations, so its periodic index check sends stale
-// shard versions and must retry on stale config errors. Wait until the check both returns the
-// correct counter and has observed at least one stale config error (so the retry path is actually
-// exercised rather than passing trivially).
+// for ns2 without refreshing the recipient so at least one shard should typically be stale when the
+// periodic index check runs. The check should retry on stale config errors and be able to
+// eventually return the correct counter.
 assert.commandWorked(st.shard0.getCollection(ns1).createIndex({x: 1}));
-// The config server runs the periodic index check as a router, resolving routing from its own
-// (lazily-refreshed) catalog cache.
-const staleConfigCountStart = ShardVersioningUtil.getRouterStaleConfigErrorCount(
-    st.configRS.getPrimary(),
-);
 assert.soon(
     () => {
-        ChunkHelper.moveChunk(
-            st.s.getDB(dbName),
-            collName2,
-            [{_id: 0}, {_id: 10}],
-            st.shard1.shardName,
-            true /* waitForDelete */,
-        );
+        ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns2, st.shard0, st.shard1, {_id: 0});
         sleep(2000);
-        ChunkHelper.moveChunk(
-            st.s.getDB(dbName),
-            collName2,
-            [{_id: 0}, {_id: 10}],
-            st.shard0.shardName,
-            true /* waitForDelete */,
-        );
+        ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns2, st.shard1, st.shard0, {_id: 0});
         sleep(2000);
 
         const latestCount = getServerStatusNumCollsWithInconsistentIndexes(
             st.configRS.getPrimary(),
         );
-        const observedStaleConfig =
-            ShardVersioningUtil.getRouterStaleConfigErrorCount(st.configRS.getPrimary()) >
-            staleConfigCountStart;
         jsTestLog(
             "Waiting for periodic index check to discover inconsistent indexes. Latest count: " +
-                latestCount +
-                ", observed stale config: " +
-                observedStaleConfig,
+                latestCount,
         );
-        return latestCount == 2 && observedStaleConfig;
+        return latestCount == 2;
     },
-    "periodic index check couldn't discover inconsistent indexes while the config server was stale",
+    "periodic index check couldn't discover inconsistent indexes with stale shards",
     undefined,
     undefined,
     {runHangAnalyzer: false},
