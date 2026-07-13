@@ -8,6 +8,8 @@
 //   assumes_read_preference_unchanged,
 //   assumes_against_mongod_not_mongos,
 //   featureFlagBlockReplicaSetWrites,
+//   # TODO(SERVER-123007): once 9.0 is lastLTS, remove this tag.
+//   multiversion_incompatible,
 //   does_not_support_config_fuzzer,
 //   cannot_run_during_upgrade_downgrade,
 //   wildcard_indexes_incompatible,
