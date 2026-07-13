@@ -1452,6 +1452,9 @@ RangeDeletionTask createRangeDeletionTask(OperationContext* opCtx,
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     t.setTimestamp(currentTime.clusterTime().asTimestamp());
     t.setPending(true);
+    // Persist the shard key pattern as production does, so the MaxKey orphan guard classifies the
+    // task from the task doc instead of fetching the collection from the config server.
+    t.setKeyPattern(KeyPattern(kShardKeyPattern));
     return t;
 }
 

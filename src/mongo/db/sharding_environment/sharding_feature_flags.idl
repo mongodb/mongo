@@ -228,7 +228,7 @@ feature_flags:
             deletes ordinary documents in the range but preserves documents whose leading shard-key
             field is MaxKey, leaving them for out-of-band recovery.
         cpp_varname: feature_flags::gMaxKeyOrphanGuard
-        default: false
+        default: true
         fcv_gated: false
     featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
         description:
