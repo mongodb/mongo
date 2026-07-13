@@ -20,6 +20,13 @@ selector:
       - streams_aspio_iceberg_5
       - streams_aspio_utilities
       - streams_aspio_pubsub
+      # The with_mongot_extension_* suites are temporary, experimental suites that load the real
+      # signed mongot-extension and can only run in extensions secure-mode builds. We exclude
+      # from burn_in since the mongot_e2e_* will give burn_in coverage of the same tests instead.
+      - with_mongot_extension_single_node
+      - with_mongot_extension_single_shard
+      - with_mongot_extension_sharded_collections
+      - with_mongot_extension_sharded_cluster
     # Exclude list of etc/evergreen.yml task names.
     exclude_tasks:
     # Exclude list of jstests file names.
