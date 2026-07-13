@@ -17,7 +17,6 @@ selector:
   exclude_files:
     # Should only remove from exclusion only after all TODOs are resolved:
     # TODO SERVER-130466: Reenable once we investigated why timeseries apply is so slow and cannot converge.
-    # TODO SERVER-130080: Reenable after the test will no longer trigger fassert.
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_reshard_with_inserts.js
 
   exclude_with_any_tags:
