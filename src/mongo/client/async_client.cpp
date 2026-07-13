@@ -86,24 +86,6 @@ boost::optional<TelemetryContextSection> AsyncDBClient::makeEgressTelemetrySecti
     return otel::traces::toWireType(request.telemetryContext.get());
 }
 
-otel::traces::Span AsyncDBClient::startEgressSpan(
-    std::shared_ptr<otel::TelemetryContext>& telemetryContext, std::string_view commandName) {
-    const auto* spanName = otel::traces::lookupCommandSpanName(commandName);
-    return otel::traces::Span::start(telemetryContext,
-                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC);
-}
-
-bool AsyncDBClient::maybeEndExhaustSpan(boost::optional<otel::traces::Span>& span,
-                                        bool isMoreToComeSet,
-                                        const Status& status) {
-    if (isMoreToComeSet || !span) {
-        return false;
-    }
-    span->setStatus(status);
-    span.reset();
-    return true;
-}
-
 Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     const HostAndPort& peer,
     transport::ConnectSSLMode sslMode,
@@ -437,7 +419,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     const CancellationToken& token) {
     auto startTimer = Timer();
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
-    auto span = startEgressSpan(request.telemetryContext, opMsgRequest.getCommandName());
+    // TODO(SERVER-130312): Start a span here.
     opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
 
     return runCommand(std::move(opMsgRequest),
@@ -445,23 +427,9 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
                       request.fireAndForget,
                       std::move(fromConnAcquiredTimer),
                       token)
-        .onCompletion([this, startTimer = std::move(startTimer), span = std::move(span)](
-                          StatusWith<rpc::UniqueReply> swResponse) mutable
-                          -> StatusWith<executor::RemoteCommandResponse> {
-            // This callback may not be destroyed immediately after this function returns, so we
-            // move the span to a local variable to ensure it ends when this function returns. Note
-            // that onCompletion includes the cancellation case.
-            auto endedSpan = std::move(span);
-            if (!swResponse.isOK()) {
-                endedSpan.setStatus(swResponse.getStatus());
-                return swResponse.getStatus();
-            }
-            // A successful round-trip can still carry a command-level error (e.g. {ok: 0}) in the
-            // reply body, so derive the span status from the command result rather than assuming
-            // OK just because the transport layer succeeded.
-            auto& commandReply = swResponse.getValue()->getCommandReply();
-            endedSpan.setStatus(getStatusFromCommandResult(commandReply));
-            return executor::RemoteCommandResponse(_peer, commandReply, startTimer.elapsed());
+        .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
+            return executor::RemoteCommandResponse(
+                _peer, response->getCommandReply(), startTimer.elapsed());
         });
 }
 
@@ -471,14 +439,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::_continueReceiveExhaustRe
     const BatonHandle& baton,
     const CancellationToken& token) {
     return _waitForResponse(msgId, baton, token)
-        .onCompletion([stopwatch, this](StatusWith<Message> swResponseMsg) mutable
-                          -> StatusWith<executor::RemoteCommandResponse> {
-            if (!swResponseMsg.isOK()) {
-                maybeEndExhaustSpan(
-                    _exhaustSpan, /*isMoreToComeSet=*/false, swResponseMsg.getStatus());
-                return swResponseMsg.getStatus();
-            }
-            Message responseMsg = std::move(swResponseMsg.getValue());
+        .then([stopwatch, msgId, baton, this](Message responseMsg) mutable {
             bool isMoreToComeSet = OpMsg::isFlagSet(responseMsg, OpMsg::kMoreToCome);
             rpc::UniqueReply response = rpc::UniqueReply(responseMsg, rpc::makeReply(&responseMsg));
             auto rcResponse =
@@ -486,9 +447,6 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::_continueReceiveExhaustRe
                                                 response->getCommandReply(),
                                                 duration_cast<Milliseconds>(stopwatch.elapsed()),
                                                 isMoreToComeSet);
-            maybeEndExhaustSpan(_exhaustSpan,
-                                isMoreToComeSet,
-                                getStatusFromCommandResult(response->getCommandReply()));
             return rcResponse;
         });
 }
@@ -514,12 +472,6 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(
     return _call(std::move(requestMsg), msgId, baton, token)
         .then([msgId, baton, this, token]() mutable {
             return _continueReceiveExhaustResponse(ClockSource::StopWatch(), msgId, baton, token);
-        })
-        .onError([this](Status s) -> StatusWith<executor::RemoteCommandResponse> {
-            // Covers the case where `_call` itself fails, before
-            // `_continueReceiveExhaustResponse` (and its own span-ending logic) ever runs.
-            maybeEndExhaustSpan(_exhaustSpan, /*isMoreToComeSet=*/false, s);
-            return s;
         });
 }
 
@@ -528,7 +480,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
     const BatonHandle& baton,
     const CancellationToken& token) {
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
-    _exhaustSpan = startEgressSpan(request.telemetryContext, opMsgRequest.getCommandName());
+    // TODO(SERVER-130312): Start a span here.
     opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
     return runExhaustCommand(std::move(opMsgRequest), baton, token);
 }
