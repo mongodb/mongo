@@ -202,6 +202,7 @@ query:
     - src/mongo/db/fts/
     - src/mongo/db/geo/
     - src/mongo/db/hasher*
+    - src/mongo/db/ifr_unrecognized_flag_info*
     - src/mongo/db/index_names*
     - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
     - src/mongo/db/matcher/

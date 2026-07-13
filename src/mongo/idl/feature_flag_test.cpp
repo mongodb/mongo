@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/feature_flag_test_gen.h"
+#include "mongo/db/ifr_unrecognized_flag_info.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -608,13 +609,50 @@ TEST(IDLFeatureFlag, FromWireRecognizedFlagStoredAtWireValue) {
 }
 
 // Death tests live in a separate suite because gtest forbids mixing TEST and
-// TEST_F (which DEATH_TEST_REGEX expands to) in the same suite.
+// TEST_F (which DEATH_TEST_REGEX expands to) in the same suite. The regex is matched against the
+// "Tripwire assertion" log line, which includes the thrown Status's reason — so it pins the error
+// identity. (The extra-info *contents* are asserted directly, off the tripwire path, in
+// UnrecognizedIFRFlagInfo's MakeStatus* tests; assertions placed inside a death-test body would
+// not fail the test because the tripwire line is logged before they run.)
 DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
                  FromWireUnknownFlagSameSenderVersionErrors,
-                 "Tripwire assertion.*13002300") {
+                 "Tripwire assertion.*Received unknown IFR flag 'unknownIfrFlagForTest9'") {
     std::vector<BSONObj> payload = {BSON("name" << "unknownIfrFlagForTest9" << "value" << true)};
-    ASSERT_THROWS_CODE(
-        IncrementalFeatureRolloutContext::fromWireForTest(payload), AssertionException, 13002300);
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+}
+
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 FromWireMultipleUnknownFlagsReportsAll,
+                 "Tripwire assertion.*Received 2 unknown IFR flags") {
+    std::vector<BSONObj> payload = {
+        BSON("name" << "unknownIfrFlagForTest9" << "value" << true),
+        BSON("name" << "anotherUnknownIfrFlagForTest" << "value" << false),
+    };
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+}
+
+// A sender specifying the same flag twice in one payload is a malformed request; the fromWire
+// accumulation loop tripwires rather than silently collapsing. Covers both the unrecognized
+// (scenario 3) and recognized (scenario 1) branches.
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 FromWireDuplicateUnknownFlagTasserts,
+                 "Tripwire assertion.*specified IFR flag 'unknownIfrFlagForTest9' more than once") {
+    std::vector<BSONObj> payload = {
+        BSON("name" << "unknownIfrFlagForTest9" << "value" << true),
+        BSON("name" << "unknownIfrFlagForTest9" << "value" << false),
+    };
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+}
+
+DEATH_TEST_REGEX(
+    IDLFeatureFlagDeathTests,
+    FromWireDuplicateRecognizedFlagTasserts,
+    "Tripwire assertion.*specified IFR flag 'featureFlagSerializeForTest' more than once") {
+    std::vector<BSONObj> payload = {
+        BSON("name" << "featureFlagSerializeForTest" << "value" << true),
+        BSON("name" << "featureFlagSerializeForTest" << "value" << false),
+    };
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
 }
 
 TEST(IDLFeatureFlag, FromWireMalformedNonStringName) {

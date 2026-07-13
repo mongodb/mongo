@@ -71,6 +71,9 @@ filters:
   - "ifr_flag_retry_info*":
     approvers:
       - 10gen/server-programmability
+  - "ifr_unrecognized_flag_info*":
+    approvers:
+      - 10gen/query-execution
   - "index_names.*":
     approvers:
       - 10gen/query-execution-write-exec

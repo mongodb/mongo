@@ -7,6 +7,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/version.h"
 
+#include <string>
+
 namespace mongo {
 
 /**
@@ -22,5 +24,13 @@ IFRSenderVersion makeIFRSenderVersion(const VersionInfoInterface& provider);
  */
 [[MONGO_MOD_PUBLIC]]
 IFRSenderVersion makeLocalIFRSenderVersion();
+
+/**
+ * Renders an 'IFRSenderVersion' for diagnostics as "major.minor.patch", appending the pre-release
+ * 'extra' component only when set (a release candidate has extra < 0, which already carries its own
+ * sign, e.g. "9.0.0-23") so rc builds stay legible.
+ */
+[[MONGO_MOD_PUBLIC]]
+std::string formatSenderVersion(const IFRSenderVersion& v);
 
 }  // namespace mongo

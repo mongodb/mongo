@@ -1146,7 +1146,15 @@ error_codes:
       categories: [RetriableError],
       extra: IFRFlagRetryInfo,
     }
-  - {code: 480, name: UnrecognizedIFRFlag}
+  # TODO SERVER-131201: make UnrecognizedIFRFlagInfo non-optional once all wire-compatible versions
+  # send it (extraIsOptional avoids transforming the error on a newer receiver during the
+  # multiversion window when a peer emits UnrecognizedIFRFlag without the extra info).
+  - {
+      code: 480,
+      name: UnrecognizedIFRFlag,
+      extra: UnrecognizedIFRFlagInfo,
+      extraIsOptional: true,
+    }
   - {
       code: 481,
       name: StreamProcessorBadChangeStreamPipeline,

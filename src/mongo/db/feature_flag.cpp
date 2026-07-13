@@ -6,6 +6,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/ifr_unrecognized_flag_info.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/server_options.h"
@@ -276,18 +277,6 @@ IFRSenderVersion toFullVersion(multiversion::FeatureCompatibilityVersion fcv) {
     version.setPatch(0);
     version.setExtra(std::numeric_limits<int>::min());
     return version;
-}
-
-// Renders an IFRSenderVersion for diagnostics as "major.minor.patch", appending the pre-release
-// 'extra' component only when set (a release candidate has extra < 0, which already carries its
-// own sign, e.g. "9.0.0-23") so rc builds stay legible.
-std::string formatSenderVersion(const IFRSenderVersion& v) {
-    str::stream s;
-    s << v.getMajor() << "." << v.getMinor() << "." << v.getPatch();
-    if (v.getExtra() != 0) {
-        s << v.getExtra();
-    }
-    return s;
 }
 
 // Use a lazy-initialization here to avoid frontloading any work for traffic which doesn't consult
@@ -568,6 +557,10 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
     // 4).
     absl::flat_hash_set<const IncrementalRolloutFeatureFlag*> receivedFlags;
 
+    // Collect all scenario-3 (genuinely unrecognized) flags so we can report them together.
+    // Keyed by name so a payload that repeats an unknown flag collapses to a single entry.
+    UnrecognizedIFRFlagInfo::FlagMap unknownFlags;
+
     for (const auto& flagObj : flags) {
         const auto& nameElem = flagObj["name"];
         uassert(
@@ -582,20 +575,26 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
         auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
 
         if (flag != nullptr) {
-            // Scenario 1: recognized flag — store the sender's value.
+            // Scenario 1: recognized flag — store the sender's value. A flag appearing twice in one
+            // payload is a malformed request from the sender; treat it as a protocol error.
             _savedFlagValues[flag] = valueElem.boolean();
-            receivedFlags.insert(flag);
+            tassert(13024005,
+                    str::stream() << "Sender specified IFR flag '" << flagName
+                                  << "' more than once",
+                    receivedFlags.insert(flag).second);
             // TODO SERVER-130479 Missing a possible scenario: flag was removed in an earlier
             // version.
         } else if (*_senderVersion <= localSenderVersion()) {
             // Scenario 3: flag is genuinely unknown and the sender is no newer than this binary
             // (compared at FCV granularity; patch-level precision is deferred with the
             // flag-introduction-granularity work). A same-series-or-older sender should never
-            // produce a flag we don't recognize; treat it as a protocol error.
-            tasserted(13002300,
-                      str::stream()
-                          << "Received unknown IFR flag '" << flagName
-                          << "' from sender at version " << formatSenderVersion(*_senderVersion));
+            // produce a flag we don't recognize; treat it as a protocol error. Accumulate all
+            // such flags so they can be reported together. As with scenario 1, a repeated flag is a
+            // malformed request.
+            tassert(13024006,
+                    str::stream() << "Sender specified IFR flag '" << flagName
+                                  << "' more than once",
+                    unknownFlags.emplace(std::string(flagName), valueElem.boolean()).second);
         } else {
             // Sender is newer than this binary (or no version info was provided). A flag unknown to
             // us was added after our binary — silently drop with a rate-limited log so
@@ -609,6 +608,13 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
                             "flagName"_attr = flagName);
             }
         }
+    }
+
+    // Scenario 3 (deferred tripwire): a same-or-older sender should never produce a flag we don't
+    // recognize, so treat it as a programmer error. Report all such flags together, attaching the
+    // structured UnrecognizedIFRFlagInfo so callers can inspect the full set without re-parsing.
+    if (!unknownFlags.empty()) {
+        tasserted(makeUnrecognizedIFRFlagStatus(std::move(unknownFlags), *_senderVersion));
     }
 
     // Scenario 4: eagerly resolve active flags that were absent from the payload.
