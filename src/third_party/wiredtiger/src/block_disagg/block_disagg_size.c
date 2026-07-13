@@ -51,10 +51,12 @@ __wti_block_disagg_decrease_size(
     } while (!__wt_atomic_cas_uint64(&block_disagg->size, orig, orig < size ? 0 : orig - size));
 
     if (orig < size)
+        /* FIXME-WT-18039: Replace this and the WT_ASSERT below with a WT_ASSERT_ALWAYS. */
         __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE,
           "disaggregated block size underflow: decrementing %" PRIu64 " from %" PRIu64
           ", clamped to 0",
           size, orig);
+    WT_ASSERT(session, orig >= size);
 }
 
 /*

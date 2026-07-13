@@ -434,6 +434,13 @@ retry:
     stable_uri = layered->stable_uri;
     /* Now do the stable table. */
     if (!S2C(session)->layered_table_manager.leader) {
+        /*
+         * Non-walk stable stats are ~0 on a follower because its pages are not resident in the
+         * local cache. Skip opening the stable table.
+         */
+        if (!F_ISSET(cst, WT_STAT_TYPE_TREE_WALK))
+            goto done;
+
         /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
         WT_ERR_NOTFOUND_OK(
           __wt_meta_checkpoint_last_name(session, stable_uri, &checkpoint_name, NULL, NULL), true);
@@ -455,8 +462,15 @@ retry:
     }
 
     ret = __wt_session_get_dhandle(session, stable_uri, NULL, NULL, 0);
-    if (ret == EBUSY)
+    if (ret == EBUSY) {
+        /*
+         * The retry re-fetches the checkpoint name and reallocates the scratch buffer, so release
+         * both before looping.
+         */
+        __wt_free(session, checkpoint_name);
+        __wt_scr_free(session, &stable_uri_buf);
         goto retry;
+    }
 
     WT_ERR(ret);
 

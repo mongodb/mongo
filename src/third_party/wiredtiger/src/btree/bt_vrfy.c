@@ -535,19 +535,20 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
             /* Account for the root page in the accumulated total block size. */
             WT_TRET(__verify_disagg_accumulate_size(session, vs, ckpt->raw.data, ckpt->raw.size));
 
+#ifdef HAVE_DIAGNOSTIC
             /* Validate the size of the btree. */
-            if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size) {
+            if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size)
                 /*
-                 * FIXME-WT-16660: We are seeing mismatches due to nuanced reconciliation issues,
+                 * FIXME-WT-18038: We are seeing mismatches due to nuanced reconciliation issues,
                  * where bytes_total increments happen before the reconciliation panic boundary,
                  * leaving us in an inconsistent state if reconciliation fails after the increment
-                 * but before completion. Re-enable this check once this is resolved.
+                 * but before completion. Only fail in diagnostic builds for now; enable this branch
+                 * in production builds once this is resolved.
                  */
-                if (false)
-                    WT_ERR_MSG(session, WT_ERROR,
-                      "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
-                      ckpt->size, vs->total_block_size);
-            }
+                WT_ERR_MSG(session, WT_ERROR,
+                  "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
+                  ckpt->size, vs->total_block_size);
+#endif
 
             /*
              * The checkpoints are in time-order, so the last one in the list is the most recent. If

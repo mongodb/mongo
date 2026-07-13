@@ -13,6 +13,15 @@ struct __wt_connection_load_control {
     wt_shared uint64_t read_load_max;  /* cache max bytes equivalent eviction trigger */
     wt_shared uint64_t write_load_max; /* cache max dirty bytes equivalent to dirty trigger */
 
+    /*
+     * Read miss rate tracking. The read load is amplified by the fraction of recently requested
+     * pages that had to be read from disk. The miss rate is sampled over the delta of the
+     * cumulative counters since the previous review to reflect current conditions rather than
+     * lifetime history.
+     */
+    wt_shared uint64_t prev_cache_read;            /* cache_read at last miss-rate review */
+    wt_shared uint64_t prev_cache_pages_requested; /* cache_pages_requested at last review */
+
     /* cache eviction controls bit positions */
 #define WT_CONN_LOAD_CONTROL 0x1u
     wt_shared uint32_t flags;
