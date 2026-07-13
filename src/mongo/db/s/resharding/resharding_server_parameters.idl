@@ -568,18 +568,20 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
         cpp_varname: gReshardingDocumentVerification
-        default: false
+        default: true
         redact: false
 
     reshardingDocumentValidationMaxCollectionSizeBytes:
         description: >-
             The maximum estimated collection size in bytes at which resharding document
             validation is allowed to run. When the estimated collection size exceeds this
-            threshold, count validation is skipped.
+            threshold, count validation is skipped. Defaults to the maximum long long value,
+            meaning validation always runs unless explicitly limited.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<long long>
         cpp_varname: gReshardingDocumentValidationMaxCollectionSizeBytes
-        default: 1024 # 1KB
+        default:
+            expr: std::numeric_limits<long long>::max()
         validator:
             gte: 0
         redact: false

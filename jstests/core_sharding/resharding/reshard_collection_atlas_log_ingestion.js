@@ -106,7 +106,7 @@ const kExpectedValidationOutcomes = {
 main();
 
 function main() {
-    const verificationEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
+    const verificationEnabled = FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
 
     const testCases = [
         TestMode.kSuccess,

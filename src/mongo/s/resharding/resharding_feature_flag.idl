@@ -122,8 +122,7 @@ feature_flags:
             "Feature flag to enable data loss and consistency verification steps during
             resharding to ensure correctness."
         cpp_varname: gFeatureFlagReshardingVerification
-        default: true
-        version: 9.0
+        default: false
         fcv_gated: true
     featureFlagReshardingCloneNoRefresh:
         mod_visibility: public

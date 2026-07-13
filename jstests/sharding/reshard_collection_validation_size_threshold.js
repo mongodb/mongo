@@ -5,7 +5,6 @@
  * @tags: [
  *   cannot_run_during_upgrade_downgrade,
  *   featureFlagReshardingVerification,
- *   requires_fcv_90,
  * ]
  */
 

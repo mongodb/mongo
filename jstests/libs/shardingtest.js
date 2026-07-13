@@ -14,18 +14,6 @@ const kDefaultWTimeoutMs = 5 * 60 * 1000;
 // Oplog collection name
 const kOplogName = "oplog.rs";
 
-// 'reshardingDocumentVerification' defaults to false in production, so enable it (and raise the
-// size-based skip threshold, default 1KB) in test clusters to preserve coverage for resharding
-// document-count validation. Only sets values not already specified so individual tests can override.
-function setDefaultReshardingVerificationParameters(setParameter) {
-    if (setParameter.reshardingDocumentVerification === undefined) {
-        setParameter.reshardingDocumentVerification = true;
-    }
-    if (setParameter.reshardingDocumentValidationMaxCollectionSizeBytes === undefined) {
-        setParameter.reshardingDocumentValidationMaxCollectionSizeBytes = 1073741824;
-    }
-}
-
 export class ShardingTest {
     // ShardingTest API
     getDB(name) {
@@ -1326,10 +1314,6 @@ export class ShardingTest {
                     startOptions.setParameter = startOptions.setParameter ?? {};
                     startOptions.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
                 }
-                if (!clusterVersionInfo.isMixedVersion) {
-                    startOptions.setParameter = startOptions.setParameter ?? {};
-                    setDefaultReshardingVerificationParameters(startOptions.setParameter);
-                }
                 rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
 
                 let nodeOptions = [];
@@ -1408,9 +1392,6 @@ export class ShardingTest {
                 if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
                     MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(rsDefaults.binVersion || "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
                     rsDefaults.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
-                }
-                if (!clusterVersionInfo.isMixedVersion) {
-                    setDefaultReshardingVerificationParameters(rsDefaults.setParameter);
                 }
 
                 let rsSettings = rsDefaults.settings;

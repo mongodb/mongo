@@ -399,6 +399,7 @@ const featureFlagReshardingVerification = FeatureFlagUtil.isPresentAndEnabled(
 );
 if (featureFlagReshardingVerification) {
     jsTest.log("Succeed if 'performVerification' parameter is set to true.");
+
     reshardCmdTest.assertReshardCollOk(
         {reshardCollection: ns, key: {newKey: 1}, performVerification: true, numInitialChunks: 1},
         1,
