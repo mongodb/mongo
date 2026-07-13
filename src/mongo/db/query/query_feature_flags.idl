@@ -279,7 +279,7 @@ feature_flags:
     featureFlagExtensionsApiSignatureValidation:
         description: "Feature flag to enable validating extension signatures at load time."
         cpp_varname: gFeatureFlagExtensionsApiSignatureValidation
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagExtensionStubParsers:

@@ -112,7 +112,7 @@ SignatureValidator::SignatureValidator(bool secureMode)
     LOGV2_DEBUG(11528804, 4, "Initializing SignatureValidator");
 
     if (_skipValidation) {
-        LOGV2_DEBUG(11528805, 4, "Skipping signature validation");
+        LOGV2(11528805, "Skipping signature validation");
         return;
     }
     /* initialize Rnp context and import validation public key into the keyring (i.e rnpCtx) */
@@ -187,6 +187,11 @@ ValidatedExtension SignatureValidator::validateExtensionSignature(
  */
 rnp::RnpInput SignatureValidator::_getValidationPublicKeyAsRnpInput() const {
     if (_secureMode) {
+        LOGV2(
+            12369100,
+            "SignatureValidator running in secure mode, using production mongot-extension signing "
+            "key");
+
         static const std::string kPublicKey(kMongoExtensionSigningPublicKey);
         return rnp::RnpInput::createFromMemory(kPublicKey, false);
     }
@@ -201,10 +206,9 @@ rnp::RnpInput SignatureValidator::_getValidationPublicKeyAsRnpInput() const {
     tassert(11528904,
             "extensionsSignaturePublicKeyPath was empty!",
             !extensionValidationPublicKeyPath.empty());
-    LOGV2_DEBUG(11528905,
-                4,
-                "SignatureValidator using public key path",
-                "extensionValidationPublicKeyPath"_attr = extensionValidationPublicKeyPath);
+    LOGV2(11528905,
+          "SignatureValidator running in insecure mode, using public key path",
+          "extensionValidationPublicKeyPath"_attr = extensionValidationPublicKeyPath);
     return rnp::RnpInput::createFromPath(extensionValidationPublicKeyPath);
 }
 }  // namespace mongo::extension::host

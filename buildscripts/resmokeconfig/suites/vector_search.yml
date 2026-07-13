@@ -9,4 +9,10 @@ selector:
 executor:
   config:
     shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            # Disable signature validation on test-signed extensions as they fail on secure-mode builds.
+            # NOTE: Production verification is covered by extensions_secure_mode suites. See SERVER-123691.
+            featureFlagExtensionsApiSignatureValidation: false
       nodb: ""
