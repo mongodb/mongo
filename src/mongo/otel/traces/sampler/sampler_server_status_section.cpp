@@ -19,18 +19,14 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         const auto stats = TracingSampler::get().getStats();
-        BSONObjBuilder b;
-        {
-            BSONObjBuilder bob(b.subobjStart("internalSpans"));
-            bob.append("acceptedByRateLimiter", stats.internalSpans.admitted);
-            bob.append("rejectedByRateLimiter", stats.internalSpans.rejected);
-        }
-        {
-            BSONObjBuilder bob(b.subobjStart("externalSpan"));
-            bob.append("acceptedByRateLimiter", stats.externalSpan.admitted);
-            bob.append("rejectedByRateLimiter", stats.externalSpan.rejected);
-        }
-        return b.obj();
+        auto rateLimiter = [](const auto& counts) {
+            return BSON("rateLimiter"
+                        << BSON("successfulAdmissions" << counts.admitted << "rejectedAdmissions"
+                                                       << counts.rejected));
+        };
+
+        return BSON("internalSpans" << rateLimiter(stats.internalSpans) << "externalSpan"
+                                    << rateLimiter(stats.externalSpan));
     }
 };
 

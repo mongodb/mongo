@@ -28,74 +28,74 @@ namespace span_names {
 SPAN_NAME_(kMongoRPC, "mongorpc");
 
 // Resharding spans
-SPAN_NAME_(kReshardCollectionCmdInvocationTypedRun, "ReshardCollectionCmd::Invocation::typedRun");
-SPAN_NAME_(kReshardingCoordinatorRun, "ReshardingCoordinator::run");
+SPAN_NAME_(kReshardCollectionCmdInvocationTypedRun, "reshard_collection_cmd.invocation.typed_run");
+SPAN_NAME_(kReshardingCoordinatorRun, "resharding_coordinator.run");
 SPAN_NAME_(kReshardingCoordinatorRunUntilReadyToCommit,
-           "ReshardingCoordinator::_runUntilReadyToCommit");
-SPAN_NAME_(kReshardingCoordinatorCommitting, "ReshardingCoordinator::committing");
-SPAN_NAME_(kReshardingCoordinatorAfterFinish, "ReshardingCoordinator::afterFinish");
+           "resharding_coordinator.run_until_ready_to_commit");
+SPAN_NAME_(kReshardingCoordinatorCommitting, "resharding_coordinator.committing");
+SPAN_NAME_(kReshardingCoordinatorAfterFinish, "resharding_coordinator.after_finish");
 SPAN_NAME_(kReshardingCoordinatorWaitForCommitMonitor,
-           "ReshardingCoordinator::waitForCommitMonitor");
-SPAN_NAME_(kReshardingCoordinatorFinalize, "ReshardingCoordinator::finalize");
+           "resharding_coordinator.wait_for_commit_monitor");
+SPAN_NAME_(kReshardingCoordinatorFinalize, "resharding_coordinator.finalize");
 SPAN_NAME_(kReshardingCoordinatorRecipientPostCloningDeltaCollector,
-           "ReshardingCoordinator::RecipientPostCloningDeltaCollector");
+           "resharding_coordinator.recipient_post_cloning_delta_collector");
 SPAN_NAME_(kReshardingCoordinatorAwaitAllDonorsReadyToDonate,
-           "ReshardingCoordinator::_awaitAllDonorsReadyToDonate");
+           "resharding_coordinator.await_all_donors_ready_to_donate");
 SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsCloning,
-           "ReshardingCoordinator::_awaitAllRecipientsCloning");
+           "resharding_coordinator.await_all_recipients_cloning");
 SPAN_NAME_(kReshardingCoordinatorFetchAndPersistNumDocumentsToCloneFromDonors,
-           "ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors");
+           "resharding_coordinator.fetch_and_persist_num_documents_to_clone_from_donors");
 SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsFinishedCloning,
-           "ReshardingCoordinator::_awaitAllRecipientsFinishedCloning");
+           "resharding_coordinator.await_all_recipients_finished_cloning");
 SPAN_NAME_(kReshardingCoordinatorTellAllDonorsToRefresh,
-           "ReshardingCoordinator::_tellAllDonorsToRefresh");
+           "resharding_coordinator.tell_all_donors_to_refresh");
 SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsFinishedApplying,
-           "ReshardingCoordinator::_awaitAllRecipientsFinishedApplying");
+           "resharding_coordinator.await_all_recipients_finished_applying");
 SPAN_NAME_(kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit,
-           "ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
+           "resharding_coordinator.tell_all_participants_resharding_ready_to_commit");
 SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsInStrictConsistency,
-           "ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency");
-SPAN_NAME_(kReshardingDonorStateMachineRun, "ReshardingDonorService::DonorStateMachine::run");
+           "resharding_coordinator.await_all_recipients_in_strict_consistency");
+SPAN_NAME_(kReshardingDonorStateMachineRun, "resharding_donor_service.donor_state_machine.run");
 SPAN_NAME_(kReshardingCoordinatorDonorPostCloningDeltaCollector,
-           "ReshardingCoordinator::DonorPostCloningDeltaCollector");
+           "resharding_coordinator.donor_post_cloning_delta_collector");
 SPAN_NAME_(kReshardingDonorOnPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData,
-           "ReshardingDonorService::_onPreparingToDonate"
-           "CalculateTimestampThenTransitionToDonatingInitialData");
+           "resharding_donor_service.on_preparing_to_donate_calculate_timestamp"
+           "_then_transition_to_donating_initial_data");
 SPAN_NAME_(kReshardingDonorAwaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries,
-           "ReshardingDonorService::_awaitAllRecipientsDoneCloning"
-           "ThenTransitionToDonatingOplogEntries");
+           "resharding_donor_service.await_all_recipients_done_cloning"
+           "_then_transition_to_donating_oplog_entries");
 SPAN_NAME_(kReshardingDonorCreateAndStartChangeStreamsMonitor,
-           "ReshardingDonorService::_createAndStartChangeStreamsMonitor");
+           "resharding_donor_service.create_and_start_change_streams_monitor");
 SPAN_NAME_(kReshardingDonorAwaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites,
-           "ReshardingDonorService::_awaitAllRecipientsDoneApplying"
-           "ThenTransitionToPreparingToBlockWrites");
+           "resharding_donor_service.await_all_recipients_done_applying"
+           "_then_transition_to_preparing_to_block_writes");
 SPAN_NAME_(kReshardingDonorWriteTransactionOplogEntryThenTransitionToBlockingWrites,
-           "ReshardingDonorService::_writeTransactionOplogEntry"
-           "ThenTransitionToBlockingWrites");
+           "resharding_donor_service.write_transaction_oplog_entry"
+           "_then_transition_to_blocking_writes");
 SPAN_NAME_(kReshardingDonorRunUntilBlockingWritesOrErrored,
-           "ReshardingDonorService::_runUntilBlockingWritesOrErrored");
+           "resharding_donor_service.run_until_blocking_writes_or_errored");
 SPAN_NAME_(kReshardingDonorNotifyCoordinatorAndAwaitDecision,
-           "ReshardingDonorService::_notifyCoordinatorAndAwaitDecision");
-SPAN_NAME_(kReshardingRecipientRun, "ReshardingRecipientService::run");
+           "resharding_donor_service.notify_coordinator_and_await_decision");
+SPAN_NAME_(kReshardingRecipientRun, "resharding_recipient_service.run");
 SPAN_NAME_(kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection,
-           "ReshardingRecipientService::_awaitAllDonorsPreparedToDonate"
-           "ThenTransitionToCreatingCollection");
+           "resharding_recipient_service.await_all_donors_prepared_to_donate"
+           "_then_transition_to_creating_collection");
 SPAN_NAME_(kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning,
-           "ReshardingRecipientService::_createTemporaryReshardingCollection"
-           "ThenTransitionToCloning");
+           "resharding_recipient_service.create_temporary_resharding_collection"
+           "_then_transition_to_cloning");
 SPAN_NAME_(kReshardingRecipientCloneThenTransitionToBuildingIndex,
-           "ReshardingRecipientService::_cloneThenTransitionToBuildingIndex");
+           "resharding_recipient_service.clone_then_transition_to_building_index");
 SPAN_NAME_(kReshardingRecipientBuildIndexThenTransitionToApplying,
-           "ReshardingRecipientService::_buildIndexThenTransitionToApplying");
+           "resharding_recipient_service.build_index_then_transition_to_applying");
 SPAN_NAME_(kReshardingRecipientCreateAndStartChangeStreamsMonitor,
-           "ReshardingRecipientService::_createAndStartChangeStreamsMonitor");
+           "resharding_recipient_service.create_and_start_change_streams_monitor");
 SPAN_NAME_(kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency,
-           "ReshardingRecipientService::_awaitAllDonorsBlockingWrites"
-           "ThenTransitionToStrictConsistency");
+           "resharding_recipient_service.await_all_donors_blocking_writes"
+           "_then_transition_to_strict_consistency");
 SPAN_NAME_(kReshardingRecipientRunUntilStrictConsistencyOrErrored,
-           "ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
+           "resharding_recipient_service.run_until_strict_consistency_or_errored");
 SPAN_NAME_(kReshardingRecipientNotifyCoordinatorAndAwaitDecision,
-           "ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
+           "resharding_recipient_service.notify_coordinator_and_await_decision");
 
 // Test-only
 SPAN_NAME_(kTest1, "test_only.span1");
