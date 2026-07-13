@@ -229,7 +229,7 @@ boost::intrusive_ptr<Expression> parseIdExpression(
         }
 
         const BSONObj idKeyObj = groupField.Obj();
-        if (idKeyObj.firstElementFieldName()[0] == '$') {
+        if (idKeyObj.firstElementFieldNameStringData().starts_with('$')) {
             // grouping on a $op expression
             return Expression::parseObject(expCtx.get(), idKeyObj, vps);
         } else {

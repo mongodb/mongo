@@ -58,7 +58,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     uassert(40234,
             str::stream() << "The field '" << fieldName << "' must be an accumulator object",
             elem.type() == BSONType::object &&
-                elem.embeddedObject().firstElementFieldName()[0] == '$');
+                elem.embeddedObject().firstElementFieldNameStringData().starts_with('$'));
 
     uassert(40235,
             str::stream() << "The field name '" << fieldName << "' cannot contain '.'",

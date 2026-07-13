@@ -45,7 +45,7 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
     const BSONElement& groupByField,
     const VariablesParseState& vps) {
     if (groupByField.type() == BSONType::object &&
-        groupByField.embeddedObject().firstElementFieldName()[0] == '$') {
+        groupByField.embeddedObject().firstElementFieldNameStringData().starts_with('$')) {
         return Expression::parseObject(expCtx.get(), groupByField.embeddedObject(), vps);
     } else if (groupByField.type() == BSONType::string &&
                // Lager than 2 because we need a '$', at least one char for the field name and

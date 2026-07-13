@@ -288,7 +288,7 @@ boost::intrusive_ptr<Expression> parseDateExpressionAcceptingTimeZone(
     BSONElement operatorElem,
     const VariablesParseState& variablesParseState) {
     if (operatorElem.type() == BSONType::object) {
-        if (operatorElem.embeddedObject().firstElementFieldName()[0] == '$') {
+        if (operatorElem.embeddedObject().firstElementFieldNameStringData().starts_with('$')) {
             // Assume this is an expression specification representing the date argument
             // like {$add: [<date>, 1000]}.
             return new SubClass(expCtx,

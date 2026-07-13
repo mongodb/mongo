@@ -667,8 +667,9 @@ bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {
 }
 
 bool isClassicalUpdateReplacement(const BSONObj& update) {
-    // An empty update object will be treated as replacement as firstElementFieldName() returns "".
-    return update.firstElementFieldName()[0] != '$';
+    // An empty update object will be treated as replacement as firstElementFieldNameStringData()
+    // returns an empty string, which does not start with '$'.
+    return !update.firstElementFieldNameStringData().starts_with('$');
 }
 
 void checkWriteErrors(const WriteCommandReplyBase& reply) {

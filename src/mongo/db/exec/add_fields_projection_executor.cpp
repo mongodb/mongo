@@ -210,7 +210,7 @@ bool AddFieldsProjectionExecutor::parseObjectAsExpression(
     const FieldPath& pathToObject,
     const BSONObj& objSpec,
     const VariablesParseState& variablesParseState) {
-    if (objSpec.firstElementFieldName()[0] == '$') {
+    if (objSpec.firstElementFieldNameStringData().starts_with('$')) {
         // This is an expression like {$add: [...]}. We already verified that it has only one field.
         tassert(7241737,
                 "expression in Projection Executor should only have one field",

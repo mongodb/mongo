@@ -38,7 +38,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
         uassert(40147,
                 str::stream() << "the sortByCount field must be defined as a $-prefixed path or an "
                                  "expression inside an object",
-                innerObj.firstElementFieldName()[0] == '$');
+                innerObj.firstElementFieldNameStringData().starts_with('$'));
     } else if (elem.type() == BSONType::string) {
         // Make sure that the sortByCount field is a $-prefixed path.
         uassert(40148,

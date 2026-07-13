@@ -252,7 +252,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::ELEM_MATCH: {
                 BSONObj subIn = field.Obj();
                 Document subOut;
-                if (subIn.firstElementFieldName()[0] == '$') {
+                if (subIn.firstElementFieldNameStringData().starts_with('$')) {
                     subOut = redactSafePortionDollarOps(subIn);
                 } else {
                     subOut = redactSafePortionTopLevel(subIn);
