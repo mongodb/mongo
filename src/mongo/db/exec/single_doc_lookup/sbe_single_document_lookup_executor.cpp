@@ -225,13 +225,25 @@ bool SbeSingleDocumentLookupExecutor::SlotBinder::bind(const BSONElement& idElem
 boost::optional<SbeSingleDocumentLookupExecutor::PreparedExecutor>
 SbeSingleDocumentLookupExecutor::PreparedExecutor::make(OperationContext* opCtx,
                                                         const CollectionAcquirer::Handle& coll,
-                                                        std::unique_ptr<CanonicalQuery> cq) {
+                                                        std::unique_ptr<CanonicalQuery> cq,
+                                                        bool shouldApplyShardFilter) {
     const NamespaceString& nss = coll.nss();
     MultipleCollectionAccessor collections(coll.collection());
+
+    // Request a shard-filter stage so orphans physically present on this node are dropped, unless
+    // the eligibility already resolved ownership from the shard key. Gate on isSharded() the same
+    // way get_executor does: requiresShardFiltering() calls getShardKeyPattern(), which invariants
+    // on an unsharded collection. When set, the shardFilterer slot is populated from the
+    // acquisition by prepareSlotBasedExecutableTree() below.
+    const bool applyShardFilter =
+        shouldApplyShardFilter && coll.collection().getShardingDescription().isSharded();
+    const size_t plannerOptions =
+        applyShardFilter ? QueryPlannerParams::INCLUDE_SHARD_FILTER : QueryPlannerParams::DEFAULT;
     auto plannerParams = QueryPlannerParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
         .opCtx = opCtx,
         .canonicalQuery = *cq,
         .collections = collections,
+        .plannerOptions = plannerOptions,
     });
     auto solutions = uassertStatusOK(QueryPlanner::plan(*cq, plannerParams));
     if (solutions.empty()) {
@@ -328,7 +340,8 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
                 }
                 assertLocalLookupReadAtOrAfter(opCtx, afterClusterTime);
 
-                if (!getOrMakeExecutor(opCtx, coll, nss, *idFilter)) {
+                if (!getOrMakeExecutor(
+                        opCtx, coll, nss, *idFilter, !_eligibilityChecksShardKeyOwnership)) {
                     // Planning failed or plan shape is not one SlotBinder supports.
                     return {LookupResult::HandledStatus::kNotHandled, boost::none};
                 }
@@ -390,7 +403,8 @@ CollectionAcquirer::Handle& SbeSingleDocumentLookupExecutor::getOrAcquireCollect
 bool SbeSingleDocumentLookupExecutor::getOrMakeExecutor(OperationContext* opCtx,
                                                         const CollectionAcquirer::Handle& coll,
                                                         const NamespaceString& nss,
-                                                        const BSONObj& filter) {
+                                                        const BSONObj& filter,
+                                                        bool shouldApplyShardFilter) {
     // First call (or invalidation): build the CanonicalQuery and create the SBE executor once.
     // 'filter' seeds the planner with literal values to generate bounds + IETs from. On subsequent
     // calls the cached executor is reused. SlotBinder::bind() resets the parameterized slots at
@@ -402,7 +416,8 @@ bool SbeSingleDocumentLookupExecutor::getOrMakeExecutor(OperationContext* opCtx,
         _preparedExecutor = PreparedExecutor::make(
             opCtx,
             coll,
-            buildCanonicalQuery(opCtx, nss, filter, coll.getCollectionPtr()->getDefaultCollator()));
+            buildCanonicalQuery(opCtx, nss, filter, coll.getCollectionPtr()->getDefaultCollator()),
+            shouldApplyShardFilter);
         if (!_preparedExecutor) {
             return false;
         }

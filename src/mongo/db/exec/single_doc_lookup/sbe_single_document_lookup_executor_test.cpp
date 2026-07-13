@@ -4,6 +4,7 @@
 #include "mongo/db/exec/single_doc_lookup/sbe_single_document_lookup_executor.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -12,6 +13,10 @@
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats_test_util.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -22,7 +27,11 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -43,6 +52,8 @@ using otel::metrics::OtelMetricsCapturer;
 
 const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("SbeSingleDocumentLookupExecutorTest.testColl");
+const NamespaceString kShardedNss = NamespaceString::createNamespaceString_forTest(
+    "SbeSingleDocumentLookupExecutorTest.shardedColl");
 
 // Walks an SBE plan stats tree and collects every stage's stageType string in pre-order.
 void collectStageTypes(const sbe::PlanStageStats* stats, std::vector<std::string>& out) {
@@ -116,9 +127,9 @@ protected:
         wuow.commit();
     }
 
-    LookupResult doLookup(SingleDocumentLookupExecutor* strategy,
-                          const BSONObj& documentKey,
-                          boost::optional<UUID> uuid = boost::none) {
+    LookupResult lookup(SingleDocumentLookupExecutor* strategy,
+                        const BSONObj& documentKey,
+                        boost::optional<UUID> uuid = boost::none) {
         return strategy->performLookup(
             _expCtx, kNss, uuid, Document(documentKey), boost::optional<Timestamp>());
     }
@@ -201,7 +212,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, FindDocumentById) {
     insertDocuments({fromjson("{_id: 1, x: 'hello'}"), fromjson("{_id: 2, x: 'world'}")});
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_TRUE(result.document.has_value());
@@ -213,7 +224,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, NotFoundForMissingDocument) {
     insertDocuments({fromjson("{_id: 1}")});
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 999}"));
+    auto result = lookup(&strategy, fromjson("{_id: 999}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
     ASSERT_FALSE(result.document.has_value());
@@ -221,7 +232,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, NotFoundForMissingDocument) {
 
 TEST_F(SbeSingleDocumentLookupExecutorTest, NotFoundForMissingCollection) {
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
 }
@@ -230,7 +241,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, NotFoundForEmptyCollection) {
     createCollection();
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
 }
@@ -243,18 +254,18 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, CachedPlanReuse) {
 
     auto strategy = makeStrategy();
 
-    auto r1 = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r1.document->toBson(), fromjson("{_id: 1, val: 'a'}"));
 
-    auto r2 = doLookup(&strategy, fromjson("{_id: 2}"));
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r2.document->toBson(), fromjson("{_id: 2, val: 'b'}"));
 
-    auto r3 = doLookup(&strategy, fromjson("{_id: 999}"));
+    auto r3 = lookup(&strategy, fromjson("{_id: 999}"));
     ASSERT_EQ(r3.status, LookupResult::HandledStatus::kDocumentNotFound);
 
-    auto r4 = doLookup(&strategy, fromjson("{_id: 3}"));
+    auto r4 = lookup(&strategy, fromjson("{_id: 3}"));
     ASSERT_EQ(r4.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r4.document->toBson(), fromjson("{_id: 3, val: 'c'}"));
 }
@@ -277,7 +288,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RepeatedLookupsReuseExecutorAndRetur
 
     auto strategy = makeStrategy();
 
-    auto r0 = doLookup(&strategy, fromjson("{_id: 42}"));
+    auto r0 = lookup(&strategy, fromjson("{_id: 42}"));
     ASSERT_EQ(r0.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r0.document->toBson(), BSON("_id" << 42 << "val" << 420));
     const auto* originalPlanRoot = strategy.getCachedPlanRoot_forTest();
@@ -301,7 +312,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RepeatedLookupsReuseExecutorAndRetur
         88,
     };
     for (int k : keys) {
-        auto r = doLookup(&strategy, BSON("_id" << k));
+        auto r = lookup(&strategy, BSON("_id" << k));
         ASSERT_EQ(r.status, LookupResult::HandledStatus::kDocumentFound) << "key=" << k;
         ASSERT_BSONOBJ_EQ(r.document->toBson(), BSON("_id" << k << "val" << k * 10));
         // Executor identity: same plan root means PreparedExecutor::make ran exactly once and
@@ -310,17 +321,17 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RepeatedLookupsReuseExecutorAndRetur
         ASSERT_EQ(strategy.getCachedPlanRoot_forTest(), originalPlanRoot) << "key=" << k;
     }
 
-    auto miss = doLookup(&strategy, fromjson("{_id: 9999}"));
+    auto miss = lookup(&strategy, fromjson("{_id: 9999}"));
     ASSERT_EQ(miss.status, LookupResult::HandledStatus::kDocumentNotFound);
     ASSERT_EQ(strategy.getCachedPlanRoot_forTest(), originalPlanRoot);
 
-    auto afterMiss = doLookup(&strategy, fromjson("{_id: 17}"));
+    auto afterMiss = lookup(&strategy, fromjson("{_id: 17}"));
     ASSERT_EQ(afterMiss.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(afterMiss.document->toBson(), BSON("_id" << 17 << "val" << 170));
     ASSERT_EQ(strategy.getCachedPlanRoot_forTest(), originalPlanRoot);
 
     for (int k = 1; k <= kNumDocs; ++k) {
-        auto r = doLookup(&strategy, BSON("_id" << k));
+        auto r = lookup(&strategy, BSON("_id" << k));
         ASSERT_EQ(r.status, LookupResult::HandledStatus::kDocumentFound) << "key=" << k;
         ASSERT_BSONOBJ_EQ(r.document->toBson(), BSON("_id" << k << "val" << k * 10));
     }
@@ -342,7 +353,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RepeatedLookupsOnClusteredCollection
 
     auto strategy = makeStrategy();
 
-    auto r0 = doLookup(&strategy, fromjson("{_id: 42}"));
+    auto r0 = lookup(&strategy, fromjson("{_id: 42}"));
     ASSERT_EQ(r0.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r0.document->toBson(), BSON("_id" << 42 << "payload" << 1042));
     const auto* originalPlanRoot = strategy.getCachedPlanRoot_forTest();
@@ -366,7 +377,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RepeatedLookupsOnClusteredCollection
         88,
     };
     for (int k : keys) {
-        auto r = doLookup(&strategy, BSON("_id" << k));
+        auto r = lookup(&strategy, BSON("_id" << k));
         ASSERT_EQ(r.status, LookupResult::HandledStatus::kDocumentFound) << "key=" << k;
         ASSERT_BSONOBJ_EQ(r.document->toBson(), BSON("_id" << k << "payload" << k + 1000));
         ASSERT_EQ(strategy.getCachedPlanRoot_forTest(), originalPlanRoot) << "key=" << k;
@@ -413,7 +424,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCompoundIdLookupsReturnFull
 
     auto strategy = makeStrategy();
 
-    auto first = doLookup(&strategy, BSON("_id" << entries[0].id));
+    auto first = lookup(&strategy, BSON("_id" << entries[0].id));
     ASSERT_EQ(first.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(first.document->toBson(), entries[0].fullDoc);
 
@@ -421,7 +432,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCompoundIdLookupsReturnFull
     ASSERT_TRUE(originalPlanRoot);
 
     for (size_t i = 1; i < entries.size(); ++i) {
-        auto r = doLookup(&strategy, BSON("_id" << entries[i].id));
+        auto r = lookup(&strategy, BSON("_id" << entries[i].id));
         ASSERT_EQ(r.status, LookupResult::HandledStatus::kDocumentFound)
             << "lookup #" << i << "; _id=" << entries[i].id.toString();
         ASSERT_BSONOBJ_EQ(r.document->toBson(), entries[i].fullDoc);
@@ -429,7 +440,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCompoundIdLookupsReturnFull
             << "Plan must be reused across lookups, not rebuilt";
     }
 
-    auto revisit = doLookup(&strategy, BSON("_id" << entries[0].id));
+    auto revisit = lookup(&strategy, BSON("_id" << entries[0].id));
     ASSERT_EQ(revisit.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(revisit.document->toBson(), entries[0].fullDoc);
 }
@@ -445,7 +456,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, MultiFieldDocumentKeyHandledViaIxsca
         {fromjson("{_id: 1, sk: 'a', data: 100}"), fromjson("{_id: 2, sk: 'b', data: 200}")});
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 1, sk: 'a'}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1, sk: 'a'}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), fromjson("{_id: 1, sk: 'a', data: 100}"));
@@ -468,7 +479,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RegularCollectionUsesIndexScan) {
         {fromjson("{_id: 1, x: 'a'}"), fromjson("{_id: 2, x: 'b'}"), fromjson("{_id: 3, x: 'c'}")});
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 2}"));
+    auto result = lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), fromjson("{_id: 2, x: 'b'}"));
 
@@ -494,7 +505,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCollectionUsesBoundedScan) 
     insertDocuments(std::move(docs));
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 25}"));
+    auto result = lookup(&strategy, fromjson("{_id: 25}"));
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), BSON("_id" << 25 << "x" << 25));
 
@@ -532,7 +543,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, IxscanLookupRecordsIdIndexUsage) {
     auto strategy = makeStrategy();
     ASSERT_EQ(idIndexAccesses(), 0);
 
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_EQ(idIndexAccesses(), 1);
     // An _id ixscan is not a collection scan.
@@ -544,7 +555,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, IxscanLookupRecordsUsageEvenWhenNotF
     insertDocuments({fromjson("{_id: 1, x: 'a'}")});
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 999}"));
+    auto result = lookup(&strategy, fromjson("{_id: 999}"));
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
 
     // $indexStats counts accesses, not just hits.
@@ -556,9 +567,9 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RepeatedIxscanLookupsAccumulateIdInd
     insertDocuments({fromjson("{_id: 1, x: 'a'}"), fromjson("{_id: 2, x: 'b'}")});
 
     auto strategy = makeStrategy();
-    doLookup(&strategy, fromjson("{_id: 1}"));
-    doLookup(&strategy, fromjson("{_id: 2}"));
-    doLookup(&strategy, fromjson("{_id: 999}"));
+    lookup(&strategy, fromjson("{_id: 1}"));
+    lookup(&strategy, fromjson("{_id: 2}"));
+    lookup(&strategy, fromjson("{_id: 999}"));
 
     ASSERT_EQ(idIndexAccesses(), 3);
 }
@@ -573,7 +584,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredLookupRecordsNothing) {
     auto strategy = makeStrategy();
     const auto scansBefore = collectionScans();
 
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
 
     ASSERT_EQ(collectionScans(), scansBefore);
@@ -594,7 +605,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, IdEqualityEngagesSlotBinderFastPath)
          std::vector<std::pair<int, BSONObj>>{{1, fromjson("{_id: 1, x: 1}")},
                                               {2, fromjson("{_id: 2, x: 2}")},
                                               {3, fromjson("{_id: 3, x: 3}")}}) {
-        auto r = doLookup(&strategy, BSON("_id" << i));
+        auto r = lookup(&strategy, BSON("_id" << i));
         ASSERT_EQ(r.status, LookupResult::HandledStatus::kDocumentFound);
         ASSERT_BSONOBJ_EQ(r.document->toBson(), expected);
     }
@@ -608,11 +619,11 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredScalarIdEngagesSlotBinder) 
 
     auto strategy = makeStrategy();
 
-    auto r1 = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r1.document->toBson(), fromjson("{_id: 1, x: 1}"));
 
-    auto r2 = doLookup(&strategy, fromjson("{_id: 2}"));
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r2.document->toBson(), fromjson("{_id: 2, x: 2}"));
 }
@@ -631,11 +642,11 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCompoundIdEngagesSlotBinder
 
     auto strategy = makeStrategy();
 
-    auto r1 = doLookup(&strategy, BSON("_id" << id1));
+    auto r1 = lookup(&strategy, BSON("_id" << id1));
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r1.document->toBson(), BSON("_id" << id1 << "body" << "first"));
 
-    auto r2 = doLookup(&strategy, BSON("_id" << id2));
+    auto r2 = lookup(&strategy, BSON("_id" << id2));
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r2.document->toBson(), BSON("_id" << id2 << "body" << "second"));
 }
@@ -658,7 +669,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, NonSimpleCollationEngagesIxscanFastP
 
     auto strategy = makeStrategy();
     // Look up with a different case; the case-insensitive _id index must still resolve it.
-    auto result = doLookup(&strategy, fromjson("{_id: 'ABC'}"));
+    auto result = lookup(&strategy, fromjson("{_id: 'ABC'}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), fromjson("{_id: 'abc', x: 1}"));
@@ -672,7 +683,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, NonSimpleCollationDeclinesClusteredF
     insertDocuments({fromjson("{_id: 'abc', x: 1}")});
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 'abc'}"));
+    auto result = lookup(&strategy, fromjson("{_id: 'abc'}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
     ASSERT_FALSE(strategy.getCachedPlanRoot_forTest())
@@ -685,7 +696,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, SimpleCollationStillEngagesIxscanFas
     insertDocuments({fromjson("{_id: 'abc', x: 1}"), fromjson("{_id: 'ABC', x: 2}")});
 
     auto strategy = makeStrategy();
-    auto result = doLookup(&strategy, fromjson("{_id: 'abc'}"));
+    auto result = lookup(&strategy, fromjson("{_id: 'abc'}"));
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), fromjson("{_id: 'abc', x: 1}"));
@@ -699,7 +710,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ReleaseResourcesDropsAllCachedState)
     insertDocuments({fromjson("{_id: 1, x: 'a'}"), fromjson("{_id: 2, x: 'b'}")});
 
     auto strategy = makeStrategy();
-    auto r1 = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_TRUE(strategy.holdsAttachedCatalogState_forTest());
     const auto rebuildCountBefore = strategy.getPlanRebuildCount_forTest();
@@ -711,7 +722,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ReleaseResourcesDropsAllCachedState)
     // releaseResources() unconditionally tears the plan down along with the acquisition, since the
     // plan's cached collection pointer would otherwise outlive the acquisition it was built
     // against. The next lookup rebuilds from scratch.
-    auto r2 = doLookup(&strategy, fromjson("{_id: 2}"));
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r2.document->toBson(), fromjson("{_id: 2, x: 'b'}"));
     ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), rebuildCountBefore + 1);
@@ -723,13 +734,13 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ReleaseResourcesIsIdempotent) {
     insertDocuments({fromjson("{_id: 1}")});
 
     auto strategy = makeStrategy();
-    doLookup(&strategy, fromjson("{_id: 1}"));
+    lookup(&strategy, fromjson("{_id: 1}"));
 
     strategy.releaseResources();
     strategy.releaseResources();
     ASSERT_FALSE(strategy.holdsAttachedCatalogState_forTest());
 
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
 }
 
@@ -763,7 +774,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest,
         std::make_unique<PreAcquiredCollectionAcquirer>(stasher, std::move(acquisition)),
         std::make_unique<AlwaysLocalEligibility>());
 
-    auto r1 = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
     const auto rebuildCountBefore = strategy.getPlanRebuildCount_forTest();
     ASSERT_EQ(rebuildCountBefore, 1U);
@@ -771,7 +782,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest,
     strategy.releaseResources();
     ASSERT_FALSE(strategy.holdsAttachedCatalogState_forTest());
 
-    auto r2 = doLookup(&strategy, fromjson("{_id: 2}"));
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r2.document->toBson(), fromjson("{_id: 2, x: 'b'}"));
     ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), rebuildCountBefore + 1)
@@ -788,7 +799,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, UuidMismatchMidBatchReportsNotFound)
     ASSERT_NE(actualUuid, staleUuid);
 
     auto strategy = makeStrategy();
-    auto r1 = doLookup(&strategy, fromjson("{_id: 1}"), actualUuid);
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"), actualUuid);
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_TRUE(strategy.holdsAttachedCatalogState_forTest());
 
@@ -796,12 +807,12 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, UuidMismatchMidBatchReportsNotFound)
     // event's UUID (as an older, since-superseded oplog entry would carry after a rename+recreate)
     // no longer matches it. Must report not-found rather than reading the wrong collection, and
     // must drop the cache rather than wedge it on the stale acquisition.
-    auto r2 = doLookup(&strategy, fromjson("{_id: 1}"), staleUuid);
+    auto r2 = lookup(&strategy, fromjson("{_id: 1}"), staleUuid);
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentNotFound);
     ASSERT_FALSE(strategy.holdsAttachedCatalogState_forTest());
 
     // The strategy recovers on the next lookup against the collection's real, current UUID.
-    auto r3 = doLookup(&strategy, fromjson("{_id: 1}"), actualUuid);
+    auto r3 = lookup(&strategy, fromjson("{_id: 1}"), actualUuid);
     ASSERT_EQ(r3.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r3.document->toBson(), fromjson("{_id: 1, x: 'old'}"));
 }
@@ -818,13 +829,13 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ReleaseResourcesThenDropCollectionIs
     insertDocuments({fromjson("{_id: 1}")});
 
     auto strategy = makeStrategy();
-    auto r1 = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
 
     strategy.releaseResources();
     dropCollection();
 
-    auto r2 = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto r2 = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentNotFound);
 }
 
@@ -839,7 +850,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, PlanCacheInvalidationMidBatchTrigger
     insertDocuments({fromjson("{_id: 1, x: 'a'}"), fromjson("{_id: 2, x: 'b'}")});
 
     auto strategy = makeStrategy();
-    auto r1 = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
     const auto rebuildCountBefore = strategy.getPlanRebuildCount_forTest();
     ASSERT_EQ(rebuildCountBefore, 1U);
@@ -847,7 +858,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, PlanCacheInvalidationMidBatchTrigger
     strategy.releaseResources();
     bumpPlanCacheInvalidatorVersion();
 
-    auto r2 = doLookup(&strategy, fromjson("{_id: 2}"));
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(r2.document->toBson(), fromjson("{_id: 2, x: 'b'}"));
     ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), rebuildCountBefore + 1);
@@ -866,8 +877,8 @@ TEST_F(SbeSingleDocumentLookupExecutorTest,
 
     // The sink only folds in at teardown (releaseResources()/resetPlan()), not after every
     // lookup, so it stays untouched mid-window.
-    doLookup(&strategy, fromjson("{_id: 1}"));
-    doLookup(&strategy, fromjson("{_id: 2}"));
+    lookup(&strategy, fromjson("{_id: 1}"));
+    lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(sink.totalKeysExamined, 0U);
     ASSERT_EQ(sink.totalDocsExamined, 0U);
 
@@ -879,7 +890,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest,
     // releaseResources() tore the plan down, so this second window rebuilds a fresh
     // PreparedExecutor with its own cumulative SBE counters starting back at 0. The sink itself is
     // external state owned by the caller, so its total keeps accumulating across the rebuild.
-    doLookup(&strategy, fromjson("{_id: 3}"));
+    lookup(&strategy, fromjson("{_id: 3}"));
     strategy.releaseResources();
 
     ASSERT_GT(sink.totalKeysExamined, afterFirstWindow);
@@ -897,14 +908,14 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, PlanSummaryStatsSinkSurvivesPlanRebu
     PlanSummaryStats sink;
     strategy.setPlanSummaryStatsSink(&sink);
 
-    doLookup(&strategy, fromjson("{_id: 1}"));
+    lookup(&strategy, fromjson("{_id: 1}"));
     strategy.releaseResources();
     const auto afterFirstWindow = sink.totalKeysExamined;
     ASSERT_GT(afterFirstWindow, 0U);
 
     bumpPlanCacheInvalidatorVersion();
 
-    doLookup(&strategy, fromjson("{_id: 2}"));
+    lookup(&strategy, fromjson("{_id: 2}"));
     strategy.releaseResources();
 
     ASSERT_GT(sink.totalKeysExamined, afterFirstWindow);
@@ -923,7 +934,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, FoundDocumentRecordsFoundAndLatency)
     auto strategy = makeStrategyWithRealRecorder(std::make_unique<AlwaysLocalEligibility>());
 
     const auto before = snapshotSbeCell(capturer);
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
     const auto after = snapshotSbeCell(capturer);
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
@@ -944,7 +955,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, AbsentDocumentRecordsNotFoundAndLate
     auto strategy = makeStrategyWithRealRecorder(std::make_unique<AlwaysLocalEligibility>());
 
     const auto before = snapshotSbeCell(capturer);
-    auto result = doLookup(&strategy, fromjson("{_id: 999}"));
+    auto result = lookup(&strategy, fromjson("{_id: 999}"));
     const auto after = snapshotSbeCell(capturer);
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
@@ -965,7 +976,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, UnknownDecisionRecordsNotHandledWith
     auto strategy = makeStrategyWithRealRecorder(MockLocalLookupEligibility::makeAlwaysUnknown());
 
     const auto before = snapshotSbeCell(capturer);
-    auto result = doLookup(&strategy, fromjson("{_id: 1}"));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
     const auto after = snapshotSbeCell(capturer);
 
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
@@ -974,6 +985,167 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, UnknownDecisionRecordsNotHandledWith
     ASSERT_EQ(after.notHandled, before.notHandled + 1);
     // A declined lookup carries no meaningful latency.
     ASSERT_EQ(after.latencyCount, before.latencyCount);
+}
+
+// --- Shard filtering -----------------------------------------------------------------------
+//
+// Exercises the acquisition's real shard filter against a physically-present orphan and inspects
+// the actual compiled plan, rather than asserting on an eligibility's checksShardKeyOwnership()
+// flag in isolation: proves the planner actually includes (or omits) the shard-filter stage, and
+// that doing so actually drops orphans, not just that the flag it reads is set correctly. The
+// behavioral tests mirror express_single_document_lookup_executor_test.cpp's
+// ExpressLookupShardFilteringTest; the plan-inspection ones are SBE-only, since Express has no
+// compiled plan tree to introspect.
+
+class SbeSingleDocumentLookupExecutorShardFilteringTest : public ShardServerTestFixture {
+protected:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+        _client = std::make_unique<DBDirectClient>(operationContext());
+        _client->createCollection(kShardedNss);
+        _expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kShardedNss);
+    }
+
+    // Shard key "sk", split at 'splitPoint': documents with sk < splitPoint are owned by this
+    // shard, sk >= splitPoint are orphans physically present here but owned by "otherShard".
+    CollectionMetadata setupShardingMetadata(int splitPoint) {
+        OperationContext* opCtx = operationContext();
+        const UUID uuid = [&] {
+            AutoGetCollection autoColl(opCtx, kShardedNss, MODE_IS);
+            return autoColl->uuid();
+        }();
+
+        const ShardKeyPattern shardKeyPattern(BSON("sk" << 1));
+        const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
+        const OID epoch = OID::gen();
+        const Timestamp timestamp(1, 1);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
+
+        ChunkType ownedChunk(uuid,
+                             ChunkRange{keyPattern.globalMin(), BSON("sk" << splitPoint)},
+                             version,
+                             kMyShardName);
+        version.incMinor();
+        ChunkType orphanChunk(uuid,
+                              ChunkRange{BSON("sk" << splitPoint), keyPattern.globalMax()},
+                              version,
+                              ShardId("otherShard"));
+
+        auto rt = RoutingTableHistory::makeNew(kShardedNss,
+                                               uuid,
+                                               keyPattern,
+                                               false /* unsplittable */,
+                                               nullptr,
+                                               false,
+                                               epoch,
+                                               timestamp,
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* reshardingFields */,
+                                               true /* allowMigrations */,
+                                               {ownedChunk, orphanChunk});
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
+        CollectionMetadata metadata(std::move(cm), kMyShardName);
+
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, kShardedNss);
+        scopedCsr->setCollectionMetadata(opCtx, metadata);
+        return metadata;
+    }
+
+    // SBE strategy over the real sharded collection (OnDemand acquirer) with the given eligibility.
+    SbeSingleDocumentLookupExecutor makeStrategy(
+        std::unique_ptr<LocalLookupEligibility> eligibility) {
+        return SbeSingleDocumentLookupExecutor(std::make_unique<OnDemandCollectionAcquirer>(),
+                                               std::move(eligibility));
+    }
+
+    LookupResult lookup(SingleDocumentLookupExecutor* strategy, const BSONObj& documentKey) {
+        return strategy->performLookup(
+            _expCtx, kShardedNss, boost::none, Document(documentKey), boost::optional<Timestamp>());
+    }
+
+    std::unique_ptr<DBDirectClient> _client;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+};
+
+// AlwaysLocal-shaped eligibility (checksShardKeyOwnership() == false, see
+// AlwaysLocalDoesNotCheckShardKeyOwnership in local_lookup_eligibility_test.cpp): the planner must
+// include the shard-filter stage.
+TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
+       EligibilityWithoutOwnershipCheckIncludesShardFilterStage) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 1));  // owned: sk < 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto strategy = makeStrategy(std::make_unique<AlwaysLocalEligibility>());
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+
+    const auto* root = strategy.getCachedPlanRoot_forTest();
+    ASSERT_TRUE(root);
+    auto types = planStageTypes(root);
+    ASSERT_TRUE(contains(types, "filter"))
+        << "Expected a shard-filter stage since the eligibility does not check ownership, got: "
+        << joinStageTypes(types);
+}
+
+// Same eligibility shape, but the looked-up document is an orphan: the included shard-filter stage
+// actually drops it. Mirrors ExpressLookupShardFilteringTest's
+// EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan.
+TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
+       EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto strategy = makeStrategy(std::make_unique<AlwaysLocalEligibility>());
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
+}
+
+// An eligibility whose Local decision already resolved ownership from the shard key: the planner
+// must omit the redundant shard-filter stage.
+TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
+       EligibilityThatChecksOwnershipOmitsShardFilterStage) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 1));  // owned: sk < 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto eligibility = MockLocalLookupEligibility::makeAlwaysLocal();
+    eligibility->setChecksShardKeyOwnership(true);
+    auto strategy = makeStrategy(std::move(eligibility));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+
+    const auto* root = strategy.getCachedPlanRoot_forTest();
+    ASSERT_TRUE(root);
+    auto types = planStageTypes(root);
+    ASSERT_FALSE(contains(types, "filter"))
+        << "Expected no shard-filter stage since the eligibility already checked ownership, got: "
+        << joinStageTypes(types);
+}
+
+// Same eligibility shape, but the looked-up document is a physically-present orphan: with the
+// shard-filter stage omitted, the orphan is returned rather than dropped. Mirrors
+// ExpressLookupShardFilteringTest's EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan.
+TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
+       EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto eligibility = MockLocalLookupEligibility::makeAlwaysLocal();
+    eligibility->setChecksShardKeyOwnership(true);
+    auto strategy = makeStrategy(std::move(eligibility));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
 }
 
 }  // namespace

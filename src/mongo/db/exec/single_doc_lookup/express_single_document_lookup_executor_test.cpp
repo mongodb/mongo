@@ -3,19 +3,29 @@
 
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/mock_local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats_test_util.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
@@ -35,6 +45,8 @@ using otel::metrics::OtelMetricsCapturer;
 
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("test", "express_lookup");
+const NamespaceString kShardedTestNss =
+    NamespaceString::createNamespaceString_forTest("test", "express_lookup_sharded");
 
 /**
  * Test acquirer whose acquireCollection() runs an injected callback that throws. Lets the exception
@@ -346,6 +358,140 @@ TEST_F(ExpressLookupTest, UnknownDecisionRecordsNotHandledWithNoLatency) {
     ASSERT_EQ(after.notHandled, before.notHandled + 1);
     // A declined lookup carries no meaningful latency.
     ASSERT_EQ(after.latencyCount, before.latencyCount);
+}
+
+// --- Shard filtering -----------------------------------------------------------------------
+//
+// Exercises the acquisition's real shard filter against a physically-present orphan, rather than
+// asserting on an eligibility's checksShardKeyOwnership() flag in isolation: proves the executor
+// actually applies (or skips) shard filtering, not just that the flag it reads is set correctly.
+// Mirrored by the behavioral tests in sbe_single_document_lookup_executor_test.cpp's
+// SbeSingleDocumentLookupExecutorShardFilteringTest, which additionally inspects the compiled plan
+// for the shard-filter stage (not possible here: Express has no plan tree to introspect).
+
+class ExpressLookupShardFilteringTest : public ShardServerTestFixture {
+protected:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+        _client = std::make_unique<DBDirectClient>(operationContext());
+        _client->createCollection(kShardedTestNss);
+    }
+
+    boost::intrusive_ptr<ExpressionContext> makeExpCtx() {
+        return make_intrusive<ExpressionContextForTest>(operationContext(), kShardedTestNss);
+    }
+
+    // Shard key "sk", split at 'splitPoint': documents with sk < splitPoint are owned by this
+    // shard, sk >= splitPoint are orphans physically present here but owned by "otherShard".
+    CollectionMetadata setupShardingMetadata(int splitPoint) {
+        OperationContext* opCtx = operationContext();
+        const UUID uuid = [&] {
+            AutoGetCollection autoColl(opCtx, kShardedTestNss, MODE_IS);
+            return autoColl->uuid();
+        }();
+
+        const ShardKeyPattern shardKeyPattern(BSON("sk" << 1));
+        const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
+        const OID epoch = OID::gen();
+        const Timestamp timestamp(1, 1);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
+
+        ChunkType ownedChunk(uuid,
+                             ChunkRange{keyPattern.globalMin(), BSON("sk" << splitPoint)},
+                             version,
+                             kMyShardName);
+        version.incMinor();
+        ChunkType orphanChunk(uuid,
+                              ChunkRange{BSON("sk" << splitPoint), keyPattern.globalMax()},
+                              version,
+                              ShardId("otherShard"));
+
+        auto rt = RoutingTableHistory::makeNew(kShardedTestNss,
+                                               uuid,
+                                               keyPattern,
+                                               false /* unsplittable */,
+                                               nullptr,
+                                               false,
+                                               epoch,
+                                               timestamp,
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* reshardingFields */,
+                                               true /* allowMigrations */,
+                                               {ownedChunk, orphanChunk});
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
+        CollectionMetadata metadata(std::move(cm), kMyShardName);
+
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, kShardedTestNss);
+        scopedCsr->setCollectionMetadata(opCtx, metadata);
+        return metadata;
+    }
+
+    ExpressSingleDocumentLookupExecutor makeExecutor(
+        std::unique_ptr<LocalLookupEligibility> eligibility) {
+        return ExpressSingleDocumentLookupExecutor(std::make_unique<OnDemandCollectionAcquirer>(),
+                                                   std::move(eligibility));
+    }
+
+    LookupResult lookup(ExpressSingleDocumentLookupExecutor& exec, const Document& documentKey) {
+        return exec.performLookup(
+            makeExpCtx(), kShardedTestNss, boost::none, documentKey, boost::none);
+    }
+
+    std::unique_ptr<DBDirectClient> _client;
+};
+
+// AlwaysLocal-shaped eligibility (checksShardKeyOwnership() == false, see
+// AlwaysLocalDoesNotCheckShardKeyOwnership in local_lookup_eligibility_test.cpp): the executor must
+// apply the acquisition's shard filter and drop a physically-present orphan. Mirrors
+// SbeSingleDocumentLookupExecutorShardFilteringTest's
+// EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan.
+TEST_F(ExpressLookupShardFilteringTest,
+       EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedTestNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedTestNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto exec = makeExecutor(MockLocalLookupEligibility::makeAlwaysLocal());
+    auto result = lookup(exec, Document{{"_id", 1}});
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
+}
+
+// Same eligibility shape, but the looked-up document is owned: the shard filter is applied but has
+// nothing to drop, so the document is still returned. SBE's analog,
+// EligibilityWithoutOwnershipCheckIncludesShardFilterStage, additionally asserts the compiled plan
+// includes the shard-filter stage (Express has no plan tree to introspect).
+TEST_F(ExpressLookupShardFilteringTest,
+       EligibilityWithoutOwnershipCheckReturnsOwnedDocumentUnfiltered) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedTestNss, BSON("_id" << 1 << "sk" << 1));  // owned: sk < 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedTestNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto exec = makeExecutor(MockLocalLookupEligibility::makeAlwaysLocal());
+    auto result = lookup(exec, Document{{"_id", 1}});
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+}
+
+// An eligibility whose Local decision already resolved ownership from the shard key: the executor
+// must skip the redundant shard filter, so even a physically-present orphan is returned. Mirrors
+// SbeSingleDocumentLookupExecutorShardFilteringTest's
+// EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan.
+TEST_F(ExpressLookupShardFilteringTest,
+       EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedTestNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedTestNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto eligibility = MockLocalLookupEligibility::makeAlwaysLocal();
+    eligibility->setChecksShardKeyOwnership(true);
+    auto exec = makeExecutor(std::move(eligibility));
+    auto result = lookup(exec, Document{{"_id", 1}});
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
 }
 
 }  // namespace

@@ -114,6 +114,17 @@ public:
         const Document& documentKey,
         const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body) const = 0;
+
+    /**
+     * Whether a Local decision from this eligibility, for a sharded collection, is reached by
+     * inspecting the documentKey's shard key (CRI targeting or keyBelongsToMe). When true,
+     * ownership has already been resolved per lookup, so the executor may skip the redundant
+     * post-read shard filter that would otherwise drop orphans. Eligibilities that only ever decide
+     * Local for unsharded collections (no shard filter exists to skip) are unaffected either way.
+     */
+    virtual bool checksShardKeyOwnership() const {
+        return false;
+    }
 };
 
 /**

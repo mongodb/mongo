@@ -36,7 +36,9 @@ public:
         boost::optional<SingleDocumentLookupStatsRecorder> recorder = boost::none)
         : _collectionAcquirer(std::move(collectionAcquirer)),
           _localEligibility(std::move(localEligibility)),
-          _recorder(std::move(recorder)) {
+          _recorder(std::move(recorder)),
+          _eligibilityChecksShardKeyOwnership(
+              _localEligibility ? _localEligibility->checksShardKeyOwnership() : false) {
         tassert(12952800,
                 "SbeSingleDocumentLookupExecutor requires a non-null collection acquirer",
                 _collectionAcquirer);
@@ -164,13 +166,16 @@ private:
         };
 
         /**
-         * Plans and compiles a fresh SBE executor for the given collection + canonical query.
-         * Returns boost::none when planning produces no solutions or the plan shape is not
-         * supported by SlotBinder.
+         * Plans and compiles a fresh SBE executor for the given collection + canonical query. When
+         * 'shouldApplyShardFilter' is true the plan includes a shard-filter stage that drops
+         * orphans on a sharded collection (skipped when the eligibility already resolved ownership
+         * from the shard key). Returns boost::none when planning produces no solutions or the plan
+         * shape is not supported by SlotBinder.
          */
         static boost::optional<PreparedExecutor> make(OperationContext* opCtx,
                                                       const CollectionAcquirer::Handle& coll,
-                                                      std::unique_ptr<CanonicalQuery> cq);
+                                                      std::unique_ptr<CanonicalQuery> cq,
+                                                      bool shouldApplyShardFilter);
 
         std::unique_ptr<sbe::PlanStage> root;
         stage_builder::PlanStageData data;
@@ -228,7 +233,8 @@ private:
     bool getOrMakeExecutor(OperationContext* opCtx,
                            const CollectionAcquirer::Handle& coll,
                            const NamespaceString& nss,
-                           const BSONObj& filter);
+                           const BSONObj& filter,
+                           bool shouldApplyShardFilter);
 
     /**
      * open(reOpen) + getNext on the cached plan. Transitions the plan to active on the first call
@@ -301,6 +307,10 @@ private:
      * Test-only. See getPlanRebuildCount_forTest().
      */
     size_t _planRebuildCount_forTest = 0;
+
+    // When true the eligibility resolves ownership from the shard key per lookup, so the plan omits
+    // the redundant shard-filter stage.
+    const bool _eligibilityChecksShardKeyOwnership;
 };
 
 }  // namespace mongo::exec::agg

@@ -219,9 +219,11 @@ mongo_cc_unit_test(
         ":express_single_document_lookup_executor",
         ":local_lookup_eligibility_test_util",
         ":single_document_lookup_stats_test_util",
+        "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
@@ -275,9 +277,11 @@ mongo_cc_unit_test(
         ":local_lookup_eligibility_test_util",
         ":sbe_single_document_lookup_executor",
         ":single_document_lookup_stats_test_util",
+        "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )

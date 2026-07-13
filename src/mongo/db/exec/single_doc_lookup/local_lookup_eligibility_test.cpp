@@ -88,6 +88,18 @@ TEST_F(LocalLookupEligibilityTest, CreateScopedShardRoleEngagesWhenShardVersionS
     ASSERT_TRUE(scope.has_value());
 }
 
+// --- checksShardKeyOwnership ------------------------------------------------------------------
+
+// AlwaysLocal decides local without inspecting a shard key ($search / replica set), so ownership is
+// not confirmed and the executor must still apply the post-read shard filter.
+TEST_F(LocalLookupEligibilityTest, AlwaysLocalDoesNotCheckShardKeyOwnership) {
+    ASSERT_FALSE(AlwaysLocalEligibility{}.checksShardKeyOwnership());
+}
+
+TEST_F(LocalLookupEligibilityTest, AlwaysUnknownDoesNotCheckShardKeyOwnership) {
+    ASSERT_FALSE(AlwaysUnknownEligibility{}.checksShardKeyOwnership());
+}
+
 // --- MockLocalLookupEligibility (the test double itself) --------------------------------------
 
 TEST_F(LocalLookupEligibilityTest, MockMakeAlwaysLocalReturnsLocalAndRecordsCall) {

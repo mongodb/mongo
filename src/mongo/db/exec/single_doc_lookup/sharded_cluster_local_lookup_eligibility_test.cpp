@@ -120,6 +120,12 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx = _serviceContext.makeOperationContext();
 };
 
+// Both decision arms resolve locality from the documentKey's shard key, so a Local decision
+// confirms ownership and the executor may skip the redundant post-read shard filter.
+TEST_F(ShardedEligibilityTest, ChecksShardKeyOwnership) {
+    ASSERT_TRUE(ShardedClusterLocalLookupEligibility{kThisShard}.checksShardKeyOwnership());
+}
+
 TEST_F(ShardedEligibilityTest, ShardedKeyOwnedByUs) {
     auto cri = shardedOnId(kThisShard);
     const Document key{{"_id", 1}};

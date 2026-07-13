@@ -57,6 +57,17 @@ public:
         _calls.clear();
     }
 
+    // Drives checksShardKeyOwnership() for tests simulating an eligibility whose Local decision
+    // already confirmed shard-key ownership (e.g. ShardedClusterLocalLookupEligibility), without
+    // depending on that concrete type or its routing machinery.
+    void setChecksShardKeyOwnership(bool value) {
+        _checksShardKeyOwnership = value;
+    }
+
+    bool checksShardKeyOwnership() const override {
+        return _checksShardKeyOwnership;
+    }
+
     // ---- Convenience factories ----
 
     static std::unique_ptr<MockLocalLookupEligibility> makeAlwaysLocal() {
@@ -97,6 +108,7 @@ public:
 private:
     Callback _cb;
     mutable std::vector<Call> _calls;
+    bool _checksShardKeyOwnership = false;
 };
 
 }  // namespace mongo::exec::agg

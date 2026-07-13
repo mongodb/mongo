@@ -35,7 +35,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionAcquirer::Handle& coll,
-    const Document& documentKey) {
+    const Document& documentKey,
+    bool shouldApplyShardFilter) {
     const auto idFilter = makeIdEqualityFilter(documentKey);
     if (!idFilter) {
         LOGV2_DEBUG(12841302,
@@ -53,15 +54,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
         .parsedFind = ParsedFindCommandParams{std::move(findCmd)},
     });
 
-    // Always apply the acquisition's shard filter so orphans physically present on this node are
-    // dropped post-read. For callers whose eligibility has already shard-key-targeted the
-    // documentKey to this shard (e.g. change-stream updateLookup) this is a redundant-but-harmless
-    // no-op; for callers running on bare _ids that may include orphans (e.g. $search/$vectorSearch
-    // idLookup) it is what drops them. The filter is only defined on sharded collections --
-    // getShardingFilter() tasserts otherwise -- so guard on isSharded(); unsharded collections have
-    // no orphans and leave the filter unset.
+    // Apply the acquisition's shard filter so orphans physically present on this node are dropped
+    // post-read, unless the caller's eligibility has already checked that the shard key belongs to
+    // the local shard ('shouldApplyShardFilter' false). For callers running on bare _ids that may
+    // include orphans (e.g. $search/$vectorSearch idLookup) it is what drops them. The filter is
+    // only defined on sharded collections as getShardingFilter() tasserts otherwise.
     boost::optional<ScopedCollectionFilter> collectionFilter;
-    if (coll.collection().getShardingDescription().isSharded()) {
+    if (shouldApplyShardFilter && coll.collection().getShardingDescription().isSharded()) {
         collectionFilter = coll.collection().getShardingFilter();
     }
 
@@ -123,7 +122,8 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
                 }
                 assertLocalLookupReadAtOrAfter(opCtx, afterClusterTime);
 
-                auto exec = makeExpressExecutor(opCtx, nss, coll, documentKey);
+                auto exec = makeExpressExecutor(
+                    opCtx, nss, coll, documentKey, !_eligibilityChecksShardKeyOwnership);
                 if (!exec) {
                     return {LookupResult::HandledStatus::kNotHandled, boost::none};
                 }

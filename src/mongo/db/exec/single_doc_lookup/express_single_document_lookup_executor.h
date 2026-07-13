@@ -28,7 +28,9 @@ public:
         boost::optional<SingleDocumentLookupStatsRecorder> recorder = boost::none)
         : _collectionAcquirer(std::move(collectionAcquirer)),
           _localEligibility(std::move(localEligibility)),
-          _recorder(std::move(recorder)) {
+          _recorder(std::move(recorder)),
+          _eligibilityChecksShardKeyOwnership(
+              _localEligibility ? _localEligibility->checksShardKeyOwnership() : false) {
         tassert(12841300,
                 "ExpressSingleDocumentLookupExecutor requires a non-null collection acquirer",
                 _collectionAcquirer);
@@ -68,6 +70,10 @@ private:
 
     // Non-owning; owned by the caller. Stats are accumulated here when set.
     PlanSummaryStats* _planSummaryStatsSink = nullptr;
+
+    // When true the eligibility resolves ownership from the shard key per lookup, so the post-read
+    // shard filter is redundant and skipped.
+    const bool _eligibilityChecksShardKeyOwnership;
 };
 
 }  // namespace mongo::exec::agg

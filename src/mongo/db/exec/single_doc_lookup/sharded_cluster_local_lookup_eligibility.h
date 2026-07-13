@@ -58,6 +58,17 @@ public:
     static Decision decideFromShardingFilter(const ScopedCollectionFilter& filter,
                                              const Document& documentKey);
 
+    /**
+     * The sharded decision arms (decideFromCri targeting, decideFromShardingFilter keyBelongsToMe)
+     * resolve locality from the documentKey's shard key, so a Local decision from either already
+     * confirms ownership. The unsharded HeldUnshardedCollectionLocally arm returns Local without a
+     * shard key to check, but that arm only ever runs against an unsharded collection, where there
+     * is no shard filter for the executor to skip so this can unconditionally return true.
+     */
+    bool checksShardKeyOwnership() const override {
+        return true;
+    }
+
 private:
     const ShardId _localShardId;
 };
