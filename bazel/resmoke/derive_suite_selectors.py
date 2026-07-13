@@ -94,6 +94,29 @@ def _has_build_file(dir_path: Path) -> bool:
     return (dir_path / "BUILD.bazel").exists() or (dir_path / "BUILD").exists()
 
 
+def _file_label(rel_path: Path, repo_root: Path) -> str | None:
+    """Build a Bazel label for a file, resolving its enclosing package.
+
+    Test files are not necessarily at the root of their Bazel package: a package
+    may export files from nested subdirectories via ``exports_files(glob(...))``.
+    Walk up from the file's directory to the nearest ancestor that owns a BUILD
+    file and reference the file by its path relative to that package, e.g.
+    ``//pkg:sub/dir/file.json``. Returns None if the file does not exist or no
+    enclosing package is found.
+    """
+    # A literal path may be a module-wildcard expansion (e.g. modules/*/foo.js)
+    # that resolves to a file only under some modules; skip ones that don't exist.
+    if not (repo_root / rel_path).is_file():
+        return None
+
+    for parent in rel_path.parents:
+        if _has_build_file(repo_root / parent):
+            target = rel_path.relative_to(parent).as_posix()
+            pkg = parent.as_posix()
+            return f"//:{target}" if pkg == "." else f"//{pkg}:{target}"
+    return None
+
+
 def _suite_label(bazel_package: str, target_prefix: str, yml_name: str) -> str:
     """Build the SUITE_SELECTORS key for a suite YAML.
 
@@ -148,10 +171,8 @@ def _glob_to_labels(pattern: str, repo_root: Path) -> list[str]:
 
     # Literal file path (no wildcards at all)
     if "*" not in pattern and "[" not in pattern and "?" not in pattern:
-        p = Path(pattern)
-        if _has_build_file(repo_root / p.parent):
-            return [f"//{p.parent.as_posix()}:{p.name}"]
-        return []
+        label = _file_label(Path(pattern), repo_root)
+        return [label] if label else []
 
     # Complex or non-standard patterns: expand via filesystem glob. A trailing
     # slash (e.g. manual_tests/*/) means "directories only";
@@ -163,7 +184,9 @@ def _glob_to_labels(pattern: str, repo_root: Path) -> list[str]:
         rel = os.path.relpath(match, repo_root)
         p = Path(rel)
         if p.is_file():
-            labels.append(f"//{p.parent.as_posix()}:{p.name}")
+            label = _file_label(p, repo_root)
+            if label:
+                labels.append(label)
         elif p.is_dir():
             labels.append(f"//{p.as_posix()}")
     return labels
