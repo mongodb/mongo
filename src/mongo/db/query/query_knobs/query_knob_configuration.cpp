@@ -15,6 +15,7 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -97,6 +98,12 @@ bool QueryKnobConfiguration::_isKnobReadAllowed(QueryKnobId id) const {
         return false;
     }
     return !QueryKnobRegistry::instance().entry(id).pqsSettable;
+}
+
+std::string QueryKnobConfiguration::_makeForbiddenKnobReadMsg(QueryKnobId id) const {
+    const auto& entry = QueryKnobRegistry::instance().entry(id);
+    return str::stream() << "PQS-settable query knob '" << entry.wireName
+                         << "' read while query settings are pending resolution";
 }
 
 BSONObj QueryKnobConfiguration::serializeForExplain() const {

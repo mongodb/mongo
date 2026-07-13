@@ -52,7 +52,7 @@ public:
      */
     template <typename T>
     T get(const QueryKnob<T>& knob) const {
-        dassert(_isKnobReadAllowed(knob.id));
+        dassert(_isKnobReadAllowed(knob.id), _makeForbiddenKnobReadMsg(knob.id));
         return _snapshot.get<T>(knob.id);
     }
 
@@ -104,6 +104,12 @@ private:
      * known) and after the overrides are applied are unrestricted.
      */
     bool _isKnobReadAllowed(QueryKnobId id) const;
+
+    /**
+     * Builds the diagnostic message naming the knob's wire name for the read-allowed check. Only
+     * referenced from the debug-only 'dassert' in 'get()', so it is compiled out of release builds.
+     */
+    std::string _makeForbiddenKnobReadMsg(QueryKnobId id) const;
 
     QueryKnobSnapshot _snapshot;
     // Outcome of the last query-settings override attempt, refreshed on each 'get()' call until it
