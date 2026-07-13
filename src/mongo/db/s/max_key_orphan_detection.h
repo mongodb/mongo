@@ -29,7 +29,7 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term);
 
 /**
  * Spawns the asynchronous MaxKey orphan detector for 'term', cancelling any detector from a prior
- * term. Gated on featureFlagMaxKeyDetection.
+ * term. Runs only if sharding_util::isMaxKeyDetectionEnabled().
  */
 void launchMaxKeyOrphanDetectionOnStepUp(OperationContext* opCtx, long long term);
 

@@ -217,8 +217,10 @@ feature_flags:
             whose leading field is MaxKey and records the result in config.maxKeyOrphanScanState.
             On the config server, the Balancer scan detects zones whose upper bound matches the
             buggy trailing-MinKey fingerprint and records the result in config.maxKeyZoneScanState.
+            Disabled by default; the scans can also be enabled at runtime via the
+            enableMaxKeyDetection server parameter without turning on this flag.
         cpp_varname: feature_flags::gMaxKeyDetection
-        default: true
+        default: false
         fcv_gated: false
     featureFlagMaxKeyOrphanGuard:
         description: >-

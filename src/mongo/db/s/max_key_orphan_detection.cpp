@@ -10,6 +10,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk_range.h"
@@ -34,7 +35,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -584,7 +584,7 @@ void runMaxKeyOrphanDetection(OperationContext* opCtx, long long term) {
 }
 
 void launchMaxKeyOrphanDetectionOnStepUp(OperationContext* opCtx, long long term) {
-    if (!feature_flags::gMaxKeyDetection.isEnabled()) {
+    if (!sharding_util::isMaxKeyDetectionEnabled()) {
         return;
     }
     auto* serviceContext = opCtx->getServiceContext();

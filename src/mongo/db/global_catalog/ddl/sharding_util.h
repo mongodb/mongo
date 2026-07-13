@@ -108,5 +108,11 @@ namespace sharding_util {
  */
 [[MONGO_MOD_PUBLIC]] bool isTrackedTimeseries(OperationContext* opCtx,
                                               const NamespaceString& bucketNss);
+
+/**
+ * Returns true iff the MaxKey detection scans should run, i.e. if either the enableMaxKeyDetection
+ * server parameter or featureFlagMaxKeyDetection is enabled.
+ */
+[[MONGO_MOD_PUBLIC]] bool isMaxKeyDetectionEnabled();
 }  // namespace sharding_util
 }  // namespace mongo

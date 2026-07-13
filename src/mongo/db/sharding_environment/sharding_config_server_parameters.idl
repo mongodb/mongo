@@ -175,7 +175,8 @@ server_parameters:
     maxKeyZoneScanEnabled:
         description: >-
             When set to false the MaxKey zone inventory scan is skipped. Re-enabling it will run
-            the scan on next stepup. Has no effect unless featureFlagMaxKeyDetection is enabled.
+            the scan on next stepup. Has no effect unless MaxKey detection is enabled (via the
+            enableMaxKeyDetection server parameter or featureFlagMaxKeyDetection).
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
         cpp_varname: gMaxKeyZoneScanEnabled

@@ -181,6 +181,18 @@ server_parameters:
         default: 3600
         redact: false
 
+    enableMaxKeyDetection:
+        description: >-
+            When enabled, runs the one-shot MaxKey inventory scans on each primary stepup (the
+            shard-side orphan detector and the config-server Balancer zone scan). This setting is
+            checked only on stepup, so enabling it at runtime takes effect on the next primary
+            stepup. The scans run if either this parameter is true or featureFlagMaxKeyDetection is enabled.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gEnableMaxKeyDetection
+        default: false
+        redact: false
+
     disableResumableRangeDeleter:
         description: >-
             Disable the resumable range deleter. Ranges will not be submitted for deletion, and if an

@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
@@ -187,6 +188,35 @@ TEST_F(MaxKeyOrphanDetectionFixture, PreservesOwnedAlertEmittedAcrossRescan) {
     ASSERT(doc->hasField("scanCompletedAt")) << *doc;
     ASSERT_TRUE(doc->getField("ownedAlertEmitted").Bool())
         << "Expected the re-scan to preserve a prior ownedAlertEmitted=true: " << *doc;
+}
+
+TEST(MaxKeyOrphanDetectionTest, DetectionGateHonorsServerParameterAndFeatureFlag) {
+    ASSERT_FALSE(sharding_util::isMaxKeyDetectionEnabled()) << "both toggles default off";
+
+    {
+        unittest::ServerParameterGuard paramOn{"enableMaxKeyDetection", true};
+        ASSERT_TRUE(sharding_util::isMaxKeyDetectionEnabled())
+            << "server parameter on, feature flag off";
+    }
+    {
+        unittest::ServerParameterGuard flagOn{"featureFlagMaxKeyDetection", true};
+        ASSERT_TRUE(sharding_util::isMaxKeyDetectionEnabled())
+            << "feature flag on, server parameter off";
+    }
+
+    ASSERT_FALSE(sharding_util::isMaxKeyDetectionEnabled()) << "guards restored: both off again";
+}
+
+TEST_F(MaxKeyOrphanDetectionFixture, StepUpLauncherDoesNotRunDetectorWhenGateDisabled) {
+    unittest::ServerParameterGuard flagOff{"featureFlagMaxKeyDetection", false};
+    unittest::ServerParameterGuard paramOff{"enableMaxKeyDetection", false};
+    ASSERT_FALSE(sharding_util::isMaxKeyDetectionEnabled());
+
+    launchMaxKeyOrphanDetectionOnStepUp(opCtx, kStartingTerm);
+    cancelMaxKeyOrphanDetection(opCtx->getServiceContext());
+
+    ASSERT_FALSE(readMaxKeyOrphanScanStateDoc(opCtx).has_value())
+        << "Detection must not run when both the feature flag and enableMaxKeyDetection are off";
 }
 
 TEST(MaxKeyOrphanDetectionTest, ShardingStatisticsReportIncludesOrphanScanFields) {

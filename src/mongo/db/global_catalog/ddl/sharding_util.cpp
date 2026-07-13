@@ -27,6 +27,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
@@ -361,6 +363,10 @@ bool isTrackedTimeseries(OperationContext* opCtx, const NamespaceString& bucketN
         // If we don't find the bucket nss it means the collection is not tracked.
         return false;
     }
+}
+
+bool isMaxKeyDetectionEnabled() {
+    return gEnableMaxKeyDetection.load() || feature_flags::gMaxKeyDetection.isEnabled();
 }
 
 }  // namespace sharding_util

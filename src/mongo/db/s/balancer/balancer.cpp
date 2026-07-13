@@ -26,6 +26,7 @@
 #include "mongo/db/global_catalog/ddl/shard_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -53,7 +54,6 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -1461,10 +1461,10 @@ std::vector<BSONObj> Balancer::buildMaxKeyZoneScanPipeline() {
 void Balancer::_runMaxKeyZoneScan(OperationContext* opCtx) {
     const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
-    if (!feature_flags::gMaxKeyDetection.isEnabled()) {
+    if (!sharding_util::isMaxKeyDetectionEnabled()) {
         LOGV2_DEBUG(12829511,
                     2,
-                    "Skipping MaxKey zone inventory scan: featureFlagMaxKeyDetection disabled",
+                    "Skipping MaxKey zone inventory scan: MaxKey detection disabled",
                     "term"_attr = term);
         return;
     }

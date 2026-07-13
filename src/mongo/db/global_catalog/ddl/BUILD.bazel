@@ -543,6 +543,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/sharding_environment:sharding_feature_flags",
         "//src/mongo/db/sharding_environment:sharding_logging",
+        "//src/mongo/db/sharding_environment:sharding_runtime_d_params_idl",
         "//src/mongo/db/sharding_environment/client:sharding_client",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/topology:remove_shard_exception",
