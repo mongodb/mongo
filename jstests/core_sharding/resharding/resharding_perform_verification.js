@@ -24,7 +24,8 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {getShardNamesForCollection} from "jstests/sharding/libs/sharding_util.js";
 
 const topology = DiscoverTopology.findConnectedNodes(db);
-const isVerificationEnabled = FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
+// TODO(SERVER-94583): Remove this check when featureFlagReshardingVerification is removed.
+const isVerificationEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
 
 const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);

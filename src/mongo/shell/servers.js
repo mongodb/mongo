@@ -776,6 +776,12 @@ MongoRunner.mongodOptions = function (opts = {}) {
         "initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs",
         "9.0.0",
     );
+    _removeSetParameterIfBeforeVersion(opts, "reshardingDocumentVerification", "9.0.0");
+    _removeSetParameterIfBeforeVersion(
+        opts,
+        "reshardingDocumentValidationMaxCollectionSizeBytes",
+        "9.0.0",
+    );
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";
