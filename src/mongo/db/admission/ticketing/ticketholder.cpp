@@ -322,6 +322,10 @@ int64_t TicketHolder::numFinishedProcessing() const {
 }
 
 int TicketHolder::queued() const {
+    auto queuedForTest = _queuedForTest.load();
+    if (queuedForTest >= 0) {
+        return queuedForTest;
+    }
     return _semaphore->waiters();
 }
 
@@ -335,6 +339,10 @@ void TicketHolder::setNumFinishedProcessing_forTest(int64_t numFinishedProcessin
 
 void TicketHolder::setPeakUsed_forTest(int used) {
     _peakUsed.store(used);
+}
+
+void TicketHolder::setQueued_forTest(int queued) {
+    _queuedForTest.store(queued);
 }
 
 void TicketHolder::incrementDelinquencyStats(

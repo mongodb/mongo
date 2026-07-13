@@ -90,6 +90,8 @@ private:
     void _increaseConcurrency(OperationContext* opCtx);
     void _decreaseConcurrency(OperationContext* opCtx);
 
+    void _breakStall(OperationContext* opCtx);
+
     void _resize(OperationContext* opCtx, TicketHolder* ticketholder, int newTickets);
 
     void _initState();
@@ -105,6 +107,8 @@ private:
     ProbingState _state = ProbingState::kStable;
     int64_t _prevNumFinishedProcessing = -1;
 
+    int32_t _consecutiveStalls = 0;
+
     Timer _timer;
 
     struct Stats {
@@ -118,6 +122,8 @@ private:
         Atomic<int64_t> timesProbedStable;
         Atomic<int64_t> timesProbedUp;
         Atomic<int64_t> timesProbedDown;
+        Atomic<int64_t> timesStalled;
+        Atomic<int64_t> totalAmountStallIncreased;
     } _stats;
 
     mutable std::mutex _mutex;

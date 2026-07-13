@@ -174,6 +174,8 @@ public:
 
     [[MONGO_MOD_PRIVATE]] void setPeakUsed_forTest(int used);
 
+    [[MONGO_MOD_PRIVATE]] void setQueued_forTest(int queued);
+
     /**
      * Appends all queue and delinquency stats.
      */
@@ -268,6 +270,7 @@ private:
     std::mutex _resizeMutex;
     Atomic<int> _outof;
     Atomic<int> _peakUsed;
+    Atomic<int> _queuedForTest{-1};
     bool _enabledDelinquent{false};
     Milliseconds _delinquentMs{0};
     DelinquentCallback _reportDelinquentOpCallback{nullptr};

@@ -141,16 +141,32 @@ void ThroughputProbing::_run(Client* client) {
         auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) /
             static_cast<double>(elapsed.count());
 
-        switch (_state) {
-            case ProbingState::kStable:
-                _probeStable(opCtx.get(), throughput);
-                break;
-            case ProbingState::kUp:
-                _probeUp(opCtx.get(), throughput);
-                break;
-            case ProbingState::kDown:
-                _probeDown(opCtx.get(), throughput);
-                break;
+        // A throughput of zero while operations are waiting for a ticket means the system is making
+        // no forward progress: operations may be stuck holding tickets while waiters cannot get in.
+        // While stalled, we suppress normal probing and instead count consecutive stalled intervals
+        // (to avoid reacting to transient measurement noise). Once the stall has persisted for long
+        // enough, we forcibly increase concurrency in the hope that admitting more operations lets
+        // some make progress. A threshold of zero disables stall breaking entirely.
+        auto stallThreshold = gStallEscalationThreshold.load();
+        auto numQueued = _readTicketHolder->queued() + _writeTicketHolder->queued();
+        if (stallThreshold > 0 && throughput == 0 && numQueued > 0) {
+            if (++_consecutiveStalls >= stallThreshold) {
+                _breakStall(opCtx.get());
+                _consecutiveStalls = 0;
+            }
+        } else {
+            _consecutiveStalls = 0;
+            switch (_state) {
+                case ProbingState::kStable:
+                    _probeStable(opCtx.get(), throughput);
+                    break;
+                case ProbingState::kUp:
+                    _probeUp(opCtx.get(), throughput);
+                    break;
+                case ProbingState::kDown:
+                    _probeDown(opCtx.get(), throughput);
+                    break;
+            }
         }
 
         // Reset these with fresh values after we've made our adjustment to establish a better
@@ -365,6 +381,36 @@ void ThroughputProbing::_decreaseConcurrency(OperationContext* opCtx) {
                 "writeConcurrency"_attr = _writeTicketHolder->outof());
 }
 
+void ThroughputProbing::_breakStall(OperationContext* opCtx) {
+    _stats.timesStalled.fetchAndAdd(1);
+    _state = ProbingState::kStable;
+
+    auto max = gMaxConcurrency.load();
+    if (_readTicketHolder->outof() >= max && _writeTicketHolder->outof() >= max) {
+        LOGV2_WARNING(12899600,
+                      "Throughput Probing: detected a stall (zero throughput while operations are "
+                      "waiting for a ticket); but max concurrency already reached");
+        return;
+    }
+
+    auto totalBefore = _readTicketHolder->outof() + _writeTicketHolder->outof();
+
+    _increaseConcurrency(opCtx);
+
+    auto totalAfter = _readTicketHolder->outof() + _writeTicketHolder->outof();
+    _stableConcurrency = totalAfter;
+    _stats.totalAmountStallIncreased.fetchAndAdd(totalAfter - totalBefore);
+
+    LOGV2_WARNING(
+        12899601,
+        "Throughput Probing: detected a stall (zero throughput while operations are waiting for a "
+        "ticket); increasing concurrency to attempt to break it",
+        "readConcurrency"_attr = _readTicketHolder->outof(),
+        "writeConcurrency"_attr = _writeTicketHolder->outof(),
+        "readQueued"_attr = _readTicketHolder->queued(),
+        "writeQueued"_attr = _writeTicketHolder->queued());
+}
+
 void ThroughputProbing::_initState() {
     int32_t minTotalConcurrency = gMinConcurrency.load() * 2;
     int32_t maxTotalConcurrency = gMaxConcurrency.load() * 2;
@@ -396,6 +442,7 @@ void ThroughputProbing::_initState() {
     _stableThroughput = 0;
     _state = ProbingState::kStable;
     _prevNumFinishedProcessing = -1;
+    _consecutiveStalls = 0;
 }
 
 void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
@@ -407,6 +454,9 @@ void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("timesProbedStable", static_cast<long long>(timesProbedStable.load()));
     builder.append("timesProbedUp", static_cast<long long>(timesProbedUp.load()));
     builder.append("timesProbedDown", static_cast<long long>(timesProbedDown.load()));
+    builder.append("timesStalled", static_cast<long long>(timesStalled.load()));
+    builder.append("totalAmountStallIncreased",
+                   static_cast<long long>(totalAmountStallIncreased.load()));
 }
 
 }  // namespace mongo::admission::execution_control

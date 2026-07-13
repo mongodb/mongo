@@ -215,6 +215,12 @@ protected:
             return !concurrencyIncreased() && !concurrencyDecreased();
         }
 
+        bool stallBroken() const {
+            return _stats["timesStalled"].Long() == _prevStats["timesStalled"].Long() + 1 &&
+                _stats["totalAmountStallIncreased"].Long() >
+                _prevStats["totalAmountStallIncreased"].Long();
+        }
+
         bool probeIncemented(std::string a) const {
             return _stats[a].Long() > _prevStats[a].Long();
         }
@@ -227,11 +233,13 @@ protected:
         BSONObj _stats =
             BSON("timesDecreased" << 0ll << "timesIncreased" << 0ll << "totalAmountDecreased" << 0ll
                                   << "totalAmountIncreased" << 0ll << "timesProbedStable" << 0ll
-                                  << "timesProbedUp" << 0ll << "timesProbedDown" << 0ll);
+                                  << "timesProbedUp" << 0ll << "timesProbedDown" << 0ll
+                                  << "timesStalled" << 0ll << "totalAmountStallIncreased" << 0ll);
         BSONObj _prevStats =
             BSON("timesDecreased" << 0ll << "timesIncreased" << 0ll << "totalAmountDecreased" << 0ll
                                   << "totalAmountIncreased" << 0ll << "timesProbedStable" << 0ll
-                                  << "timesProbedUp" << 0ll << "timesProbedDown" << 0ll);
+                                  << "timesProbedUp" << 0ll << "timesProbedDown" << 0ll
+                                  << "timesStalled" << 0ll << "totalAmountStallIncreased" << 0ll);
     } _statsTester;
 };
 
@@ -371,6 +379,124 @@ TEST_F(ThroughputProbingTest, ProbeDownFails) {
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedUp"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedStable"));
     ASSERT(_statsTester.concurrencyKept()) << _statsTester.toString();
+}
+
+TEST_F(ThroughputProbingTest, BreaksStallWhenThroughputZeroWithWaiters) {
+    gStallEscalationThreshold.store(1);
+    ON_BLOCK_EXIT([]() { gStallEscalationThreshold.store(3); });
+
+    auto size = _readTicketHolder.outof();
+
+    _readTicketHolder.setQueued_forTest(5);
+    _writeTicketHolder.setQueued_forTest(5);
+
+    _tick();
+    _run();
+
+    ASSERT_GT(_readTicketHolder.outof(), size);
+    ASSERT_GT(_writeTicketHolder.outof(), size);
+    ASSERT_TRUE(_statsTester.stallBroken()) << _statsTester.toString();
+}
+
+TEST_F(ThroughputProbingTest, StallBreakRequiresConsecutiveIntervals) {
+    gStallEscalationThreshold.store(3);
+    ON_BLOCK_EXIT([]() { gStallEscalationThreshold.store(3); });
+
+    auto size = _readTicketHolder.outof();
+
+    _readTicketHolder.setQueued_forTest(5);
+    _writeTicketHolder.setQueued_forTest(5);
+
+    _tick();
+    _run();
+    ASSERT_EQ(_readTicketHolder.outof(), size);
+    ASSERT_FALSE(_statsTester.stallBroken()) << _statsTester.toString();
+
+    _tick();
+    _run();
+    ASSERT_EQ(_readTicketHolder.outof(), size);
+    ASSERT_FALSE(_statsTester.stallBroken()) << _statsTester.toString();
+
+    _tick();
+    _run();
+    ASSERT_GT(_readTicketHolder.outof(), size);
+    ASSERT_GT(_writeTicketHolder.outof(), size);
+    ASSERT_TRUE(_statsTester.stallBroken()) << _statsTester.toString();
+}
+
+TEST_F(ThroughputProbingTest, StallCounterResetsWhenProgressResumes) {
+    gStallEscalationThreshold.store(3);
+    ON_BLOCK_EXIT([]() { gStallEscalationThreshold.store(3); });
+
+    auto size = _readTicketHolder.outof();
+
+    _readTicketHolder.setQueued_forTest(5);
+    _writeTicketHolder.setQueued_forTest(5);
+
+    _tick();
+    _run();
+    _tick();
+    _run();
+    ASSERT_EQ(_readTicketHolder.outof(), size);
+
+    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    _tick();
+    _run();
+    ASSERT_FALSE(_statsTester.stallBroken()) << _statsTester.toString();
+
+    _tick();
+    _run();
+    ASSERT_FALSE(_statsTester.stallBroken()) << _statsTester.toString();
+}
+
+TEST_F(ThroughputProbingTest, StallBreakDisabledWithZeroThreshold) {
+    gStallEscalationThreshold.store(0);
+    ON_BLOCK_EXIT([]() { gStallEscalationThreshold.store(3); });
+
+    auto size = _readTicketHolder.outof();
+
+    // Zero throughput with waiters would normally break a stall, but a threshold of zero disables
+    // stall breaking, so we fall back to normal probing and never force an increase.
+    _readTicketHolder.setQueued_forTest(5);
+    _writeTicketHolder.setQueued_forTest(5);
+
+    for (int i = 0; i < 5; ++i) {
+        _tick();
+        _run();
+        ASSERT_FALSE(_statsTester.stallBroken()) << _statsTester.toString();
+    }
+    ASSERT_LE(_readTicketHolder.outof(), size);
+}
+
+TEST_F(ThroughputProbingTest, NoStallBreakWithoutWaiters) {
+    gStallEscalationThreshold.store(1);
+    ON_BLOCK_EXIT([]() { gStallEscalationThreshold.store(3); });
+
+    _readTicketHolder.setQueued_forTest(0);
+    _writeTicketHolder.setQueued_forTest(0);
+    _tick();
+
+    _run();
+
+    ASSERT_FALSE(_statsTester.stallBroken()) << _statsTester.toString();
+}
+
+TEST_F(ThroughputProbingMaxConcurrencyTest, StallBreakRespectsMaxConcurrency) {
+    gStallEscalationThreshold.store(1);
+    ON_BLOCK_EXIT([]() { gStallEscalationThreshold.store(3); });
+
+    auto max = gMaxConcurrency.load();
+    ASSERT_EQ(_readTicketHolder.outof(), max);
+    ASSERT_EQ(_writeTicketHolder.outof(), max);
+
+    _readTicketHolder.setQueued_forTest(5);
+    _writeTicketHolder.setQueued_forTest(5);
+    _tick();
+
+    _run();
+
+    ASSERT_EQ(_readTicketHolder.outof(), max);
+    ASSERT_EQ(_writeTicketHolder.outof(), max);
 }
 
 TEST_F(ThroughputProbingMaxConcurrencyTest, NoProbeUp) {

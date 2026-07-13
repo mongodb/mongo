@@ -120,6 +120,21 @@ server_parameters:
             gt: 0
         redact: false
 
+    throughputProbingStallEscalationThreshold:
+        description: >-
+            The number of consecutive throughput probing intervals with zero throughput and at least
+            one operation waiting for a ticket that must elapse before concurrency is forcibly
+            increased to attempt to break the stall. This guards against reacting to transient
+            measurement noise. A value of 1 reacts on the first detected interval. A value of 0
+            disables stall breaking entirely.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gStallEscalationThreshold
+        default: 3
+        validator:
+            gte: 0
+        redact: false
+
     throughputProbingConcurrencyAdjustmentIntervalMillis:
         description: >-
             The interval in milliseconds in which to run the concurrency adjustment algorithm.
