@@ -25,6 +25,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 
@@ -41,6 +42,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseAfterRecipientReceiveCloneCmd);
+MONGO_FAIL_POINT_DEFINE(errorAfterProcessingReshardRecipientCloneCommand);
 
 class ShardsvrReshardRecipientCloneCommand final
     : public TypedCommand<ShardsvrReshardRecipientCloneCommand> {
@@ -85,6 +87,11 @@ public:
                       "reshardingUUID"_attr = uuid(),
                       "lsid"_attr = opCtx->getLogicalSessionId(),
                       "txnNum"_attr = opCtx->getTxnNumber());
+
+                if (MONGO_unlikely(errorAfterProcessingReshardRecipientCloneCommand.shouldFail())) {
+                    uasserted(ErrorCodes::SocketException,
+                              "Hit errorAfterProcessingReshardRecipientCloneCommand failpoint");
+                }
             } else {
                 // If state machine does not exist, either this message was delayed and the
                 // resharding operation is done, or this node is no longer a primary.

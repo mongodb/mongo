@@ -26,6 +26,7 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -34,6 +35,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(errorAfterProcessingReshardRecipientInitializeCommand);
 
 class ShardsvrReshardRecipientInitializeCommand final
     : public TypedCommand<ShardsvrReshardRecipientInitializeCommand> {
@@ -127,6 +130,12 @@ public:
                       "reshardingUUID"_attr = uuid(),
                       "lsid"_attr = opCtx->getLogicalSessionId(),
                       "txnNum"_attr = opCtx->getTxnNumber());
+            }
+
+            if (MONGO_unlikely(
+                    errorAfterProcessingReshardRecipientInitializeCommand.shouldFail())) {
+                uasserted(ErrorCodes::SocketException,
+                          "Hit errorAfterProcessingReshardRecipientInitializeCommand failpoint");
             }
 
             resharding::waitForStateDocumentMajorityCommitted(opCtx);

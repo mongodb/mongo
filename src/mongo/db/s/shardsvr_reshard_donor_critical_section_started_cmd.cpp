@@ -7,11 +7,14 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(errorAfterProcessingReshardDonorCriticalSectionStartedCommand);
 
 class ShardsvrReshardDonorCriticalSectionStartedCommand final
     : public TypedCommand<ShardsvrReshardDonorCriticalSectionStartedCommand> {
@@ -64,6 +67,13 @@ public:
                   "reshardingUUID"_attr = uuid(),
                   "lsid"_attr = opCtx->getLogicalSessionId(),
                   "txnNum"_attr = opCtx->getTxnNumber());
+
+            if (MONGO_unlikely(
+                    errorAfterProcessingReshardDonorCriticalSectionStartedCommand.shouldFail())) {
+                uasserted(
+                    ErrorCodes::SocketException,
+                    "Hit errorAfterProcessingReshardDonorCriticalSectionStartedCommand failpoint");
+            }
         }
 
     private:
