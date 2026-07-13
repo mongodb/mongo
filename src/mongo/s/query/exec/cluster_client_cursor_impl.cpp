@@ -287,11 +287,28 @@ void ClusterClientCursorImpl::recordChangeStreamThroughputMetricsForBatch() {
         if (const auto docsDelta = _docsReturned - _lastReportedDocsReturned; docsDelta > 0) {
             change_stream::cursorDocsReturned().add(docsDelta);
             _lastReportedDocsReturned = _docsReturned;
+            // Only count a batch that actually delivered documents to the client
             change_stream::cursorBatchesReturned().add(1);
         }
         if (const auto bytesDelta = _bytesReturned - _lastReportedBytesReturned; bytesDelta > 0) {
             change_stream::cursorBytesReturned().add(bytesDelta);
             _lastReportedBytesReturned = _bytesReturned;
+        }
+
+        // Record the read work performed on the shards since the previous batch. These totals are
+        // aggregated from shard getMore responses in AsyncResultsMerger (via
+        // DataBearingNodeMetrics) and accumulated into '_metrics' before this batch is returned to
+        // the client.
+        const auto docsExamined = _metrics.docsExamined.value_or(0);
+        if (const auto docsExaminedDelta = docsExamined - _lastReportedDocsExamined;
+            docsExaminedDelta > 0) {
+            change_stream::cursorDocsExamined().add(docsExaminedDelta);
+            _lastReportedDocsExamined = docsExamined;
+        }
+        const auto bytesRead = _metrics.bytesRead.value_or(0);
+        if (const auto bytesReadDelta = bytesRead - _lastReportedBytesRead; bytesReadDelta > 0) {
+            change_stream::cursorBytesRead().add(bytesReadDelta);
+            _lastReportedBytesRead = bytesRead;
         }
     } catch (...) {
     }
@@ -303,6 +320,8 @@ void ClusterClientCursorImpl::queueResult(ClusterQueryResult&& result) {
         tassert(11052321, "Expected result object to be owned", resultObj->isOwned());
         // This document was already counted when it emerged from next(); back it out here so that
         // it is only counted once, when it is re-served from the stash.
+        // TODO SERVER-131216: clean up decrementing counters by extracting counting to call site
+        // where queueResult() is called
         if (_isChangeStreamQuery) {
             --_docsReturned;
             _bytesReturned -= resultObj->objsize();

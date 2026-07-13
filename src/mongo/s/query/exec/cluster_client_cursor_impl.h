@@ -185,6 +185,12 @@ private:
     long long _lastReportedDocsReturned = 0;
     long long _lastReportedBytesReturned = 0;
 
+    // Watermarks tracking how much of the docsExamined / bytesRead totals aggregated from the
+    // shards (in '_metrics') has already been reported to the global change stream throughput
+    // counters, so each batch only records its own delta.
+    long long _lastReportedDocsExamined = 0;
+    long long _lastReportedBytesRead = 0;
+
     // The root stage of the pipeline used to return the result set, merged from the remote nodes.
     std::unique_ptr<RouterExecStage> _root;
 

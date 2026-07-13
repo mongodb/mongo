@@ -1832,8 +1832,13 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
     }
 
     IncludeMetrics remoteMetricsToInclude;
-    remoteMetricsToInclude.setQueryStats(query_stats::shouldRequestRemoteMetrics(
-        CurOp::get(expCtx->getOperationContext())->debug()));
+    // Request per-shard CursorMetrics (docsExamined/bytesRead) either when query stats sampling
+    // needs them, or for change stream cursors, which aggregate these totals in the
+    // AsyncResultsMerger to report the changeStreams.cursor.docsExamined/bytesRead throughput
+    // counters on the router.
+    const auto& aggOpDebug = CurOp::get(expCtx->getOperationContext())->debug();
+    remoteMetricsToInclude.setQueryStats(query_stats::shouldRequestRemoteMetrics(aggOpDebug) ||
+                                         aggOpDebug.isChangeStreamQuery);
 
     return dispatchTargetedPipelineAndAddMergeCursors(expCtx,
                                                       routingCtx,

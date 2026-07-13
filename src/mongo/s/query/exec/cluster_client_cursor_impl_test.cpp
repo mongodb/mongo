@@ -550,6 +550,8 @@ TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorThroughputMetrics) {
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), 0);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned), 0);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsExamined), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesRead), 0);
 
     CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
 
@@ -592,6 +594,20 @@ TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorThroughputMetrics) {
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned),
               firstBatchBytes);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 1);
+    // No shard-side read work has been folded into the cursor's metrics yet.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsExamined), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesRead), 0);
+
+    // Simulate the read work aggregated from shards (in AsyncResultsMerger) being folded into the
+    // cursor's metrics across getMores.
+    const int64_t kDocsExamined = 17;
+    const int64_t kBytesRead = 4096;
+    {
+        OpDebug::AdditiveMetrics remoteMetrics;
+        remoteMetrics.docsExamined = kDocsExamined;
+        remoteMetrics.bytesRead = kBytesRead;
+        cursor.updateMetrics(remoteMetrics);
+    }
 
     // Second batch: consume the remaining documents, then EOF.
     for (int i = kFirstBatchDocs; i < kNumDocs; ++i) {
@@ -605,11 +621,15 @@ TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorThroughputMetrics) {
     ASSERT_EQ(cursor.getNumReturnedSoFar(), kNumDocs);
     cursor.recordChangeStreamThroughputMetricsForBatch();
 
-    // Only the second batch's delta is added on top of the first.
+    // Only the second batch's delta is added on top of the first. The shard-side read work folded
+    // into the cursor's metrics before this batch is reported incrementally, not deferred to kill.
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), kNumDocs);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned),
               expectedBytes);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 2);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsExamined),
+              kDocsExamined);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesRead), kBytesRead);
 
     // Killing the cursor does not re-count throughput that was already recorded per batch.
     cursor.kill(_opCtx.get());
@@ -617,6 +637,9 @@ TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorThroughputMetrics) {
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned),
               expectedBytes);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 2);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsExamined),
+              kDocsExamined);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesRead), kBytesRead);
 }
 
 TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorStashedDocumentCountedOnceInThroughput) {
@@ -726,6 +749,8 @@ TEST_F(ClusterClientCursorImplTest, NonChangeStreamCursorDoesNotRecordThroughput
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), 0);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned), 0);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsExamined), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesRead), 0);
 }
 
 TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorCanBeDisposedEvenIfTimeGoesBackwards) {

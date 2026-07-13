@@ -4,7 +4,9 @@
  *
  * The docsReturned/bytesReturned/batchesReturned counters are reported by both the router (mongos)
  * and the data-bearing nodes (mongod). The docsExamined/bytesRead counters describe the oplog scan
- * and storage reads, so they only exist on a data-bearing node and are not present on a mongos.
+ * and storage reads; on a data-bearing node they come from local execution, while on a mongos they
+ * are aggregated from the shard responses in the AsyncResultsMerger. All counters advance
+ * incrementally as each getMore batch is returned to the client.
  *
  * @tags: [
  *   assumes_read_preference_unchanged,
@@ -18,7 +20,6 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {CursorList} from "jstests/libs/query/change_stream_util.js";
 import {
     ServerStatusMetrics,
@@ -32,16 +33,14 @@ describe("change stream throughput counters", function () {
     // Router-side counters, reported by whichever node (mongos or mongod) serves the change stream
     // cursor.
     const kRouterMetrics = ["docsReturned", "bytesReturned", "batchesReturned"];
-    // Shard-side counters describing the oplog scan and storage reads; only present on a
-    // data-bearing node, currently not on mongoS yet
+    // Shard-side counters describing the oplog scan and storage reads. These are reported by
+    // data-bearing nodes and, since SERVER-130705, also by a mongos (aggregated from the shard
+    // responses in the AsyncResultsMerger and reported incrementally per getMore batch).
     const kShardMetrics = ["docsExamined", "bytesRead"];
 
-    // On mongoS only the router-side counters are reported; on a replica set every counter is.
-    const onMongos = FixtureHelpers.isMongos(db);
-    const presentMetrics = onMongos ? kRouterMetrics : kRouterMetrics.concat(kShardMetrics);
+    // Every throughput counter is now reported on both mongos and a replica set.
+    const presentMetrics = kRouterMetrics.concat(kShardMetrics);
 
-    // Reads only the throughput counters that exist for the fixture we're connected to, so the test
-    // does not fault on the absent shard-side metrics when talking to a mongos.
     function readThroughput() {
         const cursor = ServerStatusMetrics.getCsMetrics(db).cursor;
         const out = {};
@@ -93,11 +92,6 @@ describe("change stream throughput counters", function () {
         it("advances every throughput counter as it returns getMore batches", function () {
             const kNumBatches = 3;
 
-            // docsExamined strictly increases only on a data-bearing node; bytesRead can be served
-            // entirely from the WiredTiger cache, so it must only be non-decreasing.
-            const strictlyIncreasing = kRouterMetrics.concat(onMongos ? [] : ["docsExamined"]);
-            const nonDecreasing = onMongos ? [] : ["bytesRead"];
-
             const before = readThroughput();
 
             // Open a change stream with batchSize:1 so each event is its own getMore batch.
@@ -109,6 +103,13 @@ describe("change stream throughput counters", function () {
                 assert.soon(() => csCursor.hasNext());
                 csCursor.next();
             }
+
+            // All counters advance incrementally per getMore batch, so they must have moved while
+            // the cursor is still open. docsExamined strictly increases (the oplog scan examines the
+            // inserted events); bytesRead can be served entirely from the WiredTiger cache, so it is
+            // only non-decreasing.
+            const strictlyIncreasing = kRouterMetrics.concat(["docsExamined"]);
+            const nonDecreasing = ["bytesRead"];
 
             const after = readThroughput();
             for (const metric of strictlyIncreasing) {
