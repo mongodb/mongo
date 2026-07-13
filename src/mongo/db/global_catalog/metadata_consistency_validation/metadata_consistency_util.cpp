@@ -180,6 +180,11 @@ void _checkBucketCollectionInconsistencies(
         return;
     }
 
+    // $out uses a temporary system.buckets collection without a view as part of its design.
+    if (nss.isOutStageTmpCollection()) {
+        return;
+    }
+
     for (auto& inconsistency : timeseries::checkBucketCollectionInconsistencies(
              opCtx,
              localColl,

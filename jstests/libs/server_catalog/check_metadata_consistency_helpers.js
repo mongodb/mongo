@@ -87,15 +87,7 @@ export var MetadataConsistencyChecker = (function () {
             }
 
             // Temporary workaround: tolerate these inconsistencies until linked tickets are fixed.
-            const knownInconsistencyTempWorkaround = [
-                // TODO(SERVER-130694): Fix false positives and remove inconsistency type
-                "MalformedTimeseriesBucketsCollection",
-            ];
             const shouldIgnoreInconsistencyTempWorkaround = (inconsistency) => {
-                if (knownInconsistencyTempWorkaround.includes(inconsistency.type)) {
-                    return true;
-                }
-
                 if (inconsistency.type !== "InconsistentShardCatalogCollectionMetadata") {
                     return false;
                 }
