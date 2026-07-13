@@ -43,3 +43,49 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
         "multiversion_sanity_check_last_lts_old_new_new": "last-lts",
     }.items()
 ]
+
+resmoke_suite_test(
+    name = "resmoke_end2end_tests",
+    config = "//buildscripts/resmokeconfig:suites/resmoke_end2end_tests.yml",
+    shard_count = 2,
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Makes many assumptions about paths that are incompatible with sandboxing.
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "unittest_shell_hang_analyzer",
+    config = "//buildscripts/resmokeconfig:suites/unittest_shell_hang_analyzer.yml",
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # Expects a system python to be available: `python ./buildscripts/resmoke.py hang-analyzer ...` Unable to start program python: No such file or directory
+        "requires_compile_variant",
+        "requires_execution_on_windows_patch_build",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "slow1",
+    config = "//buildscripts/resmokeconfig:suites/slow1.yml",
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "misc_js",
+        "non_win_dbg",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
