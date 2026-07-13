@@ -9,6 +9,7 @@
 #include "mongo/transport/handoff/handoff_session.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/scopeguard.h"
 
@@ -308,9 +309,26 @@ void HandoffListenerThread::_listenerLoop() {
     }
     interests.push_back(::pollfd{_wakePipe[0], POLLIN, 0});
 
+    ::pollfd& pipePollFd = interests.back();
+
+    // During backoff, we still want to monitor `_wakePipe` but we don't want to monitor any of
+    // `_sockets`.
+    std::span<::pollfd> interestsDuringBackoff(&pipePollFd, 1);
+    const int noTimeout = -1;
+    const int backoffFactor = 4;
+    const int startingBackoffMillis = 1;
+    const int maxBackoffMillis = 1000;
+    bool backingOff = false;
+    int backoffMillis = startingBackoffMillis;
+
     for (;;) {
-        const int no_timeout = -1;
-        int rc = _posix.poll(interests.data(), interests.size(), no_timeout);
+        int rc;
+        if (backingOff) {
+            rc = _posix.poll(
+                interestsDuringBackoff.data(), interestsDuringBackoff.size(), backoffMillis);
+        } else {
+            rc = _posix.poll(interests.data(), interests.size(), noTimeout);
+        }
         if (rc == -1) {
             switch (errno) {
                 case EINTR:
@@ -330,10 +348,20 @@ void HandoffListenerThread::_listenerLoop() {
             }
         }
 
+        if (rc == 0) {
+            // Timeout. This means we just backed off.
+            backingOff = false;
+            // Increase the backoff timeout for next time accept fails (unless it succeeds first).
+            backoffMillis = std::min(backoffFactor * backoffMillis, maxBackoffMillis);
+            continue;
+        }
+
         // The "wake pipe" was written to, indicating that we should stop accepting new connections.
-        if (interests.back().revents & POLLIN) {
+        if (pipePollFd.revents & POLLIN) {
             break;
         }
+
+        invariant(!backingOff);
 
         // The first `_sockets.size()` elements of `interests` correspond one-to-one with the
         // elements of `_sockets`. The final element of `interests` is the pipe, which we checked
@@ -343,18 +371,42 @@ void HandoffListenerThread::_listenerLoop() {
                 continue;
             }
 
-            const int connFd = _posix.accept(interests[i].fd, nullptr, nullptr);
+            int connFd;
+            do {
+                connFd = _posix.accept(interests[i].fd, nullptr, nullptr);
+            } while (connFd == -1 && errno == EINTR);
+
             if (connFd == -1) {
-                if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                // There are three categories of errors:
+                //
+                // 1. Errors we should ignore:
+                //     - EAGAIN or EWOULDBLOCK
+                //     - ECONNABORTED
+                // 2. Errors about running out of resources. Back off for a while, ignoring the
+                //    listening sockets but still responding to shutdown from the pipe.
+                //     - EMFILE
+                //     - ENFILE
+                //     - ENOBUFS
+                //     - ENOMEM
+                // 3. Errors that are not expected to happen. Treat these the same as (2).
+                //     - EINVAL
+                //     - ENOTSOCK
+                //     - EOPNOTSUPP
+                if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ECONNABORTED) {
                     continue;
                 }
+                backingOff = true;
                 LOG_SUPPRESSED(12779305,
                                Seconds(1),
                                logv2::LogSeverity::Error(),
                                logv2::LogSeverity::Debug(2),
-                               "HandoffTransportLayer: accept() failed",
-                               "error"_attr = errorMessage(lastSystemError()));
-                continue;
+                               "HandoffTransportLayer: accept() failed. Backing off.",
+                               "error"_attr = errorMessage(lastSystemError()),
+                               "backoffPeriod"_attr = Milliseconds(backoffMillis));
+                break;
+            } else {
+                // When we successfully accept a connection, reset the backoff timeout.
+                backoffMillis = startingBackoffMillis;
             }
 
             if (const Status status = validatePeerGroupID(_posix, connFd, _socketGroupID);

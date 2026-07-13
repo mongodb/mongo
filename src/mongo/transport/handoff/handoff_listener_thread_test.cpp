@@ -9,10 +9,11 @@
 #include "mongo/util/processinfo.h"
 
 #include <atomic>
+#include <barrier>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <thread>
+#include <utility>
 
 #include <unistd.h>
 
@@ -400,13 +401,13 @@ TEST(HandoffListenerThreadTest, PollTransientFailureContinuesListening) {
 }
 
 // accept() returning EINTR must retry via the poll loop; the pending connection must be accepted.
-// Similarly, EAGAIN or EWOULDBLOCK mean the connection that was there went away before we got a
-// chance to call accept(). Realistically that won't happen for unix domain sockets, but we allow it
-// and treat it the same as EINTR.
+// Similarly, EAGAIN, EWOULDBLOCK, or ECONNABORTED mean the connection that was there went away
+// before we got a chance to call accept(). Realistically that won't happen for unix domain sockets,
+// but we allow it and treat it the same as EINTR.
 TEST(HandoffListenerThreadTest, AcceptTransientFailureContinuesListening) {
     // EAGAIN and EWOULDBLOCK might be the same value on some platforms. Use a set so that we
     // consider distinct values only.
-    for (const int error : std::set<int>{EINTR, EAGAIN, EWOULDBLOCK}) {
+    for (const int error : std::set<int>{EINTR, EAGAIN, EWOULDBLOCK, ECONNABORTED}) {
         TemporaryDirectory dir;
         MockPOSIXInterface posix;
         TestSessionManager sessionManager;
@@ -792,6 +793,318 @@ TEST(HandoffListenerThreadTest, ShutdownWriteInterruptedBySignalWakesListener) {
     listener.stopAcceptingSessions();
     // Interrupted the first time, succeeded the second time.
     ASSERT_EQ(writeCount.load(), 2);
+    listener.shutdown();
+}
+
+// accept() failure backoff tests
+// ------------------------------
+
+// errno values for which the listener thread should back off rather than
+// treat the failure as transient.
+class AcceptBackoffTest : public testing::TestWithParam<int> {
+protected:
+    AcceptBackoffTest();
+
+    void setupBackoff();
+
+    TemporaryDirectory dir;
+    MockPOSIXInterface posix;
+    TestSessionManager sessionManager;
+    std::function<int(pollfd* fds, nfds_t count, int timeoutMillis)> onPoll;
+    std::barrier<> onPollBegin;
+    std::barrier<> onPollEnd;
+    std::function<int(int socket, sockaddr* address, socklen_t* length)> onAccept;
+    std::barrier<> onAcceptBegin;
+    HandoffListenerThread listener;
+};
+
+AcceptBackoffTest::AcceptBackoffTest()
+    : onPollBegin(2),
+      onPollEnd(2),
+      onAcceptBegin(2),
+      listener(singleSocketParams(dir.path() / "handoff-mongodb.sock", sessionManager, posix)) {
+    posix.onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        onPollBegin.arrive_and_wait();
+        std::for_each_n(fds, count, [](pollfd& interest) { interest.revents = 0; });
+        return onPoll(fds, count, timeoutMillis);
+    };
+
+    posix.onAccept = [&](int socket, sockaddr* address, socklen_t* length) {
+        onAcceptBegin.arrive_and_wait();
+        return onAccept(socket, address, length);
+    };
+}
+
+void AcceptBackoffTest::setupBackoff() {
+    ASSERT_OK(listener.setup({.s2nConfig = nullptr}));
+    ASSERT_OK(listener.listen());
+    listener.start();
+
+    // poll succeeds, but then accept() fails
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        // `fds` has two elements: The one listening socket, and the pipe.
+        ASSERT_EQ(count, 2);
+        // There's no timeout, because we're not backing off yet.
+        ASSERT_EQ(timeoutMillis, -1);
+        // Pretend that the listener has a connection to accept.
+        fds[0].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
+    onAccept = [&](int, sockaddr*, socklen_t*) {
+        // Return an error for which the listener thread will back off.
+        errno = GetParam();
+        return -1;
+    };
+    onAcceptBegin.arrive_and_wait();
+}
+
+std::string errorName(int errorCode) {
+    switch (errorCode) {
+        case EMFILE:
+            return "EMFILE";
+        case ENFILE:
+            return "ENFILE";
+        case ENOBUFS:
+            return "ENOBUFS";
+        case ENOMEM:
+            return "ENOMEM";
+        case EINVAL:
+            return "EINVAL";
+        case ENOTSOCK:
+            return "ENOTSOCK";
+        case EOPNOTSUPP:
+            return "EOPNOTSUPP";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    HandoffListenerThread,
+    AcceptBackoffTest,
+    testing::Values(EMFILE, ENFILE, ENOBUFS, ENOMEM, EINVAL, ENOTSOCK, EOPNOTSUPP),
+    [](const testing::TestParamInfo<int>& info) {
+        // Readable test names, e.g. AcceptFailuresThatTriggerBackoff/EMFILE
+        return errorName(info.param);
+    });
+
+// Certain errors reported by accept() cause the listener thread to stop listening for a time, while
+// still handling shutdown events through the pipe.
+TEST_P(AcceptBackoffTest, SomeAcceptFailuresTriggerBackoff) {
+    setupBackoff();
+
+    // The listener thread will reenter poll(), but this time with a timeout and without the
+    // listener socket.
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 1);
+        ASSERT_NE(timeoutMillis, -1);
+        // Pretend that there's data available on the shutdown pipe, so the listener thread
+        // shuts down. We'll also shut it down below, but we don't want it to block in accept().
+        fds[0].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
+    listener.shutdown();
+}
+
+// If a backoff times out (which is expected unless we shut down), then the listener thread reenters
+// poll() to wait for connections again.
+TEST_P(AcceptBackoffTest, RetriesAfterBackoff) {
+    setupBackoff();
+
+    // The listener thread will reenter poll(), but this time with a timeout and without the
+    // listener socket.
+    // If we pretend to have timed out, the listener thread will reenter poll() with the listening
+    // socket and no timeout again (retry after backoff).
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 1);
+        ASSERT_NE(timeoutMillis, -1);
+        (void)onPollEnd.arrive();
+        return 0;  // timeout
+    };
+    onPollBegin.arrive_and_wait();
+    onPollEnd.arrive_and_wait();
+
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 2);
+        ASSERT_EQ(timeoutMillis, -1);
+        // Pretend we're shutting down.
+        fds[1].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
+    listener.shutdown();
+}
+
+// When the listener thread has backed off, and then reenters poll(), and later calls accept(), if
+// no accept() fails that time around the event loop, the listener thread then does not reenter
+// backoff, i.e. lack of failure to accept cancels backoff.
+TEST_P(AcceptBackoffTest, SuccessfulAcceptCancelsBackoff) {
+    setupBackoff();
+
+    // The listener thread will reenter poll(), but this time with a timeout and without the
+    // listener socket.
+    // If we pretend to have timed out, the listener thread will reenter poll() with the listening
+    // socket and no timeout again (retry after backoff).
+
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 1);
+        ASSERT_NE(timeoutMillis, -1);
+        (void)onPollEnd.arrive();
+        return 0;  // timeout
+    };
+    onPollBegin.arrive_and_wait();
+    onPollEnd.arrive_and_wait();
+
+    // Say that a connection is available. Then return success from accept().
+    // The listener thread will create a session and return to poll without backoff.
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 2);
+        ASSERT_EQ(timeoutMillis, -1);
+        fds[0].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
+    // Give the listener thread a real socket, not that we intend to use it.
+    int fds[2];
+    ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+    onAccept = [&](int, sockaddr*, socklen_t*) {
+        return fds[0];
+    };
+    onAcceptBegin.arrive_and_wait();
+
+    const std::shared_ptr<Session> session = sessionManager.popSession();
+    ASSERT_NE(session, nullptr);
+    session->end();
+    ::close(fds[1]);
+
+    // Listener reenters poll without backoff.
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 2);
+        ASSERT_EQ(timeoutMillis, -1);
+        // Pretend we're shutting down.
+        fds[1].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
+    listener.shutdown();
+}
+
+// Repeated failures cause the listener thread to back off for longer and longer times: powers of
+// four milliseconds from 1 ms up to at most 1000 milliseconds.
+TEST_P(AcceptBackoffTest, BackoffTimeoutSequence) {
+    setupBackoff();
+
+    for (const int expectedMillis : {1, 4, 16, 64, 256, 1000, 1000}) {
+        onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+            ASSERT_EQ(count, 1);
+            ASSERT_EQ(timeoutMillis, expectedMillis);
+            (void)onPollEnd.arrive();
+            return 0;  // timeout
+        };
+        onPollBegin.arrive_and_wait();
+        onPollEnd.arrive_and_wait();
+
+        // Say that a connection is available. Then return failure from accept().
+        // The listener thread will go back into poll() with an increased backoff timeout.
+        onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+            ASSERT_EQ(count, 2);
+            ASSERT_EQ(timeoutMillis, -1);
+            fds[0].revents = POLLIN;
+            return 1;
+        };
+        onPollBegin.arrive_and_wait();
+
+        onAccept = [&](int, sockaddr*, socklen_t*) {
+            // Return an error for which the listener thread will back off.
+            errno = GetParam();
+            return -1;
+        };
+        onAcceptBegin.arrive_and_wait();
+    }
+
+    // Say that the pipe is ready in poll(). The listener thread will shut down.
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 1);
+        ASSERT_NE(timeoutMillis, -1);
+        fds[0].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+    listener.shutdown();
+}
+
+// If the listener thread was backing off and then accept() succeeded, the backoff timeout is reset.
+// The next time backoff occurs, the timeout begins again at 1 ms.
+TEST_P(AcceptBackoffTest, SuccessfulAcceptResetsBackoffTimeout) {
+    setupBackoff();
+
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 1);
+        ASSERT_NE(timeoutMillis, -1);
+        (void)onPollEnd.arrive();
+        return 0;  // timeout
+    };
+    onPollBegin.arrive_and_wait();
+    onPollEnd.arrive_and_wait();
+
+    // Say that a connection is available. Then return success from accept().
+    // The listener thread will create a session and return to poll without backoff.
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 2);
+        ASSERT_EQ(timeoutMillis, -1);
+        fds[0].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
+    // Give the listener thread a real socket, not that we intend to use it.
+    int fds[2];
+    ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+    onAccept = [&](int, sockaddr*, socklen_t*) {
+        return fds[0];
+    };
+    onAcceptBegin.arrive_and_wait();
+
+    const std::shared_ptr<Session> session = sessionManager.popSession();
+    ASSERT_NE(session, nullptr);
+    session->end();
+    ::close(fds[1]);
+
+    // Listener reenters poll without backoff.
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 2);
+        ASSERT_EQ(timeoutMillis, -1);
+        // Pretend that another connection is ready, but this time accept() will fail.
+        fds[0].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
+    onAccept = [&](int, sockaddr*, socklen_t*) {
+        // Return an error for which the listener thread will back off.
+        errno = GetParam();
+        return -1;
+    };
+    onAcceptBegin.arrive_and_wait();
+
+    // The listener thread does a round of backoff, but the timeout has not increased from last
+    // time: it's reset to one millisecond.
+    onPoll = [&](pollfd* fds, nfds_t count, int timeoutMillis) {
+        ASSERT_EQ(count, 1);
+        ASSERT_EQ(timeoutMillis, 1);
+        // Pretend that the pipe is ready so that the listener thread shuts down.
+        fds[0].revents = POLLIN;
+        return 1;
+    };
+    onPollBegin.arrive_and_wait();
+
     listener.shutdown();
 }
 

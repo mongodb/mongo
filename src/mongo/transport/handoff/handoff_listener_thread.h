@@ -135,6 +135,7 @@ public:
      * Stops accepting connections, joins the listener thread if applicable, and closes all files
      * managed by this object.
      * `shutdown` must not be called concurrently from two or more threads.
+     * Shutdown is idempotent.
      */
     void shutdown();
 
