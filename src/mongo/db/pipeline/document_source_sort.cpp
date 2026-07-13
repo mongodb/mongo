@@ -27,6 +27,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <array>
 #include <iterator>
 #include <list>
 #include <memory>
@@ -128,6 +129,25 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
             !_sortExecutor->sortPattern().empty());
 }
 
+
+std::unique_ptr<SortLiteParsed> SortLiteParsed::parse(const NamespaceString& nss,
+                                                      const BSONElement& spec,
+                                                      const LiteParserOptions& options) {
+    // '$_internalLimit' and '$_internalOutputSortKeyMetadata' are internal fields that should be
+    // rejected if supplied from an external client.
+    if (options.opCtx && spec.type() == BSONType::object) {
+        static constexpr std::array kInternalFieldNames{DocumentSourceSort::kInternalLimit,
+                                                        DocumentSourceSort::kInternalOutputSortKey};
+        const auto specObj = spec.embeddedObject();
+        for (const auto& field : kInternalFieldNames) {
+            if (specObj.hasField(field)) {
+                assertAllowedInternalIfRequired(
+                    options.opCtx, field, AllowedWithClientType::kInternal);
+            }
+        }
+    }
+    return std::make_unique<SortLiteParsed>(spec);
+}
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(sort, SortLiteParsed::parse, AllowedWithApiStrict::kAlways);
 

@@ -66,10 +66,11 @@ public:
               _extensionMetrics(static_cast<const ClusterAggregateCommandBase*>(cmd)
                                     ->getExtensionMetricsAllocation()),
               _ifrContext(IncrementalFeatureRolloutContext::get(opCtx)),
-              _liteParsedPipeline(
-                  request(),
-                  false /* isRunningAgainstView_ForHybridSearch */,
-                  {.ifrContext = _ifrContext, .extensionMetrics = &_extensionMetrics}),
+              _liteParsedPipeline(request(),
+                                  false /* isRunningAgainstView_ForHybridSearch */,
+                                  {.ifrContext = _ifrContext,
+                                   .opCtx = opCtx,
+                                   .extensionMetrics = &_extensionMetrics}),
               _privileges(uassertStatusOK(
                   auth::getPrivilegesForAggregate(opCtx,
                                                   AuthorizationSession::get(opCtx->getClient()),

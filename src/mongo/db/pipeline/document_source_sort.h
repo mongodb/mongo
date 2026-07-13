@@ -57,9 +57,7 @@ public:
 
     static std::unique_ptr<SortLiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
-                                                 const LiteParserOptions& options) {
-        return std::make_unique<SortLiteParsed>(spec);
-    }
+                                                 const LiteParserOptions& options);
 
     std::unique_ptr<StageParams> getStageParams() const final {
         return std::make_unique<SortStageParams>(_originalBson);

@@ -507,7 +507,9 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         search_helpers::checkAndSetViewOnExpCtx(
             expCtx,
             LiteParsedPipeline(
-                *originalRequest, false, LiteParserOptions{.ifrContext = expCtx->getIfrContext()}),
+                *originalRequest,
+                false,
+                LiteParserOptions{.ifrContext = expCtx->getIfrContext(), .opCtx = opCtx}),
             *resolvedView,
             viewName);
 
@@ -1231,6 +1233,7 @@ boost::optional<LiteParsedPipeline> maybeRebuildLiteParsedPipelineForRetry(
     const RetryState& state,
     AggregateCommandRequest& request,
     boost::optional<LiteParsedPipeline> userLPP,
+    OperationContext* opCtx,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     bool isRetrying = !state.ifrFlagsToDisableOnRetries.empty() || state.resolvedView ||
         !state.preResolvedNamespaces.empty();
@@ -1244,7 +1247,8 @@ boost::optional<LiteParsedPipeline> maybeRebuildLiteParsedPipelineForRetry(
         return userLPP;
     }
 
-    return LiteParsedPipeline(request, false, LiteParserOptions{.ifrContext = ifrContext});
+    return LiteParsedPipeline(
+        request, false, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
 }
 
 // Schedules `flag` to be disabled on the next retry iteration and clears any partially-built
@@ -1296,7 +1300,7 @@ void handleViewKickback(
                 foundNewViewEntry = true;
                 auto [insertedIt, _] = state.preResolvedNamespaces.emplace(rn.getNamespace(), rn);
                 insertedIt->second.setLiteParserOptions(std::make_shared<LiteParserOptions>(
-                    LiteParserOptions{.ifrContext = ifrContext}));
+                    LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx}));
             } else {
                 // Already had an entry for this namespace; treat as a non-progressing
                 // re-kickback for this entry. Keep the existing entry to preserve any
@@ -1392,9 +1396,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             }
         });
 
-        LiteParsedPipeline liteParsedToUse =
-            maybeRebuildLiteParsedPipelineForRetry(state, currentRequest, userLPP, ifrContext)
-                .value_or(liteParsedPipeline);
+        LiteParsedPipeline liteParsedToUse = maybeRebuildLiteParsedPipelineForRetry(
+                                                 state, currentRequest, userLPP, opCtx, ifrContext)
+                                                 .value_or(liteParsedPipeline);
 
         // Check if we need a CollectionRouter.
         const bool requiresCollectionRouter = needsCollectionRouter(liteParsedToUse, state);
@@ -1470,8 +1474,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 currentRequest.setPipeline(patchedPipeline);
 
                 // Recreate LiteParsedPipeline from the newly patched request.
-                liteParsedToUse = LiteParsedPipeline(
-                    currentRequest, false, LiteParserOptions{.ifrContext = ifrContext});
+                liteParsedToUse =
+                    LiteParsedPipeline(currentRequest,
+                                       false,
+                                       LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
             }
 
             aggregationStatus = runAggregateImpl(opCtx,
