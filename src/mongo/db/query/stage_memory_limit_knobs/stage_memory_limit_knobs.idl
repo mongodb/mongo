@@ -50,6 +50,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: documentSourceLookupCacheSizeBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceGraphLookupMaxMemoryBytes:
         description: >-
@@ -66,6 +69,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: documentSourceGraphLookupMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceGroupMaxMemoryBytes:
         description: >-
@@ -82,6 +88,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: documentSourceGroupMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
         description: >-
@@ -98,6 +107,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: documentSourceSetWindowFieldsMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceBucketAutoMaxMemoryBytes:
         description: >-
@@ -114,6 +126,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: documentSourceBucketAutoMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceDensifyMaxMemoryBytes:
         description: "Limits the number of bytes densification can use to store partition information."
@@ -128,6 +143,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: documentSourceDensifyMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryFacetBufferSizeBytes:
         description: "The number of bytes to buffer at once during a $facet stage."
@@ -158,6 +176,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: textOrStageMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -174,6 +195,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: sbeHashLookupApproxMemoryUseInBytesBeforeSpill
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -190,6 +214,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: sbeHashAggApproxMemoryUseInBytesBeforeSpill
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxSpoolMemoryUsageBytes:
         description: >-
@@ -207,6 +234,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: queryMaxSpoolMemoryUsageBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxBlockingSortMemoryUsageBytes:
         description: >-
@@ -256,6 +286,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: nearStageMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalMergeSortStageMaxMemoryBytes:
         description: >-
@@ -352,6 +385,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: sbeHashJoinApproxMemoryUseInBytesBeforeSpill
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalUpdateStageMaxMemoryBytes:
         description: >-

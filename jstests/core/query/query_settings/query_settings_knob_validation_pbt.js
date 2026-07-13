@@ -59,6 +59,9 @@ const excludeKnobs = [
     "internalQueryTopNAccumulatorBytes",
     "internalQueryMaxPercentileAccumulatorBytes",
     "internalQueryMaxMemoryUsageBytesPerOperation",
+    // TODO(SERVER-131174): Lowering this process-wide breaks the concurrent CheckMetadataConsistency
+    // hook's $group (no allowDiskUse). Re-include once fixed.
+    "internalDocumentSourceGroupMaxMemoryBytes",
 ];
 
 // Only pqsSettable knobs can be accepted by setQuerySettings; for all others the property holds
