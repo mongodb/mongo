@@ -55,6 +55,7 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(preventSessionsCollectionSharding);
+MONGO_FAIL_POINT_DEFINE(hangBeforeGeneratingSessionsCollectionIndexes);
 
 void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* opCtx) {
     // First, check if the collection is already sharded.
@@ -126,6 +127,8 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                     str::stream() << "Collection " << nss.toStringForErrorMsg()
                                   << " is not sharded",
                     cri.isSharded());
+
+            hangBeforeGeneratingSessionsCollectionIndexes.pauseWhileSet(opCtx);
 
             auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,

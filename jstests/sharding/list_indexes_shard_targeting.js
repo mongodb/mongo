@@ -1,11 +1,11 @@
 /**
  * Test that for an unsharded collection the listIndexes command targets the database's primary
  * shard, and for a sharded collection the command sends and checks shard versions and only
- * targets the shard that owns the MinKey chunk.
+ * targets the shard that owns the MinKey chunk (refreshing and retargeting on a stale routing
+ * table).
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 // This test makes shards have inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -16,10 +16,7 @@ const nodeOptions = {
     setParameter: {enableShardedIndexConsistencyCheck: false},
 };
 
-const st = new ShardingTest({shards: 3, other: {configOptions: nodeOptions}});
-
-// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
-skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+const st = new ShardingTest({mongos: 2, shards: 2, other: {configOptions: nodeOptions}});
 
 const dbName = "test";
 const collName = "user";
@@ -48,32 +45,31 @@ assert.eq(
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-// Perform a series of chunk operations to make the shards have the following chunks:
-// shard0: [0, MaxKey)
-// shard1: [null, 0)
-// shard2: [MinKey, null)
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard0, st.shard1, {_id: MinKey});
+// The collection has a single (MinKey) chunk, which starts on shard0. Set up a scenario where the
+// router that issues listIndexes (st.s) believes the chunk is still on shard0, while it has actually
+// been moved to shard1 through a different router (st.s1). A correct listIndexes must send a shard
+// version to shard0, receive a StaleConfig, refresh, and retarget shard1.
+//
+// shard0 (the stale target) keeps its 2 indexes ({_id: 1}, {a: 1}); shard1 (the true owner) is
+// given a third index ({c: 1}) after receiving the chunk. Reporting shard1's 3 indexes proves the
+// command refreshed and retargeted rather than reading from the stale shard0. A shard can never be
+// ignorant of its own metadata under authoritative shards, so the staleness must live on the router.
+indexes = ShardVersioningUtil.runOperationOnStaleRouterAfterMoveChunk({
+    migrateRouter: st.s1,
+    staleRouter: st.s,
+    ns,
+    toShard: st.shard1,
+    bounds: [{_id: MinKey}, {_id: MaxKey}],
+    staleOperation: (router) => {
+        // shard1 received {_id: 1} and {a: 1} with the chunk; give it a distinguishing third index.
+        assert.commandWorked(st.shard1.getCollection(ns).createIndexes([{c: 1}]));
+        return router.getCollection(ns).getIndexes();
+    },
+});
 
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: null}}));
-ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard1, st.shard2, {_id: MinKey});
-
-const latestCollectionVersion = ShardVersioningUtil.getMetadataOnShard(st.shard1, ns).collVersion;
-
-// Assert that all non-donor shards have a stale collection version.
-ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
-ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
-ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, latestCollectionVersion);
-
-// Create indexes directly on the other shards.
-st.shard1.getCollection(ns).createIndexes([{b: 1}]);
-st.shard2.getCollection(ns).createIndexes([{c: 1}]);
-
-indexes = st.s.getCollection(ns).getIndexes();
-
-// Assert that listIndexes only targeted the shard with the MinKey chunk (shard2).
+// Assert that listIndexes refreshed and targeted the shard that owns the MinKey chunk (shard1).
 indexes.sort(bsonWoCompare);
-assert.eq(3, indexes.length);
+assert.eq(3, indexes.length, `expected 3 indexes but found: ${tojson(indexes)}`);
 assert.eq(
     0,
     bsonWoCompare({_id: 1}, indexes[0].key),
