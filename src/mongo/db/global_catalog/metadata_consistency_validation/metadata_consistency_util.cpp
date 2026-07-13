@@ -148,17 +148,21 @@ MetadataInconsistencyItem makeInconsistentDurableShardCatalogMetadata(const Name
  * infrastructure will catch these cases. It is a uassert with ConflictingOperationInProgress if the
  * scenario is acceptable for this to happen.
  *
- * The two accepted scenarios are:
- * 1. The collection is `config.system.sessions` - this is acceptable since this collection is only
- * droppable via direct shard connection.
- * 2. This node is a config server - this can happen since transitionToDedicated drops collections
- * in the background.
+ * The three accepted scenarios are:
+ * 1. The current node is a secondary. Catalog stability is given by the DDL lock held by the
+ *    primary, if the primary dies then there's no stability guarantee.
+ * 2. The collection is `config.system.sessions` - this is acceptable since this collection is only
+ *    droppable via direct shard connection.
+ * 3. This node is a config server - this can happen since transitionToDedicated drops collections
+ *    in the background.
  */
-void throwCollectionDisappearedError(OperationContext* opCtx, const NamespaceString& nss) {
+void throwCollectionDisappearedError(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     RSNodeMode rsMode) {
     tassert(9690601,
             str::stream() << "Collection unexpectedly disappeared while holding database DDL lock: "
                           << nss.toStringForErrorMsg(),
-            nss == NamespaceString::kLogicalSessionsNamespace ||
+            rsMode != RSNodeMode::kPrimary || nss == NamespaceString::kLogicalSessionsNamespace ||
                 ShardingState::get(opCtx)->shardId() == ShardId::kConfigServerId);
 
     uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -171,12 +175,12 @@ void throwCollectionDisappearedError(OperationContext* opCtx, const NamespaceStr
  *
  * TODO SERVER-24266: get rid of the `getNumDocs` function and simply rely on `numRecords`.
  */
-long long getNumDocs(OperationContext* opCtx, const Collection* localColl) {
+long long getNumDocs(OperationContext* opCtx, const Collection* localColl, RSNodeMode rsMode) {
     // Since users are advised to delete empty misplaced collections, rely on isEmpty
     // that is safe because the implementation guards against SERVER-24266.
     AutoGetCollection ac(opCtx, localColl->ns(), MODE_IS);
     if (!ac) {
-        throwCollectionDisappearedError(opCtx, localColl->ns());
+        throwCollectionDisappearedError(opCtx, localColl->ns(), rsMode);
     }
     if (ac->isEmpty(opCtx)) {
         return 0;
@@ -1201,7 +1205,8 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         const BSONObj& shardKey,
                                         const CollectionPtr& localColl,
                                         std::vector<MetadataInconsistencyItem>& inconsistencies,
-                                        const bool checkRangeDeletionIndexes) {
+                                        const bool checkRangeDeletionIndexes,
+                                        RSNodeMode rsMode) {
     const auto performChecks = [&](const CollectionPtr& localColl,
                                    std::vector<MetadataInconsistencyItem>& inconsistencies) {
         // We allow users to drop hashed shard key indexes, and therefore we don't require hashed
@@ -1253,7 +1258,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     // Pessimistic check under collection lock to serialize with chunk migration commit.
     AutoGetCollection ac(opCtx, nss, MODE_IS);
     if (!ac) {
-        throwCollectionDisappearedError(opCtx, nss);
+        throwCollectionDisappearedError(opCtx, nss, rsMode);
     }
 
     const auto scopedCsr =
@@ -1317,7 +1322,7 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
             CollectionUUIDMismatchDetails{
-                nss, shardId, localUUID, catalogUUID, getNumDocs(opCtx, localColl.get())},
+                nss, shardId, localUUID, catalogUUID, getNumDocs(opCtx, localColl.get(), rsMode)},
             severity));
     }
 
@@ -1411,7 +1416,8 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
                                            catalogColl.getKeyPattern().toBSON(),
                                            localColl,
                                            inconsistencies,
-                                           checkRangeDeletionIndexes);
+                                           checkRangeDeletionIndexes,
+                                           rsMode);
     }
 
     return inconsistencies;
@@ -1434,7 +1440,7 @@ std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(
             // can't make these checks.
             return inconsistencies;
         }
-        const auto numDocs = getNumDocs(opCtx, localColl.get());
+        const auto numDocs = getNumDocs(opCtx, localColl.get(), rsMode);
         // config.system.sessions is created on the first data shard by CreateCollectionCoordinator,
         // not on the config server (the database primary). Ignore the transient MisplacedCollection
         // while the collection is being created and still empty.
