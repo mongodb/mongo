@@ -1,6 +1,7 @@
 /**
- * Tests the basic operation of a `$search` aggregation stage with real mongot.
- * E2E version of jstests/with_mongot/search_mocked/search.js
+ * Tests the basic operation of a `$search` aggregation stage: matching documents are returned
+ * in score order across getMore batches, errors from mongot propagate, empty/nonexistent
+ * collections return no results, and non-local read concerns are rejected.
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -10,7 +11,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 
-const indexName = "search_index";
+const indexName = jsTestName() + "_index";
 const searchStage = {$search: {index: indexName, text: {query: "cakes", path: "title"}}};
 
 describe("$search", function () {

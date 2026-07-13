@@ -1,11 +1,7 @@
 /**
- * Verify that `$search` sets the '$$SEARCH_META' variable with real mongot. Metadata is produced
- * via the `count` operator (the mocked version of this test injected arbitrary metadata values).
- *
- * The sharded e2e passthrough suites give this file the coverage that the mocked
- * search_collector_sharded_* variants set up by hand.
- * E2E version of jstests/with_mongot/search_mocked/search_collector.js and its
- * search_collector_* topology variants.
+ * Verify that `$search` sets the '$$SEARCH_META' variable, produced via the `count` operator:
+ * every result document observes the same merged metadata in score order, unset metadata subfields
+ * evaluate to missing, and the variable survives a split pipeline.
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -15,14 +11,16 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 
-const indexName = "search_collector_index";
-// Matches all 3 documents; the count operator makes real mongot return SEARCH_META.
+const indexName = jsTestName() + "_index";
+// Matches the 5 documents whose title contains "cakes"; the count operator makes mongot return
+// SEARCH_META.
 const searchQuery = {
     index: indexName,
-    exists: {path: "title"},
+    text: {query: "cakes", path: "title"},
     count: {type: "total"},
 };
-const expectedMeta = {count: {total: NumberLong(3)}};
+const expectedMeta = {count: {total: NumberLong(5)}};
+const expectedIds = [1, 2, 5, 6, 8];
 
 describe("$search sets $$SEARCH_META", function () {
     before(function () {
@@ -33,6 +31,11 @@ describe("$search sets $$SEARCH_META", function () {
                 {_id: 1, title: "cakes"},
                 {_id: 2, title: "cookies and cakes"},
                 {_id: 3, title: "vegetables"},
+                {_id: 4, title: "oranges"},
+                {_id: 5, title: "cakes and oranges"},
+                {_id: 6, title: "cakes and apples"},
+                {_id: 7, title: "apples"},
+                {_id: 8, title: "cakes and kale"},
             ]),
         );
 
@@ -47,19 +50,23 @@ describe("$search sets $$SEARCH_META", function () {
         coll.drop();
     });
 
-    it("should expose the same metadata to every result document", function () {
+    it("should expose the same metadata to every result document, in score order", function () {
         const results = coll
-            .aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}])
+            .aggregate([
+                {$search: searchQuery},
+                {$project: {_id: 1, score: {$meta: "searchScore"}, meta: "$$SEARCH_META"}},
+            ])
             .toArray();
 
-        assertArrayEq({
-            actual: results,
-            expected: [
-                {_id: 1, meta: expectedMeta},
-                {_id: 2, meta: expectedMeta},
-                {_id: 3, meta: expectedMeta},
-            ],
-        });
+        assert.eq(results.length, expectedIds.length, results);
+        assertArrayEq({actual: results.map((doc) => doc._id), expected: expectedIds});
+        for (let i = 0; i < results.length; i++) {
+            assert.docEq(expectedMeta, results[i].meta, results);
+            if (i > 0) {
+                // Results are merged in mongot score order.
+                assert.gte(results[i - 1].score, results[i].score, results);
+            }
+        }
     });
 
     it("should evaluate unset metadata fields to missing", function () {
@@ -70,14 +77,14 @@ describe("$search sets $$SEARCH_META", function () {
             ])
             .toArray();
 
-        assertArrayEq({actual: results, expected: [{_id: 1}, {_id: 2}, {_id: 3}]});
+        assertArrayEq({actual: results, expected: expectedIds.map((_id) => ({_id}))});
     });
 
     it("should work with a stage that forces a merge", function () {
-        // The merge half of $group cannot run on the shards, so in sharded topologies this
-        // exercises SEARCH_META surviving the split into a merging pipeline. (The mocked original
-        // used $out, which the sharded-collections passthrough disallows: the implicitly sharded
-        // output collection cannot be an $out target.)
+        // $group needs visibility across all shards' documents to produce correct final groups, so
+        // mongos splits it into a per-shard partial-group stage plus a merging stage that combines
+        // the partial results. This confirms the $$SEARCH_META-derived value already resolved into
+        // each document earlier in the pipeline survives intact across that shard/merge split.
         const results = coll
             .aggregate([
                 {$search: searchQuery},
@@ -88,6 +95,6 @@ describe("$search sets $$SEARCH_META", function () {
 
         assert.eq(results.length, 1, results);
         assert.eq(results[0]._id, expectedMeta, results);
-        assertArrayEq({actual: results[0].ids, expected: [1, 2, 3]});
+        assertArrayEq({actual: results[0].ids, expected: expectedIds});
     });
 });

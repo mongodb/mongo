@@ -1,8 +1,6 @@
 /**
  * Verify that `$searchMeta` and the '$$SEARCH_META' variable surface the metadata that mongot
- * returns for a query. With real mongot, metadata is produced via the `count` and `facet`
- * operators (the mocked version of this test injected arbitrary metadata values instead).
- * E2E version of jstests/with_mongot/search_mocked/search_meta.js
+ * returns for a query, with metadata produced via the `count` and `facet` operators.
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -12,7 +10,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 
-const indexName = "search_meta_index";
+const indexName = jsTestName() + "_index";
 const genres = ["Drama", "Comedy", "Romance"];
 
 describe("$searchMeta", function () {

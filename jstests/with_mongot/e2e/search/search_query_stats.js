@@ -3,7 +3,6 @@
  * with real mongot.
  *
  * Uses an empty collection so query stats are collected without needing actual search results.
- * E2E version of jstests/with_mongot/search_mocked/search_query_stats.js
  *
  * @tags: [
  *   # TODO (SERVER-131073): remove this tag once $searchMeta query-stats collection on mongos is fixed.
@@ -24,7 +23,7 @@ const collName = jsTestName();
 const coll = db.getCollection(collName);
 
 const searchQuery = {
-    index: "search_query_stats_index",
+    index: jsTestName() + "_index",
     text: {query: "cakes", path: "title"},
 };
 

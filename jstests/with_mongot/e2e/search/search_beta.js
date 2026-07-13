@@ -1,6 +1,5 @@
 /**
- * Verify that `$searchBeta` works as an alias for `$search` with real mongot.
- * E2E version of jstests/with_mongot/search_mocked/search_beta.js
+ * Verify that `$searchBeta` works as an alias for `$search`.
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -10,7 +9,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 
-const indexName = "search_beta_index";
+const indexName = jsTestName() + "_index";
 const searchQuery = {index: indexName, text: {query: "cakes", path: "title"}};
 
 describe("$searchBeta", function () {

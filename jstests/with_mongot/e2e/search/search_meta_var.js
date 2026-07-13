@@ -1,9 +1,8 @@
 /**
- * Verify the behavior of the '$$SEARCH_META' variable in aggregation sub-pipelines with real
- * mongot. Metadata is produced via the `count` operator; the two queries used match a different
- * number of documents so that each pipeline's metadata is distinguishable (the mocked version of
- * this test injected distinct metadata values instead).
- * E2E version of jstests/with_mongot/search_mocked/search_meta_var.js.
+ * Verify the behavior of the '$$SEARCH_META' variable in aggregation sub-pipelines ($unionWith,
+ * $lookup, let-variables), including the error cases where the variable is unavailable. Metadata
+ * is produced via the `count` operator; the two queries used match a different number of documents
+ * so that each pipeline's metadata is distinguishable.
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -13,7 +12,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 
-const indexName = "search_meta_var_index";
+const indexName = jsTestName() + "_index";
 const numDocs = 9;
 
 // Matches all 9 documents.

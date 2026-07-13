@@ -1,10 +1,6 @@
 /**
  * Tests that "searchScore", "searchHighlights", and "searchScoreDetails" metadata is properly
- * plumbed through the $search agg stage with real mongot.
- *
- * The mocked version of this test (jstests/with_mongot/search_mocked/search_metadata.js) also
- * covers mongot returning null/missing metadata fields; those response-injection cases cannot be
- * reproduced with a real mongot and stay mocked.
+ * plumbed through the $search agg stage, including across multiple getMore batches.
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
@@ -13,7 +9,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 
-const indexName = "search_metadata_index";
+const indexName = jsTestName() + "_index";
 const pipeline = [
     {
         $search: {

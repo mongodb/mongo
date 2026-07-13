@@ -1,7 +1,6 @@
 /**
  * Test error conditions for the `$search` and `$searchMeta` aggregation stages. These are all
  * mongod-side validation errors, so no search index is needed.
- * E2E version of jstests/with_mongot/search_mocked/search_error_cases.js
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
