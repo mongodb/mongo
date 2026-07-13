@@ -1,5 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
+//
+// THIS IS A GENERATED FILE, DO NOT MODIFY.
 
 #include "mongo/db/fts/unicode/codepoints.h"
 
