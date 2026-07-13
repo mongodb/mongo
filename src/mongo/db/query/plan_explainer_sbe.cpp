@@ -581,11 +581,6 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     tassert(5968203, "_debugInfo should not be null", _debugInfo);
 }
 
-const PlanExplainer::ExplainVersion& PlanExplainerSBEBase::getVersion() const {
-    static const ExplainVersion kExplainVersionForStageBuilders = "2";
-    return kExplainVersionForStageBuilders;
-}
-
 bool PlanExplainerSBEBase::matchesCachedPlan() const {
     return _cachedPlanHash && (*_cachedPlanHash == _solution->hash());
 }

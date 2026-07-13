@@ -418,7 +418,7 @@ void Explain::explainStages(PlanExecutor* exec,
     //
 
     auto&& explainer = exec->getPlanExplainer();
-    out->appendElements(explainVersionToBson(explainer.getVerbosityVersion(verbosity)));
+    out->appendElements(explainVersionToBson(explainer.getVersion(verbosity)));
 
     // Dispatch on the verbosity. Each V3 verbosity is routed to the V3 section generators, which
     // are the hooks for the future V3 output format; for now they reuse the legacy generators at
@@ -518,7 +518,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
     tassert(11320915, "expected 'exec' to be a PlanExecutorPipeline", pipelineExec);
 
     auto&& explainer = pipelineExec->getPlanExplainer();
-    out->appendElements(explainVersionToBson(explainer.getVerbosityVersion(verbosity)));
+    out->appendElements(explainVersionToBson(explainer.getVersion(verbosity)));
 
     // Dispatch on the verbosity. Each V3 verbosity is routed to writeExplainOpsV3() (the hook for
     // the future V3 pipeline format), which for now reuses the legacy writeExplainOps() at the

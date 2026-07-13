@@ -11,14 +11,14 @@
 
 
 namespace mongo {
-const PlanExplainer::ExplainVersion& PlanExplainerPipeline::getVersion() const {
-    static const ExplainVersion kExplainVersion = "1";
-
-    if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().front().get())) {
-        return docSourceCursor->getExplainVersion();
+bool PlanExplainerPipeline::isSbeExplainer() const {
+    if (!_pipeline->empty()) {
+        if (auto docSourceCursor =
+                dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().front().get())) {
+            return docSourceCursor->isSbeExplainer();
+        }
     }
-    return kExplainVersion;
+    return false;
 }
 
 std::string PlanExplainerPipeline::getPlanSummary() const {

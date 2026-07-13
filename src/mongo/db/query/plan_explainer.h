@@ -108,21 +108,26 @@ public:
     virtual ~PlanExplainer() = default;
 
     /**
-     * Returns a version of the explain format supported by this explainer. This is determined by
-     * the execution engine ("1" for the classic engine, "2" for SBE). To obtain the version that
-     * explain should actually report depending on either engine or a given verbosity, use
-     * getVerbosityVersion().
+     * Returns 'true' if this explainer describes an SBE plan (explain version "2"), or 'false' for
+     * the classic engine (explain version "1").
      */
-    virtual const ExplainVersion& getVersion() const = 0;
+    virtual bool isSbeExplainer() const = 0;
 
     /**
      * Returns the explain version to report for the given 'verbosity'. When any of the V3 verbosity
-     * modes is requested this is "3"; otherwise it is the engine-determined version from
-     * getVersion(). Centralizing the decision here keeps getVersion() meaning the engine version
-     * and ensures the V3 rule cannot be bypassed by, or diverge across, explainer implementations.
+     * modes is requested this is "3"; otherwise it is the engine-determined version ("2" for SBE,
+     * "1" for the classic engine, as reported by isSbeExplainer()). Centralizing the decision here
+     * ensures the V3 rule cannot be bypassed by, or diverge across, explainer implementations.
      */
-    ExplainVersion getVerbosityVersion(ExplainOptions::Verbosity verbosity) const {
-        return ExplainOptions::isV3Verbosity(verbosity) ? ExplainVersion{"3"} : getVersion();
+    const ExplainVersion& getVersion(ExplainOptions::Verbosity verbosity) const {
+        static const ExplainVersion kV1{"1"};
+        static const ExplainVersion kV2{"2"};
+        static const ExplainVersion kV3{"3"};
+
+        if (ExplainOptions::isV3Verbosity(verbosity)) {
+            return kV3;
+        }
+        return isSbeExplainer() ? kV2 : kV1;
     }
 
     /**

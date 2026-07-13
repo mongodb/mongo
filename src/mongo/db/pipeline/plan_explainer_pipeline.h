@@ -27,7 +27,6 @@ public:
         return false;
     }
 
-    const ExplainVersion& getVersion() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
@@ -38,6 +37,8 @@ public:
     void incrementNReturned() {
         ++_nReturned;
     }
+
+    bool isSbeExplainer() const final;
 
 private:
     const Pipeline* const _pipeline;

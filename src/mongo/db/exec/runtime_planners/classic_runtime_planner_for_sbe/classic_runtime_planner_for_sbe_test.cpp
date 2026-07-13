@@ -486,7 +486,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
             MultiPlanner planner{
                 std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
             auto exec = planner.makeExecutor(std::move(cq));
-            ASSERT_EQ(exec->getPlanExplainer().getVersion(), "2");
+            ASSERT_TRUE(exec->getPlanExplainer().isSbeExplainer());
         }
 
         {
@@ -498,7 +498,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
             MultiPlanner planner{
                 std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
             auto exec = planner.makeExecutor(std::move(cq));
-            ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
+            ASSERT_FALSE(exec->getPlanExplainer().isSbeExplainer());
         }
     });
 }

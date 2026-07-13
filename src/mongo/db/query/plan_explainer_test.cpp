@@ -206,13 +206,14 @@ TEST_F(PlanExplainerTest, GetReportedVersionReflectsV3Verbosities) {
     auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
     auto& explainer = exec->getPlanExplainer();
 
-    // For legacy verbosities, the reported version matches the engine-determined getVersion().
-    const PlanExplainer::ExplainVersion engineVersion = explainer.getVersion();
+    // For legacy verbosities, the reported version matches the engine-determined version.
+    const PlanExplainer::ExplainVersion engineVersion =
+        explainer.getVersion(ExplainOptions::Verbosity::kQueryPlanner);
     for (auto verbosity : {ExplainOptions::Verbosity::kQueryPlanner,
                            ExplainOptions::Verbosity::kExecStats,
                            ExplainOptions::Verbosity::kExecAllPlans,
                            ExplainOptions::Verbosity::kInternal}) {
-        ASSERT_EQ(explainer.getVerbosityVersion(verbosity), engineVersion);
+        ASSERT_EQ(explainer.getVersion(verbosity), engineVersion);
     }
 
     // For the V3 verbosity modes, the reported version is "3" regardless of the engine.
@@ -220,7 +221,7 @@ TEST_F(PlanExplainerTest, GetReportedVersionReflectsV3Verbosities) {
                            ExplainOptions::Verbosity::kPlannerChoice,
                            ExplainOptions::Verbosity::kPlannerStats,
                            ExplainOptions::Verbosity::kExecStatsV3}) {
-        ASSERT_EQ(explainer.getVerbosityVersion(verbosity), "3");
+        ASSERT_EQ(explainer.getVersion(verbosity), "3");
     }
 }
 

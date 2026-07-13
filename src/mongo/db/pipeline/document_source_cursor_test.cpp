@@ -71,9 +71,8 @@ private:
  */
 class MockPlanExplainer : public PlanExplainer {
 public:
-    const ExplainVersion& getVersion() const override {
-        static const ExplainVersion version = "mock";  // or any default value you prefer
-        return version;
+    bool isSbeExplainer() const override {
+        return false;  // Assuming classic engine for this mock
     }
 
     bool areThereRejectedPlansToExplain() const override {

@@ -40,7 +40,10 @@ public:
           _replanReason(std::move(replanReason)),
           _explainData(maybeExplainData.has_value() ? std::move(maybeExplainData.value())
                                                     : PlanExplainerData{}) {}
-    const ExplainVersion& getVersion() const final;
+
+    bool isSbeExplainer() const final {
+        return false;
+    }
     bool areThereRejectedPlansToExplain() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;

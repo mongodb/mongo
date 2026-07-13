@@ -137,8 +137,11 @@ public:
 
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
-    const PlanExplainer::ExplainVersion& getExplainVersion() const {
-        return _sharedState->exec->getPlanExplainer().getVersion();
+    bool isSbeExplainer() const {
+        if (!_sharedState->exec) {
+            return false;
+        }
+        return _sharedState->exec->getPlanExplainer().isSbeExplainer();
     }
 
     boost::optional<const PlanExplainer&> getPlanExplainer() const {

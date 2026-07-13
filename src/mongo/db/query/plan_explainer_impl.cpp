@@ -807,11 +807,6 @@ void appendMultikeyPaths(const BSONObj& keyPattern,
     subMultikeyPaths.doneFast();
 }
 
-const PlanExplainer::ExplainVersion& PlanExplainerImpl::getVersion() const {
-    static const ExplainVersion kExplainVersion = "1";
-    return kExplainVersion;
-}
-
 bool PlanExplainerImpl::areThereRejectedPlansToExplain() const {
     return _explainData.rejectedPlansWithStages.size() > 0 ||
         // This is needed because the backup plan may still belong in the multi plan stage.

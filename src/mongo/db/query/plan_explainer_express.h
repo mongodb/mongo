@@ -192,9 +192,8 @@ public:
           _commonStats(commonStats),
           _projection(std::move(projection)) {}
 
-    const ExplainVersion& getVersion() const override {
-        static const ExplainVersion kExplainVersion = "1";
-        return kExplainVersion;
+    bool isSbeExplainer() const override {
+        return false;
     }
 
     bool areThereRejectedPlansToExplain() const override {

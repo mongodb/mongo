@@ -56,6 +56,9 @@ public:
                          cost_based_ranker::EstimateMap estimates = {},
                          std::vector<JoinOptPlan> rejectedPlans = {});
 
+    bool isSbeExplainer() const final {
+        return true;
+    }
     bool areThereRejectedPlansToExplain() const final {
         return _isMultiPlan;
     }
@@ -63,7 +66,6 @@ public:
         return _isFromPlanCache;
     }
     bool matchesCachedPlan() const;
-    const ExplainVersion& getVersion() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
     void getSecondarySummaryStats(const NamespaceString& secondaryColl,
