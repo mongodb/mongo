@@ -21,6 +21,20 @@
       # featureFlagExtensionsInsideHybridSearch. This is fixed when featureFlagExtensionsInsideHybridSearch is true,
       # but should be banned when the flag is off.
       - jstests/with_mongot/e2e/hybridSearch/rank_fusion_lookup_local_foreign_field_view.js
+      # TODO SERVER-131199: Remove these exclusions. For views over sharded collections, mongos
+      # serializes the resolved view into the $vectorSearch spec; the extension parser rejects it
+      # ("Cannot specify the reserved field 'view'", assertion 65127; still present in v2.0.3).
+      - jstests/with_mongot/e2e/views/vector_search/unionWith.js
+      - jstests/with_mongot/e2e/views/vector_search/unionWith_nested.js
+      - jstests/with_mongot/e2e/views/vector_search/nested_view.js
+      - jstests/with_mongot/e2e/views/vector_search/match_base_case.js
+      - jstests/with_mongot/e2e/views/vector_search/addFields_base_case.js
+      - jstests/with_mongot/e2e/views/vector_search/undefined_or_underlying_index.js
+      - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_view_kickback.js
+      # TODO SERVER-131206: Remove these exclusions. Extension $vectorSearch in $unionWith exhausts
+      # IFR kickback retries instead of falling back to the legacy stage.
+      - jstests/with_mongot/e2e/sharding_no_passthrough/vector_search_shard_filtering.js
+      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_verbose_test.js
       # These should pass with featureFlagExtensionsInsideHybridSearch off: the IFR kickback
       # (throwIfrKickbackIfNecessary) should retry hybrid-search pipelines with the legacy
       # $vectorSearch, but the kickback error reaches the client instead.
