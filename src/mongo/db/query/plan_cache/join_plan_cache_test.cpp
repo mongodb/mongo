@@ -8,6 +8,9 @@
 namespace mongo {
 namespace {
 
+// A budget large enough that no entry used in these tests is ever evicted.
+constexpr size_t kLargeBudget = size_t{1} << 30;
+
 std::unique_ptr<JoinPlanCacheEntry> makeEntry() {
     return std::make_unique<JoinPlanCacheEntry>(
         nullptr, join_ordering::NodeId{0}, std::vector<CollectionTag>{});
@@ -32,13 +35,17 @@ std::unique_ptr<CachedJoinPlan> makeComplexTree() {
     });
 }
 
+JoinPlanCache largeBudgetSinglePartitionCache() {
+    return JoinPlanCache{kLargeBudget, 1};
+}
+
 TEST(JoinPlanCacheTest, LookupOnEmptyCacheReturnsNull) {
-    JoinPlanCache cache;
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
     ASSERT_EQ(nullptr, cache.lookup("key"));
 }
 
 TEST(JoinPlanCacheTest, PutAndLookupRoundtrip) {
-    JoinPlanCache cache;
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
     auto entry = makeEntry();
     auto rawPtr = entry.get();
     cache.put("key", std::move(entry));
@@ -46,7 +53,7 @@ TEST(JoinPlanCacheTest, PutAndLookupRoundtrip) {
 }
 
 TEST(JoinPlanCacheTest, PutOverwritesExistingEntry) {
-    JoinPlanCache cache;
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
     cache.put("key", makeEntry());
 
     auto newEntry = makeEntry();
@@ -58,14 +65,14 @@ TEST(JoinPlanCacheTest, PutOverwritesExistingEntry) {
 }
 
 TEST(JoinPlanCacheTest, RemoveExistingEntry) {
-    JoinPlanCache cache;
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
     cache.put("key", makeEntry());
     cache.remove("key");
     ASSERT_EQ(nullptr, cache.lookup("key"));
 }
 
 TEST(JoinPlanCacheTest, RemoveNonExistingEntry) {
-    JoinPlanCache cache;
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
     auto entry = makeEntry();
     const JoinPlanCacheEntry* rawPtr = entry.get();
     cache.put("key", std::move(entry));
@@ -74,7 +81,7 @@ TEST(JoinPlanCacheTest, RemoveNonExistingEntry) {
 }
 
 TEST(JoinPlanCacheTest, GetComplexEntry) {
-    JoinPlanCache cache;
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
 
     auto entry = std::make_unique<JoinPlanCacheEntry>(
         makeComplexTree(), join_ordering::NodeId{0}, std::vector<CollectionTag>{});
@@ -185,6 +192,80 @@ TEST(JoinPlanCacheSizeTest, EstimateIsDeterministic) {
         makeComplexTree(), join_ordering::NodeId{0}, std::vector<CollectionTag>{});
     ASSERT_EQ(entry->joinTree->estimateObjectSizeInBytes(),
               entry->joinTree->estimateObjectSizeInBytes());
+}
+
+// The per-entry budget cost of a trivial entry under a key of the given length: the entry's own
+// estimated size plus the key string length (see JoinPlanCacheBudgetEstimator).
+size_t trivialEntryCost(size_t keyLength) {
+    return makeEntry()->estimatedEntrySizeBytes + keyLength;
+}
+
+TEST(JoinPlanCacheEvictionTest, InsertingBeyondBudgetEvictsLeastRecentlyUsed) {
+    const size_t perEntryCost = trivialEntryCost(1);
+    // Budget for exactly one entry and one partition
+    JoinPlanCache cache{perEntryCost, 1};
+
+    ASSERT_EQ(0, cache.put("a", makeEntry()));
+    // Evicts "a"
+    auto bEntry = makeEntry();
+    auto bRawPtr = bEntry.get();
+    ASSERT_EQ(1, cache.put("b", std::move(bEntry)));
+
+    ASSERT_EQ(nullptr, cache.lookup("a"));
+    ASSERT_EQ(bRawPtr, cache.lookup("b").get());
+}
+
+TEST(JoinPlanCacheEvictionTest, LookupPromotesEntryToMostRecentlyUsed) {
+    const size_t perEntryCost = trivialEntryCost(1);
+    // Budget for two entries and one partition
+    JoinPlanCache cache{2 * perEntryCost, 1};
+
+    auto aEntry = makeEntry();
+    auto aRawPtr = aEntry.get();
+    cache.put("a", std::move(aEntry));
+    cache.put("b", makeEntry());
+    // Promotes "a" ahead of "b"
+    ASSERT_EQ(aRawPtr, cache.lookup("a").get());
+    // Over budget causes LRU eviction, which is now "b"
+    auto cEntry = makeEntry();
+    auto cRawPtr = cEntry.get();
+    cache.put("c", std::move(cEntry));
+
+    ASSERT_EQ(aRawPtr, cache.lookup("a").get());
+    ASSERT_EQ(nullptr, cache.lookup("b"));
+    ASSERT_EQ(cRawPtr, cache.lookup("c").get());
+}
+
+TEST(JoinPlanCacheEvictionTest, ResetToSmallerBudgetEvictsDownToFit) {
+    const size_t perEntryCost = trivialEntryCost(1);
+    JoinPlanCache cache{3 * perEntryCost, 1};
+
+    cache.put("a", makeEntry());
+    cache.put("b", makeEntry());
+    auto cEntry = makeEntry();
+    auto cRawPtr = cEntry.get();
+    cache.put("c", std::move(cEntry));
+    ASSERT_EQ(3 * perEntryCost, cache.size());
+
+    // "c" is the most recently used, so "a" and "b" are evicted to fit the new budget.
+    ASSERT_EQ(2, cache.reset(perEntryCost));
+    ASSERT_EQ(perEntryCost, cache.size());
+    ASSERT_EQ(nullptr, cache.lookup("a"));
+    ASSERT_EQ(nullptr, cache.lookup("b"));
+    ASSERT_EQ(cRawPtr, cache.lookup("c").get());
+}
+
+TEST(JoinPlanCacheEvictionTest, SizeReflectsRunningByteTotal) {
+    const size_t perEntryCost = trivialEntryCost(1);
+    JoinPlanCache cache{kLargeBudget, 1};
+
+    ASSERT_EQ(0, cache.size());
+    cache.put("a", makeEntry());
+    ASSERT_EQ(perEntryCost, cache.size());
+    cache.put("b", makeEntry());
+    ASSERT_EQ(2 * perEntryCost, cache.size());
+    cache.remove("a");
+    ASSERT_EQ(perEntryCost, cache.size());
 }
 
 }  // namespace

@@ -6,8 +6,6 @@
 #include "mongo/db/exec/container_size_helper.h"
 #include "mongo/logv2/log.h"
 
-#include <mutex>
-#include <shared_mutex>
 #include <variant>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -18,9 +16,14 @@ namespace {
 const ServiceContext::Decoration<std::unique_ptr<JoinPlanCache>> getJoinPlanCacheDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<JoinPlanCache>>();
 
+// Default to 5MiB
+constexpr size_t kDefaultJoinPlanCacheSizeBytes = 5 * 1024 * 1024;
+constexpr size_t kDefaultJoinPlanCacheNumPartitions = 32;
+
 ServiceContext::ConstructorActionRegisterer joinPlanCacheRegisterer{
     "JoinPlanCacheRegisterer", [](ServiceContext* serviceCtx) {
-        getJoinPlanCacheDecoration(serviceCtx) = std::make_unique<JoinPlanCache>();
+        getJoinPlanCacheDecoration(serviceCtx) = std::make_unique<JoinPlanCache>(
+            kDefaultJoinPlanCacheSizeBytes, kDefaultJoinPlanCacheNumPartitions);
     }};
 
 // Heap bytes backing a FieldPath.
@@ -76,20 +79,30 @@ JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                               (this->joinTree ? this->joinTree->estimateObjectSizeInBytes() : 0)) {}
 
 std::shared_ptr<const JoinPlanCacheEntry> JoinPlanCache::lookup(const JoinPlanCacheKey& key) const {
-    std::shared_lock lk(_mutex);
-    auto it = _cache.find(key);
-    return (it != _cache.end()) ? it->second : nullptr;
+    // Hold the partition lock while copying out the shared_ptr because PartitionedCache::lookup()
+    // releases its lock before returning.
+    auto [swEntry, partitionLock] = _cache.getWithPartitionLock(key);
+    if (!swEntry.isOK()) {
+        return nullptr;
+    }
+    return *swEntry.getValue();
 }
 
-void JoinPlanCache::put(JoinPlanCacheKey key, std::unique_ptr<JoinPlanCacheEntry> entry) {
+size_t JoinPlanCache::put(JoinPlanCacheKey key, std::unique_ptr<JoinPlanCacheEntry> entry) {
     tassert(12926501, "entry to join plan cache must not be null", entry);
-    std::unique_lock lk(_mutex);
-    _cache[std::move(key)] = std::move(entry);
+    return _cache.put(std::move(key), std::shared_ptr<const JoinPlanCacheEntry>(std::move(entry)));
 }
 
 void JoinPlanCache::remove(const JoinPlanCacheKey& key) {
-    std::unique_lock lk(_mutex);
-    _cache.erase(key);
+    _cache.remove(key);
+}
+
+size_t JoinPlanCache::reset(size_t cacheSizeBytes) {
+    return _cache.reset(cacheSizeBytes);
+}
+
+size_t JoinPlanCache::size() const {
+    return _cache.size();
 }
 
 JoinPlanCache& JoinPlanCache::get(ServiceContext* svc) {
