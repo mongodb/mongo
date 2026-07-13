@@ -89,6 +89,11 @@ public:
                                   CollectionAcquisitionRequest::fromOpCtx(
                                       opCtx, ns(), AcquisitionPrerequisites::kRead),
                                   MODE_IS);
+            uassert(ErrorCodes::IllegalOperation,
+                    fmt::format("{} is not supported on time-series collections",
+                                Request::kCommandName),
+                    !acquisition.exists() ||
+                        !acquisition.getCollectionPtr()->isTimeseriesCollection());
             uassert(ErrorCodes::InvalidOptions,
                     fmt::format(
                         "The range {} for the namespace {} is required to be owned by one shard",
