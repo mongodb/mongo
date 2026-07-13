@@ -157,9 +157,6 @@ public:
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
             MODE_IS);
-        uassert(ErrorCodes::IllegalOperation,
-                fmt::format("{} is not supported on time-series collections", getName()),
-                !collection.exists() || !collection.getCollectionPtr()->isTimeseriesCollection());
         // The range needs to be entirely owned by one shard. splitVector is only supported for
         // internal use. The common pattern is to take the min/max boundaries from a chunk,
         // where the max represent a non-included boundary.
