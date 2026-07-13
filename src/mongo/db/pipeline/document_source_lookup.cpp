@@ -426,6 +426,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(
         if (hasNestedSubPipeline) {
             _sharedState->resolvedPipeline =
                 _sharedState->resolvedIntrospectionPipeline->serializeToBson();
+            _sharedState->resolvedPipelineViewBinding =
+                LookupResolvedPipelineViewBinding::kAlreadyBound;
         }
     }
 
@@ -634,6 +636,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
       _sharedState(std::make_shared<LookUpSharedState>()) {
     _additionalFilter = original._additionalFilter;
     _sharedState->resolvedPipeline = original._sharedState->resolvedPipeline;
+    _sharedState->resolvedPipelineViewBinding = original._sharedState->resolvedPipelineViewBinding;
     _sharedState->resolvedIntrospectionPipeline =
         original._sharedState->resolvedIntrospectionPipeline->clone(_fromExpCtx);
 
@@ -1467,6 +1470,7 @@ void DocumentSourceLookUp::rebuildResolvedPipeline() {
     query_shape::SerializationOptions opts{.serializeForFLE2 = true};
     _sharedState->resolvedPipeline =
         _sharedState->resolvedIntrospectionPipeline->serializeToBson(opts);
+    _sharedState->resolvedPipelineViewBinding = LookupResolvedPipelineViewBinding::kAlreadyBound;
 
     // The introspection pipeline does not contain the placeholder match stage or the additional
     // filter. Add those back in here if applicable.

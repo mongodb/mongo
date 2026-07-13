@@ -48,6 +48,17 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
+// $lookup re-parses resolvedPipeline BSON per input document and buildPipeline() runs
+// makeLookupViewBinder to bind view info onto extension stages at parse time. When
+// resolvedPipeline is serialized from an already-parsed pipeline (e.g. hybrid search
+// introspection), view binding is already applied.
+// Re-binding overwrites already-resolved stages with the user-facing view name.
+// kAlreadyBound skips makeLookupViewBinder to prevent this scenario.
+enum class LookupResolvedPipelineViewBinding {
+    kNeedsBinding,
+    kAlreadyBound,
+};
+
 struct LookUpSharedState {
     // TODO SERVER-107976: Move 'pipeline' and 'execPipeline' entirely into the 'LookUpStage' class.
     std::unique_ptr<mongo::Pipeline> pipeline;
@@ -58,6 +69,9 @@ struct LookUpSharedState {
     // TODO SERVER-107976: Make 'resolvedPipeline' a 'std::shared_ptr<std::vector<BSONObj>>' and
     // move it back to the 'DocumentSourceLookUp' class.
     std::vector<BSONObj> resolvedPipeline;
+
+    LookupResolvedPipelineViewBinding resolvedPipelineViewBinding =
+        LookupResolvedPipelineViewBinding::kNeedsBinding;
 
     // A pipeline parsed from _sharedState->resolvedPipeline at creation time, intended to support
     // introspective functions. If sub-$lookup stages are present, their pipelines are constructed

@@ -86,7 +86,8 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
 }
 
 // Returns a callback (for MakePipelineOptions::resolveInvolvedNamespacesFn) that binds foreign-view
-// info onto the (extension) stages of a $lookup subpipeline that targets a non-mongot view.
+// info onto the (extension) stages of a $lookup subpipeline that targets a view.
+// Skipped when resolvedPipelineViewBinding is kAlreadyBound.
 std::function<void(LiteParsedPipeline&)> makeLookupViewBinder(
     const boost::intrusive_ptr<ExpressionContext>& fromExpCtx) {
     return [fromExpCtx](LiteParsedPipeline& liteParsedPipeline) {
@@ -345,6 +346,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     query_shape::SerializationOptions wireOptsForResolvedStore{.isSerializingForRemoteDispatch =
                                                                    true};
     _sharedState->resolvedPipeline = resolvedPipeline->serializeToBson(wireOptsForResolvedStore);
+    _sharedState->resolvedPipelineViewBinding = LookupResolvedPipelineViewBinding::kAlreadyBound;
 
     LOGV2_DEBUG(3254800,
                 3,
@@ -473,7 +475,11 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
 
     pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kDesugarOnly;
     pipelineOpts.validator = mongo::lookupPipeValidator;
-    pipelineOpts.resolveInvolvedNamespacesFn = makeLookupViewBinder(fromExpCtx);
+    if (_sharedState->resolvedPipelineViewBinding ==
+        LookupResolvedPipelineViewBinding::kNeedsBinding) {
+        pipelineOpts.resolveInvolvedNamespacesFn = makeLookupViewBinder(fromExpCtx);
+    }
+
     std::unique_ptr<mongo::Pipeline> parsedPipeline = mongo::pipeline_factory::makePipeline(
         _sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
 
