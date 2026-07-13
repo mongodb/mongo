@@ -39,12 +39,19 @@ struct CachedJoinPlan;
 struct CachedAccessPath {
     const join_ordering::NodeId nodeId;
     std::unique_ptr<const SolutionCacheData> solnCacheData;
+
+    // Heap-allocated bytes owned by this node. The node's own 'sizeof' is accounted for by the
+    // enclosing CachedJoinPlan, so it is deliberately excluded here to avoid double-counting the
+    // inline variant storage.
+    size_t estimateHeapBytes() const;
 };
 
 // Cached extra state for the right-hand side of an INLJ.
 struct CachedInljNode {
     const join_ordering::NodeId nodeId;
     const std::string inljForeignIndexName;
+
+    size_t estimateHeapBytes() const;
 };
 
 // Cached binary join node. Left and right children are owned via unique_ptr to close
@@ -56,11 +63,17 @@ struct CachedJoinNode {
     boost::optional<FieldPath> rightEmbeddingField;
     std::unique_ptr<CachedJoinPlan> left;
     std::unique_ptr<CachedJoinPlan> right;
+
+    size_t estimateHeapBytes() const;
 };
 
 // A node in the cached join tree. Wraps the variant so it can be forward-declared.
 struct CachedJoinPlan {
     std::variant<CachedAccessPath, CachedJoinNode, CachedInljNode> node;
+
+    // Total memory footprint of this subtree, including this node's own sizeof plus the
+    // heap-allocated bytes of the active variant alternative (and, recursively, its children).
+    size_t estimateObjectSizeInBytes() const;
 };
 
 // Live per-Collection version counters, bumped on DDL/sample refresh. Lives as a Collection
@@ -88,7 +101,6 @@ struct CollectionVersionTag {
     bool operator==(const CollectionVersionTag&) const = default;
 };
 
-
 // Captures the state of a collection referenced by a cached join plan: 'uuid' identifies which
 // collection the tag belongs to, and 'versionTag' is a copy of its version counters as they were
 // when the plan was cached.
@@ -101,8 +113,7 @@ struct CollectionTag {
 struct JoinPlanCacheEntry {
     JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                        join_ordering::NodeId baseNode,
-                       std::vector<CollectionTag> collections)
-        : joinTree(std::move(joinTree)), baseNode(baseNode), collections(std::move(collections)) {}
+                       std::vector<CollectionTag> collections);
 
     // Reconstructable plan.
     std::unique_ptr<const CachedJoinPlan> joinTree;
@@ -115,6 +126,10 @@ struct JoinPlanCacheEntry {
     std::vector<CollectionTag> collections;
 
     // TODO: (SERVER-130368) Add relevant index invalidation.
+
+    // Estimated memory footprint of this entry.
+    // Precomputed once at construction as the join tree is immutable.
+    const size_t estimatedEntrySizeBytes;
 };
 
 /*
@@ -129,6 +144,14 @@ std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& 
  */
 bool areCollectionTagsCurrent(const std::vector<CollectionTag>& tags,
                               const MultipleCollectionAccessor& mca);
+
+// Functor for estimating the memory footprint of a join plan cache entry.
+struct JoinPlanCacheBudgetEstimator {
+    size_t operator()(const JoinPlanCacheKey& key,
+                      const std::shared_ptr<const JoinPlanCacheEntry>& entry) const {
+        return entry->estimatedEntrySizeBytes + key.size();
+    }
+};
 
 /**
  * Global cache for join plans, keyed on a normalized join graph shape string. The cache is

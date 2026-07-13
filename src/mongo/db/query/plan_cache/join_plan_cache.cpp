@@ -3,10 +3,12 @@
 
 #include "mongo/db/query/plan_cache/join_plan_cache.h"
 
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/logv2/log.h"
 
 #include <mutex>
 #include <shared_mutex>
+#include <variant>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -21,7 +23,57 @@ ServiceContext::ConstructorActionRegisterer joinPlanCacheRegisterer{
         getJoinPlanCacheDecoration(serviceCtx) = std::make_unique<JoinPlanCache>();
     }};
 
+// Heap bytes backing a FieldPath.
+size_t estimateFieldPathHeapBytes(const FieldPath& fieldPath) {
+    // Capture FieldPath::_fieldPath string bytes
+    size_t fieldPathHeapBytes = fieldPath.fullPath().capacity() * sizeof(char);
+    // Capture FieldPath::_fieldPathDotPosition vector bytes
+    size_t fieldPathDotVectorHeapBytes = fieldPath.getPathLength() * sizeof(size_t);
+    return fieldPathHeapBytes + fieldPathDotVectorHeapBytes;
+}
+
 }  // namespace
+
+size_t CachedAccessPath::estimateHeapBytes() const {
+    return solnCacheData ? solnCacheData->estimateObjectSizeInBytes() : 0;
+}
+
+size_t CachedInljNode::estimateHeapBytes() const {
+    return inljForeignIndexName.capacity();
+}
+
+size_t CachedJoinNode::estimateHeapBytes() const {
+    size_t size = container_size_helper::estimateObjectSizeInBytes(
+        joinPredicates,
+        [](const QSNJoinPredicate& pred) {
+            return estimateFieldPathHeapBytes(pred.leftField) +
+                estimateFieldPathHeapBytes(pred.rightField);
+        },
+        /*includeShallowSize*/ true);
+    if (leftEmbeddingField) {
+        size += estimateFieldPathHeapBytes(*leftEmbeddingField);
+    }
+    if (rightEmbeddingField) {
+        size += estimateFieldPathHeapBytes(*rightEmbeddingField);
+    }
+    size += left ? left->estimateObjectSizeInBytes() : 0;
+    size += right ? right->estimateObjectSizeInBytes() : 0;
+    return size;
+}
+
+size_t CachedJoinPlan::estimateObjectSizeInBytes() const {
+    return sizeof(CachedJoinPlan) +
+        std::visit([](const auto& n) { return n.estimateHeapBytes(); }, node);
+}
+
+JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
+                                       join_ordering::NodeId baseNode,
+                                       std::vector<CollectionTag> collections)
+    : joinTree(std::move(joinTree)),
+      baseNode(baseNode),
+      collections(std::move(collections)),
+      estimatedEntrySizeBytes(sizeof(JoinPlanCacheEntry) +
+                              (this->joinTree ? this->joinTree->estimateObjectSizeInBytes() : 0)) {}
 
 std::shared_ptr<const JoinPlanCacheEntry> JoinPlanCache::lookup(const JoinPlanCacheKey& key) const {
     std::shared_lock lk(_mutex);
