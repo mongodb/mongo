@@ -92,6 +92,8 @@ public:
 
     long long getNumReturnedSoFar() const final;
 
+    void recordChangeStreamThroughputMetricsForBatch() final;
+
     void queueResult(ClusterQueryResult&& result) final;
 
     bool remotesExhausted() const final;
@@ -170,6 +172,18 @@ private:
 
     // Number of documents already returned by next().
     long long _numReturnedSoFar = 0;
+
+    // Cumulative count and size in bytes of the documents returned to the client. Only accumulated
+    // for change stream cursors, and recorded to the
+    // changeStreams.cursor.{docsReturned,bytesReturned} throughput counters incrementally as each
+    // batch is returned to the client.
+    long long _docsReturned = 0;
+    long long _bytesReturned = 0;
+
+    // Watermarks tracking how much of _docsReturned / _bytesReturned has already been reported to
+    // the global change stream throughput counters, so each batch only records its own delta.
+    long long _lastReportedDocsReturned = 0;
+    long long _lastReportedBytesReturned = 0;
 
     // The root stage of the pipeline used to return the result set, merged from the remote nodes.
     std::unique_ptr<RouterExecStage> _root;

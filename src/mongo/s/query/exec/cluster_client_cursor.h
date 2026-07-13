@@ -125,6 +125,15 @@ public:
     virtual long long getNumReturnedSoFar() const = 0;
 
     /**
+     * For a change stream cursor, records the documents, bytes, and the single batch returned to
+     * the client since the previous call into the global change stream throughput counters
+     * (changeStreams.cursor.{docsReturned,bytesReturned,batchesReturned}). Intended to be called
+     * once per batch handed back to the client (the initial batch and each getMore). A no-op for
+     * non-change-stream cursors.
+     */
+    virtual void recordChangeStreamThroughputMetricsForBatch() = 0;
+
+    /**
      * Stash the ClusterQueryResult so that it gets returned from the CCC on a later call to
      * next().
      *
@@ -248,6 +257,10 @@ public:
         if (!_firstResponseExecutionTime) {
             _firstResponseExecutionTime = _metrics.executionTime;
         }
+        // This is the per-batch consolidation point for cursor metrics (both the initial batch and
+        // each getMore), so it is also where we emit change stream read throughput for the batch
+        // just returned to the client. No-op for non-change-stream cursors.
+        recordChangeStreamThroughputMetricsForBatch();
     }
 
     void updateMetrics(const ChangeStreamCursorMetrics& csMetrics) {

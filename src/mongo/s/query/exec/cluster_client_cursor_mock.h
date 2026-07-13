@@ -81,6 +81,8 @@ public:
 
     long long getNumReturnedSoFar() const final;
 
+    void recordChangeStreamThroughputMetricsForBatch() final {}
+
     void queueResult(ClusterQueryResult&& result) final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;

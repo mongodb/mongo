@@ -151,6 +151,12 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() try {
         auto front = std::move(_stash.front());
         _stash.pop();
         ++_numReturnedSoFar;
+        if (_isChangeStreamQuery) {
+            if (const auto& resultObj = front.getResult()) {
+                ++_docsReturned;
+                _bytesReturned += resultObj->objsize();
+            }
+        }
         return {std::move(front)};
     }
 
@@ -165,6 +171,12 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() try {
     }
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
+        if (_isChangeStreamQuery) {
+            if (const auto& resultObj = next.getValue().getResult()) {
+                ++_docsReturned;
+                _bytesReturned += resultObj->objsize();
+            }
+        }
     }
     // Record if we just got a MaxTimeMSExpired error.
     _maxTimeMSExpired |= (next.getStatus().code() == ErrorCodes::MaxTimeMSExpired);
@@ -264,10 +276,37 @@ long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }
 
+void ClusterClientCursorImpl::recordChangeStreamThroughputMetricsForBatch() {
+    if (!_isChangeStreamQuery) {
+        return;
+    }
+
+    // Record the documents and bytes returned since the previous batch, and count this batch. Guard
+    // against errors so a metrics update never disrupts returning results to the client.
+    try {
+        if (const auto docsDelta = _docsReturned - _lastReportedDocsReturned; docsDelta > 0) {
+            change_stream::cursorDocsReturned().add(docsDelta);
+            _lastReportedDocsReturned = _docsReturned;
+            change_stream::cursorBatchesReturned().add(1);
+        }
+        if (const auto bytesDelta = _bytesReturned - _lastReportedBytesReturned; bytesDelta > 0) {
+            change_stream::cursorBytesReturned().add(bytesDelta);
+            _lastReportedBytesReturned = _bytesReturned;
+        }
+    } catch (...) {
+    }
+}
+
 void ClusterClientCursorImpl::queueResult(ClusterQueryResult&& result) {
     const auto& resultObj = result.getResult();
     if (resultObj) {
         tassert(11052321, "Expected result object to be owned", resultObj->isOwned());
+        // This document was already counted when it emerged from next(); back it out here so that
+        // it is only counted once, when it is re-served from the stash.
+        if (_isChangeStreamQuery) {
+            --_docsReturned;
+            _bytesReturned -= resultObj->objsize();
+        }
     }
     _stash.push(std::move(result));
 }

@@ -538,6 +538,196 @@ TEST_F(ClusterClientCursorImplTest, CheckChangeStreamServerStatusCursorMetrics) 
     ASSERT_EQ(histogram2.sum, 600'000);
 }
 
+TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorThroughputMetrics) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // Throughput counters start at zero.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 0);
+
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+    const int64_t kNumDocs = 5;
+    std::vector<int64_t> docSizes;
+    int64_t expectedBytes = 0;
+    for (int i = 1; i <= kNumDocs; ++i) {
+        auto doc = BSON("_id" << i << "fullDocument" << BSON("a" << i));
+        expectedBytes += doc.objsize();
+        docSizes.push_back(doc.objsize());
+        mockStage->queueResult(doc);
+    }
+
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    // Deliver the results across two getMore batches: 3 documents, then 2. The throughput counters
+    // advance as each batch is returned to the client, not only when the cursor is killed.
+    const int64_t kFirstBatchDocs = 3;
+    int64_t firstBatchBytes = 0;
+    for (int i = 0; i < kFirstBatchDocs; ++i) {
+        auto result = cursor.next();
+        ASSERT_OK(result.getStatus());
+        ASSERT(result.getValue().getResult());
+        firstBatchBytes += docSizes[i];
+    }
+    cursor.recordChangeStreamThroughputMetricsForBatch();
+
+    // The first batch is reflected immediately.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned),
+              kFirstBatchDocs);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned),
+              firstBatchBytes);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 1);
+
+    // Second batch: consume the remaining documents, then EOF.
+    for (int i = kFirstBatchDocs; i < kNumDocs; ++i) {
+        auto result = cursor.next();
+        ASSERT_OK(result.getStatus());
+        ASSERT(result.getValue().getResult());
+    }
+    auto eof = cursor.next();
+    ASSERT_OK(eof.getStatus());
+    ASSERT_TRUE(eof.getValue().isEOF());
+    ASSERT_EQ(cursor.getNumReturnedSoFar(), kNumDocs);
+    cursor.recordChangeStreamThroughputMetricsForBatch();
+
+    // Only the second batch's delta is added on top of the first.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), kNumDocs);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned),
+              expectedBytes);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 2);
+
+    // Killing the cursor does not re-count throughput that was already recorded per batch.
+    cursor.kill(_opCtx.get());
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), kNumDocs);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned),
+              expectedBytes);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 2);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorStashedDocumentCountedOnceInThroughput) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned), 0);
+
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+
+    const auto docA = BSON("_id" << 1 << "fullDocument" << BSON("a" << 1));
+    const auto docB = BSON("_id" << 2 << "fullDocument" << BSON("b" << 2));
+
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+    mockStage->queueResult(docA);
+    mockStage->queueResult(docB);
+
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    // Simulate the production flow where a document does not fit into the current batch: pull docA
+    // out of the merge plan, then stash it back via queueResult() (as cluster_find.cpp does). This
+    // batch delivers no documents to the client.
+    {
+        auto result = cursor.next();
+        ASSERT_OK(result.getStatus());
+        ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), docA);
+        cursor.queueResult(*result.getValue().getResult());
+    }
+    cursor.recordChangeStreamThroughputMetricsForBatch();
+
+    // Nothing was delivered, so no throughput and no batch is recorded for the empty batch.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 0);
+
+    // Next batch: re-serve the stashed docA (must NOT be counted a second time), then docB.
+    {
+        auto result = cursor.next();
+        ASSERT_OK(result.getStatus());
+        ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), docA);
+    }
+    {
+        auto result = cursor.next();
+        ASSERT_OK(result.getStatus());
+        ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), docB);
+    }
+    cursor.recordChangeStreamThroughputMetricsForBatch();
+
+    // docA was produced by next(), stashed, then re-served: it must be counted exactly once. So the
+    // stream has returned 2 distinct documents (docA + docB), not 3. Note getNumReturnedSoFar()
+    // legitimately reports 3, since it counts every next() that yields a document (including the
+    // re-serve) — the throughput counters intentionally diverge from it here.
+    ASSERT_EQ(cursor.getNumReturnedSoFar(), 3);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), 2);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned),
+              docA.objsize() + docB.objsize());
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 1);
+
+    cursor.kill(_opCtx.get());
+}
+
+TEST_F(ClusterClientCursorImplTest, NonChangeStreamCursorDoesNotRecordThroughputMetrics) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // isChangeStreamQuery defaults to false — this is not a change stream cursor.
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+    for (int i = 1; i <= 5; ++i) {
+        mockStage->queueResult(BSON("a" << i));
+    }
+
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    for (int i = 1; i <= 5; ++i) {
+        ASSERT_OK(cursor.next().getStatus());
+    }
+    // Recording per batch is a no-op for a non-change-stream cursor.
+    cursor.recordChangeStreamThroughputMetricsForBatch();
+    cursor.kill(_opCtx.get());
+
+    // No change stream throughput should be recorded for a non-change-stream cursor.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorDocsReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBytesReturned), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorBatchesReturned), 0);
+}
+
 TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorCanBeDisposedEvenIfTimeGoesBackwards) {
     otel::metrics::OtelMetricsCapturer capturer;
 
