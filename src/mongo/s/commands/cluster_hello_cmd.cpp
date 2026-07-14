@@ -41,6 +41,7 @@
 #include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/load_balancer_support.h"
+#include "mongo/transport/backpressure_connection_metrics.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/assert_util.h"
@@ -179,6 +180,13 @@ public:
         if (ClientMetadata::tryFinalize(client)) {
             isInitialHandshake = true;
             audit::logClientMetadata(client);
+
+            // Record client backpressure protocol version for connection metrics.
+            if (auto session = client->session()) {
+                BackpressureVersionMetrics::get(session.get())
+                    ->setVersionFromHelloField(
+                        cmd.getBackpressure().value_or(IDLAnyType{}).getElement());
+            }
         }
 
         if (!isInitialHandshake) {

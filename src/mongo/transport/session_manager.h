@@ -6,6 +6,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/transport/backpressure_connection_metrics.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -115,6 +116,7 @@ public:
     virtual void onLoadBalancerPeerSet(bool isLoadBalancerPeer) = 0;
 
     HelloMetrics helloMetrics;
+    BackpressureConnectionMetrics backpressureConnectionMetrics;
     ServiceExecutorStats serviceExecutorStats;
 
 protected:

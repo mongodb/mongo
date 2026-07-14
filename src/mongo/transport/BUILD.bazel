@@ -12,6 +12,7 @@ exports_files(
 mongo_cc_library(
     name = "transport_layer_common",
     srcs = [
+        "backpressure_connection_metrics.cpp",
         "hello_metrics.cpp",
         "session.cpp",
         "session_establishment_rate_limiter.cpp",
@@ -125,6 +126,7 @@ idl_generator(
 mongo_cc_library(
     name = "transport_layer",
     srcs = [
+        "backpressure_connection_metrics_collection.cpp",
         "proxy_protocol_header_parser.cpp",
         "proxy_protocol_tlv_extraction.cpp",
         "//src/mongo/transport/asio:asio_session_impl.cpp",
@@ -384,6 +386,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "transport_test",
     srcs = [
+        "backpressure_connection_metrics_test.cpp",
         "hello_metrics_test.cpp",
         "max_conns_override_test.cpp",
         "message_compressor_manager_test.cpp",
@@ -435,6 +438,17 @@ mongo_cc_integration_test(
     srcs = [
         "//src/mongo/transport/asio:asio_transport_layer_integration_test.cpp",
     ],
+    deps = [
+        ":transport_layer_egress_init",
+        ":transport_layer_integration_test_fixture",
+        "//src/mongo:base",
+        "//src/third_party/asio",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "backpressure_connection_metrics_integration_test",
+    srcs = ["backpressure_connection_metrics_integration_test.cpp"],
     deps = [
         ":transport_layer_egress_init",
         ":transport_layer_integration_test_fixture",

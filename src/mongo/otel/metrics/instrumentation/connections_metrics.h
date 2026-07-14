@@ -5,6 +5,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/transport/asio/asio_session_manager.h"
+#include "mongo/transport/backpressure_connection_metrics.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -13,9 +14,10 @@ namespace mongo {
 
 /**
  * Owns the OpenTelemetry instruments that track ingress connection state
- * (current, available, totalCreated, rejected, active), matching the fields
- * reported by serverStatus.connections. Each call to `update` sets the latest
- * values from a ConnectionsStatsSnapshot.
+ * (current, available, totalCreated, rejected, active) and per-version
+ * backpressure connection counts (current, total), matching
+ * serverStatus.connections. Each call to `update` / `updateBackpressureVersionMetrics`
+ * sets the latest values from the corresponding snapshot.
  */
 class ConnectionsMetrics {
 public:
@@ -23,6 +25,7 @@ public:
     ~ConnectionsMetrics();
 
     void update(const transport::ConnectionsStatsSnapshot& snap);
+    void updateBackpressureVersionMetrics(const BackpressureConnectionMetrics& metrics);
 
 private:
     class Impl;

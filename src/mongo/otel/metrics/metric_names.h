@@ -137,6 +137,10 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.connections.rejected");
     static constexpr MetricName kConnectionsActive =
         MetricNameMaker::make("mongodb.serverStatus.connections.active");
+    static constexpr MetricName kConnectionsBackpressureVersionsCurrent =
+        MetricNameMaker::make("mongodb.serverStatus.connections.backpressureVersions.current");
+    static constexpr MetricName kConnectionsBackpressureVersionsTotal =
+        MetricNameMaker::make("mongodb.serverStatus.connections.backpressureVersions.total");
     static constexpr MetricName kMongoDBBuildInfo = MetricNameMaker::make("mongodb.build.info");
 
     // Ingress Request Rate Limiter (Admission Control) Metrics. These mirror the fields that

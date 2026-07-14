@@ -296,6 +296,7 @@ TEST_F(TransportLayerManagerServerStatusTest, FieldCount) {
                                          "exhaustIsMaster",
                                          "exhaustHello",
                                          "awaitingTopologyChanges",
+                                         "backpressureVersions",
                                          "loadBalanced",
                                          "priority"};
     const auto actual = section.getFieldNames<std::set<std::string>>();

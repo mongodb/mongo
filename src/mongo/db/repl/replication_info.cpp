@@ -58,6 +58,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/transport/backpressure_connection_metrics.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
@@ -454,6 +455,13 @@ public:
             // Set split horizon parameters.
             auto sniName = client->getSniNameForSession();
             SplitHorizon::setParameters(client, std::move(sniName));
+
+            // Record client backpressure protocol version for connection metrics.
+            if (auto session = client->session()) {
+                BackpressureVersionMetrics::get(session.get())
+                    ->setVersionFromHelloField(
+                        cmd.getBackpressure().value_or(IDLAnyType{}).getElement());
+            }
         }
 
         if (!isInitialHandshake) {

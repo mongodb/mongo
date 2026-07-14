@@ -8,6 +8,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/transport/backpressure_connection_metrics.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/session_manager_common.h"
@@ -43,6 +44,7 @@ BSONObj Connections::generateSection(OperationContext* opCtx, const BSONElement&
 
     SessionManagerCommon::SessionStats totals;
     HelloMetrics totalHelloMetrics;
+    BackpressureConnectionMetrics totalBackpressureMetrics;
     int64_t totalLimitExempt = 0;
     int64_t totalQueued = 0;
     int64_t totalRateLimiterRejected = 0;
@@ -60,6 +62,7 @@ BSONObj Connections::generateSection(OperationContext* opCtx, const BSONElement&
         totals.numLoadBalancedSessions += s.numLoadBalancedSessions;
         totals.numPrioritySessions += s.numPrioritySessions;
         totalHelloMetrics += sm->helloMetrics;
+        totalBackpressureMetrics += sm->backpressureConnectionMetrics;
         totalLimitExempt += sm->serviceExecutorStats.limitExempt.load();
         auto& rateLimiter = sm->getSessionEstablishmentRateLimiter();
         totalQueued += rateLimiter.queued();
@@ -97,6 +100,10 @@ BSONObj Connections::generateSection(OperationContext* opCtx, const BSONElement&
     }
 
     totalHelloMetrics.serialize(&bb);
+    {
+        BSONObjBuilder sub(bb.subobjStart("backpressureVersions"));
+        totalBackpressureMetrics.serialize(&sub);
+    }
     if (auto adminExec = ServiceExecutorReserved::get(opCtx->getServiceContext())) {
         BSONObjBuilder section(bb.subobjStart("adminConnections"));
         adminExec->appendStats(&section);

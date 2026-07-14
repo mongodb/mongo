@@ -37,6 +37,7 @@ void installMongodOtelMetrics(ServiceContext* svcCtx) {
 
 void installMongosOtelMetrics(ServiceContext* svcCtx) {
     installCommonOtelMetrics(svcCtx);
+    installConnectionsOtelMetrics(svcCtx);
 }
 
 }  // namespace mongo

@@ -8,11 +8,14 @@
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
 using otel::metrics::MetricNames;
 using otel::metrics::OtelMetricsCapturer;
+using namespace std::literals;
 
 class ConnectionsOtelMetricsTest : public unittest::Test {
 protected:
@@ -30,11 +33,11 @@ TEST_F(ConnectionsOtelMetricsTest, UpdateSetsGaugesAndCounters) {
     _metrics.update(
         {.current = 10, .available = 990, .totalCreated = 500, .rejected = 3, .active = 7});
 
-    ASSERT_EQ(10, _capturer.readInt64Gauge(MetricNames::kConnectionsCurrent));
-    ASSERT_EQ(990, _capturer.readInt64Gauge(MetricNames::kConnectionsAvailable));
-    ASSERT_EQ(500, _capturer.readInt64Counter(MetricNames::kConnectionsTotalCreated));
-    ASSERT_EQ(3, _capturer.readInt64Counter(MetricNames::kConnectionsRejected));
-    ASSERT_EQ(7, _capturer.readInt64Gauge(MetricNames::kConnectionsActive));
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsCurrent), 10);
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsAvailable), 990);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsTotalCreated), 500);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsRejected), 3);
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsActive), 7);
 }
 
 TEST_F(ConnectionsOtelMetricsTest, GaugesTrackLatestSnapshot) {
@@ -42,9 +45,9 @@ TEST_F(ConnectionsOtelMetricsTest, GaugesTrackLatestSnapshot) {
 
     _metrics.update({.current = 5, .available = 995, .active = 3});
 
-    ASSERT_EQ(5, _capturer.readInt64Gauge(MetricNames::kConnectionsCurrent));
-    ASSERT_EQ(995, _capturer.readInt64Gauge(MetricNames::kConnectionsAvailable));
-    ASSERT_EQ(3, _capturer.readInt64Gauge(MetricNames::kConnectionsActive));
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsCurrent), 5);
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsAvailable), 995);
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsActive), 3);
 }
 
 TEST_F(ConnectionsOtelMetricsTest, CountersAccumulateDeltas) {
@@ -53,8 +56,121 @@ TEST_F(ConnectionsOtelMetricsTest, CountersAccumulateDeltas) {
     _metrics.update({.totalCreated = 150, .rejected = 6});
 
     // Counter accumulates the total delta across both updates: 150 and 6.
-    ASSERT_EQ(150, _capturer.readInt64Counter(MetricNames::kConnectionsTotalCreated));
-    ASSERT_EQ(6, _capturer.readInt64Counter(MetricNames::kConnectionsRejected));
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsTotalCreated), 150);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsRejected), 6);
+}
+
+TEST_F(ConnectionsOtelMetricsTest, BackpressureUpdateSetsGaugeAndCounterPerVersion) {
+    BackpressureConnectionMetrics metrics;
+    metrics.increment(0);
+    metrics.increment(0);
+    metrics.increment(1);
+
+    _metrics.updateBackpressureVersionMetrics(metrics);
+
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsBackpressureVersionsCurrent,
+                                       std::tuple{kNoBackpressureVersionLabel}),
+              2);
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsBackpressureVersionsCurrent,
+                                       std::tuple{"1"sv}),
+              1);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kNoBackpressureVersionLabel}),
+              2);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{"1"sv}),
+              1);
+}
+
+TEST_F(ConnectionsOtelMetricsTest, BackpressureGaugeTracksLatestSnapshot) {
+    BackpressureConnectionMetrics metrics;
+    metrics.increment(1);
+    metrics.increment(1);
+    _metrics.updateBackpressureVersionMetrics(metrics);
+
+    metrics.decrement(1);
+    _metrics.updateBackpressureVersionMetrics(metrics);
+
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsBackpressureVersionsCurrent,
+                                       std::tuple{"1"sv}),
+              1);
+}
+
+TEST_F(ConnectionsOtelMetricsTest, BackpressureCounterAccumulatesDeltas) {
+    BackpressureConnectionMetrics metrics;
+    metrics.increment(2);
+    metrics.increment(2);
+    _metrics.updateBackpressureVersionMetrics(metrics);
+
+    metrics.increment(2);
+    metrics.increment(2);
+    metrics.increment(2);
+    _metrics.updateBackpressureVersionMetrics(metrics);
+
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{"2"sv}),
+              5);
+}
+
+TEST_F(ConnectionsOtelMetricsTest, BackpressureVersionsGreaterThanMaxUseOtherBucket) {
+    BackpressureConnectionMetrics metrics;
+    metrics.increment(kMaxExplicitBackpressureVersion + 1);
+    metrics.increment(kMaxExplicitBackpressureVersion + 2);
+    metrics.increment(kMaxExplicitBackpressureVersion + 2);
+    _metrics.updateBackpressureVersionMetrics(metrics);
+
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsBackpressureVersionsCurrent,
+                                       std::tuple{kBackpressureOtherVersionLabel}),
+              3);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kBackpressureOtherVersionLabel}),
+              3);
+}
+
+TEST_F(ConnectionsOtelMetricsTest, BackpressureCounterIgnoresNegativeDelta) {
+    BackpressureConnectionMetrics higher;
+    higher.increment(0);
+    higher.increment(0);
+    higher.increment(kMaxExplicitBackpressureVersion + 1);
+    higher.increment(kMaxExplicitBackpressureVersion + 2);
+    _metrics.updateBackpressureVersionMetrics(higher);
+
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kNoBackpressureVersionLabel}),
+              2);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kBackpressureOtherVersionLabel}),
+              2);
+
+    BackpressureConnectionMetrics lower;
+    lower.increment(0);
+    lower.increment(kMaxExplicitBackpressureVersion + 1);
+    _metrics.updateBackpressureVersionMetrics(lower);
+
+    // A lower totalCreated snapshot yields a negative delta; counter must not decrease.
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kNoBackpressureVersionLabel}),
+              2);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kBackpressureOtherVersionLabel}),
+              2);
+
+    // Gauges still track the latest snapshot.
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsBackpressureVersionsCurrent,
+                                       std::tuple{kNoBackpressureVersionLabel}),
+              1);
+    ASSERT_EQ(_capturer.readInt64Gauge(MetricNames::kConnectionsBackpressureVersionsCurrent,
+                                       std::tuple{kBackpressureOtherVersionLabel}),
+              1);
+
+    // Recovering to the prior high-water mark must not re-emit already counted creations.
+    _metrics.updateBackpressureVersionMetrics(higher);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kNoBackpressureVersionLabel}),
+              2);
+    ASSERT_EQ(_capturer.readInt64Counter(MetricNames::kConnectionsBackpressureVersionsTotal,
+                                         std::tuple{kBackpressureOtherVersionLabel}),
+              2);
 }
 
 }  // namespace
