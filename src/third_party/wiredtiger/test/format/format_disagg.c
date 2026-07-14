@@ -224,8 +224,130 @@ disagg_is_mode_switch(void)
 }
 
 /*
+ * stepdown_workers_drained --
+ *     Return true when WT's all_durable timestamp has reached step_down_ts, meaning every
+ *     transaction at or below step_down_ts has completed (committed or rolled back). Using
+ *     all_durable is stronger than checking per-thread commit_ts: it guarantees no gaps remain in
+ *     the commit history at or below the step-down boundary.
+ */
+static bool
+stepdown_workers_drained(wt_timestamp_t step_down_ts)
+{
+    wt_timestamp_t all_durable;
+
+    testutil_check(timestamp_query("get=all_durable", &all_durable));
+    return (all_durable >= step_down_ts);
+}
+
+/*
+ * disagg_async_stepdown --
+ *     Perform an async step-down while worker threads are still live: 1. Stop the checkpoint and
+ *     timestamp threads so they cannot interfere. 2. Write lock: capture step_down_ts, advance
+ *     g.timestamp past it, and notify WT via set_timestamp(step_down_timestamp) - all under the
+ *     lock so WT begins enforcing the boundary before any new timestamps are handed out. WT rolls
+ *     back in-flight write transactions while setting the stepdown_ts; threads unblocked from the
+ *     write lock get ts values > step_down_ts -> ingest. 3. Drain: wait until every worker has
+ *     committed or rolled back at or below step_down_ts.
+ */
+void
+disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
+{
+    SAP sap;
+    WT_SESSION *session;
+    wt_timestamp_t step_down_ts;
+    uint64_t drain_polls;
+    char config[128];
+
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(g.wts_conn, &sap, NULL, NULL, &session);
+
+    track("[stepdown] stopping checkpoint and timestamp threads", 0ULL);
+
+    /*
+     * Stop the checkpoint thread before notifying WT. An uncontrolled checkpoint taken after
+     * notification could land stable at the wrong boundary.
+     */
+    if (g.checkpoint_config == CHECKPOINT_ON) {
+        g.checkpoint_quit = true;
+        testutil_check(__wt_thread_join(NULL, checkpoint_tid));
+    }
+
+    /*
+     * Stop the timestamp thread before notifying WT. It must not advance stable past step_down_ts
+     * after we pin it below.
+     */
+    if (g.transaction_timestamps_config) {
+        g.timestamp_quit = true;
+        testutil_check(__wt_thread_join(NULL, timestamp_tid));
+    }
+
+    /*
+     * Write lock: prevents any new timestamp from being allocated while we capture step_down_ts,
+     * bump g.timestamp past it, and notify WT. Holding the lock through the set_timestamp call
+     * ensures WT begins enforcing the boundary before any new allocations are handed out. Threads
+     * currently holding the read lock (mid-allocation) finish first; threads waiting for the read
+     * lock unblock after we release and get ts values strictly above step_down_ts.
+     */
+    lock_writelock(session, &g.timestamp_lock);
+    step_down_ts = g.timestamp;
+    /*
+     * Reserve step_down_ts + 1 and step_down_ts + 2 as a gap; all allocations now yield ts >
+     * step_down_ts.
+     */
+    g.timestamp += 2;
+    WT_RELEASE_WRITE_WITH_BARRIER(g.stepdown_ts, step_down_ts);
+    testutil_snprintf(config, sizeof(config), "step_down_timestamp=%" PRIx64, step_down_ts);
+    testutil_check(g.wts_conn->set_timestamp(g.wts_conn, config));
+    lock_writeunlock(session, &g.timestamp_lock);
+
+    track(
+      "[stepdown] notified WT at ts=%" PRIu64 "; draining in-flight transactions", step_down_ts);
+
+    /*
+     * Drain: wait until every in-flight transaction at or below step_down_ts has committed or been
+     * rolled back. Timeout after 60 seconds; a permanently hung worker is caught by the 15-minute
+     * abort in the outer spin loop.
+     */
+    for (drain_polls = 60 * WT_THOUSAND / 250; drain_polls > 0; --drain_polls) {
+        if (stepdown_workers_drained(step_down_ts))
+            break;
+        __wt_sleep(0, 250 * WT_THOUSAND);
+    }
+    testutil_assertfmt(
+      drain_polls > 0, "step-down drain timed out at step_down_ts=%" PRIu64, step_down_ts);
+
+    /*
+     * Reset the quit flags now that the threads are joined. g.stepdown_ts is intentionally left set
+     * so that disagg_switch_roles() can use it for the step-down checkpoint after operations()
+     * returns.
+     */
+    g.checkpoint_quit = false;
+    g.timestamp_quit = false;
+
+    wt_wrap_close_session(session);
+}
+
+/*
+ * disagg_stepdown_thread --
+ *     Thread wrapper for disagg_async_stepdown(). Runs the step-down in the background so the
+ *     operations() spin loop continues ticking (track_ops) while the drain proceeds. Sets
+ *     args->done under a release barrier when the drain is complete.
+ */
+WT_THREAD_RET
+disagg_stepdown_thread(void *arg)
+{
+    STEPDOWN_ARGS *args;
+
+    args = (STEPDOWN_ARGS *)arg;
+    disagg_async_stepdown(args->checkpoint_tid, args->timestamp_tid);
+    WT_RELEASE_WRITE_WITH_BARRIER(args->done, true);
+    return (WT_THREAD_RET_VALUE);
+}
+
+/*
  * disagg_switch_roles --
- *     Toggle the current disagg role between "leader" and "follower",
+ *     Toggle the current disagg role between "leader" and "follower". Dispatches to the async
+ *     step-down path (disagg.stepdown_async) or the synchronous fallback.
  */
 void
 disagg_switch_roles(void)
@@ -233,19 +355,62 @@ disagg_switch_roles(void)
     /* Perform step-up or step-down. */
     g.disagg_leader = !g.disagg_leader;
 
-    /*
-     * FIXME-WT-15763: WT does not yet support graceful step-downs. Simply reconfiguring WT to step
-     * down may cause issues, so we reopen the connection when switching to follower mode.
-     */
     if (!g.disagg_leader) {
-        /*
-         * Stepping down: [leader -> follower]. As part of reopening WT, we will reconfigure the
-         * database as a follower based on the value of g.disagg_leader.
-         */
-        track("[role change] leader -> follower", 0ULL);
-        wts_reopen();
-        follower_read_latest_checkpoint();
-        wts_prepare_discover(g.wts_conn);
+        /* Stepping down: [leader -> follower]. */
+        if (GV(DISAGG_STEPDOWN_ASYNC)) {
+            /*
+             * The async step-down thread stopped the checkpoint/timestamp threads and drained
+             * in-flight transactions. Complete the role transition here: pin stable, take the
+             * step-down checkpoint, and reconfigure. Both the checkpoint and reconfigure can block,
+             * so they belong in this synchronous path (after operations() returns) rather than the
+             * background thread, to avoid cache pressure from concurrent worker activity.
+             */
+            SAP sap;
+            WT_SESSION *session;
+            wt_timestamp_t stable_after;
+            char config[128];
+
+            memset(&sap, 0, sizeof(sap));
+            wt_wrap_open_session(g.wts_conn, &sap, NULL, NULL, &session);
+
+            /*
+             * Pin stable at exactly step_down_ts now that all operations have finished. Use
+             * prepare_commit_lock consistent with timestamp_once(). The subsequent checkpoint
+             * captures exactly this boundary.
+             */
+            testutil_snprintf(config, sizeof(config), "stable_timestamp=%" PRIx64, g.stepdown_ts);
+            lock_writelock(session, &g.prepare_commit_lock);
+            testutil_check(g.wts_conn->set_timestamp(g.wts_conn, config));
+            lock_writeunlock(session, &g.prepare_commit_lock);
+
+            /*
+             * Step-down checkpoint: stable is pinned at step_down_ts, so the checkpoint captures
+             * exactly the content up to the cut-over and nothing newer.
+             */
+            track("[stepdown] taking step-down checkpoint", 0ULL);
+            testutil_check(session->checkpoint(session, NULL));
+
+            testutil_check(timestamp_query("get=stable", &stable_after));
+            testutil_assertfmt(stable_after == g.stepdown_ts,
+              "step-down checkpoint: stable=%" PRIu64 " != step_down_ts=%" PRIu64, stable_after,
+              g.stepdown_ts);
+            track("[stepdown] checkpoint verified", 0ULL);
+
+            g.stepdown_ts = WT_TS_NONE;
+            wt_wrap_close_session(session);
+
+            track("[role change] leader -> follower (async completion)", 0ULL);
+            testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=follower)"));
+            follower_read_latest_checkpoint();
+        } else {
+            /*
+             * FIXME-WT-15763: graceful sync step-down is not yet fully supported, so reopen.
+             */
+            track("[role change] leader -> follower (sync)", 0ULL);
+            wts_reopen();
+            follower_read_latest_checkpoint();
+            wts_prepare_discover(g.wts_conn);
+        }
     } else {
         /* Stepping up: [follower -> leader] */
         SAP sap;

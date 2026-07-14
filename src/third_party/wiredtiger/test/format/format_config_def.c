@@ -200,6 +200,9 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"disagg.preserve", "preserve layered table constituents after data mismatches",
     C_IGNORE | C_BOOL, 100, 1, 0, V_GLOBAL_DISAGG_PRESERVE},
 
+  {"disagg.stepdown_async", "use async step-down instead of synchronous", C_IGNORE | C_BOOL, 0, 0,
+    0, V_GLOBAL_DISAGG_STEPDOWN_ASYNC},
+
   {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_DISK_CHECKSUM},
 

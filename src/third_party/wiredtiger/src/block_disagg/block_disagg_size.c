@@ -82,16 +82,15 @@ __wt_block_disagg_set_size(WT_SESSION_IMPL *session, uint64_t size)
 }
 
 /*
- * __wt_block_disagg_obsolete_delta_chain --
- *     Notify the block manager that a delta chain has been obsoleted by a full page image. The
- *     cumulative size of the old chain is no longer counted toward the total.
+ * __wt_block_disagg_decrease_size --
+ *     Decrease the total byte count. Exposed for callers outside the block manager; reconciliation
+ *     uses it when a full page image obsoletes a delta chain.
  */
 void
-__wt_block_disagg_obsolete_delta_chain(WT_SESSION_IMPL *session, uint64_t cumulative_size)
+__wt_block_disagg_decrease_size(WT_SESSION_IMPL *session, uint64_t size)
 {
     WT_ASSERT(session, F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED));
-    __wti_block_disagg_decrease_size(
-      session, (WT_BLOCK_DISAGG *)S2BT(session)->bm->block, cumulative_size);
+    __wti_block_disagg_decrease_size(session, (WT_BLOCK_DISAGG *)S2BT(session)->bm->block, size);
 }
 
 /*

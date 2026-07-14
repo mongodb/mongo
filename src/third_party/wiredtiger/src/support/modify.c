@@ -399,6 +399,25 @@ err:
 }
 
 /*
+ * __wt_update_list_print --
+ *     Print the contents of an update chain, one message per update.
+ */
+void
+__wt_update_list_print(WT_SESSION_IMPL *session, WT_UPDATE *head)
+{
+    WT_UPDATE *upd;
+    uint64_t pos;
+
+    for (upd = head, pos = 0; upd != NULL; upd = upd->next, ++pos)
+        WT_IGNORE_RET(__wt_msg(session,
+          "  upd[%" PRIu64 "]=%p type=%d txnid=%" PRIu64 " start_ts=%" PRIu64 " durable_ts=%" PRIu64
+          " prepare_state=%d flags=%#" PRIx16 " size=%" PRIu32,
+          pos, (void *)upd, (int)upd->type, __wt_atomic_load_uint64_v_acquire(&upd->txnid),
+          upd->upd_start_ts, upd->upd_durable_ts,
+          (int)__wt_atomic_load_uint8_v_acquire(&upd->prepare_state), upd->flags, upd->size));
+}
+
+/*
  * __wt_modify_reconstruct_from_upd_list --
  *     Takes an in-memory modify and populates an update value with the reconstructed full value.
  */
@@ -484,6 +503,25 @@ retry:
          * required by a previous modify update). Assert the case.
          */
         WT_ASSERT(session, cbt->slot != UINT32_MAX);
+
+        /*
+         * We need the on-page value as the base, so the page must be present. If it isn't, an
+         * update chain is referencing a page that was never instantiated or has gone away; dump the
+         * ref, cursor, and update-chain state to show why no full update was found.
+         */
+        if (cbt->ref == NULL || cbt->ref->page == NULL)
+            __wt_update_list_print(session, modify);
+
+        WT_ERR_ASSERT(session, WT_DIAGNOSTIC_TXN_VISIBILITY,
+          cbt->ref != NULL && cbt->ref->page != NULL, WT_ERROR,
+          "modify reconstruct with missing base page: dhandle=%s ref=%p state=%d page_del=%p "
+          "slot=%" PRIu32 " ins_head=%p ins=%p modify.type=%d modify.txnid=%" PRIu64
+          " modify.prepare_state=%d",
+          session->dhandle == NULL ? "(null)" : session->dhandle->name, (void *)cbt->ref,
+          cbt->ref == NULL ? -1 : (int)WT_REF_GET_STATE(cbt->ref),
+          cbt->ref == NULL ? NULL : (void *)cbt->ref->page_del, cbt->slot, (void *)cbt->ins_head,
+          (void *)cbt->ins, (int)modify->type, __wt_atomic_load_uint64_v_acquire(&modify->txnid),
+          (int)__wt_atomic_load_uint8_v_acquire(&modify->prepare_state));
 
         WT_ERR_ERROR_OK(
           __wt_value_return_buf(cbt, cbt->ref, &upd_value->buf, &tw), WT_RESTART, true);

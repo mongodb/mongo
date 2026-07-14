@@ -209,6 +209,8 @@ CONFIG configuration_list[] = {
 
 {"disagg.preserve", "preserve layered table constituents after data mismatches", C_IGNORE | C_BOOL, 100, 1, 0}
 
+{"disagg.stepdown_async", "use async step-down instead of synchronous", C_IGNORE | C_BOOL, 0, 0, 0}
+
 {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)", C_IGNORE | C_STRING | C_TABLE, 0, 0, 0}
 
 {"disk.data_extend", "configure data file extension", C_BOOL, 5, 0, 0}

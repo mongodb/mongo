@@ -104,43 +104,44 @@ class test_verbose_base(wttest.WiredTigerTestCase, suite_subprocess):
         if expect_json:
             verbose_config += ",json_output=[message]"
         conn = self.wiredtiger_open(self.home, verbose_config)
-        # Yield the connection resource to the execution context, allowing it to perform any necessary
-        # operations on the connection (for generating the expected verbose output).
-        yield conn
-        # Read the contents of stdout to extract our verbose messages.
-        output = self.readStdout(self.nlines)
-        # Split the output into their individual messages. We want validate the contents of each message
-        # to ensure we've only generated verbose messages for the expected categories.
-        verbose_messages = output.splitlines()
+        try:
+            # Yield the connection resource to the execution context, allowing it to perform any
+            # necessary operations on the connection (for generating the expected verbose output).
+            yield conn
+            # Read the contents of stdout to extract our verbose messages.
+            output = self.readStdout(self.nlines)
+            # Split the output into their individual messages. We want validate the contents of each message
+            # to ensure we've only generated verbose messages for the expected categories.
+            verbose_messages = output.splitlines()
 
-        if expect_output:
-            self.assertGreater(len(verbose_messages), 0)
-        else:
-            self.assertEqual(len(verbose_messages), 0)
+            if expect_output:
+                self.assertGreater(len(verbose_messages), 0)
+            else:
+                self.assertEqual(len(verbose_messages), 0)
 
-        if len(output) >= self.nlines:
-            # If we've read the maximum number of characters, its likely that the last line is truncated ('...'). In this
-            # case, trim the last message as we can't parse it.
-            verbose_messages = verbose_messages[:-1]
+            if len(output) >= self.nlines:
+                # If we've read the maximum number of characters, its likely that the last line is truncated ('...'). In this
+                # case, trim the last message as we can't parse it.
+                verbose_messages = verbose_messages[:-1]
 
-        # Test the contents of each verbose message, ensuring it satisfies the expected pattern.
-        verb_pattern = re.compile('|'.join(patterns))
-        # To avoid truncated messages, slice out the last message string in the
-        for line in verbose_messages:
-            # Check JSON validity
-            if expect_json:
-                try:
-                    json.loads(line)
-                except Exception as e:
-                    self.prout('Unable to parse JSON message: %s' % line)
-                    raise e
+            # Test the contents of each verbose message, ensuring it satisfies the expected pattern.
+            verb_pattern = re.compile('|'.join(patterns))
+            # To avoid truncated messages, slice out the last message string in the
+            for line in verbose_messages:
+                # Check JSON validity
+                if expect_json:
+                    try:
+                        json.loads(line)
+                    except Exception as e:
+                        self.prout('Unable to parse JSON message: %s' % line)
+                        raise e
 
-            self.assertTrue(verb_pattern.search(line) != None, 'Unexpected verbose message: ' + line)
-
-        # Close the connection resource and clean up the contents of the stdout file, flushing out the
-        # verbose output that occurred during the execution of this context.
-        conn.close()
-        self.cleanStdout()
+                self.assertTrue(verb_pattern.search(line) != None, 'Unexpected verbose message: ' + line)
+        finally:
+            # Close the connection resource and clean up the contents of the stdout file, flushing out
+            # the verbose output that occurred during the execution of this context.
+            conn.close()
+            self.cleanStdout()
 
 # Verify basic uses of the verbose configuration API work as intended i.e. passing
 # single & multiple valid and invalid verbose categories. These tests are mainly focused on uses

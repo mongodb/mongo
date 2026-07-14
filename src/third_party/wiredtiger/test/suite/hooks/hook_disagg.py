@@ -259,8 +259,8 @@ def session_checkpoint_replace(orig_session_checkpoint, session_self, config):
 
 # Called to replace Session.compact
 def session_compact_replace(orig_session_compact, session_self, uri, config):
-    uri = replace_uri(uri)
-    return orig_session_compact(session_self, uri, config)
+    # Compaction is not supported on disaggregated tables.
+    skip_test('Compaction is not supported in disagg storage')
 
 # Called to replace Session.create
 def session_create_replace(orig_session_create, session_self, uri, config):

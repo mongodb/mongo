@@ -264,7 +264,6 @@ wiredtiger_repair(WT_CONNECTION *connection, const char *config)
     WT_SESSION_IMPL *default_session, *session;
 
     WT_CLEAR(repair_config);
-    default_session = NULL;
     session = NULL;
 
     if (connection == NULL)

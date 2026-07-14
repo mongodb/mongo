@@ -133,6 +133,9 @@ static int
 __layered_clear_ingest_table(WT_SESSION_IMPL *session, const char *uri)
 {
     WT_DECL_RET;
+#ifdef WT_STANDALONE_BUILD
+    uint32_t orig_flags;
+#endif
 
     WT_ASSERT(session, WT_URI_IS_INGEST(uri));
 
@@ -140,9 +143,19 @@ __layered_clear_ingest_table(WT_SESSION_IMPL *session, const char *uri)
      * Clearing the ingest table is final and owned by no transaction. The session flag makes the
      * truncate write globally visible tombstones that are immediately visible to every reader.
      */
+#ifdef WT_STANDALONE_BUILD
+    /* FIXME-WT-18058: Replace the whole-table clear with incremental per-page draining. */
+    /* The scan must complete during step-up rather than be rolled back by application eviction. */
+    orig_flags = F_MASK(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
+#endif
     F_SET(session, WT_SESSION_NON_TRANSACTIONAL_TRUNCATE);
     ret = session->iface.truncate(&session->iface, uri, NULL, NULL, NULL);
     F_CLR(session, WT_SESSION_NON_TRANSACTIONAL_TRUNCATE);
+#ifdef WT_STANDALONE_BUILD
+    F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    F_SET(session, orig_flags);
+#endif
 
     return (ret);
 }

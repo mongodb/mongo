@@ -18,7 +18,6 @@ test_durable_ts03.py
 test_empty.py
 test_encrypt06.py
 test_env01.py
-test_error_info01.py
 test_hs24.py    # FIXME: WT-18046
 test_log03.py
 test_metadata_cursor01.py
@@ -40,6 +39,3 @@ test_util13.py
 test_util14.py
 test_util15.py
 test_util17.py
-test_verbose01.py  # FIXME: WT-15372
-test_verbose02.py
-test_verbose04.py

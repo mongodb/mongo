@@ -659,6 +659,7 @@ assertGreater
 assertTrue
 assertfmt
 asymptote
+async
 atomicity
 atomics
 atou
@@ -1121,6 +1122,7 @@ groupd
 gte
 handleops
 handlep
+handoff
 hardcoded
 hashmap
 hashq
@@ -1705,6 +1707,7 @@ stderr
 stdin
 stdout
 stepback
+stepdown
 stepp
 stepup
 stlr
