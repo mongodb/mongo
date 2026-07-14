@@ -529,9 +529,6 @@ try {
         }),
     );
     try {
-        // TODO SERVER-115896: use the dedicated query knob/setting for forcing CBR once it exists
-        // (and keep reason kQueryKnob). For now, setting internalQueryCBRCEMode to a concrete CE
-        // mode ("samplingCE") makes CBR rank every multi-plan query directly.
         checkRanker({
             qID: "7.2 - query-knob",
             cName: "20k",
