@@ -27,6 +27,10 @@ selector:
       - with_mongot_extension_single_shard
       - with_mongot_extension_sharded_collections
       - with_mongot_extension_sharded_cluster
+      - with_mongot_extension_hybridSearch_disabled_single_node
+      - with_mongot_extension_hybridSearch_disabled_single_shard
+      - with_mongot_extension_hybridSearch_disabled_sharded_collections
+      - with_mongot_extension_hybridSearch_disabled_sharded_cluster
     # Exclude list of etc/evergreen.yml task names.
     exclude_tasks:
     # Exclude list of jstests file names.

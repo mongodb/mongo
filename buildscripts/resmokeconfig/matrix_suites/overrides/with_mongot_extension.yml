@@ -1,7 +1,14 @@
-# Overrides for the with_mongot_extension_* suites, which run the with_mongot e2e corpus against
-# the real (externally-published) mongot-extension. Only the real extension is loaded -- not
-# toy test extensions -- so these suites run on signature secure-mode builds with
+# Overrides for the with_mongot_extension* suite families, which run the with_mongot e2e corpus
+# against the real (externally-published) mongot-extension. Only the real extension is loaded --
+# not toy test extensions -- so these suites run on signature secure-mode builds with
 # featureFlagExtensionsApiSignatureValidation enabled.
+#
+# There are 4 families of suites (each run in 4 topologies) that fix a different extension feature-flag
+# configuration:
+#   - with_mongot_extension_hybridSearch_disabled_*
+#   - with_mongot_extension_search_disabled_* (TODO SERVER-130878)
+#   - with_mongot_extension_vectorSearch_disabled_* (TODO SERVER-131368)
+#   - with_mongot_extension_fully_enabled_* (TODO SERVER-131369)
 
 # Tests the mongot-extension cannot run.
 - name: exclude_incompatible_tests
@@ -38,10 +45,7 @@
             featureFlagExtensionsAPI: true
             featureFlagExtensionsApiSignatureValidation: true
             featureFlagVectorSearchExtension: true
-            featureFlagSearchExtension: false # TODO SERVER-130636: flip to true once the $search extension is ready.
-            # TODO SERVER-130878: flip to true once extension stages are supported inside
-            # hybrid search. Note the hybrid-search test exclusions above are NOT gated on this
-            # flag: they should pass with it off via the IFR kickback (SERVER-130918).
+            featureFlagSearchExtension: false
             featureFlagExtensionsInsideHybridSearch: false
             featureFlagEgressGrpcForSearch: true
             useGrpcForSearch: 1
@@ -56,3 +60,56 @@
           set_parameters: *extension_set_parameters
         mongos_options:
           set_parameters: *extension_set_parameters
+
+# ---------------------------------------------------------------------------------------------
+# with_mongot_extension_hybridSearch_disabled_* family: every extension flag on except
+# featureFlagExtensionsInsideHybridSearch. $search/$searchMeta and $vectorSearch run through the
+# Extensions API; hybrid search ($rankFusion/$scoreFusion) exercises the IFR kickback to the
+# legacy stages.
+# ---------------------------------------------------------------------------------------------
+
+# Tests that fail only when featureFlagSearchExtension is on. Stacked on top of
+# exclude_incompatible_tests by every family that enables the $search extension.
+- name: exclude_search_extension_incompatible
+  value:
+    exclude_files:
+      # TODO SERVER-131304: Remove these exclusions. On a sharded cluster, extension $search desugars
+      # to an empty spec on the merge/planShardedSearch path, so mongot rejects it with "Query should
+      # contain either an operator or a collector" (error 65330 via planShardedSearch).
+      - jstests/with_mongot/e2e/search/search_beta.js
+      - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_network_interruption.js
+      # TODO SERVER-131305: Remove these exclusions. Sharded explain of extension $search/$searchMeta
+      # inside $unionWith + $lookup double-serializes the explain response, failing with
+      # "BSON field 'VectorClockComponents.explainVersion' is a duplicate field" (error 40413).
+      - jstests/with_mongot/e2e/explain_execution_stats/search_union_with_lookup_explain.js
+      - jstests/with_mongot/e2e/explain_execution_stats/search_meta_union_with_lookup_explain.js
+      # TODO SERVER-131306: Remove this exclusion. Extension $search in a $graphLookup-on-view
+      # subpipeline fails on a sharded cluster with CursorNotFound (error 43) on the remote shard.
+      - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition_graph_lookup.js
+
+- name: extension_flags_hybridSearch_disabled
+  value:
+    executor:
+      fixture:
+        # See the note on skip_extensions_signature_verification in extension_flags above.
+        skip_extensions_signature_verification: true
+        mongod_options:
+          set_parameters: &hybridSearch_disabled_set_parameters
+            featureFlagExtensionsAPI: true
+            featureFlagExtensionsApiSignatureValidation: true
+            featureFlagVectorSearchExtension: true
+            featureFlagSearchExtension: true
+            featureFlagExtensionsInsideHybridSearch: false
+            featureFlagEgressGrpcForSearch: true
+            useGrpcForSearch: 1
+            skipAuthenticationToMongot: true
+
+- name: extension_flags_hybridSearch_disabled_sharded
+  value:
+    executor:
+      fixture:
+        skip_extensions_signature_verification: true
+        mongod_options:
+          set_parameters: *hybridSearch_disabled_set_parameters
+        mongos_options:
+          set_parameters: *hybridSearch_disabled_set_parameters
