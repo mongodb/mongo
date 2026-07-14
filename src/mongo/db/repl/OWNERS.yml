@@ -58,3 +58,6 @@ filters:
   - "set_multikey_metadata_oplog_entry.idl":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "container_oplog_entry*":
+    approvers:
+      - 10gen/server-index-builds
