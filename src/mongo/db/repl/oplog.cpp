@@ -3236,44 +3236,66 @@ Status applyContainerOperations(OperationContext* opCtx,
             case repl::OpTypeEnum::kContainerInsert: {
                 auto parsed = repl::ContainerInsertOplogEntryO::parse(
                     o, IDLParserContext("ContainerInsertOplogEntryO"));
-                auto valSpan = parsed.getValue().data();
-                s = parsed.getKey().visit([&](auto key) {
-                    auto status = storage_engine_direct_crud::insert(
-                        *engine, *ru, ident, key, valSpan, policy);
-                    if (status.isOK()) {
-                        opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-                            opCtx, ident, key, valSpan);
+                // TODO SERVER-130643 Handle Array Variant
+                invariant(parsed.getValue().has_value() && !parsed.getValue()->isArrayVal());
+                auto valSpan = parsed.getValue()->data();
+                s = parsed.getKey().visit([&](auto key) -> Status {
+                    // TODO SERVER-130645: Handle batched (array) container keys.
+                    if constexpr (std::is_same_v<std::decay_t<decltype(key)>,
+                                                 std::vector<std::span<const char>>>) {
+                        MONGO_UNIMPLEMENTED;
+                    } else {
+                        auto status = storage_engine_direct_crud::insert(
+                            *engine, *ru, ident, key, valSpan, policy);
+                        if (status.isOK()) {
+                            opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
+                                opCtx, ident, key, valSpan);
+                        }
+                        return status;
                     }
-                    return status;
                 });
                 break;
             }
             case repl::OpTypeEnum::kContainerUpdate: {
                 auto parsed = repl::ContainerUpdateOplogEntryO::parse(
                     o, IDLParserContext("ContainerUpdateOplogEntryO"));
+                // TODO SERVER-130643 Handle Array Variant
+                invariant(!parsed.getValue().isArrayVal());
                 auto valSpan = parsed.getValue().data();
-                s = parsed.getKey().visit([&](auto key) {
-                    auto status = storage_engine_direct_crud::update(
-                        *engine, *ru, ident, key, valSpan, policy);
-                    if (status.isOK()) {
-                        opCtx->getServiceContext()->getOpObserver()->onContainerUpdate(
-                            opCtx, ident, key, valSpan);
+                s = parsed.getKey().visit([&](auto key) -> Status {
+                    // TODO SERVER-130645: Handle batched (array) container keys.
+                    if constexpr (std::is_same_v<std::decay_t<decltype(key)>,
+                                                 std::vector<std::span<const char>>>) {
+                        MONGO_UNIMPLEMENTED;
+                    } else {
+                        auto status = storage_engine_direct_crud::update(
+                            *engine, *ru, ident, key, valSpan, policy);
+                        if (status.isOK()) {
+                            opCtx->getServiceContext()->getOpObserver()->onContainerUpdate(
+                                opCtx, ident, key, valSpan);
+                        }
+                        return status;
                     }
-                    return status;
                 });
                 break;
             }
             case repl::OpTypeEnum::kContainerDelete: {
                 auto parsed = repl::ContainerDeleteOplogEntryO::parse(
                     o, IDLParserContext("ContainerDeleteOplogEntryO"));
-                s = parsed.getKey().visit([&](auto key) {
-                    auto status =
-                        storage_engine_direct_crud::remove(*engine, *ru, ident, key, policy);
-                    if (status.isOK()) {
-                        opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-                            opCtx, ident, key);
+                s = parsed.getKey().visit([&](auto key) -> Status {
+                    // TODO SERVER-130645: Handle batched (array) container keys.
+                    if constexpr (std::is_same_v<std::decay_t<decltype(key)>,
+                                                 std::vector<std::span<const char>>>) {
+                        MONGO_UNIMPLEMENTED;
+                    } else {
+                        auto status =
+                            storage_engine_direct_crud::remove(*engine, *ru, ident, key, policy);
+                        if (status.isOK()) {
+                            opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
+                                opCtx, ident, key);
+                        }
+                        return status;
                     }
-                    return status;
                 });
                 break;
             }

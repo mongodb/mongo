@@ -514,7 +514,7 @@ ObservedApplyOp parseContainerInnerOp(const repl::OplogEntry& innerEntry) {
             const auto parsed = repl::ContainerInsertOplogEntryO::parse(
                 innerEntry.getObject(), IDLParserContext("ContainerInsertOplogEntryO"));
             key = parsed.getKey();
-            val = parsed.getValue();
+            val = parsed.getValue().value();
             break;
         }
         case repl::OpTypeEnum::kContainerUpdate: {

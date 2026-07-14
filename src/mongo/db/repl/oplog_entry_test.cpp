@@ -512,7 +512,7 @@ TEST_F(OplogEntryTest, ContainerInsertORoundTripIntKey) {
         ContainerInsertOplogEntryO::parse(rawO, IDLParserContext("ContainerInsertOplogEntryO"));
     ASSERT_TRUE(parsed.getKey().isIntKey());
     ASSERT_EQ(parsed.getKey().getIntKey(), 42);
-    ASSERT_EQ(parsed.getValue().data().size(), 5);
+    ASSERT_EQ(parsed.getValue().value().data().size(), 5);
 
     const auto serialized = parsed.toBSON();
     ASSERT_BSONOBJ_EQ(rawO, serialized);

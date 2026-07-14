@@ -42,6 +42,7 @@ structs:
                 cpp_name: value
                 type: containerVal
                 description: "The value to insert"
+                optional: true
 
     ContainerUpdateOplogEntryO:
         description: "The 'o' field of a container update (cu) oplog entry."

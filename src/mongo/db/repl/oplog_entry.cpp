@@ -340,14 +340,25 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
 
         const BSONObj& o = getObject();
         switch (opType) {
-            case OpTypeEnum::kContainerInsert:
-                ContainerInsertOplogEntryO::parse(o,
-                                                  IDLParserContext("ContainerInsertOplogEntryO"));
-                break;
-            case OpTypeEnum::kContainerUpdate:
-                ContainerUpdateOplogEntryO::parse(o,
-                                                  IDLParserContext("ContainerUpdateOplogEntryO"));
-                break;
+            case OpTypeEnum::kContainerInsert: {
+                const auto containerInsertEntryO = ContainerInsertOplogEntryO::parse(
+                    o, IDLParserContext("ContainerInsertOplogEntryO"));
+                const auto& key = containerInsertEntryO.getKey();
+                const auto& maybeVal = containerInsertEntryO.getValue();
+                uassert(13064100,
+                        "One or more values must be specified with int-keyed containers",
+                        key.isArrayKey() || key.isBytesKey() ||
+                            (key.isIntKey() && maybeVal.has_value()));
+            } break;
+            case OpTypeEnum::kContainerUpdate: {
+                const auto containerUpdateEntryO = ContainerUpdateOplogEntryO::parse(
+                    o, IDLParserContext("ContainerUpdateOplogEntryO"));
+                const auto& key = containerUpdateEntryO.getKey();
+                const auto& val = containerUpdateEntryO.getValue();
+                uassert(13064101,
+                        "One key and one value must be specified for container update",
+                        !key.isArrayKey() && !val.isArrayVal());
+            } break;
             case OpTypeEnum::kContainerDelete:
                 ContainerDeleteOplogEntryO::parse(o,
                                                   IDLParserContext("ContainerDeleteOplogEntryO"));

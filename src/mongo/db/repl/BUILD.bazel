@@ -118,6 +118,7 @@ mongo_cc_library(
     name = "oplog_entry",
     srcs = [
         "container_oplog_entry_gen",
+        "container_oplog_entry_serialization.cpp",
         "create_oplog_entry_gen",
         "oplog_entry.cpp",
         "oplog_entry_gen",
@@ -133,6 +134,19 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/replicated_fast_count:durable_size_metadata_idl",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "container_oplog_entry_serialization_test",
+    srcs = [
+        "container_oplog_entry_serialization_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":oplog_entry",
+        "//src/mongo:base",
+        "//src/mongo/unittest",
     ],
 )
 

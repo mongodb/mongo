@@ -40,7 +40,9 @@ Timestamp validAsOfFromTimestampStoreObject(const BSONObj& object) {
     // '$v' field is ignored because the struct is non-strict).
     const auto containerO = repl::ContainerInsertOplogEntryO::parse(
         object, IDLParserContext("FastCountTimestampStoreContainerOp"));
-    const auto valueBytes = containerO.getValue().data();
+    uassert(
+        13064102, "Container object must have a value field", containerO.getValue().has_value());
+    const auto valueBytes = containerO.getValue()->data();
     const BSONObj value(valueBytes.data());
 
     const auto validAsOfElem = value[kValidAsOfKey];

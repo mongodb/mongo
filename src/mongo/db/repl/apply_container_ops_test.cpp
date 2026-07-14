@@ -570,137 +570,156 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsRejectMismatchedExistingCommitTimestam
     ru->clearCommitTimestamp();
 }
 
-TEST_F(ApplyContainerOpsTest, ParseContainerFormatFailures) {
-    int64_t k = 1;
-    auto v = BSONBinData("V", 1, BinDataGeneral);
-    auto wrongTypeV = "notBinData";
-    auto wrongTypeK = "notBinDataOrInt64";
-    auto version = static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1);
+/*
+ * Container operations ('ci', 'cd', and 'cu') must take the following form:
+ *
+ * {
+ *   ...                            // base oplog entry fields
+ *   "op": "ci" | "cd" | "cu",
+ *   "container": <string>,
+ *   "o": {
+ *     "k": <BinData | NumberLong>,
+ *     "v": <BinData>               // only allowed for "ci" and "cu"
+ *     "$v": <NumberLong>           // only allowed for "cu"
+ *   }
+ * }
+ */
+class ApplyContainerOpsParseContainerFormatFailuresTest : public ApplyContainerOpsTest {
+public:
+    ApplyContainerOpsParseContainerFormatFailuresTest() : _v("V", 1, BinDataGeneral) {}
 
-    auto baseInsert = [&]() {
+protected:
+    DurableOplogEntryParams BaseInsert() {
         return makeBaseParams(
-            _nss, _intIdent, OpTypeEnum::kContainerInsert, BSON("k" << k << "v" << v));
-    };
-    auto baseDelete = [&]() {
-        return makeBaseParams(_nss, _intIdent, OpTypeEnum::kContainerDelete, BSON("k" << k));
-    };
-    auto baseUpdate = [&]() {
+            _nss, _intIdent, OpTypeEnum::kContainerInsert, BSON("k" << _k << "v" << _v));
+    }
+
+    DurableOplogEntryParams BaseDelete() {
+        return makeBaseParams(_nss, _intIdent, OpTypeEnum::kContainerDelete, BSON("k" << _k));
+    }
+
+    DurableOplogEntryParams BaseUpdate() {
         return makeBaseParams(_nss,
                               _intIdent,
                               OpTypeEnum::kContainerUpdate,
-                              BSON("k" << k << "v" << v << "$v" << version));
-    };
-
-    /*
-     * Container operations ('ci', 'cd', and 'cu') must take the following form:
-     *
-     * {
-     *   ...                            // base oplog entry fields
-     *   "op": "ci" | "cd" | "cu",
-     *   "container": <string>,
-     *   "o": {
-     *     "k": <BinData | NumberLong>,
-     *     "v": <BinData>               // only allowed for "ci" and "cu"
-     *     "$v": <NumberLong>           // only allowed for "cu"
-     *   }
-     * }
-     */
-
-    // missing container - insert, delete, update
-    {
-        auto p = baseInsert();
-        p.container = boost::none;
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
-    }
-    {
-        auto p = baseDelete();
-        p.container = boost::none;
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
-    }
-    {
-        auto p = baseUpdate();
-        p.container = boost::none;
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+                              BSON("k" << _k << "v" << _v << "$v" << _version));
     }
 
-    // missing key - insert, delete, update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
-    }
-    {
-        auto p = baseDelete();
-        p.oField = BSONObj();
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
-    }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("v" << v << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
-    }
+    static constexpr int64_t _k = 1;
+    BSONBinData _v;
+    static constexpr auto _wrongTypeV = "notBinData";
+    static constexpr auto _wrongTypeK = "notBinDataOrInt64";
+    static constexpr auto _version =
+        static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1);
+};
 
-    // key type must be binData or numberLong - insert, delete, update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("k" << wrongTypeK << "v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
-    }
-    {
-        auto p = baseDelete();
-        p.oField = BSON("k" << wrongTypeK);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
-    }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << wrongTypeK << "v" << v << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
-    }
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingContainerInsert) {
+    auto p = BaseInsert();
+    p.container = boost::none;
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+}
 
-    // missing value - insert and update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("k" << k);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
-    }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
-    }
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingContainerDelete) {
+    auto p = BaseDelete();
+    p.container = boost::none;
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+}
 
-    // value type must be binData - insert and update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("k" << k << "v" << wrongTypeV);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
-    }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "v" << wrongTypeV << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
-    }
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingContainerUpdate) {
+    auto p = BaseUpdate();
+    p.container = boost::none;
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+}
 
-    // delete: cannot contain value
-    {
-        auto p = baseDelete();
-        p.oField = BSON("k" << k << "v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704704);
-    }
+// missing key
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingKeyInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
 
-    // update: missing version
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
-    }
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingKeyDelete) {
+    auto p = BaseDelete();
+    p.oField = BSONObj();
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
 
-    // update: version must be numeric
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "v" << v << "$v" << "notANumber");
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
-    }
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingKeyUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("v" << _v << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// key type must be binData or numberLong
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _wrongTypeK << "v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeDelete) {
+    auto p = BaseDelete();
+    p.oField = BSON("k" << _wrongTypeK);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _wrongTypeK << "v" << _v << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+// missing value - an integer key must specify a value
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingValueInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _k);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13064100);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingValueUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// value type must be binData or array of binData
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidValueTypeInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _k << "v" << _wrongTypeV);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidValueTypeUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << _wrongTypeV << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidArrayTypeUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << BSON_ARRAY(BSONBinData()) << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13064101);
+}
+
+// delete: cannot contain value
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, DeleteWithValue) {
+    auto p = BaseDelete();
+    p.oField = BSON("k" << _k << "v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704704);
+}
+
+// update: missing version
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, UpdateMissingVersion) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// update: version must be numeric
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, UpdateNonNumericVersion) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << _v << "$v" << "notANumber");
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
 }
 
 }  // namespace

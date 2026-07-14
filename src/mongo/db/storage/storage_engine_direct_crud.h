@@ -11,6 +11,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 
+#include <span>
 #include <string_view>
 
 [[MONGO_MOD_PUBLIC]];
@@ -35,6 +36,18 @@ Status insert(StorageEngine& engine,
               int64_t key,
               std::span<const char> value,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
+
+
+// This function has the same behavior as KVEngine::insertIntoIdent()
+// TODO SERVER-130643
+inline Status insert(StorageEngine& engine,
+                     RecoveryUnit& ru,
+                     std::string_view ident,
+                     std::span<std::span<const char>> keys,
+                     std::span<const char> value,
+                     BlindWritePolicy policy = BlindWritePolicy::nonBlind) {
+    MONGO_UNIMPLEMENTED;
+}
 
 // This function has the same behavior as KVEngine::updateInIdent()
 Status update(StorageEngine& engine,
@@ -77,5 +90,15 @@ Status remove(StorageEngine& engine,
               std::string_view ident,
               int64_t key,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
+
+// This function has the same behavior as KVEngine::deleteFromIdent()
+// TODO SERVER-130643
+inline Status remove(StorageEngine& engine,
+                     RecoveryUnit& ru,
+                     std::string_view ident,
+                     std::span<std::span<const char>> keys,
+                     BlindWritePolicy policy = BlindWritePolicy::nonBlind) {
+    MONGO_UNIMPLEMENTED;
+}
 
 }  // namespace mongo::storage_engine_direct_crud
