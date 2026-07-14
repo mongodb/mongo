@@ -1617,6 +1617,65 @@ TEST_F(MigrationChunkClonerSourceTest, UpdatedDocumentsFetched) {
     cloner.cancelClone(operationContext());
 }
 
+// Regression test for the deferred-xferMods reconciliation path. When a transaction's update is
+// processed without a post-image document key (e.g. a transaction prepared in a previous term), the
+// cloner defers the work and only records the pre-image document key. Later, when nextModsBatch()
+// reconciles the deferred entry, the document may already be gone because a subsequent update moved
+// its shard key out of the chunk range and it was then deleted. That out-of-range delete is skipped
+// by onDeleteOp(), so unless the deferred reconciliation models the delete itself, the recipient is
+// left with an orphaned copy of the document that was transferred while its pre-image was in range.
+TEST_F(MigrationChunkClonerSourceTest, DeferredUpdateForRemovedInRangeDocModelsDelete) {
+    const ShardKeyPattern shardKeyPattern(kShardKeyPattern);
+
+    const ShardsvrMoveRange req =
+        createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
+
+    // Materialize the collection with an unrelated in-range document so that findById() lookups
+    // resolve against an existing collection. This document is never queued for cloning and is not
+    // part of any deferred entry, so it must not appear in the transferred mods.
+    insertDocsInShardedCollection({createCollectionDocument(175)});
+
+    // Defer reconciliation for a document whose pre-image is inside the chunk range, but which no
+    // longer exists in the collection (it was moved out of range and subsequently deleted). The
+    // document key carries both the shard key and the _id, matching what the op-observer records.
+    cloner._deferProcessingForXferMod(createCollectionDocument(150));
+
+    // Also defer a document whose pre-image is *outside* the chunk range. The recipient never
+    // received this document, so no delete should be modeled for it.
+    cloner._deferProcessingForXferMod(createCollectionDocument(90));
+
+    {
+        const auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(cloner.nextCloneBatch(operationContext(), collection, &arrBuilder));
+            ASSERT_EQ(0, arrBuilder.arrSize());
+        }
+
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(0U, modsObj["reload"].Array().size());
+
+            // Only the in-range pre-image is reconciled into a delete; the out-of-range pre-image is
+            // ignored because the recipient never held that document.
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 150), modsObj["deleted"].Array()[0].Obj());
+        }
+    }
+
+    cloner.cancelClone(operationContext());
+}
+
 TEST_F(MigrationChunkClonerSourceTest, UpdatedDocumentsFetchedWithHashedShardKey) {
     const ShardKeyPattern shardKeyPattern(BSON("X" << "hashed"));
 

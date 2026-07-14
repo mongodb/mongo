@@ -891,9 +891,29 @@ void MigrationChunkClonerSource::_processDeferredXferMods(OperationContext* opCt
         auto idElement = preImageDocKey["_id"];
         BSONObj newerVersionDoc;
         if (!Helpers::findById(opCtx, this->nss(), BSON("_id" << idElement), newerVersionDoc)) {
-            // If the document can no longer be found, this means that another later op must have
-            // deleted it. That delete would have been captured by the xferMods so nothing else to
-            // do here.
+            // The document can no longer be found, which means that a later operation deleted it.
+            //
+            // If the document's shard key was still inside the chunk range when it was deleted,
+            // onDeleteOp() captured that delete in the xferMods delete buffer and there is nothing
+            // else to do here. However, the deferred update we are processing here may itself have
+            // moved the document's shard key OUT of the chunk range before the delete happened. In
+            // that case onDeleteOp() would have observed an out-of-range shard key and skipped the
+            // delete, so it was never added to the xferMods buffer. Because the document was
+            // transferred to the recipient while its pre-image was still in range, simply skipping
+            // it here would leave the recipient with an orphaned copy that no longer exists on the
+            // donor.
+            //
+            // To guarantee the recipient does not retain such an orphan, model the deletion
+            // ourselves whenever the pre-image fell inside the chunk range. Emitting a delete here
+            // is safe even if onDeleteOp() did capture the delete: the recipient applies deletes by
+            // _id and the orphan counter is only adjusted when a document is actually removed, so a
+            // duplicate delete is an idempotent no-op.
+            auto preImageShardKeyValues =
+                _shardKeyPattern.extractShardKeyFromDocumentKey(preImageDocKey);
+            if (!preImageShardKeyValues.isEmpty() &&
+                isKeyInRange(preImageShardKeyValues, getMin(), getMax())) {
+                _addToTransferModsQueue(idElement.wrap(), 'd', {});
+            }
             continue;
         }
 
