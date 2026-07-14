@@ -223,6 +223,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def setup(self):
         """Set up the replica set."""
+        # Defer mongot readiness until after replSetInitiate.
+        for node in self._all_mongot_nodes():
+            node.defer_mongot_await_ready = True
+
         start_node = 0
         if self.use_auto_bootstrap_procedure:
             # We need to wait for the first node to finish auto-bootstrapping so that we can
@@ -328,6 +332,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # want to skip reconfiguring the replset (which adds the other nodes
             # to the auto-bootstrapped replset).
             self.logger.info("Configuration exists. Skipping initializing the replset.")
+            self._await_all_mongots_ready()
             return
 
         if self.write_concern_majority_journal_default is not None:
@@ -402,6 +407,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             for ind in range(2, len(members) + 1):
                 self._add_node_to_repl_set(client, repl_config, ind, members)
 
+        # The replica set is initiated and has a primary; per-node mongot lease startup now has a
+        # valid replication source. Await mongot readiness on each node that launched one.
+        self._await_all_mongots_ready()
+
         self.removeshard_teardown_marker = False
 
     def _all_mongo_d_s_t(self):
@@ -416,6 +425,23 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
     def _all_mongots(self):
         """Return a list of all `mongot` `Process` instances in this fixture."""
         return [node.mongot for node in self.nodes]
+
+    def _all_mongot_nodes(self):
+        """Return the member nodes that may have launched a co-located mongot."""
+        nodes = list(self.nodes)
+        if self.initial_sync_node:
+            nodes.append(self.initial_sync_node)
+        return nodes
+
+    def _await_all_mongots_ready(self):
+        """
+        Await mongot readiness on every node once the replica set is initiated. Deferred out of each
+        node's setup() because mongot's lease manager needs an initiated replica set to replicate
+        from.
+        """
+        for node in self._all_mongot_nodes():
+            node.await_mongot_ready()
+            node.defer_mongot_await_ready = False
 
     def pids(self):
         """:return: all pids owned by this fixture if any."""
