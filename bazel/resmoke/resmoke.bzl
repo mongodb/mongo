@@ -424,62 +424,75 @@ def resmoke_suite_test(
             "//conditions:default": [],
         })
 
+    # Resmoke test-target attribute values, extracted into locals so the pieces are
+    # named and reusable. The data/deps/args/env of the test target are each built
+    # here and passed to py_test below.
+    data_attr = select({
+        # Skip user-provided data during cquery — it may include targets that require
+        # C++ toolchain resolution, which fails when --noincompatible_enable_cc_toolchain_resolution is set.
+        "//bazel/resmoke:skip_deps_for_cquery_enabled": cquery_safe_data,
+        "//conditions:default": data + cquery_safe_data,
+    }) + select({
+        "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test"],
+        "//conditions:default": [],
+    })
+
+    # The server binaries (mongod/mongos/mongo). Empty under installed-dist-test
+    # (prebuilt servers) and during cquery.
+    server_deps_attr = select({
+        "//bazel/resmoke:installed_dist_test_enabled": [],
+        "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
+        "//conditions:default": deps,
+    })
+
+    args_attr = [
+        "run",
+        "--suites=$(location %s)" % native.package_relative_label(generated_config),
+        "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
+        "--archiveMode=directory",
+        "--archiveLimitMb=500",
+        "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
+        "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
+        "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
+    ] + [
+        "--multiversionDir=$(location %s)" % native.package_relative_label(dep)
+        for dep in multiversion_deps
+    ] + [
+        "--tagFile=$(location %s)" % native.package_relative_label(tag)
+        for tag in multiversion_exclude_tags
+    ] + extra_args + resmoke_args
+
+    env_attr = {
+        "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
+        "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
+        "PYTHON_IMPORTS_FILE": "$(location %s)" % native.package_relative_label(python_imports_target),
+    } | seed_env | ({
+        "MULTIVERSION_CONFIG_FILE": "$(location //bazel/resmoke:multiversion_config)",
+        "MULTIVERSION_VERSIONS": ",".join([
+            dep.rsplit(":", 1)[1] if ":" in dep else dep
+            for dep in multiversion_deps
+        ]),
+    } if multiversion_deps else {}) | select({
+        "//bazel/resmoke:installed_dist_test_enabled": {},
+        "//bazel/resmoke:skip_deps_for_cquery_enabled": {},
+        "//conditions:default": {"DEPS_PATH": deps_path},
+    })
+
     py_test(
         name = name,
         srcs = [resmoke_shim],
-        data = select({
-            # Skip user-provided data during cquery — it may include targets that require
-            # C++ toolchain resolution, which fails when --noincompatible_enable_cc_toolchain_resolution is set.
-            "//bazel/resmoke:skip_deps_for_cquery_enabled": cquery_safe_data,
-            "//conditions:default": data + cquery_safe_data,
-        }) + select({
-            "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test"],
-            "//conditions:default": [],
-        }),
+        data = data_attr,
         deps = [
             resmoke,
             "//buildscripts:bazel_local_resources",
-        ] + select({
-            "//bazel/resmoke:installed_dist_test_enabled": [],
-            "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
-            "//conditions:default": deps,
-        }),
+        ] + server_deps_attr,
         main = resmoke_shim,
-        args = [
-            "run",
-            "--suites=$(location %s)" % native.package_relative_label(generated_config),
-            "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
-            "--archiveMode=directory",
-            "--archiveLimitMb=500",
-            "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
-            "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
-            "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
-        ] + [
-            "--multiversionDir=$(location %s)" % native.package_relative_label(dep)
-            for dep in multiversion_deps
-        ] + [
-            "--tagFile=$(location %s)" % native.package_relative_label(tag)
-            for tag in multiversion_exclude_tags
-        ] + extra_args + resmoke_args,
+        args = args_attr,
         tags = tags + ["no-cache", "resources:port_block:1", "resmoke_suite_test"],
         target_compatible_with = target_compatible_with,
         timeout = timeout,
         size = size,
-        env = {
-            "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
-            "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
-            "PYTHON_IMPORTS_FILE": "$(location %s)" % native.package_relative_label(python_imports_target),
-        } | seed_env | ({
-            "MULTIVERSION_CONFIG_FILE": "$(location //bazel/resmoke:multiversion_config)",
-            "MULTIVERSION_VERSIONS": ",".join([
-                dep.rsplit(":", 1)[1] if ":" in dep else dep
-                for dep in multiversion_deps
-            ]),
-        } if multiversion_deps else {}) | select({
-            "//bazel/resmoke:installed_dist_test_enabled": {},
-            "//bazel/resmoke:skip_deps_for_cquery_enabled": {},
-            "//conditions:default": {"DEPS_PATH": deps_path},
-        }),
+        env = env_attr,
         exec_properties = exec_properties | test_exec_properties(tags),
         toolchains = [
             "//bazel/resmoke:test_timeout",
