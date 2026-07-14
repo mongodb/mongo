@@ -6,7 +6,7 @@ import yaml
 from git import Remote, Repo
 
 
-DEFAULT_ORIGIN_BRANCH = "master"
+DEFAULT_ORIGIN_BRANCH = "v9.0"
 
 
 @cache

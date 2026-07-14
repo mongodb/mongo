@@ -20,7 +20,7 @@ DEFAULT_EVG_PROJECT_CONFIG = "etc/evergreen.yml"
 DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 
 # SET TO TRUE IN RAPID RELEASE BRANCHES - see docs/branching/README.md
-RELEASE_BRANCH = False
+RELEASE_BRANCH = True
 
 UNMATCHED_REGEXES = [
     re.compile(r".*buildvariant .+ has unmatched selector: .+"),

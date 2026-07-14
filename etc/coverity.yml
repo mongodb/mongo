@@ -155,5 +155,5 @@ commit:
     # module (evergreen/coverity_tasks.yml). This placeholder satisfies schema
     # validation; it is overridden before cov-commit-defects runs.
     url: https://placeholder.coverity.invalid
-    stream: mongo.master
+    stream: mongo.v9.0
     project: "MongoDB master"
