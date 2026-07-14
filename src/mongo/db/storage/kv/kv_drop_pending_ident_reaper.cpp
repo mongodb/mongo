@@ -9,6 +9,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -232,8 +233,10 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
     }
 
     boost::optional<rss::consensus::IntentGuard> writeIntentGuard;
-    if (usesSchemaEpochs) {
-        // Replicated drop mode: only primary can proceed.
+    if (usesSchemaEpochs && !storageGlobalParams.magicRestore) {
+        // Replicated drop mode: only primary can proceed. During magic restore, even though
+        // we're technically a primary, we're operating in a standby-like mode in that we're
+        // not supposed to perform any writes. So we avoid taking the Intent::Write here.
         try {
             writeIntentGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
         } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
