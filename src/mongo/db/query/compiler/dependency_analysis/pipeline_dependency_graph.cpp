@@ -8,12 +8,15 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/util/dynamic_bitset.h"
 #include "mongo/util/string_map.h"
 
 #include <algorithm>
+#include <deque>
+#include <limits>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -800,6 +803,71 @@ public:
         MONGO_UNREACHABLE_TASSERT(13052602);
     }
 
+    /**
+     * Invokes the callback for every path visible in 'scopeId' that is an alias for the base
+     * document path 'docPath'.
+     */
+    template <typename Callback>
+    void forEachBaseDocumentFieldAlias(ScopeId scopeId, PathRef docPath, const Callback& cb) const {
+        auto parsedDocPath = parsePath(docPath);
+        forEachFieldBreadthFirst(
+            scopeId, [&](FieldId fieldId, const FieldList& prefix, const ParsedPath& fieldPath) {
+                if (canPrefixContainArrays(prefix)) {
+                    // Reject array traversal. Any subpath will be ineligible too.
+                    return FieldVisit::kPrune;
+                }
+                auto* alias = getCollectionAlias(fieldId);
+                // Filter for aliases of the base document field or alias prefixes.
+                if (!alias || alias->size() > parsedDocPath.size() ||
+                    !std::equal(alias->begin(), alias->end(), parsedDocPath.begin())) {
+                    return FieldVisit::kContinue;
+                }
+                // An array in the rename source prefix means array traversal - bail out.
+                if (canCollectionFieldPrefixBeArray(*alias)) {
+                    return FieldVisit::kContinue;
+                }
+                cb(buildDottedPath(fieldPath, skipPathComponents(docPath, alias->size())));
+                return FieldVisit::kContinue;
+            });
+    }
+
+    boost::optional<FieldPath> getBaseDocumentFieldAlias(const DocumentSource* ds,
+                                                         PathRef docPath) const {
+        auto stageId = getPreviousStageId(ds);
+        if (!stageId) {
+            return boost::none;
+        }
+        auto scopeId = _stages[stageId].scope;
+
+        // The shortest resolved path found through the alias stored as {num components, path}.
+        // The pair ordering minimizes the component count first and breaks ties lexicographically.
+        std::pair<size_t, std::string> bestPrefixAlias{std::numeric_limits<size_t>::max(), {}};
+        forEachBaseDocumentFieldAlias(scopeId, docPath, [&](std::string resolved) {
+            size_t components = std::count(resolved.begin(), resolved.end(), '.') + 1;
+            if (auto candidate = std::make_pair(components, std::move(resolved));
+                candidate < bestPrefixAlias) {
+                bestPrefixAlias = std::move(candidate);
+            }
+        });
+
+        if (bestPrefixAlias.second.empty()) {
+            return boost::none;
+        }
+        return FieldPath(bestPrefixAlias.second);
+    }
+
+    OrderedPathSet getAllBaseDocumentFieldAliases(const DocumentSource* ds, PathRef docPath) const {
+        auto stageId = getPreviousStageId(ds);
+        if (!stageId) {
+            return {};
+        }
+        OrderedPathSet aliases;
+        forEachBaseDocumentFieldAlias(_stages[stageId].scope, docPath, [&](std::string resolved) {
+            aliases.insert(std::move(resolved));
+        });
+        return aliases;
+    }
+
     void recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt = {}) {
         // Recomputing is equivalent to truncating to just before stageIt and then expanding back to
         // cover the complete pipeline.
@@ -857,7 +925,7 @@ public:
 
 private:
     using ParsedPath = boost::container::small_vector<StringPool::Id, 8>;
-    using ParsedPathView = std::span<StringPool::Id>;
+    using ParsedPathView = std::span<const StringPool::Id>;
     using FieldList = boost::container::small_vector<FieldId, 8>;
     using Bitset = DynamicBitset<size_t, 1>;
 
@@ -1435,6 +1503,18 @@ private:
     }
 
     /**
+     * Returns true if the prefix of the given collection path can be an array.
+     */
+    bool canCollectionFieldPrefixBeArray(const ParsedPath& collectionPath) const {
+        if (collectionPath.size() <= 1) {
+            return false;
+        }
+        auto prefix =
+            buildDottedPath(ParsedPath(collectionPath.begin(), std::prev(collectionPath.end())));
+        return _canPathBeArray(prefix);
+    }
+
+    /**
      * Populate metadata when a base field is redefined.
      */
     void populateBaseFieldMetadata(FieldId newBaseField,
@@ -1841,6 +1921,50 @@ private:
     }
 
     /**
+     * Controls how 'forEachFieldBreadthFirst' proceeds after visiting a field.
+     */
+    enum class FieldVisit {
+        /// Keep traversing and descend into this field's subfields.
+        kContinue,
+        /// Keep traversing siblings but skip this field's subfields.
+        kPrune,
+        /// Stop the traversal entirely.
+        kStop,
+    };
+
+    /**
+     * Visits every known field in the scope in breadth-first order. The callback receives the
+     * field, its ancestor fields, and its dotted path, and returns a 'FieldVisit'.
+     */
+    template <std::invocable<FieldId, const FieldList&, const ParsedPath&> Callback>
+    void forEachFieldBreadthFirst(ScopeId scopeId, const Callback& cb) const {
+        std::deque<std::tuple<ScopeId, ParsedPath, FieldList>> queue;
+        queue.emplace_back(scopeId, ParsedPath{}, FieldList{});
+        while (!queue.empty()) {
+            auto [id, path, prefix] = std::move(queue.front());
+            queue.pop_front();
+            for (auto&& [nameId, fieldId] : _scopes[id].fields) {
+                if (!fieldId) {
+                    continue;
+                }
+                path.push_back(nameId);
+                auto visit = cb(fieldId, prefix, path);
+                if (visit == FieldVisit::kStop) {
+                    return;
+                }
+                if (visit == FieldVisit::kContinue) {
+                    if (auto embedded = _fields[fieldId].embeddedScope; embedded) {
+                        prefix.push_back(fieldId);
+                        queue.emplace_back(embedded, path, prefix);
+                        prefix.pop_back();
+                    }
+                }
+                path.pop_back();
+            }
+        }
+    }
+
+    /**
      * Truncates the graph so that it covers stages up to (excluding) 'newEndIt'.
      * Returns true if this was a valid truncation operation and 'newEndIt' points to a stage
      * covered in the graph already (or the first stage past the end).
@@ -2110,6 +2234,16 @@ const DependencyGraph* DependencyGraph::getSubpipelineGraph(const DocumentSource
 
 FieldOrigin DependencyGraph::resolveFieldOrigin(const DocumentSource* ds, PathRef path) const {
     return _impl->resolveFieldOrigin(ds, path);
+}
+
+boost::optional<FieldPath> DependencyGraph::getBaseDocumentFieldAlias(
+    const DocumentSource* ds, PathRef baseDocumentPath) const {
+    return _impl->getBaseDocumentFieldAlias(ds, baseDocumentPath);
+}
+
+OrderedPathSet DependencyGraph::getAllBaseDocumentFieldAliases_forTest(
+    const DocumentSource* ds, PathRef baseDocumentPath) const {
+    return _impl->getAllBaseDocumentFieldAliases(ds, baseDocumentPath);
 }
 
 void DependencyGraph::recompute_forTest(

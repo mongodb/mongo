@@ -7,6 +7,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -198,8 +199,37 @@ public:
     const DependencyGraph* getSubpipelineGraph(const DocumentSource* stage) const;
 
     /**
-     * Resolves 'path', as seen at the input of 'stage', back by a single hop toward its origin. If
-     * 'stage' is nullptr, the path is resolved as it appears at the end of the pipeline.
+     * Returns the field path, visible at the input of 'stage', that is a value-preserving alias of
+     * the base-document (collection) field 'baseDocumentPath'. If 'stage' is nullptr, resolves at
+     * the end of the pipeline. Returns boost::none when no visible alias exists.
+     *
+     * Prefix aliases are resolved: querying 'b.x' returns 'a.x' for {$project: {a: '$b'}}.
+     * When several aliases reach the queried path, the one that yields the fewest visible path
+     * components is returned, breaking ties lexicographically.
+     *
+     * Examples:
+     * 1. {$project: {a: '$b'}}
+     *    getBaseDocumentFieldAlias(nullptr, "b") -> "a"
+     *    getBaseDocumentFieldAlias(nullptr, "b.x") -> "a.x"
+     *    getBaseDocumentFieldAlias(nullptr, "c") -> boost::none (unknown field)
+     * 2. {$set: {a: '$b'}}
+     *    getBaseDocumentFieldAlias(nullptr, "b") -> "a"
+     * 3. {$project: {'p.q': '$a', r: '$a.x', s: '$a.x'}}
+     *    getBaseDocumentFieldAlias(nullptr, "a.x") -> "r"
+     *    'p.q' resolves to 'p.q.x', which is longer than 'r' and 's', and 'r' wins.
+     */
+    boost::optional<FieldPath> getBaseDocumentFieldAlias(const DocumentSource* stage,
+                                                         PathRef baseDocumentPath) const;
+
+    /**
+     * Like 'getBaseDocumentFieldAlias', but returns every aliasing path rather than the shortest.
+     */
+    OrderedPathSet getAllBaseDocumentFieldAliases_forTest(const DocumentSource* stage,
+                                                          PathRef baseDocumentPath) const;
+
+    /**
+     * Resolves 'path', as seen at the input of 'stage', back by a single hop toward its origin.
+     * If 'stage' is nullptr, the path is resolved as it appears at the end of the pipeline.
      *
      * See FieldOrigin for more information.
      */

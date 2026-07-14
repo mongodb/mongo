@@ -3425,5 +3425,210 @@ TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasThenSubpipeline) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasProject) {
+    setPipeline("[{$project: {a: '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("a"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x"), FieldPath("a.x"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x.y"), FieldPath("a.x.y"));
+        // A collection field that is not aliased has no visible alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), boost::none);
+        // The alias name itself is not a collection field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasSet) {
+    setPipeline("[{$set: {a: '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("a"));
+        // A collection field that is not aliased has no visible alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), boost::none);
+        // The alias name itself is not a collection field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasDottedSourceMaybeArrayPrefix) {
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        // Cannot resolve anything here, since 'b' might be array, therefore 'a' is not necessarily
+        // a value-preserving alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c.x"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasDottedSourceArrayFreePrefix) {
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c"), FieldPath("a"));
+        // A sub-path of the aliased collection path resolves through the prefix alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c.x"), FieldPath("a.x"));
+        // 'b' is only a prefix of the aliased path, not itself aliased, so it has no visible alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasVisiblePrefixMaybeArray) {
+    // 'b' is provably not an array, so the rename source is clean. But the visible alias 'a.q'
+    // sits under 'a', which might be an array, so reading 'a.q' would require array traversal and
+    // 'a.q' is not a value-preserving alias.
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {'a.q': '$b'}}]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasVisiblePrefixArrayFree) {
+    // Both 'b' (rename source) and 'a' (visible prefix) are provably not arrays, so the nested
+    // alias 'a.q' is a value-preserving alias of 'b'.
+    pathArrayness->addPath("b", {}, true);
+    pathArrayness->addPath("a", {}, true);
+    setPipeline("[{$set: {'a.q': '$b'}}]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("a.q")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasNestedTieBreakMaybeArrayPrefix) {
+    // Same pipeline as GetBaseDocumentFieldAliasNestedTieBreak, but without arrayness info the
+    // visible prefixes 'z' and 'y' might be arrays, so neither nested alias is reachable.
+    setPipeline("[{$set: {'z.a': '$x', 'y.b.c': '$x'}}]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), boost::none); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasOverwrittenIsNotVisibleAtEnd) {
+    setPipeline("[{$project: {a: '$b'}}, {$set: {a: 1}}]");
+    runTest([&] {
+        // At the end of the pipeline the alias is overwritten by the computed field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+        // But it is still visible at the input of the shadowing stage.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(stages[1].get(), "b"), FieldPath("a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasShadowedIsNotVisibleAtEnd) {
+    setPipeline("[{$project: {a: '$b'}}, {$set: {'a.x': 1}}]");
+    runTest([&] {
+        // At the end of the pipeline the alias is shadowed by the computed field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+        // But it is still visible at the input of the shadowing stage.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(stages[1].get(), "b"), FieldPath("a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasEmptyPipeline) {
+    setPipeline("[]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasTieBreaksLexicographically) {
+    // Three top-level aliases of 'x'; all have one component, so the lexicographically-first wins.
+    setPipeline("[{$set: {d: '$x', c: '$x', e: '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("c"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"c", "d", "e"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefersFewerComponents) {
+    // A top-level alias 'z' (1 component) is preferred over the nested alias 'a.c' (2).
+    pathArrayness->addPath("a", {}, true);
+    setPipeline("[{$set: {'a.c': '$x', z: '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("z"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"a.c", "z"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefersFewerComponentsTwoThree) {
+    pathArrayness->addPath("a.b", {}, true);
+    pathArrayness->addPath("z", {}, true);
+    setPipeline("[{$set: {'a.b.c': '$x', 'z.w': '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("z.w"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"a.b.c", "z.w"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasNestedTieBreak) {
+    // Only nested aliases exist: the shallower 'z.a' (2 components) beats 'y.b.c' (3).
+    // The visible prefixes must be provably non-array for the nested aliases to be reachable.
+    pathArrayness->addPath("z", {}, true);
+    pathArrayness->addPath("y", {}, true);
+    pathArrayness->addPath("y.b", {}, true);
+    setPipeline("[{$set: {'z.a': '$x', 'y.b.c': '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("z.a"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"y.b.c", "z.a"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefixThroughNestedField) {
+    // The visible prefix 'p' must be provably non-array for the nested alias 'p.q' to be reachable.
+    pathArrayness->addPath("p", {}, true);
+    setPipeline("[{$set: {'p.q': '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("p.q"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x"), FieldPath("p.q.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefersShorterCandidateOverPrefix) {
+    // 'p' aliases 'b.x' exactly (1 component); 'a' aliases 'b', reaching 'b.x' as 'a.x' (2).
+    // The shorter candidate 'p' wins. 'b' must be non-array so the dotted source 'b.x' resolves.
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {a: '$b', p: '$b.x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x"), FieldPath("p"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "b.x"),
+                  OrderedPathSet({"a.x", "p"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasChainedProjectsRenameSurvives) {
+    setPipeline(
+        "[{$project: {a: 1, b: 'string', renamed: '$c'}}, "
+        " {$project: {b: '$a', renamed: 1}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), FieldPath("b"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), FieldPath("renamed"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "renamed"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "otherField"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasInclusionProjectWithComputedField) {
+    setPipeline("[{$project: {x: '$a', y: {$add: ['$b', 1]}, z: '$c'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), FieldPath("x"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), FieldPath("z"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasExclusionProjectPreservesRename) {
+    setPipeline("[{$set: {renamed: '$c'}}, {$project: {c: 0}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), FieldPath("renamed"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "renamed"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "otherField"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasExclusionThenRenameOfPassthrough) {
+    setPipeline("[{$project: {a: 0}}, {$set: {c: '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("c"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), boost::none);
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
