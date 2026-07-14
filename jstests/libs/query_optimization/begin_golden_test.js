@@ -45,7 +45,7 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     const outputDirPlanRanking = (() => {
         switch (planRanker) {
             case "multiPlanning":
-                return relativePathToExpectedOutput;
+                return relativePathToExpectedOutput + "/" + planRanker;
             case "mixed":
                 return (
                     relativePathToExpectedOutput + "/" + planRanker + "/" + mixedPlanRankingStrategy
@@ -62,7 +62,7 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.
-        assert.fail(
+        doassert(
             "Both SBE and CBR expected outputs exist for " +
                 outputName +
                 ", cannot determine which one to use. ",
