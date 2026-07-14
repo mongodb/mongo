@@ -44,4 +44,22 @@ ExplainPolicy explainPolicyFor(ExplainOptions::Verbosity v) {
     MONGO_UNREACHABLE_TASSERT(10812000);
 }
 
+ExplainOptions::Verbosity mapV3ToLegacyVerbosity(ExplainOptions::Verbosity v) {
+    switch (v) {
+        case ExplainOptions::Verbosity::kPlanSummary:
+        case ExplainOptions::Verbosity::kPlannerChoice:
+            return ExplainOptions::Verbosity::kQueryPlanner;
+        case ExplainOptions::Verbosity::kPlannerStats:
+            return ExplainOptions::Verbosity::kExecAllPlans;
+        case ExplainOptions::Verbosity::kExecStatsV3:
+            return ExplainOptions::Verbosity::kExecStats;
+        case ExplainOptions::Verbosity::kQueryPlanner:
+        case ExplainOptions::Verbosity::kExecStats:
+        case ExplainOptions::Verbosity::kExecAllPlans:
+        case ExplainOptions::Verbosity::kInternal:
+            return v;
+    }
+    MONGO_UNREACHABLE_TASSERT(13076110);
+}
+
 }  // namespace mongo

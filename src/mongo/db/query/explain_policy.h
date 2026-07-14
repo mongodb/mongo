@@ -101,4 +101,16 @@ private:
  */
 ExplainPolicy explainPolicyFor(ExplainOptions::Verbosity v);
 
+/**
+ * Maps a requested (possibly V3) verbosity to the nearest legacy verbosity. Used only by the
+ * interim V3 explain hooks, which still delegate to the legacy generators; the mapping matches the
+ * legacy verbosities the pre-refactor dispatch passed explicitly (planSummary / plannerChoice ->
+ * queryPlanner, plannerStats -> execAllPlans, execStatsV3 -> execStats), and legacy verbosities map
+ * to themselves.
+ *
+ * TODO SERVER-130529 (find path) / SERVER-130810 (aggregation path): remove this once the real V3
+ * output format is produced directly instead of via legacy delegation.
+ */
+ExplainOptions::Verbosity mapV3ToLegacyVerbosity(ExplainOptions::Verbosity v);
+
 }  // namespace mongo

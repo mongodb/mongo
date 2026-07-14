@@ -8,6 +8,7 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
@@ -73,6 +74,25 @@ inline boost::optional<PlanExplainerData>& operator<<(boost::optional<PlanExplai
     *lhs << std::move(*rhs);
     return lhs;
 }
+
+/**
+ * One entry per-plan returned by PlanExplainer::getPlanEntries(): a single candidate plan's
+ * serialized stats tree plus its optional summary. Unlike the winner/rejected- shaped accessors,
+ * plan entries form one sequence (winner first), which is the shape of the V3 explain
+ * "plans[]" output is built over.
+ */
+struct ExplainPlanEntry {
+    // The plan's serialized stats tree, produced by the same per-plan formatting core as the legacy
+    // winning/rejected accessors.
+    BSONObj planStatsTree;
+    // Present when the explain policy requests execution stats; mirrors PlanStatsDetails::second.
+    boost::optional<PlanSummaryStats> summary;
+    // True for the winning (or sole) plan, false for the remaining candidates.
+    bool isWinner = false;
+    // TODO SERVER-130761 Later phases of SPM-4523 attach additional per-plan data
+    // (e.g. planningResult, terminationReason, score) via a per-candidate carrier added in a later
+    // phase.
+};
 
 
 /**
@@ -187,6 +207,21 @@ public:
      */
     virtual std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const = 0;
+
+    /**
+     * Returns a uniform per-plan view of the candidate plans: one ExplainPlanEntry per plan, the
+     * winning (or sole) plan first, followed by the remaining candidates. All entries are formatted
+     * by the same per-plan core as the legacy winning/rejected accessors, depending on 'policy'.
+     *
+     * This is the accessor the V3 explain output (SERVER-130529) builds its "plans[]" array
+     * over. The default implementation returns no entries. Explainers whose per-plan V3
+     * parity is deferred to later phases of SPM-4523 (SBE, Express) and explainers without
+     * candidate plans (the pipeline explainer) inherit it. PlanExplainerImpl provides the real
+     * implementation.
+     */
+    virtual std::vector<ExplainPlanEntry> getPlanEntries(const ExplainPolicy& policy) const {
+        return {};
+    }
 
     /**
      * Returns an object containing what query knobs the planner hit during plan enumeration. This

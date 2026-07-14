@@ -180,15 +180,14 @@ public:
     /**
      * The V3 analogue of writeExplainOps(): the hook where the new (version 3) pipeline "stages"
      * output will be produced. It is invoked in place of writeExplainOps() when a V3 explain
-     * verbosity is requested; the caller supplies the legacy verbosity whose output V3 currently
-     * reuses.
+     * verbosity is requested. It takes the real requested V3 verbosity and, for now, maps it to the
+     * nearest legacy verbosity internally and reuses writeExplainOps().
      *
-     * TODO SERVER-130810 Implement the V3 pipeline output format here. Until then this delegates to
-     * writeExplainOps(). Once implemented it should take the requested V3 verbosity rather than the
-     * legacy one (the legacy verbosity is a transitional artifact of the skeleton).
+     * TODO SERVER-130810 Implement the V3 pipeline output format here, replacing the interim
+     * mapV3ToLegacyVerbosity() delegation.
      */
-    std::vector<Value> writeExplainOpsV3(ExplainOptions::Verbosity legacyVerbosity) const {
-        return writeExplainOps(legacyVerbosity);
+    std::vector<Value> writeExplainOpsV3(ExplainOptions::Verbosity v3Verbosity) const {
+        return writeExplainOps(mapV3ToLegacyVerbosity(v3Verbosity));
     }
 
     boost::optional<std::string_view> getExecutorType() const override {

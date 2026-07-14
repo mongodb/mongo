@@ -187,15 +187,46 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
 }
 
 /**
+ * Appends the execution counters common to every stage (nReturned, works, needTime, ...). Only
+ * called when the policy requests execution stats.
+ *
+ * TODO SERVER-130529: this is the cleanly-separable "counters" portion of a stage's common stats.
+ * The per-stage-specific block in statsToBSON() below still interleaves structural fields
+ * (keyPattern, indexBounds, nss, ...) with execution counters (keysExamined, docsExamined, ...),
+ * and the relative order differs per stage type (e.g. COUNT_SCAN emits counters before its
+ * structural fields while IXSCAN emits structure first), so that block cannot be split into pure
+ * structure/counters emitters without reordering the output. SERVER-130529 (the V3 node serializer)
+ * must complete that separation so it can regroup the counters into the V3 shape; it is deferred
+ * here to keep this refactor byte-identical.
+ */
+void appendCommonExecStats(const PlanStageStats& stats, BSONObjBuilder* bob) {
+    bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
+    // Include the execution time if it was recorded.
+    appendExecutionTimeFields(*bob, stats.common.executionTime);
+
+    bob->appendNumber("works", static_cast<long long>(stats.common.works));
+    bob->appendNumber("advanced", static_cast<long long>(stats.common.advanced));
+    bob->appendNumber("needTime", static_cast<long long>(stats.common.needTime));
+    bob->appendNumber("needYield", static_cast<long long>(stats.common.needYield));
+    bob->appendNumber("saveState", static_cast<long long>(stats.common.yields));
+    bob->appendNumber("restoreState", static_cast<long long>(stats.common.unyields));
+    if (stats.common.failed)
+        bob->appendBool("failed", stats.common.failed);
+    bob->appendNumber("isEOF", stats.common.isEOF);
+}
+
+/**
  * Converts the stats tree 'stats' into a corresponding BSON object containing explain information.
  * If there is a MultiPlanStage node, skip that node, and follow the subplan at 'planIdx'.
  *
- * Generates the BSON stats at a verbosity specified by 'verbosity'.
+ * The content is gated by 'explainPolicy'. Shared helpers take an ExplainPolicy rather than a raw
+ * verbosity, so a caller can construct the policy once and pass it down (and so a future
+ * settings-delta is taken into account without re-deriving from a verbosity).
  */
 void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                  const cost_based_ranker::EstimateMap& estimates,
                  const PlanStageStats& stats,
-                 ExplainOptions::Verbosity verbosity,
+                 const ExplainPolicy& explainPolicy,
                  const boost::optional<size_t> planIdx,
                  BSONObjBuilder* bob,
                  BSONObjBuilder* topLevelBob,
@@ -203,8 +234,6 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     tassert(9378601, "encountered unexpected nullptr for BSONObjBuilder", bob);
     tassert(9378602, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
     tassert(9258801, "encountered unexpected nullptr for planStage", stats.common.planStage);
-
-    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
@@ -218,7 +247,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         statsToBSON(planStageQsnMap,
                     estimates,
                     *childStage,
-                    verbosity,
+                    explainPolicy,
                     planIdx,
                     bob,
                     topLevelBob,
@@ -270,22 +299,17 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
     // Some top-level exec stats get pulled out of the root stage.
     if (explainPolicy.hasExecStats()) {
-        bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
-        // Include the execution time if it was recorded.
-        appendExecutionTimeFields(*bob, stats.common.executionTime);
-
-        bob->appendNumber("works", static_cast<long long>(stats.common.works));
-        bob->appendNumber("advanced", static_cast<long long>(stats.common.advanced));
-        bob->appendNumber("needTime", static_cast<long long>(stats.common.needTime));
-        bob->appendNumber("needYield", static_cast<long long>(stats.common.needYield));
-        bob->appendNumber("saveState", static_cast<long long>(stats.common.yields));
-        bob->appendNumber("restoreState", static_cast<long long>(stats.common.unyields));
-        if (stats.common.failed)
-            bob->appendBool("failed", stats.common.failed);
-        bob->appendNumber("isEOF", stats.common.isEOF);
+        appendCommonExecStats(stats, bob);
     }
 
-    // Stage-specific stats
+    // Stage-specific stats.
+    //
+    // TODO SERVER-130529: the branches below interleave structural fields (keyPattern,
+    // indexBounds, nss, ...) with execution counters (keysExamined, docsExamined, ...), and the
+    // relative order differs per stage type. They are intentionally left fused here to keep the
+    // legacy output byte-identical.
+    // TODO SERVER-130529 the V3 node serializer must separate the structural emission from the
+    // counter emission so the counters can be regrouped into the V3 shape.
     if (STAGE_AND_HASH == stats.stageType) {
         AndHashStats* spec = static_cast<AndHashStats*>(stats.specific.get());
 
@@ -739,7 +763,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         statsToBSON(planStageQsnMap,
                     estimates,
                     *stats.children[0],
-                    verbosity,
+                    explainPolicy,
                     planIdx,
                     &childBob,
                     topLevelBob);
@@ -752,7 +776,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (auto& child : stats.children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(planStageQsnMap, estimates, *child, verbosity, planIdx, &childBob, topLevelBob);
+        statsToBSON(
+            planStageQsnMap, estimates, *child, explainPolicy, planIdx, &childBob, topLevelBob);
     }
     childrenBob.doneFast();
 }
@@ -997,10 +1022,10 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
 
 PlanExplainer::PlanStatsDetails PlanExplainerImpl::_formatPlanStats(
     const PlanStageStats* stats,
-    ExplainOptions::Verbosity verbosity,
+    const ExplainPolicy& explainPolicy,
     boost::optional<size_t> planIdx,
-    boost::optional<double> score) const {
-    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
+    boost::optional<double> score,
+    boost::optional<size_t> solutionHash) const {
     boost::optional<PlanSummaryStats> summary;
     if (explainPolicy.hasExecStats()) {
         summary = collectExecutionStatsSummary(stats, planIdx);
@@ -1009,16 +1034,15 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::_formatPlanStats(
         }
     }
 
-    const auto candidateSolutionHash = _solution ? _solution->hash() : 0;
-    bool isCached = _cachedPlanHash && _solution && (*_cachedPlanHash == candidateSolutionHash);
+    bool isCached = _cachedPlanHash && solutionHash && (*_cachedPlanHash == *solutionHash);
     BSONObjBuilder bob;
-    if (internalQueryAllowForcedPlanByHash.load() && _solution) {
-        bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
+    if (internalQueryAllowForcedPlanByHash.load() && solutionHash) {
+        bob.append("solutionHashUnstable", (long long)*solutionHash);
     }
     statsToBSON(_explainData.planStageQsnMap,
                 _explainData.estimates,
                 *stats,
-                verbosity,
+                explainPolicy,
                 planIdx,
                 &bob,
                 &bob,
@@ -1035,23 +1059,30 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     if (explainPolicy.hasAllPlansStats()) {
         score = getWinningPlanScore(_root);
     }
-
-    return _formatPlanStats(stats.get(), verbosity, winningPlanIdx, score);
+    boost::optional<size_t> solutionHash;
+    if (_solution) {
+        solutionHash = _solution->hash();
+    }
+    return _formatPlanStats(stats.get(), explainPolicy, winningPlanIdx, score, solutionHash);
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() const {
     if (_explainData.multiPlannerWinningPlanTrialStats) {
+        boost::optional<size_t> solutionHash;
+        if (_solution) {
+            solutionHash = _solution->hash();
+        }
         return _formatPlanStats(_explainData.multiPlannerWinningPlanTrialStats.get(),
-                                ExplainOptions::Verbosity::kExecAllPlans,
+                                explainPolicyFor(ExplainOptions::Verbosity::kExecAllPlans),
                                 boost::none,
-                                _explainData.multiPlannerWinningPlanScore);
+                                _explainData.multiPlannerWinningPlanScore,
+                                solutionHash);
     }
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
 
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
-    ExplainOptions::Verbosity verbosity) const {
-    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
+std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::_formatRejectedPlanStats(
+    const ExplainPolicy& explainPolicy) const {
     std::vector<PlanStatsDetails> res;
     // TODO SERVER-117119. Delete to make plan explainer multiplanner unaware. Leverage
     // _explainsData's contents.
@@ -1067,33 +1098,13 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
         for (size_t i = 0; i < mpsStats->children.size(); ++i) {
             if (i != *bestPlanIdx) {
                 const auto& candidate = mps->getCandidate(i);
-                const auto candidateSolutionHash = candidate.solution->hash();
-                bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidateSolutionHash);
-
-                BSONObjBuilder bob;
-                if (internalQueryAllowForcedPlanByHash.load()) {
-                    bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
+                boost::optional<double> score;
+                if (explainPolicy.hasAllPlansStats()) {
+                    score = mps->getCandidateScore(i);
                 }
                 auto stats = _root->getStats();
-                statsToBSON(_explainData.planStageQsnMap,
-                            _explainData.estimates,
-                            *stats,
-                            verbosity,
-                            i,
-                            &bob,
-                            &bob,
-                            isCached);
-                auto summary = [&]() -> boost::optional<PlanSummaryStats> {
-                    if (explainPolicy.hasExecStats()) {
-                        auto summary = collectExecutionStatsSummary(stats.get(), i);
-                        if (explainPolicy.hasAllPlansStats()) {
-                            summary.score = mps->getCandidateScore(i);
-                        }
-                        return summary;
-                    }
-                    return {};
-                }();
-                res.push_back({bob.obj(), summary});
+                res.push_back(_formatPlanStats(
+                    stats.get(), explainPolicy, i, score, candidate.solution->hash()));
             }
         }
     }
@@ -1101,35 +1112,51 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     for (size_t i = 0; i < _explainData.rejectedPlansWithStages.size(); ++i) {
         auto&& rejectedPlan = _explainData.rejectedPlansWithStages[i].planStage;
         auto&& rejectedSoln = _explainData.rejectedPlansWithStages[i].solution;
-        const auto candidateSolutionHash = rejectedSoln->hash();
-        bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidateSolutionHash);
-        BSONObjBuilder bob;
-        if (internalQueryAllowForcedPlanByHash.load()) {
-            bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
+        boost::optional<double> score;
+        if (explainPolicy.hasAllPlansStats()) {
+            score = rejectedSoln->score;
         }
         auto stats = rejectedPlan->getStats();
-        statsToBSON(_explainData.planStageQsnMap,
-                    _explainData.estimates,
-                    *stats,
-                    verbosity,
-                    i,
-                    &bob,
-                    &bob,
-                    isCached);
-        auto summary = [&]() -> boost::optional<PlanSummaryStats> {
-            if (explainPolicy.hasExecStats()) {
-                auto summary = collectExecutionStatsSummary(stats.get(), i);
-                if (explainPolicy.hasAllPlansStats()) {
-                    summary.score = rejectedSoln->score;
-                }
-                return summary;
-            }
-            return {};
-        }();
-        res.push_back({bob.obj(), summary});
+        res.push_back(_formatPlanStats(stats.get(), explainPolicy, i, score, rejectedSoln->hash()));
     }
 
     return res;
+}
+
+std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
+    ExplainOptions::Verbosity verbosity) const {
+    return _formatRejectedPlanStats(explainPolicyFor(verbosity));
+}
+
+std::vector<ExplainPlanEntry> PlanExplainerImpl::getPlanEntries(const ExplainPolicy& policy) const {
+    std::vector<ExplainPlanEntry> entries;
+
+    // The winning (or sole) plan first, formatted by the same per-plan core as getWinningPlanStats.
+    const auto winningPlanIdx = getWinningPlanIdx(_root);
+    auto winnerStats = _root->getStats();
+    boost::optional<double> winnerScore;
+    if (policy.hasAllPlansStats()) {
+        winnerScore = getWinningPlanScore(_root);
+    }
+    boost::optional<size_t> solutionHash;
+    if (_solution) {
+        solutionHash = _solution->hash();
+    }
+    auto winner =
+        _formatPlanStats(winnerStats.get(), policy, winningPlanIdx, winnerScore, solutionHash);
+    entries.push_back(
+        ExplainPlanEntry{std::move(winner.first), std::move(winner.second), /*isWinner*/ true});
+
+    // Then the remaining candidates, in the order produced by the rejected-plan enumeration.
+    // TODO(SERVER-130529): align this ordering with PlanRankingDecision::candidateOrder when the V3
+    // "plans[]" output is built. Nothing consumes getPlanEntries() yet, so the exact tie-break
+    // order is not observable.
+    for (auto&& details : _formatRejectedPlanStats(policy)) {
+        entries.push_back(ExplainPlanEntry{
+            std::move(details.first), std::move(details.second), /*isWinner*/ false});
+    }
+
+    return entries;
 }
 
 PlanStage* getStageByType(PlanStage* root, StageType type) {
@@ -1157,7 +1184,7 @@ std::vector<PlanExplainer::PlanStatsDetails> getCachedPlanStats(
 
     for (auto&& stats : decision.stats.candidatePlanStats) {
         BSONObjBuilder bob;
-        statsToBSON({}, {}, *stats, verbosity, winningPlanIdx, &bob, &bob);
+        statsToBSON({}, {}, *stats, explainPolicy, winningPlanIdx, &bob, &bob);
         res.push_back({bob.obj(),
                        {explainPolicy.hasExecStats(),
                         collectExecutionStatsSummary(stats.get(), winningPlanIdx)}});

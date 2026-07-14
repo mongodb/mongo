@@ -9,6 +9,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
@@ -51,6 +52,7 @@ public:
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
+    std::vector<ExplainPlanEntry> getPlanEntries(const ExplainPolicy& policy) const final;
     std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
                                                      ExplainOptions::Verbosity) const;
 
@@ -64,12 +66,23 @@ public:
 
 private:
     /**
-     * A helper that formats the plan stats into a BSON object and collects summary stats.
+     * The shared per-plan formatting core: serializes one plan's stats tree (depending on 'policy')
+     * and collects its summary stats. 'solutionHash', when present, is the plan's QuerySolution
+     * hash. It is used to decide the "isCached" flag and to emit "solutionHashUnstable". Reused by
+     * the winning-, rejected-, and per-plan-entry accessors.
      */
     PlanStatsDetails _formatPlanStats(const PlanStageStats* stats,
-                                      ExplainOptions::Verbosity verbosity,
+                                      const ExplainPolicy& policy,
                                       boost::optional<size_t> planIdx,
-                                      boost::optional<double> score) const;
+                                      boost::optional<double> score,
+                                      boost::optional<size_t> solutionHash) const;
+
+    /**
+     * Enumerates and formats the rejected candidate plans (the MultiPlanStage trial plans followed
+     * by any stored rejected plans), each via _formatPlanStats(). Shared by
+     * getRejectedPlansStats().
+     */
+    std::vector<PlanStatsDetails> _formatRejectedPlanStats(const ExplainPolicy& policy) const;
 
     PlanStage* const _root;
     boost::optional<size_t> _cachedPlanHash;
