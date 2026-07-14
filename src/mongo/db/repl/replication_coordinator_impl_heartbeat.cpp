@@ -339,8 +339,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
     if (responseStatus.isOK()) {
         networkTime = cbData.response.elapsed.value_or(Microseconds{0});
-        // TODO (SERVER-123321): Because the term is duplicated in ReplSetMetaData, we can get rid
-        // of this and update tests.
         const auto& hbResponse = hbStatusResponse.getValue();
         _updateTerm(lk, hbResponse.getTerm());
         // Postpone election timeout if we have a successful heartbeat response from the primary.
