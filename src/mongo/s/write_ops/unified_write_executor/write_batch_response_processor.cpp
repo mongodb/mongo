@@ -7,7 +7,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
-#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -1429,19 +1428,10 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
         resp.setWriteConcernError(new WriteConcernErrorDetail{totalWcError->toStatus()});
     }
 
-    // This is a write being re-routed inside the internal transaction used for a retryable
-    // time-series update. The originating router stamped 'includeQueryStatsMetrics' on the request,
-    // so the aggregated metrics must be echoed back to it. Internal sessions for retryable writes
-    // are server-created and cannot be forged by users.
-    const auto& lsid = opCtx->getLogicalSessionId();
-    const bool isRetryableWriteInternalTransaction =
-        lsid && isInternalSessionForRetryableWrite(*lsid);
-
-    // Append query stats metrics so a parent that requested them can receive and aggregate them.
-    // This happens in two cases:
-    //   1. This node is a primary shard processing a command forwarded from a router.
-    //   2. This is a write inside the internal transaction for a retryable write.
-    if (opCtx->isCommandForwardedFromRouter() || isRetryableWriteInternalTransaction) {
+    // Append query stats metrics if the command is forwarded from router (the current node is a
+    // primary shard) such that router can receive and aggregate the metrics there.
+    // Otherwise, ignore if the current node is a router.
+    if (opCtx->isCommandForwardedFromRouter()) {
         auto& opDebug = CurOp::get(opCtx)->debug();
         resp.setQueryStatsMetrics(opDebug.gatherQueryStatsMetricsForBatchWrites());
     }

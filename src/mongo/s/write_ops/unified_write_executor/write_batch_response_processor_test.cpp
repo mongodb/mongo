@@ -12,7 +12,6 @@
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/session_catalog_router.h"
@@ -2704,68 +2703,6 @@ TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromMul
 
     auto& opDebug = CurOp::get(opCtx)->debug();
     assertQueryStatsAggregated(opDebug, 0, 25, 13);  // 10+15, 5+8
-}
-
-// When the write runs inside the internal transaction used to dispatch a retryable write (i.e. the
-// opCtx is under a server-created internal session for a retryable write), the aggregated query
-// stats metrics must be echoed back in the response so the originating router can record them.
-// See SERVER-129911.
-TEST_F(WriteBatchResponseProcessorTest,
-       QueryStatsMetricsEchoedBackInsideRetryableWriteInternalTransaction) {
-    opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
-
-    auto updateRequest = write_ops::UpdateCommandRequest(
-        nss1,
-        {write_ops::UpdateOpEntry(BSON("_id" << 0),
-                                  write_ops::UpdateModification(BSON("a" << 0)))});
-    auto request = BatchedCommandRequest(updateRequest);
-
-    auto resp = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
-    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
-
-    CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
-
-    WriteCommandRef cmdRef(request);
-    Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats);
-    processor.onWriteBatchResponse(
-        opCtx,
-        routingCtx,
-        SimpleWriteBatchResponse{
-            {{shard1Name,
-              ShardResponse::make(rcr, {WriteOp(request, 0)}, false /*inTransaction*/)}}});
-
-    auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
-    ASSERT_TRUE(reply.areQueryStatsMetricsSet());
-    ASSERT_EQ(reply.getQueryStatsMetrics().size(), 1u);
-}
-
-// On the originating router (no internal session and the command was not forwarded from another
-// router), query stats metrics are recorded locally and must NOT be echoed back in the response.
-TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsNotEchoedBackOnTopLevelRouter) {
-    auto updateRequest = write_ops::UpdateCommandRequest(
-        nss1,
-        {write_ops::UpdateOpEntry(BSON("_id" << 0),
-                                  write_ops::UpdateModification(BSON("a" << 0)))});
-    auto request = BatchedCommandRequest(updateRequest);
-
-    auto resp = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
-    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
-
-    CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
-
-    WriteCommandRef cmdRef(request);
-    Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats);
-    processor.onWriteBatchResponse(
-        opCtx,
-        routingCtx,
-        SimpleWriteBatchResponse{
-            {{shard1Name,
-              ShardResponse::make(rcr, {WriteOp(request, 0)}, false /*inTransaction*/)}}});
-
-    auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
-    ASSERT_FALSE(reply.areQueryStatsMetricsSet());
 }
 
 }  // namespace
