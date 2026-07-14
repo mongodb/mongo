@@ -61,7 +61,7 @@ TimeseriesTest.run((insert) => {
 
         jsTestLog("Collection stats for " + coll.getFullName() + ": " + tojson(coll.stats()));
 
-        if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
+        if (TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
             assert.eq(2, bucketDocs.length, tojson(bucketDocs));
 
             // Check both buckets.

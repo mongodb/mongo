@@ -139,7 +139,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:22:02.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:59:59.999Z")}));
     let bucketCount = getTimeseriesCollForRawOps(coll).find().rawData().itcount();
-    if (TestData.runningWithBalancer) {
+    if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
         assert.lte(2, bucketCount);
     } else {
         assert.eq(2, bucketCount);
@@ -185,7 +185,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T20:59:59.999Z")}));
     let bucketCount = getTimeseriesCollForRawOps(coll).find().rawData().itcount();
-    if (TestData.runningWithBalancer) {
+    if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
         assert.lte(2, bucketCount);
     } else {
         assert.eq(2, bucketCount);
@@ -230,7 +230,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T19:59:59.999Z")}));
     let bucketCount = getTimeseriesCollForRawOps(coll).find().rawData().itcount();
-    if (TestData.runningWithBalancer) {
+    if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
         assert.lte(2, bucketCount);
     } else {
         assert.eq(2, bucketCount);

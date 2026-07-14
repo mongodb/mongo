@@ -419,7 +419,7 @@ export var TimeseriesTest = class {
         if (TestData.runningWithBalancer) {
             // If we are running with moveCollection in the background, we may run into the issue
             // described by SERVER-89349 which can result in more bucket documents than needed.
-            return true;
+            return false;
         }
 
         if (
@@ -428,9 +428,9 @@ export var TimeseriesTest = class {
             TestData.sessionOptions.retryWrites
         ) {
             // TODO SERVER-119937 FCV upgrade/downgrade and retriable writes causes more buckets to be created
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     /**
@@ -440,7 +440,7 @@ export var TimeseriesTest = class {
      * counts in this test to be accurate.
      */
     static createTimeFieldIndexToAllowBucketsReopening(coll) {
-        if (!this.canAssumeCanonicalTimeseriesBucketsLayout()) {
+        if (this.canAssumeCanonicalTimeseriesBucketsLayout()) {
             return;
         }
 

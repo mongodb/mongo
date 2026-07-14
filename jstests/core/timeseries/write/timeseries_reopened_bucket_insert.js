@@ -43,13 +43,14 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     assert.commandWorked(coll.insert(measurement));
 
     stats = assert.commandWorked(coll.stats());
-    assert(stats.timeseries);
-    assert.eq(stats.timeseries["bucketCount"], expectedBucketCount);
-    if (TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
+    assert.hasFields(stats, ["timeseries"]);
+    if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
         // When resharding is happening in the background, it can cause errors that result in
         // operations being retried and the bucket reopening count being too high.
+        assert.gte(stats.timeseries["bucketCount"], expectedBucketCount);
         assert.gte(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
     } else {
+        assert.eq(stats.timeseries["bucketCount"], expectedBucketCount);
         assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
     }
 };
