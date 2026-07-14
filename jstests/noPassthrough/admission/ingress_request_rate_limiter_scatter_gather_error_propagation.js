@@ -246,11 +246,16 @@ describe("scatter-gather queries with ingress rate limiter", function () {
                     ),
                     kRetryAttempts + 1,
                 );
-                assert.eq(
+                // An overload error is not always followed by a retry: the terminal error, and any
+                // error received after the concurrent shard called stopRetrying(), is counted
+                // without a corresponding retry attempt.
+                assert.between(
+                    Math.min(shard0Diff.numOverloadErrorsReceived - 1, kRetryAttempts),
                     shard0Diff.numRetriesDueToOverloadAttempted,
                     Math.min(shard0Diff.numOverloadErrorsReceived, kRetryAttempts),
                 );
-                assert.eq(
+                assert.between(
+                    Math.min(shard1Diff.numOverloadErrorsReceived - 1, kRetryAttempts),
                     shard1Diff.numRetriesDueToOverloadAttempted,
                     Math.min(shard1Diff.numOverloadErrorsReceived, kRetryAttempts),
                 );
