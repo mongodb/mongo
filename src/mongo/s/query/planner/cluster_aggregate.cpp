@@ -1286,6 +1286,10 @@ void handleViewKickback(
         opCtx,
         "hangBeforeRetryingAggregateAfterViewKickback");
 
+    tassert(12941000,
+            "Expected a non-null IncrementalFeatureRolloutContext when handling a view kickback",
+            ifrContext);
+
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
         txnRouter.onViewResolutionError(opCtx, requestedNss);
     }
@@ -1296,7 +1300,7 @@ void handleViewKickback(
     // resolution information.
     // TODO SERVER-121094 Remove when feature flag is removed.
     auto kickedBackView = ex.extraInfo<ResolvedNamespace>();
-    const bool hybridSearchFlagEnabled = ifrContext &&
+    const bool hybridSearchFlagEnabled =
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
 
     bool foundNewViewEntry = false;
