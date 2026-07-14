@@ -28,7 +28,9 @@ using PathId = uint16_t;
 using PredicateId = uint16_t;
 
 struct ResolvedPath {
+    // The join graph node this path originates from.
     NodeId nodeId;
-    FieldPath fieldName;
+    // Field path directly on the base collection that the join node 'nodeId' refers to.
+    FieldPath underlyingFieldPath;
 };
 }  // namespace mongo::join_ordering

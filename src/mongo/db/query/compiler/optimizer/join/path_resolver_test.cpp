@@ -22,7 +22,7 @@ void validatePath(boost::optional<PathId> id,
     ASSERT_LT(*id, pr.resolvedPaths().size());
     const auto& path = pr.resolvedPaths()[*id];
     ASSERT_EQ(path.nodeId, expectedNodeId);
-    ASSERT_EQ(path.fieldName.fullPath(), expectedPath);
+    ASSERT_EQ(path.underlyingFieldPath.fullPath(), expectedPath);
 }
 
 // Resolve, validate actual path value, then verify that a second resolution yields the same path

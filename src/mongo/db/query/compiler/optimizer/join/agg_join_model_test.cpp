@@ -765,7 +765,7 @@ TEST_F(PipelineAnalyzerTest, LetLocalFieldPrefixedByAsField) {
     const auto& resolvedPaths = joinModel.getResolvedPaths();
     bool foundLocalOnBase = false;
     for (const auto& rp : resolvedPaths) {
-        if (rp.fieldName.fullPath() == "X.y") {
+        if (rp.underlyingFieldPath.fullPath() == "X.y") {
             ASSERT_EQ((NodeId)0, rp.nodeId);
             foundLocalOnBase = true;
         }

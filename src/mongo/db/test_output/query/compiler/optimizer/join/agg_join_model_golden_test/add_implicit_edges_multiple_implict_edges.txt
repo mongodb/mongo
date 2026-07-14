@@ -146,19 +146,19 @@ output: {
     "resolvedPaths": [
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "a"
+            "underlyingFieldPath": "a"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "a"
+            "underlyingFieldPath": "a"
         },
         {
             "nodeId": {"$numberInt":"2"},
-            "fieldName": "b"
+            "underlyingFieldPath": "b"
         },
         {
             "nodeId": {"$numberInt":"3"},
-            "fieldName": "c"
+            "underlyingFieldPath": "c"
         }
     ],
     "prefix": [

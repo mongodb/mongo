@@ -115,7 +115,7 @@ std::shared_ptr<const IndexCatalogEntry> bestIndexSatisfyingJoinPredicates(
             const auto pathId = edge.left == nodeId ? pred.left : pred.right;
             indexedJoinPreds.push_back({
                 .op = convertToPhysicalOperator(pred.op),
-                .field = ctx.resolvedPaths[pathId].fieldName,
+                .field = ctx.resolvedPaths[pathId].underlyingFieldPath,
             });
         }
 

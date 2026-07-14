@@ -116,9 +116,9 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
                 "join predicate selectivity estimation only supported for equality",
                 joinPred.isEquality());
         auto pathId = smallerCardIsLeft ? joinPred.left : joinPred.right;
-        fields.push_back({.path = ctx.resolvedPaths[pathId].fieldName,
+        fields.push_back({.path = ctx.resolvedPaths[pathId].underlyingFieldPath,
                           .isExprEq = joinPred.op == JoinPredicate::Operator::ExprEq});
-        fieldNames.emplace(ctx.resolvedPaths[pathId].fieldName);
+        fieldNames.emplace(ctx.resolvedPaths[pathId].underlyingFieldPath);
     }
 
     // Get sampling estimator for the "primary key" collection

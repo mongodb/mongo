@@ -38,19 +38,19 @@
     "resolvedPaths": [
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "foo"
+            "underlyingFieldPath": "foo"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "foo"
+            "underlyingFieldPath": "foo"
         },
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "bar"
+            "underlyingFieldPath": "bar"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "bar"
+            "underlyingFieldPath": "bar"
         }
     ],
     "prefix": [

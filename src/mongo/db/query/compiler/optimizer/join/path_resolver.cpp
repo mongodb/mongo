@@ -46,7 +46,7 @@ boost::optional<PathId> PathResolver::addPathOrGetExisting(ResolvedPath path) {
     }
 
     auto& resolvedPaths = it->second.resolvedPaths;
-    if (auto pathIt = resolvedPaths.find(path.fieldName); pathIt != resolvedPaths.end()) {
+    if (auto pathIt = resolvedPaths.find(path.underlyingFieldPath); pathIt != resolvedPaths.end()) {
         // We already know this path!
         return pathIt->second;
     }
@@ -57,7 +57,7 @@ PathId PathResolver::addPath(ResolvedPath path) {
     PathId id = _resolvedPaths.size();
     auto it = _nodeLookups.find(path.nodeId);
     tassert(12835901, "Expected to know of this node already", it != _nodeLookups.end());
-    it->second.resolvedPaths.try_emplace(path.fieldName, id);
+    it->second.resolvedPaths.try_emplace(path.underlyingFieldPath, id);
     _resolvedPaths.push_back(std::move(path));
     return id;
 }
@@ -175,7 +175,7 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
         graph = _graph.getSubpipelineGraph(_nodeLookups[resolved->nodeId].sourceLookup);
         tassert(12836400, "Expected to find a dependency graph for lookup", graph);
 
-        if (graph->getPrevModifyingStage(nullptr, resolved->fieldName.fullPath())) {
+        if (graph->getPrevModifyingStage(nullptr, resolved->underlyingFieldPath.fullPath())) {
             // This path was modified at some point by our sub-pipeline! Bail.
             return boost::none;
         }

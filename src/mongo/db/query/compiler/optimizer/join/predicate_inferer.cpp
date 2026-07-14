@@ -265,7 +265,7 @@ StatusWith<std::unique_ptr<MatchExpression>> finalizeSTPForTargetNode(
 
     auto& targetNode = graph.getNode(resolvedPaths[pathId].nodeId);
     auto targetNodeExpCtx = targetNode.accessPath->getExpCtx().get();
-    const auto& targetFieldName = resolvedPaths[pathId].fieldName;
+    const auto& targetFieldName = resolvedPaths[pathId].underlyingFieldPath;
     // Step 1: Get a MatchExpression, regardless of which alternative pred holds.
     std::unique_ptr<MatchExpression> matchExpr = std::visit(
         [&](const auto& singletablepreciate) -> std::unique_ptr<MatchExpression> {
@@ -406,7 +406,7 @@ boost::optional<SingleTablePredResult> extractSingleTablePredicateFromEquivclass
 
         if (!cq->getPrimaryMatchExpression()->isTriviallyTrue()) {
             // There is a single table predicate (STP) on this node.
-            auto& fieldName = resolvedPaths[pathId].fieldName;
+            auto& fieldName = resolvedPaths[pathId].underlyingFieldPath;
             // Confirm that the STP is indeed on the field that is associated with this
             // equivalence class.
             if (auto pred = getSingleTablePredicateForField(

@@ -91,8 +91,8 @@ TEST_F(ReorderGraphTest, SimpleGraph) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -114,9 +114,9 @@ TEST_F(ReorderGraphTest, TwoJoins) {
         {.collName = "c", .embedPath = FieldPath{"c"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id3, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -139,8 +139,8 @@ TEST_F(ReorderGraphTest, SimpleINLJ) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -162,8 +162,8 @@ TEST_F(ReorderGraphTest, SimpleINLJSwapEdge) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     // Swap edge dir compared to previous.
@@ -190,9 +190,9 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
         {.collName = "c", .embedPath = FieldPath{"c"}, .filter = {}, .indexes = {BSON("c" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id3, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -240,10 +240,10 @@ TEST_F(ReorderGraphTest, JoinWithDeps) {
         {.collName = "f2", .embedPath = FieldPath{"f2"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
-        ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id3, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*f1.a*/);
@@ -268,8 +268,8 @@ TEST_F(ReorderGraphTest, INLJResidualPred) {
                                     .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -293,8 +293,8 @@ TEST_F(ReorderGraphTest, INLJUseIndexPrefix) {
                                     .indexes = {BSON("b" << 1 << "c" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -317,8 +317,8 @@ TEST_F(ReorderGraphTest, AvoidINLJOverIneligibleIndex) {
                                     .indexes = {BSON("b" << 1 << "c" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.c*/);
@@ -352,10 +352,10 @@ TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
                                     .indexes = {BSON("c" << 1 << "d" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"d"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"d"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 2 /*b.c*/);
@@ -564,8 +564,8 @@ TEST_F(CachedJoinPlanTest, INLJJoinNodeToCachedJoinNode) {
         {.collName = "b", .embedPath = {}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
 
@@ -606,8 +606,8 @@ TEST_F(CachedJoinPlanTest, HJTwoBaseNodesToCachedJoinNode) {
 
     // PathId 0 maps to field "x" on node A; PathId 1 maps to field "y" on node B.
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"x"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"y"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"x"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"y"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*x*/, 1 /*y*/);
 
@@ -648,8 +648,8 @@ TEST_F(CachedJoinPlanTest, EmbeddingFieldPreserved) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
 
@@ -681,9 +681,9 @@ TEST_F(CachedJoinPlanTest, NestedJoinNodeThreeCollections) {
     auto idC = addNssWithEmbedding({.collName = "c", .embedPath = {}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = idC, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idC, .underlyingFieldPath = FieldPath{"c"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
     graph.addSimpleEqualityEdge(idB, idC, 1 /*b*/, 2 /*c*/);
@@ -755,8 +755,8 @@ TEST_F(CachedJoinPlanTest, INLJJoinRoundTrip) {
         {.collName = "b", .embedPath = {}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
 
@@ -792,8 +792,8 @@ TEST_F(CachedJoinPlanTest, HJTwoBaseNodesRoundTrip) {
     auto idB = addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"x"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"y"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"x"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"y"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*x*/, 1 /*y*/);
 
@@ -838,8 +838,8 @@ TEST_F(CachedJoinPlanTest, EmbeddingFieldPreservedRoundTrip) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
 
@@ -880,9 +880,9 @@ TEST_F(CachedJoinPlanTest, NestedJoinRoundTrip) {
     auto idC = addNssWithEmbedding({.collName = "c", .embedPath = {}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = idC, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idC, .underlyingFieldPath = FieldPath{"c"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
     graph.addSimpleEqualityEdge(idB, idC, 1 /*b*/, 2 /*c*/);
@@ -934,7 +934,7 @@ TEST_F(CachedJoinPlanTest, SelfJoinRoundTrip) {
         {.collName = "a", .embedPath = FieldPath("a"), .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"x"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"x"}},
     };
     graph.addSimpleEqualityEdge(idA, idA2, 0, 0);
 
@@ -972,8 +972,8 @@ TEST_F(CachedJoinPlanTest, ConstructSolutionBottomUpPopulatesCachedJoinPlan) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = idA, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
     };
     graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b.b*/);
 

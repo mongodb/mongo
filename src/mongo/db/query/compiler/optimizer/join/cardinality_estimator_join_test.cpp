@@ -24,8 +24,8 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
     auto bNodeId = *mgraph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
-    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
-    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "foo"});
 
     mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
 
@@ -65,8 +65,8 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
     auto bNodeId = *mgraph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
-    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
-    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "foo"});
 
     mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
 
@@ -106,10 +106,10 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     auto bNodeId = *mgraph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
-    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
-    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
-    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "bar"});
-    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "bar"});
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "bar"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "bar"});
 
     // a.foo = b.foo && a.bar = b.bar
     mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
@@ -322,8 +322,8 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
     auto bNodeId = *graph.addNode(bNss, nullptr, FieldPath{"b"});
 
     // The edge represents a.foo == b.bar.
-    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
-    resolvedPaths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "bar"});
+    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    resolvedPaths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "bar"});
     graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
 
     // Establish that |a| is smaller, so that we will use it for NDV estimation.
@@ -364,9 +364,9 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFieldsCompoundJo
     auto bNodeId = *graph.addNode(bNss, nullptr, FieldPath{"b"});
 
     // Compound edge is a.foo == b.baz && a.bar == foo.baz.
-    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});  // 0
-    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "bar"});  // 1
-    resolvedPaths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "baz"});  // 2
+    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});  // 0
+    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "bar"});  // 1
+    resolvedPaths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "baz"});  // 2
     graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 2);
     graph.addSimpleEqualityEdge(aNodeId, bNodeId, 1, 2);
 

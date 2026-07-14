@@ -58,7 +58,7 @@ JoinPlanCacheKey makeJoinPlanCacheKey(const join_ordering::JoinGraph& graph,
 
     auto encodeResolvedPath = [&](const join_ordering::ResolvedPath& path, StringBuilder& sb) {
         sb << kEncodeChildrenBegin << path.nodeId << ',';
-        encodeUserString(path.fieldName.fullPath(), &sb);
+        encodeUserString(path.underlyingFieldPath.fullPath(), &sb);
         sb << kEncodeChildrenEnd;
     };
 
