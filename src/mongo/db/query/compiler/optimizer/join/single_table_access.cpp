@@ -41,7 +41,9 @@ SamplingEstimatorMap makeSamplingEstimators(
                     qkc.getNumChunksForChunkBasedSampling(),
                     ce::CardinalityEstimate{numRecords,
                                             cost_based_ranker::EstimationSource::Metadata},
-                    joinExpCtx);
+                    joinExpCtx,
+                    SamplingSourceEnum::kPersistentSample,
+                    qkc.getInternalJoinOptimizationSamplingCEMethod());
 
             // Generate a sample for the fields relevant to this join.
             // TODO SERVER-112233: figure out based on join predicates which fields exactly we need.

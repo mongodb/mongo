@@ -165,4 +165,5 @@ executor:
         featureFlagCostBasedRanker: true
         internalQueryCBRCEMode: "samplingCE"
         internalQuerySamplingCEMethod: "random"
+        internalQuerySamplingCEMethodForPersistentSamples: "random"
         internalQuerySamplingBySequentialScan: true

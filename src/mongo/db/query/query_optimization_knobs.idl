@@ -1139,8 +1139,8 @@ server_parameters:
     internalQuerySamplingCEMethod:
         mod_visibility: public
         description: >-
-            Control sampling CE method. There two supported sampling CE method, random and
-            chunk-based.
+            Control sampling CE method for on-the-fly sampling behavior. There are two supported
+            sampling CE methods, random and chunk-based.
         set_at: [startup, runtime]
         cpp_class:
             name: CBRSamplingCEMethod
@@ -1151,6 +1151,25 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: samplingCEMethod
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    internalQuerySamplingCEMethodForPersistentSamples:
+        mod_visibility: public
+        description: >-
+            Control which sampling method the persistent-sample read path attempts to load before
+            falling back to on-the-fly sampling.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: PersistentSampleCEMethod
+            data: WithOnUpdateHook<synchronized_value<SamplingCEMethodEnum>>
+        default:
+            expr: SamplingCEMethodEnum::kRandom
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingCEMethodForPersistentSamples
                 pqs_settable: true
                 fcv:
                     min: "9.0"
