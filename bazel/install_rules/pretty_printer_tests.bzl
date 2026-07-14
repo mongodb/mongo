@@ -5,7 +5,7 @@ load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
 def mongo_pretty_printer_test_impl(ctx):
     split_name = ctx.label.name.split("-")
 
-    # eg optimizer_gdb_test
+    # eg query_pretty_printers_gdb_test
     short_name = split_name[-1]
 
     final_output_directory = "bazel-bin/install/bin/"

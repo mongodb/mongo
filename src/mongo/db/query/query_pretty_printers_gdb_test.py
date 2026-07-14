@@ -34,9 +34,9 @@ if __name__ == "__main__":
         gdb.execute("run")
         gdb.execute("frame function main")
 
-        # These tests work in tandem with the test binary 'optimizer_gdb_test_program'. Each test
-        # case inspects a local variable by invoking the appropriate pretty printer and comparing
-        # to the expected output.
+        # These tests work in tandem with the test binary
+        # 'query_pretty_printers_gdb_test_program'. Each test case inspects a local variable by
+        # invoking the appropriate pretty printer and comparing to the expected output.
 
         assertPrintedOutput(
             "testABT",
@@ -48,6 +48,12 @@ if __name__ == "__main__":
             + '|   Constant["1"], \n'
             + 'Constant["0"]\n',
         )
+
+        # Cost-based ranker estimate printers.
+        assertPrintedOutput("testCE", "Cardinality: 100, Source: Histogram")
+        assertPrintedOutput("testCost", "Cost: 25.5, Source: Code")
+        assertPrintedOutput("testCostCoeff", "Cost coefficient: 0.5, Source: Code")
+        assertPrintedOutput("testSelectivity", "Selectivity: 0.25, Source: Sampling")
 
         gdb.write("TEST PASSED\n")
     except Exception as err:
