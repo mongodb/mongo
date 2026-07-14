@@ -83,7 +83,6 @@ structs:
                 description: >-
                     The sampling strategy applied to spans that are sampled by default and to
                     sampled spans that don't specify a samplingStrategy.
-                    TODO(SERVER-127466): Add relevant span names.
                     TODO(SERVER-127467): Add relevant span names.
                     TODO(SERVER-127468): Add relevant span names.
                 type: OpenTelemetryTracingSamplingStrategy
