@@ -1919,7 +1919,8 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
                 expCtx,
                 std::move(pipelineToTarget),
                 aggRequest,
-                getPipelineDataSource(LiteParsedPipeline(aggRequest)),
+                getPipelineDataSource(LiteParsedPipeline(
+                    aggRequest, false, LiteParserOptions{.ifrContext = expCtx->getIfrContext()})),
                 routingCtx,
                 shardCursorsSortSpec,
                 shardTargetingPolicy,

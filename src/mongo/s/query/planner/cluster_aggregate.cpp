@@ -602,6 +602,7 @@ Status _parseQueryStatsAndReturnEmptyResult(
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
     bool alreadyDesugared = false,
     ResolvedNamespaceMap preResolvedNamespaces = {}) {
 
@@ -650,7 +651,7 @@ Status _parseQueryStatsAndReturnEmptyResult(
                                                originalRequest,
                                                verbosity,
                                                alreadyDesugared,
-                                               nullptr /* ifrContext */,
+                                               std::move(ifrContext),
                                                std::move(preResolvedNamespaces));
 
         pipeline->validateCommon(false);
@@ -710,6 +711,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                 originalRequest,
                 verbosity,
                 res,
+                ifrContext,
                 alreadyDesugared,
                 std::move(preResolvedNamespaces));
         }
@@ -1592,6 +1594,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                         state.originalRequest,
                                                         verbosity,
                                                         result,
+                                                        ifrContext,
                                                         state.alreadyDesugared,
                                                         state.preResolvedNamespaces);
         }

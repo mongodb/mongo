@@ -8,6 +8,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/generic_argument_gen.h"
@@ -220,6 +221,44 @@ TEST_F(InstallIfrContextFromWireTest, SecondInstallWithIfrFlagsIsNoopAndPreserve
 
     installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
     ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), first);
+}
+
+TEST_F(InstallIfrContextFromWireTest, NestedDirectClientGetDoesNotMaskOuterWireInstall) {
+    // A pre-parse nested DBDirectClient op calls get() on the shared opCtx before the parent
+    // installs its wire context. get() must hand it a detached context rather than materializing
+    // the decoration; otherwise the parent's wire flag values are silently discarded by the
+    // install-once check.
+    _opCtx->getClient()->setInDirectClient(true);
+    auto nestedCtx = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_TRUE(nestedCtx);
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::isInstalled(_opCtx.get()));
+
+    _opCtx->getClient()->setInDirectClient(false);
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_NE(ctx.get(), nestedCtx.get());
+}
+
+TEST_F(InstallIfrContextFromWireTest, WireFlagValueSurvivesNestedDirectClientGet) {
+    // The wire value must win over the node-local default even after a nested direct-client get()
+    // ran first: featureFlagReleaseForTest defaults true locally, so a wire value of false proves
+    // the parent's wire install was not masked.
+    auto& flag = feature_flags::gFeatureFlagReleaseForTest;
+    GenericArguments args;
+    args.setIfrFlags(std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << false)});
+
+    _opCtx->getClient()->setInDirectClient(true);
+    (void)IncrementalFeatureRolloutContext::get(_opCtx.get());
+
+    _opCtx->getClient()->setInDirectClient(false);
+    installIfrContextFromWire(_opCtx.get(), args);
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_FALSE(ctx->getSavedFlagValue(flag));
 }
 
 }  // namespace
