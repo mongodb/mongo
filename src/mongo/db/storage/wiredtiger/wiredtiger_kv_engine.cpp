@@ -2202,6 +2202,10 @@ void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session) try {
         return;
     }
 
+    // Must be computed before taking _checkpointMutex. This creates a Client, and taking the
+    // ServiceContext mutex under _checkpointMutex is a lock-order inversion.
+    auto oplogNeededForRollback = getOplogNeededForRollback();
+
     // Limits the actions of concurrent checkpoint callers as we update some internal data
     // during a checkpoint. WT has a mutex of its own to only have one checkpoint active at all
     // times so this is only to protect our internal updates.
@@ -2262,8 +2266,6 @@ void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session) try {
                            "Stable timestamp hasn't advanced, skipping a checkpoint.",
                            "stableTimestamp"_attr = stableTimestamp);
     } else {
-        auto oplogNeededForRollback = getOplogNeededForRollback();
-
         LOGV2_FOR_RECOVERY(23986,
                            2,
                            "Performing stable checkpoint.",
