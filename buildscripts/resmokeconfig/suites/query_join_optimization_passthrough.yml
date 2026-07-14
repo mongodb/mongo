@@ -46,6 +46,7 @@ selector:
   exclude_with_any_tags:
     - requires_kernel_619
     - assumes_change_streams_v1
+    - requires_kernel_7014
 executor:
   config:
     shell_options:

@@ -1,0 +1,19 @@
+test_kind: js_test
+description: |
+  Tests for rseq/tcmalloc kernel compatibility on Linux >= 7.0.14.
+  Only runs on the amazon2023-kernel714-rseq-check variants.
+
+selector:
+  roots:
+    - jstests/noPassthrough/rseq_linux_compatibility/**/*.js
+  include_with_any_tags:
+    - requires_kernel_7014
+
+executor:
+  config:
+    shell_options:
+      nodb: ""
+      process_kwargs:
+        env_vars:
+          # Make sure tcmalloc fast path is active by settinng GLIBC tunable.
+          GLIBC_TUNABLES: "glibc.pthread.rseq=0"
