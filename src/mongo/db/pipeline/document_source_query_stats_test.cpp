@@ -11,14 +11,20 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
+#include <absl/hash/hash.h>
 #include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -54,6 +60,26 @@ public:
                                                       *parsedFind->findCommandRequest,
                                                       std::move(statusWithShape.getValue()),
                                                       query_shape::CollectionType::kCollection);
+    }
+
+    std::unique_ptr<const Key> makeAggKeyWithAllowPartialResults(
+        boost::optional<bool> allowPartialResults) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+        auto rawPipeline = {fromjson(R"({ $match: { x: 1 } })")};
+        AggregateCommandRequest acr(kDefaultTestNss.nss());
+        acr.setPipeline(rawPipeline);
+        if (allowPartialResults) {
+            acr.setAllowPartialResults(*allowPartialResults);
+        }
+        auto pipeline =
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+        auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+            acr, kDefaultTestNss.nss(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+        return std::make_unique<query_stats::AggKey>(expCtx,
+                                                     acr,
+                                                     std::move(aggShape),
+                                                     pipeline->getInvolvedCollections(),
+                                                     query_shape::CollectionType::kCollection);
     }
 
     QueryStatsStore& setUpQueryStatsStore(unsigned numPartitions = 1) {
@@ -252,6 +278,59 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextOverMultiplePartitions) {
 
     // We should see three unique filters.
     ASSERT_EQ(filters.size(), 3);
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextForAllowPartialResultsTriState) {
+    // Populate the query stats store with 3 agg entries differing only in allowPartialResults:
+    // omitted, true, and false.
+    auto& queryStatsStore = setUpQueryStatsStore();
+    auto keyOmitted = makeAggKeyWithAllowPartialResults(boost::none);
+    const auto hashOmitted = absl::HashOf(*keyOmitted);
+    queryStatsStore.put(hashOmitted, QueryStatsEntry{std::move(keyOmitted)});
+    auto keyTrue = makeAggKeyWithAllowPartialResults(true);
+    const auto hashTrue = absl::HashOf(*keyTrue);
+    queryStatsStore.put(hashTrue, QueryStatsEntry{std::move(keyTrue)});
+    auto keyFalse = makeAggKeyWithAllowPartialResults(false);
+    const auto hashFalse = absl::HashOf(*keyFalse);
+    queryStatsStore.put(hashFalse, QueryStatsEntry{std::move(keyFalse)});
+
+    const auto source =
+        DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+    auto stage = exec::agg::buildStage(source);
+
+    // allowPartialResults is a command-level key field, not part of the query shape, so all three
+    // entries must produce the same queryShapeHash despite having distinct keyHash values. Each
+    // entry is identified by its own 'key.allowPartialResults' field (missing/true/false),
+    // independent of iteration order.
+    StringMap<std::string> keyHashesByLabel;
+    boost::optional<std::string> sharedQueryShapeHash;
+    for (int i = 0; i < 3; ++i) {
+        auto result = stage->getNext();
+        ASSERT_TRUE(result.isAdvanced());
+        const auto& doc = result.getDocument();
+
+        const auto& allowPartialResultsField = doc.getNestedField({"key.allowPartialResults"});
+        std::string label = allowPartialResultsField.missing()
+            ? "omitted"
+            : (allowPartialResultsField.getBool() ? "true" : "false");
+        ASSERT_FALSE(keyHashesByLabel.contains(label)) << "Saw duplicate entry for: " << label;
+        keyHashesByLabel.emplace(label, std::string(doc["keyHash"].getString()));
+
+        auto queryShapeHash = std::string(doc["queryShapeHash"].getString());
+        if (sharedQueryShapeHash) {
+            ASSERT_EQ(*sharedQueryShapeHash, queryShapeHash);
+        } else {
+            sharedQueryShapeHash = queryShapeHash;
+        }
+    }
+
+    ASSERT_TRUE(stage->getNext().isEOF());
+
+    // We should see all three distinct entries exactly once, with distinct keyHash values.
+    ASSERT_EQ(keyHashesByLabel.size(), 3);
+    ASSERT_NE(keyHashesByLabel["omitted"], keyHashesByLabel["true"]);
+    ASSERT_NE(keyHashesByLabel["omitted"], keyHashesByLabel["false"]);
+    ASSERT_NE(keyHashesByLabel["true"], keyHashesByLabel["false"]);
 }
 
 TEST_F(DocumentSourceQueryStatsTest, GetNextTransformIdentifiers) {
