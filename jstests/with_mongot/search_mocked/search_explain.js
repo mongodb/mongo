@@ -1,6 +1,8 @@
 /**
  * Test the use of "explain" with the "$search" aggregation stage, but does not check the value of
  * executionStats.
+ * TODO SERVER-131069: Mocked-only coverage not in e2e: explain-only vs
+ * explain-plus-cursor variants, exact injected explain payload assertions.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";

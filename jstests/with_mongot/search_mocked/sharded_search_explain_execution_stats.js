@@ -1,8 +1,10 @@
 /**
  * Sharding tests for using "explain" with the $search aggregation stage and checks that usage of
  * $$SEARCH_META works as expected. This test checks execution stats are as expected.
- *
- * @tags:[requires_fcv_81]
+ * TODO SERVER-131069: Mocked-only coverage not in e2e: per-shard statistics,
+ * multi-cursor getMore sequencing, unconsumed metadata cursors (SERVER-82206),
+ * primary-vs-secondary routing, planShardedSearch metadata.
+ * @tags: [requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";

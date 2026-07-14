@@ -1,6 +1,9 @@
 /**
  * Sharding tests for using "explain" with the $searchMeta aggregation stage.
- *
+ * TODO SERVER-131069: Mocked-only coverage not in e2e: per-shard
+ * omitSearchDocumentResults commands, explain-only vs multi-cursor variants,
+ * metadata-cursor getMore, per-shard nReturned, primary-vs-secondary routing,
+ * planning protocol.
  * @tags: [requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

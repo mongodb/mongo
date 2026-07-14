@@ -1,7 +1,9 @@
 /**
  * Sharding tests for using "explain" with the $search aggregation stage for queries that do not
  * contain meaningful executionStats. This tests "queryPlanner" verbosity (no execution stats).
- *
+ * TODO SERVER-131069: Mocked-only coverage not in e2e: per-shard mongot
+ * commands, planShardedSearch metadata, primary-vs-secondary routing,
+ * injected explain payloads.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";

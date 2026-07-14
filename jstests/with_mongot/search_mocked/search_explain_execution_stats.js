@@ -1,8 +1,9 @@
 /**
- * Test the use of "explain" with the "$search" aggregation stage. This tests  "executionStats" and
+ * Test the use of "explain" with the "$search" aggregation stage. This tests "executionStats" and
  * "allPlansExecution" verbosities and checks that they function as expected.
+ * TODO SERVER-131069: Mocked-only coverage not in e2e: controlled getMore
+ * sequencing, deterministic missing-ID filtering, multi-batch nReturned.
  * @tags: [requires_fcv_81]
- *
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
