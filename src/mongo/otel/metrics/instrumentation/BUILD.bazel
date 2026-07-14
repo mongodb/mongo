@@ -198,6 +198,29 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "wiredtiger_metrics",
+    srcs = ["wiredtiger_metrics.cpp"],
+    hdrs = ["wiredtiger_metrics.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage/kv:kv_engine",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wiredtiger_metrics_test",
+    srcs = ["wiredtiger_metrics_test.cpp"],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":wiredtiger_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
     name = "connections_metrics",
     srcs = ["connections_metrics.cpp"],
     hdrs = ["connections_metrics.h"],
@@ -298,6 +321,8 @@ mongo_cc_library(
         ":query_memory_metrics",
         ":system_health_metrics",
         ":system_mount_metrics",
+        ":wiredtiger_metrics",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
     ],
 )

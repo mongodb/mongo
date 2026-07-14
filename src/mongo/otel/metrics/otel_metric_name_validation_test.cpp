@@ -79,8 +79,19 @@ TEST(OtelMetricNameValidation, RejectsSpace) {
     ASSERT_NOT_OK(validateOtelMetricName("network.open_ connections"));
 }
 
-TEST(OtelMetricNameValidation, RejectsHyphenInSegment) {
-    ASSERT_NOT_OK(validateOtelMetricName("network.open-connections"));
+// Interior hyphens are allowed to support serverStatus
+// names (e.g. serverStatus.wiredTiger.data-handle....).
+// A hyphen must be followed by at least one alphanumeric character.
+TEST(OtelMetricNameValidation, AcceptsInteriorHyphenInSegment) {
+    ASSERT_OK(validateOtelMetricName("network.open-connections"));
+    ASSERT_OK(validateOtelMetricName("serverStatus.wiredTiger.data-handle.count"));
+    ASSERT_OK(validateOtelMetricName("network.open-ingress-connections"));
+}
+
+TEST(OtelMetricNameValidation, RejectsLeadingTrailingOrConsecutiveHyphens) {
+    ASSERT_NOT_OK(validateOtelMetricName("network.-connections"));
+    ASSERT_NOT_OK(validateOtelMetricName("network.connections-"));
+    ASSERT_NOT_OK(validateOtelMetricName("network.open--connections"));
 }
 
 TEST(OtelMetricNameValidation, RejectsPunctuationInSegment) {

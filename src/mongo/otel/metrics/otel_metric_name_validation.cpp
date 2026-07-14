@@ -12,13 +12,13 @@ namespace mongo::otel::metrics {
 
 namespace {
 // Each dot-separated segment starts with a lowercase letter and is then either:
-//   - snake_case: only lowercase letters, digits, and underscores, OR
-//   - camelCase:  only lowercase/uppercase letters and digits (no underscores)
-// Mixing the two styles within a single segment is disallowed. Underscores in snake_case
-// must be followed by at least one alphanumeric character, so trailing underscores and
-// consecutive underscores are rejected.
-constexpr std::string_view kSnakeCasePattern = "[a-z0-9]*(?:_[a-z0-9]+)*";
-constexpr std::string_view kCamelCasePattern = "[a-zA-Z0-9]*";
+//   - snake_case: only lowercase letters, digits, underscores, and hyphens, OR
+//   - camelCase:  lowercase/uppercase letters, digits, and hyphens (no underscores)
+// Mixing the underscore and camelCase styles within a single segment is disallowed. Underscores
+// and hyphens must each be followed by at least one alphanumeric character, so trailing and
+// consecutive underscores/hyphens are rejected.
+constexpr std::string_view kSnakeCasePattern = "[a-z0-9]*(?:[_-][a-z0-9]+)*";
+constexpr std::string_view kCamelCasePattern = "[a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)*";
 std::string segmentPattern() {
     return fmt::format("[a-z](?:{0}|{1})", kSnakeCasePattern, kCamelCasePattern);
 }

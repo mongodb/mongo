@@ -143,6 +143,53 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.connections.backpressureVersions.total");
     static constexpr MetricName kMongoDBBuildInfo = MetricNameMaker::make("mongodb.build.info");
 
+    // WiredTiger metrics
+    static constexpr MetricName kEvictionCallsToGetAPageFoundQueueEmpty = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.eviction_calls_to_get_a_page_found_queue_empty");
+    static constexpr MetricName kEvictionEmptyScore =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.eviction_empty_score");
+    static constexpr MetricName kEvictPageAttemptsByEvictionWorkerThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.evict_page_attempts_by_eviction_worker_threads");
+    static constexpr MetricName kEvictPageFailuresByEvictionWorkerThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.evict_page_failures_by_eviction_worker_threads");
+    static constexpr MetricName kEvictionWorkerThreadActive = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.eviction_worker_thread_active");
+    static constexpr MetricName kEvictionWorkerThreadStableNumber = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.eviction_worker_thread_stable_number");
+    static constexpr MetricName kPageEvictAttemptsByApplicationThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.page_evict_attempts_by_application_threads");
+    static constexpr MetricName kPageEvictFailuresByApplicationThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.page_evict_failures_by_application_threads");
+    static constexpr MetricName kConnectionDataHandlesCurrentlyActive = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.data-handle.connection_data_handles_currently_active");
+    static constexpr MetricName kTransactionCheckpointMostRecentTime = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.transaction.transaction_checkpoint_most_recent_time_"
+        "msecs");
+    static constexpr MetricName kConcurrentTransactionsReadAvailable = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.concurrentTransactions.read.available");
+    static constexpr MetricName kConcurrentTransactionsWriteAvailable = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.concurrentTransactions.write.available");
+    static constexpr MetricName kBytesReadIntoCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.bytes_read_into_cache");
+    static constexpr MetricName kBytesWrittenFromCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.bytes_written_from_cache");
+    static constexpr MetricName kBytesCurrentlyInTheCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.bytes_currently_in_the_cache");
+    static constexpr MetricName kTrackedDirtyBytesInTheCache = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.tracked_dirty_bytes_in_the_cache");
+    static constexpr MetricName kMaximumBytesConfigured =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.maximum_bytes_configured");
+    static constexpr MetricName kPagesReadIntoCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.pages_read_into_cache");
+    static constexpr MetricName kPagesRequestedFromTheCache = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.pages_requested_from_the_cache");
+    // Keeping these scoped to serverStatus for consistency with every other metric avoids
+    // confusion.
+    static constexpr MetricName kWiredTigerCollectErrors =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.collectErrors");
+    static constexpr MetricName kWiredTigerEngineNotReadyErrors =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.engineNotReadyErrors");
+
     // Ingress Request Rate Limiter (Admission Control) Metrics. These mirror the fields that
     // RateLimiter::appendStats() historically reported under
     static constexpr MetricName kIngressRequestRateLimiterAttemptedAdmissions =

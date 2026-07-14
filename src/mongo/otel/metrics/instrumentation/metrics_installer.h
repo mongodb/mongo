@@ -10,11 +10,7 @@ namespace mongo {
 class ServiceContext;
 
 /**
- * Installs OpenTelemetry metrics common to all server roles.
- */
-[[MONGO_MOD_PUBLIC]] void installCommonOtelMetrics(ServiceContext* svcCtx);
-
-/**
+>>>>>>> 2e55574d775 (Address nits)
  * Installs all OpenTelemetry instrumentation metrics for mongod. Intended to be called once at
  * startup from mongod_main.
  */

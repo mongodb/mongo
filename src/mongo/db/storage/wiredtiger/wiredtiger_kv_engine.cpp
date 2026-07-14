@@ -3275,6 +3275,38 @@ boost::optional<StorageTierLevelEnum> WiredTigerKVEngine::getStorageTierFromStor
     }
 }
 
+boost::optional<BSONObj> WiredTigerKVEngine::collectStorageStats() {
+    // The curated set of WiredTiger statistics we currently expose as
+    // OpenTelemetry and ServerStatus metrics
+    // TODO (SERVER-131210): Consider creating a single source of truth for
+    // these strings to prevent drift.
+    static const std::vector<std::string> fieldsToInclude = {
+        "cache: eviction calls to get a page found queue empty",
+        "cache: evict page attempts by eviction worker threads",
+        "cache: evict page failures by eviction worker threads",
+        "cache: page evict attempts by application threads",
+        "cache: page evict failures by application threads",
+        "cache: bytes read into cache",
+        "cache: bytes written from cache",
+        "cache: pages read into cache",
+        "cache: pages requested from the cache",
+        "cache: eviction empty score",
+        "cache: eviction worker thread active",
+        "cache: eviction worker thread stable number",
+        "cache: bytes currently in the cache",
+        "cache: tracked dirty bytes in the cache",
+        "cache: maximum bytes configured",
+        "data-handle: connection data handles currently active",
+        "checkpoint: most recent time (msecs)",
+    };
+
+    BSONObjBuilder bob;
+    if (!WiredTigerUtil::collectConnectionStatistics(*this, bob, fieldsToInclude))
+        return boost::none;
+
+    return bob.obj();
+}
+
 BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
 

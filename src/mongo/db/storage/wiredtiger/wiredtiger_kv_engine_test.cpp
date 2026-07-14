@@ -8,6 +8,8 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -1291,6 +1293,46 @@ TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
 TEST_F(WiredTigerKVEngineTest, TestGetBackupCheckpointTimestampWithoutOpenBackupCursor) {
     auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT_EQ(Timestamp::min(), engine->getBackupCheckpointTimestamp());
+}
+
+TEST_F(WiredTigerKVEngineTest, CollectStorageStatsReturnsNestedCategories) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+
+    auto stats = engine->collectStorageStats();
+    ASSERT(stats);
+
+    // Ensure all 3 categories we expect are present.
+    for (std::string_view category : {"cache", "data-handle", "checkpoint"}) {
+        auto elem = (*stats)[category];
+        ASSERT(!elem.eoo()) << "missing category: " << category;
+        ASSERT_EQ(elem.type(), BSONType::object) << "category not an object: " << category;
+    }
+
+    // Check that a representative sample of fields are present.
+    const BSONObj cache = stats->getObjectField("cache");
+    for (std::string_view measurement : {"bytes read into cache",
+                                         "bytes written from cache",
+                                         "bytes currently in the cache",
+                                         "maximum bytes configured"}) {
+        auto elem = cache[measurement];
+        ASSERT(!elem.eoo()) << "missing cache measurement: " << measurement;
+        ASSERT(elem.isNumber()) << "cache measurement not numeric: " << measurement;
+    }
+
+    ASSERT(stats->getObjectField("data-handle")["connection data handles currently active"]
+               .isNumber());
+    ASSERT(stats->getObjectField("checkpoint")["most recent time (msecs)"].isNumber());
+}
+
+TEST_F(WiredTigerKVEngineTest, CollectStorageStatsReturnsNoneWhenConnectionNotReady) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+    ASSERT(engine->collectStorageStats());
+
+    engine->cleanShutdown(kMemLeakAllowed);
+    ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
+    ASSERT(!engine->collectStorageStats());
 }
 
 using WiredTigerKVEngineTestDeathTest = WiredTigerKVEngineTest;

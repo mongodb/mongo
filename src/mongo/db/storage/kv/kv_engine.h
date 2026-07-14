@@ -688,6 +688,14 @@ public:
         const BSONObj& storageEngineOptions) const = 0;
 
     /**
+     * Returns a collection of statistics about the storage engine, or boost::none
+     * if the engine is unable to collect or by default.
+     */
+    virtual boost::optional<BSONObj> collectStorageStats() {
+        return boost::none;
+    }
+
+    /**
      * Returns the input storage engine options, sanitized to remove options that may not apply to
      * this node, such as encryption. Might be called for both collection and index options. See
      * SERVER-68122.

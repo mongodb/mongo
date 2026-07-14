@@ -36,9 +36,9 @@ constexpr std::string_view kSdaIoQueuedMs = "systemMetrics.disks.sda.io_queued_m
 constexpr std::string_view kSdbWrites = "systemMetrics.disks.sdb.writes"sv;
 constexpr std::string_view kSdcWrites = "systemMetrics.disks.sdc.writes"sv;
 
-// A disk whose name will not resolve to a valid otel metric name
-constexpr std::string_view kInvalidDisk = "dm-0"sv;
-constexpr std::string_view kInvalidDiskMetricName = "systemMetrics.disks.dm-0.writes"sv;
+// A disk whose name will not resolve to a valid otel metric name (segment starts with a digit)
+constexpr std::string_view kInvalidDisk = "0sda"sv;
+constexpr std::string_view kInvalidDiskMetricName = "systemMetrics.disks.0sda.writes"sv;
 
 BSONObj makeDiskBson(std::string_view device,
                      long long reads,
