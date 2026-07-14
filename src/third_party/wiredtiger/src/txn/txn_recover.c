@@ -946,6 +946,7 @@ __metadata_clean_incomplete_table(WT_RECOVERY *r, const char *uri, const char *c
         __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_WARNING,
           "cannot remove incomplete table '%s' (%s, %s) in readonly mode", uri, colgroup_msg,
           file_msg);
+        ret = 0;
         goto done;
     }
 

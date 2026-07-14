@@ -1,0 +1,50 @@
+name: FIXME Closure Check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+jobs:
+  check-fixmes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check for stale FIXME references
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          title="$PR_TITLE"
+
+          if [[ "$title" == Revert\ \"* ]]; then
+            echo "Skipping FIXME closure check for revert PR."
+            exit 0
+          fi
+
+          ticket="$(grep -Eo 'WT-[0-9]+' <<< "$title" | head -n 1 || true)"
+
+          if [[ -z "$ticket" ]]; then
+            echo "No WT ticket found in PR title."
+            exit 0
+          fi
+
+          matches="$(git grep -n -P "FIX-?ME[-:\s]+.*?${ticket}(?![0-9])" HEAD || true)"
+
+          if [[ -z "$matches" ]]; then
+            echo "No stale FIXME references found for ${ticket}."
+            exit 0
+          fi
+
+          echo "::error::PR closes ${ticket} but FIXME references to it remain. Remove them or retarget them to a follow-up ticket."
+          echo "$matches"
+          exit 1

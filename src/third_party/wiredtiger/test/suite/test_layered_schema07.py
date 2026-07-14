@@ -33,14 +33,14 @@
 
 import os, time
 import wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages, DisaggSchemaEpochMixin
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
 # Test WT_SESSION::publish for disaggregated storage.
 @disagg_test_class
-class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
+class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggSchemaEpochMixin):
     test_name = __qualname__
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader",lose_all_my_data=true)'
@@ -54,22 +54,6 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
     #
     # Helper methods
     #
-
-    def set_stable_epoch(self, epoch):
-        """
-        Set stable_disaggregated_schema_epoch.
-        """
-        self.conn.set_timestamp(
-            'stable_disaggregated_schema_epoch=' + self.timestamp_str(epoch))
-
-    def leader_checkpoint(self, stable_ts):
-        """
-        Set the oldest and stable timestamps, and then take a timestamped checkpoint.
-        """
-        self.conn.set_timestamp(
-            'stable_timestamp=' + self.timestamp_str(stable_ts) +
-            ',oldest_timestamp=' + self.timestamp_str(1))
-        self.session.checkpoint()
 
     def open_follower(self):
         """
@@ -98,15 +82,6 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
         session_follower.close()
         conn_follower.close()
         return exists
-
-    def publish(self, uri, epoch, session=None):
-        """
-        Publish a schema change with the given epoch. If session is None, use the main test session.
-        """
-        if session is None:
-            session = self.session
-        session.publish(uri, 'disaggregated=(schema_epoch=' + self.timestamp_str(epoch) + ')')
-
 
     #
     # Functional tests
@@ -309,6 +284,38 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.set_timestamp(
             'stable_timestamp=' + self.timestamp_str(1) +
             ',oldest_timestamp=' + self.timestamp_str(1))
+
+    def subprocess_publish_epoch_regression(self):
+        """
+        Helper run in a subprocess by test_publish_error_epoch_regression.
+        Triggers a panic by re-publishing a table at a lower epoch than its earlier publish.
+        """
+        self.session.create(self.uri, 'key_format=i,value_format=S')
+        self.publish(self.uri, 20)
+        try:
+            self.publish(self.uri, 10)  # Expected to panic.
+        except wiredtiger.WiredTigerError:
+            # Exit immediately to avoid hanging in tearDown when closing a panicked connection.
+            os._exit(1)
+
+    def test_publish_error_epoch_regression(self):
+        """
+        Publish epochs for the same URI cannot regress: publishing a table at an epoch lower
+        than an earlier publish of the same URI finds the already-published operation at a
+        future epoch and panics.
+
+        Publish panics on this error, so the trigger is run in a subprocess.
+        """
+        subdir = 'SUBPROCESS_EPOCH_REGRESSION'
+        [returncode, _] = self.run_subprocess_function(subdir,
+            f'{self.test_name}.{self.test_name}.subprocess_publish_epoch_regression',
+            silent=True)
+        self.assertNotEqual(returncode, 0,
+            'Expected subprocess to panic on publish at a regressed epoch')
+        # Set timestamps so the tearDown shutdown checkpoint can succeed (precise_checkpoint=true
+        # requires a stable timestamp).
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
+                                ',oldest_timestamp=' + self.timestamp_str(1))
 
     #
     # Statistics tests

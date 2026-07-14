@@ -1084,7 +1084,7 @@ err:
  *     Mark all disaggregated btrees readonly and outdated, then step down to follower mode. The
  *     outdated mark makes the next leader open fresh handles instead of reusing these stale ones.
  */
-static void
+static int
 __disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -1109,7 +1109,7 @@ __disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
             continue;
 
         WT_WITH_BTREE(session, btree, ret = __wt_evict_file_exclusive_on(session));
-        WT_IGNORE_RET(ret);
+        WT_RET(ret);
 
         /* Mark the disaggregated as readonly. */
         F_SET(btree, WT_BTREE_READONLY);
@@ -1129,15 +1129,17 @@ __disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
     /* Step down to the follower mode. */
     conn->layered_table_manager.leader = false;
     WT_STAT_CONN_SET(session, disagg_role_leader, 0);
+    return (0);
 }
 
 /*
  * __disagg_step_down --
  *     Step down to the follower mode.
  */
-static void
+static int
 __disagg_step_down(WT_SESSION_IMPL *session)
 {
+    WT_DECL_RET;
     WT_SHARED_DSK_CACHE *shared_dsk_cache;
 
     WT_CONNECTION_IMPL *conn = S2C(session);
@@ -1152,7 +1154,9 @@ __disagg_step_down(WT_SESSION_IMPL *session)
      * eviction paths, especially parent split path, from dirtying pages during the step-down
      * window.
      */
-    WT_WITH_HANDLE_LIST_READ_LOCK(session, __disagg_mark_btrees_readonly_then_step_down(session));
+    WT_WITH_HANDLE_LIST_READ_LOCK(
+      session, ret = __disagg_mark_btrees_readonly_then_step_down(session));
+    WT_ERR(ret);
 
     /* Do some cleanup as we are abandoning the current checkpoint. */
     __disagg_shared_metadata_queue_clear(session);
@@ -1172,7 +1176,10 @@ __disagg_step_down(WT_SESSION_IMPL *session)
 
     /* Clear the step-down timestamp after stepping down. */
     __wt_atomic_store_uint64_relaxed(&conn->txn_global.step_down_timestamp, WT_TS_NONE);
+
+err:
     F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
+    return (ret);
 }
 
 /*
@@ -1267,8 +1274,9 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     } else if (was_leader && !leader) {
         /* Leader step-down. */
         time_start = __wt_clock(session);
-        WT_WITH_CHECKPOINT_LOCK(session, __disagg_step_down(session));
+        WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_step_down(session));
         time_stop = __wt_clock(session);
+        WT_ERR_MSG_CHK(session, ret, "Failed to step down to the follower role");
         WT_STAT_CONN_SET(session, disagg_step_down_time, WT_CLOCKDIFF_MS(time_stop, time_start));
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
           "Step down completed in %" PRIu64 " milliseconds",
@@ -1393,6 +1401,8 @@ err:
 
     if (ret != 0 && reconfig && !was_leader && leader)
         return (__wt_panic(session, ret, "failed to step-up as primary"));
+    if (ret != 0 && reconfig && was_leader && !leader)
+        return (__wt_panic(session, ret, "failed to step-down as primary"));
     return (ret);
 }
 

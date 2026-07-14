@@ -776,6 +776,70 @@ class DisaggCorruptionMixin:
                 f"expected 1 affected row, got {affected} for "
                 f"table_id={table_id}, page_id={page_id}, lsn={lsn}")
 
+# Shared helpers for tests that exercise WT_SESSION::publish and schema epochs on
+# layered tables. Tests using this mixin must define conn_config_follower.
+class DisaggSchemaEpochMixin:
+    def set_stable_epoch(self, epoch, conn=None):
+        """Set stable_disaggregated_schema_epoch on the given (or main) connection."""
+        if conn is None:
+            conn = self.conn
+        conn.set_timestamp(
+            'stable_disaggregated_schema_epoch=' + self.timestamp_str(epoch))
+
+    def leader_checkpoint(self, stable_ts, conn=None, session=None):
+        """Set the oldest and stable timestamps, then take a timestamped checkpoint."""
+        if conn is None:
+            conn = self.conn
+        if session is None:
+            session = self.session
+        conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(stable_ts) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        session.checkpoint()
+
+    def publish(self, uri, epoch, session=None):
+        """Publish a schema change for uri at the given epoch."""
+        if session is None:
+            session = self.session
+        session.publish(uri, 'disaggregated=(schema_epoch=' + self.timestamp_str(epoch) + ')')
+
+    def stable_uri(self, uri):
+        """Return the stable component URI for a given layered table URI."""
+        tablename = uri[len('layered:'):]
+        return 'file:' + tablename + '.wt_stable'
+
+    def uri_in_shared_metadata(self, conn, uri):
+        """Return True if uri's stable constituent is present in the shared metadata table."""
+        session = conn.open_session('')
+        cursor = session.open_cursor('file:WiredTigerShared.wt_stable', None, None)
+        cursor.set_key(self.stable_uri(uri))
+        found = cursor.search() == 0
+        cursor.close()
+        session.close()
+        return found
+
+    def uri_in_local_metadata(self, conn, uri):
+        """Return True if uri's stable constituent is present in conn's local metadata."""
+        session = conn.open_session('')
+        exists = True
+        try:
+            c = session.open_cursor(self.stable_uri(uri))
+            c.close()
+        except wiredtiger.WiredTigerError:
+            exists = False
+        session.close()
+        return exists
+
+    def open_follower(self):
+        """Open a follower, pick up the latest leader checkpoint, and open a session on it."""
+        conn = self.wiredtiger_open(
+            'follower',
+            self.extensionsConfig() + ',create,' + self.conn_config_follower)
+        self.ignoreStdoutPattern('WT_VERB_RTS|(wiredtiger_open:.*WT_VERB_METADATA)')
+        self.disagg_advance_checkpoint(conn)
+        session = conn.open_session('')
+        return conn, session
+
 class DisaggSizeTestMixin:
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True

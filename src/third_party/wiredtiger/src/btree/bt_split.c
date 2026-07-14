@@ -2325,6 +2325,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
     __wt_verbose(session, WT_VERB_SPLIT, "%p: split-insert", (void *)ref);
 
+    if (__wt_btree_is_stale_disagg(session))
+        return (__wt_set_return(session, EBUSY));
+
     /*
      * Set the session split generation to ensure underlying code isn't surprised by internal page
      * eviction, then proceed with the insert split.
@@ -2448,11 +2451,14 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 
     __wt_verbose(session, WT_VERB_SPLIT, "%p: split-multi", (void *)ref);
 
-    /*
-     * Set the session split generation to ensure underlying code isn't surprised by internal page
-     * eviction, then proceed with the split.
-     */
-    WT_WITH_PAGE_INDEX(session, ret = __split_multi_lock(session, ref, closing));
+    if (__wt_btree_is_stale_disagg(session))
+        ret = __wt_set_return(session, EBUSY);
+    else
+        /*
+         * Set the session split generation to ensure underlying code isn't surprised by internal
+         * page eviction, then proceed with the split.
+         */
+        WT_WITH_PAGE_INDEX(session, ret = __split_multi_lock(session, ref, closing));
 
     if (ret == EBUSY)
         WT_STAT_CONN_DSRC_INCR(session, cache_evict_split_failed_lock);
@@ -2486,6 +2492,9 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_DECL_RET;
 
     __wt_verbose(session, WT_VERB_SPLIT, "%p: reverse-split", (void *)ref);
+
+    if (__wt_btree_is_stale_disagg(session))
+        return (__wt_set_return(session, EBUSY));
 
     /*
      * Set the session split generation to ensure underlying code isn't surprised by internal page

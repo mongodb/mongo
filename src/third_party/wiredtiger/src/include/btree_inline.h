@@ -37,6 +37,17 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_btree_is_stale_disagg --
+ *     Return whether the current btree belongs to an outdated disaggregated generation.
+ */
+static WT_INLINE bool
+__wt_btree_is_stale_disagg(WT_SESSION_IMPL *session)
+{
+    return (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED | WT_BTREE_READONLY) &&
+      F_ISSET(session->dhandle, WT_DHANDLE_OUTDATED));
+}
+
+/*
  * __wt_page_is_empty --
  *     Return if the page is empty.
  */

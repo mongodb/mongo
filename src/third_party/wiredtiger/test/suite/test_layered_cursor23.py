@@ -41,7 +41,9 @@ from wtscenario import make_scenarios
 #   leader role  : stable values only (a leader disregards the ingest table);
 #   follower role: the union of stable and ingest (a value present in either constituent).
 #
-# test_methods drives every write method on a single key and compares the outcomes.
+# test_methods drives every write method on a single key and compares the outcomes; the prime
+# flag first positions the cursor on a different key, so the write-conflict check must not trust
+# that stale constituent position.
 # test_traverse brackets the scenario key with two neighbors (one visible only on ingest, one
 # only on stable) and walks the table with next()/prev(), optionally applying a write to the
 # current record between steps, comparing the whole sequence to the classic cursor. The neighbors
@@ -53,6 +55,7 @@ class test_layered_cursor23(wttest.WiredTigerTestCase):
     uri = f'layered:{test_name}'
     uri_ref = f'table:{test_name}_ref'
     key = 'k'
+    prime_key = 'j'
     conn_base_config = ',create,statistics=(all),'
 
     # Visible commit < read < invisible commit <= checkpoint; ingest is newer than stable.
@@ -65,10 +68,12 @@ class test_layered_cursor23(wttest.WiredTigerTestCase):
     vis_ingest_opts = [('vi1', dict(vis_ingest=True)), ('vi0', dict(vis_ingest=False))]
     invis_stable_opts = [('xs1', dict(invis_stable=True)), ('xs0', dict(invis_stable=False))]
     invis_ingest_opts = [('xi1', dict(invis_ingest=True)), ('xi0', dict(invis_ingest=False))]
+    prime_opts = [('no_prime', dict(prime=None)), ('prime_stable', dict(prime='stable')),
+        ('prime_ingest', dict(prime='ingest'))]
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, roles, overwrite_opts,
-        vis_stable_opts, vis_ingest_opts, invis_stable_opts, invis_ingest_opts)
+        vis_stable_opts, vis_ingest_opts, invis_stable_opts, invis_ingest_opts, prime_opts)
 
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
@@ -137,6 +142,10 @@ class test_layered_cursor23(wttest.WiredTigerTestCase):
     def run_method(self, session, uri, method):
         cursor = session.open_cursor(uri, None, f'overwrite={str(self.overwrite).lower()}')
         session.begin_transaction('read_timestamp=' + self.timestamp_str(self.READ))
+        if self.prime is not None:
+            # Position cursor (stable or ingest) on a different key first.
+            cursor.set_key(self.prime_key)
+            self.assertEqual(cursor.search(), 0)
         cursor.set_key(self.key)
         if method in ('insert', 'update'):
             cursor.set_value('new')
@@ -159,9 +168,14 @@ class test_layered_cursor23(wttest.WiredTigerTestCase):
         return outcome
 
     def test_methods(self):
+        if self.prime == 'ingest' and self.role == 'leader':
+            self.skipTest('prime_ingest is not meaningful for the leader role')
         self.create_tables()
         self.build_key(self.key, self.vis_stable, self.vis_ingest,
             self.invis_stable, self.invis_ingest)
+        if self.prime is not None:
+            self.build_key(
+                self.prime_key, self.prime == 'stable', self.prime == 'ingest', False, False)
         self.checkpoint_and_advance()
 
         mismatches = []
@@ -223,6 +237,8 @@ class test_layered_cursor23(wttest.WiredTigerTestCase):
         return obs
 
     def test_traverse(self):
+        if self.prime is not None:
+            self.skipTest('pre-positioning applies only to test_methods')
         self.create_tables()
         # Bracket the scenario key with neighbors so the walk spans both constituents: 'a' is
         # visible only on ingest, 'z' only on stable, and the middle key takes the scenario's state.
