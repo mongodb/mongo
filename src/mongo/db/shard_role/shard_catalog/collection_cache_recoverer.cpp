@@ -36,7 +36,6 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
         repl::ReadConcernArgs::get(opCtx) = repl::ReadConcernArgs{};
     }
 
-    // TODO (SERVER-128431): Investigate if we can avoid the full refresh by passing the current sv.
     auto aggRequest =
         makeCollectionAndChunksAggregation(opCtx,
                                            NamespaceString::kConfigShardCatalogCollectionsNamespace,
