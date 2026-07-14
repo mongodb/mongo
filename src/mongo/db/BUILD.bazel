@@ -2740,6 +2740,7 @@ mongo_cc_library(
         "//bazel/config:enterprise_feature_ldap_enabled": [
             "//src/mongo/db/modules/enterprise/src/ldap:ldap_manager_init",
             "//src/mongo/db/modules/enterprise/src/ldap:ldap_options_mongod",
+            "//src/mongo/db/modules/enterprise/src/ldap:openssl_init_legacy",
         ],
         "//conditions:default": [],
     }) + select({
