@@ -65,6 +65,16 @@ TEST(Builder, GrowBeyondBufferMaxSize) {
     });
 }
 
+TEST(Builder, InitialSizeBeyondMaxSize) {
+    ASSERT_THROWS_WITH_CHECK(
+        BufBuilder(BufferMaxSize + 1), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), 13061200);
+            ASSERT_STRING_SEARCH_REGEX(
+                exception.reason(),
+                R"(BufBuilder initially requesting \d+ bytes, past the \d+MB limit.)");
+        });
+}
+
 TEST(Builder, StringBuilderAddress) {
     const void* longPtr = reinterpret_cast<const void*>(-1);
     const void* shortPtr = reinterpret_cast<const void*>(static_cast<uintptr_t>(0xDEADBEEF));

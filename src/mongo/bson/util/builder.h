@@ -79,6 +79,11 @@ public:
     SharedBufferAllocator() = default;
     explicit SharedBufferAllocator(const Allocator& allocator) : _buf(allocator) {}
     SharedBufferAllocator(size_t sz, const Allocator& allocator = {}) : _buf(allocator) {
+        massert(13061200,
+                fmt::format("BufBuilder initially requesting {} bytes, past the {}MB limit.",
+                            sz,
+                            BufferMaxSize / (1024 * 1024)),
+                sz <= BufferMaxSize);
         if (sz > 0)
             malloc(sz);
     }
