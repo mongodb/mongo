@@ -1,5 +1,7 @@
 /**
  * Verify that $search with 'returnStoredSource' returns both metadata and full documents.
+ * TODO SERVER-131069: Mocked-only coverage not in e2e: malformed mongot
+ * responses (missing storedSource field), engine-specific behavior.
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
