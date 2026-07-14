@@ -62,6 +62,8 @@ const excludeKnobs = [
     // TODO(SERVER-131174): Lowering this process-wide breaks the concurrent CheckMetadataConsistency
     // hook's $group (no allowDiskUse). Re-include once fixed.
     "internalDocumentSourceGroupMaxMemoryBytes",
+    // TODO(SERVER-131322): remove this exclusion once the resharding invariant (BF-44347) is fixed.
+    "internalQueryPlannerUseMultiplannerForSingleSolutions",
 ];
 
 // Only pqsSettable knobs can be accepted by setQuerySettings; for all others the property holds

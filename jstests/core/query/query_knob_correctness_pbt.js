@@ -89,6 +89,8 @@ const excludeKnobs = [
     "internalQueryMaxSingleExpressionMemoryUsageBytes",
     // Operation-wide memory cap: a small value fails every query outright.
     "internalQueryMaxMemoryUsageBytesPerOperation",
+    // TODO SERVER-131322: remove this exclusion once the resharding invariant (BF-44347) is fixed.
+    "internalQueryPlannerUseMultiplannerForSingleSolutions",
 ];
 
 const knobSchema = db

@@ -685,6 +685,7 @@ server_parameters:
         cpp_varname: "internalQueryPlannerUseMultiplannerForSingleSolutions"
         cpp_vartype: Atomic<bool>
         default: false
+        test_only: true
         redact: false
         annotations:
             query_knob:
