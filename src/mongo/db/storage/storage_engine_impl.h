@@ -126,6 +126,10 @@ public:
 
     Timestamp getStableTimestamp() const override;
 
+    void setStepDownTimestamp(Timestamp stepDownTimestamp) override;
+
+    Timestamp getStepDownTimestamp() const override;
+
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     Timestamp getInitialDataTimestamp() const override;

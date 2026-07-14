@@ -143,6 +143,10 @@ public:
     Timestamp getOldestTimestamp() const final {
         return {};
     };
+    void setStepDownTimestamp(Timestamp stepDownTimestamp) override {}
+    Timestamp getStepDownTimestamp() const override {
+        return {};
+    }
     void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) final {}
 

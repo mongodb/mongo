@@ -798,6 +798,14 @@ Timestamp StorageEngineImpl::getStableTimestamp() const {
     return _engine->getStableTimestamp();
 }
 
+void StorageEngineImpl::setStepDownTimestamp(Timestamp stepDownTimestamp) {
+    _engine->setStepDownTimestamp(stepDownTimestamp);
+}
+
+Timestamp StorageEngineImpl::getStepDownTimestamp() const {
+    return _engine->getStepDownTimestamp();
+}
+
 void StorageEngineImpl::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }

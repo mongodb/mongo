@@ -2484,6 +2484,22 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     setOldestTimestamp(newOldestTimestamp, false);
 }
 
+void WiredTigerKVEngine::setStepDownTimestamp(Timestamp stepDownTimestamp) {
+    invariant(!stepDownTimestamp.isNull());
+
+    // WiredTiger rejects this unless we are a disaggregated leader with no step-down timestamp
+    // already set, so any error here reflects a violated precondition in the caller.
+    auto stepDownTSConfigString =
+        fmt::format("step_down_timestamp={:x}", stepDownTimestamp.asULL());
+    invariantWTOK(_conn->set_timestamp(_conn, stepDownTSConfigString.c_str()), nullptr);
+
+    _stepDownTimestamp.store(stepDownTimestamp.asULL());
+
+    LOGV2(13113700,
+          "Set step-down (cutover) timestamp",
+          "stepDownTimestamp"_attr = stepDownTimestamp);
+}
+
 void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
     if (MONGO_unlikely(WTPreserveSnapshotHistoryIndefinitely.shouldFail())) {
         return;
@@ -3112,6 +3128,10 @@ WiredTigerKVEngine::_getJournalListenerWithToken(OperationContext* opCtx,
 
 Timestamp WiredTigerKVEngine::getStableTimestamp() const {
     return Timestamp(_stableTimestamp.load());
+}
+
+Timestamp WiredTigerKVEngine::getStepDownTimestamp() const {
+    return Timestamp(_stepDownTimestamp.load());
 }
 
 Timestamp WiredTigerKVEngine::getOldestTimestamp() const {

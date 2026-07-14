@@ -577,6 +577,8 @@ public:
 
     void setStableTimestamp(Timestamp stableTimestamp, bool force) override;
 
+    void setStepDownTimestamp(Timestamp stepDownTimestamp) override;
+
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     Timestamp getInitialDataTimestamp() const override;
@@ -638,6 +640,7 @@ public:
     bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
 
     Timestamp getStableTimestamp() const override;
+    Timestamp getStepDownTimestamp() const override;
     Timestamp getOldestTimestamp() const override;
     Timestamp getCheckpointTimestamp() const override;
 
@@ -954,6 +957,9 @@ private:
     // Tracks the stable and oldest timestamps we've set on the storage engine.
     Atomic<std::uint64_t> _oldestTimestamp;
     Atomic<std::uint64_t> _stableTimestamp;
+
+    // The last stepdown timestamp we've set for the storage engine, if any.
+    Atomic<std::uint64_t> _stepDownTimestamp;
 
     // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
     // timestamp. Provided by replication layer because WT does not persist timestamps.

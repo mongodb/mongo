@@ -434,6 +434,18 @@ public:
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force) {}
 
     /**
+     * See `StorageEngine::setStepDownTimestamp`
+     */
+    virtual void setStepDownTimestamp(Timestamp stepDownTimestamp) {}
+
+    /**
+     * See `StorageEngine::getStepDownTimestamp`
+     */
+    virtual Timestamp getStepDownTimestamp() const {
+        return Timestamp();
+    }
+
+    /**
      * See `StorageEngine::setInitialDataTimestamp`
      */
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) {}

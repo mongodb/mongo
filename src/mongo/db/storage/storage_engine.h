@@ -731,6 +731,19 @@ public:
     virtual Timestamp getInitialDataTimestamp() const = 0;
 
     /**
+     * Sets the cutover timestamp for a planned step-down of disaggregated storage. Only valid on a
+     * disaggregated leader that does not already have a step-down timestamp set; violating either
+     * precondition is fatal.
+     */
+    virtual void setStepDownTimestamp(Timestamp stepDownTimestamp) = 0;
+
+    /**
+     * Returns the step-down (cutover) timestamp last set via setStepDownTimestamp(), or a null
+     * timestamp if none has been set.
+     */
+    virtual Timestamp getStepDownTimestamp() const = 0;
+
+    /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. Additionally, all future writes must be newer or equal to this value.
      */
