@@ -775,6 +775,6 @@ bazel_evergreen_shutils::query_resmoke_configs() {
 
     ${BAZEL_BINARY} cquery ${FLAGS} 'kind(resmoke_config, //...)' \
         --output=starlark \
-        --starlark:expr='": ".join([str(target.label).replace("@@","")] + [f.path for f in target.files.to_list()])' \
+        --starlark:expr='": ".join([str(target.label).replace("@@","")] + [f.path for f in target.files.to_list()]) if target.files.to_list() else ""' \
         >"${OUTPUT_FILE}"
 }

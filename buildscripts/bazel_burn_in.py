@@ -12,7 +12,7 @@ generate-tasks: generates Evergreen task configurations to execute burn-in tests
 Usage:
     # First, generate resmoke configs:
     bazel build //... --build_tag_filters=resmoke_config
-    bazel cquery "kind(resmoke_config, //...)" --output=starlark --starlark:expr "': '.join([str(target.label).replace('@@','')] + [f.path for f in target.files.to_list()])" > resmoke_suite_configs.yml
+    bazel cquery "kind(resmoke_config, //...)" --output=starlark --starlark:expr "': '.join([str(target.label).replace('@@','')] + [f.path for f in target.files.to_list()]) if target.files.to_list() else ''" > resmoke_suite_configs.yml
 
     # Generate burn-in test targets in BUILD.bazel files:
     python buildscripts/bazel_burn_in.py generate-targets <origin_rev>

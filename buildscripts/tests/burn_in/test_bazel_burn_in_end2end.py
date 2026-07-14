@@ -16,7 +16,8 @@ BAZEL_NO_REMOTE_EXEC_CONFIG = "--config=no-remote-exec"
 # end-to-end test's runtime reasonable.
 RESMOKE_CONFIG_CQUERY = "kind(resmoke_config, //jstests/suites/...)"
 RESMOKE_CONFIG_STARLARK_EXPR = (
-    "': '.join([str(target.label).replace('@@','')] + " "[f.path for f in target.files.to_list()])"
+    "': '.join([str(target.label).replace('@@','')] + "
+    "[f.path for f in target.files.to_list()]) if target.files.to_list() else ''"
 )
 MAX_BAZEL_COMMAND_RETRIES = 3
 INITIAL_BAZEL_COMMAND_RETRY_DELAY_SECONDS = 1
