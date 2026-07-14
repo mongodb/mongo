@@ -3223,17 +3223,7 @@
       "licenses": [
         {
           "license": {
-            "id": "CC0-1.0"
-          }
-        },
-        {
-          "license": {
             "id": "MIT"
-          }
-        },
-        {
-          "license": {
-            "name": "Apache 2.0 with LLVM exception"
           }
         }
       ],
