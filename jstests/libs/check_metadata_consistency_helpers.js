@@ -61,6 +61,17 @@ export var MetadataConsistencyChecker = (function() {
                 }
             }
 
+            // Since bucket collections are not created atomically with their view, it may happen
+            // that checkMetadataConsistency interleaves with the creation steps in case of stepdown
+            const isStepdownSuite = Boolean(jsTest.options().runningWithShardStepdowns);
+            if (isStepdownSuite) {
+                for (let i = inconsistencies.length - 1; i >= 0; i--) {
+                    if (inconsistencies[i].type == "MalformedTimeseriesBucketsCollection") {
+                        inconsistencies.splice(i, 1);  // Remove inconsistency
+                    }
+                }
+            }
+
             assert.eq(0,
                       inconsistencies.length,
                       `Found metadata inconsistencies: ${tojson(inconsistencies)}`);

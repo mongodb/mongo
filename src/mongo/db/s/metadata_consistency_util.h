@@ -36,6 +36,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -100,6 +101,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& shardingCatalogCollections,
+    std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
     bool optionalCheckIndexes);
 
