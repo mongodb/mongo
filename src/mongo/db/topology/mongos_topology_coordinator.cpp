@@ -81,7 +81,7 @@ StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
  * ShutdownInProgress error message
  */
 
-constexpr std::string_view kMongosQuiesceModeShutdownMessage =
+constexpr std::string_view kQuiesceModeShutdownMessage =
     "Mongos is in quiesce mode and will shut down"sv;
 
 }  // namespace
@@ -111,7 +111,7 @@ std::shared_ptr<MongosHelloResponse> MongosTopologyCoordinator::_makeHelloRespon
     // Check that we are not in Quiesce Mode before returning a response to avoid responding with
     // a higher topology version, but no indication that we are shutting down.
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
-            kMongosQuiesceModeShutdownMessage,
+            kQuiesceModeShutdownMessage,
             !_inQuiesceMode);
 
     auto response = std::make_shared<MongosHelloResponse>(_topologyVersion);
@@ -127,7 +127,7 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
     // Fail all new hello requests with ShutdownInProgress if we've transitioned to Quiesce
     // Mode.
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
-            kMongosQuiesceModeShutdownMessage,
+            kQuiesceModeShutdownMessage,
             !_inQuiesceMode);
 
     // Respond immediately if:
@@ -229,7 +229,7 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
         _topologyVersion.setCounter(counter + 1);
         _promise->setError(
             Status(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
-                   kMongosQuiesceModeShutdownMessage));
+                   kQuiesceModeShutdownMessage));
 
         // Reset counter to 0 since we will respond to all waiting hello requests with an error.
         // All new hello requests will immediately fail with ShutdownInProgress.
