@@ -34,25 +34,22 @@ AggCmdComponents::AggCmdComponents(const AggregateCommandRequest& request_,
                                    const boost::optional<ExplainOptions::Verbosity>& verbosity)
     : involvedNamespaces(std::move(involvedNamespaces_)),
       _bypassDocumentValidation(request_.getBypassDocumentValidation().value_or(false)),
-      _allowPartialResults(request_.getAllowPartialResults().value_or(false)),
       _verbosity(verbosity),
       _hasField{.batchSize = request_.getCursor().getBatchSize().has_value(),
                 .bypassDocumentValidation = request_.getBypassDocumentValidation().has_value(),
                 .explain = request_.getExplain().has_value(),
-                .passthroughToShard = request_.getPassthroughToShard().has_value(),
-                .allowPartialResults = request_.getAllowPartialResults().has_value()} {}
+                // TODO SERVER-130981: Include aggregate allowPartialResults in query stats
+                .passthroughToShard = request_.getPassthroughToShard().has_value()} {}
 
 
 void AggCmdComponents::HashValue(absl::HashState state) const {
     state = absl::HashState::combine(std::move(state),
                                      _bypassDocumentValidation,
-                                     _allowPartialResults,
                                      _hasField.batchSize,
                                      _hasField.bypassDocumentValidation,
                                      _verbosity,
                                      _hasField.explain,
-                                     _hasField.passthroughToShard,
-                                     _hasField.allowPartialResults);
+                                     _hasField.passthroughToShard);
     // We don't need to add 'involvedNamespaces' here since they are already tracked/duplicated in
     // the Pipeline component of the query shape. We just expose them here for ease of
     // analysis/querying.
@@ -76,11 +73,6 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob,
     if (_hasField.bypassDocumentValidation) {
         bob.append(AggregateCommandRequest::kBypassDocumentValidationFieldName,
                    _bypassDocumentValidation);
-    }
-
-    // allowPartialResults
-    if (_hasField.allowPartialResults) {
-        bob.append(AggregateCommandRequest::kAllowPartialResultsFieldName, _allowPartialResults);
     }
 
     // We don't store the specified batch size values since they don't matter.

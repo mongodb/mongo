@@ -69,9 +69,8 @@ TEST_F(AggKeyTest, SizeOfAggCmdComponents) {
     auto aggComponents = std::make_unique<AggCmdComponents>(acr, namespaces, expCtx->getExplain());
 
     const auto minimumSize = sizeof(SpecificKeyComponents) +
-        sizeof(stdx::unordered_set<NamespaceString>) +
-        3 /*size for the two bools (_bypassDocumentValidation, _allowPartialResults) and HasField*/
-        + sizeof(boost::optional<mongo::ExplainOptions::Verbosity>) + namespaceSize(namespaces);
+        sizeof(stdx::unordered_set<NamespaceString>) + 2 /*size for bool and HasField*/ +
+        sizeof(boost::optional<mongo::ExplainOptions::Verbosity>) + namespaceSize(namespaces);
     ASSERT_GTE(aggComponents->size(), minimumSize);
     ASSERT_LTE(aggComponents->size(), minimumSize + 8 /*padding*/);
 }
@@ -96,7 +95,6 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
     acrAllValues.setExplain(true);
     acrAllValues.setBypassDocumentValidation(true);
     acrAllValues.setPassthroughToShard(PassthroughToShardOptions("shard1"));
-    acrAllValues.setAllowPartialResults(true);
 
     auto pipeline =
         pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
@@ -110,7 +108,7 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
         bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(
         fromjson(
-            R"({ bypassDocumentValidation: true, allowPartialResults: true, cursor: { batchSize: 1 }, explain: "queryPlanner", $_passthroughToShard: { shard: "?" } })"),
+            R"({ bypassDocumentValidation: true, cursor: { batchSize: 1 }, explain: "queryPlanner", $_passthroughToShard: { shard: "?" } })"),
         bob.obj());
 
     // Create a request that has no values set.
@@ -120,14 +118,6 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
         std::make_unique<AggCmdComponents>(acrNoSetValues, namespaces, expCtx->getExplain());
 
     ASSERT_EQ(aggComponentsAllValues->size(), aggComponentsNoValues->size());
-
-    // Confirm that when no optional values are set, none of them appear in the appended BSON.
-    // Unlike some other commands, agg's tri-state fields have no IDL default and are simply omitted
-    // when unset.
-    BSONObjBuilder noValuesBob;
-    aggComponentsNoValues->appendTo(
-        noValuesBob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
-    ASSERT_BSONOBJ_EQ(BSONObj(), noValuesBob.obj());
 }
 
 TEST_F(AggKeyTest, DifferentAggCmdComponentSizes) {
@@ -272,47 +262,6 @@ TEST_F(AggKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
     auto keyB = makeKeyWithHash("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 
     ASSERT_NE(absl::HashOf(*keyA), absl::HashOf(*keyB));
-}
-
-TEST_F(AggKeyTest, AllowPartialResultsTriState) {
-    auto makeKey = [](boost::optional<bool> allowPartialResults) {
-        auto nss = kDefaultTestNss.nss();
-        auto expCtx = make_intrusive<ExpressionContextForTest>(nss);
-        auto rawPipeline = {fromjson(R"({ $match: { x: 1 } })")};
-        AggregateCommandRequest acr(kDefaultTestNss.nss());
-        acr.setPipeline(rawPipeline);
-        if (allowPartialResults) {
-            acr.setAllowPartialResults(*allowPartialResults);
-        }
-        auto pipeline =
-            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
-        auto aggShape = std::make_unique<query_shape::AggCmdShape>(
-            acr, nss, pipeline->getInvolvedCollections(), *pipeline, expCtx);
-        return std::make_unique<AggKey>(
-            expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
-    };
-
-    auto keyOmitted = makeKey(boost::none);
-    auto keyTrue = makeKey(true);
-    auto keyFalse = makeKey(false);
-
-    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
-    const auto opts = query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
-
-    auto omittedBson = keyOmitted->toBson(expCtx->getOperationContext(), opts, {});
-    ASSERT_FALSE(omittedBson.hasField("allowPartialResults"));
-
-    auto trueBson = keyTrue->toBson(expCtx->getOperationContext(), opts, {});
-    ASSERT_TRUE(trueBson.hasField("allowPartialResults"));
-    ASSERT_TRUE(trueBson["allowPartialResults"].Bool());
-
-    auto falseBson = keyFalse->toBson(expCtx->getOperationContext(), opts, {});
-    ASSERT_TRUE(falseBson.hasField("allowPartialResults"));
-    ASSERT_FALSE(falseBson["allowPartialResults"].Bool());
-
-    ASSERT_NE(absl::HashOf(*keyOmitted), absl::HashOf(*keyTrue));
-    ASSERT_NE(absl::HashOf(*keyOmitted), absl::HashOf(*keyFalse));
-    ASSERT_NE(absl::HashOf(*keyTrue), absl::HashOf(*keyFalse));
 }
 
 }  // namespace

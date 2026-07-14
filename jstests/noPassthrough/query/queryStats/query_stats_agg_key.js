@@ -74,25 +74,6 @@ function validateSystemVariables(coll) {
     assert.eq(entry.key.queryShape.pipeline, [{$addFields: {falseField: "$$REMOVE"}}]);
 }
 
-// allowPartialResults is not supported for aggregations with write stages (e.g. $out), so it
-// can't be included in 'aggregateCommandObj' above. Rather than initialize a new
-// `aggregateCommandObj` that exercises a $match stage in the pipeline, this validation function
-// narrows the test coverage to just the allowPartialResults behavior.
-function validateAllowPartialResults(coll) {
-    const testDB = coll.getDB();
-
-    assert.commandWorked(
-        testDB.runCommand({
-            aggregate: coll.getName(),
-            pipeline: [{$match: {v: 1}}],
-            cursor: {},
-            allowPartialResults: true,
-        }),
-    );
-    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
-    assert.eq(entry.key.allowPartialResults, true);
-}
-
 withQueryStatsEnabled(collName, (coll) => {
     // Have to create an index for hint not to fail.
     assert.commandWorked(coll.createIndex({v: 1}));
@@ -107,5 +88,4 @@ withQueryStatsEnabled(collName, (coll) => {
     });
 
     validateSystemVariables(coll);
-    validateAllowPartialResults(coll);
 });

@@ -47,7 +47,6 @@ struct AggCmdComponents : public SpecificKeyComponents {
 
     stdx::unordered_set<NamespaceString> involvedNamespaces;
     bool _bypassDocumentValidation;
-    bool _allowPartialResults;
     const boost::optional<mongo::ExplainOptions::Verbosity> _verbosity;
 
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
@@ -57,7 +56,6 @@ struct AggCmdComponents : public SpecificKeyComponents {
         bool bypassDocumentValidation : 1 = false;
         bool explain : 1 = false;
         bool passthroughToShard : 1 = false;
-        bool allowPartialResults : 1 = false;
     } _hasField;
 };
 
