@@ -11,7 +11,6 @@
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {assertFailsValidation} from "jstests/libs/doc_validation_utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -22,8 +21,6 @@ const errorAndLogId = 7488700;
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 
 function checkLogsForFailedValidation(db, logId) {
-    // In case of sharded deployments, look on all shards and expect the log to be found on one of
-    // them.
     const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
 
     const errInfo = {
@@ -36,6 +33,8 @@ function checkLogsForFailedValidation(db, logId) {
         },
     };
 
+    // In case of sharded deployments, look on all shards and expect the log to be found on one of
+    // them.
     assert(
         nodesToCheck.some((conn) =>
             checkLog.checkContainsOnceJson(conn, logId, {
@@ -47,104 +46,98 @@ function checkLogsForFailedValidation(db, logId) {
     );
 }
 
-function runTest(db) {
-    const t = db[collName];
-    t.drop();
-
-    const validatorExpression = {a: 1};
-    assert.commandWorked(db.createCollection(t.getName(), {validator: validatorExpression}));
-
-    assert.commandWorked(t.insert({_id: 1, a: 1}));
-    assert.eq(1, t.count());
-
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
-        const res = assert.commandWorkedOrFailedWithCode(
-            t.runCommand("collMod", {validationAction: "errorAndLog"}),
-            ErrorCodes.InvalidOptions,
-        );
-        if (res.ok) {
-            assertFailsValidation(t.update({}, {$set: {a: 2}}));
-            checkLogsForFailedValidation(db, errorAndLogId);
-            // make sure persisted
-            const info = db.getCollectionInfos({name: t.getName()})[0];
-            assert.eq("errorAndLog", info.options.validationAction, tojson(info));
-        }
-    }
-
-    // check we can do a bad update in warn mode
-    assert.commandWorked(t.runCommand("collMod", {validationAction: "warn"}));
-    assert.commandWorked(t.update({}, {$set: {a: 2}}));
-    assert.eq(1, t.find({a: 2}).itcount());
-
-    // check log for message. In case of sharded deployments, look on all shards and expect the log
-    // to be found on one of them.
-    checkLogsForFailedValidation(db, warnLogId);
-
-    // make sure persisted
-    const info = db.getCollectionInfos({name: t.getName()})[0];
-    assert.eq("warn", info.options.validationAction, tojson(info));
-}
-
-function runTestWithRedaction(db) {
-    if (!hasEnterpriseModule) {
-        jsTest.log.info("Skipping redaction test: enterprise module not available");
-        return;
-    }
-
-    const t = db[collName + "_redact"];
-    t.drop();
+function checkLogsForRedactedValidation(db, logId) {
+    const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
 
     const redactedErrInfo = {
-        failingDocumentId: 1,
+        failingDocumentId: "###",
         details: {
-            operatorName: "$eq",
-            specifiedAs: {a: 1},
-            reason: "comparison failed",
+            operatorName: "###",
+            specifiedAs: {a: "###"},
+            reason: "###",
             consideredValue: "###",
         },
     };
 
-    // Test warn mode with redaction.
-    assert.commandWorked(db.createCollection(t.getName(), {validator: {a: 1}, validationAction: "warn"}));
-    assert.commandWorked(t.insert({_id: 1, a: 1}));
-
-    assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: true}));
-    try {
-        assert.commandWorked(t.update({}, {$set: {a: 2}}));
-    } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: false}));
-    }
-
+    // With full log redaction, all leaf values are replaced with "###". Objects and arrays retain
+    // their structure but every scalar inside becomes "###".
     assert(
-        checkLog.checkContainsOnceJson(db, warnLogId, {
-            "errInfo": function (obj) {
-                return documentEq(obj, redactedErrInfo);
-            },
-        }),
+        nodesToCheck.some((conn) =>
+            checkLog.checkContainsOnceJson(conn, logId, {
+                "errInfo": function (obj) {
+                    return documentEq(obj, redactedErrInfo);
+                },
+            }),
+        ),
     );
+}
 
-    // Test errorAndLog mode with redaction.
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
-        const res = assert.commandWorkedOrFailedWithCode(
-            t.runCommand("collMod", {validationAction: "errorAndLog"}),
-            ErrorCodes.InvalidOptions,
-        );
-        if (res.ok) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: true}));
-            try {
-                assertFailsValidation(t.update({_id: 1}, {$set: {a: 3}}));
-            } finally {
-                assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: false}));
-            }
+function runTest(db) {
+    const coll = db[collName];
+    coll.drop();
 
-            assert(
-                checkLog.checkContainsOnceJson(db, errorAndLogId, {
-                    "errInfo": function (obj) {
-                        return documentEq(obj, redactedErrInfo);
-                    },
-                }),
-            );
+    const validatorExpression = {a: 1};
+    assert.commandWorked(db.createCollection(coll.getName(), {validator: validatorExpression}));
+
+    assert.commandWorked(coll.insert({_id: 1, a: 1}));
+    assert.eq(1, coll.count());
+
+    assert.commandWorked(coll.runCommand("collMod", {validationAction: "errorAndLog"}));
+    assertFailsValidation(coll.update({}, {$set: {a: 2}}));
+    checkLogsForFailedValidation(db, errorAndLogId);
+    // make sure persisted
+    const errorAndLogInfo = db.getCollectionInfos({name: coll.getName()})[0];
+    assert.eq("errorAndLog", errorAndLogInfo.options.validationAction, tojson(errorAndLogInfo));
+
+    // check we can do a bad update in warn mode
+    assert.commandWorked(coll.runCommand("collMod", {validationAction: "warn"}));
+    assert.commandWorked(coll.update({}, {$set: {a: 2}}));
+    assert.eq(1, coll.find({a: 2}).itcount());
+
+    checkLogsForFailedValidation(db, warnLogId);
+
+    // make sure persisted
+    const info = db.getCollectionInfos({name: coll.getName()})[0];
+    assert.eq("warn", info.options.validationAction, tojson(info));
+
+    // Verify that errInfo is fully redacted when log redaction is enabled.
+    if (hasEnterpriseModule) {
+        const adminDb = db.getSiblingDB("admin");
+        FixtureHelpers.runCommandOnEachPrimary({
+            db: adminDb,
+            cmdObj: {setParameter: 1, redactClientLogData: true},
+        });
+        try {
+            assert.commandWorked(coll.update({}, {$set: {a: 3}}));
+        } finally {
+            FixtureHelpers.runCommandOnEachPrimary({
+                db: adminDb,
+                cmdObj: {setParameter: 1, redactClientLogData: false},
+            });
         }
+        checkLogsForRedactedValidation(db, warnLogId);
+
+        // Restore the document to a validator-compliant state while still in warn mode. The prior
+        // warn-mode updates set "a" to 2 then 3, which violate the validator {a: 1}. Bringing it
+        // back into compliance ensures the upcoming errorAndLog-mode case rejects only because of
+        // its own update, not pre-existing invalid state.
+        assert.commandWorked(coll.update({}, {$set: {a: 1}}));
+
+        // Verify errorAndLog mode also redacts errInfo.
+        assert.commandWorked(coll.runCommand("collMod", {validationAction: "errorAndLog"}));
+        FixtureHelpers.runCommandOnEachPrimary({
+            db: adminDb,
+            cmdObj: {setParameter: 1, redactClientLogData: true},
+        });
+        try {
+            assertFailsValidation(coll.update({}, {$set: {a: 4}}));
+        } finally {
+            FixtureHelpers.runCommandOnEachPrimary({
+                db: adminDb,
+                cmdObj: {setParameter: 1, redactClientLogData: false},
+            });
+        }
+        checkLogsForRedactedValidation(db, errorAndLogId);
     }
 }
 
@@ -153,7 +146,6 @@ function runTestWithRedaction(db) {
     const db = conn.getDB(jsTestName());
     try {
         runTest(db);
-        runTestWithRedaction(db);
     } finally {
         MongoRunner.stopMongod(conn);
     }
