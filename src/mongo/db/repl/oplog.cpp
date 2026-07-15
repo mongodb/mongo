@@ -133,6 +133,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
@@ -3232,70 +3233,115 @@ Status applyContainerOperations(OperationContext* opCtx,
         // skipping the read-before-write on layered tables.
         const auto policy = engine->getEngine()->chooseBlindWritePolicy(opCtx);
 
+        auto* opObserver = opCtx->getServiceContext()->getOpObserver();
+
         switch (op->getOpType()) {
             case repl::OpTypeEnum::kContainerInsert: {
                 auto parsed = repl::ContainerInsertOplogEntryO::parse(
                     o, IDLParserContext("ContainerInsertOplogEntryO"));
-                // TODO SERVER-130643 Handle Array Variant
-                invariant(parsed.getValue().has_value() && !parsed.getValue()->isArrayVal());
-                auto valSpan = parsed.getValue()->data();
-                s = parsed.getKey().visit([&](auto key) -> Status {
-                    // TODO SERVER-130645: Handle batched (array) container keys.
-                    if constexpr (std::is_same_v<std::decay_t<decltype(key)>,
-                                                 std::vector<std::span<const char>>>) {
-                        MONGO_UNIMPLEMENTED;
-                    } else {
+                const auto& maybeVal = parsed.getValue();
+                s = parsed.getKey().visit(OverloadedVisitor{
+                    [&](std::vector<std::span<const char>> keys) -> Status {
+                        // Bytes-keyed range insert (SERVER-130645): an array of keys, each written
+                        // with an empty value. The batch commits together with the enclosing wuow.
+                        // An array key carries no value; construction validation (13064100) permits
+                        // a value here, so reject it gracefully rather than tripping an invariant.
+                        uassert(13064104,
+                                "A container insert with an array of keys must not carry a value",
+                                !maybeVal);
+                        const auto emptyVal = std::span<const char>{};
+                        auto status = storage_engine_direct_crud::insert(
+                            *engine, *ru, ident, keys, emptyVal, policy);
+                        if (status.isOK()) {
+                            for (const auto& k : keys) {
+                                opObserver->onContainerInsert(opCtx, ident, k, emptyVal);
+                            }
+                        }
+                        return status;
+                    },
+                    [&](int64_t key) -> Status {
+                        if (maybeVal && maybeVal->isArrayVal()) {
+                            // Int-keyed range insert (SERVER-130643): the i-th value is written at
+                            // key (base + i), so keys auto-increment.
+                            const auto values = maybeVal->getArrayVal();
+                            int64_t i = 0;
+                            for (const auto& v : values) {
+                                auto status = storage_engine_direct_crud::insert(
+                                    *engine, *ru, ident, key + i, v, policy);
+                                if (!status.isOK()) {
+                                    return status;
+                                }
+                                opObserver->onContainerInsert(opCtx, ident, key + i, v);
+                                ++i;
+                            }
+                            return Status::OK();
+                        }
+                        // Single int-keyed insert.
+                        invariant(maybeVal);
+                        const auto valSpan = maybeVal->data();
                         auto status = storage_engine_direct_crud::insert(
                             *engine, *ru, ident, key, valSpan, policy);
                         if (status.isOK()) {
-                            opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-                                opCtx, ident, key, valSpan);
+                            opObserver->onContainerInsert(opCtx, ident, key, valSpan);
                         }
                         return status;
-                    }
+                    },
+                    [&](std::span<const char> key) -> Status {
+                        // Single bytes-keyed insert. 'v' is optional; an absent value is empty.
+                        const auto valSpan = maybeVal.value_or(ContainerVal{}).data();
+                        auto status = storage_engine_direct_crud::insert(
+                            *engine, *ru, ident, key, valSpan, policy);
+                        if (status.isOK()) {
+                            opObserver->onContainerInsert(opCtx, ident, key, valSpan);
+                        }
+                        return status;
+                    },
                 });
                 break;
             }
             case repl::OpTypeEnum::kContainerUpdate: {
+                // Updates are single-key by design (validated at oplog-entry construction), so
+                // neither the key nor the value is ever an array here.
                 auto parsed = repl::ContainerUpdateOplogEntryO::parse(
                     o, IDLParserContext("ContainerUpdateOplogEntryO"));
-                // TODO SERVER-130643 Handle Array Variant
                 invariant(!parsed.getValue().isArrayVal());
                 auto valSpan = parsed.getValue().data();
-                s = parsed.getKey().visit([&](auto key) -> Status {
-                    // TODO SERVER-130645: Handle batched (array) container keys.
-                    if constexpr (std::is_same_v<std::decay_t<decltype(key)>,
-                                                 std::vector<std::span<const char>>>) {
-                        MONGO_UNIMPLEMENTED;
-                    } else {
+                s = parsed.getKey().visit(OverloadedVisitor{
+                    [&](const std::vector<std::span<const char>>&) -> Status { MONGO_UNREACHABLE; },
+                    [&](auto key) -> Status {
                         auto status = storage_engine_direct_crud::update(
                             *engine, *ru, ident, key, valSpan, policy);
                         if (status.isOK()) {
-                            opCtx->getServiceContext()->getOpObserver()->onContainerUpdate(
-                                opCtx, ident, key, valSpan);
+                            opObserver->onContainerUpdate(opCtx, ident, key, valSpan);
                         }
                         return status;
-                    }
+                    },
                 });
                 break;
             }
             case repl::OpTypeEnum::kContainerDelete: {
                 auto parsed = repl::ContainerDeleteOplogEntryO::parse(
                     o, IDLParserContext("ContainerDeleteOplogEntryO"));
-                s = parsed.getKey().visit([&](auto key) -> Status {
-                    // TODO SERVER-130645: Handle batched (array) container keys.
-                    if constexpr (std::is_same_v<std::decay_t<decltype(key)>,
-                                                 std::vector<std::span<const char>>>) {
-                        MONGO_UNIMPLEMENTED;
-                    } else {
+                s = parsed.getKey().visit(OverloadedVisitor{
+                    [&](std::vector<std::span<const char>> keys) -> Status {
+                        // Bytes-keyed range delete (SERVER-130645): an array of keys to remove.
+                        auto status =
+                            storage_engine_direct_crud::remove(*engine, *ru, ident, keys, policy);
+                        if (status.isOK()) {
+                            for (const auto& k : keys) {
+                                opObserver->onContainerDelete(opCtx, ident, k);
+                            }
+                        }
+                        return status;
+                    },
+                    [&](auto key) -> Status {
                         auto status =
                             storage_engine_direct_crud::remove(*engine, *ru, ident, key, policy);
                         if (status.isOK()) {
-                            opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-                                opCtx, ident, key);
+                            opObserver->onContainerDelete(opCtx, ident, key);
                         }
                         return status;
-                    }
+                    },
                 });
                 break;
             }

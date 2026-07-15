@@ -38,16 +38,14 @@ Status insert(StorageEngine& engine,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
 
 
-// This function has the same behavior as KVEngine::insertIntoIdent()
-// TODO SERVER-130643
-inline Status insert(StorageEngine& engine,
-                     RecoveryUnit& ru,
-                     std::string_view ident,
-                     std::span<std::span<const char>> keys,
-                     std::span<const char> value,
-                     BlindWritePolicy policy = BlindWritePolicy::nonBlind) {
-    MONGO_UNIMPLEMENTED;
-}
+// Inserts every key in 'keys' with the same 'value', as a batched (range) write. Stops and returns
+// the first failing status, leaving the enclosing WriteUnitOfWork to roll back partial work.
+Status insert(StorageEngine& engine,
+              RecoveryUnit& ru,
+              std::string_view ident,
+              std::span<std::span<const char>> keys,
+              std::span<const char> value,
+              BlindWritePolicy policy = BlindWritePolicy::nonBlind);
 
 // This function has the same behavior as KVEngine::updateInIdent()
 Status update(StorageEngine& engine,
@@ -91,14 +89,12 @@ Status remove(StorageEngine& engine,
               int64_t key,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
 
-// This function has the same behavior as KVEngine::deleteFromIdent()
-// TODO SERVER-130643
-inline Status remove(StorageEngine& engine,
-                     RecoveryUnit& ru,
-                     std::string_view ident,
-                     std::span<std::span<const char>> keys,
-                     BlindWritePolicy policy = BlindWritePolicy::nonBlind) {
-    MONGO_UNIMPLEMENTED;
-}
+// Removes every key in 'keys', as a batched (range) write. Stops and returns the first failing
+// status, leaving the enclosing WriteUnitOfWork to roll back partial work.
+Status remove(StorageEngine& engine,
+              RecoveryUnit& ru,
+              std::string_view ident,
+              std::span<std::span<const char>> keys,
+              BlindWritePolicy policy = BlindWritePolicy::nonBlind);
 
 }  // namespace mongo::storage_engine_direct_crud

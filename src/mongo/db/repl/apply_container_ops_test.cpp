@@ -722,5 +722,179 @@ TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, UpdateNonNumericVersio
     ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
 }
 
+// Builds a container OplogEntry ('ci'/'cu'/'cd') with a caller-supplied, verbatim 'o' field so that
+// the batched (range) encodings can be applied end to end. Constructing the DurableOplogEntry runs
+// the same container 'o' validation as production.
+OplogEntry makeContainerBatchEntry(const NamespaceString& nss,
+                                   std::string_view ident,
+                                   OpTypeEnum type,
+                                   const BSONObj& o) {
+    return OplogEntry(DurableOplogEntry(makeBaseParams(nss, ident, type, o)));
+}
+
+// Int-keyed range insert: a NumberLong base key plus an array of values, with the i-th value
+// written at key (base + i).
+TEST_F(ApplyContainerOpsTest, BatchInsertIntKeyedRange) {
+    const int64_t base = 100;
+    auto v0 = BSONBinData("A", 1, BinDataGeneral);
+    auto v1 = BSONBinData("B", 1, BinDataGeneral);
+    auto v2 = BSONBinData("C", 1, BinDataGeneral);
+
+    auto o = BSON("k" << base << "v" << BSON_ARRAY(v0 << v1 << v2));
+    auto entry = makeContainerBatchEntry(_nss, _intIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    auto g0 = _get(_opCtx.get(), _intIdent, base);
+    auto g1 = _get(_opCtx.get(), _intIdent, base + 1);
+    auto g2 = _get(_opCtx.get(), _intIdent, base + 2);
+    ASSERT_OK(g0.getStatus());
+    ASSERT_OK(g1.getStatus());
+    ASSERT_OK(g2.getStatus());
+    EXPECT_EQ(0, std::memcmp(g0.getValue().get(), v0.data, v0.length));
+    EXPECT_EQ(0, std::memcmp(g1.getValue().get(), v1.data, v1.length));
+    EXPECT_EQ(0, std::memcmp(g2.getValue().get(), v2.data, v2.length));
+}
+
+// Int-keyed range insert rolls back entirely if a mid-range write fails.
+TEST_F(ApplyContainerOpsTest, BatchInsertIntKeyedRangeMidFailureRollsBack) {
+    const int64_t base = 1;
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+
+    // Pre-insert 'base + 1' so the second write of the range collides and fails.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeContainerInsertOplogEntry(OpTime(), _intIdent, base + 1, v)));
+
+    auto n0 = BSONBinData("X", 1, BinDataGeneral);
+    auto n1 = BSONBinData("Y", 1, BinDataGeneral);
+    auto o = BSON("k" << base << "v" << BSON_ARRAY(n0 << n1));
+    auto entry = makeContainerBatchEntry(_nss, _intIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_NOT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    // The first write ('base') was rolled back with the failed op.
+    ASSERT_EQ(_get(_opCtx.get(), _intIdent, base).getStatus(), ErrorCodes::NoSuchKey);
+}
+
+// Bytes-keyed range insert: an array of BinData keys, each inserted with an empty value.
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRange) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k2, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral)));
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (const char* k : {k1, k2, k3}) {
+        ASSERT_OK(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k, 2)).getStatus());
+    }
+}
+
+// An array of keys carries no value. Construction validation permits a value alongside an array
+// key, so the apply path must reject it gracefully (a DBException) rather than tripping an
+// invariant and crashing the server.
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeWithValueIsRejected) {
+    const char k1[] = "K1", k2[] = "K2";
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+
+    auto o = BSON(
+        "k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral) << BSONBinData(k2, 2, BinDataGeneral))
+            << "v" << v);
+    // The entry is constructible (validation 13064100 allows a value with an array key)...
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o);
+    // ...but applying it fails with a graceful error rather than an invariant/fassert.
+    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), entry), DBException, 13064104);
+}
+
+// Bytes-keyed range delete: an array of BinData keys to remove.
+TEST_F(ApplyContainerOpsTest, BatchDeleteBytesKeyedRange) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+    for (const char* k : {k1, k2, k3}) {
+        ASSERT_OK(applyContainerOpHelper(
+            _opCtx.get(),
+            makeContainerInsertOplogEntry(OpTime(), _bytesIdent, {k, 2, BinDataGeneral}, v)));
+    }
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral)));
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerDelete, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    ASSERT_EQ(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k1, 2)).getStatus(),
+              ErrorCodes::NoSuchKey);
+    ASSERT_OK(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k2, 2)).getStatus());
+    ASSERT_EQ(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k3, 2)).getStatus(),
+              ErrorCodes::NoSuchKey);
+}
+
+// End-to-end within the container layer: build the 'o' field through the container serializer
+// (ContainerInsertOplogEntryO::toBSON, which drives ContainerKey/ContainerVal::serialize) rather
+// than by hand, then apply it. This exercises the serialize -> parse -> apply round trip -- as
+// close to "generate then apply" as is possible until batched-write generation exists.
+TEST_F(ApplyContainerOpsTest, BatchInsertIntKeyedRangeSerializedRoundTrip) {
+    const int64_t base = 200;
+    constexpr std::string_view a = "a", b = "b", c = "c";
+    std::vector<std::span<const char>> values{
+        {a.data(), a.size()}, {b.data(), b.size()}, {c.data(), c.size()}};
+
+    ContainerInsertOplogEntryO o;
+    o.setKey(ContainerKey(base));
+    o.setValue(ContainerVal(values));
+
+    auto entry = makeContainerBatchEntry(_nss, _intIdent, OpTypeEnum::kContainerInsert, o.toBSON());
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (int64_t i = 0; i < 3; ++i) {
+        auto g = _get(_opCtx.get(), _intIdent, base + i);
+        ASSERT_OK(g.getStatus());
+        ASSERT_EQ(0, std::memcmp(g.getValue().get(), values[i].data(), values[i].size()));
+    }
+}
+
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeSerializedRoundTrip) {
+    constexpr std::string_view k1 = "K1", k2 = "K2", k3 = "K3";
+    std::vector<std::span<const char>> keys{
+        {k1.data(), k1.size()}, {k2.data(), k2.size()}, {k3.data(), k3.size()}};
+
+    ContainerInsertOplogEntryO o;
+    o.setKey(ContainerKey(keys));
+    // No value: a bytes-keyed range insert writes empty values.
+
+    auto entry =
+        makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o.toBSON());
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (std::string_view k : {k1, k2, k3}) {
+        ASSERT_OK(
+            _get(_opCtx.get(), _bytesIdent, std::span<const char>(k.data(), k.size())).getStatus());
+    }
+}
+
+TEST_F(ApplyContainerOpsTest, BatchDeleteBytesKeyedRangeSerializedRoundTrip) {
+    constexpr std::string_view k1 = "K1", k2 = "K2";
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+    for (std::string_view k : {k1, k2}) {
+        ASSERT_OK(applyContainerOpHelper(
+            _opCtx.get(),
+            makeContainerInsertOplogEntry(
+                OpTime(), _bytesIdent, {k.data(), static_cast<int>(k.size()), BinDataGeneral}, v)));
+    }
+
+    std::vector<std::span<const char>> keys{{k1.data(), k1.size()}, {k2.data(), k2.size()}};
+    ContainerDeleteOplogEntryO o;
+    o.setKey(ContainerKey(keys));
+
+    auto entry =
+        makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerDelete, o.toBSON());
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    ASSERT_EQ(
+        _get(_opCtx.get(), _bytesIdent, std::span<const char>(k1.data(), k1.size())).getStatus(),
+        ErrorCodes::NoSuchKey);
+    ASSERT_EQ(
+        _get(_opCtx.get(), _bytesIdent, std::span<const char>(k2.data(), k2.size())).getStatus(),
+        ErrorCodes::NoSuchKey);
+}
+
 }  // namespace
 }  // namespace mongo::repl

@@ -32,6 +32,20 @@ Status insert(StorageEngine& engine,
     return engine.getEngine()->insertIntoIdent(ru, ident, key, value, policy);
 }
 
+Status insert(StorageEngine& engine,
+              RecoveryUnit& ru,
+              std::string_view ident,
+              std::span<std::span<const char>> keys,
+              std::span<const char> value,
+              BlindWritePolicy policy) {
+    for (const auto& key : keys) {
+        if (auto status = insert(engine, ru, ident, key, value, policy); !status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status update(StorageEngine& engine,
               RecoveryUnit& ru,
               std::string_view ident,
@@ -78,6 +92,19 @@ Status remove(StorageEngine& engine,
               int64_t key,
               BlindWritePolicy policy) {
     return engine.getEngine()->deleteFromIdent(ru, ident, key, policy);
+}
+
+Status remove(StorageEngine& engine,
+              RecoveryUnit& ru,
+              std::string_view ident,
+              std::span<std::span<const char>> keys,
+              BlindWritePolicy policy) {
+    for (const auto& key : keys) {
+        if (auto status = remove(engine, ru, ident, key, policy); !status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
 }
 
 }  // namespace mongo::storage_engine_direct_crud

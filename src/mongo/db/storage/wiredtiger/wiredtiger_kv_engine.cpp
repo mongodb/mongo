@@ -579,7 +579,11 @@ StatusWith<UniqueBuffer> WiredTigerKVEngineBase::getFromIdent(
         return status;
 
     UniqueBuffer out = UniqueBuffer::allocate(v.size());
-    std::memcpy(out.get(), v.data(), v.size());
+    // Guard the copy: a zero-length value (e.g. an empty-valued container key) has a null data
+    // pointer, and memcpy() with a null argument is undefined behavior even for a length of zero.
+    if (v.size() > 0) {
+        std::memcpy(out.get(), v.data(), v.size());
+    }
     return out;
 }
 
