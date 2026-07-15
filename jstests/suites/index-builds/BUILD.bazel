@@ -179,3 +179,52 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "replica_sets_primary_driven_index_builds",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_primary_driven_index_builds.yml",
+    tags = [
+        "ci-default",
+        "primary_driven_index_builds",
+        "replica_sets",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+        "//src/third_party/wiredtiger:wt",
+    ],
+)
+
+resmoke_suite_test(
+    name = "auth_primary_driven_index_builds",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/auth_primary_driven_index_builds.yml",
+    shard_count = 4,
+    tags = [
+        "auth",
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # commands_builtin_roles_sharded.js times out after 16 minutes.
+        "primary_driven_index_builds",
+        "resources:cpu:2",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_primary_driven_index_builds",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_primary_driven_index_builds.yml",
+    tags = [
+        "ci-default",
+        "primary_driven_index_builds",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
