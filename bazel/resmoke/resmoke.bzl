@@ -351,6 +351,7 @@ def resmoke_suite_test(
         # are included in all suites for now.
         # TODO(SERVER-122756), prune this, ideally removing it entirely.
         "//jstests/aggregation/extras:merge_helpers.js",
+        "//jstests/auth:all_javascript_files",
         "//jstests/auth/lib:all_subpackage_javascript_files",
         "//jstests/concurrency/fsm_libs:all_javascript_files",
         "//jstests/concurrency/fsm_libs:shard_fixture.js",
@@ -388,6 +389,8 @@ def resmoke_suite_test(
         "//jstests/with_mongot:keyfile_for_testing",
         "//jstests/with_mongot/search_mocked/lib:all_javascript_files",
         "//jstests/with_mongot/search_mocked/ssl/lib:all_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/audit/lib:all_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/audit/lib:localKey",
         "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:all_javascript_files",
         "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:ekf",
         "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:ekf2",

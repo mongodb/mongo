@@ -422,3 +422,170 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "audit",
+    config = "//buildscripts/resmokeconfig:suites/audit.yml",
+    shard_count = 20,
+    tags = [
+        "audit",
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  #log_rotate_command_errors.js fails, "cannot find name for user ID 108" since remote executors do not have a username set.
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/audit:mongoauditdecrypt",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "auth_audit",
+    config = "//buildscripts/resmokeconfig:suites/auth_audit.yml",
+    data = [
+        "//jstests/sharding/libs:proxy_protocol_server",
+    ],
+    shard_count = 6,
+    tags = [
+        "audit",
+        "auth",
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # commands_builtin_roles_sharded.js timeout after 16 minutes.
+        "patch_build",
+        "requires_replicated_fast_count_recovery",
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "ese",
+    config = "//buildscripts/resmokeconfig:suites/ese.yml",
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "incompatible_with_bazel_remote_test",  # Needs kmip_server.py, for which rules_poetry does not properly handle PyKMIP from git.
+        "patch_build",
+        "requires_replicated_fast_count_recovery",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "external_auth",
+    config = "//buildscripts/resmokeconfig:suites/external_auth.yml",
+    resmoke_args = ["--excludeWithAnyTags=requires_domain_controller"],
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # Connects to external AWS resources.
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "external_auth_aws",
+    config = "//buildscripts/resmokeconfig:suites/external_auth_aws.yml",
+    shard_count = 2,
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # Connects to external AWS resources.
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multiversion_auth",
+    config = "//buildscripts/resmokeconfig:suites/multiversion_auth.yml",
+    multiversion_deps = [
+        "//bazel/resmoke/multiversion:last-continuous",
+        "//bazel/resmoke/multiversion:last-lts",
+    ],
+    shard_count = 9,
+    tags = [
+        "auth",
+        "ci-default",
+        "future_git_tag_incompatible",
+        "multiversion",
+        "no_multiversion_generate_tasks",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_auth_audit",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_auth_audit.yml",
+    shard_count = 50,
+    tags = [
+        "audit",
+        "auth",
+        "ci-release-critical",
+        "non_live_record",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_auth",
+    config = "//buildscripts/resmokeconfig:suites/sharding_auth.yml",
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
