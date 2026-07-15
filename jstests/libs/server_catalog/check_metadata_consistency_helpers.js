@@ -63,7 +63,7 @@ export var MetadataConsistencyChecker = (function () {
 
             // Since bucket collections are not created atomically with their view, it may happen
             // that checkMetadataConsistency interleaves with the creation steps in case of stepdown
-            const isStepdownSuite = Boolean(jsTest.options().runningWithShardStepdowns);
+            const isStepdownSuite = Boolean(TestData.runningWithShardStepdowns);
             if (isStepdownSuite) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {
                     if (inconsistencies[i].type == "MalformedTimeseriesBucketsCollection") {
