@@ -992,6 +992,7 @@ let testCases = {
     getShardingReady: {skip: "internal command"},
     whatsmysni: {skip: "does not accept read or write concern"},
     whatsmyuri: {skip: "internal command"},
+    wiredTigerRepair: {skip: "does not accept read or write concern"},
 };
 
 commandsRemovedFromMongodSinceLastLTS.forEach(function (cmd) {

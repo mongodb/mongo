@@ -1014,6 +1014,24 @@ public:
     virtual Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) = 0;
 
     /**
+     * Runs WiredTiger's runtime repair interface (wiredtiger_repair()) and returns its diagnostic
+     * report. Caller must hold a global lock so the storage engine can't shut down mid-operation.
+     */
+    virtual StatusWith<std::string> wiredTigerRepair(const std::string& config) {
+        return {ErrorCodes::CommandNotSupported,
+                "The current storage engine does not support wiredTigerRepair"};
+    }
+
+    /**
+     * Recomputes and persists the disaggregated database size via a checkpoint. Requires a
+     * disaggregated leader connection.
+     */
+    virtual Status fixDatabaseSize() {
+        return {ErrorCodes::CommandNotSupported,
+                "The current storage engine does not support fixDatabaseSize"};
+    }
+
+    /**
      * Pauses (pause=true) or resumes (pause=false) background auto-compaction for a replica set
      * write block critical section transition. Pausing saves the currently-active configuration so
      * the storage engine can restore it on resume; a run-once compaction is never treated as

@@ -8244,6 +8244,18 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "wiredTigerRepair",
+            command: {wiredTigerRepair: 1, fetchMetadata: {local: true}},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {__system: 1},
+                    privileges: [{resource: {cluster: true}, actions: ["wiredtiger"]}],
+                },
+            ],
+        },
+        {
             testname: "_configsvrAddShard",
             command: {_configsvrAddShard: "x"},
             skipSharded: true,

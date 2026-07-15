@@ -196,6 +196,7 @@ enums:
             validate: "validate"
             viewRole: "viewRole"
             viewUser: "viewUser"
+            wiredtiger: "wiredtiger"
             applyOps: "applyOps"
             containerInsert: "containerInsert" # run "ci" ops in the applyOps command
             containerDelete: "containerDelete" # run "cd" ops in the applyOps command

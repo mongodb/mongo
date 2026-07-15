@@ -447,6 +447,7 @@ let testCases = {
     waitForFailPoint: {skip: "does not return user data"},
     getShardingReady: {skip: "does not return user data"},
     whatsmyuri: {skip: "does not return user data"},
+    wiredTigerRepair: {skip: "does not return user data"},
 };
 
 commandsRemovedFromMongosSinceLastLTS.forEach(function (cmd) {

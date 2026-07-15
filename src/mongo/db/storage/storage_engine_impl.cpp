@@ -1179,6 +1179,14 @@ Status StorageEngineImpl::autoCompact(RecoveryUnit& ru, const AutoCompactOptions
     return _engine->autoCompact(ru, options);
 }
 
+StatusWith<std::string> StorageEngineImpl::wiredTigerRepair(const std::string& config) {
+    return _engine->wiredTigerRepair(config);
+}
+
+Status StorageEngineImpl::fixDatabaseSize() {
+    return _engine->fixDatabaseSize();
+}
+
 namespace {
 // Background auto-compaction reconfigures are applied asynchronously by the storage engine;
 // while a previous reconfigure is still being consumed, a new one is transiently rejected with

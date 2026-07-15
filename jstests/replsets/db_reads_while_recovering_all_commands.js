@@ -497,6 +497,7 @@ const allCommands = {
     getShardingReady: {skip: isNotAUserDataRead},
     whatsmysni: {skip: isNotAUserDataRead},
     whatsmyuri: {skip: isNotAUserDataRead},
+    wiredTigerRepair: {skip: isAnInternalCommand},
 };
 
 /**

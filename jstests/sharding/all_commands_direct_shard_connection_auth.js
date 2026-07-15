@@ -1379,6 +1379,11 @@ const allCommands = {
         isAdminCommand: true,
         shouldFail: false,
     },
+    wiredTigerRepair: {
+        command: {wiredTigerRepair: 1, fetchMetadata: {local: true}},
+        isAdminCommand: true,
+        shouldFail: true,
+    },
 };
 
 /**

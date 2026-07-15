@@ -3564,6 +3564,7 @@ const wcCommandsTests = {
     getShardingReady: {skip: "internal command"},
     whatsmysni: {skip: "does not accept write concern"},
     whatsmyuri: {skip: "internal command"},
+    wiredTigerRepair: {skip: "does not accept write concern"},
 };
 
 // All commands applicable on timeseries collections in the server.
@@ -4785,6 +4786,7 @@ const wcTimeseriesCommandsTests = {
     getShardingReady: {skip: "internal command"},
     whatsmysni: {skip: "does not accept write concern"},
     whatsmyuri: {skip: "internal command"},
+    wiredTigerRepair: {skip: "does not accept write concern"},
 };
 
 // A list of additional CRUD ops which exercise different write paths, and do error handling

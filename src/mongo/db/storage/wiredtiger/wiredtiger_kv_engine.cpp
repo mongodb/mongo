@@ -3426,6 +3426,22 @@ Status WiredTigerKVEngine::autoCompact(RecoveryUnit& ru, const AutoCompactOption
     return Status::OK();
 }
 
+StatusWith<std::string> WiredTigerKVEngine::wiredTigerRepair(const std::string& config) {
+    // wiredtiger_repair() has no error-code contract -- failures are reported as text in the
+    // (connection-owned, must-copy) report string, not via the return value.
+    const char* report = ::wiredtiger_repair(getConn(), config.c_str());
+    return std::string{report != nullptr ? report : ""};
+}
+
+Status WiredTigerKVEngine::fixDatabaseSize() {
+    // Valid only on a disaggregated leader (ENOTSUP otherwise).
+    WiredTigerManagedSession managedSession = getConnection().getUninterruptibleSession();
+    WiredTigerSession& session = *managedSession;
+    return wtRCToStatus(session.checkpoint("debug=(database_size_fix=true)"),
+                        session,
+                        "wiredTigerRepair fixDatabaseSize checkpoint");
+}
+
 Status WiredTigerKVEngine::pauseOrResumeAutoCompactForWriteBlock(
     RecoveryUnit& ru, bool pause, const std::vector<std::string_view>& excludedIdents) {
     if (pause) {

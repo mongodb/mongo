@@ -1914,6 +1914,7 @@ const allCommands = {
         command: {whatsmyuri: 1},
         isAdminCommand: true,
     },
+    wiredTigerRepair: {skip: isAnInternalCommand},
 };
 
 /**

@@ -751,6 +751,10 @@ public:
 
     Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) override;
 
+    StatusWith<std::string> wiredTigerRepair(const std::string& config) override;
+
+    Status fixDatabaseSize() override;
+
     Status pauseOrResumeAutoCompactForWriteBlock(
         RecoveryUnit&, bool pause, const std::vector<std::string_view>& excludedIdents) override;
 

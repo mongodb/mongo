@@ -717,6 +717,22 @@ public:
     }
 
     /**
+     * See StorageEngine::wiredTigerRepair for details.
+     */
+    virtual StatusWith<std::string> wiredTigerRepair(const std::string& config) {
+        return {ErrorCodes::CommandNotSupported,
+                "The current storage engine does not support wiredTigerRepair"};
+    }
+
+    /**
+     * See StorageEngine::fixDatabaseSize for details.
+     */
+    virtual Status fixDatabaseSize() {
+        return {ErrorCodes::CommandNotSupported,
+                "The current storage engine does not support fixDatabaseSize"};
+    }
+
+    /**
      * See StorageEngine::getIndexStorageSize for details.
      */
     virtual StatusWith<int64_t> getIndexStorageSize(

@@ -36,6 +36,17 @@ mongo_idl_library(
     ],
 )
 
+idl_generator(
+    name = "wiredtiger_repair_gen",
+    src = "wiredtiger_repair.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
 # This is the smallest possible set of files that wraps WT
 mongo_cc_library(
     name = "storage_wiredtiger_core",
@@ -108,13 +119,19 @@ mongo_cc_library(
         "spill_wiredtiger_server_status.cpp",
         "wiredtiger_init.cpp",
         "wiredtiger_options_init.cpp",
+        "wiredtiger_repair_command.cpp",
         "wiredtiger_server_status.cpp",
+        ":wiredtiger_repair_gen",
     ],
     target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,
     deps = [
         "storage_wiredtiger_core",
         "storage_wiredtiger_customization_hooks",
+        "//src/mongo/db:commands",
+        "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/shard_role",
         "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/storage:storage_engine_impl",
         "//src/mongo/db/storage:storage_engine_lock_file",

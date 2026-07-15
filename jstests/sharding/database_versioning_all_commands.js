@@ -1552,6 +1552,7 @@ const allTestCases = {
         waitForFailPoint: {skip: "TODO", conditional: true},
         whatsmysni: {skip: "TODO"},
         whatsmyuri: {skip: "TODO"},
+        wiredTigerRepair: {skip: "not on a user database"},
     },
 };
 
