@@ -15,7 +15,7 @@ const collectionConfig = {
     storageEngine: {wiredTiger: {configString: "type=lsm"}}
 };
 const createResult = db.createCollection("coll", collectionConfig);
-assert.commandFailedWithCode(createResult, 6627201);
+assert.commandFailedWithCode(createResult, ErrorCodes.IllegalOperation);
 
 MongoRunner.stopMongod(conn);
 })();
