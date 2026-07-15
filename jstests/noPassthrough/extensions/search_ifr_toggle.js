@@ -21,6 +21,12 @@ checkPlatformCompatibleWithExtensions();
 const pipeline = [{$search: {}}];
 
 /*
+ * $searchBeta is a deprecated alias for $search: it re-dispatches through the $search lite parser,
+ * so it must resolve to the same extension/legacy implementation as $search under every flag state.
+ */
+const betaPipeline = [{$searchBeta: {}}];
+
+/*
  * Test with no extensions loaded. Legacy (fallback) should always be used, regardless of feature
  * flag state.
  */
@@ -32,9 +38,17 @@ withExtensions({}, (conn) => {
 
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: true}));
     assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), ErrorCodes.SearchNotEnabled);
+    assert.throwsWithCode(
+        () => coll.aggregate(betaPipeline).toArray(),
+        ErrorCodes.SearchNotEnabled,
+    );
 
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: false}));
     assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), ErrorCodes.SearchNotEnabled);
+    assert.throwsWithCode(
+        () => coll.aggregate(betaPipeline).toArray(),
+        ErrorCodes.SearchNotEnabled,
+    );
 });
 
 /*
@@ -55,10 +69,15 @@ withExtensions({"libsearch_extension.so": {}}, (conn) => {
     // Flag enabled; extension is used. The mock emits no doc results, so the pipeline returns [].
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: true}));
     assertArrayEq({actual: coll.aggregate(pipeline).toArray(), expected: []});
+    assertArrayEq({actual: coll.aggregate(betaPipeline).toArray(), expected: []});
 
     // Flag disabled; legacy is used (errors because mongot is not configured).
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: false}));
     assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), ErrorCodes.SearchNotEnabled);
+    assert.throwsWithCode(
+        () => coll.aggregate(betaPipeline).toArray(),
+        ErrorCodes.SearchNotEnabled,
+    );
 
     // Toggles correctly with a more complex pipeline.
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: true}));
