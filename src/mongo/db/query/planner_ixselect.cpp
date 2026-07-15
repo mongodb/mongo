@@ -1108,7 +1108,6 @@ std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPre
         }
     }
 
-    indexedPreds.reserve(indexedPreds.size() + node->numChildren());
     for (size_t i = 0; i < node->numChildren(); ++i) {
         auto [childAssigned, childPreds] =
             traverseAndPropagateANDRelatedPredicates(node->getChild(i), wildcardField, idx);
