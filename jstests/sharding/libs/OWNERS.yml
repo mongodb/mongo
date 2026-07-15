@@ -33,3 +33,6 @@ filters:
   - "set_allow_chunk_operations_util.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "shard_versioning_util.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
