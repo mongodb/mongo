@@ -367,6 +367,41 @@ TEST_F(MaxKeyOrphanDetectionFixture, GuardDoesNotSkipCompoundPartialThroughWider
         opCtx, nss.dbName(), uuid, BSON("a" << 1 << "b" << 1), kCompoundGlobalMaxRange));
 }
 
+TEST_F(MaxKeyOrphanDetectionFixture, GuardSkipsRefineDemotedOrphan) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("maxKeyGuard.refineDemoted");
+    auto uuid = createIndexedCollection(
+        opCtx, nss, BSON("a" << 1 << "b" << 1), {BSON("a" << MAXKEY << "b" << 5)});
+    // Pre-refine task range: upper bound is the single-field global max {a: MaxKey}.
+    const ChunkRange preRefineRange{BSON("a" << MINKEY), BSON("a" << MAXKEY)};
+    ASSERT_TRUE(shouldSkipRangeDeletionForMaxKeyOrphans(
+        opCtx, nss.dbName(), uuid, BSON("a" << 1 << "b" << 1), preRefineRange));
+}
+
+TEST_F(MaxKeyOrphanDetectionFixture, GuardSkipsRefineDemotedCompoundOrphan) {
+    const auto nss =
+        NamespaceString::createNamespaceString_forTest("maxKeyGuard.refineDemotedCompound");
+    auto uuid = createIndexedCollection(opCtx,
+                                        nss,
+                                        BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        {BSON("a" << MAXKEY << "b" << MAXKEY << "c" << 5)});
+    const ChunkRange preRefineRange{BSON("a" << MINKEY << "b" << MINKEY),
+                                    BSON("a" << MAXKEY << "b" << MAXKEY)};
+    ASSERT_TRUE(shouldSkipRangeDeletionForMaxKeyOrphans(
+        opCtx, nss.dbName(), uuid, BSON("a" << 1 << "b" << 1 << "c" << 1), preRefineRange));
+}
+
+TEST_F(MaxKeyOrphanDetectionFixture, GuardSkipsRefineDemotedOrphanThroughWiderIndex) {
+    const auto nss =
+        NamespaceString::createNamespaceString_forTest("maxKeyGuard.refineDemotedWiderIndex");
+    auto uuid = createIndexedCollection(opCtx,
+                                        nss,
+                                        BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        {BSON("a" << MAXKEY << "b" << 5 << "c" << 10)});
+    const ChunkRange preRefineRange{BSON("a" << MINKEY), BSON("a" << MAXKEY)};
+    ASSERT_TRUE(shouldSkipRangeDeletionForMaxKeyOrphans(
+        opCtx, nss.dbName(), uuid, BSON("a" << 1 << "b" << 1), preRefineRange));
+}
+
 TEST_F(MaxKeyOrphanDetectionFixture, GuardThrowsWhenShardKeyIndexMissing) {
     const auto nss = NamespaceString::createNamespaceString_forTest("maxKeyGuard.coll6");
     DBDirectClient client(opCtx);
