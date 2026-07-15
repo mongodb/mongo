@@ -122,17 +122,13 @@ maybe_generate_burn_in_targets() {
     ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:bazel_burn_in -- generate-targets "$base_revision" || echo "Failed to generate burn-in targets"
 }
 
-# Builds then tests with retries. Leaves the result in the global RET.
+# Build with retries, then test. Leaves the result in the global RET.
 run_build_and_test() {
     local build_attempts=3
-    local test_attempts=2
+    local test_attempts=1
     if [[ "${resmoke_disable_rbe}" == "true" ]]; then
-        # Local exec runs a full suite serially on a single host, so re-running the tests
-        # would repeat hours of work; cap the test phase to a single attempt and extend the
-        # bazel-level timeout well beyond the remote-exec default so the run can finish. The
-        # build phase still retries: builds are incremental, so a retry resumes from cache and
-        # only redoes the failed actions, which is cheap even locally.
-        test_attempts=1
+        # Local exec runs a full suite serially on a single host, extend the
+        # bazel-level timeout well beyond the remote-exec default so the run can finish.
         build_timeout_seconds=14400
         export build_timeout_seconds
     fi
