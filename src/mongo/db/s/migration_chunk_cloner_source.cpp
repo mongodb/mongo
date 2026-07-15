@@ -893,7 +893,10 @@ void MigrationChunkClonerSource::_processDeferredXferMods(OperationContext* opCt
         if (!Helpers::findById(opCtx, this->nss(), BSON("_id" << idElement), newerVersionDoc)) {
             // If the document can no longer be found, this means that another later op must have
             // deleted it. That delete would have been captured by the xferMods so nothing else to
-            // do here.
+            // do here. This relies on the fact that the cloner reads on this document is blocked
+            // because it doesn't ignore prepare conflicts and waits for the transaction against
+            // this document to finish. Once the transaction finishes, the normal non-deferred
+            // xferMods will have captured any further modifications.
             continue;
         }
 
