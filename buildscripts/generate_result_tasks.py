@@ -361,23 +361,23 @@ def _build_tag_query(tags: list[str], target_pattern: str) -> str:
     positive_tags = [t for t in tags if not t.startswith("-")]
     negative_tags = [t[1:] for t in tags if t.startswith("-")]
 
-    excluded_parts = [
-        f"attr(tags, '\\bincompatible_with_bazel_remote_test(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
-    ]
-    for tag in negative_tags:
-        excluded_parts.append(
-            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+    def tagged(tag: str) -> str:
+        # resmoke_suite_test targets carrying `tag` as a whole word (the negative
+        # lookahead prevents matching tag prefixes). The macro expands to the custom
+        # _resmoke_test rule, and the ci-*/exclusion tags this query filters on are
+        # only ever applied to resmoke suites, so no other rule kind is relevant.
+        return (
+            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', " f"kind('_resmoke_test', {target_pattern}))"
         )
+
+    excluded_parts = [tagged("incompatible_with_bazel_remote_test")]
+    excluded_parts += [tagged(tag) for tag in negative_tags]
     excluded = " + ".join(excluded_parts)
 
     if len(positive_tags) == 1:
-        inclusion = f"attr(tags, '\\b{positive_tags[0]}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+        inclusion = tagged(positive_tags[0])
     else:
-        tag_queries = [
-            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
-            for tag in positive_tags
-        ]
-        inclusion = f"({' + '.join(tag_queries)})"
+        inclusion = f"({' + '.join(tagged(tag) for tag in positive_tags)})"
 
     return f"{inclusion} - ({excluded})"
 
