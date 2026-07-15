@@ -4,9 +4,7 @@
 #include "mongo/client/dbclient_base.h"
 
 #include "mongo/client/connection_string.h"
-#include "mongo/db/client.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/version_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
@@ -181,20 +179,13 @@ TEST_F(AppendMetadataTest, LocalConnectionTypeDoesNotSetTelemetryContext) {
                      .has_value());
 }
 
-TEST_F(AppendMetadataTest, SamplingFlagChecksTargetFCVNotLocalFCV) {
-    // Use a version (8.3) where featureFlagTracing  passes but featureFlagOtelTraceSampling (9.0)
-    // would fail a local FCV check.
-    auto opCtx = makeOperationContext();
-    {
-        ClientLock lk(opCtx->getClient());
-        VersionContext::setDecoration(
-            lk,
-            opCtx.get(),
-            VersionContext{multiversion::FeatureCompatibilityVersion::kVersion_8_3});
-    }
-    auto span = Span::start(opCtx.get(), span_names::kTest1);
+TEST_F(AppendMetadataTest, FireAndForgetWithNullOperationContext) {
+    ASSERT(!getClient()->getOperationContext());
 
-    EXPECT_FALSE(sendAndGetTelemetryContext(WireVersion::WIRE_VERSION_90).has_value());
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.runFireAndForgetCommand(makeRequest());
+    ASSERT_TRUE(client.lastSent().has_value());
+    EXPECT_FALSE(OpMsgRequest::parse(*client.lastSent()).telemetryContext.has_value());
 }
 
 }  // namespace

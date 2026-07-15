@@ -45,97 +45,71 @@ protected:
     OtelTracesCapturer _capturer;
 };
 
-// Returns the telemetry section that makeEgressTelemetrySection produces for the given context,
-// wire version, and OperationContext (used to check whether tracing is enabled).
+// Returns the telemetry section that makeEgressTelemetrySection produces for the given
+// telemetry context and wire version.
 boost::optional<TelemetryContextSection> callMakeEgressTelemetrySection(
-    OperationContext* opCtx,
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx,
-    int maxWireVersion) {
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx, int maxWireVersion) {
     executor::RemoteCommandRequest request;
-    request.opCtx = opCtx;
     request.telemetryContext = std::move(telemetryCtx);
     return AsyncDBClient::makeEgressTelemetrySection(request, maxWireVersion);
 }
 
 TEST_F(MakeEgressTelemetrySectionTest, ActiveSpanAndSupportedWireVersion) {
-    auto opCtx = makeOperationContext();
     auto telemetryCtx = Span::createTelemetryContext();
     auto span = Span::start(telemetryCtx, span_names::kTest1);
 
-    EXPECT_THAT(
-        callMakeEgressTelemetrySection(opCtx.get(), telemetryCtx, WireVersion::WIRE_VERSION_90),
-        Not(Eq(boost::none)));
-    EXPECT_THAT(
-        callMakeEgressTelemetrySection(opCtx.get(), telemetryCtx, WireVersion::WIRE_VERSION_90 + 1),
-        Not(Eq(boost::none)));
+    EXPECT_THAT(callMakeEgressTelemetrySection(telemetryCtx, WireVersion::WIRE_VERSION_90),
+                Not(Eq(boost::none)));
+    EXPECT_THAT(callMakeEgressTelemetrySection(telemetryCtx, WireVersion::WIRE_VERSION_90 + 1),
+                Not(Eq(boost::none)));
 }
 
 TEST_F(MakeEgressTelemetrySectionTest, ActiveSpanButOldWireVersion) {
-    auto opCtx = makeOperationContext();
     auto telemetryCtx = Span::createTelemetryContext();
     auto span = Span::start(telemetryCtx, span_names::kTest1);
 
-    EXPECT_THAT(
-        callMakeEgressTelemetrySection(opCtx.get(), telemetryCtx, WireVersion::WIRE_VERSION_90 - 1),
-        Eq(boost::none));
+    EXPECT_THAT(callMakeEgressTelemetrySection(telemetryCtx, WireVersion::WIRE_VERSION_90 - 1),
+                Eq(boost::none));
 }
 
 TEST_F(MakeEgressTelemetrySectionTest, NullTelemetryContext) {
-    auto opCtx = makeOperationContext();
-    EXPECT_THAT(callMakeEgressTelemetrySection(
-                    opCtx.get(), /*telemetryCtx=*/nullptr, WireVersion::WIRE_VERSION_90),
-                Eq(boost::none));
+    EXPECT_THAT(
+        callMakeEgressTelemetrySection(/*telemetryCtx=*/nullptr, WireVersion::WIRE_VERSION_90),
+        Eq(boost::none));
 }
 
 TEST_F(MakeEgressTelemetrySectionTest, NoActiveSpan) {
     // Context exists but no span has been started on it, so there is no active span.
-    auto opCtx = makeOperationContext();
     auto telemetryCtx = Span::createTelemetryContext();
-    EXPECT_THAT(
-        callMakeEgressTelemetrySection(opCtx.get(), telemetryCtx, WireVersion::WIRE_VERSION_90),
-        Eq(boost::none));
+    EXPECT_THAT(callMakeEgressTelemetrySection(telemetryCtx, WireVersion::WIRE_VERSION_90),
+                Eq(boost::none));
 }
 
 TEST_F(MakeEgressTelemetrySectionTest, UnknownWireVersionSentinel) {
     // StreamableReplicaSetMonitor returns std::numeric_limits<int>::max() when no server
     // descriptions are known yet. We must not send the telemetry section in that case.
-    auto opCtx = makeOperationContext();
     auto telemetryCtx = Span::createTelemetryContext();
     auto span = Span::start(telemetryCtx, span_names::kTest1);
 
-    EXPECT_THAT(
-        callMakeEgressTelemetrySection(opCtx.get(), telemetryCtx, std::numeric_limits<int>::max()),
-        Eq(boost::none));
+    EXPECT_THAT(callMakeEgressTelemetrySection(telemetryCtx, std::numeric_limits<int>::max()),
+                Eq(boost::none));
 }
 
 TEST_F(MakeEgressTelemetrySectionTest, TracingDisabled) {
     unittest::ServerParameterGuard featureFlagTracing{"featureFlagTracing", false};
 
-    auto opCtx = makeOperationContext();
     auto telemetryCtx = Span::createTelemetryContext();
     auto span = Span::start(telemetryCtx, span_names::kTest1);
 
-    EXPECT_THAT(
-        callMakeEgressTelemetrySection(opCtx.get(), telemetryCtx, WireVersion::WIRE_VERSION_90),
-        Eq(boost::none));
-}
-
-TEST_F(MakeEgressTelemetrySectionTest, NullOpCtxDoesNotSetTelemetrySection) {
-    auto telemetryCtx = Span::createTelemetryContext();
-    auto span = Span::start(telemetryCtx, span_names::kTest1);
-
-    EXPECT_THAT(callMakeEgressTelemetrySection(
-                    /*opCtx=*/nullptr, telemetryCtx, WireVersion::WIRE_VERSION_90),
+    EXPECT_THAT(callMakeEgressTelemetrySection(telemetryCtx, WireVersion::WIRE_VERSION_90),
                 Eq(boost::none));
 }
 
 TEST_F(MakeEgressTelemetrySectionTest, TraceparentIsNonEmptyWhenSectionIsSet) {
-    auto opCtx = makeOperationContext();
     auto telemetryCtx = Span::createTelemetryContext();
     auto span = Span::start(telemetryCtx, span_names::kTest1);
 
-    auto section =
-        callMakeEgressTelemetrySection(opCtx.get(), telemetryCtx, WireVersion::WIRE_VERSION_90);
+    auto section = callMakeEgressTelemetrySection(telemetryCtx, WireVersion::WIRE_VERSION_90);
     ASSERT_THAT(section, Not(Eq(boost::none)));
     EXPECT_THAT(section->getOtel().getTraceparent(), Not(IsEmpty()));
 }

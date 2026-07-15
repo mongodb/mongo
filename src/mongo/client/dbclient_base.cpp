@@ -184,8 +184,7 @@ void appendMetadata(OperationContext* opCtx,
     // A kLocal connection talks to the local server in-process, so there is no need to propagate a
     // telemetry context as it will be available on OperationContext.
     const bool isLocalConnection = connectionType == ConnectionString::ConnectionType::kLocal;
-    if (targetAcceptsTelemetrySection && !isLocalConnection &&
-        otel::traces::isTracingEnabled(opCtx)) {
+    if (targetAcceptsTelemetrySection && !isLocalConnection && opCtx) {
         auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx);
         request.telemetryContext = otel::traces::toWireType(holder.getTelemetryContext().get());
     }
