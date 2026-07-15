@@ -5001,5 +5001,50 @@ TEST_F(AsyncResultsMergerTest,
     }
 }
 
+// Regression test: if the ARM is detached while a rate-limited retry is pending on
+// its SubBaton, the retry callback must not re-dispatch the captured (now-stale) request.
+TEST_F(AsyncResultsMergerTest, DetachWhileRetryPendingDoesNotReissueStaleRequest) {
+    const auto backOffDelayMs = 1000;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
+
+    // SystemOverloadedError triggers a delayed backoff retry scheduled on the SubBaton.
+    const BSONObj retryableErrorResponse = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable,
+        "dummy msg",
+        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    ASSERT_FALSE(arm->ready());
+    unittest::assertGet(arm->nextEvent());
+    // Deliver the error while attached; the retry is now pending on the SubBaton.
+    scheduleNetworkResponseObjs({retryableErrorResponse});
+    runScheduledTasks(operationContext());
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    // Detach while the retry delay is still outstanding.
+    arm->detachFromOperationContext();
+
+    // Advance past the backoff and pump callbacks; the retry fires while the ARM is detached.
+    advanceTime(Milliseconds(backOffDelayMs + 1));
+    runScheduledTasks(operationContext());
+    runReadyCallbacks();
+
+    // The stale request must not have been re-issued.
+    const bool reissued = networkHasReadyRequests();
+
+    arm->reattachToOperationContext(operationContext());
+    auto killFuture = arm->kill(operationContext());
+    while (!killFuture.isReady()) {
+        runReadyCallbacks();
+    }
+    killFuture.wait();
+
+    ASSERT_FALSE(reissued);
+}
+
 }  // namespace
 }  // namespace mongo
