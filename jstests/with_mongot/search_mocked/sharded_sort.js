@@ -1,6 +1,9 @@
 /**
  * Sharding tests where $search is given a sort.
  *
+ * TODO (SERVER-131069): Mock-only $searchSortValues format and planShardedSearch sortSpec. Cannot
+ * migrate to real-mongot E2E.
+ *
  * @tags: [
  *     requires_fcv_70
  * ]
