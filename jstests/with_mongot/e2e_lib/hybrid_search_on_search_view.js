@@ -8,6 +8,9 @@
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
+const legacySearchViewErrCode = 10623000;
+const extensionSearchViewErrCode = 65180;
+
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -210,9 +213,12 @@ export function runHybridSearchOnSearchViewsTest(
         // If any part of the input pipeline has a mongot stage, then the hybrid search should fail
         // as mongot queries on mongot views are not allowed.
         if (hasMongotPipeline) {
+            // The query-time ban may surface as either legacySearchViewErrCode or extensionSearchViewErrCode
+            // (both "view definition is incompatible with Atlas Search") depending if $search is running as
+            // legacy or extension.
             assert.commandFailedWithCode(
                 searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, cursor: {}}),
-                10623000,
+                [legacySearchViewErrCode, extensionSearchViewErrCode],
             );
             assert.commandFailedWithCode(
                 searchView.runCommand("aggregate", {
@@ -220,7 +226,7 @@ export function runHybridSearchOnSearchViewsTest(
                     explain: true,
                     cursor: {},
                 }),
-                10623000,
+                [legacySearchViewErrCode, extensionSearchViewErrCode],
             );
         } else {
             const hybridSearchPipelineWithViewPrepended = createPipelineFn(
@@ -267,19 +273,18 @@ export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(
     const hybridSearchPipeline = createPipelineFn(inputPipelines);
     for (let i = 0; i < views.length; i++) {
         const searchView = views[i];
-        // Creating a search index on a view defined with search should fail with the error code
-        // 10623000 because it is illegal to create a search index on a view defined with a search
-        // stage.
+        // Creating a search index on a view defined with search should fail cause it is illegal to create
+        // a search index on a view defined with a search stage.
         assert.commandFailedWithCode(
             searchView.runCommand({createSearchIndexes: viewNames[i], indexes: [searchIndexDef]}),
-            10623000,
+            [legacySearchViewErrCode, extensionSearchViewErrCode],
         );
 
         // Running a hybrid search query with mongot input pipelines aggregation query should fail
         // on views defined with search.
         assert.commandFailedWithCode(
             searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, cursor: {}}),
-            10623000,
+            [legacySearchViewErrCode, extensionSearchViewErrCode],
         );
 
         // Explain for this query should fail.
@@ -289,7 +294,7 @@ export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(
                 explain: true,
                 cursor: {},
             }),
-            10623000,
+            [legacySearchViewErrCode, extensionSearchViewErrCode],
         );
     }
 }

@@ -199,6 +199,18 @@ filters:
   - "/with_mongot_extension_hybridSearch_disabled_single_shard.yml":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "/with_mongot_extension_search_disabled_sharded_cluster.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
+  - "/with_mongot_extension_search_disabled_sharded_collections.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
+  - "/with_mongot_extension_search_disabled_single_node.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
+  - "/with_mongot_extension_search_disabled_single_shard.yml":
+    approvers:
+      - 10gen/query-integration-extensions-api
   - "/with_mongot_extension_sharded_cluster.yml":
     approvers:
       - 10gen/query-integration-extensions-api

@@ -34,6 +34,10 @@ selector:
       - concurrency_with_mongot_extension_single_node
       - concurrency_with_mongot_extension_mongos
       - concurrency_with_mongot_extension_sharded_collections
+      - with_mongot_extension_search_disabled_single_node
+      - with_mongot_extension_search_disabled_single_shard
+      - with_mongot_extension_search_disabled_sharded_collections
+      - with_mongot_extension_search_disabled_sharded_cluster
     # Exclude list of etc/evergreen.yml task names.
     exclude_tasks:
     # Exclude list of jstests file names.
