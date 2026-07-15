@@ -63,9 +63,7 @@ commands:
                 type: AnalyzeMode
                 optional: true
             samplingMethod:
-                description: >-
-                    The sampling method to use when mode is 'sample'. Defaults to the
-                    value of the internalQuerySamplingCEMethodForPersistentSamples.
+                description: "The sampling method to use when mode is 'sample'."
                 type: SamplingCEMethod
                 optional: true
             numChunks:

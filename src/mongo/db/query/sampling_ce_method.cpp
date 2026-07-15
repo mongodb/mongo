@@ -33,20 +33,6 @@ Status CBRSamplingCEMethod::setFromString(std::string_view value,
     return Status::OK();
 }
 
-void PersistentSampleCEMethod::append(OperationContext*,
-                                      BSONObjBuilder* b,
-                                      std::string_view name,
-                                      const boost::optional<TenantId>&) {
-    *b << name << idl::serialize(_data.get());
-}
-
-Status PersistentSampleCEMethod::setFromString(std::string_view value,
-                                               const boost::optional<TenantId>&) {
-    _data = idl::deserialize<SamplingCEMethodEnum>(
-        value, IDLParserContext("internalQuerySamplingCEMethodForPersistentSamples"));
-    return Status::OK();
-}
-
 void JoinSamplingCEMethod::append(OperationContext*,
                                   BSONObjBuilder* b,
                                   std::string_view name,

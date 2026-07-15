@@ -11,7 +11,6 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/modules.h"
 
@@ -41,12 +40,11 @@ public:
 
     /**
      * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
-     * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' is the on-the-fly
-     * method used when no persisted sample is loaded. 'samplingSource' controls whether to try
-     * reading a persistent sample from `<db>.system.stats.samples` before falling back to
-     * on-the-fly SBE sampling; 'analyze' passes kOnTheFlySample to bypass the persisted read.
-     * 'persistentSampleMethod' independently picks which sampling technique to look for in the
-     * persisted samples collection. Prefer the factory method above outside tests.
+     * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
+     * sampling method. 'samplingSource' controls whether to try reading a persistent sample
+     * from `<db>.system.stats.samples` before falling back to on-the-fly SBE sampling;
+     * 'analyze' passes kOnTheFlySample to bypass the persisted read. Prefer the factory method
+     * above outside tests.
      */
     SamplingEstimatorImpl(
         OperationContext* opCtx,
@@ -59,12 +57,13 @@ public:
         double marginOfError,
         boost::optional<int> numChunks,
         boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
-        SamplingCEMethodEnum persistentSampleMethod = PersistentSampleCEMethod::kDataDefault);
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     /*
-     * Lets the caller specify an exact sample size, e.g. for a smaller preliminary-analysis
-     * sample. Prefer the factory method above outside tests.
+     * This constructor allows the caller to specify the sample size if necessary. This constructor
+     * is useful when a certain scale of sample is more appropriate, for example, the planner wants
+     * to do preliminary data distribution analysis with a small sample size. Testing cases may
+     * require only a small sample. Prefer the factory method above outside tests.
      */
     SamplingEstimatorImpl(
         OperationContext* opCtx,
@@ -76,8 +75,7 @@ public:
         boost::optional<int> numChunks,
         CardinalityEstimate collectionCard,
         boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
-        SamplingCEMethodEnum persistentSampleMethod = PersistentSampleCEMethod::kDataDefault);
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     /*
      * Convenience constructor that accepts a raw record count instead of a CardinalityEstimate,
@@ -161,6 +159,22 @@ public:
         const std::vector<FieldPathAndEqSemantics>& fields,
         boost::optional<std::span<const OrderedIntervalList>> bounds) const override;
     using SamplingEstimator::estimateNDVMultiKey;
+
+    /*
+     * Generates a sample using a random cursor. The caller can call this function to draw a sample
+     * of 'sampleSize'. If it's a re-sample request, the old sample will be freed and replaced by
+     * the new sample.
+     */
+    void generateRandomSample(size_t sampleSize);
+    void generateRandomSample();
+
+    /*
+     * Generates a sample using a chunk-based sampling method. The sample consists of multiple
+     * random chunks. Similar to the other sampling function, the caller can call this function to
+     * re-sample. The old sample will be freed.
+     */
+    void generateChunkSample(size_t sampleSize);
+    void generateChunkSample();
 
     /*
      * Generates a sample of documents from the collection using random, chunk-based, sequential
@@ -343,9 +357,6 @@ protected:
     mutable boost::optional<size_t> _uniqueDocCount;
     // Set to true when tryLoadPersistentSample() successfully loads sample from stats collection.
     bool _wasSamplePersisted = false;
-    SamplingCEMethodEnum _persistentSampleMethod;
-    // On-the-fly sampling technique used when no persisted sample is loaded.
-    SamplingCEMethodEnum _samplingStyle;
 
 private:
     /**
@@ -368,11 +379,6 @@ private:
      * generated when the collection size is smaller than the required sample size.
      */
     void generateFullCollScanSample();
-
-    /**
-     * Builds and runs an on-the-fly sampling plan for 'technique'.
-     */
-    void generateSampleForTechnique(SamplingTechniqueEnum technique);
 
     /**
      * This function executes the sampling query and generates the sample from the documents
@@ -417,6 +423,7 @@ private:
     boost::intrusive_ptr<const ExpressionContext> _customerQueryExpCtx;
     NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
+    SamplingCEMethodEnum _samplingStyle;
     // The set of top level fields that we want to include in the sampled documents.
     StringSet _topLevelSampleFieldNames;
 

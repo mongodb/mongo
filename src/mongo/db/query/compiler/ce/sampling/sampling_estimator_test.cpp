@@ -549,18 +549,10 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
     auto sample = samplingEstimator.getSample();
     ASSERT_EQUALS(sample.size(), kSampleSize);
 
-    // A separate estimator with a different sample size draws a sample of that size.
-    SamplingEstimatorForTesting smallerEstimator(operationContext(),
-                                                 colls,
-                                                 kTestNss,
-                                                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                 3 /* sampleSize */,
-                                                 SamplingCEMethodEnum::kRandom,
-                                                 numChunks,
-                                                 makeCardinalityEstimate(10),
-                                                 nullptr /*customerQueryExpCtx*/);
-    smallerEstimator.generateSample(ce::NoProjection{});
-    auto newSample = smallerEstimator.getSample();
+    // Specifing a new sample size and re-sample. The old sample should be replaced by the new
+    // sample of a different sample size.
+    samplingEstimator.generateRandomSample(3);
+    auto newSample = samplingEstimator.getSample();
     ASSERT_EQUALS(newSample.size(), 3);
 }
 
@@ -2242,7 +2234,9 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
-    // Cardinality estimate exceeds `sampleSize` so we avoid the full-collection-scan branch.
+    // Cardinality estimate must exceed `sampleSize` so `generateSample` takes the
+    // generateRandomSample path (which consults the persistent sample) instead of falling
+    // into the full-collection-scan branch.
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
                                           kTestNss,
@@ -2373,7 +2367,9 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
-    // Cardinality estimate exceeds `sampleSize` so we avoid the full-collection-scan branch.
+    // Cardinality estimate must exceed `sampleSize` so `generateSample` takes the
+    // generateChunkSample path (which consults the persistent sample) instead of falling
+    // into the full-collection-scan branch.
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
                                           kTestNss,
@@ -2383,7 +2379,6 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
                                           testNumChunks,
                                           makeCardinalityEstimate(100),
                                           nullptr /*customerQueryExpCtx*/);
-    estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kChunk);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2391,103 +2386,6 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
     for (const auto& doc : sample) {
         ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
     }
-}
-
-TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSamplingStyle) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    // Persisted-sample method (kRandom) is independent of samplingStyle (kChunk).
-    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollection(operationContext(), kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    std::vector<BSONObj> persistedDocs{BSON("_id" << 2 << "tag" << "persisted"),
-                                       BSON("_id" << 3 << "tag" << "persisted"),
-                                       BSON("_id" << 4 << "tag" << "persisted")};
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
-
-    auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(coll, {}, false);
-    const int testNumChunks = 1;
-    SamplingEstimatorForTesting estimator(operationContext(),
-                                          colls,
-                                          kTestNss,
-                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                          persistedDocs.size(),
-                                          SamplingCEMethodEnum::kChunk,
-                                          testNumChunks,
-                                          makeCardinalityEstimate(100),
-                                          nullptr /*customerQueryExpCtx*/);
-    estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kRandom);
-    estimator.generateSample(ce::NoProjection{});
-
-    const auto& sample = estimator.getSample();
-    ASSERT_EQUALS(sample.size(), persistedDocs.size());
-    for (const auto& doc : sample) {
-        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
-    }
-    const auto meta = estimator.getSamplingMetadata();
-    ASSERT_TRUE(meta.isPersisted);
-    ASSERT_TRUE(meta.technique == SamplingTechniqueEnum::kRandom);
-}
-
-TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlyUsingSamplingStyle) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    // Persisted-sample method is kRandom, so the persisted kChunk sample below is a miss.
-    std::vector<BSONObj> sourceDocs;
-    for (int i = 0; i < 20; ++i) {
-        sourceDocs.push_back(BSON("_id" << i << "tag" << "not_persisted"));
-    }
-    insertDocuments(kTestNss, sourceDocs);
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollection(operationContext(), kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    const int testNumChunks = 1;
-    const size_t sampleSize = 3;
-    std::vector<BSONObj> persistedDocs{BSON("_id" << 100 << "tag" << "persisted"),
-                                       BSON("_id" << 101 << "tag" << "persisted"),
-                                       BSON("_id" << 102 << "tag" << "persisted")};
-    // Persist a chunk sample, which the random lookup must ignore.
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(uuid,
-                                  SamplingTechniqueEnum::kChunk,
-                                  sampleSize,
-                                  persistedDocs,
-                                  /*numChunks=*/testNumChunks)});
-
-    auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(coll, {}, false);
-    // Cardinality estimate exceeds `sampleSize` so we avoid the full-collection-scan branch.
-    SamplingEstimatorForTesting estimator(operationContext(),
-                                          colls,
-                                          kTestNss,
-                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                          sampleSize,
-                                          SamplingCEMethodEnum::kChunk,
-                                          testNumChunks,
-                                          makeCardinalityEstimate(sourceDocs.size()),
-                                          nullptr /*customerQueryExpCtx*/);
-    estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kRandom);
-    estimator.generateSample(ce::NoProjection{});
-
-    // Fell back to on-the-fly chunk sampling from the source collection.
-    const auto& sample = estimator.getSample();
-    ASSERT_GREATER_THAN(sample.size(), 0u);
-    for (const auto& doc : sample) {
-        ASSERT_EQUALS(doc.getStringField("tag"), "not_persisted");
-    }
-    const auto meta = estimator.getSamplingMetadata();
-    ASSERT_FALSE(meta.isPersisted);
-    ASSERT_TRUE(meta.technique == SamplingTechniqueEnum::kChunk);
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlagDisabled) {

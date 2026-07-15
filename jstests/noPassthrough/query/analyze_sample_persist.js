@@ -262,141 +262,17 @@ insertDocs(20);
 // =============================================================================
 
 // `random` and `chunk` success cases are exercised by the sampleSize
-// and numChunks sections above. Here we cover the default and IDL enum boundaries.
+// and numChunks sections above. Here we only test error cases and IDL enum
+// boundaries.
 
-// samplingMethod defaults to internalQuerySamplingCEMethodForPersistentSamples when omitted.
+// samplingMethod must be specified in mode 'sample'
 cleanup();
 insertDocs(20);
-{
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 10,
-        }),
-    );
-    PersistentSamplesUtils.verifySampleDoc(db, {
-        sampledCollName: collName,
-        mode: "sample",
-        samplingMethod: "random",
-        requestedSampleSize: 10,
-        actualSampleSize: 10,
-        expectedSchemaVersion: expectedSchemaVersion,
-        expectedFields: sourceDocFields,
-    });
-}
-
-// Confirms the default tracks the knob, not a hardcoded value.
-cleanup();
-insertDocs(20);
-{
-    const prevMethod = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalQuerySamplingCEMethodForPersistentSamples: 1}),
-    ).internalQuerySamplingCEMethodForPersistentSamples;
-    assert.commandWorked(
-        db.adminCommand({
-            setParameter: 1,
-            internalQuerySamplingCEMethodForPersistentSamples: "chunk",
-        }),
-    );
-    try {
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                sampleSize: 10,
-            }),
-        );
-        PersistentSamplesUtils.verifySampleDoc(db, {
-            sampledCollName: collName,
-            mode: "sample",
-            samplingMethod: "chunk",
-            requestedSampleSize: 10,
-            actualSampleSize: 10,
-            numChunks: defaultNumChunks,
-            expectedSchemaVersion: expectedSchemaVersion,
-            expectedFields: sourceDocFields,
-        });
-    } finally {
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethodForPersistentSamples: prevMethod,
-            }),
-        );
-    }
-}
-
-// Invalid mode values/types fail to parse.
-cleanup();
-insertDocs(20);
-{
-    // Unknown enum string for mode.
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: "bogus"}),
-        ErrorCodes.BadValue,
-        "unknown mode should fail to parse",
-    );
-    // Wrong BSON type for mode (expects a string).
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: 1}),
-        ErrorCodes.TypeMismatch,
-        "non-string mode should fail to parse",
-    );
-}
-
-// Invalid samplingMethod values and types are rejected by IDL parsing.
-cleanup();
-insertDocs(20);
-{
-    // Unknown enum string.
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: "bogus"}),
-        ErrorCodes.BadValue,
-        "unknown samplingMethod should fail to parse",
-    );
-    // Wrong BSON type for samplingMethod (expects a string).
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: 1}),
-        ErrorCodes.TypeMismatch,
-        "non-string samplingMethod should fail to parse",
-    );
-}
-
-// Invalid sample-mode inputs are rejected.
-cleanup();
-insertDocs(20);
-{
-    // sampleSize must be > 0.
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: "sample", sampleSize: 0, samplingMethod: "random"}),
-        ErrorCodes.BadValue,
-        "sampleSize of 0 should fail the gt:0 validator",
-    );
-    // numChunks must be > 0.
-    assert.commandFailedWithCode(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 10,
-            samplingMethod: "chunk",
-            numChunks: 0,
-        }),
-        ErrorCodes.BadValue,
-        "numChunks of 0 should fail the gt:0 validator",
-    );
-    // Wrong BSON type for sampleSize (expects an int).
-    assert.commandFailedWithCode(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: "ten",
-            samplingMethod: "random",
-        }),
-        ErrorCodes.TypeMismatch,
-        "non-numeric sampleSize should fail to parse",
-    );
-}
+assert.commandFailedWithCode(
+    db.runCommand({analyze: collName, mode: "sample"}),
+    12433001,
+    "Missing samplingMethod should fail when using mode 'sample'",
+);
 
 // =============================================================================
 // timeseries collection

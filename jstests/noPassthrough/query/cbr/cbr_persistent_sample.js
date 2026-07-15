@@ -86,11 +86,7 @@ try {
     {
         jsTest.log.info("Testing random sampling technique with a persistent sample hit");
         assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
-            }),
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}),
         );
         resetCollections();
 
@@ -127,11 +123,7 @@ try {
     {
         jsTest.log.info("Testing random sampling technique with a persistent sample miss");
         assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
-            }),
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}),
         );
         resetCollections();
 
@@ -154,11 +146,7 @@ try {
     {
         jsTest.log.info("Testing chunk sampling technique with a persistent sample hit");
         assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "chunk",
-                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
-            }),
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}),
         );
         resetCollections();
 
@@ -212,11 +200,7 @@ try {
     {
         jsTest.log.info("Testing chunk sampling technique with a persistent sample miss");
         assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "chunk",
-                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
-            }),
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}),
         );
         resetCollections();
 
@@ -241,11 +225,7 @@ try {
             "Testing full coll scan technique with a persistent sample hit (small collection)",
         );
         assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
-            }),
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}),
         );
         coll.drop();
         PersistentSamplesUtils.dropSamplesColl(db);
@@ -291,11 +271,7 @@ try {
             "Testing full coll scan technique with a persistent sample miss (small collection)",
         );
         assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
-            }),
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}),
         );
         coll.drop();
         PersistentSamplesUtils.dropSamplesColl(db);
