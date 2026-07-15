@@ -1135,6 +1135,17 @@ export function assertValidChangeStreamPreImageDocument(preImage, db) {
 }
 
 /**
+ * Advance the cluster time on all primary nodes of the test fixture, even if the no-op oplog writer is disabled.
+ */
+export function advanceClusterTime(db) {
+    const msg =
+        "Advancing oplog time before waiting for changestream. See SERVER-131399 for motivation";
+    for (const primary of FixtureHelpers.getPrimaries(db)) {
+        assert.commandWorked(primary.getDB("admin").runCommand({appendOplogNote: 1, data: {msg}}));
+    }
+}
+
+/**
  * Returns the current cluster time by issuing a 'hello' command to the server and extracting
  * the cluster time from it.
  */
