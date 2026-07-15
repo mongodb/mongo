@@ -24,6 +24,30 @@ using namespace std::literals::string_view_literals;
 [[MONGO_MOD_NEEDS_REPLACEMENT]] bool& isRawDataOperation(OperationContext*);
 
 /**
+ * RAII guard that temporarily overrides the "raw data" flag on the given operation context. The
+ * original value is saved on construction and restored on destruction, including when the scope is
+ * exited via an exception.
+ */
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ScopedRawDataOperation {
+public:
+    ScopedRawDataOperation(OperationContext* opCtx, bool value)
+        : _opCtx(opCtx), _original(isRawDataOperation(opCtx)) {
+        isRawDataOperation(_opCtx) = value;
+    }
+
+    ScopedRawDataOperation(const ScopedRawDataOperation&) = delete;
+    ScopedRawDataOperation& operator=(const ScopedRawDataOperation&) = delete;
+
+    ~ScopedRawDataOperation() {
+        isRawDataOperation(_opCtx) = _original;
+    }
+
+private:
+    OperationContext* const _opCtx;
+    const bool _original;
+};
+
+/**
  * Returns the rewritten command object, replacing the collection name with the one provided.
  */
 template <class CommandRequest>

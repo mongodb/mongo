@@ -88,13 +88,10 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse insertResponse;
     BatchWriteExecStats insertStats;
-    const bool isRawData = isRawDataOperation(opCtx);
-    // Restore the isRawData value for this operation.
-    ON_BLOCK_EXIT([&] { isRawDataOperation(opCtx) = isRawData; });
-
+    boost::optional<ScopedRawDataOperation> rawDataGuard;
     if (isTimeseriesViewRequest) {
         // We directly insert the updated bucket.
-        isRawDataOperation(opCtx) = true;
+        rawDataGuard.emplace(opCtx, true);
     }
 
     cluster::write(opCtx, insertRequest, nullptr, &insertStats, &insertResponse);

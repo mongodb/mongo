@@ -75,13 +75,12 @@ boost::optional<BSONObj> findOneLocally(const boost::intrusive_ptr<ExpressionCon
         uasserted(ErrorCodes::SnapshotTooOld, "Failing findOne during findAndModify image lookup");
     }
 
-    const bool isRawData = isRawDataOperation(pExpCtx->getOperationContext());
-    ON_BLOCK_EXIT([&] { isRawDataOperation(pExpCtx->getOperationContext()) = isRawData; });
+    boost::optional<ScopedRawDataOperation> rawDataGuard;
     if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(pExpCtx->getOperationContext()),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // This must be set for the request to work against a timeseries collection.
-        isRawDataOperation(pExpCtx->getOperationContext()) = true;
+        rawDataGuard.emplace(pExpCtx->getOperationContext(), true);
     }
 
     boost::optional<ScopedReadConcern> scopedReadConcern;

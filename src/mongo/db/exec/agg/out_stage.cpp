@@ -148,8 +148,7 @@ void OutStage::retrieveOriginalOutCollInfo() {
         }
 
         if (!originalOptions.isEmpty()) {
-            const bool isRawData = isRawDataOperation(pExpCtx->getOperationContext());
-            ON_BLOCK_EXIT([&] { isRawDataOperation(pExpCtx->getOperationContext()) = isRawData; });
+            boost::optional<ScopedRawDataOperation> rawDataGuard;
 
             auto outputNsForFetchingIndexes = _outputNs;
             if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
@@ -158,7 +157,7 @@ void OutStage::retrieveOriginalOutCollInfo() {
                 // Set isRawDataOperation to ensure getIndexSpecs always propagates rawData:true
                 // even though we are targeting the main namespace.
                 // TODO(SERVER-111600): Remove once AllBinariesSupportRawDataOperations is last LTS
-                isRawDataOperation(pExpCtx->getOperationContext()) = true;
+                rawDataGuard.emplace(pExpCtx->getOperationContext(), true);
             } else if (originalOptions.hasField("timeseries")) {
                 // When rawData operations are not supported (FCV < 8.2), getIndexSpecs cannot
                 // resolve timeseries indexes through the user-facing namespace, so we must
@@ -330,6 +329,7 @@ void OutStage::createTemporaryCollection() {
     // Copy the indexes of the output collection to the temp collection.
     try {
         auto targetNsForCreateIndex = _tempNs;
+        boost::optional<ScopedRawDataOperation> rawDataGuard;
         if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
                 VersionContext::getDecoration(pExpCtx->getOperationContext()),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -337,7 +337,7 @@ void OutStage::createTemporaryCollection() {
             // the fields of the bucket documents, we need to perform the recreation of those
             // indexes on the temp collection as a rawData operation to avoid erroneously
             // translating the indexes a second time.
-            isRawDataOperation(pExpCtx->getOperationContext()) = true;
+            rawDataGuard.emplace(pExpCtx->getOperationContext(), true);
 
             if (_outIsLegacyTimeseries) {
                 // If we can use rawData then we always use the main timeseries namespace, never the
@@ -348,9 +348,6 @@ void OutStage::createTemporaryCollection() {
 
         pExpCtx->getMongoProcessInterface()->createIndexesOnEmptyCollection(
             pExpCtx->getOperationContext(), targetNsForCreateIndex, _originalOutCollInfo->indexes);
-
-        // Reset rawData to false for the rest of the operation
-        isRawDataOperation(pExpCtx->getOperationContext()) = false;
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");
         throw;
