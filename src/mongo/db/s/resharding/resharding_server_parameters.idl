@@ -554,7 +554,8 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: Atomic<long long>
         cpp_varname: gReshardingDocumentValidationMaxCollectionSizeBytes
-        default: 1024 # 1KB
+        default:
+            expr: 100LL * 1024 * 1024 * 1024 # 100 GiB
         validator:
             gte: 0
         redact: false
