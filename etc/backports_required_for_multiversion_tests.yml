@@ -35,6 +35,8 @@ last-patch:
       ticket: SERVER-118700
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
       ticket: SERVER-127051
+    - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
+      ticket: SERVER-121084
     - test_file: jstests/fle2/implicit_ecoc_creation.js
       ticket: SERVER-126384
   suites: null
@@ -72,6 +74,8 @@ last-continuous:
       ticket: SERVER-95530
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
       ticket: SERVER-127051
+    - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
+      ticket: SERVER-121084
     - test_file: jstests/core/timeseries/query/timeseries_explain_delete.js
       ticket: SERVER-122559
     - test_file: jstests/core/timeseries/query/timeseries_lookup_index_use.js
@@ -445,6 +449,8 @@ last-lts:
       ticket: SERVER-88072
     - test_file: jstests/core/timeseries/query/timeseries_cursor_batches.js
       ticket: SERVER-91512
+    - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
+      ticket: SERVER-121084
     - test_file: jstests/core/timeseries/query/timeseries_explain_delete.js
       ticket: SERVER-122559
     - test_file: jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js

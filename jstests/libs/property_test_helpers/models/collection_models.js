@@ -16,8 +16,9 @@ export function getCollectionModel({isTS = false, indexesModel, docsModel} = {})
         indexesModel = getIndexesModel({isTS: isTSCollection});
     }
 
-    // TODO SERVER-121084: Reevaluate whether metaField='' should be allowed.
-    const metaFieldArb = isTSCollection ? fc.constant("m") : fc.constant(undefined);
+    // Timeseries collections allow an empty-string metaField, so exercise both a normal name and
+    // the empty string to cover empty-metaField handling.
+    const metaFieldArb = isTSCollection ? fc.constantFrom("m", "") : fc.constant(undefined);
     return fc.record({
         isTS: fc.constant(isTSCollection),
         metaField: metaFieldArb,
