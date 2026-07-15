@@ -115,7 +115,9 @@ TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
     OpMsg::setFlag(&request, 1u << 15);  // This should be the last required flag to be assigned.
 
     Message reply;
-    ASSERT_THROWS_CODE(conn->call(request), DBException, ErrorCodes::HostUnreachable);
+    // The server closes the connection on an unknown required flag; the client observes the
+    // graceful peer close (eof) as ConnectionClosedByPeer on all platforms.
+    ASSERT_THROWS_CODE(conn->call(request), DBException, ErrorCodes::ConnectionClosedByPeer);
 }
 
 TEST(OpMsg, UnknownOptionalFlagIsIgnored) {

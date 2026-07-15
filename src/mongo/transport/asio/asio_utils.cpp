@@ -6,10 +6,15 @@
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 
+#ifdef MONGO_CONFIG_SSL
+#include "mongo/util/net/ssl.hpp"
+#endif
+
 #include <string_view>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+#include <fmt/format.h>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport {
 
@@ -22,8 +27,8 @@ Status errorCodeToStatus(const std::error_code& ec, std::string_view context) {
         return Status::OK();
 
     // Add additional context string to Status reason if included.
-    auto makeStatus = [&](ErrorCodes::Error code, std::string_view reason) {
-        Status result(code, reason);
+    auto makeStatus = [&](ErrorCodes::Error code, std::string reason) {
+        Status result(code, std::move(reason));
         if (context.data())
             result.addContext(context);
         return result;
@@ -40,9 +45,34 @@ Status errorCodeToStatus(const std::error_code& ec, std::string_view context) {
 #endif
         return makeStatus(ErrorCodes::NetworkTimeout, "Socket operation timed out");
     } else if (ec == asio::error::eof) {
-        return makeStatus(ErrorCodes::HostUnreachable, "Connection closed by peer");
+        // Non-TLS graceful FIN. Same code as stream_truncated below; the appended ec.message()
+        // distinguishes the two transport modes for diagnosis.
+        return makeStatus(ErrorCodes::ConnectionClosedByPeer,
+                          fmt::format("Connection closed by peer: {}", ec.message()));
+#ifdef MONGO_CONFIG_SSL
+    } else if (ec == asio::ssl::error::stream_truncated) {
+        // TLS peer closed without a proper close_notify — semantically identical to EOF.
+        return makeStatus(ErrorCodes::ConnectionClosedByPeer,
+                          fmt::format("Connection closed by peer: {}", ec.message()));
+#endif
+#ifdef _WIN32
+    } else if (ec == asio::error::connection_reset || ec == asio::error::connection_aborted) {
+        // On Windows, a purposeful peer termination during connection establishment can surface as
+        // an abortive close -- connection_reset (WSAECONNRESET, "connection reset by peer") or
+        // connection_aborted (WSAECONNABORTED, "an established connection was aborted by the
+        // software in your host machine") -- whereas Linux reports the same termination as a
+        // graceful close (eof) or a plain reset. Normalize the Windows abortive codes to
+        // ConnectionClosedByPeer so an establishment-phase peer close is classified consistently
+        // across platforms. The appended ec.message() keeps the variants distinguishable in
+        // diagnostics.
+        return makeStatus(ErrorCodes::ConnectionClosedByPeer,
+                          fmt::format("Connection closed by peer: {}", ec.message()));
+#else
     } else if (ec == asio::error::connection_reset) {
+        // Preserve the historical classification on non-Windows platforms: a reset is treated as a
+        // network-level failure rather than a graceful peer close.
         return makeStatus(ErrorCodes::HostUnreachable, "Connection reset by peer");
+#endif
     } else if (ec == asio::error::network_reset) {
         return makeStatus(ErrorCodes::HostUnreachable, "Connection reset by network");
     } else if (ec == asio::error::in_progress) {

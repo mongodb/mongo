@@ -27,8 +27,10 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
         // TLS 1.3 mismatches:
         //  - server only TLS 1.3, client only TLS 1.2 -> Connection closed by peer
         //  - server only TLS 1.2, client only TLS 1.3 -> SEC_E_ALGORITHM_MISMATCH text
-        // Legacy TLS 1.2 mismatch path:
-        //  - Connection reset by peer
+        // Legacy TLS 1.2 mismatch path: the server drops the connection with an abortive close,
+        // which the egress client now classifies as ConnectionClosedByPeer ("Connection closed by
+        // peer: ...") instead of the former "Connection reset by peer". Accept either so the test
+        // passes on both current and older builds.
         if (serverDisabledProtos === "TLS1_2" && clientDisabledProtos === "TLS1_3") {
             expectedRegex =
                 /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*Connection closed by peer/;
@@ -37,7 +39,7 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
                 /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*cannot communicate, because they do not possess a common algorithm/;
         } else {
             expectedRegex =
-                /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*Connection reset by peer/;
+                /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*(Connection reset by peer|Connection closed by peer)/;
         }
     } else if (implementation === "apple") {
         expectedRegex =

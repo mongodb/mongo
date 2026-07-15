@@ -4,7 +4,9 @@
 #include "mongo/executor/connection_pool_test_fixture.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #include <functional>
 #include <memory>
@@ -175,9 +177,11 @@ void ConnectionImpl::cancelTimeout() {
 void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb, std::string) {
     _setupCallback = std::move(cb);
 
-    _timer.setTimeout(timeout, [this] {
+    _timer.setTimeout(timeout, [this, timeout] {
         auto setupCb = std::move(_setupCallback);
-        setupCb(this, Status(ErrorCodes::HostUnreachable, "timeout"));
+        std::string reason = str::stream()
+            << "Timed out connecting to " << _hostAndPort << " after " << timeout;
+        setupCb(this, Status(ErrorCodes::ConnectionEstablishmentTimeout, std::move(reason)));
     });
 
     _setupQueue.push_back(this);
@@ -190,9 +194,11 @@ void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb, std::string) 
 void ConnectionImpl::refresh(Milliseconds timeout, RefreshCallback cb) {
     _refreshCallback = std::move(cb);
 
-    _timer.setTimeout(timeout, [this] {
+    _timer.setTimeout(timeout, [this, timeout] {
         auto refreshCb = std::move(_refreshCallback);
-        refreshCb(this, Status(ErrorCodes::HostUnreachable, "timeout"));
+        std::string reason = str::stream()
+            << "Timed out refreshing host " << _hostAndPort << " after " << timeout;
+        refreshCb(this, Status(ErrorCodes::HostUnreachable, std::move(reason)));
     });
 
     _refreshQueue.push_back(this);
