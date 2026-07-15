@@ -1,6 +1,7 @@
 // Test the shell helpers which wrap the plan cache commands.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_unchanged,
 //   # This test attempts to perform queries and introspect the server's plan cache entries. The

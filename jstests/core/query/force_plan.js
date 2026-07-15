@@ -2,6 +2,7 @@
  * Test using the forcedPlanSolutionHash parameter to the find and
  * explain commands.
  * @tags: [
+ *    uses_explain,
  *    assumes_unsharded_collection,
  *    assumes_against_mongod_not_mongos,
  *    # We modify the value of a query knob. setParameter is not persistent.

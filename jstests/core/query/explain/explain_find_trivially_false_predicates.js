@@ -1,6 +1,7 @@
 /**
  * Tests for optimizations applied to trivially false predicates.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_81,
  *   # Explain command does not support read concerns other than local
  *   assumes_read_concern_local

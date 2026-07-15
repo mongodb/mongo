@@ -5,6 +5,7 @@
 // from generating a COUNT_SCAN plan. Further, we do not allow stepdowns, since the code responsible
 // for retrying on interrupt is not prepared to handle aggregation explain.
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 // ]

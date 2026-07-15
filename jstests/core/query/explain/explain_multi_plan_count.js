@@ -4,6 +4,7 @@
 // This test is not prepared to handle explain output for sharded collections or when executed
 // against a mongos.
 // @tags: [
+//   uses_explain,
 //   assumes_against_mongod_not_mongos,
 //   assumes_unsharded_collection,
 //   assumes_no_implicit_index_creation,

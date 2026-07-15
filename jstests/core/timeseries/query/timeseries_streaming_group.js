@@ -3,6 +3,7 @@
  * monotonic on time and documents are sorted on time.
  *
  * @tags: [
+ *   uses_explain,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   does_not_support_stepdowns,

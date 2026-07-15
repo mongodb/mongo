@@ -4,6 +4,7 @@
  * When enabled, verifies that the settings are actually applied by checking explain output,
  * and that cluster PQS takes precedence over user-supplied settings on conflict.
  * @tags: [
+ *   uses_explain,
  *   does_not_support_stepdowns,
  *   directly_against_shardsvrs_incompatible,
  *   simulate_atlas_proxy_incompatible,

@@ -4,6 +4,7 @@
  * and without explode for sort optimization.
  *
  * @tags: [
+ *   uses_explain,
  *   # Since the plan cache is per-node state, this test assumes that all operations are happening
  *   # against the same mongod.
  *   assumes_read_preference_unchanged,

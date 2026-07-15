@@ -1,6 +1,7 @@
 // Test covered query with sort stage between index scan and projection.
 //
 // @tags: [
+//   uses_explain,
 //   # Cannot implicitly shard accessed collections because queries on a sharded collection are not
 //   # able to be covered when they aren't on the shard key since the document needs to be fetched
 //   # in order to apply the SHARDING_FILTER stage.

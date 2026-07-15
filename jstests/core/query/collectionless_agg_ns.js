@@ -1,6 +1,7 @@
 /**
  * Tests commands run against the $cmd.aggregate namespace.
  * @tags: [
+ *   uses_explain,
  *   # Some of these commands produce "cannot run within a multi-document transaction"
  *   does_not_support_transactions,
  *   requires_fcv_83,

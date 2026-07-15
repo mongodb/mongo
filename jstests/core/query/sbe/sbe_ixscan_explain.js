@@ -2,6 +2,7 @@
 // executionStats output.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_against_mongod_not_mongos,
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,

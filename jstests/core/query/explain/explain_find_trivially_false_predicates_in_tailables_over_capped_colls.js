@@ -2,6 +2,7 @@
  * Tests for optimizations applied to trivially false predicates specifically when using tailable
  * cursors over capped collections.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_81,
  *   requires_capped,
  *   # Explain command does not support read concerns other than local

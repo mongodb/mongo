@@ -5,6 +5,7 @@
 // MatchExpression semantics compared to agg, so the expression will not be rewritten or be able to
 // use indexes when they are present in the inList.
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 //   requires_fcv_81,
 //   requires_getmore,

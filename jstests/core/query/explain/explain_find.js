@@ -1,6 +1,7 @@
 /**
  * Tests for explaining find through the explain command.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   requires_fcv_81,
  * ]

@@ -5,6 +5,7 @@
  * cannot be covered when they aren't on the shard key since the document needs to be fetched in
  * order to apply the SHARDING_FILTER stage.
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   # The test assumes it is in control of which indexes exist and makes some assertions on explain
  *   # plans.

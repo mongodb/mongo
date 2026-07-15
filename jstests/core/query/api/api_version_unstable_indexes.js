@@ -4,6 +4,7 @@
  * excluded from API version 1. Note "geoHaystack" index has been deprecated after 4.9.
  *
  * @tags: [
+ *   uses_explain,
  *   uses_api_parameters,
  *   assumes_read_concern_local,
  *   not_allowed_with_signed_security_token,

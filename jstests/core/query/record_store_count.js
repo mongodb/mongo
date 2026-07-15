@@ -2,6 +2,7 @@
  * Tests that a count will ask the record store for the count when the query predicate is empty, or
  * logically empty. See SERVER-20536 for more details.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
  *   exclude_from_timeseries_crud_passthrough,

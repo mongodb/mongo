@@ -2,6 +2,7 @@
 // performance is what we expect it to be with indexing both fields.
 //
 // @tags: [
+//   uses_explain,
 //   operations_longer_than_stepdown_interval_in_txns,
 //   requires_fastcount,
 // ]

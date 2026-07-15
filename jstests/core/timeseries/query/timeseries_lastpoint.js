@@ -26,6 +26,7 @@
  * optimizations such as DISTINCT_SCAN.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   # Aggregation with explain may return incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,

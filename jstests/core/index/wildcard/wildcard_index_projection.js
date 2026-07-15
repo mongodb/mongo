@@ -2,6 +2,7 @@
  * Tests that a wildcard index with an exclusion projection but including _id field gets saved
  * properly. Exercises the fix for SERVER-52814.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   does_not_support_stepdowns,
  *   no_selinux,

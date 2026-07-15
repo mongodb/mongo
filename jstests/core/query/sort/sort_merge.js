@@ -2,6 +2,7 @@
  * Tests $or queries which can be answered with a SORT_MERGE stage.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   requires_getmore,
  * ]

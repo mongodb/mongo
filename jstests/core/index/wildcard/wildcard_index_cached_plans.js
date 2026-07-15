@@ -2,6 +2,7 @@
  * Test that cached plans which use wildcard indexes work.
  *
  * @tags: [
+ *   uses_explain,
  *   # This test attempts to perform queries and introspect the server's plan cache entries using
  *   # the $planCacheStats aggregation source. Both operations must be routed to the primary, and
  *   # the latter only supports 'local' readConcern.

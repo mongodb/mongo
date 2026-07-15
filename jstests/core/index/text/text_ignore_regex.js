@@ -2,6 +2,7 @@
  * Tests that regexes aren't allowed in text indexes.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_81,
  * ]
  */

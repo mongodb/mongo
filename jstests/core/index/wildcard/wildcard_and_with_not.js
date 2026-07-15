@@ -4,6 +4,7 @@
  * answered by the index.
  *
  * @tags: [
+ *   uses_explain,
  *   # We may choose a different plan if other indexes are created, which would break the test.
  *   assumes_no_implicit_index_creation,
  *   assumes_read_concern_local,

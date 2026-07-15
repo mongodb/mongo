@@ -3,6 +3,7 @@
 // command against views, which is converted to a hinted aggregation on execution.
 //
 // @tags: [
+//   uses_explain,
 //   does_not_support_stepdowns,
 //   # Explain of a resolved view must be executed by mongos.
 //   directly_against_shardsvrs_incompatible,

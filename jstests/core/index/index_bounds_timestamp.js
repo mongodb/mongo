@@ -2,6 +2,7 @@
 // This file tests whether index bounds for timestamps are generated properly in terms of
 // inclusiveness and exactness.
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 //   requires_fcv_82,
 // ]

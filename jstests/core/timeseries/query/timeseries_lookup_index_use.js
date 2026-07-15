@@ -6,6 +6,7 @@
  * predicate to be generated and forcing a collection scan.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   references_foreign_collection,
  *   requires_pipeline_optimization,

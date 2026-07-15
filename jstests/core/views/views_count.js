@@ -1,6 +1,7 @@
 // Test the count command with views.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 //   requires_fastcount,
 //   # Explain of a resolved view must be executed by mongos.

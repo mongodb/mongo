@@ -1,6 +1,7 @@
 /**
  * Tests $group usage of block processing for time series.
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   does_not_support_stepdowns,
  *   # During fcv upgrade/downgrade the engine might not be what we expect.

@@ -5,6 +5,7 @@
  * passthroughs will reject.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   # Some expected index bounds require the multi-planner to choose the optimal plan that uses a

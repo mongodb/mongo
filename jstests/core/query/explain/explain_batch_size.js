@@ -5,6 +5,7 @@
 // limit()
 //
 // @tags: [
+//   uses_explain,
 //   requires_fastcount,
 //   requires_getmore,
 // ]

@@ -3,6 +3,7 @@
  * range scan using a combination of minRecord and maxRecord.
  *
  * @tags: [
+ *   uses_explain,
  *   # The test assumes no index exists on the time field. shardCollection implicitly creates an
  *   # index.
  *   assumes_unsharded_collection,

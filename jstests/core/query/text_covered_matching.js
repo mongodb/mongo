@@ -8,6 +8,7 @@
 // same covered matching behavior with and without 'textScore' in the projection.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 //   # $text is not supported on views.

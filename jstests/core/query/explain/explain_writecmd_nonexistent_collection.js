@@ -1,6 +1,7 @@
 // Test explaining a delete command against a non-existent collection.
 //
 // @tags: [
+//    uses_explain,
 //    requires_non_retryable_writes,
 //    requires_fastcount,
 //    assumes_no_implicit_collection_creation_after_drop,

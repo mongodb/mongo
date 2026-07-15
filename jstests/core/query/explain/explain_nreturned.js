@@ -1,5 +1,6 @@
 // Tests aimed specifically at explain() with execution stats and the reported 'nReturned' value.
 // @tags: [
+//   uses_explain,
 //   # SERVER-29449 changed the way sharded collections report explain for queries with skip/limit.
 //   requires_fcv_82,
 //

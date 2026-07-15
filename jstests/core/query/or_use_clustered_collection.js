@@ -2,6 +2,7 @@
  * Verifies that $or queries on clustered collections produce plans with IXSCAN and
  * CLUSTERED_IXSCAN stages when possible.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_71,
  *  # Explain for the aggregate command cannot run within a multi-document transaction.
  *  does_not_support_transactions,

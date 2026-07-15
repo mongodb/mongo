@@ -2,6 +2,7 @@
  * Test that 'planCacheShapeHash' and 'planCacheKey' from explain() output have sensible values
  * across catalog changes.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   # This test expects query shapes and plans to stay the same at the beginning and
  *   # at the end of test run. That's just wrong expectation when chunks are moving

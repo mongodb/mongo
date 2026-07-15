@@ -1,6 +1,7 @@
 // Tests query settings are applied to aggregate queries regardless of the query engine (SBE or
 // classic).
 // @tags: [
+//   uses_explain,
 //   # TODO SERVER-98659 Investigate why this test is failing on
 //   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
 //   does_not_support_stepdowns,

@@ -2,6 +2,7 @@
  * Test that verifies the behavior of multi-key index scan when memory limit is set.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_stable_shard_list,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,

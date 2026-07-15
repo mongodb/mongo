@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 //   requires_getmore,
 //   # Explain will return different plan than expected when a collection becomes a time-series

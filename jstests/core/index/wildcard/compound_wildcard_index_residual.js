@@ -8,6 +8,7 @@
  *  - generic entry - all-values prefix scan ("$_path"): covers any wildcard subpath.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   # Implicit index creation may change the plan/engine used.
  *   assumes_no_implicit_index_creation,

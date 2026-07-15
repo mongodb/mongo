@@ -6,6 +6,7 @@
  * for queries on clustered collections.
  *
  * @tags: [
+ *   uses_explain,
  *   # Explain details will be different on sharded collections, and this test is focused on the
  *   # quality of the plan chosen, not the explain output.
  *   assumes_against_mongod_not_mongos,

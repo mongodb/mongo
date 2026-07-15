@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 //   requires_getmore,
 //   # Time series collections may return fields in a different order due to internal rewriting or view semantics.

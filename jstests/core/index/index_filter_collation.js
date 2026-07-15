@@ -2,6 +2,7 @@
  * Test that index filters are applied with the correct collation.
  *
  * @tags: [
+ *   uses_explain,
  *   # The test runs commands that are not allowed with security token: planCacheListFilters,
  *   # planCacheSetFilter.
  *   not_allowed_with_signed_security_token,

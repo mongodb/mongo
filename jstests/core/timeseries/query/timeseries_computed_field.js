@@ -1,6 +1,7 @@
 /**
  * Test use of computed fields in aggregations on time series collections.
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   does_not_support_stepdowns,
  *   directly_against_shardsvrs_incompatible,

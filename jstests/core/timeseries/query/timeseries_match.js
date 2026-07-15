@@ -1,6 +1,7 @@
 /**
  * Tests $match usage of block processing for time series.
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   does_not_support_stepdowns,
  *   directly_against_shardsvrs_incompatible,

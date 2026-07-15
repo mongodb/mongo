@@ -2,6 +2,7 @@
  * Ensures that distinct queries properly utilize subplanning when appropriate.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   # During fcv upgrade/downgrade the engine might not be what we expect.
  *   cannot_run_during_upgrade_downgrade,

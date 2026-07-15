@@ -2,6 +2,7 @@
 // for each plan cache entry when appropriate.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,

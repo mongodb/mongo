@@ -1,6 +1,7 @@
 /**
  * Tests that $** indexes obey hinting.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   does_not_support_stepdowns,
  * ]

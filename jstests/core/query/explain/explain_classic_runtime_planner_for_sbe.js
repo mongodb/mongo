@@ -1,6 +1,7 @@
 // Test that explain format for classic multiplanning with SBE features classic explain format for
 // queryPlanner and allPlansExecution, but SBE format for executionStats.
 // @tags: [
+//  uses_explain,
 //  assumes_unsharded_collection,
 //  featureFlagSbeFull,
 //  requires_fcv_80,  # because ClassicRuntimePlanningForSbe was enabled starting in 8.0
@@ -42,7 +43,7 @@ function assertExplainFormat(explain, expectedNumReturned) {
     const explainVersion = isSharded
         ? explain.queryPlanner.winningPlan.shards[0].explainVersion
         : explain.explainVersion;
-    assert.eq(explainVersion, "2", explain);
+    assert.contains(explainVersion, ["2", "3"], explain);
 
     // Confirm the number of results is as expected
     const execStatsList = getExecutionStats(explain);

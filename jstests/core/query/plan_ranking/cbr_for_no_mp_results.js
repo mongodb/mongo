@@ -3,6 +3,7 @@
  * with results or EOF are handled by the multi-planner.
  *
  * @tags: [
+ *    uses_explain,
  *    # setParameter calls to enable CBR will fail if a stepdown happens in between.
  *    does_not_support_stepdowns,
  *    # Timeseries bucket collections don't have user-created indexes, leading to COLLSCAN.

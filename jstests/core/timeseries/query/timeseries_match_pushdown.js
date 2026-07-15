@@ -3,6 +3,7 @@
  * predicates.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   # This test was modified to account for improvements made in 8.3.
  *   requires_fcv_83,

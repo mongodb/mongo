@@ -1,6 +1,7 @@
 /**
  * Make sure explain succeeds even when the index bounds are really big.
  * @tags: [
+ * uses_explain,
  * resource_intensive,
  * # Exclude the test from every suit in which the balancer is enabled. The migrations
  * # might cause a StaleConfig errors which will be retried for a max number of times before being

@@ -8,6 +8,7 @@
  * 5. The reported stats should reflect how the command would be executed.
  *
  * @tags: [
+ *   uses_explain,
  *   # The test runs commands that are not allowed with security token: isbdgrid.
  *   not_allowed_with_signed_security_token,
  *   # Cannot implicitly shard accessed collections because of collection existing when none

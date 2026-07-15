@@ -3,6 +3,7 @@
  * $alwaysFalse predicate.
  *
  * @tags: [
+ *   uses_explain,
  *   # Cannot run explain on agg queries with stepdowns
  *   does_not_support_stepdowns,
  *   # Explain for the aggregate command cannot run within a multi-document transaction.

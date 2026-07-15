@@ -2,6 +2,7 @@
 // variables for use in expressions within the command.
 // Before 7.2, $rand was evaluated more than once in sharded find (SERVER-75927).
 // @tags: [
+//   uses_explain,
 //   # TODO SERVER-123918: remove the multiversion incompatible tag.
 //   multiversion_incompatible,
 //   # Requires a batch size greater than one.

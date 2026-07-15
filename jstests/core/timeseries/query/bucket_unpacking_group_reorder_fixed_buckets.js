@@ -5,6 +5,7 @@
  * and/or $dateTrunc expressions on the timeField.
  *
  * @tags: [
+ *     uses_explain,
  *     # We need a timeseries collection.
  *     requires_timeseries,
  *     requires_fcv_71,

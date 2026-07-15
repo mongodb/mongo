@@ -9,6 +9,7 @@
  * and that memory usage is tracked.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,

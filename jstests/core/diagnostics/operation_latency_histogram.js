@@ -6,6 +6,7 @@
 // compact does not exist on such storage engines.
 //
 // @tags: [
+//   uses_explain,
 //   # The test runs commands that are not allowed with security token: compact, dataSize,reIndex,
 //   # whatsmyuri.
 //   not_allowed_with_signed_security_token,

@@ -1,6 +1,7 @@
 // Test commands that are not allowed in multi-document transactions.
 //
 // @tags: [
+//   uses_explain,
 //   # The test runs commands that are not allowed with security token: applyOps, endSession,
 //   # mapReduce.
 //   not_allowed_with_signed_security_token,

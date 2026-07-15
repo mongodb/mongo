@@ -1,5 +1,6 @@
 // Tests for $elemMatch to ensure correct count of returned elements.
 // @tags: [
+//   uses_explain,
 //   assumes_write_concern_unchanged,
 // ]
 

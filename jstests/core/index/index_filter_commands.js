@@ -20,6 +20,7 @@
  * filters.
  *
  * @tags: [
+ *   uses_explain,
  *   # The test runs commands that are not allowed with security token: planCacheClearFilters,
  *   # planCacheListFilters, planCacheSetFilter.
  *   not_allowed_with_signed_security_token,

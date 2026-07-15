@@ -2,7 +2,7 @@
  * FLE-supported commands that contain an invalid 'jsonSchema' field should return to the user a
  * more specific error message for diagnostic purposes.
  *
- * @tags: [requires_non_retryable_writes]
+ * @tags: [requires_non_retryable_writes, uses_explain]
  */
 const coll = db.command_json_schema_field;
 coll.drop();

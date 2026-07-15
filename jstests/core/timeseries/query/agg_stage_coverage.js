@@ -4,6 +4,7 @@
  * for a new document source.
  *
  * @tags: [
+ *   uses_explain,
  *   # $listMqlEntities cannot be wrapped in a $facet stage.
  *   do_not_wrap_aggregations_in_facets,
  *   requires_timeseries,

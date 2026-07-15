@@ -2,6 +2,7 @@
  * Tests that clustered collections respect collation for the _id field and any other fields
  *
  * @tags: [
+ *   uses_explain,
  *   # Clustered collections cannot be sharded.
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,

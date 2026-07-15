@@ -1,6 +1,7 @@
 /**
  * Tests for explaining an aggregation pipeline which uses the $sample stage.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  * ]
  */

@@ -4,6 +4,7 @@
  * collection.
  *
  * @tags: [
+ *   uses_explain,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Time series geo functionality requires optimization.

@@ -1,5 +1,6 @@
 // Test that limit is applied by explain.
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 //   requires_fcv_82,
 // ]

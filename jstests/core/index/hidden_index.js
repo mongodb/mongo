@@ -3,6 +3,7 @@
  * it will not be used in planning. It is handled in the same way as other indexes by the index
  * catalog and for TTL purposes.
  * @tags: [
+ *   uses_explain,
  *   # CollMod is not retryable.
  *   requires_non_retryable_commands,
  *   not_allowed_with_signed_security_token,

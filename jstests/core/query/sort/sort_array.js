@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   requires_fcv_90,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,

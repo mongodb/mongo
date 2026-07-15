@@ -1,6 +1,7 @@
 /**
  * This test ensures that bit test query operators work.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   # Explain will return different plan than expected when a collection becomes a time-series
  *   # collection. Also, query shape will be different.

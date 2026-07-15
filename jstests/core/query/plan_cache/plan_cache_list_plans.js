@@ -1,6 +1,7 @@
 // Tests for using $planCacheStats to list cached plans.
 //
 // @tags: [
+//   uses_explain,
 //   # If the balancer is on and chunks are moved, the plan cache can have entries with isActive:
 //   # false when the test assumes they are true because the query has already been run many times.
 //   assumes_balancer_off,

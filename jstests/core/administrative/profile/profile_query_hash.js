@@ -1,6 +1,7 @@
 // Confirms that profile entries for find commands contain the appropriate 'planCacheShapeHash'.
 //
 // @tags: [
+//   uses_explain,
 //   # The test runs commands that are not allowed with security token: setProfilingLevel.
 //   not_allowed_with_signed_security_token,
 //   assumes_against_mongod_not_mongos,

@@ -2,6 +2,7 @@
 // using the empty string as the out collection name is converted to an error and no longer retains
 // the "code" property.
 // @tags: [
+//   uses_explain,
 //   # This test runs commands that are not allowed with security token: cleanupOrphaned,
 //   # cloneCollectionAsCapped, compact, dataSize, enableSharding, godinsert, mapreduce,
 //   # mergeChunks, moveChunk, movePrimary, planCacheClear, planCacheClearFilters,

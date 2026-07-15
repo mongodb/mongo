@@ -2,6 +2,7 @@
  * Non-leading $match is not pushed down to SBE if there are no $group or $lookup stages.
  *
  * @tags: [
+ *    uses_explain,
  *    assumes_against_mongod_not_mongos,
  *    # Explain command does not support read concerns other than local.
  *    assumes_read_concern_local,

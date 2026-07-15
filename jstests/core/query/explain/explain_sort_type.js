@@ -3,6 +3,7 @@
  * "default".
  *
  * @tags: [
+ *   uses_explain,
  *   # Shard filtering may be required if the collection is sharded, which could affect the query
  *   # planner's selection of the "simple" versus "default" sort algorithm.
  *   assumes_unsharded_collection,

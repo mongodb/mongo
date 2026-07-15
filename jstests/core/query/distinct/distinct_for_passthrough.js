@@ -5,6 +5,7 @@
  * may appear).
  *
  * @tags: [
+ *  uses_explain,
  *  featureFlagShardFilteringDistinctScan,
  *  requires_fcv_82,
  *  simulate_mongoq_incompatible,

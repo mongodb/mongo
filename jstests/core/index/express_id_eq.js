@@ -2,6 +2,7 @@
  * Tests that IDHACK (and thus, the express path) works on queries of the shape {_id: {$eq: 123}}.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_81,
  *   # "Explain for the aggregate command cannot run within a multi-document transaction"
  *   does_not_support_transactions,

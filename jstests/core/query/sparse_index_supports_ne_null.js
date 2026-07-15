@@ -6,6 +6,7 @@
  * depending on how the collection is sharded. (For example, if one shard's index goes multikey,
  * but another's is still not multikey, they may need to use different plans for certain queries).
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   # In 8.0, we changed behavior for equality to null.
  *   requires_fcv_80,

@@ -3,6 +3,7 @@
  * internalMaxGroupAccumulatorsInSbe parameter and engine configuration.
  *
  * @tags: [
+ *   uses_explain,
  *   # Sharded collection passthroughs add shard filters that can prevent $group pushdown when it
  *   # would otherwise be allowed.
  *   assumes_unsharded_collection,

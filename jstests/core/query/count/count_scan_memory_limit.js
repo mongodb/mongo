@@ -8,6 +8,7 @@
  * into the duplicate tracker, so the memory check is never reached.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,

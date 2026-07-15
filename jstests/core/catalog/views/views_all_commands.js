@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   # The test runs a lot of commands that are not allowed with security token: addShard,
 //   # addShardToZone, appendOplogNote, applyOps, and so on.
 //   not_allowed_with_signed_security_token,

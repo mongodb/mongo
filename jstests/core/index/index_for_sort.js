@@ -2,6 +2,7 @@
  * Tests that verify that queries using an index for sorting produce the same results as queries
  * that do collscan instead.
  * @tags: [
+ *  uses_explain,
  *  # Uses $where.
  *  requires_scripting,
  *  requires_fcv_90,

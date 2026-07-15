@@ -4,6 +4,7 @@
  * suboptimal due to a change in data.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,

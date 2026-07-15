@@ -1,6 +1,7 @@
 /**
  * Test that $** indexes work when provided with a partial filter expression.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   does_not_support_stepdowns,
  * ]

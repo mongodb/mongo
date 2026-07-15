@@ -2,6 +2,7 @@
  * Test that verifies the behavior of NearStage when memory limit is set.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_stable_shard_list,
  *   assumes_stable_collection_uuid,
  *   assumes_unsharded_collection,

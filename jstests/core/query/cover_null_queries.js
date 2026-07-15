@@ -1,6 +1,7 @@
 /**
  * Test to verify that null queries can be fully covered by an index.
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
  *   # SERVER-36681 changed the behavior of SBE and classic engines

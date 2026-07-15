@@ -2,6 +2,7 @@
  * Tests that the unpacking stage has correct unpacking behaviour when $match is pushed into it.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   requires_fcv_62,
  *   does_not_support_stepdowns,

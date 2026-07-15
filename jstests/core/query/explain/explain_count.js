@@ -1,6 +1,7 @@
 // Test running explains on count commands.
 //
 // @tags: [
+//    uses_explain,
 //    requires_fastcount,
 //    requires_fcv_82,
 // ]

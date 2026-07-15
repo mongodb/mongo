@@ -2,6 +2,7 @@
  * Tests explaining read operations over the buckets of a time-series collection (with rawData).
  *
  * @tags: [
+ *   uses_explain,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,

@@ -2,6 +2,7 @@
  * Make sure that $gt and $lt queries return the same results regardless of whether there is a
  * multikey index.
  * @tags: [
+ *     uses_explain,
  *     requires_fcv_81,
  *     requires_getmore,
  *     # This test runs too long for TSAN and code coverage builds.

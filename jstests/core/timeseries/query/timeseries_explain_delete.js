@@ -2,6 +2,7 @@
  * Tests whether the explain works for a single delete operation on a timeseries collection.
  *
  * @tags: [
+ *   uses_explain,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # To avoid multiversion tests

@@ -1,6 +1,7 @@
 /**
  * Tests that queries using a multikey $** index, return correct results.
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   assumes_read_concern_local,
  *   does_not_support_stepdowns,

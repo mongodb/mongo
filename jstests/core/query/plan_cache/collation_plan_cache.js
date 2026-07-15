@@ -1,6 +1,7 @@
 // Integration testing for the plan cache and index filter commands with collation.
 //
 // @tags: [
+//   uses_explain,
 //   # The test runs commands that are not allowed with security token: planCacheClear,
 //   # planCacheClearFilters, planCacheListFilters, planCacheSetFilter.
 //   not_allowed_with_signed_security_token,

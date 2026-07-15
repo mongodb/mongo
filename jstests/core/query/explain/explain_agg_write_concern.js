@@ -2,6 +2,7 @@
 // for output collection of aggregation pipeline.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 //   assumes_write_concern_unchanged,
 //   does_not_support_stepdowns,

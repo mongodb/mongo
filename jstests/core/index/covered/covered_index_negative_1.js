@@ -5,6 +5,7 @@
 
 // Include helpers for analyzing explain output.
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   does_not_support_stepdowns,
 // ]

@@ -1,6 +1,7 @@
 /**
  * Tests for optimizations applied to trivially false predicates in aggregate pipelines.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_83,
  *   # Tests run here require explaining plans on aggregate commands that could be incomplete
  *   # during stepdown

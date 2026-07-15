@@ -2,6 +2,7 @@
  * Test that variable-type fields are found correctly in timeseries collections.
  *
  * @tags: [
+ *   uses_explain,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant

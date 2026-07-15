@@ -1,6 +1,7 @@
 /**
  * Tests passing a hint to the findAndModify command on a time-series collection for deletes.
  * @tags: [
+ *   uses_explain,
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,

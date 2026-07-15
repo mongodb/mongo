@@ -1,6 +1,7 @@
 // Test spilling in geo near. Data has a lot of points on a circle, which forces NearStage to buffer
 // all of them.
 // @tags: [
+//   uses_explain,
 //   requires_fcv_83,
 //   requires_getmore,
 //   requires_persistence,

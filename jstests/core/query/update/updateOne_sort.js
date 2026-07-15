@@ -4,6 +4,7 @@
  *   - Sort will only have functionality in updateOne, not update or updateMany
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,

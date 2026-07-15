@@ -2,6 +2,7 @@
  * Tests basic raw index creation and operations directly on buckets, by using rawData operations.
  *
  * @tags: [
+ *   uses_explain,
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,

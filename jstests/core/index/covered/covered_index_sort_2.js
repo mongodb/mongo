@@ -1,5 +1,6 @@
 // Simple covered index query test with sort on _id
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 // ]

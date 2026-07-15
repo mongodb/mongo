@@ -1,5 +1,6 @@
 // Check explain results for a plan that uses an index to obtain the requested sort order.
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 //   operations_longer_than_stepdown_interval,  # large bulk inserts

@@ -2,6 +2,7 @@
  * Tests the find command on views.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   requires_getmore,
  *   # Explain of a resolved view must be executed by mongos.

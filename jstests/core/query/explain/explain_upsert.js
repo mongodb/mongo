@@ -1,5 +1,6 @@
 // This test asserts on query plans expected from unsharded collections.
 // @tags: [
+//   uses_explain,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_fastcount,
 // ]

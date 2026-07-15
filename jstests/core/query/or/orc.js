@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_non_retryable_writes, uses_explain]
 
 // test that or duplicates are dropped in certain special cases
 let t = db.jstests_orc;

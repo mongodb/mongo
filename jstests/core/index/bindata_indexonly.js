@@ -3,6 +3,7 @@
  * 1) Return the correct documents.
  * 2) Can perform index-only data access.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  * ]
  */

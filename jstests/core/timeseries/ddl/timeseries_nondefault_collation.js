@@ -7,6 +7,7 @@
  * Collection's collation might affect the computed control values.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_non_retryable_writes,
  *   requires_pipeline_optimization,
  *   does_not_support_stepdowns,

@@ -2,6 +2,7 @@
  * Check that various distinct commands return the same results regardless of whether the collection
  * is a view.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_60,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,

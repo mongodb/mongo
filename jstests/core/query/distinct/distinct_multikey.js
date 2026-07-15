@@ -1,6 +1,7 @@
 /**
  * Tests for distinct planning and execution in the presence of multikey indexes.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  * ]
  */

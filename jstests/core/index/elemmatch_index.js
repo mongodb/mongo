@@ -2,6 +2,7 @@
  * Test that queries containing $elemMatch correctly use an index if each child expression is
  * compatible with the index.
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   assumes_read_concern_local,
  *   requires_getmore,

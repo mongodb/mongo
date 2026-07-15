@@ -2,6 +2,7 @@
 // allPlansExecution verbosity.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 //   requires_fcv_80,
 // ]

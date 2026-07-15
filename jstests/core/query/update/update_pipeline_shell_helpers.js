@@ -2,6 +2,7 @@
  * Tests that each of the update shell helpers correctly validates pipeline-style update operations.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_write_concern_unchanged,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,

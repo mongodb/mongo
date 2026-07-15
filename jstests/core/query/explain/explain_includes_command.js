@@ -2,6 +2,7 @@
  * Confirms that the explain command includes the command object that was run.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  * ]
  */

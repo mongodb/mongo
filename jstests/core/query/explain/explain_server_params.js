@@ -1,5 +1,6 @@
 // Tests server parameter information shown by explain.
 // @tags: [
+//   uses_explain,
 //   does_not_support_stepdowns,
 //   # TODO SERVER-30466
 //   does_not_support_causal_consistency,

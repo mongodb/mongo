@@ -12,6 +12,7 @@
  * about all plans.
  *
  * @tags: [
+ * uses_explain,
  * query_intensive_pbt,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,

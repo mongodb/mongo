@@ -279,3 +279,6 @@ filters:
   - "concurrency_resharding_with_lightweight_stepdowns.yml":
     approvers:
       - 10gen/server-cluster-scalability
+  - "core_explain_v3_passthrough.yml":
+    approvers:
+      - 10gen/query-optimization

@@ -1,4 +1,5 @@
 // @tags: [
+//  uses_explain,
 //  requires_fcv_90,
 //  # Explain will return different plan than expected when a collection becomes a time-series
 //  # collection. Also, query shape will be different.

@@ -4,6 +4,7 @@
  * 'DISTINCT_SCAN' when it is appropriate.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   # Time series collections do not support hashed indexes on measurement fields.

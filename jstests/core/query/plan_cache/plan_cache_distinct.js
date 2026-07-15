@@ -2,6 +2,7 @@
  * Test that distinct command and DISTINCT_SCAN optimizations correctly use the plan cache.
  *
  * @tags: [
+ *   uses_explain,
  *   # The test runs commands that are not allowed with security token: planCacheClear.
  *   not_allowed_with_signed_security_token,
  *   # This test attempts to perform queries and introspect/manipulate the server's plan cache

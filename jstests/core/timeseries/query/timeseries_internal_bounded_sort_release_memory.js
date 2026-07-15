@@ -1,6 +1,7 @@
 /**
  * Test releaseMemory command for cursors with $_internalBoundedSort stage.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_preference_unchanged,
  *   assumes_superuser_permissions,
  *   does_not_support_transactions,

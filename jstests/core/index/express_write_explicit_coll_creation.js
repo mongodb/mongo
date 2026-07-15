@@ -4,6 +4,7 @@
  * creation after drop.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_80,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,

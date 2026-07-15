@@ -7,6 +7,7 @@
  * Doesn't support stepdowns because it runs explain() on an aggregation (which can apparently
  * return incomplete results).
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   # Explain will return different plan than expected when a collection becomes a time-series

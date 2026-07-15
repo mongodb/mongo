@@ -3,6 +3,7 @@
  * Also asserts on which stages are pushed down to SBE, and which remain as document sources.
  *
  * @tags: [
+ *   uses_explain,
  *   # Different versions may have different SBE components enabled.
  *   multiversion_incompatible,
  *   # Topology doesn't affect engine selection.

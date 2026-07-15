@@ -2,6 +2,7 @@
  * Tests that compound wildcard indexes can support queries on non-wildcard prefix.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,

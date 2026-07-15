@@ -6,6 +6,7 @@
  * getMores, which the stepdown/kill_primary passthroughs will reject.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   requires_getmore,

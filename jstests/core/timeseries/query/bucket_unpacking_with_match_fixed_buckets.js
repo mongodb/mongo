@@ -3,6 +3,7 @@
  * with fixed buckets.
  *
  * @tags: [
+ *     uses_explain,
  *     # We need a timeseries collection.
  *     requires_timeseries,
  *     requires_fcv_71,

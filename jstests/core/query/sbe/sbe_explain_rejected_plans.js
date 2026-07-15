@@ -1,6 +1,7 @@
 /**
  * Tests that SBE reports correct rejected plans when calling explain().
  * @tags: [
+ *    uses_explain,
  *    assumes_unsharded_collection,
  *    requires_fcv_63,
  *   # During fcv upgrade/downgrade the engine might not be what we expect.

@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_unsharded_collection,
 //   # Asserts that some queries use a collection scan.
