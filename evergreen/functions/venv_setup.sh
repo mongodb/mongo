@@ -78,10 +78,37 @@ toolchain_txt="$pip_dir/toolchain-requirements.txt"
 activate_venv
 echo "Upgrading pip to ${pip_version}"
 
-python -m pip --disable-pip-version-check install "pip==${pip_version}" "wheel==${wheel_version}" || exit 1
-if ! python -m pip --disable-pip-version-check install --resume-retries 5 -r "$toolchain_txt" -q --log install.log; then
-  echo "Pip install error"
-  cat install.log || true
-  exit 1
+python -m pip --disable-pip-version-check install --prefer-binary "pip==${pip_version}" "wheel==${wheel_version}" || exit 1
+run_toolchain_pip_install() {
+  python -m pip --disable-pip-version-check install \
+    "$@" \
+    --prefer-binary \
+    --resume-retries 5 \
+    -r "$toolchain_txt" \
+    -q \
+    --log install.log
+}
+
+clear_pip_cache_for_retry() {
+  local pip_cache_dir="${PIP_CACHE_DIR:-${workdir}/pip_cache}"
+
+  echo "Pip hash mismatch detected; clearing pip cache and retrying once"
+  rm -rf "$pip_cache_dir" "${workdir}/tmp"/pip-*
+  rm -f install.log
+}
+
+if ! run_toolchain_pip_install; then
+  if grep -q "THESE PACKAGES DO NOT MATCH THE HASHES" install.log; then
+    clear_pip_cache_for_retry
+    if ! run_toolchain_pip_install --no-cache-dir; then
+      echo "Pip install error"
+      cat install.log || true
+      exit 1
+    fi
+  else
+    echo "Pip install error"
+    cat install.log || true
+    exit 1
+  fi
 fi
 python -m pip freeze > pip-requirements.txt
