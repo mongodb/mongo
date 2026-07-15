@@ -325,7 +325,7 @@ public:
 
     CollectionType getCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 repl::ReadConcernLevel readConcernLevel) override {
+                                 repl::ReadConcernArgs readConcern) override {
         std::lock_guard lk{_mutex};
 
         const auto it =
@@ -340,7 +340,7 @@ public:
 
     CollectionType getCollection(OperationContext* opCtx,
                                  const UUID& uuid,
-                                 repl::ReadConcernLevel readConcernLevel) override {
+                                 repl::ReadConcernArgs readConcern) override {
         std::lock_guard lk{_mutex};
 
         const auto it =
@@ -364,7 +364,7 @@ public:
         repl::OpTime* opTime,
         const OID& epoch,
         const Timestamp& timestamp,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<BSONObj>& hint = boost::none) override {
 
         std::lock_guard lk{_mutex};
@@ -421,14 +421,14 @@ public:
 
     DatabaseType getDatabase(OperationContext* opCtx,
                              const DatabaseName& db,
-                             repl::ReadConcernLevel readConcernLevel) override {
+                             repl::ReadConcernArgs readConcern) override {
         std::lock_guard lk{_mutex};
         invariant(db == _dbEntry.getDbName());
         return _dbEntry;
     }
 
     repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
-                                                          repl::ReadConcernLevel readConcern,
+                                                          repl::ReadConcernArgs readConcern,
                                                           BSONObj filter) override {
         std::vector<ShardType> result = {
             ShardType{kThisShard.getShardId().toString(), boost::none, "localhost-1"},
@@ -1050,7 +1050,7 @@ private:
             });
 
         shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
-            opCtx, tempNss, tempUuid, op.nss, targetUUID, op.isUpgrading, isCurrentPrimary);
+            opCtx, tempNss, tempUuid, op.nss, targetUUID, isCurrentPrimary);
     }
 
     void executeDDL(OperationContext* opCtx, const ReshardCollectionDDL& op) {
@@ -1082,7 +1082,7 @@ private:
             boost::optional<ScopedSetShardRole> setShardRole;
             bool isTracked = cri.hasRoutingTable();
             if (isTracked) {
-                auto shardVersion = cri.getShardVersion(opCtx, kThisShard);
+                auto shardVersion = cri.getShardVersion(kThisShard);
                 setShardRole.emplace(opCtx, nss, shardVersion, boost::none);
             } else {
                 setShardRole.emplace(opCtx, nss, ShardVersion::UNTRACKED(), cri.getDbVersion());
