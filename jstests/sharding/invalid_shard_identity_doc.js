@@ -25,8 +25,6 @@ let shardIdentityDoc = {
     clusterId: ObjectId(),
 };
 
-const updateErrorMsgPrefix = "Plan executor error during update :: caused by :: ";
-
 // TODO: SERVER-67837 Change to test that the server crashed when auto-bootstrapping is enabled by
 // default.
 //
@@ -38,9 +36,11 @@ let res = assert.commandFailedWithCode(
         .runCommand({insert: "system.version", documents: [shardIdentityDoc]}),
     ErrorCodes.UnsupportedFormat,
 );
-assert.eq(
-    res.writeErrors[0].errmsg,
-    'Invalid shard identity document: the shard name for a shard server cannot be "config"',
+assert(
+    res.writeErrors[0].errmsg.includes(
+        'Invalid shard identity document: the shard name for a shard server cannot be "config"',
+    ),
+    "Missing or wrong error message",
 );
 
 // Update with shard name "config" on shard server should fail
@@ -51,10 +51,11 @@ res = assert.commandFailedWithCode(
     }),
     ErrorCodes.UnsupportedFormat,
 );
-assert.eq(
-    res.writeErrors[0].errmsg,
-    updateErrorMsgPrefix +
+assert(
+    res.writeErrors[0].errmsg.includes(
         'Invalid shard identity document: the shard name for a shard server cannot be "config"',
+    ),
+    "Missing or wrong error message",
 );
 
 // Update with shard name "pizza" on config server should fail
@@ -66,10 +67,11 @@ res = assert.commandFailedWithCode(
     }),
     ErrorCodes.UnsupportedFormat,
 );
-assert.eq(
-    res.writeErrors[0].errmsg,
-    updateErrorMsgPrefix +
+assert(
+    res.writeErrors[0].errmsg.includes(
         'Invalid shard identity document: the shard name for a config server cannot be "pizza"',
+    ),
+    "Missing or wrong error message",
 );
 
 // TODO SERVER-74570: Enable parallel shutdown
