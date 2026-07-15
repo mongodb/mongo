@@ -3673,6 +3673,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
+        "//src/mongo/db/query/query_settings:query_settings_command_hooks",
         "//src/mongo/db/repl:repl_coordinator_impl",
         "//src/mongo/db/repl:serveronly_repl",
         "//src/mongo/db/repl:storage_interface_impl",

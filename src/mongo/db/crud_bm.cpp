@@ -6,6 +6,7 @@
 #include "mongo/db/index_builds/index_builds_coordinator_mongod.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_id.h"
+#include "mongo/db/query/query_settings/query_settings_command_hooks.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -118,6 +119,26 @@ void setupOpObservers(ServiceContext* svcCtx) {
     svcCtx->setOpObserver(std::move(opObserverRegistry));
 }
 
+void setupCommandHooks(ServiceContext* svcCtx) {
+    class BenchmarkCommandInvocationHooks final : public CommandInvocationHooks {
+    public:
+        void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override {
+            _querySettingsHook.onBeforeRun(opCtx, invocation);
+        }
+
+        void onAfterRun(OperationContext* opCtx,
+                        CommandInvocation* invocation,
+                        rpc::ReplyBuilderInterface* response) override {
+            _querySettingsHook.onAfterRun(opCtx, invocation, response);
+        }
+
+    private:
+        query_settings::QuerySettingsCommandHooks _querySettingsHook{};
+    };
+
+    CommandInvocationHooks::set(svcCtx, std::make_unique<BenchmarkCommandInvocationHooks>());
+}
+
 // Sets up storage engine with a clean slate.
 void setupStorage(ServiceContext* svcCtx) {
     constexpr auto kDBPrefix = "/tmp/bench";
@@ -154,6 +175,7 @@ public:
         setupCatalog(svcCtx);
         setupShardingState(svcCtx);
         setupOpObservers(svcCtx);
+        setupCommandHooks(svcCtx);
         setupStorage(svcCtx);
     }
 
