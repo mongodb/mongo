@@ -374,6 +374,27 @@ public:
             if (isDryRun) {
                 return;
             }
+
+            // Some invocations of this command complete without performing any writes of their
+            // own (e.g. the early return below when the FCV is already at the target). In those
+            // cases, the client's lastOp can be stale, so waiting for it to be majority committed
+            // below would effectively be a no-op and give a false sense of durability. setFCV's
+            // result should always be based on majority-committed data regardless of whether this
+            // particular invocation performed a write, so unconditionally advance the client's
+            // lastOp to the system's current last opTime first.
+            try {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+            } catch (const DBException& ex) {
+                // Best-effort: this runs in a scope-exit handler, so we must not let an exception
+                // escape. Fall back to waiting on whatever lastOp the client already has.
+                LOGV2_DEBUG(12097800,
+                            2,
+                            "Failed to advance lastOp to the system's last opTime before waiting "
+                            "for setFeatureCompatibilityVersion write concern",
+                            "error"_attr = ex.toStatus());
+            }
+
             WriteConcernResult res;
             auto waitForWCStatus = waitForWriteConcern(
                 opCtx,
@@ -395,13 +416,6 @@ public:
             const bool shouldEarlyReturn = !fcvDoc.getPhase().has_value();
 
             if (shouldEarlyReturn) {
-                // Set the client's last opTime to the system last opTime so no-ops wait for
-                // writeConcern. This will wait for any previous setFCV disk writes to be majority
-                // committed before returning to the user, if the previous setFCV command had
-                // updated the FCV but encountered failover afterwards.
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-
                 // _finalizeUpgrade and _finalizeDowngrade are only for any tasks that must be done
                 // to fully complete the FCV upgrade AFTER the FCV document has been updated to the
                 // UPGRADED/DOWNGRADED FCV. We call them here because it's possible that during an
