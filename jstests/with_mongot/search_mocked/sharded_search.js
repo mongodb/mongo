@@ -1,8 +1,5 @@
 /**
  * Sharding tests for the `$search` aggregation pipeline stage.
- *
- * TODO (SERVER-131069): Ordering and re-sort covered by e2e/search/search.js in sharded
- * passthroughs. Remaining mock-only: error injection, uneven batches, misbehaving mongot.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {

@@ -1,9 +1,6 @@
 /**
  * Sharding tests where $search with a sort is invoked as part of a subpipeline.
  *
- * TODO (SERVER-131069): Mock-only PSS routing for sort in sub-pipelines. Cannot migrate to
- * real-mongot E2E.
- *
  * @tags: [
  *     requires_fcv_70
  * ]

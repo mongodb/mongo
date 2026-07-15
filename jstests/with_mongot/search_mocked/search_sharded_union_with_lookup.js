@@ -1,9 +1,6 @@
 /**
  * Sharding test of `$search` aggregation stage within $unionWith and $lookup stages. Also checks
  * explain results.
- *
- * TODO (SERVER-131069): E2E coverage added by SERVER-131287. Remaining mock-only:
- * planShardedSearch routing, per-shard dispatch, injected explain responses.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {

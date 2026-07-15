@@ -1,8 +1,5 @@
 /**
  * Test of `$search` aggregation stage within $unionWith and $lookup stages.
- *
- * TODO (SERVER-131069): E2E coverage added by SERVER-131287. Remaining mock-only: command counts,
- * lookup caching, routing, injected explain responses.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
