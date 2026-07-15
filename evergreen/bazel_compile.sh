@@ -130,6 +130,14 @@ if [[ "${skip_debug_link:-}" == "true" ]]; then
   fi
 fi
 
+# On the xxxlarge Amazon 2023 arm64 host, cap the compile's local CPU scheduling
+# to 3/4 of the cores for the archive_dist_test and package tasks. Using all the CPUs
+# causes us to bottleneck on RAM and cause nondeterministic failures which sometimes
+# corrupts binaries
+if [[ ("${task_name:-}" == "archive_dist_test" || "${task_name:-}" == "package") && "${distro_id:-}" == "amazon2023.3-arm64-xxxlarge" ]]; then
+  task_compile_flags="${task_compile_flags:-} --local_resources=cpu=HOST_CPUS*.75"
+fi
+
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Targets: ${targets}"
 
