@@ -750,10 +750,10 @@ public:
             streamDeadline = opCtx->getServiceContext()->getFastClockSource()->now() +
                 replCoord->getConfig().getHeartbeatInterval();
         }
-        // Block until lastApplied advances (if getNextAppliedOpTimeFuture is overridden) or the
-        // heartbeat interval expires. Timeout is intentional — it drives the periodic liveness
-        // signal.
-        auto future = replCoord->getNextAppliedOpTimeFuture();
+        // Block until a value reported in the heartbeat response advances (lastApplied or the last
+        // installed checkpoint timestamp, if getNextHeartbeatNotificationFuture is overridden) or
+        // the heartbeat interval expires. Timeout is intentional — it drives the periodic liveness
+        auto future = replCoord->getNextHeartbeatNotificationFuture();
         const auto waitStatus = opCtx->runWithDeadline(
             streamDeadline, ErrorCodes::MaxTimeMSExpired, [&] { return future.getNoThrow(opCtx); });
         if (!waitStatus.isOK() && waitStatus != ErrorCodes::MaxTimeMSExpired) {
@@ -763,7 +763,7 @@ public:
         // Delegate heartbeat processing and response building to run() via the standard path.
         const bool ok = BasicCommand::runWithReplyBuilder(opCtx, dbName, cmdObj, replyBuilder);
 
-        // Keep the exhaust stream alive when lastApplied advanced so the primary is notified
+        // Keep the exhaust stream alive when a reported value advanced so the primary is notified
         // promptly for each advance within an interval. End the stream on interval expiry so the
         // primary reschedules with fresh $replData gossip (lastApplied, lastSent, lastCheckpoint).
         const bool intervalExpired = (waitStatus == ErrorCodes::MaxTimeMSExpired);
@@ -800,7 +800,7 @@ public:
         uassertStatusOK(args.initialize(cmdObj));
 
         ReplSetHeartbeatResponse response;
-        status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(args, &response);
+        status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(opCtx, args, &response);
         if (status.isOK())
             response.addToBSON(&result);
 

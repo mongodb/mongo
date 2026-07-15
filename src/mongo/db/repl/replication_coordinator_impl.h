@@ -419,7 +419,8 @@ public:
     void setOldestTimestampMetric(const Timestamp& timestamp);
     void setOldestTimestamp(const Timestamp& timestamp) override;
 
-    Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+    Status processHeartbeatV1(OperationContext* opCtx,
+                              const ReplSetHeartbeatArgsV1& args,
                               ReplSetHeartbeatResponse* response) override;
 
     bool getWriteConcernMajorityShouldJournal() override;

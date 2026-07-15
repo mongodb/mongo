@@ -942,10 +942,10 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCWMajToW1WithCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     // As we have set the cluster-wide write concern, the reconfig should succeed.
@@ -1001,10 +1001,10 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCW1ToWMajWithCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     // As we have set the cluster-wide write concern, the reconfig should succeed.
@@ -1062,13 +1062,13 @@ TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtW1WithoutCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(4);
     hbArgs.setSenderHost(HostAndPort("node4", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
@@ -1118,10 +1118,10 @@ TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtWMajWithoutCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
@@ -2405,7 +2405,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &response));
 
     // No requests should have been scheduled.
     getNet()->enterNetwork();
@@ -2427,7 +2427,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
     hbArgs.setTerm(0);
     ASSERT(hbArgs.isInitialized());
 
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &response));
 
     // Schedule a response with a newer config.
     auto newerConfigVersion = 3;
@@ -2506,7 +2506,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithForceHeartbeatReconfig) {
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &response));
 
     // Schedule a response with a newer config.
     auto newerConfigVersion = 3;

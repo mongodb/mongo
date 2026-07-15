@@ -5452,7 +5452,8 @@ bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal(WithLock l
     return _rsConfig.unsafePeek().getWriteConcernMajorityShouldJournal();
 }
 
-Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+Status ReplicationCoordinatorImpl::processHeartbeatV1(OperationContext* opCtx,
+                                                      const ReplSetHeartbeatArgsV1& args,
                                                       ReplSetHeartbeatResponse* response) {
     std::lock_guard lk(_mutex);
     if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {

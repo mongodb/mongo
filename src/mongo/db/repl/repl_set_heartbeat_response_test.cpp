@@ -463,13 +463,14 @@ TEST(ReplSetHeartbeatResponse, ServerError) {
 // CmdReplSetHeartbeat exhaust streaming tests
 // ============================================================
 
-// Lets the test choose whether getNextAppliedOpTimeFuture() resolves immediately (simulating an
-// optime advance) or stays pending (simulating no progress), so we can drive both exhaust paths.
+// Lets the test choose whether getNextHeartbeatNotificationFuture() resolves immediately
+// (simulating a lastApplied or checkpoint advance) or stays pending (simulating no progress), so we
+// can drive both exhaust paths.
 class ExhaustReplCoordMock : public ReplicationCoordinatorMock {
 public:
     using ReplicationCoordinatorMock::ReplicationCoordinatorMock;
 
-    SharedSemiFuture<void> getNextAppliedOpTimeFuture() override {
+    SharedSemiFuture<void> getNextHeartbeatNotificationFuture() override {
         return _future;
     }
 
@@ -525,8 +526,8 @@ protected:
     ExhaustReplCoordMock* _replCoord = nullptr;
 };
 
-// When getNextAppliedOpTimeFuture() resolves before the interval deadline, the node keeps the
-// exhaust stream open so the primary gets a prompt response for each optime advance.
+// When getNextHeartbeatNotificationFuture() resolves before the interval deadline, the node keeps
+// the exhaust stream open so the primary gets a prompt response for each reported-value advance.
 TEST_F(ExhaustHeartbeatTest, FutureResolved_StreamStaysOpen) {
     _replCoord->setFuture(SemiFuture<void>::makeReady().share());
 
@@ -541,9 +542,9 @@ TEST_F(ExhaustHeartbeatTest, FutureResolved_StreamStaysOpen) {
         << "expected exhaust stream to remain open when optime advanced before interval expired";
 }
 
-// When the heartbeat interval deadline expires before getNextAppliedOpTimeFuture() resolves, the
-// node closes the exhaust stream so the primary is forced to issue a fresh request carrying updated
-// $replData gossip.
+// When the heartbeat interval deadline expires before getNextHeartbeatNotificationFuture()
+// resolves, the node closes the exhaust stream so the primary is forced to issue a fresh request
+// carrying updated $replData gossip.
 TEST_F(ExhaustHeartbeatTest, IntervalExpired_StreamCloses) {
     // First call with a ready future: initialises the per-Client streamDeadline to now() + 2s and
     // verifies the normal path works.

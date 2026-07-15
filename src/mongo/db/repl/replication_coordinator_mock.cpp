@@ -669,7 +669,8 @@ void ReplicationCoordinatorMock::prepareReplMetadata(const GenericArguments& gen
                                                      const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {}
 
-Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+Status ReplicationCoordinatorMock::processHeartbeatV1(OperationContext* opCtx,
+                                                      const ReplSetHeartbeatArgsV1& args,
                                                       ReplSetHeartbeatResponse* response) {
     return Status::OK();
 }

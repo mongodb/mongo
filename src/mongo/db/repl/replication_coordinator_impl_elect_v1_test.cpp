@@ -2976,7 +2976,8 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
         hbArgs.setTerm(getReplCoord()->getTerm());
         ASSERT(hbArgs.isInitialized());
         ReplSetHeartbeatResponse response;
-        ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+        ASSERT_OK(
+            getReplCoord()->processHeartbeatV1(makeOperationContext().get(), hbArgs, &response));
     });
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);

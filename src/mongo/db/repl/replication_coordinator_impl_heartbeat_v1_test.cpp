@@ -146,7 +146,15 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    // processHeartbeatV1 takes the heartbeat command's OperationContext. Reuse this thread's if one
+    // is already bound, otherwise make a temporary one for the call.
+    auto* opCtx = cc().getOperationContext();
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    if (!opCtx) {
+        opCtxHolder = makeOperationContext();
+        opCtx = opCtxHolder.get();
+    }
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx, hbArgs, &response));
     return response;
 }
 
@@ -1170,7 +1178,8 @@ TEST_F(ReplCoordHBV1Test,
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    Status status = getReplCoord()->processHeartbeatV1(hbArgs, &response);
+    Status status =
+        getReplCoord()->processHeartbeatV1(makeOperationContext().get(), hbArgs, &response);
     ASSERT_EQUALS(ErrorCodes::NotYetInitialized, status.code());
 }
 

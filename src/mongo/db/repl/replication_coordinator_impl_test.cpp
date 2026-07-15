@@ -7790,10 +7790,10 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(makeOperationContext().get(), hbArgs, &hbResp));
     hbArgs.setSenderId(2);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(makeOperationContext().get(), hbArgs, &hbResp));
 
     // Confirm that the node remains PRIMARY after the timeout from the UpdatePosition expires.
     getNet()->enterNetwork();
@@ -7830,7 +7830,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     hbArgs.setSenderId(1);
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(makeOperationContext().get(), hbArgs, &hbResp));
 
     // Confirm that the node relinquishes PRIMARY after only one node is left UP.
     const Date_t startDateNew = getNet()->now();

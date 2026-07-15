@@ -477,7 +477,8 @@ bool ReplicationCoordinatorNoOp::getWriteConcernMajorityShouldJournal() {
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::processHeartbeatV1(const ReplSetHeartbeatArgsV1&,
+Status ReplicationCoordinatorNoOp::processHeartbeatV1(OperationContext*,
+                                                      const ReplSetHeartbeatArgsV1&,
                                                       ReplSetHeartbeatResponse*) {
     MONGO_UNREACHABLE;
 }

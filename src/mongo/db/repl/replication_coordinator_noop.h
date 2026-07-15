@@ -287,7 +287,9 @@ public:
 
     void prepareReplMetadata(const GenericArguments&, const OpTime&, BSONObjBuilder*) const final;
 
-    Status processHeartbeatV1(const ReplSetHeartbeatArgsV1&, ReplSetHeartbeatResponse*) final;
+    Status processHeartbeatV1(OperationContext*,
+                              const ReplSetHeartbeatArgsV1&,
+                              ReplSetHeartbeatResponse*) final;
 
     bool getWriteConcernMajorityShouldJournal() final;
 
