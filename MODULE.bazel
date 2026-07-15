@@ -52,30 +52,6 @@ spidermonkey_wasi_repo(
     ] * 5,
 )
 
-# SourceGraph indexer
-http_file(
-    name = "scip-clang",
-    executable = True,
-    sha256 = "9fc7d1c309f8adee1b8663efa802efa7363ef22ee06f4711117535e406690689",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/sourcegraph/scip-clang/releases/download/v0.3.2/scip-clang-x86_64-linux",
-    ] * 5,
-)
-
-# SourceGraph CLI
-http_file(
-    name = "scip-src",
-    executable = True,
-    sha256 = "eb3d627c4dad56b9f5d06634b90384104db065d410c4b338fa5e6558be4f3ad9",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/sourcegraph/src-cli/releases/download/6.4.0/src_linux_amd64",
-    ] * 5,
-)
-
 bazel_dep(name = "rules_cc", version = "0.2.10")
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 bazel_dep(name = "rules_proto", version = "7.1.0")
