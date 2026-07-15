@@ -17,6 +17,12 @@ public:
     ScopedReadConcern(OperationContext* opCtx, repl::ReadConcernArgs requestReadConcernArgs);
     ~ScopedReadConcern();
 
+    ScopedReadConcern(const ScopedReadConcern&) = delete;
+    ScopedReadConcern& operator=(const ScopedReadConcern&) = delete;
+    ScopedReadConcern& operator=(ScopedReadConcern&&) = delete;
+
+    ScopedReadConcern(ScopedReadConcern&& o) noexcept;
+
 private:
     OperationContext* _opCtx;
     repl::ReadConcernArgs _originalRCA;

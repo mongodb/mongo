@@ -24,6 +24,9 @@ ScopedReadConcern::ScopedReadConcern(OperationContext* opCtx,
 }
 
 ScopedReadConcern::~ScopedReadConcern() {
+    if (!_opCtx) {
+        return;
+    }
     std::lock_guard<Client> lk(*_opCtx->getClient());
     repl::ReadConcernArgs::get(_opCtx) = _originalRCA;
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
@@ -32,6 +35,14 @@ ScopedReadConcern::~ScopedReadConcern() {
     } else {
         shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(_originalReadSource);
     }
+}
+
+ScopedReadConcern::ScopedReadConcern(ScopedReadConcern&& o) noexcept
+    : _opCtx{o._opCtx},
+      _originalRCA{std::move(o._originalRCA)},
+      _originalReadSource{std::move(o._originalReadSource)},
+      _originalReadTimestamp{std::move(o._originalReadTimestamp)} {
+    o._opCtx = nullptr;
 }
 
 }  // namespace mongo
