@@ -698,14 +698,19 @@ public:
     /**
      * Configures the storage engine as the leader, allowing it to flush checkpoints to remote
      * storage.
+     * Invariants on failure.
+     * This is NOT idempotent - it will invariant if the storage engine is already in
+     * leader mode.
      */
     virtual void promoteToLeader() = 0;
 
     /**
-     * Configures the storage engine as a standby. Inverse of promoteToLeader(). Must be safe to
-     * call even if we're already not a leader.
+     * Configures the storage engine as a follower. Inverse of promoteToLeader().
+     * Invariants on failure.
+     * This is NOT idempotent - it will invariant if the storage engine is already in
+     * follower mode.
      */
-    virtual void demoteFromLeader() = 0;
+    virtual void demoteToFollower() = 0;
 
     /**
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This

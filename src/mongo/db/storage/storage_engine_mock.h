@@ -123,7 +123,7 @@ public:
 
     void promoteToLeader() final {}
 
-    void demoteFromLeader() final {}
+    void demoteToFollower() final {}
 
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {
         _stableTimestamp = stableTimestamp;

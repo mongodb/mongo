@@ -786,8 +786,8 @@ void StorageEngineImpl::promoteToLeader() {
     _engine->promoteToLeader();
 }
 
-void StorageEngineImpl::demoteFromLeader() {
-    // The engine itself doesn't need to do anything here yet.
+void StorageEngineImpl::demoteToFollower() {
+    _engine->demoteToFollower();
 }
 
 void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force) {

@@ -120,7 +120,7 @@ public:
 
     void promoteToLeader() override;
 
-    void demoteFromLeader() override;
+    void demoteToFollower() override;
 
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 

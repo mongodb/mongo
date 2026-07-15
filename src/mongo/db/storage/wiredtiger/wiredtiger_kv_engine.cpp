@@ -2421,6 +2421,11 @@ void WiredTigerKVEngine::promoteToLeader() {
     invariantWTOK(_conn->reconfigure(_conn, leaderConfig), nullptr);
 }
 
+void WiredTigerKVEngine::demoteToFollower() {
+    static constexpr char followerConfig[] = "disaggregated=(role=\"follower\")";
+    invariantWTOK(_conn->reconfigure(_conn, followerConfig), nullptr);
+}
+
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
     if (stableTimestamp.isNull()) {
         return;

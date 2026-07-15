@@ -575,6 +575,8 @@ public:
 
     void promoteToLeader() final;
 
+    void demoteToFollower() final;
+
     void setStableTimestamp(Timestamp stableTimestamp, bool force) override;
 
     void setStepDownTimestamp(Timestamp stepDownTimestamp) override;

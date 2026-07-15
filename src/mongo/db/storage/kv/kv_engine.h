@@ -425,8 +425,18 @@ public:
     /**
      * Configures the storage engine as the leader, allowing it to flush checkpoints to remote
      * storage.
+     * Invariants on failure.
+     * This is NOT idempotent - it will invariant if the storage engine is already in leader mode.
      */
     virtual void promoteToLeader() {}
+
+    /**
+     * Configures the storage engine as a follower. Inverse of promoteToLeader().
+     * Invariants on failure.
+     * This is NOT idempotent - it will invariant if the storage engine is already in
+     * follower mode.
+     */
+    virtual void demoteToFollower() {}
 
     /**
      * See `StorageEngine::setStableTimestamp`
