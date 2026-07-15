@@ -348,6 +348,41 @@ public:
      */
     static const std::vector<IncrementalRolloutFeatureFlag*>& getFlagsIntroducedSinceLastLTS();
 
+    /**
+     * Process-wide count of `fromWire()` constructions attempted. Increments once per inbound
+     * request that carried an `ifrFlags` payload, regardless of how many flags were in it, before
+     * any per-flag processing occurs — so it still increments even if a later flag in the same
+     * payload causes construction to fail (e.g. a malformed field or an unknown-flag protocol
+     * error). This keeps it in step with the per-flag wire-install counters, which are bumped
+     * inline as each flag is processed and are therefore also retained on partial failure.
+     */
+    static int64_t getWireInstallsCount();
+
+    /**
+     * Process-wide count of protocol errors where one or more unknown IFR flags arrived from a
+     * same-or-older sender. Non-zero indicates a misconfiguration.
+     */
+    static int64_t getUnknownWireFlagErrorsCount();
+
+    /**
+     * Process-wide count of incoming IFR flag values dropped because the local binary does not
+     * know the flag name (sender is newer). A non-zero value indicates a mixed-version cluster is
+     * sending IFR flags the local binary cannot interpret.
+     */
+    static int64_t getUnknownWireFlagsDroppedCount();
+
+    /**
+     * Process-wide count of active flags absent from an inbound wire payload (scenario 4) that were
+     * conservatively resolved to false because the sender predates the flag's introduction.
+     */
+    static int64_t getAbsentFlagsConservativeFalseCount();
+
+    /**
+     * Process-wide count of active flags absent from an inbound wire payload (scenario 4) that were
+     * resolved to this binary's local default because the sender is same-or-newer.
+     */
+    static int64_t getAbsentFlagsLocalDefaultCount();
+
     IncrementalRolloutFeatureFlag(std::string_view flagName,
                                   RolloutPhase phase,
                                   bool value,
@@ -364,6 +399,12 @@ public:
      */
     bool checkEnabled();
 
+    /**
+     * Records that this flag was installed from an inbound wire payload with the given value.
+     * Bumps the matching per-flag wire-install counter surfaced by 'appendFlagStats'.
+     */
+    void recordWireInstall(bool value);
+
     void appendFlagStats(BSONArrayBuilder& flagStats) const;
 
     /**
@@ -374,6 +415,8 @@ public:
      *   "falseChecks": <number>,
      *   "trueChecks": <number>,
      *   "numToggles": <number>,
+     *   "trueWireInstalls": <number>,
+     *   "falseWireInstalls": <number>,
      * }
      */
     static void appendFlagsStats(BSONArrayBuilder& flagStats);
@@ -444,6 +487,11 @@ private:
     Atomic<int64_t> _numFalseChecks;
     Atomic<int64_t> _numTrueChecks;
     Atomic<int64_t> _numToggles;
+
+    // Per-flag counts of how many times this flag was installed from an inbound wire payload with a
+    // true / false value (scenario 1 of the wire-resolution table).
+    Atomic<int64_t> _numTrueWireInstalls;
+    Atomic<int64_t> _numFalseWireInstalls;
 };
 
 /**
@@ -584,6 +632,14 @@ public:
         return _cachedEgressMetadata.has_value();
     }
 
+    /**
+     * Names of flags that were present on the wire but unknown to this binary (and dropped because
+     * the sender is newer). Populated only for wire-installed contexts; read by diagnostics.
+     */
+    const absl::flat_hash_set<std::string>& getUnknownWireFlags() const {
+        return _unknownWireFlags;
+    }
+
 private:
     /**
      *  Constructor for the 'from wire' case. 'senderVersion' must not be null.
@@ -612,5 +668,9 @@ private:
     // Memoized serialization of this context's egress-metadata sub-object. The IFRContext is
     // per-opCtx so there is no cross-context contention; simple lazy init suffices.
     boost::optional<BSONObj> _cachedEgressMetadata;
+
+    // Names of flags received on the wire that this binary does not recognize and dropped because
+    // the sender is newer. Populated only for wire-installed contexts.
+    absl::flat_hash_set<std::string> _unknownWireFlags;
 };
 }  // namespace mongo

@@ -368,6 +368,10 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
       - 10gen/query-execution
+  - "incremental_rollout_metrics.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
   - "feature_flag_test.idl.tpl":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -468,6 +468,8 @@ TEST(IDLFeatureFlag, IncrementalRolloutFeatureFlag) {
                                     .append("falseChecks", 1)
                                     .append("trueChecks", 2)
                                     .append("numToggles", 1)
+                                    .append("trueWireInstalls", 0)
+                                    .append("falseWireInstalls", 0)
                                     .obj());
 
     // Check the flag's stats again, to ensure that we did not alter their state by observing them.
@@ -500,6 +502,8 @@ TEST(IDLFeatureFlag, ReleaseIncrementalRolloutFeatureFlag) {
                                     .append("falseChecks", 1)
                                     .append("trueChecks", 2)
                                     .append("numToggles", 1)
+                                    .append("trueWireInstalls", 0)
+                                    .append("falseWireInstalls", 0)
                                     .obj());
 
     // Check the flag's stats again, to ensure that we did not alter their state by observing them.
@@ -644,6 +648,35 @@ DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
     IncrementalFeatureRolloutContext::fromWireForTest(payload);
 }
 
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 WireInstallCounterIncrementsEvenOnProtocolError,
+                 "Tripwire assertion") {
+    const auto before = IncrementalRolloutFeatureFlag::getWireInstallsCount();
+    std::vector<BSONObj> payload = {BSON("name" << "unknownIfrFlagForTest9" << "value" << true)};
+    try {
+        IncrementalFeatureRolloutContext::fromWireForTest(payload);
+        FAIL("Expected exception");
+    } catch (const ExceptionFor<ErrorCodes::UnrecognizedIFRFlag>&) {
+        // The counter reflects attempted, not successful, constructions — it increments at ctor
+        // entry, before per-flag processing, so it stays in step with the per-flag wire-install
+        // counters (which are also retained on partial failure).
+        ASSERT_EQ(IncrementalRolloutFeatureFlag::getWireInstallsCount(), before + 1);
+    }
+}
+
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 UnknownWireFlagErrorsIncrementsOnProtocolError,
+                 "Tripwire assertion") {
+    const auto before = IncrementalRolloutFeatureFlag::getUnknownWireFlagErrorsCount();
+    std::vector<BSONObj> payload = {BSON("name" << "unknownIfrFlagForTest9" << "value" << true)};
+    try {
+        IncrementalFeatureRolloutContext::fromWireForTest(payload);
+        FAIL("Expected exception");
+    } catch (const ExceptionFor<ErrorCodes::UnrecognizedIFRFlag>&) {
+        ASSERT_EQ(IncrementalRolloutFeatureFlag::getUnknownWireFlagErrorsCount(), before + 1);
+    }
+}
+
 DEATH_TEST_REGEX(
     IDLFeatureFlagDeathTests,
     FromWireDuplicateRecognizedFlagTasserts,
@@ -748,6 +781,83 @@ TEST(IDLFeatureFlag, FromWireAbsentFlagNoSenderVersionDisabled) {
     auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{}, nullptr);
     ASSERT_TRUE(ctx->isInstalledFromWire());
     ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+// ---- wire-install metrics tests ----
+
+TEST(IDLFeatureFlag, WireInstallCounterIncrementsOnSuccess) {
+    const auto before = IncrementalRolloutFeatureFlag::getWireInstallsCount();
+    IncrementalFeatureRolloutContext::fromWireForTest(std::span<const BSONObj>{});
+    ASSERT_EQ(IncrementalRolloutFeatureFlag::getWireInstallsCount(), before + 1);
+}
+
+TEST(IDLFeatureFlag, TrueWireInstallsIncrementsOnTrueWireValue) {
+    auto& flag = feature_flags::gFeatureFlagSerializeForTest;
+    const auto before = readStatsFromFlag(flag);
+    std::vector<BSONObj> payload = {BSON("name" << flag.getName() << "value" << true)};
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+    const auto after = readStatsFromFlag(flag);
+    ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
+              before["trueWireInstalls"].safeNumberLong() + 1);
+    ASSERT_EQ(after["falseWireInstalls"].safeNumberLong(),
+              before["falseWireInstalls"].safeNumberLong());
+}
+
+TEST(IDLFeatureFlag, FalseWireInstallsIncrementsOnFalseWireValue) {
+    auto& flag = feature_flags::gFeatureFlagSerializeForTest;
+    const auto before = readStatsFromFlag(flag);
+    std::vector<BSONObj> payload = {BSON("name" << flag.getName() << "value" << false)};
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+    const auto after = readStatsFromFlag(flag);
+    ASSERT_EQ(after["falseWireInstalls"].safeNumberLong(),
+              before["falseWireInstalls"].safeNumberLong() + 1);
+    ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
+              before["trueWireInstalls"].safeNumberLong());
+}
+
+TEST(IDLFeatureFlag, AbsentFlagDoesNotIncrementWireInstalls) {
+    auto& flag = feature_flags::gFeatureFlagSerializeForTest;
+    flag.setForServerParameter(true);
+    const auto before = readStatsFromFlag(flag);
+    // Empty payload from an older sender: scenario 4 resolves the flag but must not count as a
+    // per-flag wire install.
+    // (Generic FCV reference): Used for testing — an older sender predating the flags.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
+    IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+                                               std::move(senderVersion));
+    const auto after = readStatsFromFlag(flag);
+    ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
+              before["trueWireInstalls"].safeNumberLong());
+    ASSERT_EQ(after["falseWireInstalls"].safeNumberLong(),
+              before["falseWireInstalls"].safeNumberLong());
+}
+
+TEST(IDLFeatureFlag, AbsentFlagIncrementsConservativeFalseCounter) {
+    // An older sender with an empty payload predates every kLatest-introduced flag, so scenario 4
+    // resolves each one to false. getFlagsIntroducedSinceLastLTS() contains exactly those flags.
+    const auto expectedDelta = static_cast<int64_t>(
+        IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS().size());
+    const auto before = IncrementalRolloutFeatureFlag::getAbsentFlagsConservativeFalseCount();
+    // (Generic FCV reference): Used for testing — an older sender predating the flags.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
+    IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+                                               std::move(senderVersion));
+    ASSERT_EQ(IncrementalRolloutFeatureFlag::getAbsentFlagsConservativeFalseCount(),
+              before + expectedDelta);
+}
+
+TEST(IDLFeatureFlag, AbsentFlagIncrementsLocalDefaultCounter) {
+    // A same-version sender with an empty payload knows every kLatest-introduced flag, so scenario
+    // 4 resolves each to the local default.
+    const auto expectedDelta = static_cast<int64_t>(
+        IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS().size());
+    const auto before = IncrementalRolloutFeatureFlag::getAbsentFlagsLocalDefaultCount();
+    // (Generic FCV reference): Used for testing — a same-version sender.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLatest);
+    IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+                                               std::move(senderVersion));
+    ASSERT_EQ(IncrementalRolloutFeatureFlag::getAbsentFlagsLocalDefaultCount(),
+              before + expectedDelta);
 }
 
 // ---- getFlagsIntroducedSinceLastLTS / installForRequestWithoutIfrFlags tests ----
