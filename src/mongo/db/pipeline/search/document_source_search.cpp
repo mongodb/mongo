@@ -46,19 +46,13 @@ std::string_view removePrefixWorkaround(std::string_view key, std::string_view p
 
 Rarely _samplerSearchBeta;
 
-std::unique_ptr<LiteParsedDocumentSource> parseSearchBeta(const NamespaceString& nss,
-                                                          const BSONElement& spec,
-                                                          const LiteParserOptions& options) {
+std::unique_ptr<SearchLiteParsed> parseSearchBeta(const NamespaceString& nss,
+                                                  const BSONElement& spec,
+                                                  const LiteParserOptions& options) {
     if (_samplerSearchBeta.tick()) {
         LOGV2_WARNING(12165200, "$searchBeta is deprecated. Use $search instead.");
     }
-
-    // $searchBeta is a deprecated alias for $search. Re-dispatch through the $search parser.
-    BSONObjBuilder searchBuilder;
-    searchBuilder.appendAs(spec, DocumentSourceSearch::kStageName);
-    auto liteParsed = LiteParsedDocumentSource::parse(nss, searchBuilder.obj(), options);
-    liteParsed->makeOwned();
-    return liteParsed;
+    return SearchLiteParsed::parse(nss, spec, options);
 }
 }  // namespace
 
