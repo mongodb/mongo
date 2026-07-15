@@ -80,6 +80,14 @@ private:
         std::vector<ShardId> participantsNotOwningChunks;
     };
 
+    bool _isTrackedTimeseriesUpdate() const;
+
+    bool _mustAlwaysMakeProgress() override;
+
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

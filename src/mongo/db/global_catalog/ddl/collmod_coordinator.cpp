@@ -66,9 +66,10 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
+MONGO_FAIL_POINT_DEFINE(throwErrorDuringConfigUpdatePhase);
+MONGO_FAIL_POINT_DEFINE(throwErrorDuringUpdateShardsPhase);
 
 namespace {
-
 
 template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShards(
@@ -358,8 +359,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
-                    hasTimeseriesOptions(_request)) {
+                if (_isTrackedTimeseriesUpdate()) {
                     std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
                     if (_shardingInfo->isPrimaryOwningChunks) {
                         shards.push_back(_shardingInfo->primaryShard);
@@ -385,10 +385,13 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
-                    hasTimeseriesOptions(_request)) {
+                if (_isTrackedTimeseriesUpdate()) {
                     commitToGlobalCatalog(
                         opCtx, nss().dbName(), _collInfo->nsForTargeting, _request);
+
+                    uassert(ErrorCodes::BadValue,
+                            "Failing collmod during UpdateConfig phase due to failpoint",
+                            !throwErrorDuringConfigUpdatePhase.shouldFail());
 
                     commitToShardCatalog(
                         opCtx,
@@ -410,119 +413,108 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isTracked) {
-                    try {
-                        if (!_firstExecution && _collInfo->isSharded) {
-                            bool allowMigrations =
-                                sharding_ddl_util::checkAllowMigrationsOnConfigServer(
-                                    opCtx, _collInfo->nsForTargeting);
-                            if (_result.is_initialized() && allowMigrations) {
-                                // The command finished and we have the response. Return it.
-                                return;
-                            } else if (allowMigrations) {
-                                // Previous run on a different node completed, but we lost the
-                                // result in the stepdown. Restart from kFreezeMigrations.
-                                _enterPhase(Phase::kFreezeMigrations);
-                                uasserted(ErrorCodes::Interrupted,
-                                          "Retriable error to move to previous stage");
-                            }
+                    if (!_firstExecution && _collInfo->isSharded) {
+                        bool allowMigrations =
+                            sharding_ddl_util::checkAllowMigrationsOnConfigServer(
+                                opCtx, _collInfo->nsForTargeting);
+                        if (_result.is_initialized() && allowMigrations) {
+                            // The command finished and we have the response. Return it.
+                            return;
+                        } else if (allowMigrations) {
+                            // Previous run on a different node completed, but we lost the
+                            // result in the stepdown. Restart from kFreezeMigrations.
+                            _enterPhase(Phase::kFreezeMigrations);
+                            uasserted(ErrorCodes::Interrupted,
+                                      "Retriable error to move to previous stage");
                         }
-
-                        // If trying to convert an index to unique on a sharded collection, executes
-                        // a dryRun first to find any duplicates without actually changing the
-                        // indexes to avoid inconsistent index specs on different shards. Example:
-                        //   Shard0: {_id: 0, a: 1}
-                        //   Shard1: {_id: 1, a: 2}, {_id: 2, a: 2}
-                        //   When trying to convert index {a: 1} to unique, the dry run will return
-                        //   the duplicate errors to the user without converting the indexes.
-                        if (isCollModIndexUniqueConversion(_request)) {
-                            // The 'dryRun' option only works with 'unique' index option. We need to
-                            // strip out other incompatible options.
-                            auto dryRunRequest = ShardsvrCollModParticipant{
-                                originalNss(), makeCollModDryRunRequest(_request)};
-                            generic_argument_util::setMajorityWriteConcern(
-                                dryRunRequest.getGenericArguments());
-                            auto optsDryRun = std::make_shared<
-                                async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-                                **executor, token, dryRunRequest);
-                            std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
-                            if (_shardingInfo->isPrimaryOwningChunks) {
-                                shards.push_back(_shardingInfo->primaryShard);
-                            }
-                            sharding_ddl_util::sendAuthenticatedCommandToShards(
-                                opCtx, optsDryRun, shards);
-                        }
-
-                        ShardsvrCollModParticipant request(originalNss(), _request);
-                        bool needsUnblock =
-                            _collInfo->timeSeriesOptions && hasTimeseriesOptions(_request);
-                        request.setNeedsUnblock(needsUnblock);
-                        if (needsUnblock) {
-                            const bool isDDLAuthoritative =
-                                _doc.getAuthoritativeMetadataAccessLevel() >=
-                                AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-                            request.setClearCollMetadata(!isDDLAuthoritative);
-                        }
-
-                        std::vector<AsyncRequestsSender::Response> responses;
-
-                        // We are broadcasting the collMod to all the shards, but only appending the
-                        // participants' responses from those owning chunks.
-
-                        auto primaryResponse =
-                            _sendCollModToPrimaryShard(opCtx, request, executor, token);
-                        if (_shardingInfo->isPrimaryOwningChunks) {
-                            responses.insert(responses.end(),
-                                             std::make_move_iterator(primaryResponse.begin()),
-                                             std::make_move_iterator(primaryResponse.end()));
-                        }
-
-                        auto participantsResponses =
-                            _sendCollModToParticipantShards(opCtx, request, executor, token);
-                        responses.insert(responses.end(),
-                                         std::make_move_iterator(participantsResponses.begin()),
-                                         std::make_move_iterator(participantsResponses.end()));
-
-
-                        BSONObjBuilder builder;
-                        std::string errmsg;
-                        bool ok = [&]() {
-                            BSONObjBuilder rawBuilder;
-                            bool ok = appendRawResponses(opCtx, &errmsg, &rawBuilder, responses)
-                                          .responseOK;
-                            BSONObj extractedObjFromRaw = rawBuilder.obj();
-                            if (ok) {
-                                extractedObjFromRaw = extractedObjFromRaw.removeField("raw");
-                                _appendResponseCollModIndexChanges(responses, builder);
-                            }
-                            builder.appendElements(extractedObjFromRaw);
-                            return ok;
-                        }();
-
-                        if (!errmsg.empty()) {
-                            CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
-                        }
-
-                        _result = builder.obj();
-
-                        const auto collUUID = _doc.getCollUUID();
-                        sharding_ddl_util::resumeMigrations(
-                            opCtx,
-                            _collInfo->nsForTargeting,
-                            collUUID,
-                            [&] { return getNewSession(opCtx); },
-                            _doc.getAuthoritativeMetadataAccessLevel());
-                    } catch (DBException& ex) {
-                        if (!_isRetriableErrorForDDLCoordinator(ex.toStatus())) {
-                            const auto collUUID = _doc.getCollUUID();
-                            sharding_ddl_util::resumeMigrations(
-                                opCtx,
-                                _collInfo->nsForTargeting,
-                                collUUID,
-                                [&] { return getNewSession(opCtx); },
-                                _doc.getAuthoritativeMetadataAccessLevel());
-                        }
-                        throw;
                     }
+
+                    uassert(ErrorCodes::BadValue,
+                            "Failing collmod during UpdateShards phase due to failpoint",
+                            !throwErrorDuringUpdateShardsPhase.shouldFail());
+
+                    // If trying to convert an index to unique on a sharded collection, executes
+                    // a dryRun first to find any duplicates without actually changing the
+                    // indexes to avoid inconsistent index specs on different shards. Example:
+                    //   Shard0: {_id: 0, a: 1}
+                    //   Shard1: {_id: 1, a: 2}, {_id: 2, a: 2}
+                    //   When trying to convert index {a: 1} to unique, the dry run will return
+                    //   the duplicate errors to the user without converting the indexes.
+                    if (isCollModIndexUniqueConversion(_request)) {
+                        // The 'dryRun' option only works with 'unique' index option. We need to
+                        // strip out other incompatible options.
+                        auto dryRunRequest = ShardsvrCollModParticipant{
+                            originalNss(), makeCollModDryRunRequest(_request)};
+                        generic_argument_util::setMajorityWriteConcern(
+                            dryRunRequest.getGenericArguments());
+                        auto optsDryRun = std::make_shared<
+                            async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+                            **executor, token, dryRunRequest);
+                        std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
+                        if (_shardingInfo->isPrimaryOwningChunks) {
+                            shards.push_back(_shardingInfo->primaryShard);
+                        }
+                        sharding_ddl_util::sendAuthenticatedCommandToShards(
+                            opCtx, optsDryRun, shards);
+                    }
+
+                    ShardsvrCollModParticipant request(originalNss(), _request);
+                    bool needsUnblock = _isTrackedTimeseriesUpdate();
+                    request.setNeedsUnblock(needsUnblock);
+                    if (needsUnblock) {
+                        const bool isDDLAuthoritative =
+                            _doc.getAuthoritativeMetadataAccessLevel() >=
+                            AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+                        request.setClearCollMetadata(!isDDLAuthoritative);
+                    }
+
+                    std::vector<AsyncRequestsSender::Response> responses;
+
+                    // We are broadcasting the collMod to all the shards, but only appending the
+                    // participants' responses from those owning chunks.
+
+                    auto primaryResponse =
+                        _sendCollModToPrimaryShard(opCtx, request, executor, token);
+                    if (_shardingInfo->isPrimaryOwningChunks) {
+                        responses.insert(responses.end(),
+                                         std::make_move_iterator(primaryResponse.begin()),
+                                         std::make_move_iterator(primaryResponse.end()));
+                    }
+
+                    auto participantsResponses =
+                        _sendCollModToParticipantShards(opCtx, request, executor, token);
+                    responses.insert(responses.end(),
+                                     std::make_move_iterator(participantsResponses.begin()),
+                                     std::make_move_iterator(participantsResponses.end()));
+
+                    BSONObjBuilder builder;
+                    std::string errmsg;
+                    bool ok = [&]() {
+                        BSONObjBuilder rawBuilder;
+                        bool ok =
+                            appendRawResponses(opCtx, &errmsg, &rawBuilder, responses).responseOK;
+                        BSONObj extractedObjFromRaw = rawBuilder.obj();
+                        if (ok) {
+                            extractedObjFromRaw = extractedObjFromRaw.removeField("raw");
+                            _appendResponseCollModIndexChanges(responses, builder);
+                        }
+                        builder.appendElements(extractedObjFromRaw);
+                        return ok;
+                    }();
+
+                    if (!errmsg.empty()) {
+                        CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
+                    }
+
+                    _result = builder.obj();
+
+                    const auto collUUID = _doc.getCollUUID();
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx,
+                        _collInfo->nsForTargeting,
+                        collUUID,
+                        [&] { return getNewSession(opCtx); },
+                        _doc.getAuthoritativeMetadataAccessLevel());
                 } else {
                     CollMod cmd(originalNss());
                     cmd.setCollModRequest(_request);
@@ -537,18 +529,106 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     builder.appendElements(collModRes);
                     _result = builder.obj();
                 }
-            }));
+            }))
+        .onError([this, executor = executor, anchor = shared_from_this()](const Status& status) {
+            // For tracked timeseries updates, we cannot clean up and give up after we reach the
+            // kUpdateConfig phase because that would leave us with potential inconsistencies
+            // between the global, shard authoritative, and shard local metadata. If we hit an error
+            // prior to setting the collection information locally, we can't tell for sure if this
+            // is the case or not, so we err on the side of caution and force a retry.
+            bool mustMakeProgressForTimeseriesUpdate = _doc.getPhase() >= Phase::kUpdateConfig &&
+                (!_collInfo || _isTrackedTimeseriesUpdate());
+            if (_doc.getPhase() >= Phase::kFreezeMigrations &&
+                !_isRetriableErrorForDDLCoordinator(status) &&
+                !mustMakeProgressForTimeseriesUpdate) {
+                const auto opCtxHolder = makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+
+                triggerCleanup(opCtx, status);
+                MONGO_UNREACHABLE_TASSERT(12592101);
+            }
+
+            return status;
+        });
+}
+
+bool CollModCoordinator::_isTrackedTimeseriesUpdate() const {
+    return _collInfo->isTracked && _collInfo->timeSeriesOptions && hasTimeseriesOptions(_request);
+}
+
+ExecutorFuture<void> CollModCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, executor = executor, status, anchor = shared_from_this()] {
+            const auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+
+            _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
+
+            if (!_collInfo->isTracked) {
+                return;
+            }
+
+            bool allowMigrations = sharding_ddl_util::checkAllowMigrationsOnConfigServer(
+                opCtx, _collInfo->nsForTargeting);
+
+            // If we already re-enabled migrations, then we have completed the cleanup and can
+            // return early.
+            if (allowMigrations) {
+                return;
+            }
+
+            if (_doc.getPhase() >= Phase::kBlockShards && _isTrackedTimeseriesUpdate()) {
+                // We need the sharding info to know which shards to unblock. Because migrations are
+                // still disabled, the set of shards should be stable.
+                _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
+                std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
+                if (_shardingInfo->isPrimaryOwningChunks) {
+                    shards.push_back(_shardingInfo->primaryShard);
+                }
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+                    opCtx,
+                    _collInfo->nsForTargeting,
+                    shards,
+                    CriticalSectionBlockTypeEnum::kUnblock,
+                    boost::none /* reason */,
+                    _doc.getAuthoritativeMetadataAccessLevel(),
+                    session,
+                    executor,
+                    token,
+                    false);
+            }
+
+            if (_collInfo->isTracked) {
+                sharding_ddl_util::resumeMigrations(
+                    opCtx,
+                    _collInfo->nsForTargeting,
+                    _doc.getCollUUID(),
+                    [&] { return getNewSession(opCtx); },
+                    _doc.getAuthoritativeMetadataAccessLevel());
+            }
+        });
+}
+
+bool CollModCoordinator::_mustAlwaysMakeProgress() {
+    // Once migrations are blocked, the coordinator must always make forward progress
+    // so cleanup (unblock migrations and release critical section) cannot be skipped.
+    // _mustAlwaysMakeProgress() returning true ensures that even if triggerCleanup() fails
+    // transiently, the base class retries _runImpl and calls triggerCleanup again.
+    return _doc.getPhase() >= Phase::kFreezeMigrations;
 }
 
 bool CollModCoordinator::isInCriticalSection(Phase phase) const {
     if (!_collInfo) {
-        // If the _collInfo is missing, then we can't say confidently enough that we are not in a
-        // critical section. Since the ShardingCoordinator infrastructure's approach in these
+        // If the _collInfo is missing, then we can't say confidently enough that we are not in
+        // a critical section. Since the ShardingCoordinator infrastructure's approach in these
         // situations is to be cautious and act as being in a critical section, we follow that
         // approach here too for consistency.
         return true;
     }
-    return phase >= Phase::kBlockShards && _collInfo->isTracked && _collInfo->timeSeriesOptions &&
-        hasTimeseriesOptions(_request);
+    return phase >= Phase::kBlockShards && _isTrackedTimeseriesUpdate();
 }
 }  // namespace mongo
