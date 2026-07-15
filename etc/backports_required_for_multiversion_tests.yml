@@ -21,6 +21,10 @@
 #
 last-patch:
   all:
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
+      ticket: SERVER-121079
+    - test_file: jstests/core/administrative/block_replica_set_writes.js
+      ticket: SERVER-121079
     - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
@@ -36,8 +40,12 @@ last-patch:
   suites: null
 last-continuous:
   all:
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
       ticket: SERVER-121533
+    - test_file: jstests/core/administrative/block_replica_set_writes.js
+      ticket: SERVER-121079
     - test_file: jstests/core/administrative/filemd5.js
       ticket: SERVER-119317
     - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
@@ -217,6 +225,8 @@ last-lts:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
       ticket: SERVER-107819
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/query/remove/update_and_batched_delete.js
       ticket: SERVER-95570
     - test_file: jstests/concurrency/fsm_workloads/query/update/upsert_unique_index_collation.js
@@ -235,6 +245,8 @@ last-lts:
       ticket: SERVER-113887
     - test_file: jstests/concurrency/fsm_workloads/timeseries/timeseries_reshard_with_inserts.js
       ticket: SERVER-93149
+    - test_file: jstests/core/administrative/block_replica_set_writes.js
+      ticket: SERVER-121079
     - test_file: jstests/core/administrative/connection_status.js
       ticket: SERVER-95952
     - test_file: jstests/core/administrative/filemd5.js
