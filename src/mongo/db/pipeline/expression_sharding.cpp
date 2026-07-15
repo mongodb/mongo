@@ -99,6 +99,12 @@ Value ExpressionInternalIndexKey::evaluate(const Document& root,
 }
 
 REGISTER_STABLE_EXPRESSION(_internalOwningShard, ExpressionInternalOwningShard::parse);
-REGISTER_STABLE_EXPRESSION(_internalIndexKey, ExpressionInternalIndexKey::parse);
+REGISTER_EXPRESSION_CONDITIONALLY(_internalIndexKey,
+                                  ExpressionInternalIndexKey::parse,
+                                  AllowedWithApiStrict::kInternal,
+                                  AllowedWithClientType::kInternal,
+                                  nullptr, /* featureFlag */
+                                  false,   /* shouldOmitDiagnosticInformation */
+                                  true);
 
 }  // namespace mongo
