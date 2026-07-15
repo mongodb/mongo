@@ -70,12 +70,13 @@ if (hasEnterpriseModule) {
             {db: adminDb, cmdObj: {setParameter: 1, redactClientLogData: false}});
     }
     assert.commandWorked(t.remove({_id: 2}));
+    // With full log redaction, all leaf values are replaced with "###".
     const redactedErrInfo = {
-        failingDocumentId: 2,
+        failingDocumentId: "###",
         details: {
-            operatorName: "$eq",
-            specifiedAs: {a: 1},
-            reason: "comparison failed",
+            operatorName: "###",
+            specifiedAs: {a: "###"},
+            reason: "###",
             consideredValue: "###"
         }
     };
