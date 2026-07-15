@@ -175,6 +175,24 @@ private:
 };
 
 /*
+ * Returns true if an FCV upgrade or downgrade is currently in progress, as determined by the
+ * presence of a transition phase on the on-disk FCV document.
+ *
+ * Unlike the FCV snapshot's isUpgradingOrDowngrading(), which can still evaluate to true while
+ * some shards remain mid-transition, this function effectively only evaluates to true once all
+ * shards and the config server have fully upgraded or downgraded.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline bool isFcvTransitionInProgress(
+    const FixedFCVRegion& fixedFcv) {
+    bool transitionInProgress = false;
+    fixedFcv->withAcquiredFCVDocument([&](const auto* fcvDoc) {
+        tassert(13138000, "Expected the FCV document to be present", fcvDoc);
+        transitionInProgress = fcvDoc->getPhase().has_value();
+    });
+    return transitionInProgress;
+}
+
+/*
  * Optimistically runs the specified checks over a stable (fully upgraded / fully downgraded) FCV.
  * This is intended for commands such as `validate` or `checkMetadataConsistency` to check the
  * metadata is consistent with FCV, avoiding both acquiring locks and false positives.
