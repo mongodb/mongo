@@ -973,23 +973,25 @@ VersionContext getVersionContextOrDefault(
     using GenericFCV = multiversion::GenericFCV;
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
 
-    switch (fcv) {
-        // (Generic FCV reference): these generic references are used to determine the default
-        // FCV when no VersionContext is set in ForwardableOperationMetadata.
-        // Case (1): resharding started in kLastLTS.
-        case GenericFCV::kLastLTS:
-        case GenericFCV::kUpgradingFromLastLTSToLatest:
-            return VersionContext{GenericFCV::kLastLTS};
-        // Case (2): resharding started in kLastContinuous.
-        case GenericFCV::kLastContinuous:
-        case GenericFCV::kUpgradingFromLastContinuousToLatest:
-            return VersionContext{GenericFCV::kLastContinuous};
-        default:
-            tasserted(13001300,
-                      "Expected global FCV to be kLastLTS or kLastContinuous (or upgrading from "
-                      "those to kLatest) when no VersionContext is set in "
-                      "ForwardableOperationMetadata");
+    // we can't replace the ifs with a switch case, as it is possible that lastLTS ==
+    // lastContinuous; when this happens, kUpgradingFromLastLTSToLatest ==
+    // kUpgradingFromLastContinuousToLatest
+
+    // (Generic FCV reference): these generic references are used to determine the default
+    // FCV when no VersionContext is set in ForwardableOperationMetadata.
+    // Case (1): resharding started in kLastLTS.
+    if (fcv == GenericFCV::kLastLTS || fcv == GenericFCV::kUpgradingFromLastLTSToLatest) {
+        return VersionContext{GenericFCV::kLastLTS};
     }
+    // Case (2): resharding started in kLastContinuous.
+    if (fcv == GenericFCV::kLastContinuous ||
+        fcv == GenericFCV::kUpgradingFromLastContinuousToLatest) {
+        return VersionContext{GenericFCV::kLastContinuous};
+    }
+    tasserted(13001300,
+              "Expected global FCV to be kLastLTS or kLastContinuous (or upgrading from "
+              "those to kLatest) when no VersionContext is set in "
+              "ForwardableOperationMetadata");
 }
 
 bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetadata>& fom,

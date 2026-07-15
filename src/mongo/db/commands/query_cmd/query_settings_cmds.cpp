@@ -51,14 +51,11 @@ using query_settings::mergeQuerySettings;
 bool isUpgradingToVersionThatHasDedicatedRepresentativeQueriesCollection(OperationContext* opCtx) {
     // (Generic FCV reference): Check if the server is in the process of upgrading the FCV to the
     // version that has 'gFeatureFlagPQSBackfill' enabled.
-    switch (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()) {
-        case multiversion::GenericFCV::kUpgradingFromLastLTSToLatest:
-            [[fallthrough]];
-        case multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest:
-            return true;
-        default:
-            return false;
-    }
+    const auto version = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    // we can't replace this with a switch case, as it is possible that lastLTS == lastContinuous;
+    // when this happens, kUpgradingFromLastLTSToLatest == kUpgradingFromLastContinuousToLatest
+    return version == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
+        version == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest;
 }
 
 /**
