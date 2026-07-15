@@ -554,5 +554,30 @@ TEST_F(MaxKeyOrphanDetectionFixture, ClassifyThrowsOnUnreadableStateDoc) {
     ASSERT_THROWS(loadOrComputeBlockedMaxKeyRangeDeletionTasks(opCtx), DBException);
 }
 
+TEST_F(MaxKeyOrphanDetectionFixture, ScanInterruptedByOpCtxKill) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("maxKeyGuard.scanInterrupt");
+    auto uuid =
+        createIndexedCollection(opCtx, nss, BSON("a" << 1), {BSON("a" << 5), BSON("a" << MAXKEY)});
+
+    opCtx->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_THROWS_CODE(shouldSkipRangeDeletionForMaxKeyOrphans(
+                           opCtx, nss.dbName(), uuid, BSON("a" << 1), kGlobalMaxRange),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+}
+
+TEST_F(MaxKeyOrphanDetectionFixture, ClassifyInterruptedByOpCtxKill) {
+    const auto nss =
+        NamespaceString::createNamespaceString_forTest("maxKeyGuard.classifyInterrupt");
+    auto uuid =
+        createIndexedCollection(opCtx, nss, BSON("a" << 1), {BSON("a" << 5), BSON("a" << MAXKEY)});
+    insertRangeDeletionTask(opCtx, nss, uuid, kGlobalMaxRange, BSON("a" << 1));
+
+    opCtx->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+    ASSERT_THROWS_CODE(loadOrComputeBlockedMaxKeyRangeDeletionTasks(opCtx),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+}
+
 }  // namespace
 }  // namespace mongo
