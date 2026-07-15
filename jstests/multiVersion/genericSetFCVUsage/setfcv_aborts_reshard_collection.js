@@ -8,14 +8,6 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-// This test does a resharding with a setFCV that upgrades from lastLTS to latest, which causes
-// the abort to take the legacy path and bump the global catalog placement version without updating
-// the shard's in-memory catalog. The FCV upgrade then runs ShardsvrCloneAuthoritativeMetadata
-// which fixes the durable shard catalog, but the in-memory catalog divergence is transient and
-// will eventually self-correct.
-// TODO(SERVER-130698): Fix the transient in-memory catalog divergence during FCV upgrade.
-TestData.skipCheckMetadataConsistency = true;
-
 function runTest({forcePooledConnectionsDropped, withUUID, configShard}) {
     const reshardingTest = new ReshardingTest({
         numDonors: 2,
