@@ -48,6 +48,63 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          Shard::RetryPolicy retryPolicy,
                                          std::unique_ptr<ResourceYielder> resourceYielder,
                                          const ShardHostMap& designatedHostsMap)
+    : _impl(std::make_shared<Impl>(opCtx,
+                                   std::move(executor),
+                                   dbName,
+                                   requests,
+                                   readPreference,
+                                   retryPolicy,
+                                   std::move(resourceYielder),
+                                   designatedHostsMap)) {
+    Impl::executeRequests(_impl);
+}
+
+AsyncRequestsSender::~AsyncRequestsSender() {
+    // Cancel outstanding work and detach ARS-facing callbacks, then drop our reference.
+    // The underlying Impl object will be destroyed when all callbacks are destroyed.
+    _impl->detachFromCaller();
+}
+
+bool AsyncRequestsSender::done() const noexcept {
+    return _impl->done();
+}
+
+AsyncRequestsSender::Response AsyncRequestsSender::next() {
+    return _impl->next();
+}
+
+void AsyncRequestsSender::stopRetrying() noexcept {
+    _impl->stopRetrying();
+}
+
+AsyncRequestsSender::Request::Request(ShardRef shardRef,
+                                      BSONObj cmdObj,
+                                      std::shared_ptr<Shard> shard)
+    : shardRef(std::move(shardRef)), cmdObj(std::move(cmdObj)), shard(std::move(shard)) {}
+
+Status AsyncRequestsSender::Response::getEffectiveStatus(
+    const AsyncRequestsSender::Response& response) {
+    if (!response.swResponse.isOK()) {
+        return response.swResponse.getStatus();
+    }
+
+    const auto& cmdResponse = response.swResponse.getValue().data;
+    auto commandStatus = getStatusFromCommandResult(cmdResponse);
+    if (!commandStatus.isOK()) {
+        return commandStatus;
+    }
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(cmdResponse);
+    return writeConcernStatus;
+}
+
+AsyncRequestsSender::Impl::Impl(OperationContext* opCtx,
+                                std::shared_ptr<executor::TaskExecutor> executor,
+                                const DatabaseName& dbName,
+                                const std::vector<AsyncRequestsSender::Request>& requests,
+                                const ReadPreferenceSetting& readPreference,
+                                Shard::RetryPolicy retryPolicy,
+                                std::unique_ptr<ResourceYielder> resourceYielder,
+                                const ShardHostMap& designatedHostsMap)
     : _opCtx(opCtx),
       _db(dbName),
       _readPreference(readPreference),
@@ -61,33 +118,50 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
 
     _remotes.reserve(requests.size());
     for (const auto& request : requests) {
-        // Kick off requests immediately.
         auto designatedHostIter = designatedHostsMap.find(request.shardRef);
         auto designatedHost = designatedHostIter != designatedHostsMap.end()
             ? designatedHostIter->second
             : HostAndPort();
-        _remotes
-            .emplace_back(
-                this, request.shardRef, request.cmdObj, std::move(designatedHost), request.shard)
-            .executeRequest();
+        _remotes.emplace_back(
+            _opCtx, request.shardRef, request.cmdObj, std::move(designatedHost), request.shard);
     }
 
     CurOp::get(_opCtx)->ensureRecordRemoteOpWait();
 }
 
-AsyncRequestsSender::~AsyncRequestsSender() {
-    // It is necessary to cancel all outstanding retries here. This is required because the
-    // callbacks for retry requests need access to the AsyncRequestsSender's internals, and we
-    // cannot destroy the AsyncRequestsSender when there are still outstanding retry requests on the
-    // baton.
-    _cancellationSource.cancel();
-
-    // Any scheduled callbacks from this AsyncResultsMerger instance cannot be serviced anymore when
-    // the instance goes out of scope.
-    _subBaton.shutdown();
+void AsyncRequestsSender::Impl::executeRequests(std::shared_ptr<Impl> impl) {
+    for (auto& remote : impl->_remotes) {
+        remote.executeRequest(impl);
+    }
 }
 
-AsyncRequestsSender::Response AsyncRequestsSender::next() {
+void AsyncRequestsSender::Impl::detachFromCaller() {
+    // It is necessary to cancel all outstanding retries here. This is required because the
+    // callbacks for retry requests need access to the AsyncRequestsSender's internals, and we want
+    // to stop scheduling new work as soon as the caller lets go of the handle.
+    _cancellationSource.cancel();
+
+    // Any scheduled continuations from this instance cannot be serviced anymore.
+    _subBaton.shutdown();
+
+    // Cancel any outstanding work in the task executor. Callbacks for cancelled commands still run
+    // (they push a cancellation response onto the queue), but each of those callbacks shares the
+    // Impl, so it remains alive for them.
+    _subExecutor->shutdown();
+}
+
+bool AsyncRequestsSender::Impl::done() const noexcept {
+    return !_remotesLeft;
+}
+
+void AsyncRequestsSender::Impl::stopRetrying() noexcept {
+    _stopRetrying = true;
+
+    // Cancel all pending retry operations, as they are not needed anymore.
+    _cancellationSource.cancel();
+}
+
+AsyncRequestsSender::Response AsyncRequestsSender::Impl::next() {
     invariant(!done());
 
     hangBeforePollResponse.executeIf(
@@ -202,51 +276,19 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
     return popResponseAfterInterrupt();
 }
 
-void AsyncRequestsSender::stopRetrying() noexcept {
-    _stopRetrying = true;
-
-    // Cancel all pending retry operations, as they are not needed anymore.
-    _cancellationSource.cancel();
-}
-
-bool AsyncRequestsSender::done() const noexcept {
-    return !_remotesLeft;
-}
-
-AsyncRequestsSender::Request::Request(ShardRef shardRef,
-                                      BSONObj cmdObj,
-                                      std::shared_ptr<Shard> shard)
-    : shardRef(std::move(shardRef)), cmdObj(std::move(cmdObj)), shard(std::move(shard)) {}
-
-Status AsyncRequestsSender::Response::getEffectiveStatus(
-    const AsyncRequestsSender::Response& response) {
-    if (!response.swResponse.isOK()) {
-        return response.swResponse.getStatus();
-    }
-
-    const auto& cmdResponse = response.swResponse.getValue().data;
-    auto commandStatus = getStatusFromCommandResult(cmdResponse);
-    if (!commandStatus.isOK()) {
-        return commandStatus;
-    }
-    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(cmdResponse);
-    return writeConcernStatus;
-}
-
-AsyncRequestsSender::RemoteData::RemoteData(AsyncRequestsSender* ars,
-                                            ShardRef shardRef,
-                                            BSONObj cmdObj,
-                                            HostAndPort designatedHostAndPort,
-                                            std::shared_ptr<Shard> shard)
-    : _ars(ars),
-      _shardRef(std::move(shardRef)),
+AsyncRequestsSender::Impl::RemoteData::RemoteData(OperationContext* opCtx,
+                                                  ShardRef shardRef,
+                                                  BSONObj cmdObj,
+                                                  HostAndPort designatedHostAndPort,
+                                                  std::shared_ptr<Shard> shard)
+    : _shardRef(std::move(shardRef)),
       _cmdObj(std::move(cmdObj)),
       _designatedHostAndPort(std::move(designatedHostAndPort)),
       _shard(std::move(shard)),
-      _telemetryCtx(
-          otel::TelemetryContextHolder::getDecoration(ars->_opCtx).cloneTelemetryContext()) {}
+      _telemetryCtx(otel::TelemetryContextHolder::getDecoration(opCtx).cloneTelemetryContext()) {}
 
-SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::RemoteData::getShard() {
+SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::Impl::RemoteData::getShard(
+    std::shared_ptr<Impl> impl) {
     if (_shard) {
         // Clear the cached shard so any retries will look up the shard again, in case its state has
         // changed.
@@ -259,40 +301,41 @@ SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::RemoteData::getShard() {
 
     return Grid::get(getGlobalServiceContext())
         ->shardRegistry()
-        ->getShard(*_ars->_subBaton, _shardRef)
-        .thenRunOn(*_ars->_subBaton)
-        .then([this](auto&& shard) {
+        ->getShard(*impl->_subBaton, _shardRef)
+        .thenRunOn(*impl->_subBaton)
+        .then([this, impl = std::move(impl)](auto&& shard) {
             _shardHandle = shard->getHandle();
             return shard;
         })
         .semi();
 }
 
-void AsyncRequestsSender::RemoteData::executeRequest() {
-    scheduleRequest()
-        .thenRunOn(*_ars->_subBaton)
-        .getAsync([this](StatusWith<RemoteCommandCallbackArgs> rcr) {
+void AsyncRequestsSender::Impl::RemoteData::executeRequest(std::shared_ptr<Impl> impl) {
+    scheduleRequest(impl)
+        .thenRunOn(*impl->_subBaton)
+        .getAsync([this, impl = std::move(impl)](StatusWith<RemoteCommandCallbackArgs> rcr) {
             _done = true;
             if (rcr.isOK()) {
-                _ars->_responseQueue.push(
+                impl->_responseQueue.push(
                     {std::move(_shardRef), rcr.getValue().response, std::move(_shardHostAndPort)});
             } else {
-                _ars->_responseQueue.push(
+                impl->_responseQueue.push(
                     {std::move(_shardRef), rcr.getStatus(), std::move(_shardHostAndPort)});
             }
         });
 }
 
-auto AsyncRequestsSender::RemoteData::scheduleRequest() -> SemiFuture<RemoteCommandCallbackArgs> {
-    return getShard()
-        .thenRunOn(*_ars->_subBaton)
-        .then([this](const auto& shard) -> SemiFuture<HostAndPort> {
+auto AsyncRequestsSender::Impl::RemoteData::scheduleRequest(std::shared_ptr<Impl> impl)
+    -> SemiFuture<RemoteCommandCallbackArgs> {
+    return getShard(impl)
+        .thenRunOn(*impl->_subBaton)
+        .then([this, impl = impl](const auto& shard) -> SemiFuture<HostAndPort> {
             if (!_retryStrategy) {
                 Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
                     _cmdObj.getField("startTransaction").booleanSafe()
                     ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
                     : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
-                _retryStrategy.emplace(shard, _ars->_retryPolicy, isStartTransaction);
+                _retryStrategy.emplace(shard, impl->_retryPolicy, isStartTransaction);
             }
 
             if (!_designatedHostAndPort.empty()) {
@@ -306,27 +349,30 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest() -> SemiFuture<RemoteComm
                 return _designatedHostAndPort;
             }
 
-            return shard->getTargeter()->findHost(_ars->_readPreference,
+            return shard->getTargeter()->findHost(impl->_readPreference,
                                                   CancellationToken::uncancelable(),
                                                   _retryStrategy->getTargetingMetadata());
         })
-        .thenRunOn(*_ars->_subBaton)
-        .then([this](const auto& hostAndPort) {
+        .thenRunOn(*impl->_subBaton)
+        .then([this, impl = impl](const auto& hostAndPort) {
             _shardHostAndPort.emplace(hostAndPort);
-            return scheduleRemoteCommand(hostAndPort);
+            return scheduleRemoteCommand(hostAndPort, std::move(impl));
         })
-        .then([this](auto&& rcr) { return handleResponse(std::move(rcr)); })
+        .then([this, impl = std::move(impl)](auto&& rcr) {
+            return handleResponse(std::move(rcr), std::move(impl));
+        })
         .semi();
 }
 
-auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(const HostAndPort& hostAndPort)
+auto AsyncRequestsSender::Impl::RemoteData::scheduleRemoteCommand(const HostAndPort& hostAndPort,
+                                                                  std::shared_ptr<Impl> impl)
     -> SemiFuture<RemoteCommandCallbackArgs> {
     executor::RemoteCommandRequest request(
         hostAndPort,
-        _ars->_db,
+        impl->_db,
         _cmdObj,
-        _ars->_metadataObj,
-        _ars->_opCtx,
+        impl->_metadataObj,
+        impl->_opCtx,
         executor::RemoteCommandRequest::Options{.telemetryContext = _telemetryCtx});
 
     // We have to make a promise future pair because the TaskExecutor doesn't currently support a
@@ -334,18 +380,19 @@ auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(const HostAndPort& h
     auto [p, f] = makePromiseFuture<RemoteCommandCallbackArgs>();
 
     // Failures to schedule skip the retry loop
-    uassertStatusOK(_ars->_subExecutor->scheduleRemoteCommand(
+    uassertStatusOK(impl->_subExecutor->scheduleRemoteCommand(
         request,
         // We have to make a shared_ptr<Promise> here because scheduleRemoteCommand requires
         // copyable callbacks
-        [p = std::make_shared<Promise<RemoteCommandCallbackArgs>>(std::move(p))](
-            const RemoteCommandCallbackArgs& cbData) { p->emplaceValue(cbData); },
-        *_ars->_subBaton));
+        [p = std::make_shared<Promise<RemoteCommandCallbackArgs>>(std::move(p)),
+         impl = impl](const RemoteCommandCallbackArgs& cbData) { p->emplaceValue(cbData); },
+        *impl->_subBaton));
 
     return std::move(f).semi();
 }
 
-auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs rcr)
+auto AsyncRequestsSender::Impl::RemoteData::handleResponse(RemoteCommandCallbackArgs rcr,
+                                                           std::shared_ptr<Impl> impl)
     -> SemiFuture<RemoteCommandCallbackArgs> {
     _shardHostAndPort = rcr.response.target;
 
@@ -376,10 +423,13 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
     }
 
     // There was an error with either the response or the command.
-    return getShard()
-        .thenRunOn(*_ars->_subBaton)
-        .then([this, status = std::move(status), rcr = std::move(rcr), isRemote](
-                  std::shared_ptr<mongo::Shard> shard) {
+    return getShard(impl)
+        .thenRunOn(*impl->_subBaton)
+        .then([this,
+               impl = std::move(impl),
+               status = std::move(status),
+               rcr = std::move(rcr),
+               isRemote](std::shared_ptr<mongo::Shard> shard) {
             if (!ErrorCodes::isShutdownError(status.code()) || isRemote) {
                 shard->updateReplSetMonitor(rcr.response.target, status);
             }
@@ -389,7 +439,7 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
                     rcr.response.target,
                     rcr.response.getErrorLabels(),
                     rcr.response.getBaseBackoffMS()) &&
-                !_ars->_stopRetrying) {
+                !impl->_stopRetrying) {
                 const auto delay = _retryStrategy->getNextRetryDelay();
 
                 LOGV2_DEBUG(
@@ -404,19 +454,19 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
                 _shardHostAndPort.reset();
 
                 if (delay > Milliseconds{0}) {
-                    return _ars->_subBaton
-                        ->waitUntil(_ars->_subExecutor->now() + delay,
-                                    _ars->_cancellationSource.token())
-                        .then([this, delay] {
+                    return impl->_subBaton
+                        ->waitUntil(impl->_subExecutor->now() + delay,
+                                    impl->_cancellationSource.token())
+                        .then([this, impl, delay] {
                             _retryStrategy->recordBackoff(delay);
                             // retry through recursion
-                            return scheduleRequest();
+                            return scheduleRequest(std::move(impl));
                         })
                         .semi();
                 }
 
                 // retry through recursion
-                return scheduleRequest();
+                return scheduleRequest(std::move(impl));
             }
 
 
