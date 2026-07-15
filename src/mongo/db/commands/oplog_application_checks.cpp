@@ -187,12 +187,17 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         }
         return Status::OK();
     } else if (opType == "ci"_sd) {
-        if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::containerInsert)) {
+        // Container ops write to the storage ident named by the op's "container" field, not to
+        // "nss" -- the two are unrelated, so this cannot be scoped to nss like the other ops
+        // above. Require the action on any resource instead.
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyResource(nss.tenantId()), ActionType::containerInsert)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
     } else if (opType == "cd"_sd) {
-        if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::containerDelete)) {
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyResource(nss.tenantId()), ActionType::containerDelete)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();

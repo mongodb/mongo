@@ -211,14 +211,25 @@ Status _applyOps(OperationContext* opCtx,
                     switch (entry.getOpType()) {
                         case OpTypeEnum::kContainerInsert:
                         case OpTypeEnum::kContainerDelete: {
-                            if (const auto fcv =
+                            // Container ops (ci/cd) are internal-only. A direct applyOps invocation
+                            // may still run them when the primary-driven-index-builds feature flag
+                            // is enabled. Every other oplogApplicationMode is client-controlled and
+                            // must not be trusted to indicate real oplog application, so it is only
+                            // permitted when opCtx->writesAreReplicated() is false, i.e. this is
+                            // genuinely not a user-issued applyOps.
+                            if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
+                                const auto fcv =
                                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                                !(fcv.isVersionInitialized() &&
-                                  ::mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-                                      .isEnabled(VersionContext::getDecoration(opCtx), fcv)) &&
-                                oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
-                                uasserted(ErrorCodes::InvalidOptions,
-                                          "Container ops are not enabled");
+                                uassert(
+                                    ErrorCodes::InvalidOptions,
+                                    "Container ops are not enabled",
+                                    fcv.isVersionInitialized() &&
+                                        ::mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                                            .isEnabled(VersionContext::getDecoration(opCtx), fcv));
+                            } else {
+                                uassert(ErrorCodes::InvalidOptions,
+                                        "Container ops are not enabled",
+                                        !opCtx->writesAreReplicated());
                             }
                             auto coll = acquireCollection(opCtx,
                                                           {nss,
