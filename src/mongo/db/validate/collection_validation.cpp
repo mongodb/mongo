@@ -274,8 +274,10 @@ void _logInvalidIndices(OperationContext* opCtx,
         if (!ivr.isValid()) {
             const auto entry = validateState->getCollection()->getIndexCatalog()->findIndexByName(
                 opCtx, indexName);
-            auto indexSpec = entry->descriptor()->infoObj();
-            LOGV2_ERROR(7463100, "Index failed validation", "spec"_attr = indexSpec);
+            if (entry) {
+                auto indexSpec = entry->descriptor()->infoObj();
+                LOGV2_ERROR(7463100, "Index failed validation", "spec"_attr = indexSpec);
+            }
         }
     }
 }
