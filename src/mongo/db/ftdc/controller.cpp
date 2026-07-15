@@ -360,21 +360,20 @@ void FTDCController::doLoop(Service* service) try {
                 uasserted(ErrorCodes::BSONObjectTooLarge,
                           "Injected BSONObjectTooLarge exception for testing");
             }
-            auto collectSample = feature_flags::gFeatureFlagGaplessFTDC.isEnabled()
+            auto [sample, startTime] = feature_flags::gFeatureFlagGaplessFTDC.isEnabled()
                 ? _asyncPeriodicCollectors->collect(client, sectionSizes)
                 : _periodicCollectors.collect(client, sectionSizes);
 
-            lastSampleSizeBytes.set(std::get<0>(collectSample).objsize());
+            lastSampleSizeBytes.set(sample.objsize());
 
-            Status s = _mgr->writeSampleAndRotateIfNeeded(
-                client, std::get<0>(collectSample), std::get<1>(collectSample));
+            Status s = _mgr->writeSampleAndRotateIfNeeded(client, sample, startTime);
 
             uassertStatusOK(s);
 
             // Store a reference to the most recent document from the periodic collectors
             {
                 std::lock_guard<std::mutex> lock(_mutex);
-                _mostRecentPeriodicDocument = std::get<0>(collectSample);
+                _mostRecentPeriodicDocument = sample;
             }
         } catch (const DBException& e) {
             logCollectionError(e.toStatus(), sectionSizes);
@@ -395,9 +394,10 @@ void FTDCController::doLoop(Service* service) try {
             metadataCaptureFrequencyCountdown = _config.metadataCaptureFrequency;
             sectionSizes.clear();
             try {
-                auto collectSample = _periodicMetadataCollectors.collect(client, sectionSizes);
-                Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
-                    client, std::get<0>(collectSample), std::get<1>(collectSample));
+                auto [sample, startTime] =
+                    _periodicMetadataCollectors.collect(client, sectionSizes);
+                Status s =
+                    _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(client, sample, startTime);
                 iassert(s);
 
             } catch (const DBException& e) {

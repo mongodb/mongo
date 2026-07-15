@@ -3,6 +3,7 @@
 
 #include "mongo/db/ftdc/collector.h"
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
@@ -17,13 +18,16 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -76,9 +80,16 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
     const auto endDate = getCurrentDate(opCtx.get());
     builder.appendDate(kFTDCCollectEndField, endDate);
 
+    auto result = builder.obj();
+    if (MONGO_unlikely(kDebugBuild || TestingProctor::instance().isEnabled())) {
+        if (Status status = validateBSON(result); !status.isOK()) {
+            LOGV2_FATAL(13141900, "FTDC collector produced invalid BSON", "error"_attr = status);
+        }
+    }
+
     FTDCCollectionMetrics::get(opCtx.get()).onCompletingCollection(endDate - startDate);
 
-    return std::tuple<BSONObj, Date_t>(builder.obj(), startDate);
+    return std::tuple<BSONObj, Date_t>(std::move(result), startDate);
 }
 
 SampleCollectorCache::SampleCollectorCache(Milliseconds maxSampleWaitMS,
