@@ -899,6 +899,7 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
         if (chunkRanges) {
             getAllChunkRanges(chunkRanges);
         }
+        return;
     }
 
     _rt->optRt->forEachOverlappingChunk(min, max, includeMaxBound, [&](const auto& chunkInfo) {
