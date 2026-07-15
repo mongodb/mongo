@@ -5,6 +5,7 @@
  * changes the expected cursor history.
  * @tags: [ requires_fcv_81 ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForQuery,
@@ -24,6 +25,10 @@ const mongotTestDB = mongotConn.getDB(dbName);
 
 const conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host}});
 const db = conn.getDB(dbName);
+// When enabled, idLookup resolves _ids a whole window at a time. An unbounded query then drains
+// mongot's cursor to EOF (nothing left to kill), so the killCursors-forwarding scenario is only
+// reachable when a limit stops the drain early and leaves the cursor open.
+const batchedIdLookup = FeatureFlagUtil.isEnabled(db, "SearchOptimizedIdLookup");
 
 const coll = db.getCollection(collName);
 
@@ -32,24 +37,38 @@ prepCollection(conn, dbName, collName);
 const cursorId = NumberLong(123);
 const collectionUUID = getUUIDFromListCollections(db, coll.getName());
 
-function runTest(pipeline, expectedCommand, shouldPrefetchGetMore) {
+function runTest(pipeline, expectedCommand, shouldPrefetchGetMore, limit) {
     const someScore = {$vectorSearchScore: 0.97};
+    let firstBatch;
+    if (batchedIdLookup) {
+        // Return exactly the limit's worth of docs in the first batch. idLookup pulls the whole
+        // window at once, meets the limit without a getMore, and stops with the cursor still open.
+        firstBatch = [];
+        for (let i = 0; i < limit; i++) {
+            firstBatch.push({_id: i + 1, ...someScore});
+        }
+    } else {
+        firstBatch = [
+            {_id: 1, ...someScore},
+            {_id: 2, ...someScore},
+        ];
+    }
     const cursorHistory = [
         {
             expectedCommand,
             response: {
                 ok: 1,
                 cursor: {
-                    firstBatch: [
-                        {_id: 1, ...someScore},
-                        {_id: 2, ...someScore},
-                    ],
+                    firstBatch,
                     id: cursorId,
                     ns: coll.getFullName(),
                 },
             },
         },
     ];
+    // After the first batch is exhausted, the mongot-remote stage prefetches one getMore (whose
+    // results go unused here) while the cursor stays open. Batched, idLookup has already met its
+    // limit from the first window, so this prefetch is the only getMore issued.
     if (shouldPrefetchGetMore) {
         cursorHistory.push({
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -105,22 +124,29 @@ runTest(
     [{$vectorSearch: vectorSearchQuery}],
     mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID}),
     /*shouldPrefetchGetMore*/ true,
+    /*limit*/ vectorSearchQuery.limit,
 );
 
 const searchQuery = {
     query: "cakes",
     path: "title",
 };
-runTest(
-    [{$search: searchQuery}],
-    mongotCommandForQuery({
-        query: searchQuery,
-        collName: collName,
-        db: dbName,
-        collectionUUID: collectionUUID,
-    }),
-    /*shouldPrefetchGetMore*/ false,
-);
+// This unbounded $search has no limit to stop a batched drain early, so under batched idLookup it
+// would run mongot's cursor to EOF and leave nothing to kill. The killCursors-forwarding path is
+// covered by the limited $vectorSearch case above.
+if (!batchedIdLookup) {
+    runTest(
+        [{$search: searchQuery}],
+        mongotCommandForQuery({
+            query: searchQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collectionUUID,
+        }),
+        /*shouldPrefetchGetMore*/ false,
+        /*limit*/ 2,
+    );
+}
 
 mongotMock.stop();
 MongoRunner.stopMongod(conn);

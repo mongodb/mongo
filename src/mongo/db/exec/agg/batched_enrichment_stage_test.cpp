@@ -39,8 +39,9 @@ public:
         return md.freeze();
     };
 
-    // Optional output cap: when set and it returns true, the base stops filling and finishes.
-    std::function<bool()> shouldStopFn;
+    // Optional output cap: when set, its return value is the remaining emit budget (boost::none =
+    // unbounded, 0 = stop). Drives both the fill cap and the stop condition.
+    std::function<boost::optional<size_t>()> remainingFn;
 
     int beginCalls = 0;
     int closeCalls = 0;
@@ -64,8 +65,8 @@ protected:
         ++enrichCalls;
         return enrichFn(std::move(event));
     }
-    bool shouldStopEmittingDocuments() const override {
-        return shouldStopFn ? shouldStopFn() : false;
+    boost::optional<size_t> remainingDocumentsToEmit() const override {
+        return remainingFn ? remainingFn() : boost::none;
     }
     void onExhausted() override {
         ++exhaustedCalls;
@@ -710,7 +711,7 @@ TEST_F(BatchedEnrichmentStageTest, WholeWindowDroppedAcrossFillsRefillsUntilEOF)
     ASSERT_EQ(stage->closeCalls, 3);
 }
 
-TEST_F(BatchedEnrichmentStageTest, ShouldStopEmittingStopsAndDropsLeftoverInput) {
+TEST_F(BatchedEnrichmentStageTest, EmitBudgetStopsAtCapAndDoesNotOverPullUpstream) {
     auto source = MockStage::createForTest(
         std::vector<Document>{dataEvent(1), dataEvent(2), dataEvent(3), dataEvent(4), dataEvent(5)},
         _expCtx);
@@ -720,9 +721,9 @@ TEST_F(BatchedEnrichmentStageTest, ShouldStopEmittingStopsAndDropsLeftoverInput)
         ++emitted;
         return d;
     };
-    // Cap output at 2 events; the third enrich must never run.
-    stage->shouldStopFn = [&] {
-        return emitted >= 2;
+    // Budget of 2: allow two emits, then stop. The remaining allowance also caps the fill.
+    stage->remainingFn = [&]() -> boost::optional<size_t> {
+        return emitted >= 2 ? 0u : static_cast<size_t>(2 - emitted);
     };
 
     auto out = drainToEOF(*stage);
@@ -730,18 +731,20 @@ TEST_F(BatchedEnrichmentStageTest, ShouldStopEmittingStopsAndDropsLeftoverInput)
     ASSERT_EQ(out.size(), 2u);
     ASSERT_EQ(out[0].getDocument()["_id"].getInt(), 1);
     ASSERT_EQ(out[1].getDocument()["_id"].getInt(), 2);
-    // The window stops at the cap; leftover buffered input (3,4,5) is dropped, not enriched.
+    // The budget caps the fill, so only 2 events are pulled and enriched; 3,4,5 are never pulled
+    // from upstream (they remain queued in the source), not pulled-then-discarded.
     ASSERT_EQ(stage->enrichCalls, 2);
+    ASSERT_EQ(_source->size(), 3u);
     ASSERT_GTE(stage->exhaustedCalls, 1);
     ASSERT_FALSE(stage->scopeOpen);
 }
 
-TEST_F(BatchedEnrichmentStageTest, ShouldStopEmittingAtStartReturnsEOFWithoutFillingOrEnriching) {
+TEST_F(BatchedEnrichmentStageTest, ZeroEmitBudgetAtStartReturnsEOFWithoutFillingOrEnriching) {
     auto source =
         MockStage::createForTest(std::vector<Document>{dataEvent(1), dataEvent(2)}, _expCtx);
     auto stage = makeStage(std::move(source), looseLimits());
-    stage->shouldStopFn = [] {
-        return true;
+    stage->remainingFn = []() -> boost::optional<size_t> {
+        return 0u;
     };
 
     ASSERT_TRUE(stage->getNext().isEOF());

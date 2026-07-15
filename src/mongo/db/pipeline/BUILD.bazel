@@ -1049,8 +1049,8 @@ mongo_cc_library(
     deps = [
         ":pipeline",
         "//src/mongo/db/exec/single_doc_lookup:collection_acquirer",
-        "//src/mongo/db/exec/single_doc_lookup:express_single_document_lookup_executor",
         "//src/mongo/db/exec/single_doc_lookup:local_lookup_eligibility",
+        "//src/mongo/db/exec/single_doc_lookup:sbe_single_document_lookup_executor",
         "//src/mongo/db/exec/single_doc_lookup:single_document_lookup_executor",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/query_knobs:query_knob_configuration",
@@ -1551,6 +1551,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/exec/single_doc_lookup:express_single_document_lookup_executor",
+        "//src/mongo/db/exec/single_doc_lookup:sbe_single_document_lookup_executor",
         "//src/mongo/db/exec/single_doc_lookup:single_document_lookup_executor",
         "//src/mongo/db/extension/host:extension_loader",
         "//src/mongo/db/memory_tracking",

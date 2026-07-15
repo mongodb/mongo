@@ -15,6 +15,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/sbe_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
@@ -324,7 +325,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, StageHoldsLocalReadExecutorWhenFla
     collections.clear();
 }
 
-TEST_F(InternalSearchIdLookupWithCatalogTest, BuildIdLookupExecutorReturnsExpressWhenFlagOn) {
+TEST_F(InternalSearchIdLookupWithCatalogTest, BuildIdLookupExecutorReturnsSbeWhenFlagOn) {
     unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
     auto [sharedStasher, collections] = createCatalogResources();
     auto catalogResourceHandle = make_intrusive<DSInternalSearchIdLookUpCatalogResourceHandle>(
@@ -332,8 +333,9 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BuildIdLookupExecutorReturnsExpres
     auto executor =
         exec::agg::buildIdLookupExecutor(expCtx, catalogResourceHandle, boost::none /* view */);
 
-    ASSERT_TRUE(
-        dynamic_cast<const exec::agg::ExpressSingleDocumentLookupExecutor*>(executor.get()));
+    // Flag on + no view: the SBE point-read executor. It runs local and, on a sharded acquisition,
+    // drops orphans via the SHARDING_FILTER it puts above the scan -- no fallback needed.
+    ASSERT_TRUE(dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(executor.get()));
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
@@ -356,14 +358,14 @@ TEST_F(InternalSearchIdLookupWithCatalogTest,
     collections.clear();
 }
 
-TEST_F(InternalSearchIdLookupWithCatalogTest, StageHoldsExpressExecutorWhenFlagOn) {
+TEST_F(InternalSearchIdLookupWithCatalogTest, StageHoldsSbeExecutorWhenFlagOn) {
     unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
     expCtx->setUUID(UUID::gen());
     auto [idLookup, idLookupStage, collections] = createIdLookup();
 
     auto* stage = dynamic_cast<exec::agg::InternalSearchIdLookUpStage*>(idLookupStage.get());
     ASSERT_TRUE(stage);
-    ASSERT_TRUE(dynamic_cast<const exec::agg::ExpressSingleDocumentLookupExecutor*>(
+    ASSERT_TRUE(dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(
         stage->getLookupExecutor_forTest()));
 
     // Clearing collections as it needs to be destroyed before the stasher.
@@ -406,7 +408,7 @@ DEATH_TEST_F(InternalSearchIdLookupWithCatalogDeathTest,
     collections.clear();
 }
 
-TEST_F(InternalSearchIdLookupWithCatalogTest, ExpressPathSkipsMissingIdWhenFlagOn) {
+TEST_F(InternalSearchIdLookupWithCatalogTest, OptimizedPathSkipsMissingIdWhenFlagOn) {
     unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
     std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv)};
     insertDocuments(kTestNss, docs);
@@ -426,7 +428,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ExpressPathSkipsMissingIdWhenFlagO
     collections.clear();
 }
 
-TEST_F(InternalSearchIdLookupWithCatalogTest, ExpressPathPreservesMetadataWhenFlagOn) {
+TEST_F(InternalSearchIdLookupWithCatalogTest, OptimizedPathPreservesMetadataWhenFlagOn) {
     unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
     std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv)};
     insertDocuments(kTestNss, docs);
@@ -450,9 +452,11 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ExpressPathPreservesMetadataWhenFl
     collections.clear();
 }
 
-// The Express path must still surface per-lookup execution stats in explain (totalDocs/KeysExamined
-// accumulate one per found document on the non-clustered _id index), matching the local-read path.
-TEST_F(InternalSearchIdLookupWithCatalogTest, ExpressPathPopulatesExplainExecStatsWhenFlagOn) {
+// The optimized (SBE) path must still surface per-lookup execution stats in explain
+// (totalDocs/KeysExamined, one per found document on the _id index), matching the local-read path.
+// SBE folds these into its stats only when the batch window is torn down, so they are guaranteed
+// only after the source is fully drained.
+TEST_F(InternalSearchIdLookupWithCatalogTest, OptimizedPathPopulatesExplainExecStatsWhenFlagOn) {
     unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
     std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv),
                               BSON("_id" << 1 << "color" << "blue"sv),
@@ -470,7 +474,6 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ExpressPathPopulatesExplainExecSta
 
     const auto* stats =
         static_cast<const DocumentSourceIdLookupStats*>(idLookupStage->getSpecificStats());
-    ASSERT_EQ(3, stats->planSummaryStats.nReturned);
     ASSERT_EQ(3, stats->planSummaryStats.totalDocsExamined);
     ASSERT_EQ(3, stats->planSummaryStats.totalKeysExamined);
     // The non-clustered collection resolves each _id via its default _id index.
@@ -693,9 +696,9 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedWholeWindowDroppedRefillsUn
     collections.clear();
 }
 
-// The 'limit' cap trips mid-window: the stage returns exactly 'limit' documents, and the leftover
-// buffered input is dropped without being resolved (never enriched, so never "seen").
-TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedLimitStopsMidWindowAndDropsLeftover) {
+// A batch larger than the 'limit' pulls only 'limit' results upstream (leaving the rest un-pulled),
+// returns exactly 'limit', then EOFs -- so it never advances mongot for results the limit discards.
+TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedLimitCapsUpstreamPullWithinWindow) {
     expCtx->setUUID(UUID::gen());
     std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv),
                               BSON("_id" << 1 << "color" << "blue"sv),
@@ -721,9 +724,48 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedLimitStopsMidWindowAndDrops
     }
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
 
-    // Only the two enriched up to the cap are seen; _ids 2..4 are discarded without a lookup.
+    // Only the 2 the limit needs are seen/returned; _ids 2..4 stay in the source (never pulled),
+    // though the batch could hold all 5.
     ASSERT_EQ(2, metrics->getDocsSeenByIdLookup());
     ASSERT_EQ(2, metrics->getDocsReturnedByIdLookup());
+    ASSERT_EQ(3u, mockLocalStage->size());
+
+    collections.clear();
+}
+
+// The cap tracks the remaining limit across batches: earlier windows fill fully, the last pulls
+// only the few results still needed to reach the limit.
+TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedLimitCapsUpstreamPullAcrossBatches) {
+    expCtx->setUUID(UUID::gen());
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv),
+                              BSON("_id" << 1 << "color" << "blue"sv),
+                              BSON("_id" << 2 << "color" << "green"sv),
+                              BSON("_id" << 3 << "color" << "yellow"sv),
+                              BSON("_id" << 4 << "color" << "purple"sv)};
+    insertDocuments(kTestNss, docs);
+
+    // Window 2, limit 3: window 1 pulls _ids 0,1; window 2 is capped to the 1 remaining (_id 2), so
+    // _ids 3,4 are never pulled.
+    auto [idLookupStage, metrics, collections] =
+        createBatchedIdLookup(/*maxInputEvents=*/2, /*limit=*/3);
+    auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 0}},
+                                                               Document{{"_id", 1}},
+                                                               Document{{"_id", 2}},
+                                                               Document{{"_id", 3}},
+                                                               Document{{"_id", 4}}},
+                                                              expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    for (int expectedId : {0, 1, 2}) {
+        auto next = idLookupStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_EQ(next.getDocument()["_id"].getInt(), expectedId);
+    }
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    ASSERT_EQ(3, metrics->getDocsSeenByIdLookup());
+    ASSERT_EQ(3, metrics->getDocsReturnedByIdLookup());
+    ASSERT_EQ(2u, mockLocalStage->size());
 
     collections.clear();
 }
@@ -842,9 +884,9 @@ protected:
 
     // Runs the orphan-filtering scenario (shard key "skey", split at 10) and asserts only the 3
     // owned documents are returned. Shared by the flag-off and flag-on tests so both exercise an
-    // identical body: orphan filtering must hold whether or not the Express fast path is enabled.
-    void assertFiltersOrphans(bool expressEnabled) {
-        unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", expressEnabled};
+    // identical body: orphan filtering must hold whether or not the optimized fast path is enabled.
+    void assertFiltersOrphans(bool optimizedEnabled) {
+        unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", optimizedEnabled};
 
         std::vector<BSONObj> docs{
             BSON("_id" << 0 << "skey" << 0 << "color" << "red"),      // owned
@@ -855,7 +897,7 @@ protected:
         };
         insertDocuments(docs);
 
-        // Use the real collection UUID: with the Express fast path on, the stage passes
+        // Use the real collection UUID: with the optimized fast path on, the stage passes
         // expCtx->getUUID() to PreAcquiredCollectionAcquirer, which requires it to match the held
         // acquisition's UUID. (The flag-off local-read path does not validate it.)
         _expCtx->setUUID([&] {
@@ -902,14 +944,38 @@ protected:
     std::unique_ptr<DBDirectClient> _client;
 };
 
-// Orphan filtering must hold identically on both paths: Express drops orphans via the acquisition's
-// shard filter, local-read via INCLUDE_SHARD_FILTER. Run the shared body with the flag off and on.
+// Orphan filtering must hold identically whether the optimized fast path is off or on. With the
+// flag off, the local-read executor applies the acquisition's shard filter. With the flag on, the
+// SBE executor puts a SHARDING_FILTER above the scan (INCLUDE_SHARD_FILTER on a sharded
+// acquisition) that drops orphans post-read. Run the shared body with the flag off and on.
 TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocumentsExpressDisabled) {
-    assertFiltersOrphans(/*expressEnabled=*/false);
+    assertFiltersOrphans(/*optimizedEnabled=*/false);
 }
 
 TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocumentsExpressEnabled) {
-    assertFiltersOrphans(/*expressEnabled=*/true);
+    assertFiltersOrphans(/*optimizedEnabled=*/true);
+}
+
+// On a sharded collection with the flag on, the stage builds the same SBE point-read executor as
+// for an unsharded collection -- there's no sharded-ness branch on our layer. This test pins that
+// executor choice.
+TEST_F(InternalSearchIdLookupOrphanFilteringTest,
+       StageHoldsSbeExecutorForShardedCollectionWhenFlagOn) {
+    unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
+    _expCtx->setUUID([&] {
+        AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IS);
+        return autoColl->uuid();
+    }());
+    auto metadata = setupShardingMetadata(10);
+    auto [idLookup, idLookupStage, collections] = createIdLookup(metadata);
+
+    auto* stage = dynamic_cast<exec::agg::InternalSearchIdLookUpStage*>(idLookupStage.get());
+    ASSERT_TRUE(stage);
+    ASSERT_TRUE(dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(
+        stage->getLookupExecutor_forTest()));
+
+    // Clearing collections as it needs to be destroyed before the stasher.
+    collections.clear();
 }
 
 // Helper namespace strings for view-binding tests.

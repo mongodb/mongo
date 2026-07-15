@@ -95,10 +95,11 @@ private:
     boost::optional<Document> enrich(Document event) override;
 
     /**
-     * Caps output at the spec's 'limit' (0 or unset means no cap): stops emitting once that many
-     * documents have been returned, even though mongot may still have results to hand up.
+     * Remaining documents allowed by the spec's 'limit' (limit minus what has been returned; 0 or
+     * unset limit means no cap). 0 stops emitting even though mongot may still have results, and a
+     * positive value caps the next fill so a batch never advances mongot past what the limit needs.
      */
-    bool shouldStopEmittingDocuments() const override;
+    boost::optional<size_t> remainingDocumentsToEmit() const override;
 
     /**
      * Opens the non-ticketed interval for post-search in-memory work once the search source is
@@ -125,10 +126,10 @@ private:
 };
 
 /**
- * Builds the executor InternalSearchIdLookUpStage drives for every _id. idLookup has no remote
- * lookup, so there is no fallback. Returns the Express fast path when the flag is on and there is
- * no view (a view is not a pure _id point lookup); otherwise the local-read executor. The stage
- * wires its explain stats sink through the executor interface, so no separate handle is returned.
+ * Builds the executor InternalSearchIdLookUpStage drives for every _id. Returns the SBE point-read
+ * executor when the flag is on and there is no view (a view is not a pure _id point lookup);
+ * otherwise the local-read executor. The stage wires its explain stats sink through the executor
+ * interface, so no separate handle is returned.
  */
 std::unique_ptr<SingleDocumentLookupExecutor> buildIdLookupExecutor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
