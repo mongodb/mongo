@@ -13,7 +13,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity.h"
@@ -59,7 +58,7 @@ bool containsUnknownRequiredFlags(uint32_t flags) {
 enum class Section : uint8_t {
     kBody = 0,
     kDocSequence = 1,
-    kSecurityToken = 2,
+    // kSecurityToken = 2, // Never used in production - support removed.
     kTelemetry = 3,
 };
 
@@ -160,7 +159,6 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // with comments.
     bool haveBody = false;
     OpMsg msg;
-    std::string_view securityToken;
     while (!sectionsBuf.atEof()) {
         const auto sectionKind = sectionsBuf.read<Section>();
         switch (sectionKind) {
@@ -206,16 +204,6 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 break;
             }
 
-            case Section::kSecurityToken: {
-                // if op_msg is parsed by mongoBridge, bridge has a backup check since multitenancy
-                // should be false
-                uassert(ErrorCodes::Unauthorized,
-                        "Unsupported Security Token provided",
-                        gMultitenancySupport || serverGlobalParams.isMongoBridge);
-                securityToken = sectionsBuf.readCStr();
-                break;
-            }
-
             case Section::kTelemetry: {
                 uassert(ErrorCodes::BadValue,
                         "Multiple telemetry context sections in message",
@@ -253,10 +241,6 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 *checksum == calculateChecksum(message));
     }
 #endif
-    if (gMultitenancySupport) {
-        msg.validatedTenancyScope =
-            auth::ValidatedTenancyScopeFactory::parse(client, securityToken);
-    }
 
     return msg;
 } catch (const DBException& ex) {
@@ -356,12 +340,6 @@ OpMsgRequest OpMsgRequestBuilder::create(
 
 namespace {
 void serializeHelper(const OpMsg& msg, OpMsgBuilder* output) {
-    if (msg.validatedTenancyScope) {
-        auto securityToken = msg.validatedTenancyScope->getOriginalToken();
-        if (!securityToken.empty()) {
-            output->setSecurityToken(securityToken);
-        }
-    }
     for (auto&& seq : msg.sequences) {
         auto docSeq = output->beginDocSequence(seq.name);
         for (auto&& obj : seq.objs) {
@@ -398,12 +376,6 @@ void OpMsg::shareOwnershipWith(const ConstSharedBuffer& buffer) {
             }
         }
     }
-}
-
-void OpMsgBuilder::setSecurityToken(std::string_view token) {
-    invariant(_state == kEmpty);
-    _buf.appendStruct(Section::kSecurityToken);
-    _buf.appendCStr(token);
 }
 
 void OpMsgBuilder::setTelemetryContext(const TelemetryContextSection& telemetryContext) {

@@ -3,6 +3,3 @@ filters:
   - "audit*":
     approvers:
       - 10gen/server-security
-  - "security_token*":
-    approvers:
-      - 10gen/server-security

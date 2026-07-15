@@ -12,7 +12,6 @@
  *   # Uses $function
  *   requires_scripting,
  *   uses_transactions,
- *   featureFlagSecurityToken,
  * ]
  */
 
@@ -29,15 +28,13 @@ function setDefaultReadMaxTimeMS(db, newValue) {
     assert.commandWorked(db.runCommand({getClusterParameter: "defaultMaxTimeMS"}));
 }
 
-function setup(conn, getConn, multiTenancy = false) {
+function setup(conn, getConn) {
     // Create a global admin user.
     {
         const adminDB = conn.getDB("admin");
         adminDB.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     }
 
-    // Fetch a new connection, this might seem redundant, but is intended to make this work for the
-    // multi-tenancy case.
     const adminDB = getConn("admin", "admin", "admin");
 
     // Prepare a regular user without the 'bypassDefaultMaxtimeMS' privilege.
@@ -56,40 +53,36 @@ function setup(conn, getConn, multiTenancy = false) {
         roles: ["readAnyDatabase", "bypassDefaultMaxtimeMSRole"],
     });
 
-    if (multiTenancy) {
-        return {sleep: 1, millis: 300};
-    } else {
-        const dbName = jsTestName();
-        const testDB = adminDB.getSiblingDB(dbName);
-        const collName = "test";
-        const coll = testDB.getCollection(collName);
+    const dbName = jsTestName();
+    const testDB = adminDB.getSiblingDB(dbName);
+    const collName = "test";
+    const coll = testDB.getCollection(collName);
 
-        // Insert some data to be queried
-        for (let i = 0; i < 10; ++i) {
-            assert.commandWorked(coll.insert({a: 1}));
-        }
+    // Insert some data to be queried
+    for (let i = 0; i < 10; ++i) {
+        assert.commandWorked(coll.insert({a: 1}));
+    }
 
-        const slowStage = {
-            $match: {
-                $expr: {
-                    $function: {
-                        body: function () {
-                            sleep(1000);
-                            return true;
-                        },
-                        args: [],
-                        lang: "js",
+    const slowStage = {
+        $match: {
+            $expr: {
+                $function: {
+                    body: function () {
+                        sleep(1000);
+                        return true;
                     },
+                    args: [],
+                    lang: "js",
                 },
             },
-        };
+        },
+    };
 
-        return {
-            aggregate: collName,
-            pipeline: [slowStage],
-            cursor: {},
-        };
-    }
+    return {
+        aggregate: collName,
+        pipeline: [slowStage],
+        cursor: {},
+    };
 }
 
 function runBypassTests(getConn, commandToRun, dbName = jsTestName()) {
@@ -171,52 +164,4 @@ const keyFile = "jstests/libs/key1";
     runBypassTests(getConn, commandToRun);
 
     st.stop();
-}
-
-// Multi-tenant test.
-{
-    const vtsKey = "secret";
-    const rstWithTenants = new ReplSetTest({
-        nodes: 1,
-        nodeOptions: {
-            setParameter: {
-                multitenancySupport: true,
-                testOnlyValidatedTenancyScopeKey: vtsKey,
-            },
-        },
-        keyFile: keyFile,
-    });
-    rstWithTenants.startSet();
-    rstWithTenants.initiate();
-
-    const conn = rstWithTenants.getPrimary();
-
-    const tenantId1 = ObjectId();
-    const unsignedToken1 = _createTenantToken({tenant: tenantId1});
-    const getConnWithGlobalUser = (dbName, user, password) => {
-        const newConn = new Mongo(conn.host);
-        newConn._setSecurityToken(unsignedToken1);
-        const newConnDB = newConn.getDB(dbName);
-        assert.eq(1, newConnDB.auth(user, password));
-        return newConnDB;
-    };
-    const getConn = (dbName, user, password) => {
-        // setClusterParameter is only possible with a global user with useTenant.
-        if (user == "admin") {
-            return getConnWithGlobalUser(dbName, user, password);
-        }
-
-        const newConn = new Mongo(conn.host);
-        const securityToken = _createSecurityToken(
-            {user: user, db: "admin", tenant: tenantId1},
-            vtsKey,
-        );
-        newConn._setSecurityToken(securityToken);
-        return newConn.getDB(dbName);
-    };
-
-    const commandToRun = setup(conn, getConnWithGlobalUser, true);
-    runBypassTests(getConn, commandToRun, "admin");
-
-    rstWithTenants.stopSet();
 }

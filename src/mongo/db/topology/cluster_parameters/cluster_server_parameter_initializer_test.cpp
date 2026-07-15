@@ -38,43 +38,30 @@ public:
             auto opCtx = cc().makeOperationContext();
             ASSERT_OK(createCollection(
                 opCtx.get(), CreateCommand(NamespaceString::kClusterParametersNamespace)));
-            ASSERT_OK(createCollection(
-                opCtx.get(), CreateCommand(NamespaceString::makeClusterParametersNSS(kTenantId))));
         }
 
-        // Insert documents on-disk for ClusterServerParameterTest. This should be loaded in-memory
+        // Insert a document on-disk for ClusterServerParameterTest. This should be loaded in-memory
         // by the initializer during startup recovery and at the end of initial sync.
         Timestamp now(time(nullptr));
         auto doc = makeClusterParametersDoc(LogicalTime(now), kInitialIntValue, kInitialStrValue);
 
         upsert(doc, boost::none);
-
-        doc = makeClusterParametersDoc(
-            LogicalTime(now), kInitialTenantIntValue, kInitialTenantStrValue);
-
-        upsert(doc, kTenantId);
     }
 
     void tearDown() final {
         // Delete all cluster server parameter documents written and refresh in-memory state.
         remove(boost::none);
-        remove(kTenantId);
         auto opCtx = cc().makeOperationContext();
-        auto resynchronize = [opCtx = opCtx.get()](const boost::optional<TenantId>& tenantId) {
-            const auto coll =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest(
-                                      NamespaceString::makeClusterParametersNSS(tenantId),
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      repl::ReadConcernArgs::get(opCtx),
-                                      AcquisitionPrerequisites::kRead),
-                                  MODE_IS);
+        const auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString::kClusterParametersNamespace,
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
 
-            cluster_parameters::resynchronizeAllTenantParametersFromCollection(
-                opCtx, *coll.getCollectionPtr().get());
-        };
-        resynchronize(boost::none);
-        resynchronize(kTenantId);
+        cluster_parameters::resynchronizeAllTenantParametersFromCollection(
+            opCtx.get(), *coll.getCollectionPtr().get());
     }
     /**
      * Simulates the call to the ClusterServerParameterInitializer at the end of initial sync, when
@@ -109,10 +96,6 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
-    cspTest = sp->getValue(kTenantId);
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
-
     // Indicate that data is available at the end of initial sync and check that the in-memory data
     // is updated.
     doInitialSync();
@@ -121,10 +104,6 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
-
-    cspTest = sp->getValue(kTenantId);
-    ASSERT_EQ(cspTest.getIntValue(), kInitialTenantIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kInitialTenantStrValue);
 }
 
 TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
@@ -143,10 +122,6 @@ TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
     cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
-
-    cspTest = sp->getValue(kTenantId);
-    ASSERT_EQ(cspTest.getIntValue(), kInitialTenantIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kInitialTenantStrValue);
 }
 
 }  // namespace

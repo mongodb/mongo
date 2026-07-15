@@ -251,8 +251,6 @@ public:
         resumeBody().appendElements(body);
     }
 
-    void setSecurityToken(std::string_view token);
-
     void setTelemetryContext(const TelemetryContextSection& telemetryContext);
 
     /**
