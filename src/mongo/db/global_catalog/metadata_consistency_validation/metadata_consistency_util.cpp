@@ -1223,16 +1223,11 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         std::vector<MetadataInconsistencyItem>& inconsistencies,
                                         const bool checkRangeDeletionIndexes,
                                         RSNodeMode rsMode) {
-    const auto performChecks = [&](const CollectionPtr& localColl,
-                                   std::vector<MetadataInconsistencyItem>& inconsistencies) {
-        // We allow users to drop hashed shard key indexes, and therefore we don't require hashed
-        // shard keys to have a supporting index.
-        if (!ShardKeyPattern(shardKey).isHashedPattern()) {
-            inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
-                MetadataInconsistencyTypeEnum::kMissingShardKeyIndex,
-                MissingShardKeyIndexDetails{localColl->ns(), shardId, shardKey}));
-        }
-    };
+    // Shards that do not own any chunks do not participate in the creation of new indexes, so they
+    // could potentially miss any indexes created after they no longer own chunks. Thus we first
+    // perform a check optimistically without taking collection lock, if missing indexes are found
+    // we check under the collection lock if this shard currently own any chunk and re-execute again
+    // the checks under the lock to ensure stability of the ShardVersion.
 
     // Check that the collection has an index that supports the shard key. The
     // checkMetadataConsistency function is executed under the database DDL lock, ensuring any
@@ -1243,6 +1238,62 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     if (findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
         return;
     }
+
+    std::vector<MetadataInconsistencyItem> tmpInconsistencies;
+
+    // We allow users to drop hashed shard key indexes, and therefore we don't require hashed
+    // shard keys to have a supporting index.
+    if (!ShardKeyPattern(shardKey).isHashedPattern()) {
+        tmpInconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMissingShardKeyIndex,
+            MissingShardKeyIndexDetails{localColl->ns(), shardId, shardKey}));
+    }
+
+    if (tmpInconsistencies.size()) {
+        // Pessimistic check under collection lock to serialize with chunk migration commit.
+        AutoGetCollection ac(opCtx, nss, MODE_IS);
+        if (!ac) {
+            throwCollectionDisappearedError(opCtx, nss, rsMode);
+        }
+
+        if (findShardKeyPrefixedIndex(opCtx, *ac, shardKey, false /*requireSingleKey*/)) {
+            return;
+        }
+
+        const auto scopedCsr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+        auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
+        if (!optCollDescr) {
+            LOGV2_DEBUG(7531701,
+                        1,
+                        "Ignoring missing shard key index because collection metadata is unknown",
+                        logAttrs(nss),
+                        "inconsistencies"_attr = tmpInconsistencies);
+            tmpInconsistencies.clear();
+        } else if (!optCollDescr->hasRoutingTable()) {
+            LOGV2_DEBUG(9302300,
+                        1,
+                        "Ignoring missing shard key index because collection metadata is incorrect",
+                        logAttrs(nss),
+                        logAttrs(nss),
+                        "inconsistencies"_attr = tmpInconsistencies);
+            tmpInconsistencies.clear();
+        } else if (!optCollDescr->currentShardHasAnyChunks()) {
+            LOGV2_DEBUG(7531703,
+                        1,
+                        "Ignoring missing shard key index because shard does not own any chunk for "
+                        "this collection",
+                        logAttrs(nss),
+                        "inconsistencies"_attr = tmpInconsistencies);
+            tmpInconsistencies.clear();
+        }
+    }
+
+    // At this point we didn't find a shard key index (even though we may not report it).
+
+    // Copy the possible kMissingShardKeyIndex into the resulting inconsistencies.
+    inconsistencies.insert(
+        inconsistencies.end(), tmpInconsistencies.begin(), tmpInconsistencies.end());
 
     // If the checkRangeDeletionIndexes flag is set, perform an additional check to detect
     // inconsistencies in cases where a collection has an outstanding range deletion without
@@ -1256,61 +1307,6 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                 RangeDeletionMissingShardKeyIndexDetails{localColl->ns(), shardId, shardKey}));
         }
     }
-
-    std::vector<MetadataInconsistencyItem> tmpInconsistencies;
-
-    // Shards that do not own any chunks do not participate in the creation of new indexes, so they
-    // could potentially miss any indexes created after they no longer own chunks. Thus we first
-    // perform a check optimistically without taking collection lock, if missing indexes are found
-    // we check under the collection lock if this shard currently own any chunk and re-execute again
-    // the checks under the lock to ensure stability of the ShardVersion.
-    performChecks(localColl, tmpInconsistencies);
-
-    if (!tmpInconsistencies.size()) {
-        // No index inconsistencies found
-        return;
-    }
-
-    // Pessimistic check under collection lock to serialize with chunk migration commit.
-    AutoGetCollection ac(opCtx, nss, MODE_IS);
-    if (!ac) {
-        throwCollectionDisappearedError(opCtx, nss, rsMode);
-    }
-
-    const auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-    auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
-    if (!optCollDescr) {
-        LOGV2_DEBUG(7531701,
-                    1,
-                    "Ignoring index inconsistencies because collection metadata is unknown",
-                    logAttrs(nss),
-                    "inconsistencies"_attr = tmpInconsistencies);
-        return;
-    }
-
-    if (!optCollDescr->hasRoutingTable()) {
-        LOGV2_DEBUG(9302300,
-                    1,
-                    "Ignoring index inconsistencies because collection metadata is incorrect",
-                    logAttrs(nss),
-                    logAttrs(nss),
-                    "inconsistencies"_attr = tmpInconsistencies);
-        return;
-    }
-
-    if (!optCollDescr->currentShardHasAnyChunks()) {
-        LOGV2_DEBUG(7531703,
-                    1,
-                    "Ignoring index inconsistencies because shard does not own any chunk for "
-                    "this collection",
-                    logAttrs(nss),
-                    "inconsistencies"_attr = tmpInconsistencies);
-        return;
-    }
-
-    tmpInconsistencies.clear();
-    performChecks(*ac, inconsistencies);
 }
 
 std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
