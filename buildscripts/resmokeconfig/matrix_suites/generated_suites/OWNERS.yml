@@ -211,15 +211,15 @@ filters:
   - "/with_mongot_extension_search_disabled_single_shard.yml":
     approvers:
       - 10gen/query-integration-extensions-api
-  - "/with_mongot_extension_sharded_cluster.yml":
+  - "/with_mongot_extension_vectorSearch_disabled_sharded_cluster.yml":
     approvers:
       - 10gen/query-integration-extensions-api
-  - "/with_mongot_extension_sharded_collections.yml":
+  - "/with_mongot_extension_vectorSearch_disabled_sharded_collections.yml":
     approvers:
       - 10gen/query-integration-extensions-api
-  - "/with_mongot_extension_single_node.yml":
+  - "/with_mongot_extension_vectorSearch_disabled_single_node.yml":
     approvers:
       - 10gen/query-integration-extensions-api
-  - "/with_mongot_extension_single_shard.yml":
+  - "/with_mongot_extension_vectorSearch_disabled_single_shard.yml":
     approvers:
       - 10gen/query-integration-extensions-api
