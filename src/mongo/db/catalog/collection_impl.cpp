@@ -698,7 +698,6 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
 Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                                                      const BSONObj& document) const {
     std::pair<SchemaValidationResult, Status> result = checkValidation(opCtx, document);
-
     if (result.first == SchemaValidationResult::kPass) {
         return Status::OK();
     }
@@ -709,9 +708,9 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
             "Document would fail validation",
             logAttrs(ns()),
             "document"_attr = redact(document),
-            "errInfo"_attr =
+            "errInfo"_attr = redact(
                 result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                    ->getRedactedDetails());
+                    ->getDetails()));
         return Status::OK();
     }
 

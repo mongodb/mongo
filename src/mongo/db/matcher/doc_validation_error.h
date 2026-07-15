@@ -50,7 +50,6 @@ public:
                 !err.isEmpty());
     }
     const BSONObj& getDetails() const;
-    BSONObj getRedactedDetails() const;
     void serialize(BSONObjBuilder* bob) const override;
 
 private:
