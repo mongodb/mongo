@@ -19,8 +19,13 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 // pinToSingleMongos due to configureFailPoint command.
 TestData.pinToSingleMongos = true;
 
-const testDB = db.getSiblingDB("test_failcommand");
+const testDB = db.getSiblingDB(jsTestName());
 const adminDB = db.getSiblingDB("admin");
+
+// Ensure a clean namespace. This test may be run more than once against the same fixture (e.g.
+// burn_in repeats suites without restarting the fixture in between), and leftover documents from
+// a prior run would break passthroughs that assert on the emptiness of untouched namespaces.
+assert.commandWorked(testDB.dropDatabase());
 
 const getCurOpMetadata = function () {
     let myUri = adminDB.runCommand({whatsmyuri: 1}).you;
@@ -449,11 +454,6 @@ assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]})); // Work
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test with natural failure and writeConcernError.
-
-// This document is removed before testing the following insert to prevent a DuplicateKeyError
-// if the failcommand_failpoint test is run multiple times on the same fixture.
-testDB.c.remove({_id: "dup"});
-
 assert.commandWorked(testDB.runCommand({insert: "c", documents: [{_id: "dup"}]}));
 assert.commandWorked(
     adminDB.runCommand({
@@ -763,68 +763,63 @@ assert.eq(res.writeConcernError, {code: ErrorCodes.NotWritablePrimary, errmsg: "
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"), res);
 
-// failCommandsExcept is a new option and is not understood by older binaries,
-// so skip these tests when running against mixed-version clusters.
-// TODO SERVER-125631: Remove the isMultiversion check when 9.0 becomes last-lts.
-if (!isMultiversion) {
-    // Test failAllCommands with failCommandsExcept: every command fails except those allowlisted.
-    assert.commandWorked(
-        adminDB.runCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                errorCode: ErrorCodes.NotWritablePrimary,
-                failAllCommands: true,
-                failCommandsExcept: ["ping"],
-                threadName: threadName,
-            },
-        }),
-    );
-    // "ping" is allowlisted -> still works.
-    assert.commandWorked(testDB.runCommand({ping: 1}));
-    // Other commands hit the failpoint.
-    assert.commandFailedWithCode(testDB.runCommand({find: "test"}), ErrorCodes.NotWritablePrimary);
-    assert.commandFailedWithCode(
-        testDB.runCommand({insert: "test", documents: [{x: 1}]}),
-        ErrorCodes.NotWritablePrimary,
-    );
+// Test failAllCommands with failCommandsExcept: every command fails except those allowlisted.
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failAllCommands: true,
+            failCommandsExcept: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
+// "ping" is allowlisted -> still works.
+assert.commandWorked(testDB.runCommand({ping: 1}));
+// Other commands hit the failpoint.
+assert.commandFailedWithCode(testDB.runCommand({find: "test"}), ErrorCodes.NotWritablePrimary);
+assert.commandFailedWithCode(
+    testDB.runCommand({insert: "test", documents: [{x: 1}]}),
+    ErrorCodes.NotWritablePrimary,
+);
 
-    // Aliases registered on the same command are honored: listing "isMaster" also exempts its
-    // alias "ismaster" (both belong to the CmdIsMaster command class). However "hello" and
-    // "isMaster" are separate command classes (CmdHello vs CmdIsMaster) and do NOT alias each
-    // other, so each must be listed explicitly to be exempt.
-    assert.commandWorked(
-        adminDB.runCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                errorCode: ErrorCodes.NotWritablePrimary,
-                failAllCommands: true,
-                failCommandsExcept: ["isMaster"],
-                threadName: threadName,
-            },
-        }),
-    );
-    assert.commandWorked(testDB.runCommand({isMaster: 1}));
-    assert.commandWorked(testDB.runCommand({ismaster: 1}));
-    assert.commandFailedWithCode(testDB.runCommand({hello: 1}), ErrorCodes.NotWritablePrimary);
-    assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
+// Aliases registered on the same command are honored: listing "isMaster" also exempts its
+// alias "ismaster" (both belong to the CmdIsMaster command class). However "hello" and
+// "isMaster" are separate command classes (CmdHello vs CmdIsMaster) and do NOT alias each
+// other, so each must be listed explicitly to be exempt.
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failAllCommands: true,
+            failCommandsExcept: ["isMaster"],
+            threadName: threadName,
+        },
+    }),
+);
+assert.commandWorked(testDB.runCommand({isMaster: 1}));
+assert.commandWorked(testDB.runCommand({ismaster: 1}));
+assert.commandFailedWithCode(testDB.runCommand({hello: 1}), ErrorCodes.NotWritablePrimary);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 
-    // failCommandsExcept without failAllCommands has no effect (the allowlist only modifies
-    // failAllCommands; failCommands denylist remains authoritative).
-    assert.commandWorked(
-        adminDB.runCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                errorCode: ErrorCodes.NotWritablePrimary,
-                failCommands: ["ping"],
-                failCommandsExcept: ["ping"],
-                threadName: threadName,
-            },
-        }),
-    );
-    assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
+// failCommandsExcept without failAllCommands has no effect (the allowlist only modifies
+// failAllCommands; failCommands denylist remains authoritative).
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["ping"],
+            failCommandsExcept: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 
-    assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
-}
+assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
