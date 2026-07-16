@@ -692,7 +692,7 @@ def dbtest_program(
     """Return a Process instance that starts a dbtest with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_DBTEST_EXECUTABLE)
-    args = [executable]
+    args = [executable, "--enhancedReporter=false"]
 
     if suites is not None:
         args.extend(suites)
