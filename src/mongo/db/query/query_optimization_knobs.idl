@@ -1205,7 +1205,6 @@ server_parameters:
             query_knob:
                 wire_name: samplingBySequentialScan
 
-    # TODO SERVER-127563: Revisit the naming and organization of CBR-related knobs
     internalQuerySamplingByStrides:
         mod_visibility: needs_replacement
         description:
