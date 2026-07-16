@@ -4,7 +4,6 @@
 #include "mongo/db/versioning_protocol/stale_exception.h"
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -17,8 +16,7 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
     const ShardId kShardId("SHARD_ID");
 
-    StaleConfigInfo info(
-        kNss, ShardVersion::UNTRACKED(), ShardVersion::UNTRACKED(), ShardRef(kShardId));
+    StaleConfigInfo info(kNss, ShardVersion::UNTRACKED(), ShardVersion::UNTRACKED(), kShardId);
 
     // Serialize
     BSONObjBuilder bob;
@@ -31,26 +29,7 @@ TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
     ASSERT_EQUALS(deserializedInfo->getNss(), kNss);
     ASSERT_EQUALS(deserializedInfo->getVersionReceived(), ShardVersion::UNTRACKED());
     ASSERT_EQUALS(*deserializedInfo->getVersionWanted(), ShardVersion::UNTRACKED());
-    ASSERT_EQUALS(deserializedInfo->getShardRef(), ShardRef(kShardId));
-}
-
-TEST(StaleExceptionTest, StaleConfigInfoUuidSerializationTest) {
-    const UUID kShardUuid = UUID::gen();
-
-    StaleConfigInfo info(
-        kNss, ShardVersion::UNTRACKED(), ShardVersion::UNTRACKED(), ShardRef(kShardUuid));
-
-    BSONObjBuilder bob;
-    info.serialize(&bob);
-
-    auto deserializedInfo =
-        std::static_pointer_cast<const StaleConfigInfo>(StaleConfigInfo::parse(bob.obj()));
-
-    ASSERT_EQUALS(deserializedInfo->getNss(), kNss);
-    ASSERT_EQUALS(deserializedInfo->getVersionReceived(), ShardVersion::UNTRACKED());
-    ASSERT_EQUALS(*deserializedInfo->getVersionWanted(), ShardVersion::UNTRACKED());
-    ASSERT(deserializedInfo->getShardRef().isUUID());
-    ASSERT_EQUALS(deserializedInfo->getShardRef().getUUID(), kShardUuid);
+    ASSERT_EQUALS(deserializedInfo->getShardId(), kShardId);
 }
 
 TEST(StaleExceptionTest, StaleEpochInfoSerializationTest) {

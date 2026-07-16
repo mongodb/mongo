@@ -122,7 +122,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
             uassert(StaleConfigInfo(nss,
                                     cri.getCollectionVersion() /* receivedVersion */,
                                     ShardVersion::UNTRACKED() /* wantedVersion */,
-                                    ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+                                    ShardingState::get(opCtx)->shardId()),
                     str::stream() << "Collection " << nss.toStringForErrorMsg()
                                   << " is not sharded",
                     cri.isSharded());

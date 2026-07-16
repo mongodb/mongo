@@ -273,7 +273,7 @@ void maybeThrowStaleConfigOnNoopWriteFailure(OperationContext* opCtx,
     uasserted(StaleConfigInfo(nss,
                               ShardVersionFactory::make(chunkVersion),
                               boost::none /* wantedVersion */,
-                              ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+                              ShardingState::get(opCtx)->shardId()),
               str::stream() << "Could not advance configTime to resolve an incomparable shard "
                                "version for "
                             << nss.toStringForErrorMsg()
@@ -1176,7 +1176,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                                                               ? *chunkVersionReceived
                                                               : ChunkVersion::IGNORED()),
                                 boost::none /* wantedVersion */,
-                                ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+                                ShardingState::get(opCtx)->shardId()),
                 str::stream() << "Exhausted maximum number (" << maxNoProgressAttempts
                               << ") of consecutive no-progress authoritative collection metadata "
                                  "recovery attempts for "

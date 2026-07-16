@@ -28,13 +28,12 @@ void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     if (_wanted)
         _wanted->serialize("vWanted", bob);
 
-    // Note that this is serialized as shardId for backwards compatibility for parsing.
-    _shardRef.serialize("shardId", bob);
+    bob->append("shardId", _shardId.toString());
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
-    uassert(ErrorCodes::NoSuchKey, "The shardId field is missing", obj.hasField("shardId"));
-    auto shardRef = ShardRef::parse(obj["shardId"]);
+    auto shardId = obj["shardId"].String();
+    uassert(ErrorCodes::NoSuchKey, "The shardId field is missing", !shardId.empty());
 
     return std::make_shared<StaleConfigInfo>(
         NamespaceStringUtil::deserialize(
@@ -45,7 +44,7 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
                 return boost::make_optional(ShardVersion::parse(vWantedElem));
             return boost::optional<ShardVersion>();
         }(),
-        shardRef);
+        ShardId(std::move(shardId)));
 }
 
 void StaleEpochInfo::serialize(BSONObjBuilder* bob) const {

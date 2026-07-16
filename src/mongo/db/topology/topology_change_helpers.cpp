@@ -1745,7 +1745,7 @@ void addShardInTransaction(OperationContext* opCtx,
                            [&](const DatabaseName& dbName) {
                                return DatabaseType(
                                           dbName,
-                                          newShard.getHandle().toShardRef(opCtx),
+                                          ShardRef(newShard.getName()),
                                           DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
                                    .toBSON();
                            });
@@ -1760,10 +1760,9 @@ void addShardInTransaction(OperationContext* opCtx,
                            databasesInNewShard.end(),
                            std::back_inserter(placementEntries),
                            [&](const DatabaseName& dbName) {
-                               return NamespacePlacementType(
-                                          NamespaceString(dbName),
-                                          newShard.getTopologyTime(),
-                                          {newShard.getHandle().toShardRef(opCtx)})
+                               return NamespacePlacementType(NamespaceString(dbName),
+                                                             newShard.getTopologyTime(),
+                                                             {ShardRef(newShard.getName())})
                                    .toBSON();
                            });
             write_ops::InsertCommandRequest insertPlacementEntries(
@@ -1775,7 +1774,7 @@ void addShardInTransaction(OperationContext* opCtx,
         if (insertPlacementHistoryInitMetadata) {
             auto insertRequest =
                 ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-                    newShard.getTopologyTime(), {newShard.getHandle().toShardRef(opCtx)});
+                    newShard.getTopologyTime(), {ShardRef(newShard.getName())});
             auto insertResponse = txnClient.runCRUDOpSync(insertRequest, {});
             uassertStatusOK(insertResponse.toStatus());
         }

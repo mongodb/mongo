@@ -1270,34 +1270,7 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CheckCriticalSectionMetric
     ASSERT_EQ(metrics["totalTimeWaiting"].safeNumberLong(), 0);
 }
 
-class CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader
-    : public CollectionShardingRuntimeTestWithMockedLoader,
-      public testing::WithParamInterface<bool> {
-protected:
-    void setUp() override {
-        _featureFlagScope.emplace("featureFlagUniqueShardIdentifiers", GetParam());
-        CollectionShardingRuntimeTestWithMockedLoader::setUp();
-    }
-
-    void tearDown() override {
-        CollectionShardingRuntimeTestWithMockedLoader::tearDown();
-        _featureFlagScope.reset();
-    }
-
-private:
-    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
-};
-
-INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,
-                         CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
-                         testing::Bool(),
-                         [](const testing::TestParamInfo<bool>& info) {
-                             return info.param ? "WithUniqueShardIdentifiers"
-                                               : "WithoutUniqueShardIdentifiers";
-                         });
-
-TEST_P(CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
-       CriticalSectionMetricsReportWaiters) {
+TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsReportWaiters) {
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
         // Enter the critical section.
@@ -1328,7 +1301,7 @@ TEST_P(CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
             ASSERT_EQ(kNss, exInfo->getNss());
             ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
             ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
+            ASSERT_EQ(kMyShardName, exInfo->getShardId());
             const auto& signal = exInfo->getCriticalSectionSignal();
             sleepmillis(10);
             auto metrics = getStatistics();

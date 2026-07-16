@@ -25,7 +25,7 @@ void ChunkOperationShardingCoordinatorMixin::_checkSetAllowChunkOperations(
         StaleConfigInfo(nss,
                         ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
                         boost::none /* wantedVersion */,
-                        ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+                        ShardingState::get(opCtx)->shardId()),
         str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
         optMetadata);
 

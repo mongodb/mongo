@@ -239,14 +239,14 @@ TEST_F(ShardRoleLoopTest, handleStaleConfigException) {
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {2, 0})),
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "shard is stale"};
 
     const Status staleConfigShardUnknownMetadataStatus{
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
                         boost::none,
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "shard does not know its version"};
 
     const Status staleConfigShardCriticalSectionActiveStatus{
@@ -254,7 +254,7 @@ TEST_F(ShardRoleLoopTest, handleStaleConfigException) {
             kTestNss,
             ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
             boost::none,
-            ShardRef(kTestShardId),
+            kTestShardId,
             CriticalSectionSignal{SemiFuture<void>::makeReady().share(),
                                   CriticalSectionSignal::CriticalSectionType::Collection}),
         "shard critical section active"};
@@ -263,7 +263,7 @@ TEST_F(ShardRoleLoopTest, handleStaleConfigException) {
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {2, 0})),
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "router is stale"};
 
     // Shard is stale.
@@ -303,7 +303,7 @@ TEST_F(ShardRoleLoopTest, handleStaleConfigExceptionNonComparableVersions) {
                             ShardVersion shardWantedVersionAfterRecovery,
                             bool expectShardRetry) {
         const Status staleConfigUncomparableVersionsStatus{
-            StaleConfigInfo(kTestNss, routerVersion, shardWantedVersion, ShardRef(kTestShardId)),
+            StaleConfigInfo(kTestNss, routerVersion, shardWantedVersion, kTestShardId),
             "version mismatch, but versions not totally ordered."};
 
         _staleShardExceptionHandlerMock->_handleStaleShardVersionExceptionRet =
@@ -499,21 +499,21 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigBecauseShardIsStale) {
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration2, {1, 0})),
                         boost::none,
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "shard has unknown collection metadata"});
 
     testFn(Status{
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration2, {1, 0})),
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "shard's known coll generation is older than the one in the request"});
 
     testFn(Status{
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {2, 0})),
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "shard's known placement version is older than the one in the request"});
 
     testFn(
@@ -521,7 +521,7 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigBecauseShardIsStale) {
                    kTestNss,
                    ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {2, 0})),
                    ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
-                   ShardRef(kTestShardId),
+                   kTestShardId,
                    CriticalSectionSignal{SemiFuture<void>::makeReady().share(),
                                          CriticalSectionSignal::CriticalSectionType::Collection}),
                "critical section active"});
@@ -548,14 +548,14 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigBecauseRouterIsStale) {
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration2, {1, 0})),
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "router's known coll generation is older than the one in the request"});
 
     testFn(Status{
         StaleConfigInfo(kTestNss,
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
                         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {2, 0})),
-                        ShardRef(kTestShardId)),
+                        kTestShardId),
         "shard's known placement version is older than the one in the request"});
 }
 
@@ -565,9 +565,9 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigNonComparable_RouterActuallySta
         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0}));
 
     std::queue<Status> statuses;
-    statuses.push({Status{
-        StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), shardedSV, ShardRef(kTestShardId)),
-        "non comparable"}});
+    statuses.push(
+        {Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), shardedSV, kTestShardId),
+                "non comparable"}});
     _staleShardExceptionHandlerMock->_handleStaleShardVersionExceptionRet =
         shardedSV.placementVersion();
     MockFn fn(statuses);
@@ -584,9 +584,9 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigNonComparable_ShardActuallyStal
         ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0}));
 
     std::queue<Status> statuses;
-    statuses.push({Status{
-        StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), shardedSV, ShardRef(kTestShardId)),
-        "non comparable"}});
+    statuses.push(
+        {Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), shardedSV, kTestShardId),
+                "non comparable"}});
     statuses.push(
         Status::OK());  // After refresh, the shard is not stale anymore so the fn succeeds.
     _staleShardExceptionHandlerMock->_handleStaleShardVersionExceptionRet =
@@ -643,9 +643,8 @@ TEST_F(ShardRoleLoopTest, LoopExhaustRetryAttempts) {
                                         boost::none),
                   "shard is stale"});
 
-    testFn(Status{
-        StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, ShardRef(kTestShardId)),
-        "shard is stale"});
+    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, kTestShardId),
+                  "shard is stale"});
 
     _catalogCacheMock->setCollectionReturnValue(
         kTestNss,
@@ -674,9 +673,8 @@ TEST_F(ShardRoleLoopTest, LoopFnDoesNotRetryWhenLocksHeldHigherUp) {
                                         DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                         boost::none),
                   "stale db reason"});
-    testFn(Status{
-        StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, ShardRef(kTestShardId)),
-        "unknown collection metadata"});
+    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, kTestShardId),
+                  "unknown collection metadata"});
     testFn(
         Status{ShardCannotRefreshDueToLocksHeldInfo(kTestNss), "cannot refresh due to locks held"});
 }
@@ -700,9 +698,8 @@ TEST_F(ShardRoleLoopTest, LoopFnDoesNotRetryWhenInDbDirectClient) {
                                         DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                         boost::none),
                   "stale db reason"});
-    testFn(Status{
-        StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, ShardRef(kTestShardId)),
-        "unknown collection metadata"});
+    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, kTestShardId),
+                  "unknown collection metadata"});
     testFn(
         Status{ShardCannotRefreshDueToLocksHeldInfo(kTestNss), "cannot refresh due to locks held"});
 }
