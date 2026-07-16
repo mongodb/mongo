@@ -516,7 +516,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     /* Update the reference and discard the page. */
     if (__wt_ref_is_root(ref))
         __wt_ref_out(session, ref);
-    else if ((evict_clean && !F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY)) || tree_dead)
+    else if ((evict_clean && !__wt_btree_stays_in_memory(S2BT(session))) || tree_dead)
         /*
          * Pages that belong to dead trees never write back to disk and can't support page splits.
          */
@@ -640,7 +640,7 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     }
 
     if (!instantiated && !tree_dead && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) &&
-      !F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY) && !closing)
+      !__wt_btree_stays_in_memory(S2BT(session)) && !closing)
         __evict_page_victim_cache(session, ref);
 
     /*
@@ -1090,7 +1090,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * Clean pages can't be evicted from in memory btrees. This should be uncommon - we don't add
      * clean pages to the queue.
      */
-    if (F_ISSET(btree, WT_BTREE_IN_MEMORY) && !modified && !closing)
+    if (__wt_btree_stays_in_memory(btree) && !modified && !closing)
         return (__wt_set_return(session, EBUSY));
 
     /* Check if the page can be evicted. */
@@ -1247,8 +1247,8 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
      */
     else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(btree->dhandle))
         ;
-    /* Always do update restore for in-memory btrees. */
-    else if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+    /* Always do update restore for in-memory btrees, and for btrees still awaiting publication. */
+    else if (__wt_btree_stays_in_memory(btree))
         LF_SET(WT_REC_IN_MEMORY | WT_REC_SCRUB);
     /* For data store leaf pages, write the history to history store except for metadata. */
     else if (!WT_IS_METADATA(btree->dhandle) && !WT_IS_DISAGG_META(btree->dhandle)) {
@@ -1322,7 +1322,7 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
          * being processed. Therefore, we use snapshot API that doesn't publish shared IDs to the
          * outside world.
          */
-        if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && !F_ISSET(btree, WT_BTREE_IN_MEMORY)) {
+        if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && !__wt_btree_stays_in_memory(btree)) {
             uint64_t btree_ckpt_gen, ckpt_gen;
             /*
              * If precise checkpoint is configured, only evict the updates that visible to the

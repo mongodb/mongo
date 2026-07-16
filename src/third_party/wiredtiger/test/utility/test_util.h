@@ -83,7 +83,7 @@ extern "C" {
     ",force_error=%" PRIu64 ",cache_size_mb=%" PRIu64 ",verbose=%" PRIu32 "))"
 #define TESTUTIL_ENV_CONFIG_KEY_PROVIDER_EXT                        \
     ",\"%s/ext/test/key_provider/libwiredtiger_key_provider.so\"=(" \
-    "early_load=true,config=(key_expires=60,verbose=-1))"
+    "early_load=true,config=(version=%d,key_expires=60,verbose=-1))"
 #define TESTUTIL_ENV_CONFIG_TIERED               \
     ",tiered_storage=(bucket=%s"                 \
     ",bucket_prefix=%s,local_retention=%" PRIu32 \
@@ -164,6 +164,11 @@ typedef struct {
     uint64_t tiered_flush_interval_us; /* Microseconds between flush_tier calls */
     uint64_t tiered_flush_next_us;     /* Next tiered flush in epoch microseconds */
 
+/* Key provider modes for the disagg.key_provider configuration. */
+#define DISAGG_KEY_PROVIDER_OFF 0
+#define DISAGG_KEY_PROVIDER_PULL 1
+#define DISAGG_KEY_PROVIDER_PUSH 2
+
     /* Fields used for testing disaggregated storage. */
     struct {
         /*
@@ -173,7 +178,7 @@ typedef struct {
          * setup.
          */
         bool is_enabled;          /* Uses disaggregated storage */
-        bool key_provider;        /* Uses key provider testing module for disaggregated storage */
+        uint32_t key_provider;    /* Key provider mode: see DISAGG_KEY_PROVIDER_* */
         bool internal_page_delta; /* Use internal page deltas */
         bool leaf_page_delta;     /* Use leaf page deltas */
 

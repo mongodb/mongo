@@ -590,6 +590,10 @@ create_database(const char *home, WT_CONNECTION **connp)
 
     testutil_checkfmt(wiredtiger_open(home, &event_handler, config, &conn), "%s", home);
 
+    /* Leader: seed an initial key before the create-time close checkpoint. */
+    if (g.disagg_leader)
+        disagg_key_push_initial(conn);
+
     *connp = conn;
 }
 

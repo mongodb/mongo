@@ -169,6 +169,10 @@ class test_layered_schema13(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
         conn_follow, session_follow = self.open_follower()
 
+        # Make sure the follower has a stable epoch set, so that it knows to treat new tables as
+        # unpublished.
+        self.set_stable_epoch(10, conn_follow)
+
         session_follow.create(self.uri, self.table_config)
         session_follow.close()
 

@@ -181,7 +181,7 @@ parse_and_set_disagg_opt(TEST_OPTS *opts)
 {
     TESTUTIL_DISAGG_INIT(opts,
       /* is_enabled           */ true,
-      /* key_provider         */ true,
+      /* key_provider         */ DISAGG_KEY_PROVIDER_PULL,
       /* internal_page_delta  */ true,
       /* leaf_page_delta      */ true,
       /* mode                 */ "leader",

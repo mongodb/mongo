@@ -1759,7 +1759,7 @@ variables:
       - func: "compile wiredtiger"
       - func: "format test script"
         vars:
-          format_test_script_args: -t 180 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch runs.timer=5:10
+          format_test_script_args: -t 120 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch runs.timer=5:10
           num_jobs: 1 # FIXME-WT-16134 PALite cannot run multiple jobs. PALI will address this.
       - func: "format test disagg"
         vars:
@@ -1774,7 +1774,7 @@ variables:
       - func: "compile wiredtiger"
       - func: "format test script"
         vars:
-          format_test_script_args: -t 180 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
+          format_test_script_args: -t 120 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
           num_jobs: 1 # FIXME-WT-16134 PALite cannot run multiple jobs. PALI will address this.
       - func: "format test disagg"
         vars:
@@ -2495,6 +2495,16 @@ tasks:
             set -o verbose
 
             ./smoke_lazyfs.sh
+
+  - name: csuite-schema-disagg-abort
+    tags: ["pull_request"]
+    depends_on: *s-all-dep
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "make check directory"
+        vars:
+          directory: test/csuite/schema_disagg_abort
 
   - name: csuite-wt12015-backup-corruption-test
     tags: ["pull_request"]

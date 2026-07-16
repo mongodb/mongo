@@ -70,7 +70,9 @@ class test_verbose05(test_verbose_base):
             # the number of progress messages we expect to see
             checkpoint_pages_upper_bound = stat_cursor[stat.conn.checkpoint_pages_reconciled][2]
 
-        output = self.readStdout(checkpoint_pages_upper_bound * 100)
+        # Leave headroom beyond the page-progress messages for the fixed-size checkpoint
+        # prepare/snapshot messages that always precede them.
+        output = self.readStdout(checkpoint_pages_upper_bound * 100 + 2000)
         progress_pattern = re.compile(
             r'WT_VERB_CHECKPOINT_PROGRESS.*Checkpoint has been running for \d+ seconds, wrote \d+' \
             r' pages \(\d+ MB\), walked \d+ pages and checkpointed \d+ files')
@@ -79,5 +81,9 @@ class test_verbose05(test_verbose_base):
         self.assertLess(log_count, upper_limit, "Too many progress logs emitted: {}".format(log_count))
         lower_limit = max(1, math.log(checkpoint_pages_upper_bound, 10))
         self.assertGreater(log_count, lower_limit, "Less than expected progress logs emitted")
+        # Checkpoint prepare always logs a final progress message, and closing the connection
+        # runs its own checkpoint; ignore that expected output, which isn't what this test checks.
+        self.ignoreStdoutPattern(
+            r'WT_VERB_CHECKPOINT_PROGRESS.*(Checkpoint (prepare )?ran|saving checkpoint snapshot)')
         self.cleanStdout()
         self.conn.reconfigure('verbose=[]')

@@ -36,6 +36,7 @@ static void config_checkpoint(void);
 static void config_checksum(TABLE *);
 static void config_compact(void);
 static void config_compression(TABLE *, const char *);
+static void config_disagg_key_provider(void);
 static void config_disagg_storage(void);
 static void config_encryption(void);
 static bool config_explicit(TABLE *, const char *);
@@ -493,6 +494,7 @@ config_run(void)
     /* Order can be important, don't shuffle without careful consideration. */
     config_tiered_storage();                         /* Tiered storage */
     config_disagg_storage();                         /* Disaggregated storage */
+    config_disagg_key_provider();                    /* Disaggregated key provider */
     config_transaction();                            /* Transactions */
     config_backup_incr();                            /* Incremental backup */
     config_prefetch();                               /* Prefetch */
@@ -1501,6 +1503,29 @@ config_disagg_storage(void)
 
     /*  Tiered storage is not supported with disagg */
     config_single(NULL, "tiered_storage.storage_source=off", true);
+}
+
+/*
+ * config_disagg_key_provider --
+ *     Disaggregated key provider mode configuration (0=off, 1=pull, 2=push).
+ */
+static void
+config_disagg_key_provider(void)
+{
+    if (!g.disagg_storage_config) {
+        config_single(NULL, "disagg.key_provider=0", false);
+        return;
+    }
+
+    if (!config_explicit(NULL, "disagg.key_provider")) {
+        uint32_t r = mmrand(&g.extra_rnd, 1, 10);
+        if (r <= 5)
+            config_single(NULL, "disagg.key_provider=2", false); /* 50% push */
+        else if (r <= 7)
+            config_single(NULL, "disagg.key_provider=1", false); /* 20% pull */
+        else
+            config_single(NULL, "disagg.key_provider=0", false); /* 30% off */
+    }
 }
 
 /*

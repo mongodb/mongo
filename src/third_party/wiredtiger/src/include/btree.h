@@ -186,6 +186,9 @@ struct __wt_btree {
     /* For an ingest btree, an upper bound on the durable timestamp of any update it holds. */
     wt_shared wt_timestamp_t max_ingest_write_ts;
 
+    /* For an unpublished btree, the smallest durable timestamp of any update it holds. */
+    wt_shared wt_timestamp_t min_unpublished_durable_ts;
+
 #define WT_SPLIT_DEEPEN_MIN_CHILD_DEF (10 * WT_THOUSAND)
     u_int split_deepen_min_child; /* Minimum entries to deepen tree */
 #define WT_SPLIT_DEEPEN_PER_CHILD_DEF 100
@@ -365,6 +368,15 @@ struct __wt_btree {
 #define WT_BTREE_VERIFY 0x1000000u          /* Handle is for verify */
                                             /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
+
+/*
+ * Atomic flags, use F_*_ATOMIC_32. Unlike the flags above, we expect to set and clear these flags
+ * concurrently without locking the btree.
+ */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_BTREE_AWAITS_PUBLISH 0x1u /* An unpublished btree, which will be published later */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    wt_shared uint32_t flags_atomic;
 };
 
 /* Flags that make a btree handle special (not for normal use). */
@@ -448,3 +460,17 @@ struct __wti_disk_leaf_merge_state {
     uint8_t *cell_ptr;
     uint32_t entries;
 };
+
+/*
+ * __wt_btree_stays_in_memory --
+ *     Return whether a btree must be kept in memory, i.e. no page may be written to disk. This is
+ *     true for an in-memory configured btree, and for a disaggregated btree that is still awaiting
+ *     publication: such a btree behaves as if in-memory until the flag is cleared, after which it
+ *     is written out and checkpointed normally.
+ */
+static WT_INLINE bool
+__wt_btree_stays_in_memory(WT_BTREE *btree)
+{
+    return (
+      F_ISSET(btree, WT_BTREE_IN_MEMORY) || F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH));
+}

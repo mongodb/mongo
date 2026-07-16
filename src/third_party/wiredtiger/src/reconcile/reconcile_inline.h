@@ -537,7 +537,7 @@ __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT
      * or no benefit.
      */
     if (!WT_TIME_WINDOW_HAS_PREPARE(tw) &&
-      (!F_ISSET(btree, WT_BTREE_IN_MEMORY) || !F_ISSET(btree, WT_BTREE_LOGGED))) {
+      (!__wt_btree_stays_in_memory(btree) || !F_ISSET(btree, WT_BTREE_LOGGED))) {
         /*
          * Check if the start of the time window is globally visible, and if so remove unnecessary
          * values.

@@ -534,30 +534,8 @@ err:
 static int
 __disagg_shared_metadata_op(WT_SESSION_IMPL *session, WT_DISAGG_METADATA_OP *entry)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(md_key);
     WT_DECL_RET;
-    WT_DISAGG_METADATA_OP *queue_entry;
-
-    conn = S2C(session);
-
-    /*
-     * For UPDATE operations, verify that the table's CREATE will be applied at or before the schema
-     * epoch of the UPDATE, if it has not been applied yet. If a CREATE entry is still in the queue
-     * with a schema epoch ahead of this UPDATE operation's schema epoch (including
-     * WT_SCHEMA_EPOCH_UNPUBLISHED = WT_TS_MAX), the table will not be visible to followers before
-     * the update. Having stable data in an unpublished table is an API contract violation, which
-     * requires that a table must be published before the checkpoint that includes its data.
-     */
-    if (entry->metadata_op == WT_SHARED_METADATA_UPDATE) {
-        WT_ASSERT_SPINLOCK_OWNED(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
-        TAILQ_FOREACH (queue_entry, &conn->disaggregated_storage.shared_metadata_qh, q)
-            if (queue_entry->metadata_op == WT_SHARED_METADATA_CREATE &&
-              queue_entry->schema_epoch > entry->schema_epoch &&
-              strcmp(queue_entry->table_name, entry->table_name) == 0)
-                WT_RET_MSG(session, EINVAL, "Stable data checkpointed for unpublished table \"%s\"",
-                  entry->table_name);
-    }
 
     WT_ERR(__wt_scr_alloc(session, 0, &md_key));
     WT_ERR(__wt_buf_fmt(session, md_key, "colgroup:%s", entry->table_name));

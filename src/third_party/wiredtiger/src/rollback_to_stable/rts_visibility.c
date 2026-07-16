@@ -112,7 +112,7 @@ __wti_rts_visibility_page_needs_abort(
      *    - The on page address max durable timestamp.
      *    - The off page address max durable timestamp.
      */
-    if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY)) {
+    if (__wt_btree_stays_in_memory(S2BT(session))) {
         tag = "in-memory";
         result = true;
     } else if (mod != NULL && mod->rec_result == WT_PM_REC_REPLACE) {

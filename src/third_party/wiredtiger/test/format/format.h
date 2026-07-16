@@ -105,6 +105,9 @@
 
 #define MIN_TIMESTAMP 2 /* Minimum timestamp */
 
+/* Capacity of the static push-mode key rotation history. */
+#define KEY_PUSH_HISTORY_MAX WT_THOUSAND
+
 #include "format_config.h"
 extern CONFIG configuration_list[];
 
@@ -341,6 +344,9 @@ typedef struct {
     DISAGG_MULTI_DB_HASH *disagg_multi_db_hash; /* Leader and follower database hash */
     int disagg_multi_sync_socket;               /* Socket for leader-follower sync */
 
+    wt_timestamp_t key_push_history[KEY_PUSH_HISTORY_MAX]; /* Push-mode key rotation: timestamps */
+    size_t key_push_count; /* Number of pushed timestamps recorded */
+
     bool column_store_config;           /* At least one column-store table configured */
     bool disagg_storage_config;         /* If disaggregated storage is configured */
     bool multi_table_config;            /* If configuring multiple tables */
@@ -469,6 +475,11 @@ WT_THREAD_RET backup(void *);
 WT_THREAD_RET checkpoint(void *);
 WT_THREAD_RET compact(void *);
 WT_THREAD_RET follower(void *);
+WT_THREAD_RET disagg_key_rotation(void *);
+void disagg_key_push_initial(WT_CONNECTION *);
+void disagg_key_history_clear(void);
+void disagg_key_validate_after_checkpoint(WT_SESSION *);
+int follower_fetch_full_metadata(WT_SESSION *, WT_PAGE_LOG *, const WT_ITEM *, WT_ITEM *);
 WT_THREAD_RET hs_cursor(void *);
 WT_THREAD_RET import(void *);
 WT_THREAD_RET random_kv(void *);

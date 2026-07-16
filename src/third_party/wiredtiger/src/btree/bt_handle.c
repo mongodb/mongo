@@ -522,6 +522,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     WT_DECL_RET;
     int64_t maj_version, min_version;
     const char **cfg;
+    bool awaits_publish;
 
     btree = S2BT(session);
     cfg = btree->dhandle->cfg;
@@ -598,6 +599,42 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     }
 
     /*
+     * Detect if the btree is disaggregated. FIXME-WT-14721: the file extension check should be
+     * replaced with something more robust.
+     */
+    if (WT_URI_IS_INGEST(btree->dhandle->name))
+        /* Flag the ingest btree as participating in automatic garbage collection */
+        F_SET(btree, WT_BTREE_GARBAGE_COLLECT);
+    else {
+        WT_RET(__wt_config_gets(session, cfg, "block_manager", &cval));
+        if (WT_URI_IS_STABLE(btree->dhandle->name) || WT_CONFIG_LIT_MATCH("disagg", cval)) {
+            F_SET(btree, WT_BTREE_DISAGGREGATED);
+
+            WT_RET(__btree_setup_page_log(session, btree));
+
+            /* A page log service and a storage source cannot both be enabled. */
+            WT_ASSERT(session, btree->page_log == NULL || btree->bstorage == NULL);
+        }
+    }
+
+    /*
+     * Check if we expect the btree to be published in the future, which happens if (1) the btree is
+     * newly created, (2) it is disaggregated, and (3) the disaggregated stable schema epoch is set.
+     * Ignore the "system" tables, such as the shared history store and the shared metadata table.
+     *
+     * If we use schema epochs in disaggregated storage, the btree starts in memory, so that we
+     * cannot write any pages until the table is published - not even an empty root page.
+     */
+    awaits_publish = ckpt->raw.size == 0 && F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
+      !WT_IS_URI_HS(btree->dhandle->name) && !WT_IS_URI_METADATA(btree->dhandle->name) &&
+      (__wt_get_stable_disaggregated_schema_epoch(session) != WT_SCHEMA_EPOCH_NONE);
+
+    if (awaits_publish)
+        F_SET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH);
+    else
+        F_CLR_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH);
+
+    /*
      * This option allows the tree to be reconciled by eviction. But we only replace the disk image
      * in memory to reduce the memory footprint and nothing is written to disk and no data is moved
      * to the history store. Checkpoint will also skip this tree.
@@ -643,25 +680,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
         F_SET(btree, WT_BTREE_NO_CHECKPOINT);
     else
         F_CLR(btree, WT_BTREE_NO_CHECKPOINT);
-
-    /*
-     * Detect if the btree is disaggregated. FIXME-WT-14721: the file extension check should be
-     * replaced with something more robust.
-     */
-    if (WT_URI_IS_INGEST(btree->dhandle->name))
-        /* Flag the ingest btree as participating in automatic garbage collection */
-        F_SET(btree, WT_BTREE_GARBAGE_COLLECT);
-    else {
-        WT_RET(__wt_config_gets(session, cfg, "block_manager", &cval));
-        if (WT_URI_IS_STABLE(btree->dhandle->name) || WT_CONFIG_LIT_MATCH("disagg", cval)) {
-            F_SET(btree, WT_BTREE_DISAGGREGATED);
-
-            WT_RET(__btree_setup_page_log(session, btree));
-
-            /* A page log service and a storage source cannot both be enabled. */
-            WT_ASSERT(session, btree->page_log == NULL || btree->bstorage == NULL);
-        }
-    }
 
     /* Page sizes */
     WT_RET(__btree_page_sizes(session));

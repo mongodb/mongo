@@ -449,6 +449,7 @@ SCons
 SDK
 SIGABRT
 SIGBUS
+SIGKILL
 SIGSEGV
 SIMD
 SLS
@@ -511,6 +512,7 @@ TieredConfigMixin
 Timespec
 Tput
 TryCV
+Tunables
 TypeError
 Typedefs
 UBSAN
@@ -912,6 +914,7 @@ dequeued
 der
 deref
 dereference
+dereferences
 dereferencing
 desc
 designator
@@ -931,6 +934,7 @@ difftime
 dir
 directio
 dirlist
+dirs
 dirstore
 disagg
 disaggregated
@@ -1226,6 +1230,7 @@ jsondump
 k'th
 kB
 kbits
+kek
 key'd
 keycmp
 keyedness
@@ -1479,6 +1484,7 @@ overcount
 oversized
 ovfl
 ownp
+pP
 pR
 pT
 packv

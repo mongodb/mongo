@@ -32,7 +32,7 @@
  * follower_fetch_full_metadata --
  *     Fetch the full checkpoint metadata from the page log.
  */
-static int
+int
 follower_fetch_full_metadata(WT_SESSION *session, WT_PAGE_LOG *page_log,
   const WT_ITEM *checkpoint_metadata, WT_ITEM *full_metadata)
 {

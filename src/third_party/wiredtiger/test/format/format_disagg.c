@@ -225,18 +225,17 @@ disagg_is_mode_switch(void)
 
 /*
  * stepdown_workers_drained --
- *     Return true when WT's all_durable timestamp has reached step_down_ts, meaning every
- *     transaction at or below step_down_ts has completed (committed or rolled back). Using
- *     all_durable is stronger than checking per-thread commit_ts: it guarantees no gaps remain in
- *     the commit history at or below the step-down boundary.
+ *     Return true once every worker's most recent commit is past step_down_ts, proving no worker
+ *     can commit at or below the boundary again. Only commits the workers have completed count:
+ *     querying WT's all_durable would miss a timestamp a worker has allocated but not yet given to
+ *     timestamp_transaction, letting the drain finish early and that commit land behind stable.
+ *     Timer-based runs are required (enforced at configuration): a worker that exhausts its
+ *     operation count stops committing and would stall the drain.
  */
 static bool
 stepdown_workers_drained(wt_timestamp_t step_down_ts)
 {
-    wt_timestamp_t all_durable;
-
-    testutil_check(timestamp_query("get=all_durable", &all_durable));
-    return (all_durable >= step_down_ts);
+    return (timestamp_minimum_committed() >= step_down_ts);
 }
 
 /*
@@ -352,11 +351,21 @@ disagg_stepdown_thread(void *arg)
 void
 disagg_switch_roles(void)
 {
+    SAP sap;
+    WT_SESSION *session;
+
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(g.wts_conn, &sap, NULL, NULL, &session);
+
     /* Perform step-up or step-down. */
     g.disagg_leader = !g.disagg_leader;
 
     if (!g.disagg_leader) {
         /* Stepping down: [leader -> follower]. */
+
+        /* Reset the leader-side KEK push history. */
+        disagg_key_history_clear();
+
         if (GV(DISAGG_STEPDOWN_ASYNC)) {
             /*
              * The async step-down thread stopped the checkpoint/timestamp threads and drained
@@ -365,13 +374,8 @@ disagg_switch_roles(void)
              * so they belong in this synchronous path (after operations() returns) rather than the
              * background thread, to avoid cache pressure from concurrent worker activity.
              */
-            SAP sap;
-            WT_SESSION *session;
             wt_timestamp_t stable_after;
             char config[128];
-
-            memset(&sap, 0, sizeof(sap));
-            wt_wrap_open_session(g.wts_conn, &sap, NULL, NULL, &session);
 
             /*
              * Pin stable at exactly step_down_ts now that all operations have finished. Use
@@ -382,6 +386,7 @@ disagg_switch_roles(void)
             lock_writelock(session, &g.prepare_commit_lock);
             testutil_check(g.wts_conn->set_timestamp(g.wts_conn, config));
             lock_writeunlock(session, &g.prepare_commit_lock);
+            g.stable_timestamp = g.stepdown_ts;
 
             /*
              * Step-down checkpoint: stable is pinned at step_down_ts, so the checkpoint captures
@@ -397,37 +402,33 @@ disagg_switch_roles(void)
             track("[stepdown] checkpoint verified", 0ULL);
 
             g.stepdown_ts = WT_TS_NONE;
-            wt_wrap_close_session(session);
 
             track("[role change] leader -> follower (async completion)", 0ULL);
             testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=follower)"));
             follower_read_latest_checkpoint();
         } else {
-            /*
-             * FIXME-WT-15763: graceful sync step-down is not yet fully supported, so reopen.
-             */
             track("[role change] leader -> follower (sync)", 0ULL);
-            wts_reopen();
+            timestamp_sync_threads_commit_ts();
+            timestamp_once(session, false, false);
+            testutil_check(session->checkpoint(session, NULL));
+            testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=follower)"));
             follower_read_latest_checkpoint();
             wts_prepare_discover(g.wts_conn);
         }
     } else {
         /* Stepping up: [follower -> leader] */
-        SAP sap;
-        WT_SESSION *session;
-
         track("[role change] follower -> leader", 0ULL);
         testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=leader)"));
 
-        memset(&sap, 0, sizeof(sap));
-        wt_wrap_open_session(g.wts_conn, &sap, NULL, NULL, &session);
         /* Advance timestamps to cover all in-memory commits from the follower phase. */
         timestamp_sync_threads_commit_ts();
         timestamp_once(session, false, false);
         testutil_check(session->checkpoint(session, NULL));
-        wt_wrap_close_session(session);
-    }
 
+        /* Verify that this step-up checkpoint persisted the correct KEK. */
+        disagg_key_validate_after_checkpoint(session);
+    }
+    wt_wrap_close_session(session);
     /* After every switch, verify the contents of each table */
     wts_verify_mirrors(g.wts_conn, NULL, NULL);
 }

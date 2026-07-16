@@ -1805,7 +1805,7 @@ retry:
     }
 
     /* If there's no visible update in the update chain or ondisk, check the history store file. */
-    if (!F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY) &&
+    if (!__wt_btree_stays_in_memory(S2BT(session)) &&
       F_ISSET_ATOMIC_32(S2C(session), WT_CONN_HS_OPEN) &&
       !F_ISSET(session->dhandle, WT_DHANDLE_HS) && !WT_IS_METADATA(session->dhandle)) {
         /*

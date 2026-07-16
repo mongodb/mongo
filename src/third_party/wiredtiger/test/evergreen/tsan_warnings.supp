@@ -99,6 +99,7 @@ race:timestamp_minimum_committed
 race:snap_op_init
 race:snap_track
 race:snap_verify_callback
+race:disagg_key_rotation
 
 # FIXME-WT-16783: Statistic logging flags have concurrent accesses
 race:__statlog_config

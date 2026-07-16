@@ -3071,21 +3071,16 @@ __clayered_close(WT_CURSOR *cursor)
 err:
     if (ret == 0) {
         /*
-         * If releasing the cursor fails in any way, it will be left in a state that allows it to be
-         * normally closed.
+         * Close constituent cursors before caching the layered cursor. A cursor-cache sweep
+         * triggered during constituent close could otherwise find the layered cursor already in the
+         * cache with constituent pointers still set, and double-close them.
          */
+        WT_TRET(__clayered_close_cursors(clayered));
+
         bool released = false;
-        ret = __wti_cursor_cache_release(session, cursor, &released);
-
-        if (released) {
-            /*
-             * If the cursor has been cached, try to cache the constituent cursors by evoking a
-             * cursor close.
-             */
-            WT_TRET(__clayered_close_cursors(clayered));
-
+        WT_TRET(__wti_cursor_cache_release(session, cursor, &released));
+        if (released)
             goto done;
-        }
     }
     /* For cached cursors, free any extra buffers retained now. */
     __wt_cursor_free_cached_memory(cursor);

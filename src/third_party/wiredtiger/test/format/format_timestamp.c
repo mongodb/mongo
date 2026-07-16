@@ -73,6 +73,14 @@ timestamp_sync_threads_commit_ts(void)
     TINFO **tlp;
     wt_timestamp_t ts;
 
+    /*
+     * Workers committed up to g.timestamp (atomic post-increment, so g.timestamp equals the last
+     * used value). timestamp_minimum_committed() returns g.timestamp-1, which would leave the final
+     * committed timestamp uncovered by stable. Bump by one so stable lands exactly at the last used
+     * timestamp.
+     */
+    __wt_atomic_add_uint64_v(&g.timestamp, 1);
+
     if (tinfo_list == NULL)
         return;
 

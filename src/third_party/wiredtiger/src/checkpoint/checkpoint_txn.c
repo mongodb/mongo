@@ -404,6 +404,56 @@ __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __checkpoint_disagg_maybe_publish --
+ *     If a disaggregated btree is awaiting publication, check whether the checkpoint's stable
+ *     schema epoch covers the table's CREATE entry. If so, clear WT_BTREE_AWAITS_PUBLISH so the
+ *     btree is written out and included in this checkpoint. If not, verify the btree has no stable
+ *     updates: having stable data in an unpublished table violates the API contract that a table
+ *     must be published before the checkpoint that includes its data.
+ */
+static int
+__checkpoint_disagg_maybe_publish(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DATA_HANDLE *dhandle;
+    WT_DISAGG_METADATA_OP *entry;
+    wt_timestamp_t ckpt_epoch, ckpt_timestamp;
+    bool published;
+
+    conn = S2C(session);
+    dhandle = session->dhandle;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+    WT_ASSERT(session, dhandle->handle == btree);
+
+    ckpt_epoch = __wt_atomic_load_uint64_acquire(&conn->txn_global.checkpoint_disagg_schema_epoch);
+    if (ckpt_epoch == WT_SCHEMA_EPOCH_NONE)
+        return (0);
+
+    published = false;
+    __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+    TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q)
+        if (entry->metadata_op == WT_SHARED_METADATA_CREATE &&
+          strcmp(entry->stable_uri, dhandle->name) == 0 && entry->schema_epoch <= ckpt_epoch) {
+            published = true;
+            break;
+        }
+    __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
+    if (!published) {
+        ckpt_timestamp = conn->txn_global.checkpoint_timestamp;
+        if (btree->min_unpublished_durable_ts != WT_TS_NONE &&
+          btree->min_unpublished_durable_ts <= ckpt_timestamp)
+            WT_RET_MSG(session, EINVAL, "stable data checkpointed for unpublished table \"%s\"",
+              dhandle->name);
+    }
+
+    if (published)
+        F_CLR_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH);
+    return (0);
+}
+
+/*
  * __wt_checkpoint_get_handles --
  *     Get a list of handles to flush.
  */
@@ -433,9 +483,18 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 
     btree = S2BT(session);
 
+    /*
+     * A disaggregated btree carries WT_BTREE_AWAITS_PUBLISH when it was created while a stable
+     * schema epoch was set and is waiting to be published. Clear the flag if the btree is ready to
+     * participate in this checkpoint; its pages are dirty (nothing was written while it awaited
+     * publication) and are reconciled and written normally once the flag is clear.
+     */
+    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH))
+        WT_RET(__checkpoint_disagg_maybe_publish(session, btree));
+
     /* Skip the history store file as it is checkpointed manually later. */
     if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT | WT_BTREE_IN_MEMORY | WT_BTREE_READONLY) ||
-      WT_IS_HS(btree->dhandle))
+      F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH) || WT_IS_HS(btree->dhandle))
         return (0);
 
     if (__wt_conn_is_disagg(session)) {
@@ -838,8 +897,7 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Output a verbose progress message for long running checkpoints. */
-    if (conn->ckpt.progress.msg_count > 0)
-        __checkpoint_progress(session, true);
+    __checkpoint_progress(session, true);
 
     /* Compute end-to-end timer statistics for checkpoint. */
     __wt_epoch(session, &stop);
@@ -1743,9 +1801,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_ERR(__checkpoint_db_debug_crash_points(session, cfg));
 
-    /* Log the final checkpoint prepare progress message if needed. */
-    if (conn->ckpt.progress.msg_count > 0)
-        __checkpoint_prepare_progress(session, true);
+    /* Log the final checkpoint prepare progress message. */
+    __checkpoint_prepare_progress(session, true);
 
     /*
      * Save the checkpoint timestamp in a temporary variable, when we release our snapshot it'll be
