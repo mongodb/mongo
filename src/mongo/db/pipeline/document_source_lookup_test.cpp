@@ -1052,6 +1052,51 @@ TEST_F(DocumentSourceLookUpTest, RejectsUserSuppliedIsHybridSearchWhenExtensions
 }
 
 TEST_F(DocumentSourceLookUpTest,
+       BansLocalForeignFieldSyntaxForHybridSearchLookupWhenExtensionsFlagOff) {
+    // With the featureFlagExtensionsInsideHybridSearch flag off, $lookup with a hybrid search
+    // subpipeline rejects localField/foreignField syntax.
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
+        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << false)});
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(getOpCtx())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << "coll" << "localField" << "x" << "foreignField" << "x"
+                                          << "pipeline" << BSONArray() << "as" << "out"
+                                          << "$_internalIsHybridSearch" << true))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        12982600);
+}
+
+TEST_F(DocumentSourceLookUpTest,
+       AllowsLocalForeignFieldSyntaxForHybridSearchLookupWhenExtensionsFlagOn) {
+    // With the featureFlagExtensionsInsideHybridSearch flag on, the localField/foreignField
+    // restriction is lifted for $lookup with a hybrid search subpipeline.
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
+        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(getOpCtx())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "coll" << "localField" << "x" << "foreignField" << "x"
+                                      << "pipeline" << BSONArray() << "as" << "out"
+                                      << "$_internalIsHybridSearch" << true))
+            .firstElement(),
+        expCtx);
+    ASSERT(lookupStage);
+}
+
+TEST_F(DocumentSourceLookUpTest,
        CreateFromStageParamsRoutesThroughLppConstructorForLocalForeignFieldView) {
     // Exercises the createFromStageParams path for $lookup:{from:view, localField, foreignField}
     // with a pre-resolved LPP (shouldParseLpp = true). This mirrors the $unionWith fix: instead of

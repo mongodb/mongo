@@ -389,6 +389,30 @@ export function assertIfVectorSearchNotAllowedInLookup(db, runPipeline, onAllowe
     onAllowed();
 }
 
+/**
+ * A $lookup with a $rankFusion/$scoreFusion subpipeline using localField/foreignField join syntax
+ * is only supported when featureFlagExtensionsInsideHybridSearch is enabled. If the flag is off,
+ * this asserts that running the pipeline is rejected with error 12982600. If the flag is on, it
+ * invokes 'onAllowed' so the caller can assert success.
+ *
+ * @param {DB} db - used to check the feature flag value.
+ * @param {Function} runPipeline - runs the aggregate command and returns its raw result, e.g.
+ *     `() => coll.runCommand("aggregate", {pipeline, cursor: {}})`.
+ * @param {Function} onAllowed - invoked with no arguments to assert success when the flag is
+ *     enabled.
+ */
+export function assertIfLocalForeignFieldNotAllowedInHybridSearchLookup(
+    db,
+    runPipeline,
+    onAllowed,
+) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "ExtensionsInsideHybridSearch")) {
+        assert.commandFailedWithCode(runPipeline(), 12982600);
+        return;
+    }
+    onAllowed();
+}
+
 export const datasets = {
     MOVIES: {id: 1, indexName: "moviesIndex"},
     RENTALS: {id: 2},
