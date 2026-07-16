@@ -2628,6 +2628,31 @@ TEST_F(OplogEntryTest, SizeMetadataSingleOpRoundTrip) {
     EXPECT_EQ(expectedSizeMetadata.getSz(), parsedSingleOpSizeMetadata->getSz());
 }
 
+TEST_F(OplogEntryTest, SizeMetadataSingleOpAbsentSzRoundTrip) {
+    SingleOpSizeMetadata expectedSizeMetadata;
+    ASSERT_FALSE(expectedSizeMetadata.getSz().has_value());
+
+    const BSONObj oplogEntryBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "i");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("wall", Date_t());
+        bob.append("o", BSON("_id" << 1));
+        bob.append("m", expectedSizeMetadata.toBSON());
+        return bob.obj();
+    }();
+
+    const auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogEntryBson));
+    const auto& parsedSizeMetadata = entry.getSizeMetadata();
+    ASSERT_TRUE(parsedSizeMetadata.has_value());
+    const auto* parsedSingleOpSizeMetadata =
+        std::get_if<SingleOpSizeMetadata>(&parsedSizeMetadata.value());
+    ASSERT_NE(parsedSingleOpSizeMetadata, nullptr);
+    EXPECT_FALSE(parsedSingleOpSizeMetadata->getSz().has_value());
+}
+
 TEST_F(OplogEntryTest, SizeMetadataMultiOpRoundTrip) {
     MultiOpSizeMetadata expectedMeta1;
     expectedMeta1.setUuid(UUID::gen());

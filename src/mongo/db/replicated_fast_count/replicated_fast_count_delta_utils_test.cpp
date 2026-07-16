@@ -336,6 +336,57 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForDelete) {
     EXPECT_EQ(sizeDelta, extractedSizeCount->size);
 }
 
+TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnInsert) {
+    SingleOpSizeMetadata metadataWithoutSz;
+    ASSERT_FALSE(metadataWithoutSz.getSz().has_value());
+    repl::OplogEntry insertOp{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kInsert,
+        .nss = _nss1,
+        .oField = BSONObj(),
+        .sizeMetadata = repl::OplogEntrySizeMetadata{metadataWithoutSz},
+        .wallClockTime = Date_t::now(),
+    }}};
+
+    // With 'sz' absent, extraction of the insert size delta must return boost::none.
+    ASSERT_TRUE(insertOp.getSizeMetadata().has_value());
+    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(insertOp), boost::none);
+}
+
+TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnUpdate) {
+    SingleOpSizeMetadata metadataWithoutSz;
+    ASSERT_FALSE(metadataWithoutSz.getSz().has_value());
+    repl::OplogEntry updateOp{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kUpdate,
+        .nss = _nss1,
+        .oField = BSONObj(),
+        .sizeMetadata = repl::OplogEntrySizeMetadata{metadataWithoutSz},
+        .wallClockTime = Date_t::now(),
+    }}};
+
+    // With 'sz' absent, extraction of the update size delta must return boost::none.
+    ASSERT_TRUE(updateOp.getSizeMetadata().has_value());
+    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(updateOp), boost::none);
+}
+
+TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnDelete) {
+    SingleOpSizeMetadata metadataWithoutSz;
+    ASSERT_FALSE(metadataWithoutSz.getSz().has_value());
+    repl::OplogEntry deleteOp{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kDelete,
+        .nss = _nss1,
+        .oField = BSONObj(),
+        .sizeMetadata = repl::OplogEntrySizeMetadata{metadataWithoutSz},
+        .wallClockTime = Date_t::now(),
+    }}};
+
+    // With 'sz' absent, extraction of the delete size delta must return boost::none.
+    ASSERT_TRUE(deleteOp.getSizeMetadata().has_value());
+    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(deleteOp), boost::none);
+}
+
 TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentFromOplogEntry) {
     // 'OpTypeEnum::kInsert' supports replicated fast count information, but none is extracted
     // because the 'm' field is absent from the oplog entry.

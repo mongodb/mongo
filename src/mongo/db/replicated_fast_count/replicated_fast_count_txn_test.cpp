@@ -525,8 +525,9 @@ protected:
         for (const auto& doc : docs) {
             auto operation = repl::DurableOplogEntry::makeInsertOperation(
                 nss, coll.uuid(), doc, doc["_id"].wrap());
-            operation.setSizeMetadata(repl::OplogEntrySizeMetadata{
-                SingleOpSizeMetadata(static_cast<int32_t>(doc.objsize()))});
+            SingleOpSizeMetadata sizeMetadata;
+            sizeMetadata.setSz(static_cast<int32_t>(doc.objsize()));
+            operation.setSizeMetadata(repl::OplogEntrySizeMetadata{sizeMetadata});
             txnParticipant.addTransactionOperation(opCtx, operation);
         }
     }

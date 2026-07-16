@@ -182,7 +182,9 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op)
     }
 
     const auto* perOpMd = std::get_if<SingleOpSizeMetadata>(&sizeMd.value());
-    if (!perOpMd) {
+    if (!perOpMd || !perOpMd->getSz()) {
+        // Return boost::none if the oplog entry has no size metadata or if the size metadata does
+        // not contain a size delta.
         return boost::none;
     }
 
@@ -214,7 +216,7 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op)
                           << ", entry opTime: " << opTimeStringForLog(op),
             op.getUuid().has_value());
 
-    return CollectionSizeCount{.size = perOpMd->getSz(), .count = computeCountDeltaForOp(opType)};
+    return CollectionSizeCount{.size = *perOpMd->getSz(), .count = computeCountDeltaForOp(opType)};
 }
 
 boost::optional<UUID> getUUIDFromOplogEntry(const repl::OplogEntry& oplogEntry) {

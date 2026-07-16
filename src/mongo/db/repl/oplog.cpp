@@ -1888,9 +1888,13 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
     // change produced by the update. A mismatch indicates data inconsistency.
     if (mode == OplogApplication::Mode::kSecondary) {
         if (const auto& sizeMeta = op.getDurableReplOperation().getSizeMetadata()) {
-            if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value())) {
+            // Perform the verification only if the oplog entry has size metadata and the size
+            // metadata contains a size delta.
+            if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value());
+                singleOpMeta && singleOpMeta->getSz().has_value()) {
+                const int oplogSz = *singleOpMeta->getSz();
                 const int actualDelta = postDocImageSize - preImageSize;
-                if (actualDelta != singleOpMeta->getSz()) {
+                if (actualDelta != oplogSz) {
                     logOplogConstraintViolation(
                         opCtx,
                         op.getNss(),
@@ -1907,11 +1911,11 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                 collPtr->ns().toStringForErrorMsg(),
                                 collPtr->uuid().toString(),
                                 rid.toString(),
-                                singleOpMeta->getSz(),
+                                oplogSz,
                                 actualDelta,
                                 op.getOpTime().toString(),
                                 redact(op.toBSONForLogging()).toString()),
-                    actualDelta == singleOpMeta->getSz());
+                    actualDelta == oplogSz);
             }
         }
     }
@@ -2070,9 +2074,11 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
     // of the deleted document. A mismatch indicates data inconsistency.
     if (mode == OplogApplication::Mode::kSecondary) {
         if (const auto& sizeMeta = op.getDurableReplOperation().getSizeMetadata()) {
-            if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value())) {
+            if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value());
+                singleOpMeta && singleOpMeta->getSz().has_value()) {
+                const int oplogSz = *singleOpMeta->getSz();
                 const int actualDelta = -preImage.value().objsize();
-                if (actualDelta != singleOpMeta->getSz()) {
+                if (actualDelta != oplogSz) {
                     logOplogConstraintViolation(
                         opCtx,
                         op.getNss(),
@@ -2089,11 +2095,11 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                 collPtr->ns().toStringForErrorMsg(),
                                 collPtr->uuid().toString(),
                                 rid.toString(),
-                                singleOpMeta->getSz(),
+                                oplogSz,
                                 actualDelta,
                                 op.getOpTime().toString(),
                                 redact(op.toBSONForLogging()).toString()),
-                    actualDelta == singleOpMeta->getSz());
+                    actualDelta == oplogSz);
             }
         }
     }

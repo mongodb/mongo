@@ -240,8 +240,11 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
     }
     const auto mObj = f.m.Obj();
     const auto szElem = mObj.getField(SingleOpSizeMetadata::kSzFieldName);
-    if (szElem.eoo() || !szElem.isNumber()) {
-        // `sz` is required and must be numeric per SingleOpSizeMetadata. Anything else is
+    if (szElem.eoo()) {
+        return 0;  // No `sz` field → no delta possible from this entry. Counted as "processed".
+    }
+    if (!szElem.isNumber()) {
+        // `sz` must be numeric per SingleOpSizeMetadata. Anything else is
         // malformed; fall through to Layer 3.
         return boost::none;
     }

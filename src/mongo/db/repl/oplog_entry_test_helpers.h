@@ -292,6 +292,18 @@ OplogEntry makeDeleteOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
                                                            const RecordId& rid,
                                                            int sizeDelta);
 
+OplogEntry makeUpdateOplogEntryWithRecordIdWithoutSz(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& documentToUpdate,
+                                                     const BSONObj& updatedDocument,
+                                                     const RecordId& rid);
+
+OplogEntry makeDeleteOplogEntryWithRecordIdWithoutSz(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const UUID& uuid,
+                                                     const BSONObj& docToDelete,
+                                                     const RecordId& rid);
+
 /*
  * Returns a collection UUID.
  */

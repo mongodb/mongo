@@ -67,6 +67,18 @@ TEST_F(SizeDeltaTestDisable, DeleteAbsentSizeMetadataIsSkippedInSecondaryMode) {
     EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
 
+TEST_F(SizeDeltaTestDisable, DeletePresentSizeMetadataWithAbsentSzIsSkippedInSecondaryMode) {
+    // A present SingleOpSizeMetadata whose sz is absent must apply without any size check.
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    auto op =
+        makeDeleteOplogEntryWithRecordIdWithoutSz(nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid);
+    ASSERT_OK(runOpSteadyState(op));
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+}
+
 TEST_F(SizeDeltaTest, DeleteWrongSizeDeltaInInitialSyncModeIsIgnored) {
     // The size check must be skipped entirely during initial sync.
     const RecordId rid(1);
@@ -137,6 +149,17 @@ TEST_F(SizeDeltaTestDisable, UpdateAbsentSizeMetadataIsSkippedInSecondaryMode) {
     insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
 
     auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 200)), rid);
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SizeDeltaTestDisable, UpdatePresentSizeMetadataWithAbsentSzIsSkippedInSecondaryMode) {
+    // A present SingleOpSizeMetadata whose sz is absent must apply without any size check.
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    auto op = makeUpdateOplogEntryWithRecordIdWithoutSz(
         nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 200)), rid);
     ASSERT_OK(runOpSteadyState(op));
 }

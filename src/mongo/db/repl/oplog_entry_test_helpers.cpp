@@ -468,6 +468,7 @@ OplogEntry makeInsertOplogEntryWithRecordId(OpTime opTime,
     return {DurableOplogEntry(builder.obj())};
 }
 
+// TODO SERVER-131416: Rename to makeUpdateOplogEntryWithSingleOpMetadataNoSz
 OplogEntry makeUpdateOplogEntryWithRecordId(OpTime opTime,
                                             const NamespaceString& nss,
                                             const BSONObj& documentToUpdate,
@@ -484,6 +485,7 @@ OplogEntry makeUpdateOplogEntryWithRecordId(OpTime opTime,
     return {DurableOplogEntry(builder.obj())};
 }
 
+// TODO SERVER-131416: Rename to makeDeleteOplogEntryWithSingleOpMetadataNoSz
 OplogEntry makeUpdateOplogEntryWithUpsert(OpTime opTime,
                                           const NamespaceString& nss,
                                           const BSONObj& documentToUpdate,
@@ -557,6 +559,35 @@ OplogEntry makeDeleteOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
     BSONObjBuilder builder;
     builder.appendElements(baseEntry.getEntry().toBSON());
     builder.append("m", BSON("sz" << sizeDelta));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeUpdateOplogEntryWithRecordIdWithoutSz(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& documentToUpdate,
+                                                     const BSONObj& updatedDocument,
+                                                     const RecordId& rid) {
+    OplogEntry baseEntry =
+        makeUpdateOplogEntryWithRecordId(opTime, nss, documentToUpdate, updatedDocument, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSONObj());
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeDeleteOplogEntryWithRecordIdWithoutSz(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const UUID& uuid,
+                                                     const BSONObj& docToDelete,
+                                                     const RecordId& rid) {
+    OplogEntry baseEntry = makeDeleteOplogEntryWithRecordId(opTime, nss, uuid, docToDelete, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSONObj());
 
     return {DurableOplogEntry(builder.obj())};
 }

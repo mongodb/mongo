@@ -61,7 +61,7 @@ protected:
 
     // Feeds an arbitrary BSON record straight to consumeRecord, bypassing the cursor + OplogEntry
     // round-trip. Used by the fast-lane tests that need to construct deliberately malformed or
-    // hand-shaped raw entries (e.g. non-string `op`, missing `sz`, custom `tid` field).
+    // hand-shaped raw entries (e.g. non-string `op`, custom `tid` field).
     OplogScanResult runAccumulatorRaw(StreamingOplogDeltaAccumulator::Options opts,
                                       const std::vector<BSONObj>& rawRecords) {
         StreamingOplogDeltaAccumulator acc(std::move(opts));
@@ -460,6 +460,42 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudIneligibleNamespace_NoDe
         runAccumulatorRaw({makeRawCrudBson(ts, "i"sv, localNss, UUID::gen(), BSON("sz" << 10))});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudPresentMAbsentSz_NoDeltasOnInsert) {
+    // On insert, SingleOpSizeMetadata without `sz` is treated as no-delta. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, /*mField=*/BSONObj())});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudPresentMAbsentSz_NoDeltasOnUpdate) {
+    // On update, SingleOpSizeMetadata without `sz` is treated as no-delta. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "u"sv, collA.nss, collA.uuid, /*mField=*/BSONObj())});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudPresentMAbsentSz_NoDeltasOnDelete) {
+    // On delete, SingleOpSizeMetadata without `sz` is treated as no-delta. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "d"sv, collA.nss, collA.uuid, /*mField=*/BSONObj())});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudNonNumericSz_FallsThroughToLayer3) {
+    // A non-numeric `sz` is malformed, so the fast lane falls back to Layer 3. Layer 3's IDL parser
+    // surfaces the error.
+    const Timestamp ts{1, 1};
+    ASSERT_THROWS(runAccumulatorRaw({makeRawCrudBson(
+                      ts, "i"sv, collA.nss, collA.uuid, BSON("sz" << "notanumber"))}),
+                  DBException);
 }
 
 // ----- Layer 2.5: tryFastApplyOps applyOps shapes -----
