@@ -50,6 +50,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -108,6 +109,9 @@ buildvariants:
   - name: snmp
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -155,6 +159,7 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -276,6 +281,10 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - amazon2-arm64-latest-large
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
   - name: vector_search
@@ -435,6 +444,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -485,6 +495,10 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns !.csrs
   - name: slow1_gen
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -530,6 +544,7 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -631,6 +646,10 @@ buildvariants:
   - name: search_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -800,6 +819,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
+  - name: save_waterfall_artifacts_binaries
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian10-64
@@ -849,6 +869,9 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian11
@@ -902,6 +925,7 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -953,6 +977,9 @@ buildvariants:
   - name: snmp
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1003,6 +1030,7 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1093,6 +1121,7 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: selinux_rhel8_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1212,6 +1241,10 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-large
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: selinux_rhel8_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1263,6 +1296,7 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1320,6 +1354,10 @@ buildvariants:
     distros:
     - rhel82-arm64-large
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
   - name: vector_search
@@ -1372,6 +1410,7 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: selinux_rhel9_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1447,6 +1486,10 @@ buildvariants:
   - name: snmp
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1498,6 +1541,7 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1555,6 +1599,10 @@ buildvariants:
     distros:
     - rhel90-arm64-large
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1610,6 +1658,7 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1659,6 +1708,9 @@ buildvariants:
     distros:
     - suse12-sp5-large
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1703,6 +1755,9 @@ buildvariants:
   - name: snmp
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1754,6 +1809,7 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1810,6 +1866,7 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1876,6 +1933,10 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .watchdog
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1926,6 +1987,9 @@ buildvariants:
   - name: .ssl
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1957,6 +2021,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: jsCore
   - name: replica_sets_jscore_passthrough
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2008,6 +2073,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2059,6 +2125,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2112,6 +2179,9 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2165,6 +2235,10 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2240,6 +2314,9 @@ buildvariants:
   - name: .ssl
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2271,6 +2348,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: jsCore
   - name: replica_sets_jscore_passthrough
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2322,6 +2400,9 @@ buildvariants:
   - name: .ssl
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2353,6 +2434,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: jsCore
   - name: replica_sets_jscore_passthrough
+  - name: save_waterfall_artifacts_binaries
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2387,6 +2469,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - windows-vsCurrent-large
+  - name: save_waterfall_artifacts_binaries_windows
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -2449,6 +2532,18 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - windows-vsCurrent-large
+  - name: save_waterfall_artifacts_binaries_windows
+  - name: save_waterfall_artifacts_cryptd
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_crypt_shared
+    depends_on:
+      - name: crypt_create_lib
+  - name: save_waterfall_artifacts_mh
+    depends_on:
+      - name: package
+      - name: jsCore
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -2512,6 +2607,10 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common !.auth
   - name: .ssl
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
   - name: push
 
 - name: macos-arm64
@@ -2542,6 +2641,10 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common !.auth
   - name: .ssl
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
   - name: push
 
 - name: enterprise-macos
@@ -2569,6 +2672,18 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: sasl
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+  - name: save_waterfall_artifacts_cryptd
+    depends_on:
+      - name: package
+  - name: save_waterfall_artifacts_crypt_shared
+    depends_on:
+      - name: crypt_create_lib
+  - name: save_waterfall_artifacts_mh
+    depends_on:
+      - name: package
   - name: push
   - name: .crypt
   - name: .publish_crypt
@@ -2600,6 +2715,21 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: sasl
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_cryptd
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_crypt_shared
+    depends_on:
+      - name: crypt_create_lib
+  - name: save_waterfall_artifacts_mh
+    depends_on:
+      - name: package
+      - name: jsCore
   - name: push
   - name: .crypt
   - name: .publish_crypt

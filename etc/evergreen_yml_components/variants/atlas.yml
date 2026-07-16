@@ -72,6 +72,10 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl

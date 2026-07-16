@@ -54,6 +54,17 @@ buildvariants:
   - name: snmp
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_cryptd
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_crypt_shared
+    depends_on:
+      - name: crypt_create_lib
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -111,6 +122,17 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_cryptd
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_crypt_shared
+    depends_on:
+      - name: crypt_create_lib
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-72-s390x
@@ -165,6 +187,17 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_cryptd
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_crypt_shared
+    depends_on:
+      - name: crypt_create_lib
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-83-s390x
@@ -212,5 +245,16 @@ buildvariants:
   - name: snmp
   - name: .crypt
   - name: .publish_crypt
+  - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_cryptd
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_crypt_shared
+    depends_on:
+      - name: crypt_create_lib
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping

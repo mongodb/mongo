@@ -1,0 +1,400 @@
+functions:
+  "upload waterfall artifact":
+    - command: s3.put
+      display_name: "upload artifact"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: ${upload_content_type}
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sig file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sig
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sig
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: application/pgp-signature
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha1 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha1
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha1
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha256 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha256
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha256
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .md5 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.md5
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.md5
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+
+  "upload waterfall msi artifact":
+    - command: s3.put
+      display_name: "upload artifact"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: ${upload_content_type}
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha1 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha1
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha1
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha256 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha256
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha256
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .md5 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.md5
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.md5
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+
+tasks:
+  - name: save_waterfall_artifacts_binaries
+    run_on: rhel8.7-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["commit"]
+    stepback: false
+    depends_on:
+      - name: package
+      - name: jsCore
+    commands:
+      - command: manifest.load
+      - func: "f_expansions_write"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "set up venv"
+
+      - command: s3.get
+        display_name: "fetch dist tarball"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.tgz
+          bucket: mciuploads
+          local_file: ./src/mongodb-${push_name}-${push_arch}-${version}.tgz
+
+      - command: s3.get
+        display_name: "fetch dist debugsymbols"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.tgz
+          bucket: mciuploads
+          local_file: ./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.tgz
+
+      - func: "log into devprod container registry"
+      - func: "f_expansions_write"
+
+      - command: subprocess.exec
+        display_name: "sign and generate checksums"
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/waterfall_gpg_sign.sh"
+            - "mongodb-${push_name}-${push_arch}-${version}.tgz"
+            - "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.tgz"
+          env:
+            GARASIGN_USERNAME: ${garasign_gpg_username_60}
+            GARASIGN_PASSWORD: ${garasign_gpg_password_60}
+            GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+
+      - func: "upload waterfall artifact"
+        vars:
+          local_file: "./src/mongodb-${push_name}-${push_arch}-${version}.tgz"
+          remote_file: "mongodb-${push_name}-${push_arch}-${version}.tgz"
+          upload_content_type: "application/gzip"
+      - func: "upload waterfall artifact"
+        vars:
+          local_file: "./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.tgz"
+          remote_file: "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.tgz"
+          upload_content_type: "application/gzip"
+
+  - name: save_waterfall_artifacts_binaries_windows
+    run_on: rhel8.7-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["commit"]
+    stepback: false
+    depends_on:
+      - name: package
+      - name: jsCore
+    commands:
+      - command: manifest.load
+      - func: "f_expansions_write"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "set up venv"
+
+      - command: s3.get
+        display_name: "fetch dist tarball"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.zip
+          bucket: mciuploads
+          local_file: ./src/mongodb-${push_name}-${push_arch}-${version}.zip
+
+      - command: s3.get
+        display_name: "fetch dist debugsymbols"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.zip
+          bucket: mciuploads
+          local_file: ./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip
+
+      - func: "fetch packages"
+
+      - func: "log into devprod container registry"
+      - func: "f_expansions_write"
+
+      - command: subprocess.exec
+        display_name: "sign and generate checksums"
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/waterfall_gpg_sign.sh"
+            - "mongodb-${push_name}-${push_arch}-${version}.zip"
+            - "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip"
+          env:
+            GARASIGN_USERNAME: ${garasign_gpg_username_60}
+            GARASIGN_PASSWORD: ${garasign_gpg_password_60}
+            GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+
+      - command: subprocess.exec
+        display_name: "sign msi"
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/waterfall_jsign_sign.sh"
+            - "./build/cached/msi/mongodb-win32-${push_arch}-windows-${version}.msi"
+            - "mongodb-${push_name}-${push_arch}-${version}-signed.msi"
+          env:
+            GARASIGN_USERNAME: ${garasign_jsign_username}
+            GARASIGN_PASSWORD: ${garasign_jsign_password}
+            GARASIGN_IMAGE: ${garasign_jsign_image_ecr}
+
+      - func: "upload waterfall artifact"
+        vars:
+          local_file: "./src/mongodb-${push_name}-${push_arch}-${version}.zip"
+          remote_file: "mongodb-${push_name}-${push_arch}-${version}.zip"
+          upload_content_type: "application/zip"
+      - func: "upload waterfall artifact"
+        vars:
+          local_file: "./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip"
+          remote_file: "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip"
+          upload_content_type: "application/zip"
+
+      - func: "upload waterfall msi artifact"
+        vars:
+          local_file: "./src/mongodb-${push_name}-${push_arch}-${version}-signed.msi"
+          remote_file: "mongodb-${push_name}-${push_arch}-${version}-signed.msi"
+          upload_content_type: "application/x-msi"
+
+  - name: save_waterfall_artifacts_cryptd
+    run_on: rhel8.7-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["commit"]
+    stepback: false
+    depends_on:
+      - name: package
+      - name: jsCore
+    commands:
+      - command: manifest.load
+      - func: "f_expansions_write"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "set up venv"
+
+      - command: s3.get
+        display_name: "fetch cryptd binary"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${mongo_cryptd}
+          bucket: mciuploads
+          local_file: "./src/mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}"
+
+      - func: "log into devprod container registry"
+      - func: "f_expansions_write"
+
+      - command: subprocess.exec
+        display_name: "sign and generate checksums"
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/waterfall_gpg_sign.sh"
+            - "mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          env:
+            GARASIGN_USERNAME: ${garasign_gpg_username_60}
+            GARASIGN_PASSWORD: ${garasign_gpg_password_60}
+            GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+
+      - func: "upload waterfall artifact"
+        vars:
+          local_file: "./src/mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          remote_file: "mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          upload_content_type: "${content_type|application/gzip}"
+
+  - name: save_waterfall_artifacts_crypt_shared
+    run_on: rhel8.7-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["commit"]
+    stepback: false
+    depends_on:
+      - name: crypt_create_lib
+      - name: jsCore
+    commands:
+      - command: manifest.load
+      - func: "f_expansions_write"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "set up venv"
+
+      - command: s3.get
+        display_name: "fetch crypt shared binary"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1-${version}.${ext|tgz}
+          bucket: mciuploads
+          local_file: ./src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${version}.${ext|tgz}
+
+      - func: "log into devprod container registry"
+      - func: "f_expansions_write"
+
+      - command: subprocess.exec
+        display_name: "sign and generate checksums"
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/waterfall_gpg_sign.sh"
+            - "mongo_crypt_shared_v1-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          env:
+            GARASIGN_USERNAME: ${garasign_gpg_username_60}
+            GARASIGN_PASSWORD: ${garasign_gpg_password_60}
+            GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+
+      - func: "upload waterfall artifact"
+        vars:
+          local_file: "./src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          remote_file: mongo_crypt_shared_v1-${push_name}-${push_arch}-${version}.${ext|tgz}
+          upload_content_type: "${content_type|application/gzip}"
+
+  - name: save_waterfall_artifacts_mh
+    run_on: rhel8.7-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["commit"]
+    stepback: false
+    depends_on:
+      - name: package
+      - name: jsCore
+    commands:
+      - command: manifest.load
+      - func: "f_expansions_write"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "set up venv"
+
+      - command: s3.get
+        display_name: "fetch mh binary"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${mh_archive}
+          bucket: mciuploads
+          local_file: "./src/mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
+
+      - func: "log into devprod container registry"
+      - func: "f_expansions_write"
+
+      - command: subprocess.exec
+        display_name: "sign and generate checksums"
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/waterfall_gpg_sign.sh"
+            - "mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          env:
+            GARASIGN_USERNAME: ${garasign_gpg_username_60}
+            GARASIGN_PASSWORD: ${garasign_gpg_password_60}
+            GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+
+      - func: "upload waterfall artifact"
+        vars:
+          local_file: "./src/mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          remote_file: "mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          upload_content_type: "${content_type|application/gzip}"
