@@ -338,6 +338,17 @@ TEST_F(IdentGenerationTest, InvalidIdents) {
     ASSERT_FALSE(ident::isValidIdent("db/index/:a"));
     // dbname containing characters that should have been escaped
     ASSERT_FALSE(ident::isValidIdent("db[name]/index/a"));
+
+    // Format 3 ("$dbName/$identType-$uniqueTag") must validate the dbName segment identically to
+    // Format 4. Path traversal components in the dbName must be rejected (SERVER path traversal).
+    ASSERT_FALSE(ident::isValidIdent("../collection-abcdef0123456789abcdef0123456789"));
+    ASSERT_FALSE(ident::isValidIdent("../index-0"));
+    ASSERT_FALSE(ident::isValidIdent("./collection-0"));
+    ASSERT_FALSE(ident::isValidIdent("../internal-0"));
+    // dbname in Format 3 containing characters that should have been escaped
+    ASSERT_FALSE(ident::isValidIdent("db[name]/collection-0"));
+    // Nested path traversal in the Format 3 dbName segment
+    ASSERT_FALSE(ident::isValidIdent("db/../collection-0"));
 }
 
 TEST_F(IdentGenerationTest, IdentDirectoryRejectsInvalidIdents) {
