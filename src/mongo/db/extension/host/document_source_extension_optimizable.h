@@ -350,6 +350,11 @@ public:
             return !_properties.getRequiresInputDocSource();
         }
 
+        // Extension stages are unsupported on timeseries collections.
+        Constraints constraints() const override {
+            return {.canRunOnTimeseries = false};
+        }
+
         bool requiresAuthzChecks() const override {
             // If the stage specifies a non-empty set of required privileges, mandatory auth checks
             // are required. Otherwise, it is safe to opt out of auth checks.
