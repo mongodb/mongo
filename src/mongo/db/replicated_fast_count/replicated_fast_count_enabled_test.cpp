@@ -125,8 +125,14 @@ TEST(ReplicatedFastCountEligibleNsTest, SystemProfileNotEligible) {
     EXPECT_FALSE(isReplicatedFastCountEligible(systemProfileNss));
 }
 
-TEST(ReplicatedFastCountEligibleNsTest, OplogEligible) {
+TEST(ReplicatedFastCountEligibleNsTest, OplogEligibleWhenTruncationFFOn) {
+    unittest::ServerParameterGuard ffTruncation("featureFlagSizeBasedOplogTruncationForDisagg",
+                                                true);
     EXPECT_TRUE(isReplicatedFastCountEligible(NamespaceString::kRsOplogNamespace));
+}
+
+TEST(ReplicatedFastCountEligibleNsTest, OplogIneligibleWhenTruncationFFOff) {
+    EXPECT_FALSE(isReplicatedFastCountEligible(NamespaceString::kRsOplogNamespace));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenBothFlagsOff) {
@@ -248,6 +254,8 @@ TEST_P(ShouldReadFromReplicatedFastCountTestWithParams, ShouldReadFromReplicated
     const auto& p = GetParam();
 
     unittest::ServerParameterGuard flag("featureFlagReplicatedFastCount", p.featureFlagOn);
+    unittest::ServerParameterGuard ffTruncation("featureFlagSizeBasedOplogTruncationForDisagg",
+                                                true);
 
     for (const auto& [dbName, collName, expected] : p.testCases) {
         const auto nss = NamespaceString::createNamespaceString_forTest(dbName, collName);

@@ -26,7 +26,7 @@ bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
 }
 
 bool isReplicatedFastCountEligible(const NamespaceString& nss) {
-    if (nss.isOplog()) {
+    if (nss.isOplog() && gFeatureFlagSizeBasedOplogTruncationForDisagg.isEnabled()) {
         return true;
     }
     if (nss.isLocalDB() || nss.isImplicitlyReplicated() || nss.isServerConfigurationCollection() ||

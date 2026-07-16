@@ -517,6 +517,8 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTracksOplogSizeCount) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard truncationFeatureFlag(
+        "featureFlagSizeBasedOplogTruncationForDisagg", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));

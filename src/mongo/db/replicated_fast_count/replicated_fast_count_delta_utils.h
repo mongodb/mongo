@@ -5,6 +5,7 @@
 
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -73,7 +74,7 @@ void mergeDeltas(const SizeCountDeltas& src, SizeCountDeltas& dst);
  * the two functions must agree on every input outside the store namespaces.
  */
 inline bool isFastCountEligibleNonStore(const NamespaceString& nss) {
-    if (nss.isOplog()) {
+    if (nss.isOplog() && gFeatureFlagSizeBasedOplogTruncationForDisagg.isEnabled()) {
         return true;
     }
     return !nss.isLocalDB() && !nss.isImplicitlyReplicated() &&
