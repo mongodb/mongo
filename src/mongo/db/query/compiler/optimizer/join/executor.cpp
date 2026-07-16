@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/optimizer/join/executor.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -43,6 +44,18 @@ MONGO_FAIL_POINT_DEFINE(sleepWhileJoinOptimizing);
 MONGO_FAIL_POINT_DEFINE(hangAfterJoinModelConstruction);
 
 namespace {
+/**
+ * Number of times a usable plan was found in the join plan cache. Exposed in serverStatus as
+ * 'metrics.query.planCache.join.hits'.
+ */
+auto& joinPlanCacheHits = *MetricBuilder<Counter64>{"query.planCache.join.hits"};
+
+/**
+ * Number of times no usable plan was found in the join plan cache (either absent or stale).
+ * Exposed in serverStatus as 'metrics.query.planCache.join.misses'.
+ */
+auto& joinPlanCacheMisses = *MetricBuilder<Counter64>{"query.planCache.join.misses"};
+
 PlanTreeShape getPlanTreeShape(JoinPlanTreeShapeEnum shape) {
     switch (shape) {
         case JoinPlanTreeShapeEnum::kLeftDeep:
@@ -435,9 +448,11 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
         auto exec = checkPlanCacheForPlan(opCtx, *cacheKey, mca, model, yieldPolicy);
         if (exec) {
+            joinPlanCacheHits.increment(1);
             return JoinReorderedExecutorResult{.executor = std::move(exec),
                                                .model = std::move(model)};
         }
+        joinPlanCacheMisses.increment(1);
         LOGV2_DEBUG(11083907, 5, "Join plan cache miss, running optimization");
     }
 
