@@ -65,6 +65,12 @@ std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op)
         auto [lbTag, lbVal] = tryLowerBound();
         auto [ubTag, ubVal] = tryUpperBound();
 
+        // NaN is an outlier that compares false against everything, so a bound of NaN breaks the
+        // monotonicity assumption below. Fall back to processing the whole block in that case.
+        if (isNaN(lbTag, lbVal) || isNaN(ubTag, ubVal)) {
+            return nullptr;
+        }
+
         if (lbTag == ubTag && lbTag != value::TypeTags::Nothing) {
             auto minOwned = op.processSingle(lbTag, lbVal);
             auto maxOwned = op.processSingle(ubTag, ubVal);

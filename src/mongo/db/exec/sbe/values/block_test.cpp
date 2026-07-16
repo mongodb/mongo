@@ -1024,6 +1024,39 @@ TEST_F(ValueBlockTest, TestBlockMapFast) {
     ASSERT_EQ(block->mapMonotonicFastPath(testOp5), nullptr);
 }
 
+// A monotonic "less than 50" comparison, mirroring the block operation generated for a
+// {$lt: 50} predicate on a measurement field.
+static const auto testOpLtFifty =
+    value::makeColumnOp<ColumnOpType::kMonotonic>([](TypeTags tag, Value val) {
+        return value::genericLt(tag, val, TypeTags::NumberDouble, value::bitcastFrom<double>(50.0));
+    });
+
+// NaN sorts as a block's lower bound but compares false against everything, so the monotonic map
+// fast path must not fire when a bound is NaN. Otherwise a matching value in the block (e.g. one
+// less than the target that sorts above NaN) would be incorrectly dropped.
+TEST_F(ValueBlockTest, TestBlockMapFastNaNBound) {
+    auto block = std::make_unique<TestBlock>();
+
+    block->push_back(TypeTags::NumberDouble, value::bitcastFrom<double>(1.0));
+    block->push_back(TypeTags::NumberDouble,
+                     value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
+    block->push_back(TypeTags::NumberDouble, value::bitcastFrom<double>(100.0));
+
+    // The block reports NaN as its lower bound (NaN sorts smallest) and 100 as its upper bound.
+    block->setMin(TypeTags::NumberDouble,
+                  value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
+    block->setMax(TypeTags::NumberDouble, value::bitcastFrom<double>(100.0));
+
+    // The fast path must bail out because a bound is NaN, leaving the actual per-value comparison
+    // to the general map path.
+    ASSERT_EQ(block->mapMonotonicFastPath(testOpLtFifty), nullptr);
+
+    // The full map correctly matches only the value that is less than 50.
+    auto outBlock = block->map(testOpLtFifty);
+    auto output = blockToBsonArr(*outBlock);
+    ASSERT_BSONOBJ_EQ(output, fromjson("{result: [true, false, false]}"));
+}
+
 // Tests for getApproximateSize() on ValueBlock and CellBlock implementations.
 // Each test asserts the result is in [lower, upper] where lower is the raw payload
 // size and upper is a generous multiple that accounts for per-element and struct overhead.

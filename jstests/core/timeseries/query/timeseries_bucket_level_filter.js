@@ -178,3 +178,32 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
         });
     }
 })();
+
+// Test that a bucket containing a NaN measurement isn't incorrectly dropped by the bucket-level
+// filter. NaN sorts as the smallest value, so it becomes the bucket's control.min; a bucket-level
+// filter must not use that to conclude the whole bucket fails a range predicate (SERVER-126494).
+(function testWithNaNMeasurement() {
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "ts", metaField: "m"}}),
+    );
+
+    const docs = [
+        {ts: ISODate("2024-01-01T00:00:00Z"), m: 1, v: 1},
+        {ts: ISODate("2024-01-01T00:01:00Z"), m: 1, v: NaN},
+        {ts: ISODate("2024-01-01T00:02:00Z"), m: 1, v: 100},
+    ];
+    assert.commandWorked(coll.insertMany(docs));
+
+    // The $match on 'v' followed by an inclusion $project exercises the block-processing path,
+    // where a matching measurement (v: 1) must still be returned even though the bucket also
+    // contains NaN.
+    const pipeline = [{$match: {v: {$lt: 50}}}, {$project: {_id: 0, v: 1}}];
+    assertArrayEq({
+        expected: [{v: 1}],
+        actual: coll.aggregate(pipeline).toArray(),
+        extraErrorMsg: ` result of $match on a field with a NaN measurement. Explain: ${tojson(
+            coll.explain().aggregate(pipeline),
+        )}`,
+    });
+})();
