@@ -163,8 +163,10 @@ export function getAllChangeStreamEvents(
     while (true) {
         assert(!csCursor.isClosed(), "change stream cursor was closed unexpectedly");
 
+        let idle = true;
         while (csCursor.hasNext()) {
             result.push(csCursor.next());
+            idle = false;
         }
         const cursorTime = decodeResumeToken(csCursor.getResumeToken()).clusterTime;
         if (bsonWoCompare(cursorTime, endTime) >= 0) {
@@ -172,9 +174,9 @@ export function getAllChangeStreamEvents(
             break;
         }
 
-        // Add a little delay after the initial getMore requests, so that we do not pound that
-        // server with requests in a tight loop.
-        if (iterations++ > 3) {
+        if (idle && iterations++ >= 5) {
+            // Add a little delay after the initial getMore requests, so that we do not pound that
+            // server with requests in a tight loop.
             sleep(10);
         }
     }
