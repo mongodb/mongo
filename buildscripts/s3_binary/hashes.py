@@ -37,6 +37,6 @@ S3_SHA256_HASHES = {
     "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-manylinux2014-s390x": "d018b9a755293ec16289e55b37c4b92d4a51e73fbe7aa3414c1809901e7bde04",
     "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-macos-universal2": "eb65e7234928e13db25fe75fdcafd798871f248a9763b49821eab6cd469b2832",
     "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-windows-x86_64.exe": "bc3a0a1771ad0b44e5319e0edd0dd8bb8544b6f8ca80a6caa2273f41efe1117b",
-    "https://mongot-extension.s3.amazonaws.com/release/mongot-extension-1.0.4-amazon2023-x86_64.tgz": "c91f22d1d8c3497066fdf06cfade92b3c089c13273887ee1806782b7da4bb0fd",
-    "https://mongot-extension.s3.amazonaws.com/release/mongot-extension-1.0.4-amazon2023-aarch64.tgz": "99072648c18d8ba4dd9dc0da1c17c4bc30d4306bffd455e081743cf0c8f0abf2",
+    "https://mongot-extension.s3.amazonaws.com/release/mongot-extension-1.0.7-amazon2023-x86_64.tgz": "f5672efb22b5087cf3d210700cc208d753d40afae9457f187766902e4258ad0a",
+    "https://mongot-extension.s3.amazonaws.com/release/mongot-extension-1.0.7-amazon2023-aarch64.tgz": "8276374b386bcea293249a4d29c7e6b25f7f86f3b4086fb3ecf05af4028c04ba",
 }
