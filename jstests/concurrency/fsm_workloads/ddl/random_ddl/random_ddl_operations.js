@@ -16,6 +16,7 @@ export const $config = (function () {
         dbCount: 2,
         collPrefix: "sharded_coll_",
         collCount: 2,
+        originalImplicitRetryDdlOnConflictWithMigration: null,
         getRandomDb: function (db) {
             return db.getSiblingDB(this.dbPrefix + Random.randInt(this.dbCount));
         },
@@ -207,6 +208,12 @@ export const $config = (function () {
     };
 
     let setup = function (db, collName, cluster) {
+        // Balancer-based suites inject background hook to automatically handle errors caused
+        // by multiple incompatible DDL operations on each request.
+        // Such a behavior may cause this workload to starve, so it gets disabled.
+        this.originalImplicitRetryDdlOnConflictWithMigration =
+            TestData.implicitRetryDdlOnConflictWithMigration;
+        TestData.implicitRetryDdlOnConflictWithMigration = false;
         for (let i = 0; i < this.dbCount; i++) {
             const dbName = this.dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);
@@ -215,6 +222,8 @@ export const $config = (function () {
     };
 
     let teardown = function (db, collName, cluster) {
+        TestData.implicitRetryDdlOnConflictWithMigration =
+            this.originalImplicitRetryDdlOnConflictWithMigration;
         const configDB = db.getSiblingDB("config");
         // All the DDLs executed within the context of this workload should have completed, unblocking migrations on each targeted namespace.
         // Allow some grace time for operations issued by background hooks (or the balancer) that might still be inflight.

@@ -44,7 +44,12 @@ export const $config = (function () {
     // Keep data less then 64 (internalInsertMaxBatchSize) to avoid insertMany to yield while
     // inserting. This might cause an rename to execute during the insertMany and post-assertions
     // checks to fail.
-    let data = {numChunks: 20, documentsPerChunk: 3, CRUDMutex: "CRUDMutex"};
+    let data = {
+        originalImplicitRetryDdlOnConflictWithMigration: null,
+        numChunks: 20,
+        documentsPerChunk: 3,
+        CRUDMutex: "CRUDMutex",
+    };
 
     /**
      * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
@@ -416,12 +421,20 @@ export const $config = (function () {
     };
 
     let setup = function (db, collName, cluster) {
+        // Balancer-based suites inject background hook to automatically handle errors caused by multiple incompatible DDL operations on each request.
+        // Such a behavior may cause this workload to starve, so it gets disabled.
+        this.originalImplicitRetryDdlOnConflictWithMigration =
+            TestData.implicitRetryDdlOnConflictWithMigration;
+        TestData.implicitRetryDdlOnConflictWithMigration = false;
         for (let tid = 0; tid < this.threadCount; ++tid) {
             db[data.CRUDMutex].insert({tid: tid, mutex: 0});
         }
     };
 
-    let teardown = function (db, collName, cluster) {};
+    let teardown = function (db, collName, cluster) {
+        TestData.implicitRetryDdlOnConflictWithMigration =
+            this.originalImplicitRetryDdlOnConflictWithMigration;
+    };
 
     return {
         threadCount: 12,
