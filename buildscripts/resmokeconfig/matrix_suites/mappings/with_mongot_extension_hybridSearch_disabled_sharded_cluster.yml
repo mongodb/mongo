@@ -5,6 +5,7 @@ description: >-
   featureFlagExtensionsInsideHybridSearch.
 excludes:
   - "with_mongot_extension.exclude_incompatible_tests"
+  - "with_mongot_extension.exclude_sharded_incompatible_tests"
   - "with_mongot_extension.exclude_search_extension_incompatible"
 overrides:
   - "with_mongot_extension.load_extension"
