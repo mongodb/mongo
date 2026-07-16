@@ -64,16 +64,6 @@
       # subpipeline fails on a sharded cluster with CursorNotFound (error 43) on the remote shard.
       - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition_graph_lookup.js
 
-# Tests that fail only when featureFlagExtensionsInsideHybridSearch is off while the search
-# extensions are loaded. Stacked on top of exclude_incompatible_tests by the hybridSearch_disabled
-# family only.
-- name: exclude_extensions_inside_hybrid_search_disabled_incompatible
-  value:
-    exclude_files:
-      # TODO SERVER-131479: Remove this exclusion once the test skips its $vectorSearch-in-$lookup
-      # cases when featureFlagExtensionsInsideHybridSearch is off (Location51047).
-      - jstests/with_mongot/e2e/hybridSearch/union_with_vector_search.js
-
 - name: extension_flags_hybridSearch_disabled
   value:
     executor:
