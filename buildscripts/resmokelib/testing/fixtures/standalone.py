@@ -115,6 +115,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         # therefore all other nodes have been assigned ports, which allows mongot to connect to a given mongod or
         # mongos. The MongoTFixture is then launched by the MongoDFixture in setup().
         self.mongot = None
+        # When true, launch_mongot() spawns mongot but does not block on await_ready(); the parent
+        # fixture is responsible for calling await_mongot_ready() after replSetInitiate.
+        self.defer_mongot_await_ready = False
 
         # Process load_extensions: ["*"] means all, otherwise load named extensions.
         _load_exts = normalize_load_extensions(load_extensions)
@@ -218,7 +221,14 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         mongot.setup()
         self.mongot = mongot
-        self.mongot.await_ready()
+        # Parent fixtures defer this to after replSetInitiate.
+        if not self.defer_mongot_await_ready:
+            self.mongot.await_ready()
+
+    def await_mongot_ready(self):
+        """Await mongot readiness. Called by parent fixtures after the replica set is initiated."""
+        if self.mongot is not None:
+            self.mongot.await_ready()
 
     def setup(self, temporary_flags={}):
         """Set up the mongod."""
