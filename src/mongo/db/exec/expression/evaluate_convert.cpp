@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
@@ -1391,7 +1392,7 @@ public:
     JsonStringGenerator(ExpressionContext* expCtx, size_t maxSize)
         : _expCtx(expCtx), _maxSize(maxSize) {}
 
-    void writeValue(fmt::memory_buffer& buffer, const Value& val) const {
+    void writeValue(fmt::memory_buffer& buffer, const Value& val) {
         switch (val.getType()) {
             // The below types have a JSON counterpart.
             case BSONType::eoo:
@@ -1470,7 +1471,9 @@ private:
         }
     }
 
-    void writeObject(fmt::memory_buffer& buffer, const Document& doc) const {
+    void writeObject(fmt::memory_buffer& buffer, const Document& doc) {
+        ++_depth;
+        uassertDepthLimit();
         buffer.push_back('{');
         bool first{true};
         for (auto it = doc.fieldIterator(); it.more();) {
@@ -1484,9 +1487,12 @@ private:
             writeValue(buffer, value);
         }
         buffer.push_back('}');
+        --_depth;
     }
 
-    void writeArray(fmt::memory_buffer& buffer, const std::vector<Value>& arr) const {
+    void writeArray(fmt::memory_buffer& buffer, const std::vector<Value>& arr) {
+        ++_depth;
+        uassertDepthLimit();
         buffer.push_back('[');
         for (size_t i = 0; i < arr.size(); i++) {
             if (i > 0) {
@@ -1496,6 +1502,15 @@ private:
             writeValue(buffer, arr[i]);
         }
         buffer.push_back(']');
+        --_depth;
+    }
+
+    void uassertDepthLimit() const {
+        static const auto depthLimit = 2 * BSONDepth::getMaxAllowableDepth();
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream() << "Result exceeds maximum depth limit of "
+                              << BSONDepth::getMaxAllowableDepth() << " levels of nesting",
+                _depth <= depthLimit);
     }
 
     /**
@@ -1525,6 +1540,7 @@ private:
 
     ExpressionContext* const _expCtx;
     const size_t _maxSize;
+    size_t _depth = 0;
 };
 
 std::string stringifyObjectOrArray(ExpressionContext* const expCtx, Value val) {
