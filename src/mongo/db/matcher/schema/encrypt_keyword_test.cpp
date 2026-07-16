@@ -33,6 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/schema/assert_serializes_to.h"
+#include "mongo/db/matcher/schema/json_pointer.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
@@ -263,6 +264,16 @@ TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadPointer) {
                                                                             << "invalidPointer"))));
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), 51065);
+}
+
+TEST(JSONSchemaParserEncryptTest, FailsToParseWithPointerExceedingMaxDepth) {
+    std::string pointer = "/a";
+    for (size_t i = 1; i <= JSONPointer::kMaxJSONPointerDepth + 10; ++i) {
+        pointer += "/a";
+    }
+    auto schema = BSON("encryptMetadata" << BSON("keyId" << pointer));
+    auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_EQ(result.getStatus().code(), 51067);
 }
 
 TEST(JSONSchemaParserEncryptTest, TopLevelEncryptMetadataValidatedCorrectly) {

@@ -76,6 +76,9 @@ JSONPointer::JSONPointer(std::string ptr) {
         key = ptr.substr(startOfKeyIndex, nextSlashIndex - startOfKeyIndex);
         key = replaceEscapeChars(std::move(key));
         _parsed.push_back(std::move(key));
+        uassert(51067,
+                str::stream() << "JSONPointer exceeds maximum depth of " << kMaxJSONPointerDepth,
+                _parsed.size() <= kMaxJSONPointerDepth);
         startOfKeyIndex = nextSlashIndex + 1;
     }
     // Parse the last key.
@@ -83,6 +86,9 @@ JSONPointer::JSONPointer(std::string ptr) {
     key = ptr.substr(startOfKeyIndex, nextSlashIndex - startOfKeyIndex);
     key = replaceEscapeChars(std::move(key));
     _parsed.push_back(std::move(key));
+    uassert(51069,
+            str::stream() << "JSONPointer exceeds maximum depth of " << kMaxJSONPointerDepth,
+            _parsed.size() <= kMaxJSONPointerDepth);
 
     _original = ptr;
 }
