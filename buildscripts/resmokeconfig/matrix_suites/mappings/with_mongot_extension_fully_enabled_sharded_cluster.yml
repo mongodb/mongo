@@ -1,13 +1,13 @@
-base_suite: mongot_e2e_single_shard
+base_suite: mongot_e2e_sharded_cluster
 description: >-
-  Runs the with_mongot e2e suite against a one-shard cluster to test the real
-  mongot-extension, with every extension feature flag enabled except
-  featureFlagVectorSearchExtension.
+  Runs the with_mongot e2e suite against a sharded cluster (not implicitly sharded) to test the real
+  mongot-extension, with every extension feature flag enabled.
 excludes:
   - "with_mongot_extension.exclude_incompatible_tests"
   - "with_mongot_extension.exclude_search_extension_incompatible"
+  - "with_mongot_extension.exclude_extensions_inside_hybrid_search_incompatible"
   - "with_mongot_extension.exclude_search_extension_inside_hybrid_search_incompatible"
   - "with_mongot_extension.exclude_sharded_incompatible_tests"
 overrides:
   - "with_mongot_extension.load_extension"
-  - "with_mongot_extension.extension_flags_vectorSearch_disabled_sharded"
+  - "with_mongot_extension.extension_flags_fully_enabled_sharded"

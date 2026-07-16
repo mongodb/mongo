@@ -8,7 +8,7 @@
 #   - with_mongot_extension_hybridSearch_disabled_*
 #   - with_mongot_extension_search_disabled_*
 #   - with_mongot_extension_vectorSearch_disabled_*
-#   - with_mongot_extension_fully_enabled_* (TODO SERVER-131369)
+#   - with_mongot_extension_fully_enabled_*
 
 # Tests the mongot-extension cannot run.
 - name: exclude_incompatible_tests
@@ -200,3 +200,38 @@
           set_parameters: *vectorSearch_disabled_set_parameters
         mongos_options:
           set_parameters: *vectorSearch_disabled_set_parameters
+
+# ---------------------------------------------------------------------------------------------
+# with_mongot_extension_fully_enabled_* family: every extension feature flag on. $search,
+# $searchMeta, $vectorSearch, and extension stages inside hybrid search all run through the
+# Extensions API. Its mappings stack all of the exclusion blocks above -- no fully_enabled-only
+# failures are known.
+# ---------------------------------------------------------------------------------------------
+
+- name: extension_flags_fully_enabled
+  value:
+    executor:
+      fixture:
+        # See the note on skip_extensions_signature_verification in
+        # extension_flags_hybridSearch_disabled above.
+        skip_extensions_signature_verification: true
+        mongod_options:
+          set_parameters: &fully_enabled_set_parameters
+            featureFlagExtensionsAPI: true
+            featureFlagExtensionsApiSignatureValidation: true
+            featureFlagVectorSearchExtension: true
+            featureFlagSearchExtension: true
+            featureFlagExtensionsInsideHybridSearch: true
+            featureFlagEgressGrpcForSearch: true
+            useGrpcForSearch: 1
+            skipAuthenticationToMongot: true
+
+- name: extension_flags_fully_enabled_sharded
+  value:
+    executor:
+      fixture:
+        skip_extensions_signature_verification: true
+        mongod_options:
+          set_parameters: *fully_enabled_set_parameters
+        mongos_options:
+          set_parameters: *fully_enabled_set_parameters

@@ -86,6 +86,9 @@ selector:
     - jstests/with_mongot/e2e/views/search_meta/searchMeta.js
     - jstests/with_mongot/e2e/hybridSearch/rank_fusion_lookup_local_foreign_field_view.js
     - jstests/with_mongot/e2e/sharding_no_passthrough/subpipeline_storedSource_chunk_migration.js
+    - jstests/with_mongot/e2e/search/search_sequence_token.js
+    - jstests/with_mongot/e2e/search/search_sequence_token_in_lookup.js
+    - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_sequence_token.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_sharding
