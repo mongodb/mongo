@@ -89,6 +89,12 @@ public:
 
     Timestamp getCommitTimestamp() const override;
 
+    void setSchemaEpoch(uint64_t schemaEpoch) override;
+
+    boost::optional<uint64_t> getSchemaEpoch() const override {
+        return _schemaEpoch;
+    }
+
     void setDurableTimestamp(Timestamp timestamp) override;
 
     Timestamp getDurableTimestamp() const override;
@@ -222,7 +228,7 @@ private:
     void _abort();
     void _commit(boost::optional<Timestamp> commitTime);
     void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine,
-                                 Timestamp commitTime,
+                                 uint64_t schemaEpoch,
                                  bool needsAllDurablePin);
 
     void _ensureSession();
@@ -315,6 +321,7 @@ private:
     // this timestamp if they want to avoid missing any entries in the oplog that may not yet have
     // committed ('holes'). @see StorageOplogManager::getOplogReadTimestamp
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
+    boost::optional<uint64_t> _schemaEpoch;
 
     WiredTigerStats _sessionStatsAfterLastOperation;
 

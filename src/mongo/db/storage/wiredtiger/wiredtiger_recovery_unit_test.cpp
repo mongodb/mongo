@@ -523,6 +523,39 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
     ru1->commitUnitOfWork();
 }
 
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
+                   SetSchemaEpochOutsideUnitOfWork,
+                   "Inactive") {
+    // setSchemaEpoch must be called inside a WriteUnitOfWork.
+    ru1->setSchemaEpoch(1);
+}
+
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
+                   SetSchemaEpochTwice,
+                   "Schema epoch already set to") {
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->setSchemaEpoch(1);
+    ru1->setSchemaEpoch(2);
+}
+
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
+                   SetSchemaEpochWithCommitTimestamp,
+                   "Commit timestamp is") {
+    ru1->setCommitTimestamp({1, 1});
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    // setSchemaEpoch is mutually exclusive with having a commit timestamp set.
+    ru1->setSchemaEpoch(1);
+}
+
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
+                   SetSchemaEpochWithSetTimestamp,
+                   "Last timestamp set is") {
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ASSERT_OK(ru1->setTimestamp({1, 1}));
+    // setSchemaEpoch is mutually exclusive with having a write timestamp set.
+    ru1->setSchemaEpoch(1);
+}
+
 TEST_F(WiredTigerRecoveryUnitTestFixture, RoundUpPreparedTimestamps) {
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
     RecoveryUnit::OpenSnapshotOptions roundUp{.roundUpPreparedTimestamps = true};
@@ -1372,6 +1405,20 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
     ru1->onCreateTable("my-table");
     txn.commit();
     ru1->clearCommitTimestamp();
+}
+
+using WiredTigerRecoveryUnitPublishTableCreationTestDeathTest =
+    WiredTigerRecoveryUnitPublishTableCreationTest;
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitPublishTableCreationTestDeathTest,
+                   CommitWithoutTimestampOrSchemaEpochWhenSchemaEpochsInUse,
+                   "_schemaEpoch") {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    StorageWriteTransaction txn(*ru1);
+    ru1->getSession();
+    ru1->onCreateTable("my-table");
+    // Committing without a timestamp or schema epoch when schema epochs are in use must fail
+    txn.commit();
 }
 
 }  // namespace
