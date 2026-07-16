@@ -28,7 +28,7 @@ constexpr auto kHttpEndpoint = "http://localhost:4318/v1/traces";
  * non-SDK provider (e.g. noop).
  */
 opentelemetry::sdk::trace::TracerProvider* getSdkProvider(TracerProviderService& svc) {
-    return dynamic_cast<opentelemetry::sdk::trace::TracerProvider*>(svc.getTracerProvider().get());
+    return dynamic_cast<opentelemetry::sdk::trace::TracerProvider*>(svc.getTracerProvider());
 }
 
 /**

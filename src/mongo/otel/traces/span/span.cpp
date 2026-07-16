@@ -99,16 +99,16 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                   SpanName name,
                   bool bypassSampling) {
     TracerProviderService* tracerProviderService = getGlobalTracerProviderService();
-    if (!tracerProviderService || !tracerProviderService->isEnabled()) {
+    if (!tracerProviderService) {
         return Span{};
     }
 
-    auto tracerProvider = tracerProviderService->getTracerProvider();
-    if (!tracerProvider) {
+    auto* provider = tracerProviderService->getTracerProvider();
+    if (!provider) {
         return Span{};
     }
 
-    auto tracer = tracerProvider->GetTracer("mongodb");
+    auto tracer = provider->GetTracer("mongodb");
     if (!tracer) {
         return Span{};
     }

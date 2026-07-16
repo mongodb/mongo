@@ -45,12 +45,11 @@ public:
             {"service.name", "test"}, {"service.instance.id", 1}};
         auto resource = opentelemetry::sdk::resource::Resource::Create(resourceAttributes);
 
-        std::shared_ptr<opentelemetry::trace::TracerProvider> provider =
-            opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor),
-                                                                     resource);
+        auto provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(
+            std::move(processor), resource);
         // Create and set the TracerProviderService
         auto tracerProviderService = createNoOpTracerProviderService();
-        tracerProviderService->setTracerProvider_ForTest(provider);
+        tracerProviderService->setTracerProvider_ForTest(std::move(provider));
 
         setGlobalTracerProviderService(std::move(tracerProviderService));
     }
