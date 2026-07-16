@@ -41,7 +41,6 @@ rollout:
   featureFlagSbeEqLookupUnwindNestedLoopJoin: {}
   featureFlagSbeNonLeadingMatch: {}
   featureFlagSbeTransformStages: {}
-  featureFlagUnifiedWriteExecutor: {}
 
 release:
   featureFlagChangeStreamOptimizedUpdateLookup: {}
@@ -54,4 +53,5 @@ release:
   featureFlagSbeAccumulators: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagSearchExtension: {}
+  featureFlagUnifiedWriteExecutor: {}
   featureFlagVectorSearchExtension: {}
