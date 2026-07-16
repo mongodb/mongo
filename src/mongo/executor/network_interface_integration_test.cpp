@@ -1316,7 +1316,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ConnectionErrorAssociatedWit
 
     auto result = deferred.get(interruptible());
 
-    ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
+    ASSERT_EQ(ErrorCodes::SocketException, result.status);
     ASSERT_EQ(result.target, fixture().getServers().front());
     assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 1u, .succeeded = 0u});
 }

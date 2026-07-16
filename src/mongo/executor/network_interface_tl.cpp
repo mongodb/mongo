@@ -1055,12 +1055,6 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
                 return false;
             });
 
-            // The TransportLayer has, for historical reasons returned SocketException for network
-            // errors, but sharding assumes HostUnreachable on network errors.
-            if (response.status == ErrorCodes::SocketException) {
-                response.status = Status(ErrorCodes::HostUnreachable, response.status.reason());
-            }
-
             LOGV2_DEBUG(22597,
                         2,
                         "Request finished",
