@@ -30,7 +30,9 @@ namespace mongo {
 
 SimpleMemoryUsageTracker& ExpressionContext::getExpressionFallbackTracker() {
     if (!_expressionFallbackTracker) {
-        if (getOperationContext() && !_params.excludeOperationMemoryTracking &&
+        if (getOperationContext() &&
+            !_params.excludeExpressionFallbackFromOperationMemoryTracking &&
+            !_params.excludeOperationMemoryTracking &&
             feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
             feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
             // Memory tracking is enabled and an OperationContext is available: wire the fallback to

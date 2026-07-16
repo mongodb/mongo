@@ -750,6 +750,17 @@ public:
         _params.excludeOperationMemoryTracking = excludeOperationMemoryTracking;
     }
 
+    bool getExcludeExpressionFallbackFromOperationMemoryTracking() const {
+        return _params.excludeExpressionFallbackFromOperationMemoryTracking;
+    }
+
+    void setExcludeExpressionFallbackFromOperationMemoryTracking(bool exclude) {
+        if (_params.excludeExpressionFallbackFromOperationMemoryTracking != exclude) {
+            _expressionFallbackTracker.reset();
+        }
+        _params.excludeExpressionFallbackFromOperationMemoryTracking = exclude;
+    }
+
     bool getExprUnstableForApiV1() const {
         return _params.exprUnstableForApiV1;
     }
@@ -1238,6 +1249,11 @@ protected:
         // not report to (or be bounded by) the operation-wide OperationMemoryUsageTracker.
         // Standalone per-stage and per-expression limits still apply.
         bool excludeOperationMemoryTracking = false;
+        // When true, the expression fallback tracker (see getExpressionFallbackTracker()) is not
+        // rolled up into the operation-wide OperationMemoryUsageTracker; it becomes a standalone
+        // tracker bounded only by the per-expression safety cap. Stage-level memory trackers are
+        // unaffected.
+        bool excludeExpressionFallbackFromOperationMemoryTracking = false;
         // These fields can be used in a context when API version validations were not enforced
         // during parse time (Example creating a view or validator), but needs to be enforce while
         // querying later.

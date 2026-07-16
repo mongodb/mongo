@@ -134,6 +134,18 @@ Exchange::Exchange(OperationContext* opCtx,
 
     _execPipeline->detachFromOperationContext();
     _pipeline->detachFromOperationContext();
+
+    if (ownsOperationMemoryTracker()) {
+        // When the Exchange owns the producer's operation memory tracker, the shared producer
+        // pipeline is executed under whichever consumer's OperationContext wins the race to load
+        // the next batch, but the producer's memory is meant to be tracked solely by
+        // '_memoryTracker' (published to CurOp only via consumer 0). An expression that lacks a
+        // stage-level tracker would otherwise roll up into the operation-wide tracker of the
+        // current consumer's opCtx, lazily creating one on non-owning consumers and misreporting
+        // their memory metrics. Keep the producer's expression fallback standalone so it never
+        // touches a consumer's opCtx.
+        _pipeline->getContext()->setExcludeExpressionFallbackFromOperationMemoryTracking(true);
+    }
 }
 
 std::vector<std::string> Exchange::extractBoundaries(
