@@ -1030,31 +1030,14 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
         return SecondParseRequirement::kReparseFromBson;
     }
 
-    // For search queries on views don't do any of the pipeline stitching that is done for
-    // normal views.
-    // TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and
-    // handle the view through a bindResolvedNamespace() override.
-    if (search_helpers::isMongotLiteParsedPipeline(*desugaredLPP)) {
-        // Still call bindResolvedNamespace() on all stages so that any extension stages further in
-        // the pipeline get properly validated against the view.
-        if (aggExState.isView()) {
-            LOGV2_DEBUG(
-                11856001, 4, "Skipping view pipeline prepend because this is a mongot query");
-            PipelineResolver::validateStagesOnView(
-                desugaredLPP,
-                aggExState.getResolvedNamespace(),
-                aggExState.getOriginalNss(),
-                uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
-                LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
-            return currentRequirement;
-        }
-
-        auto resolvedNamespaces =
-            uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx()));
-        bool anyViewBound = PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
-            desugaredLPP, aggExState.getOriginalNss(), resolvedNamespaces);
-        return anyViewBound ? SecondParseRequirement::kReparseFromLPP : currentRequirement;
-    }
+    // Mongot pipelines get the view bound to their stages — recursively, so nested mongot or
+    // extension stages are bound too — rather than prepended; see the isMongotLiteParsedPipeline
+    // branch in resolveInvolvedNamespacesOnLiteParsedPipeline. Compute this before the resolver
+    // runs: stitching can change the front stage, and the early return below must agree with the
+    // resolver's bind-vs-prepend decision.
+    // TODO SERVER-115069 Remove the mongot special-casing once search queries are desugared at
+    // LiteParsed time and handle the view through a bindResolvedNamespace() override.
+    const bool isMongotPipeline = search_helpers::isMongotLiteParsedPipeline(*desugaredLPP);
 
     auto resolvedNamespaces =
         uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx()));
@@ -1071,6 +1054,19 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
 
     bool anyViewBound = PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
         desugaredLPP, aggExState.getOriginalNss(), resolvedNamespaces);
+
+    if (isMongotPipeline && aggExState.isView()) {
+        // The view was bound rather than prepended, so no reparse is needed on its account.
+        // Sub-pipeline stitching only reaches the executed pipeline via a reparse, but mongot
+        // pipelines with view-targeting sub-pipelines desugar at LiteParsed time, which already
+        // makes 'currentRequirement' kReparseFromLPP; non-desugared ones keep the
+        // DocumentSource-level view fallback.
+        LOGV2_DEBUG(11856001,
+                    4,
+                    "Bound view to mongot pipeline without prepending the view pipeline",
+                    "view"_attr = aggExState.getOriginalNss());
+        return currentRequirement;
+    }
 
     return anyViewBound ? SecondParseRequirement::kReparseFromLPP : currentRequirement;
 }

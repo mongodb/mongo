@@ -117,11 +117,6 @@
 - name: exclude_extensions_inside_hybrid_search_incompatible
   value:
     exclude_files:
-      # TODO SERVER-131307: Remove these exclusions. A hybrid search mixing a legacy $search with an
-      # extension $vectorSearch on a view fails with "index is required" (Location65160): the
-      # extension $vectorSearch's index isn't forwarded to mongot for the mixed-stage case.
-      - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_view.js
-      - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_view.js
       # TODO SERVER-131308: Remove these exclusions. An extension $vectorSearch in a $lookup subpipeline
       # on a view fails with Location40602 ("$_extensionVectorSearch is only valid as the first stage"):
       # view resolution prepends the view's stages, pushing the extension stage out of first position.
