@@ -280,6 +280,7 @@ mongo_cc_unit_test(
         ":rewrite_state_change_errors",
         ":rpc",
         "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/shard_role:service_context_non_d",

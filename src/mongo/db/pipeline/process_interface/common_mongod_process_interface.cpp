@@ -236,7 +236,10 @@ bool acquireCollectionsForPipeline(const boost::intrusive_ptr<ExpressionContext>
                                    CollectionOrViewAcquisitionMap& allAcquisitions) {
     // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
     // when constructing our query executor.
-    auto lpp = LiteParsedPipeline(expCtx->getNamespaceString(), pipeline);
+    auto lpp = LiteParsedPipeline(expCtx->getNamespaceString(),
+                                  pipeline,
+                                  false,
+                                  LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = lpp.getForeignExecutionNamespaces();
     auto* opCtx = expCtx->getOperationContext();
 
@@ -822,7 +825,10 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     auto hybridSearchFlagEnabled = ifrCtx &&
         ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
     if (hybridSearchFlagEnabled) {
-        LiteParsedPipeline(expCtx->getNamespaceString(), serializedPipeline)
+        LiteParsedPipeline(expCtx->getNamespaceString(),
+                           serializedPipeline,
+                           false,
+                           LiteParserOptions{.ifrContext = ifrCtx})
             .validateWithCollectionMetadata(primaryAcquisition);
     } else {
         // TODO SERVER-121094 Delete this duplicated check.
