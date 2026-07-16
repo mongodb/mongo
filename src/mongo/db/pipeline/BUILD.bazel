@@ -320,6 +320,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:change_stream_helpers",
         "//src/mongo/db/pipeline:sharded_agg_helpers",
         "//src/mongo/db/update:update_driver",
+        "//src/mongo/s/commands:document_shard_key_query_conversion",
         "//src/mongo/s/query:router_exec_stage",
     ],
 )
