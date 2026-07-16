@@ -359,9 +359,9 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             const auto currentTime = VectorClock::get(opCtx)->getTime();
             const auto clusterTime = currentTime.clusterTime();
             if (!VectorClock::isValidComponentTime(clusterTime)) {
-                // currentTime should only be uninitialized if we are in startup recovery or initial
-                // sync.
-                invariant(memberState.startup() || memberState.startup2());
+                // currentTime should only be uninitialized if we are in startup recovery, initial
+                // sync, or on an arbiter.
+                invariant(memberState.startup() || memberState.startup2() || memberState.arbiter());
                 return {ErrorCodes::NotPrimaryOrSecondary,
                         str::stream() << "Current clusterTime is uninitialized, cannot service the "
                                          "requested clusterTime. Requested clusterTime: "
