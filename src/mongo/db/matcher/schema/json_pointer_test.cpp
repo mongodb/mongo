@@ -89,6 +89,14 @@ TEST(JSONPointerTest, MissingKeyReturnsEOO) {
     ASSERT_FALSE(pointer.evaluate(obj));
 }
 
+std::string makePointerOfDepth(size_t depth) {
+    std::string pointer = "/a";
+    for (size_t i = 1; i < depth; ++i) {
+        pointer += "/a";
+    }
+    return pointer;
+}
+
 TEST(JSONPointerTest, InvalidPointerThrows) {
     ASSERT_THROWS_CODE(JSONPointer(""), AssertionException, 51064);
     ASSERT_THROWS_CODE(JSONPointer("random"), AssertionException, 51065);
@@ -97,6 +105,23 @@ TEST(JSONPointerTest, InvalidPointerThrows) {
     ASSERT_THROWS_CODE(JSONPointer("/ran~dom/valid"), AssertionException, 51063);
     ASSERT_THROWS_CODE(JSONPointer("/ran~0~dom/random"), AssertionException, 51063);
     ASSERT_THROWS_CODE(JSONPointer("/ran~1~dom/random"), AssertionException, 51063);
+}
+
+TEST(JSONPointerTest, AcceptsPointerAtMaxDepth) {
+    JSONPointer pointer{makePointerOfDepth(JSONPointer::kMaxJSONPointerDepth)};
+    ASSERT_EQ(pointer.toString(), makePointerOfDepth(JSONPointer::kMaxJSONPointerDepth));
+}
+
+TEST(JSONPointerTest, RejectsPointerExceedingMaxDepth) {
+    ASSERT_THROWS_CODE(JSONPointer(makePointerOfDepth(JSONPointer::kMaxJSONPointerDepth + 1)),
+                       AssertionException,
+                       51069);
+}
+
+TEST(JSONPointerTest, RejectsPointerExceedingMaxDepthNotLastComponent) {
+    ASSERT_THROWS_CODE(JSONPointer(makePointerOfDepth(JSONPointer::kMaxJSONPointerDepth + 100)),
+                       AssertionException,
+                       51067);
 }
 
 TEST(JSONPointerTest, NestedFields) {

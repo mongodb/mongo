@@ -49,6 +49,10 @@ namespace mongo {
  */
 class JSONPointer {
 public:
+    // Maximum number of '/'-delimited path components accepted in a JSON Pointer. Matches the
+    // FieldRef limit on dotted field path depth.
+    static constexpr std::size_t kMaxJSONPointerDepth = 255;
+
     /* Constructs a parsed representation of the JSON Pointer in 'ptr', encoded in UTF-8. Throws a
      * UserException if 'ptr' is invalid.
      *
