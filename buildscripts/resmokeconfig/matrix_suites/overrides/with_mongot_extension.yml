@@ -63,6 +63,10 @@
       # TODO SERVER-131306: Remove this exclusion. Extension $search in a $graphLookup-on-view
       # subpipeline fails on a sharded cluster with CursorNotFound (error 43) on the remote shard.
       - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition_graph_lookup.js
+      # TODO SERVER-131409: Remove this exclusion. With featureFlagSearchExtension on, a nested
+      # $unionWith/$lookup with an extension $search on views returns wrong results on single_node
+      # (assertArrayEq mismatch: deeply-nested results dropped). Excluded family-wide.
+      - jstests/with_mongot/e2e/views/search/unionWith_lookup_nested_deep.js
 
 - name: extension_flags_hybridSearch_disabled
   value:
@@ -101,19 +105,6 @@
 # $vectorSearch and hybrid search run through the Extensions API.
 # ---------------------------------------------------------------------------------------------
 
-# Tests that fail only when featureFlagExtensionsInsideHybridSearch is on. Stacked on top of
-# exclude_incompatible_tests by every family that enables extension stages inside hybrid search.
-- name: exclude_extensions_inside_hybrid_search_incompatible
-  value:
-    exclude_files:
-      # TODO SERVER-131308: Remove these exclusions. An extension $vectorSearch in a $lookup subpipeline
-      # on a view fails with Location40602 ("$_extensionVectorSearch is only valid as the first stage"):
-      # view resolution prepends the view's stages, pushing the extension stage out of first position.
-      - jstests/with_mongot/e2e/views/vector_search/lookup_vector_search_view.js
-      - jstests/with_mongot/e2e/views/vector_search/lookup_subpipeline_combinations.js
-      - jstests/with_mongot/e2e/views/vector_search/lookup_nested_view.js
-      - jstests/with_mongot/e2e/views/vector_search/lookup_identity_and_combined.js
-
 - name: extension_flags_search_disabled
   value:
     executor:
@@ -146,32 +137,10 @@
 # with_mongot_extension_vectorSearch_disabled_* family: every extension flag on except
 # featureFlagVectorSearchExtension. $vectorSearch uses the server's legacy implementation while
 # $search/$searchMeta and hybrid search run through the Extensions API. Its mappings stack
-# exclude_incompatible_tests + exclude_search_extension_incompatible +
-# exclude_search_extension_inside_hybrid_search_incompatible; the extension-$vectorSearch
-# exclusions do not apply since $vectorSearch runs the legacy path.
+# exclude_incompatible_tests + exclude_search_extension_incompatible (and exclude_sharded_incompatible_tests
+# on the sharded mappings). The extension-$vectorSearch exclusions do not apply since $vectorSearch
+# runs the legacy path.
 # ---------------------------------------------------------------------------------------------
-
-# Tests that fail only when featureFlagSearchExtension AND featureFlagExtensionsInsideHybridSearch
-# are both on. Stacked on top of exclude_incompatible_tests by every family that enables both.
-- name: exclude_search_extension_inside_hybrid_search_incompatible
-  value:
-    exclude_files:
-      # TODO SERVER-131212: Remove these exclusions. With extension stages inside hybrid search
-      # enabled, the extension $search/$searchMeta desugar includes
-      # $_internalDocumentResultsAndMetadata, and view resolution in a $lookup/$unionWith
-      # subpipeline prepends the view's stages, pushing it out of first position (Location40602) --
-      # the $search variant of the same view-resolution bug.
-      - jstests/with_mongot/e2e/views/search/lookup.js
-      - jstests/with_mongot/e2e/views/search/lookup_nested.js
-      - jstests/with_mongot/e2e/views/search/lookup_nested_deep.js
-      - jstests/with_mongot/e2e/views/search/lookup_cache.js
-      - jstests/with_mongot/e2e/views/search/lookup_match.js
-      - jstests/with_mongot/e2e/views/search/lookup_as_a_view.js
-      - jstests/with_mongot/e2e/views/search/undefined_or_underlying_index.js
-      - jstests/with_mongot/e2e/views/search/unionWith_lookup_nested_deep.js
-      - jstests/with_mongot/e2e/views/search_meta/searchMeta.js
-      - jstests/with_mongot/e2e/hybridSearch/rank_fusion_lookup_local_foreign_field_view.js
-      - jstests/with_mongot/e2e/sharding_no_passthrough/subpipeline_storedSource_chunk_migration.js
 
 - name: extension_flags_vectorSearch_disabled
   value:
@@ -204,8 +173,9 @@
 # ---------------------------------------------------------------------------------------------
 # with_mongot_extension_fully_enabled_* family: every extension feature flag on. $search,
 # $searchMeta, $vectorSearch, and extension stages inside hybrid search all run through the
-# Extensions API. Its mappings stack all of the exclusion blocks above -- no fully_enabled-only
-# failures are known.
+# Extensions API. Its mappings stack exclude_incompatible_tests + exclude_search_extension_incompatible
+# (and exclude_sharded_incompatible_tests on the sharded mappings) -- no fully_enabled-only failures
+# are known.
 # ---------------------------------------------------------------------------------------------
 
 - name: extension_flags_fully_enabled

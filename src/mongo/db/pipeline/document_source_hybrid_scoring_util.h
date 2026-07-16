@@ -122,6 +122,13 @@ void validateIsHybridSearchNotSetByUser(boost::intrusive_ptr<ExpressionContext> 
 void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+/**
+ * Throws if 'nss' is a search view (its definition begins with a mongot
+ * $search/$searchMeta/$vectorSearch stage) defined over a timeseries collection.
+ */
+void assertForeignSearchViewIsNotTimeseries(const NamespaceString& nss,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 // -----------------------------Helper String Manipulation Functions-----------------------------
 
 /**

@@ -53,6 +53,10 @@ std::vector<BSONObj> buildResolvedPipelineForSimpleCase(
     // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
     // For this reason, we do not expand the aggregation request to include the view pipeline.
     // Caller is expected to use LiteParsedPipeline::handleView() for such cases.
+    // TODO SERVER-117168: Remove the isExtensionMongotPipeline check. Extension search stages
+    // declare FirstStageViewApplicationPolicy::kDoNothing via
+    // get_first_stage_view_application_policy (other extension stages default to kDefaultPrepend),
+    // so the policy-driven handleView() paths handle them without stage-name special-casing.
     if (search_helper_bson_obj::isMongotPipeline(ifrContext, userPipeline) ||
         search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, userPipeline)) {
         return userPipeline;

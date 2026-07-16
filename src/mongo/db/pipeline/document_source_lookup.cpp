@@ -319,23 +319,33 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     NamespaceString fromNs,
     std::vector<BSONObj> pipeline,
     boost::optional<std::pair<std::string, std::string>> localForeignFields,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    FirstStageViewApplicationPolicy subpipelineViewPolicy) {
     // When fromNs represents a view, we have to decipher if the view is mongot-indexed or not.
-    // Currently, if the pipeline to be run on the joined collection is a mongot pipeline (it starts
-    // with $search, $searchMeta, or $vectorSearch -- or the extension desugar of those), $lookup
-    // assumes the view is mongot-indexed.
+    // Currently, if the pipeline to be run on the joined collection is a
+    // mongot pipeline (it starts with $search, $searchMeta, or $vectorSearch), $lookup assumes
+    // the view is mongot-indexed. The same applies when the subpipeline's first stage declared
+    // FirstStageViewApplicationPolicy::kDoNothing at lite-parse time (e.g. an extension search
+    // stage): the stage applies the view itself, so the view pipeline must not be prepended.
     //
     // Skip validation/view application when we know that the router already processed the view.
     const bool pipelineIsAlreadyDesugared = !pipeline.empty() &&
         pipeline[0].hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName);
 
-    if (_fromNsIsAView && isMongotLookupSubpipeline(expCtx->getIfrContext(), pipeline) &&
+    const bool isLegacyMongotPipeline =
+        search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline);
+    if (_fromNsIsAView &&
+        (isMongotLookupSubpipeline(expCtx->getIfrContext(), pipeline) ||
+         subpipelineViewPolicy == FirstStageViewApplicationPolicy::kDoNothing) &&
         !pipelineIsAlreadyDesugared) {
-        // The user pipeline is a mongot pipeline so we assume the view is a mongot-indexed view. As
-        // such, we overwrite the view pipeline. This is because in the case of mongot queries on
-        // mongot-indexed views, idLookup applies the view transforms as part of its subpipeline.
-        _fromExpCtx->setView(boost::make_optional(
-            ResolvedNamespace::makeForView(fromNs, _resolvedNs, _sharedState->resolvedPipeline)));
+        if (isLegacyMongotPipeline) {
+            // The user pipeline is a legacy mongot pipeline so we assume the view is a
+            // mongot-indexed view. Stash the view on the subpipeline's ExpressionContext so the
+            // legacy stage's createFromBson can attach it: idLookup applies the view transforms
+            // as part of its subpipeline.
+            _fromExpCtx->setView(boost::make_optional(ResolvedNamespace::makeForView(
+                fromNs, _resolvedNs, _sharedState->resolvedPipeline)));
+        }
         _sharedState->resolvedPipeline = pipeline;
         // The join $match belongs immediately after the mongot prefix. For an unparsed pipeline
         // (a single $search/$searchMeta/$vectorSearch stage) the prefix is one stage, so index 1.
@@ -413,9 +423,11 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     boost::optional<std::pair<std::string, std::string>> localForeignFields,
     boost::optional<BSONObj> unwindSpec,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    bool containsUserSpecifiedPipeline)
+    bool containsUserSpecifiedPipeline,
+    FirstStageViewApplicationPolicy subpipelineViewPolicy)
     : DocumentSourceLookUp(fromNs, as, pExpCtx) {
-    resolvedPipelineHelper(fromNs, userPipeline, localForeignFields, pExpCtx);
+    resolvedPipelineHelper(
+        fromNs, userPipeline, localForeignFields, pExpCtx, subpipelineViewPolicy);
 
     parseAndDefineLetVariables(letVariables, pExpCtx);
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
@@ -569,6 +581,8 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
         params.isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(params.pipeline);
     if (isHybridSearchLookup) {
         hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.fromNss, expCtx);
+    } else {
+        hybrid_scoring_util::assertForeignSearchViewIsNotTimeseries(params.fromNss, expCtx);
     }
 
     const bool hasLocal = params.localField.has_value();
@@ -611,7 +625,8 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
                                              std::move(localForeignFields),
                                              std::move(params.unwindSpec),
                                              expCtx,
-                                             !params.noUserPipeline);
+                                             !params.noUserPipeline,
+                                             params.subpipelineViewPolicy);
 
     // TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
     // parsing/desugaring/resolution.

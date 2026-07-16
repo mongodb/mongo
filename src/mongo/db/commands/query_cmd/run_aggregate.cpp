@@ -1061,10 +1061,6 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
         // pipelines with view-targeting sub-pipelines desugar at LiteParsed time, which already
         // makes 'currentRequirement' kReparseFromLPP; non-desugared ones keep the
         // DocumentSource-level view fallback.
-        LOGV2_DEBUG(11856001,
-                    4,
-                    "Bound view to mongot pipeline without prepending the view pipeline",
-                    "view"_attr = aggExState.getOriginalNss());
         return currentRequirement;
     }
 

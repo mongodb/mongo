@@ -55,6 +55,8 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
     // search stage.
     if (hybrid_scoring_util::isHybridSearchPipeline(params.pipeline) || params.isHybridSearch) {
         hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.unionNss, expCtx);
+    } else {
+        hybrid_scoring_util::assertForeignSearchViewIsNotTimeseries(params.unionNss, expCtx);
     }
 
     // It is possible to specify a $unionWith with *only* a collection in order to do a
@@ -393,6 +395,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
             // come from a mongos that does not know if the collection is a valid collection for
             // hybrid search. Therefore, we must validate it here.
             hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(unionNss, expCtx);
+        } else {
+            hybrid_scoring_util::assertForeignSearchViewIsNotTimeseries(unionNss, expCtx);
         }
     }
     return make_intrusive<DocumentSourceUnionWith>(

@@ -19,6 +19,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/query/util/string_util.h"
 #include "mongo/util/string_map.h"
 
@@ -418,6 +419,34 @@ void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
               "$rankFusion and $scoreFusion are unsupported on timeseries collections, but not "
               "enough information is available to determine if a subpipeline is running on a "
               "timeseries collection.");
+    }
+}
+
+void assertForeignSearchViewIsNotTimeseries(const NamespaceString& nss,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto opCtx = expCtx->getOperationContext();
+    const auto catalog = CollectionCatalog::get(opCtx);
+    const auto viewPtr = catalog->lookupView(opCtx, nss);
+
+    // Only reject a search view (a view whose definition begins with a mongot stage). A plain view
+    // over a timeseries collection remains a valid foreign namespace. A shard that does not own the
+    // namespace may not see the view here; that is fine, because the search stages are validated on
+    // the shard that resolves the view.
+    if (!viewPtr ||
+        !search_helper_bson_obj::startsWithMongotStage(expCtx->getIfrContext(),
+                                                       viewPtr->pipeline())) {
+        return;
+    }
+
+    // The view is a search view. Reject it if it is backed by a timeseries collection. This covers
+    // both the legacy buckets-view model (ViewDefinition::timeseries()) and the viewless-timeseries
+    // model, where the view is defined directly on the timeseries collection, so we inspect the
+    // backing collection.
+    const auto backing = catalog->lookupCollectionByNamespace(opCtx, viewPtr->viewOn());
+    if (viewPtr->timeseries() || (backing && backing->isTimeseriesCollection())) {
+        uasserted(13130801,
+                  "$search, $searchMeta, and $vectorSearch are unsupported on views over "
+                  "timeseries collections");
     }
 }
 

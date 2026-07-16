@@ -1311,6 +1311,57 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT_FALSE(lookup->getResolvedPipelineForTest()[0].getField("$addFields").eoo());
 }
 
+TEST_F(DocumentSourceLookUpTest, SubpipelineViewPolicyDoNothingSuppressesViewPrepend) {
+    // When the subpipeline's first stage declares FirstStageViewApplicationPolicy::kDoNothing
+    // (e.g. an extension search stage that applies the view itself), a $lookup targeting a view
+    // must not prepend the view pipeline; the user pipeline stays first.
+    auto mainNss = NamespaceString::createNamespaceString_forTest("test", "main");
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test", "foreign");
+    auto backingNss = NamespaceString::createNamespaceString_forTest("test", "backing");
+
+    auto expCtx = ExpressionContextBuilder{}.opCtx(getOpCtx()).ns(mainNss).build();
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    BSONObj viewStage = BSON("$addFields" << BSON("viewField" << 1));
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(
+        viewNss,
+        ResolvedNamespace(viewNss, backingNss, std::vector<BSONObj>{viewStage}, BSONObj{}, opts));
+    expCtx->setResolvedNamespaces(std::move(nsMap));
+
+    auto lookupBson =
+        BSON("$lookup" << BSON("from" << viewNss.coll() << "as" << "r" << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))));
+    auto liteParsed =
+        LiteParsedLookUp::parse(mainNss, lookupBson.firstElement(), LiteParserOptions{});
+    liteParsed->makeOwned();
+    auto stageParams = liteParsed->getStageParams();
+    auto* params = dynamic_cast<LookUpStageParams*>(stageParams.get());
+    ASSERT_TRUE(params);
+    // Force kDoNothing directly. This isolates the createFromStageParams suppression path: a real
+    // $match subpipeline would report kDefaultPrepend, so we override it here only to drive the
+    // branch under test.
+    params->subpipelineViewPolicy = FirstStageViewApplicationPolicy::kDoNothing;
+
+    auto sources = DocumentSourceLookUp::createFromStageParams(*params, expCtx);
+    ASSERT_EQ(sources.size(), 1U);
+    auto* lookup = dynamic_cast<DocumentSourceLookUp*>(sources.front().get());
+    ASSERT_TRUE(lookup != nullptr);
+
+    // The user pipeline must stay first, with no view stage prepended. Like the legacy mongot
+    // branch, an empty $match placeholder is inserted right after the first stage.
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 2U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$match" << BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[1], BSON("$match" << BSONObj()));
+    for (const auto& stage : resolvedPipeline) {
+        ASSERT_TRUE(stage.getField("$addFields").eoo());
+    }
+}
+
 TEST_F(DocumentSourceLookUpTest,
        ExplainSerializesSubpipelineWithoutFieldMatchPlaceholderForFieldsAndPipeline) {
     auto expCtx = getExpCtx();

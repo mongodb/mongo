@@ -207,8 +207,13 @@ bool LiteParsedLookUp::hasExtensionSearchStage() const {
 
 std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
     boost::optional<StageParamsPipeline> subParams;
+    auto subpipelineViewPolicy = FirstStageViewApplicationPolicy::kDefaultPrepend;
     if (!_pipelines.empty()) {
         subParams = _pipelines[0]->getStageParams();
+        const auto& subStages = _pipelines[0]->getStages();
+        if (!subStages.empty()) {
+            subpipelineViewPolicy = subStages.front()->getFirstStageViewApplicationPolicy();
+        }
     }
     return std::make_unique<LookUpStageParams>(*_foreignNss,
                                                _as,
@@ -223,7 +228,8 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
                                                std::move(subParams),
                                                _internalFieldMatchPipelineIdx,
                                                _internalFromIsAView,
-                                               _noUserPipeline);
+                                               _noUserPipeline,
+                                               subpipelineViewPolicy);
 }
 
 void LiteParsedLookUp::validate() const {

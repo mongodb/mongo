@@ -76,10 +76,6 @@ selector:
     - jstests/with_mongot/e2e/search/search_sequence_token.js
     - jstests/with_mongot/e2e/search/search_sequence_token_in_lookup.js
     - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_sequence_token.js
-    - jstests/with_mongot/e2e/views/vector_search/lookup_vector_search_view.js
-    - jstests/with_mongot/e2e/views/vector_search/lookup_subpipeline_combinations.js
-    - jstests/with_mongot/e2e/views/vector_search/lookup_nested_view.js
-    - jstests/with_mongot/e2e/views/vector_search/lookup_identity_and_combined.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_unsharded_collection
