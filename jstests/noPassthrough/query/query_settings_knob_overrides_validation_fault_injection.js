@@ -28,10 +28,10 @@ const kFailPointName = "failQueryKnobOverridesParsing";
 const kClusterParameterApplyLogId = 12978700;
 
 // samplingMarginOfError (double, valid range [1, 10]) is the knob targeted by the failpoint.
-// planRankerMode (enum) is the sibling knob that must survive the fault injection.
+// cbrCEMode (enum) is the sibling knob that must survive the fault injection.
 const kBadKnobName = "samplingMarginOfError";
 const kBadKnobValue = 3.0;
-const kGoodKnobName = "planRankerMode";
+const kGoodKnobName = "cbrCEMode";
 const kGoodKnobValue = "heuristicCE";
 
 function makeSettings() {
