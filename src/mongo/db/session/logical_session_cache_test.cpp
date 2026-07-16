@@ -446,6 +446,70 @@ TEST_F(LogicalSessionCacheTest, RefreshUsesKExemptAdmissionPriority) {
         << "LogicalSessionCacheRefresh should use kExempt admission priority";
 }
 
+namespace {
+bool containsLsid(const LogicalSessionRecordSet& records, const LogicalSessionId& lsid) {
+    for (const auto& record : records) {
+        if (record.getId() == lsid) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Runs one refresh whose sessions all fail with `error`, then returns whether the failed session
+// is retried by the next refresh.
+bool failedSessionIsRetried(LogicalSessionCache* cache,
+                            OperationContext* opCtx,
+                            MockSessionsCollectionImpl* sessions,
+                            Status error) {
+    auto record = makeLogicalSessionRecordForTest();
+    ASSERT_OK(cache->startSession(opCtx, record));
+
+    sessions->setRefreshHook([&](const LogicalSessionRecordSet& toRefresh) {
+        return SessionsCollection::RefreshSessionsResult{{toRefresh.begin(), toRefresh.end()},
+                                                         {error}};
+    });
+    ASSERT_EQ(cache->refreshNow(opCtx), error);
+
+    LogicalSessionRecordSet retried;
+    sessions->setRefreshHook([&](const LogicalSessionRecordSet& toRefresh) {
+        retried = toRefresh;
+        return SessionsCollection::RefreshSessionsResult{};
+    });
+    ASSERT_OK(cache->refreshNow(opCtx));
+    return containsLsid(retried, record.getId());
+}
+}  // namespace
+
+// Sessions that fail to refresh because the job deadline fired must not be retried by the next
+// refresh; re-storing the backlog would just cause the next cycle to hit the same wall.
+TEST_F(LogicalSessionCacheTest, SessionFailedWithMaxTimeMSIsNotRetriedWhenJobTimeoutEnabled) {
+    unittest::ServerParameterGuard timeoutController{"logicalSessionCacheJobTimeoutEnabled", true};
+    ASSERT_FALSE(
+        failedSessionIsRetried(cache().get(),
+                               opCtx(),
+                               sessions().get(),
+                               Status(ErrorCodes::MaxTimeMSExpired, "refresh job deadline fired")));
+}
+
+// Sessions that fail to refresh for any other reason must still be retried by the next refresh.
+TEST_F(LogicalSessionCacheTest, SessionFailedWithOtherErrorIsRetriedWhenJobTimeoutEnabled) {
+    unittest::ServerParameterGuard timeoutController{"logicalSessionCacheJobTimeoutEnabled", true};
+    ASSERT_TRUE(failedSessionIsRetried(cache().get(),
+                                       opCtx(),
+                                       sessions().get(),
+                                       Status(ErrorCodes::WriteConcernTimeout, "wc timeout")));
+}
+
+// With the job timeout disabled, even MaxTimeMSExpired failures must be retried.
+TEST_F(LogicalSessionCacheTest, SessionFailedWithMaxTimeMSIsRetriedWhenJobTimeoutDisabled) {
+    unittest::ServerParameterGuard timeoutController{"logicalSessionCacheJobTimeoutEnabled", false};
+    ASSERT_TRUE(failedSessionIsRetried(cache().get(),
+                                       opCtx(),
+                                       sessions().get(),
+                                       Status(ErrorCodes::MaxTimeMSExpired, "caller's maxTimeMS")));
+}
+
 /**
  * Test fixture that allows verification of the reap callback.
  */
