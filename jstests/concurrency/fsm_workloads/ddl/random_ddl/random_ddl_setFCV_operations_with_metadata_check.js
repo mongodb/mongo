@@ -15,8 +15,6 @@
  *   # Currently all DDL are not compatible with transactions, it does not make sense to run this
  *   # test in transaction suites.
  *   does_not_support_transactions,
- *   # TODO (SERVER-104789): config shards cause setFCV to hang because resharding is not aborted.
- *   config_shard_incompatible,
  *   runs_set_fcv,
  * ]
  */
@@ -125,13 +123,6 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     // Move a random collection to a random shard, effectively tracking it.
     $config.states.moveCollection = function (db, collName, connCache) {
-        // TODO (SERVER-104789): when featureFlagSymmetricFCV is enabled, this test fails
-        // with "Authoritative shards requires no shard refreshes to be executed" error. This
-        // issue is being investigated in the mentioned ticket. Once that is resolved,
-        // we can run this state
-        if (FeatureFlagUtil.isEnabled(db.getSiblingDB("admin"), "SymmetricFCV")) {
-            return;
-        }
         db = $config.data.getRandomDb(db);
         const coll = $config.data.getRandomCollection(db);
         const fullNs = coll.getFullName();
