@@ -172,7 +172,7 @@ std::vector<RemoteCursor> ChangeStreamHandleTopologyChangeStage::establishShardC
         pExpCtx->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
         pExpCtx->getNamespaceString(),
         ReadPreferenceSetting::get(opCtx),
-        {{ShardRef{newShard.getName()}, cmdObj}},
+        {{newShard.getName(), cmdObj}},
         allowPartialResults);
 }
 

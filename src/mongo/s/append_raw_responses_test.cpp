@@ -17,7 +17,6 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/remote_command_response.h"
@@ -28,7 +27,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 #include <memory>
 #include <set>
@@ -77,15 +75,8 @@ executor::RemoteCommandResponse makeWriteConcernErrorResponse(
     return executor::RemoteCommandResponse::make_forTest(res.obj(), Milliseconds(0));
 }
 
-HostAndPort makeHostAndPort(const ShardHandle& shardHandle) {
-    return HostAndPort(str::stream() << shardHandle.name() << ":123");
-}
-
-AsyncRequestsSender::Response makeTestArsResponse(
-    const ShardHandle& shardHandle,
-    StatusWith<executor::RemoteCommandResponse> swResponse,
-    boost::optional<HostAndPort> hostAndPort = boost::none) {
-    return {ShardRef(shardHandle.name()), std::move(swResponse), std::move(hostAndPort)};
+HostAndPort makeHostAndPort(const ShardId& shardId) {
+    return HostAndPort(str::stream() << shardId << ":123");
 }
 
 class AppendRawResponsesTest : public ShardingTestFixture {
@@ -96,8 +87,8 @@ protected:
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         std::vector<std::tuple<ShardId, HostAndPort>> remoteShards;
-        for (const auto& shardHandle : kShardHandleList) {
-            remoteShards.emplace_back(shardHandle.name(), makeHostAndPort(shardHandle));
+        for (const auto& shardId : kShardIdList) {
+            remoteShards.emplace_back(shardId, makeHostAndPort(shardId));
         }
 
         addRemoteShards(remoteShards);
@@ -111,8 +102,8 @@ protected:
     void runAppendRawResponsesExpect(
         const std::vector<AsyncRequestsSender::Response>& shardResponses,
         const Status& expectedStatus,
-        const std::vector<ShardHandle>& expectedShardsInRawSubObj,
-        const std::vector<ShardHandle>& expectedShardsWithSuccessResponses,
+        const std::vector<ShardId>& expectedShardsInRawSubObj,
+        const std::set<ShardId>& expectedShardsWithSuccessResponses,
         const Status& expectedWriteConcernStatus = Status::OK()) {
         BSONObjBuilder result;
         std::string errmsg;
@@ -140,18 +131,15 @@ protected:
         // Check the 'raw' sub-object.
         const auto rawSubObj = resultObj.getField("raw").Obj();
         ASSERT_EQ(rawSubObj.nFields(), int(expectedShardsInRawSubObj.size()));
-        for (const auto& shard : expectedShardsInRawSubObj) {
-            ASSERT(rawSubObj.hasField(makeHostAndPort(shard).toString()));
+        for (const auto& shardId : expectedShardsInRawSubObj) {
+            ASSERT(rawSubObj.hasField(makeHostAndPort(shardId).toString()));
         }
 
         // Check the shards with successes object.
-        std::set<ShardId> expectedShardIds;
-        for (const auto& shard : expectedShardsWithSuccessResponses) {
-            expectedShardIds.insert(shard.name());
-        }
-        _assertShardIdsMatch(expectedShardIds, response.shardsWithSuccessResponses);
+        _assertShardIdsMatch(expectedShardsWithSuccessResponses,
+                             response.shardsWithSuccessResponses);
 
-        ASSERT_EQ(expectedShardIds.size(), response.successResponses.size());
+        ASSERT_EQ(expectedShardsWithSuccessResponses.size(), response.successResponses.size());
 
         // Check for a writeConcern error.
         if (expectedWriteConcernStatus.isOK()) {
@@ -166,18 +154,17 @@ protected:
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:
-            StaticCatalogClient(std::vector<ShardHandle> shards)
-                : _shardHandles(std::move(shards)) {}
+            StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
             repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
                                                                   repl::ReadConcernArgs readConcern,
                                                                   BSONObj filter) override {
                 std::vector<ShardType> shardTypes;
-                for (const auto& shardHandle : _shardHandles) {
+                for (const auto& shardId : _shardIds) {
                     const ConnectionString cs = ConnectionString::forReplicaSet(
-                        shardHandle.name().toString(), {makeHostAndPort(shardHandle)});
+                        shardId.toString(), {makeHostAndPort(shardId)});
                     ShardType sType;
-                    sType.setHandle(shardHandle);
+                    sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
                     sType.setHost(cs.toString());
                     shardTypes.push_back(std::move(sType));
                 };
@@ -185,20 +172,19 @@ protected:
             }
 
         private:
-            const std::vector<ShardHandle> _shardHandles;
+            const std::vector<ShardId> _shardIds;
         };
 
-        return std::make_unique<StaticCatalogClient>(kShardHandleList);
+        return std::make_unique<StaticCatalogClient>(kShardIdList);
     }
 
-    const ShardHandle kShardHandle1{ShardId("s1"), boost::make_optional(UUID::gen())};
-    const ShardHandle kShardHandle2{ShardId("s2"), boost::make_optional(UUID::gen())};
-    const ShardHandle kShardHandle3{ShardId("s3"), boost::make_optional(UUID::gen())};
-    const ShardHandle kShardHandle4{ShardId("s4"), boost::make_optional(UUID::gen())};
-    const ShardHandle kShardHandle5{ShardId("s5"), boost::make_optional(UUID::gen())};
+    const ShardId kShard1{"s1"};
+    const ShardId kShard2{"s2"};
+    const ShardId kShard3{"s3"};
+    const ShardId kShard4{"s4"};
+    const ShardId kShard5{"s5"};
 
-    const std::vector<ShardHandle> kShardHandleList{
-        kShardHandle1, kShardHandle2, kShardHandle3, kShardHandle4, kShardHandle5};
+    const std::vector<ShardId> kShardIdList{kShard1, kShard2, kShard3, kShard4, kShard5};
 
 private:
     static void _assertShardIdsMatch(const std::set<ShardId>& expectedShardIds,
@@ -223,14 +209,12 @@ private:
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnSuccess) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kOkResponse, makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kOkResponse, makeHostAndPort(kShardHandle3))};
+        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, kOkResponse, makeHostAndPort(kShard3)}};
 
-    runAppendRawResponsesExpect(shardResponses,
-                                Status::OK(),
-                                {kShardHandle1, kShardHandle2, kShardHandle3},
-                                {kShardHandle1, kShardHandle2, kShardHandle3});
+    runAppendRawResponsesExpect(
+        shardResponses, Status::OK(), {kShard1, kShard2, kShard3}, {kShard1, kShard2, kShard3});
 }
 
 //
@@ -239,54 +223,54 @@ TEST_F(AppendRawResponsesTest, AllShardsReturnSuccess) {
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnSuccessOneWithWriteConcernError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1,
-                            makeWriteConcernErrorResponse(kWriteConcernError1Status),
-                            makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kOkResponse, makeHostAndPort(kShardHandle3))};
+        {kShard1,
+         makeWriteConcernErrorResponse(kWriteConcernError1Status),
+         makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, kOkResponse, makeHostAndPort(kShard3)}};
 
     runAppendRawResponsesExpect(shardResponses,
                                 Status::OK(),
-                                {kShardHandle1, kShardHandle2, kShardHandle3},
-                                {kShardHandle1, kShardHandle2, kShardHandle3},
+                                {kShard1, kShard2, kShard3},
+                                {kShard1, kShard2, kShard3},
                                 kWriteConcernError1Status);
 }
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnSuccessMoreThanOneWithWriteConcernError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1,
-                            makeWriteConcernErrorResponse(kWriteConcernError1Status),
-                            makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2,
-                            makeWriteConcernErrorResponse(kWriteConcernError2Status),
-                            makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kOkResponse, makeHostAndPort(kShardHandle3))};
+        {kShard1,
+         makeWriteConcernErrorResponse(kWriteConcernError1Status),
+         makeHostAndPort(kShard1)},
+        {kShard2,
+         makeWriteConcernErrorResponse(kWriteConcernError2Status),
+         makeHostAndPort(kShard2)},
+        {kShard3, kOkResponse, makeHostAndPort(kShard3)}};
 
     // The first writeConcern error is reported.
     runAppendRawResponsesExpect(shardResponses,
                                 Status::OK(),
-                                {kShardHandle1, kShardHandle2, kShardHandle3},
-                                {kShardHandle1, kShardHandle2, kShardHandle3},
+                                {kShard1, kShard2, kShard3},
+                                {kShard1, kShard2, kShard3},
                                 kWriteConcernError1Status);
 }
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnSuccessAllWithWriteConcernError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1,
-                            makeWriteConcernErrorResponse(kWriteConcernError1Status),
-                            makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2,
-                            makeWriteConcernErrorResponse(kWriteConcernError2Status),
-                            makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3,
-                            makeWriteConcernErrorResponse(kWriteConcernError1Status),
-                            makeHostAndPort(kShardHandle3))};
+        {kShard1,
+         makeWriteConcernErrorResponse(kWriteConcernError1Status),
+         makeHostAndPort(kShard1)},
+        {kShard2,
+         makeWriteConcernErrorResponse(kWriteConcernError2Status),
+         makeHostAndPort(kShard2)},
+        {kShard3,
+         makeWriteConcernErrorResponse(kWriteConcernError1Status),
+         makeHostAndPort(kShard3)}};
 
     // The first writeConcern error is reported.
     runAppendRawResponsesExpect(shardResponses,
                                 Status::OK(),
-                                {kShardHandle1, kShardHandle2, kShardHandle3},
-                                {kShardHandle1, kShardHandle2, kShardHandle3},
+                                {kShard1, kShard2, kShard3},
+                                {kShard1, kShard2, kShard3},
                                 kWriteConcernError1Status);
 }
 
@@ -296,105 +280,95 @@ TEST_F(AppendRawResponsesTest, AllShardsReturnSuccessAllWithWriteConcernError) {
 
 TEST_F(AppendRawResponsesTest, AllAttemptsToSendRequestsReturnShardNotFoundError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(kShardHandle2, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(kShardHandle3, kShardNotFoundStatus, boost::none)};
+        {kShard1, kShardNotFoundStatus, boost::none},
+        {kShard2, kShardNotFoundStatus, boost::none},
+        {kShard3, kShardNotFoundStatus, boost::none}};
 
     // The ShardNotFound error gets promoted to a regular error.
     runAppendRawResponsesExpect(
-        shardResponses, kShardNotFoundStatus, {kShardHandle1, kShardHandle2, kShardHandle3}, {});
+        shardResponses, kShardNotFoundStatus, {kShard1, kShard2, kShard3}, {});
 }
 
 TEST_F(AppendRawResponsesTest,
        SomeShardsReturnSuccessRestOfAttemptsToSendRequestsReturnShardNotFoundError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kOkResponse, makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(kShardHandle4, kShardNotFoundStatus, boost::none)};
+        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, kShardNotFoundStatus, boost::none},
+        {kShard4, kShardNotFoundStatus, boost::none}};
 
     // The ShardNotFound errors are ignored.
-    runAppendRawResponsesExpect(shardResponses,
-                                Status::OK(),
-                                {kShardHandle1, kShardHandle2},
-                                {kShardHandle1, kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, Status::OK(), {kShard1, kShard2}, {kShard1, kShard2});
 }
 
 TEST_F(AppendRawResponsesTest, AllAttemptsToSendRequestsReturnSameError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kError1Status, boost::none),
-        makeTestArsResponse(kShardHandle2, kError1Status, boost::none),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none)};
+        {kShard1, kError1Status, boost::none},
+        {kShard2, kError1Status, boost::none},
+        {kShard3, kError1Status, boost::none}};
 
     // The error is returned.
-    runAppendRawResponsesExpect(
-        shardResponses, kError1Status, {kShardHandle1, kShardHandle2, kShardHandle3}, {});
+    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard1, kShard2, kShard3}, {});
 }
 
 TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestOfAttemptsToSendRequestsReturnSameError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kOkResponse, makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none),
-        makeTestArsResponse(kShardHandle4, kError1Status, boost::none)};
+        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, kError1Status, boost::none},
+        {kShard4, kError1Status, boost::none}};
 
     // The error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShardHandle1, kShardHandle2, kShardHandle3, kShardHandle4},
-                                {kShardHandle1, kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, kError1Status, {kShard1, kShard2, kShard3, kShard4}, {kShard1, kShard2});
 }
 
 TEST_F(AppendRawResponsesTest, AttemptsToSendRequestsReturnDifferentErrors) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kError1Status, boost::none),
-        makeTestArsResponse(kShardHandle2, kError2Status, boost::none),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none)};
+        {kShard1, kError1Status, boost::none},
+        {kShard2, kError2Status, boost::none},
+        {kShard3, kError1Status, boost::none}};
 
     // The first error is returned.
-    runAppendRawResponsesExpect(
-        shardResponses, kError1Status, {kShardHandle1, kShardHandle2, kShardHandle3}, {});
+    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard1, kShard2, kShard3}, {});
 }
 
 TEST_F(AppendRawResponsesTest,
        SomeShardsReturnSuccessRestOfAttemptsToSendRequestsReturnDifferentErrors) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kOkResponse, makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none),
-        makeTestArsResponse(kShardHandle4, kError2Status, boost::none)};
+        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, kError1Status, boost::none},
+        {kShard4, kError2Status, boost::none}};
 
     // The first error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShardHandle1, kShardHandle2, kShardHandle3, kShardHandle4},
-                                {kShardHandle1, kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, kError1Status, {kShard1, kShard2, kShard3, kShard4}, {kShard1, kShard2});
 }
 
 TEST_F(AppendRawResponsesTest, AllAttemptsToSendRequestsReturnErrorsSomeShardNotFound) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(kShardHandle2, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none),
-        makeTestArsResponse(kShardHandle4, kError2Status, boost::none)};
+        {kShard1, kShardNotFoundStatus, boost::none},
+        {kShard2, kShardNotFoundStatus, boost::none},
+        {kShard3, kError1Status, boost::none},
+        {kShard4, kError2Status, boost::none}};
 
     // The first error is returned.
-    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShardHandle3, kShardHandle4}, {});
+    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard3, kShard4}, {});
 }
 
 TEST_F(AppendRawResponsesTest,
        SomeShardsReturnSuccessRestOfAttemptsToSendRequestsReturnErrorsSomeShardNotFound) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none),
-        makeTestArsResponse(kShardHandle4, kError1Status, boost::none)};
+        {kShard1, kShardNotFoundStatus, boost::none},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, kError1Status, boost::none},
+        {kShard4, kError1Status, boost::none}};
 
     // The first error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShardHandle2, kShardHandle3, kShardHandle4},
-                                {kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, kError1Status, {kShard2, kShard3, kShard4}, {kShard2});
 }
 
 //
@@ -403,126 +377,92 @@ TEST_F(AppendRawResponsesTest,
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnShardNotFoundError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(
-            kShardHandle1, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(
-            kShardHandle2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3,
-                            makeErrorResponse(kShardNotFoundStatus),
-                            makeHostAndPort(kShardHandle3))};
+        {kShard1, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard1)},
+        {kShard2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard3)}};
 
     // The ShardNotFound error gets promoted to a regular error.
     runAppendRawResponsesExpect(
-        shardResponses, kShardNotFoundStatus, {kShardHandle1, kShardHandle2, kShardHandle3}, {});
+        shardResponses, kShardNotFoundStatus, {kShard1, kShard2, kShard3}, {});
 }
 
 TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestReturnShardNotFound) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kOkResponse, makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(
-            kShardHandle3, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle3)),
-        makeTestArsResponse(kShardHandle4,
-                            makeErrorResponse(kShardNotFoundStatus),
-                            makeHostAndPort(kShardHandle4))};
+        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard3)},
+        {kShard4, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard4)}};
 
     // The ShardNotFound errors are ignored.
-    runAppendRawResponsesExpect(shardResponses,
-                                Status::OK(),
-                                {kShardHandle1, kShardHandle2},
-                                {kShardHandle1, kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, Status::OK(), {kShard1, kShard2}, {kShard1, kShard2});
 }
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnSameError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(
-            kShardHandle1, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(
-            kShardHandle2, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(
-            kShardHandle3, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle3))};
+        {kShard1, makeErrorResponse(kError1Status), makeHostAndPort(kShard1)},
+        {kShard2, makeErrorResponse(kError1Status), makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kError1Status), makeHostAndPort(kShard3)}};
 
     // The error is returned.
-    runAppendRawResponsesExpect(
-        shardResponses, kError1Status, {kShardHandle1, kShardHandle2, kShardHandle3}, {});
+    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard1, kShard2, kShard3}, {});
 }
 
 TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestReturnError) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kOkResponse, makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(
-            kShardHandle3, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle3)),
-        makeTestArsResponse(
-            kShardHandle4, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle4))};
+        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kError1Status), makeHostAndPort(kShard3)},
+        {kShard4, makeErrorResponse(kError1Status), makeHostAndPort(kShard4)}};
 
     // The error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShardHandle1, kShardHandle2, kShardHandle3, kShardHandle4},
-                                {kShardHandle1, kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, kError1Status, {kShard1, kShard2, kShard3, kShard4}, {kShard1, kShard2});
 }
 
 TEST_F(AppendRawResponsesTest, ShardsReturnDifferentErrors) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(
-            kShardHandle1, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(
-            kShardHandle2, makeErrorResponse(kError2Status), makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(
-            kShardHandle3, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle3))};
+        {kShard1, makeErrorResponse(kError1Status), makeHostAndPort(kShard1)},
+        {kShard2, makeErrorResponse(kError2Status), makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kError1Status), makeHostAndPort(kShard3)}};
 
     // The first error is returned.
-    runAppendRawResponsesExpect(
-        shardResponses, kError1Status, {kShardHandle1, kShardHandle2, kShardHandle3}, {});
+    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard1, kShard2, kShard3}, {});
 }
 
 TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestReturnDifferentErrors) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kOkResponse, makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(
-            kShardHandle3, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle3)),
-        makeTestArsResponse(
-            kShardHandle4, makeErrorResponse(kError2Status), makeHostAndPort(kShardHandle4))};
+        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kError1Status), makeHostAndPort(kShard3)},
+        {kShard4, makeErrorResponse(kError2Status), makeHostAndPort(kShard4)}};
 
     // The first error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShardHandle1, kShardHandle2, kShardHandle3, kShardHandle4},
-                                {kShardHandle1, kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, kError1Status, {kShard1, kShard2, kShard3, kShard4}, {kShard1, kShard2});
 }
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnErrorsSomeShardNotFound) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(
-            kShardHandle1, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(
-            kShardHandle2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(
-            kShardHandle3, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle3)),
-        makeTestArsResponse(
-            kShardHandle4, makeErrorResponse(kError2Status), makeHostAndPort(kShardHandle4))};
+        {kShard1, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard1)},
+        {kShard2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kError1Status), makeHostAndPort(kShard3)},
+        {kShard4, makeErrorResponse(kError2Status), makeHostAndPort(kShard4)}};
 
     // The first non-ShardNotFound error is returned.
-    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShardHandle3, kShardHandle4}, {});
+    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard3, kShard4}, {});
 }
 
 TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestReturnErrorsSomeShardNotFound) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(
-            kShardHandle1, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle1)),
-        makeTestArsResponse(kShardHandle2, kOkResponse, makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(
-            kShardHandle3, makeErrorResponse(kError1Status), makeHostAndPort(kShardHandle3)),
-        makeTestArsResponse(
-            kShardHandle4, makeErrorResponse(kError2Status), makeHostAndPort(kShardHandle4))};
+        {kShard1, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard1)},
+        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
+        {kShard3, makeErrorResponse(kError1Status), makeHostAndPort(kShard3)},
+        {kShard4, makeErrorResponse(kError2Status), makeHostAndPort(kShard4)}};
 
     // The first non-ShardNotFound error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShardHandle2, kShardHandle3, kShardHandle4},
-                                {kShardHandle2});
+    runAppendRawResponsesExpect(
+        shardResponses, kError1Status, {kShard2, kShard3, kShard4}, {kShard2});
 }
 
 // Mix of errors *sending* and *processing* the requests.
@@ -530,56 +470,48 @@ TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestReturnErrorsSomeShardN
 TEST_F(AppendRawResponsesTest,
        AllShardsReturnErrorsMixOfErrorsSendingRequestsAndErrorsProcessingRequests) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(
-            kShardHandle2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none),
-        makeTestArsResponse(
-            kShardHandle4, makeErrorResponse(kError2Status), makeHostAndPort(kShardHandle4))};
+        {kShard1, kShardNotFoundStatus, boost::none},
+        {kShard2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard2)},
+        {kShard3, kError1Status, boost::none},
+        {kShard4, makeErrorResponse(kError2Status), makeHostAndPort(kShard4)}};
 
     // The first non-ShardNotFound error is returned.
-    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShardHandle3, kShardHandle4}, {});
+    runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard3, kShard4}, {});
 }
 
 TEST_F(
     AppendRawResponsesTest,
     SomeShardsReturnSuccessRestReturnErrorsMixOfErrorsSendingRequestsAndErrorsProcessingRequests) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(
-            kShardHandle2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none),
-        makeTestArsResponse(
-            kShardHandle4, makeErrorResponse(kError2Status), makeHostAndPort(kShardHandle4)),
-        makeTestArsResponse(kShardHandle5, kOkResponse, HostAndPort("e:1"))};
+        {kShard1, kShardNotFoundStatus, boost::none},
+        {kShard2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard2)},
+        {kShard3, kError1Status, boost::none},
+        {kShard4, makeErrorResponse(kError2Status), makeHostAndPort(kShard4)},
+        {kShard5, kOkResponse, HostAndPort("e:1")}};
 
     // The first non-ShardNotFound error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShardHandle3, kShardHandle4, kShardHandle5},
-                                {kShardHandle5});
+    runAppendRawResponsesExpect(
+        shardResponses, kError1Status, {kShard3, kShard4, kShard5}, {kShard5});
 }
 
 // Mix of errors sending or processing the requests *and* writeConcern error.
 
 TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessWithWriteConcernErrorRestReturnMixOfErrors) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
-        makeTestArsResponse(kShardHandle1, kShardNotFoundStatus, boost::none),
-        makeTestArsResponse(
-            kShardHandle2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShardHandle2)),
-        makeTestArsResponse(kShardHandle3, kError1Status, boost::none),
-        makeTestArsResponse(
-            kShardHandle4, makeErrorResponse(kError2Status), makeHostAndPort(kShardHandle4)),
-        makeTestArsResponse(kShardHandle5,
-                            makeWriteConcernErrorResponse(kWriteConcernError1Status),
-                            makeHostAndPort(kShardHandle5))};
+        {kShard1, kShardNotFoundStatus, boost::none},
+        {kShard2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard2)},
+        {kShard3, kError1Status, boost::none},
+        {kShard4, makeErrorResponse(kError2Status), makeHostAndPort(kShard4)},
+        {kShard5,
+         makeWriteConcernErrorResponse(kWriteConcernError1Status),
+         makeHostAndPort(kShard5)}};
 
     // The first non-ShardNotFound error is returned, and writeConcern error is reported at the top
     // level.
     runAppendRawResponsesExpect(shardResponses,
                                 kError1Status,
-                                {kShardHandle3, kShardHandle4, kShardHandle5},
-                                {kShardHandle5},
+                                {kShard3, kShard4, kShard5},
+                                {kShard5},
                                 kWriteConcernError1Status);
 }
 

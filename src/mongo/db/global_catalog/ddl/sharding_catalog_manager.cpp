@@ -535,7 +535,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
         if (!shardStatus.isOK()) {
             continue;
         }

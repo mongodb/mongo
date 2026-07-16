@@ -92,8 +92,6 @@ auto sendCommands(OperationContext* opCtx,
                 [&getShardId,
                  formatResponse](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
                                  size_t index) -> AsyncRequestsSender::Response {
-                    // TODO (SERVER-128062): Update the response to include the shard
-                    // handle.
                     return AsyncRequestsSender::Response{getShardId(index), formatResponse(reply)};
                 })
                 .getNoThrow();
@@ -117,7 +115,7 @@ auto sendCommands(OperationContext* opCtx,
                                return formatResponse(swReply.getValue());
                            }
                        }();
-                       // TODO (SERVER-128062): Update the response to include the shard handle.
+
                        return AsyncRequestsSender::Response{getShardId(index), response};
                    })
             .get();

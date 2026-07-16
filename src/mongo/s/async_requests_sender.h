@@ -78,10 +78,10 @@ public:
      * Defines a request to a remote shard that can be run by the ARS.
      */
     struct Request {
-        Request(ShardRef shardRef, BSONObj cmdObj, std::shared_ptr<Shard> shard = nullptr);
+        Request(ShardId shardId, BSONObj cmdObj, std::shared_ptr<Shard> shard = nullptr);
 
-        // ShardRef of the shard to which the command will be sent.
-        const ShardRef shardRef;
+        // ShardId of the shard to which the command will be sent.
+        const ShardId shardId;
 
         // The command object to send to the remote host.
         const BSONObj cmdObj;
@@ -94,9 +94,8 @@ public:
      * Defines a response for a request to a remote shard.
      */
     struct Response {
-        // TODO (SERVER-128424): Update callers to use the correct shard handle rather than shardId
-        // when possible.
-        ShardRef shardId;
+        // The shard to which the request was sent.
+        ShardId shardId;
 
         // The response or error from the remote.
         //
@@ -124,7 +123,7 @@ public:
         static Status getEffectiveStatus(const AsyncRequestsSender::Response& response);
     };
 
-    using ShardHostMap = stdx::unordered_map<ShardRef, HostAndPort>;
+    using ShardHostMap = stdx::unordered_map<ShardId, HostAndPort>;
 
     /**
      * Constructs a new AsyncRequestsSender. The OperationContext* and TaskExecutor* must remain
@@ -224,7 +223,7 @@ private:
              * Creates a new uninitialized remote state with a command to send.
              */
             RemoteData(OperationContext* opCtx,
-                       ShardRef shardRef,
+                       ShardId shardId,
                        BSONObj cmdObj,
                        HostAndPort designatedHost,
                        std::shared_ptr<Shard> shard = nullptr);
@@ -256,7 +255,7 @@ private:
              * Extracts a failed response from the remote, given an interruption status.
              */
             Response makeFailedResponse(Status status) && {
-                return {std::move(_shardRef), std::move(status), std::move(_shardHostAndPort)};
+                return {std::move(_shardId), std::move(status), std::move(_shardHostAndPort)};
             }
 
             /**
@@ -294,8 +293,8 @@ private:
         private:
             bool _done = false;
 
-            // ShardRef of the shard to which the command will be sent.
-            ShardRef _shardRef;
+            // ShardId of the shard to which the command will be sent.
+            ShardId _shardId;
 
             // ShardHandle of the shard to which the command was sent.
             ShardHandle _shardHandle;

@@ -68,8 +68,8 @@ protected:
         ShardServerTestFixture::setUp();
 
         {
-            auto donorShard = assertGet(shardRegistry()->getShard(
-                operationContext(), ShardRef(kDonorConnStr.getSetName())));
+            auto donorShard = assertGet(
+                shardRegistry()->getShard(operationContext(), kDonorConnStr.getSetName()));
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
                 ->setConnectionStringReturnValue(kDonorConnStr);
             RemoteCommandTargeterMock::get(donorShard->getTargeter())

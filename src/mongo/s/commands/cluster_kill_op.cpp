@@ -84,7 +84,7 @@ private:
         LOGV2(22754, "About to kill op", "opToKill"_attr = redact(opToKill));
 
         // Will throw if shard id is not found
-        auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardIdent));
+        auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdent);
         uassertStatusOK(shardStatus.getStatus());
         auto shard = shardStatus.getValue();
 

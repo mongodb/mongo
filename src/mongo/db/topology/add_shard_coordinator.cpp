@@ -344,7 +344,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 shardRegistry->reload(opCtx);
                 tassert(9870601,
                         "Shard not found in ShardRegistry after committing addShard",
-                        shardRegistry->getShard(opCtx, ShardRef(shard.getName())).isOK());
+                        shardRegistry->getShard(opCtx, shard.getName()).isOK());
 
                 topology_change_helpers::
                     hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);

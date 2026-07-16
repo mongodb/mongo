@@ -77,10 +77,8 @@ void AsyncRequestsSender::stopRetrying() noexcept {
     _impl->stopRetrying();
 }
 
-AsyncRequestsSender::Request::Request(ShardRef shardRef,
-                                      BSONObj cmdObj,
-                                      std::shared_ptr<Shard> shard)
-    : shardRef(std::move(shardRef)), cmdObj(std::move(cmdObj)), shard(std::move(shard)) {}
+AsyncRequestsSender::Request::Request(ShardId shardId, BSONObj cmdObj, std::shared_ptr<Shard> shard)
+    : shardId(std::move(shardId)), cmdObj(std::move(cmdObj)), shard(std::move(shard)) {}
 
 Status AsyncRequestsSender::Response::getEffectiveStatus(
     const AsyncRequestsSender::Response& response) {
@@ -118,12 +116,12 @@ AsyncRequestsSender::Impl::Impl(OperationContext* opCtx,
 
     _remotes.reserve(requests.size());
     for (const auto& request : requests) {
-        auto designatedHostIter = designatedHostsMap.find(request.shardRef);
+        auto designatedHostIter = designatedHostsMap.find(request.shardId);
         auto designatedHost = designatedHostIter != designatedHostsMap.end()
             ? designatedHostIter->second
             : HostAndPort();
         _remotes.emplace_back(
-            _opCtx, request.shardRef, request.cmdObj, std::move(designatedHost), request.shard);
+            _opCtx, request.shardId, request.cmdObj, std::move(designatedHost), request.shard);
     }
 
     CurOp::get(_opCtx)->ensureRecordRemoteOpWait();
@@ -277,11 +275,11 @@ AsyncRequestsSender::Response AsyncRequestsSender::Impl::next() {
 }
 
 AsyncRequestsSender::Impl::RemoteData::RemoteData(OperationContext* opCtx,
-                                                  ShardRef shardRef,
+                                                  ShardId shardId,
                                                   BSONObj cmdObj,
                                                   HostAndPort designatedHostAndPort,
                                                   std::shared_ptr<Shard> shard)
-    : _shardRef(std::move(shardRef)),
+    : _shardId(std::move(shardId)),
       _cmdObj(std::move(cmdObj)),
       _designatedHostAndPort(std::move(designatedHostAndPort)),
       _shard(std::move(shard)),
@@ -295,13 +293,11 @@ SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::Impl::RemoteData::getSha
         using std::swap;
         std::shared_ptr<Shard> temp;
         swap(_shard, temp);
-        _shardHandle = temp->getHandle();
         return temp;
     }
-
     return Grid::get(getGlobalServiceContext())
         ->shardRegistry()
-        ->getShard(*impl->_subBaton, _shardRef)
+        ->getShard(*impl->_subBaton, _shardId)
         .thenRunOn(*impl->_subBaton)
         .then([this, impl = std::move(impl)](auto&& shard) {
             _shardHandle = shard->getHandle();
@@ -317,10 +313,10 @@ void AsyncRequestsSender::Impl::RemoteData::executeRequest(std::shared_ptr<Impl>
             _done = true;
             if (rcr.isOK()) {
                 impl->_responseQueue.push(
-                    {std::move(_shardRef), rcr.getValue().response, std::move(_shardHostAndPort)});
+                    {std::move(_shardId), rcr.getValue().response, std::move(_shardHostAndPort)});
             } else {
                 impl->_responseQueue.push(
-                    {std::move(_shardRef), rcr.getStatus(), std::move(_shardHostAndPort)});
+                    {std::move(_shardId), rcr.getStatus(), std::move(_shardHostAndPort)});
             }
         });
 }
@@ -446,7 +442,7 @@ auto AsyncRequestsSender::Impl::RemoteData::handleResponse(RemoteCommandCallback
                     4615637,
                     1,
                     "Command to remote shard failed with retryable error and will be retried",
-                    "shardRef"_attr = _shardRef,
+                    "shardId"_attr = _shardId,
                     "attemptedHosts"_attr = rcr.request.target,
                     "failedHost"_attr = rcr.response.target,
                     "error"_attr = redact(status),
