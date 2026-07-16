@@ -10,6 +10,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -207,14 +208,14 @@ public:
     }
 
     /**
-     * In-memory tag identifying a group of operations that should be kept together when packing
-     * operations into applyOps entries.
+     * In-memory only (not serialized): the record id of the group this operation belongs to. Lets
+     * the applyOps packer keep a group's operations in one entry.
      */
-    boost::optional<int32_t> getAtomicGroupId() const {
-        return _atomicGroupId;
+    boost::optional<RecordId> getGroupRecordId() const {
+        return _groupRecordId;
     }
-    void setAtomicGroupId(boost::optional<int32_t> value) {
-        _atomicGroupId = value;
+    void setGroupRecordId(boost::optional<RecordId> value) {
+        _groupRecordId = std::move(value);
     }
 
     /**
@@ -285,8 +286,8 @@ private:
     // transaction.
     bool _preImageRecordedForRetryableInternalTransaction{false};
 
-    // In-memory tag for grouping operations during applyOps packing.
-    boost::optional<int32_t> _atomicGroupId;
+    // Record id saved to identify this operation's group during applyOps packing.
+    boost::optional<RecordId> _groupRecordId;
 };
 
 /**

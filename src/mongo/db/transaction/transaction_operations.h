@@ -173,6 +173,14 @@ public:
     void clear();
 
     /**
+     * Reorders the stored operations so all operations for the same record are contiguous, which
+     * getApplyOpsInfo(..., respectAtomicGroups) requires to fit a record's operations in one
+     * applyOps entry. A record is its group record id if set, else its own record id; records keep
+     * first-seen order and operations keep their staged order within a record.
+     */
+    void groupByRecordId();
+
+    /**
      * Adds an operation to this container and updates relevant statistics.
      *
      * Ensures that statement ids in operation do not conflict with the operations
@@ -181,7 +189,7 @@ public:
      * Ensures that total size of collected operations after adding operation does not
      * exceed 'transactionSizeLimitBytes' (if provided).
      */
-    Status addOperation(const TransactionOperation& operation,
+    Status addOperation(TransactionOperation operation,
                         boost::optional<std::size_t> transactionSizeLimitBytes = boost::none);
 
     /**
@@ -198,10 +206,17 @@ public:
      * operations, their assignments to "applyOps" entries, and the number of oplog slots to be used
      * for writing pre- and post- image oplog entries for the transaction consisting of
      * 'operations'. The 'prepare' indicates if the function is called when preparing a transaction.
+     *
+     * When 'respectAtomicGroups' is true, a group's operations are never split across "applyOps"
+     * entries: a group that would straddle a boundary is packed whole into the next entry, and a
+     * group too large for one entry throws TransactionTooLarge. The operations must already be
+     * grouped (see groupByRecordId). Used for kGroupForPossiblyRetryableOperations, whose entries
+     * apply independently on secondaries.
      */
     ApplyOpsInfo getApplyOpsInfo(std::size_t oplogEntryCountLimit,
                                  std::size_t oplogEntrySizeLimitBytes,
-                                 bool prepare) const;
+                                 bool prepare,
+                                 bool respectAtomicGroups = false) const;
 
     /**
      * Logs applyOps oplog entries for preparing a transaction, committing an unprepared

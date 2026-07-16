@@ -1,19 +1,15 @@
 /**
- * Tests that a primary-driven index build aborts on step-up after a concurrent multi-statement write
- * is torn across applyOps oplog entries -- whether the failover happens during the load phase, with
+ * Tests that a primary-driven index build resumes on step-up after a concurrent multi-statement write
+ * spans multiple applyOps oplog entries -- whether the failover happens during the load phase, with
  * resume state already persisted, or before the build has written any resume state.
  *
- * A write touching multiple documents replicates as a batch whose operations can be applied
- * independently. When the batch spans more than one applyOps oplog entry, the index entries the build
- * records for it can be torn across the boundary, leaving state the build cannot safely resume from,
- * so it must abort on step-up. The split is forced here by lowering
- * maxNumberOfBatchedOperationsInSingleOplogEntry; in production it happens when the batch exceeds the
- * 16 MB oplog entry limit (for example a large time-series insert). A single-statement write
- * replicates atomically and cannot tear, so it resumes instead; see
- * single_statement_write_resumes_on_failover.js.
- *
- * TODO (SERVER-126257): Update this test when the build can resume across a torn write; the torn
- * cases will then resume rather than abort.
+ * A write touching multiple documents replicates as a batch that can span more than one applyOps
+ * oplog entry, and those entries apply independently on secondaries. The applyOps packer keeps each
+ * record's operations (its collection write and the index entries the build records for it) within a
+ * single entry, so no record is torn across the boundary and the build is safe to resume. The split
+ * is forced here by lowering maxNumberOfBatchedOperationsInSingleOplogEntry; in production it happens
+ * when the batch exceeds the 16 MB oplog entry limit (for example a large time-series insert). See
+ * single_statement_write_resumes_on_failover.js for the single-statement case.
  *
  * @tags: [
  *   requires_persistence,
@@ -37,9 +33,9 @@ const requiredFlags = [
     "ResumablePrimaryDrivenIndexBuilds",
 ];
 
-// Runs a primary-driven index build, performs a multi-document insert forced to tear across applyOps
-// oplog entries, fails over (either during the load phase or before any resume state is written),
-// and asserts the build aborted on the new primary.
+// Runs a primary-driven index build, performs a multi-document insert forced to span multiple
+// applyOps oplog entries, fails over (either during the load phase or before any resume state is
+// written), and asserts the build resumed and completed on the new primary.
 function runScenario({failoverDuringLoad}) {
     const rst = new ReplSetTest({
         nodes: TestData.doesNotSupportGracefulStepdown
@@ -58,10 +54,9 @@ function runScenario({failoverDuringLoad}) {
             quit();
         }
     }
-    // The suite injects random WT write conflicts. Under them, the torn vectored insert below falls
-    // back to per-document kGroupForTransaction inserts, which apply atomically and are safe to
-    // resume. Disable the fault injection so the torn-write-aborts-the-build path is exercised
-    // deterministically.
+    // The suite injects random WT write conflicts, which would steer the insert below onto a
+    // different (per-document) write path. Disable the fault injection so it deterministically takes
+    // the grouped batched-write path this test is exercising.
     for (const node of rst.nodes) {
         assert.commandWorked(
             node.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}),
@@ -100,8 +95,8 @@ function runScenario({failoverDuringLoad}) {
     IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, indexName);
 
     // Capping the operations per applyOps entry at 1 forces this multi-document insert to span
-    // multiple oplog entries that apply independently, so the index entries the build records for it
-    // are torn apart.
+    // multiple oplog entries that apply independently. The packer still keeps each record's
+    // operations together, so no record is torn across the boundary.
     assert.commandWorked(
         primary.adminCommand({setParameter: 1, maxNumberOfBatchedOperationsInSingleOplogEntry: 1}),
     );
@@ -117,7 +112,7 @@ function runScenario({failoverDuringLoad}) {
         }),
     );
     // Self-validation: the insert must have spanned more than one applyOps entry, otherwise the
-    // scenario is not exercising the torn-write path it claims to.
+    // scenario is not exercising the multi-entry resume path it claims to.
     const applyOpsEntries = oplog
         .find({ts: {$gt: tsBeforeInsert}, "o.applyOps": {$exists: true}})
         .toArray();
@@ -143,15 +138,20 @@ function runScenario({failoverDuringLoad}) {
     }
     awaitIndexBuild({checkExitSuccess: false});
 
-    // The torn write leaves the build unable to resume, so it is aborted on the new primary.
+    // Each record's operations stayed within one applyOps entry, so the build resumes and completes
+    // on the new primary.
     const newColl = newPrimary.getDB(dbName).getCollection(collName);
-    IndexBuildTest.assertIndexesSoon(newColl, 1, ["_id_"]);
+    IndexBuildTest.assertIndexesSoon(newColl, 2, ["_id_", indexName]);
 
     rst.stopSet();
 }
 
-jsTest.log.info("Torn multi-statement write, failover during the load phase -> build aborts");
+jsTest.log.info(
+    "Multi-statement write spanning applyOps entries, failover during the load phase -> build resumes",
+);
 runScenario({failoverDuringLoad: true});
 
-jsTest.log.info("Torn multi-statement write, failover before any resume state -> build aborts");
+jsTest.log.info(
+    "Multi-statement write spanning applyOps entries, failover before any resume state -> build resumes",
+);
 runScenario({failoverDuringLoad: false});

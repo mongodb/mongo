@@ -32,8 +32,7 @@ void BatchedWriteContext::assertNoMixedBatchedOps(bool isDDL) {
     }
 }
 
-void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
-                                              const BatchedOperation& operation) {
+void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx, BatchedOperation operation) {
     invariant(_batchWrites);
     assertNoMixedBatchedOps(/*isDDL=*/false);
 
@@ -48,7 +47,35 @@ void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    invariantStatusOK(_batchedOperations.addOperation(operation));
+    if (_currentGroupRecordId) {
+        // Stamp the operation with its record so the packer keeps a record's operations in one
+        // entry.
+        operation.setGroupRecordId(*_currentGroupRecordId);
+        _hasAtomicOperationGroups = true;
+    }
+    invariantStatusOK(_batchedOperations.addOperation(std::move(operation)));
+}
+
+BatchedWriteContext::AtomicOperationGroup::AtomicOperationGroup(OperationContext* opCtx,
+                                                                const RecordId& recordId)
+    : _context(BatchedWriteContext::get(opCtx)) {
+    _context._enterAtomicOperationGroup(recordId);
+}
+
+BatchedWriteContext::AtomicOperationGroup::~AtomicOperationGroup() {
+    _context._leaveAtomicOperationGroup();
+}
+
+void BatchedWriteContext::_enterAtomicOperationGroup(const RecordId& recordId) {
+    // Nesting is not supported: a group must be left before another is entered.
+    invariant(!_currentGroupRecordId);
+    _currentGroupRecordId = recordId;
+}
+
+void BatchedWriteContext::_leaveAtomicOperationGroup() {
+    // Must be balanced with a preceding _enterAtomicOperationGroup().
+    invariant(_currentGroupRecordId);
+    _currentGroupRecordId = boost::none;
 }
 
 TransactionOperations* BatchedWriteContext::getBatchedOperations(OperationContext* opCtx) {
@@ -59,6 +86,8 @@ TransactionOperations* BatchedWriteContext::getBatchedOperations(OperationContex
 void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {
     _batchedOperations.clear();
     _ddlOperationOccurred = false;
+    _currentGroupRecordId = boost::none;
+    _hasAtomicOperationGroups = false;
 }
 
 bool BatchedWriteContext::writesAreBatched() const {

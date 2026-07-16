@@ -23,6 +23,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -198,6 +199,7 @@ Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
         Status status = _indexKeysOrWriteToSideTable(opCtx,
                                                      coll,
                                                      entry,
+                                                     bsonRecord.id,
                                                      *keys,
                                                      *multikeyMetadataKeys,
                                                      *multikeyPaths,
@@ -241,7 +243,7 @@ void SortedDataIndexAccessMethod::remove(OperationContext* opCtx,
             loc);
 
     _unindexKeysOrWriteToSideTable(
-        opCtx, coll, entry, *keys, obj, logIfError, numDeleted, options, checkRecordId);
+        opCtx, coll, entry, loc, *keys, obj, logIfError, numDeleted, options, checkRecordId);
 }
 
 Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
@@ -263,6 +265,7 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
         _unindexKeysOrWriteToSideTable(opCtx,
                                        coll,
                                        entry,
+                                       loc,
                                        updateTicket.removed,
                                        oldDoc,
                                        logIfError,
@@ -272,6 +275,7 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
         return _indexKeysOrWriteToSideTable(opCtx,
                                             coll,
                                             entry,
+                                            loc,
                                             updateTicket.added,
                                             updateTicket.newMultikeyMetadataKeys,
                                             updateTicket.newMultikeyPaths,
@@ -1541,6 +1545,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const IndexCatalogEntry* entry,
+    const RecordId& recordId,
     const KeyStringSet& keys,
     const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths,
@@ -1559,6 +1564,8 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
             }
         }
 
+        // Group this record's side-table writes so the packer keeps them with its collection write.
+        BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t inserted = 0;
         status = interceptor->sideWrite(opCtx,
                                         coll,
@@ -1596,6 +1603,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const IndexCatalogEntry* entry,
+    const RecordId& recordId,
     const KeyStringSet& keys,
     const BSONObj& obj,
     bool logIfError,
@@ -1612,6 +1620,8 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
             }
         }
 
+        // Group this record's side-table writes so the packer keeps them with its collection write.
+        BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t removed = 0;
         fassert(
             31155,

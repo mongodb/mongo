@@ -4,8 +4,11 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/transaction/transaction_operations.h"
 #include "mongo/util/modules.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
@@ -48,7 +51,7 @@ public:
      * The stored operations must generate an applyOps entry that's within the max BSON size.
      * Anything larger will throw a TransactionTooLarge exception at commit.
      */
-    void addBatchedOperation(OperationContext* opCtx, const BatchedOperation& operation);
+    void addBatchedOperation(OperationContext* opCtx, BatchedOperation operation);
 
     /**
      * Returns a pointer to the stored operations for the current WUOW.
@@ -56,11 +59,48 @@ public:
     TransactionOperations* getBatchedOperations(OperationContext* opCtx);
     void clearBatchedOperations(OperationContext* opCtx);
 
+    /**
+     * RAII scope that stamps every operation staged during its lifetime with a shared group record
+     * id (from 'recordId'), so the applyOps packer keeps operations for the same record within a
+     * single applyOps entry. Nesting is not supported.
+     */
+    class AtomicOperationGroup {
+    public:
+        AtomicOperationGroup(OperationContext* opCtx, const RecordId& recordId);
+        ~AtomicOperationGroup();
+        AtomicOperationGroup(const AtomicOperationGroup&) = delete;
+        AtomicOperationGroup& operator=(const AtomicOperationGroup&) = delete;
+
+    private:
+        BatchedWriteContext& _context;
+    };
+
+    /**
+     * Returns true if any operation staged in this batch was assigned an atomic group, i.e. an
+     * AtomicOperationGroup was active while staging.
+     */
+    bool hasAtomicOperationGroups() const {
+        return _hasAtomicOperationGroups;
+    }
+
 private:
+    // Sets the group record id stamped on operations staged while an AtomicOperationGroup is
+    // active.
+    void _enterAtomicOperationGroup(const RecordId& recordId);
+    // Clears the current group record id.
+    void _leaveAtomicOperationGroup();
+
     // Whether batching writes is enabled.
     bool _batchWrites = false;
     // Whether a DDL operation has occurred in the current batched write group.
     bool _ddlOperationOccurred = false;
+
+    // The group record id stamped onto operations staged while an AtomicOperationGroup is active;
+    // boost::none when none is active.
+    boost::optional<RecordId> _currentGroupRecordId;
+    // Whether any staged operation was stamped with a group record id. Gates group-aware packing at
+    // commit.
+    bool _hasAtomicOperationGroups = false;
 
     /**
      * Holds oplog data for operations which have been applied in the current batched

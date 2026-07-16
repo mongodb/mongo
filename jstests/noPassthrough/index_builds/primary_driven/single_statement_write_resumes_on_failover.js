@@ -5,9 +5,8 @@
  *
  * A single-statement write replicates and applies as one atomic unit, so the index entries the build
  * records for it cannot be torn apart on the new primary, even when the write is large enough to span
- * multiple applyOps oplog entries. The build is therefore safe to resume after failover. A torn
- * multi-statement write is the case that instead forces an abort; see
- * multi_statement_write_aborts_on_failover.js.
+ * multiple applyOps oplog entries. The build is therefore safe to resume after failover. See
+ * multi_statement_write_resumes_on_failover.js for the multi-statement case.
  *
  * @tags: [
  *   requires_persistence,
