@@ -423,6 +423,12 @@ public:
      */
     void stopExpressionCounters();
 
+    /**
+     * Increments the memory-intensive expression counter and throws ExceededMemoryLimit if it
+     * exceeds internalQueryMaxMemoryIntensiveExpressions.
+     */
+    void checkAndIncrementMemoryIntensiveExprCount(std::string_view exprName);
+
     bool expressionCountersAreActive() const {
         return static_cast<bool>(_expressionCounters);
     }
@@ -1403,6 +1409,7 @@ private:
     // Created lazily and reused across all documents/expressions in this query.
     boost::optional<SimpleMemoryUsageTracker> _expressionFallbackTracker;
 
+    uint32_t _memoryIntensiveExprCount = 0;
     bool _gotTemporarilyUnavailableException = false;
 
     bool _isCappedDelete = false;
