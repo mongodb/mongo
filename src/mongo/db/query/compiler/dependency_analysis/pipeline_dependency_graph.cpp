@@ -7,7 +7,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
@@ -156,6 +158,26 @@ using FieldId = TypedId<Field>;
 
 using FieldMap = absl::flat_hash_map<StringPool::Id, FieldId>;
 using ModifiedPrefixPolicy = document_transformation::ModifiedPrefixPolicy;
+using ParsedPath = boost::container::small_vector<StringPool::Id, 8>;
+using ParsedPathView = std::span<const StringPool::Id>;
+
+/// Describes how a stage exposes its subpipeline's output into the enclosing document.
+enum class SubpipelineKind : uint8_t {
+    /// The exposure shape is unknown; make no assumptions about where output lands.
+    kOther,
+    /// Output embedded at a single field (the $lookup "as").
+    kEmbedded,
+    /// Output merged as whole documents ($unionWith).
+    kUnion,
+};
+
+/// Metadata describing a stage's subpipeline.
+struct SubpipelineInfo {
+    std::unique_ptr<DependencyGraph> graph;
+    SubpipelineKind kind{SubpipelineKind::kOther};
+    /// The path at which the subpipeline output is stored (the $lookup "as"), empty otherwise.
+    ParsedPath embeddingPath;
+};
 
 /// Represents the set of field definition nodes that a stage or a field definition node depends on.
 /// When a stage depends on a field definition, it means that the stage references a field that was
@@ -246,9 +268,8 @@ struct Stage {
     // the graph.
     ScopeId nextNewScope;
     bool isSingleDocumentTransformation;
-    // If this stage has a sub-pipeline (e.g. $lookup, $unionWith), this points to the dependency
-    // graph for that sub-pipeline's stages, owned by Impl::_subpipelineGraphs.
-    DependencyGraph* subpipelineGraph = nullptr;
+    // If this stage has a subpipeline, points to its metadata; nullptr otherwise.
+    SubpipelineInfo* subpipeline = nullptr;
 };
 
 /**
@@ -451,6 +472,7 @@ std::string_view getPathPrefix(std::string_view path) {
     return {};
 }
 
+
 /// Result type used when looking up a field.
 enum class FieldMatchType : uint8_t {
     /**
@@ -600,7 +622,7 @@ public:
         if (type == FieldMatchType::kShadowed) {
             ScopeId declaringScopeId = _fields[fieldId].declaringScope;
             StageId declaringStageId = _scopes[declaringScopeId].stage;
-            if (auto* subGraph = _stages[declaringStageId].subpipelineGraph) {
+            if (auto* subGraph = getSubpipelineForPath(declaringStageId, parsedPath)) {
                 auto suffixPath = skipPathComponents(path, prefix.size() + 1);
                 if (!suffixPath.empty()) {
                     auto result = subGraph->getPrevModifyingStageIncludingSubpipelines_forTest(
@@ -641,7 +663,7 @@ public:
                 // resolve the suffix path against the sub-pipeline's graph.
                 ScopeId declaringScopeId = _fields[fieldId].declaringScope;
                 StageId declaringStageId = _scopes[declaringScopeId].stage;
-                if (auto* subGraph = _stages[declaringStageId].subpipelineGraph) {
+                if (auto* subGraph = getSubpipelineForPath(declaringStageId, parsedPath)) {
                     auto suffixPath = skipPathComponents(path, prefix.size() + 1);
                     if (!suffixPath.empty()) {
                         return subGraph->canPathBeArray(nullptr, suffixPath);
@@ -726,7 +748,28 @@ public:
 
     const DependencyGraph* getSubpipelineGraph(const DocumentSource* ds) const {
         auto stageId = getStageId(ds);
-        return _stages[stageId].subpipelineGraph;
+        auto* sub = _stages[stageId].subpipeline;
+        return sub ? sub->graph.get() : nullptr;
+    }
+
+    /**
+     * Returns the subpipeline graph that 'path' resolves into, or nullptr if it does not. 'path'
+     * resolves into 'stageId's subpipeline when the stage's embedding path is a prefix of it (the
+     * embedding field itself, or any field nested under it).
+     */
+    const DependencyGraph* getSubpipelineForPath(StageId stageId, ParsedPathView path) const {
+        const auto* sub = _stages[stageId].subpipeline;
+        if (!sub || sub->kind != SubpipelineKind::kEmbedded) {
+            return nullptr;
+        }
+        const auto& embedding = sub->embeddingPath;
+        if (path.size() < embedding.size()) {
+            return nullptr;
+        }
+        if (!std::equal(embedding.begin(), embedding.end(), path.begin())) {
+            return nullptr;
+        }
+        return sub->graph.get();
     }
 
     FieldOrigin resolveFieldOrigin(const DocumentSource* ds, PathRef path) const {
@@ -777,9 +820,9 @@ public:
 
                 // If the path comes from a $lookup, we need to ensure that the $lookup 'as' field
                 // was unwound.
-                if (auto* subpipeline = _stages[declaringStageId].subpipelineGraph;
-                    subpipeline && !_fields[fieldId].metadata.canFieldBeArray) {
-                    // Strip the 'as' path (shadowing portion).
+                if (auto* subGraph = getSubpipelineForPath(declaringStageId, parsedPath);
+                    subGraph && !_fields[fieldId].metadata.canFieldBeArray) {
+                    // Strip the embedding field path (shadowing portion).
                     auto suffixPath = skipPathComponents(path, prefix.size() + 1);
                     return {FieldOriginKind::kSubpipeline, declaringStage, std::string(suffixPath)};
                 }
@@ -924,8 +967,6 @@ public:
     }
 
 private:
-    using ParsedPath = boost::container::small_vector<StringPool::Id, 8>;
-    using ParsedPathView = std::span<const StringPool::Id>;
     using FieldList = boost::container::small_vector<FieldId, 8>;
     using Bitset = DynamicBitset<size_t, 1>;
 
@@ -1860,6 +1901,19 @@ private:
     }
 
     /**
+     * Fills in metadata which describes how the DocumentSource exposes the subpipeline results.
+     */
+    void setSubpipelineMetadata(const DocumentSource* ds, SubpipelineInfo& info) {
+        if (typeid(*ds) == typeid(DocumentSourceLookUp)) {
+            info.kind = SubpipelineKind::kEmbedded;
+            info.embeddingPath =
+                internPath(checked_cast<const DocumentSourceLookUp*>(ds)->getAsField().fullPath());
+        } else if (typeid(*ds) == typeid(DocumentSourceUnionWith)) {
+            info.kind = SubpipelineKind::kUnion;
+        }
+    }
+
+    /**
      * If the stage has a sub-pipeline (e.g. $lookup, $unionWith), builds a separate
      * DependencyGraph for it. Initialize the corresponding PathArrayness API with
      * canSecondaryCollPathBeArray().
@@ -1872,9 +1926,12 @@ private:
         auto subExpCtx = ds->getSubpipelineExpCtx();
         tassert(12414601, "Expected to have subpipeline expression context", subExpCtx);
         auto& mainExpCtx = *ds->getExpCtx();
-        _subpipelineGraphs.push_back(std::make_unique<DependencyGraph>(
-            *subPipeline, CanPathBeArrayForNss{mainExpCtx, subExpCtx->getNamespaceString()}));
-        _stages[stageId].subpipelineGraph = _subpipelineGraphs.back().get();
+        auto info = std::make_unique<SubpipelineInfo>();
+        setSubpipelineMetadata(ds, *info);
+        info->graph = std::make_unique<DependencyGraph>(
+            *subPipeline, CanPathBeArrayForNss{mainExpCtx, subExpCtx->getNamespaceString()});
+        _subpipelineGraphs.push_back(std::move(info));
+        _stages[stageId].subpipeline = _subpipelineGraphs.back().get();
     }
 
     /**
@@ -2111,7 +2168,7 @@ private:
         size_t subpipelinesToRemove = 0;
         for (auto sid = invalidStage; sid < _stages.getNextId(); sid.value++) {
             // Remove subpipeline graphs for invalidated stages (always at the tail of the vector).
-            if (_stages[sid].subpipelineGraph) {
+            if (_stages[sid].subpipeline) {
                 ++subpipelinesToRemove;
             }
             // Clean up DocumentSource to StageId mapping for affected stages.
@@ -2188,8 +2245,8 @@ private:
     // Side table of known constant Values, keyed by FieldId.
     absl::flat_hash_map<FieldId, Value> _constants;
 
-    // Owns the immediate sub-pipeline dependency graphs for stages in this pipeline.
-    std::vector<std::unique_ptr<DependencyGraph>> _subpipelineGraphs;
+    // Owns the immediate subpipeline metadata for stages in this pipeline.
+    std::vector<std::unique_ptr<SubpipelineInfo>> _subpipelineGraphs;
 
     // Reference to the complete pipeline.
     const DocumentSourceContainer& _container;
@@ -2344,8 +2401,8 @@ private:
         BSONObjBuilder stageBob = bob.subobjStart(formatStage(stageId));
         serializeScope(stage.scope, stageBob);
         serializeDependencies(stage.dependencies, stageBob);
-        if (stage.subpipelineGraph) {
-            stageBob.append("subpipelineGraph", stage.subpipelineGraph->toBSON());
+        if (stage.subpipeline) {
+            stageBob.append("subpipelineGraph", stage.subpipeline->graph->toBSON());
         }
     }
 

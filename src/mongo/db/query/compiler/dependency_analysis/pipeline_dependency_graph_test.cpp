@@ -499,6 +499,22 @@ TEST_F(PipelineDependencyGraphTest, LookupWithAbsorbedUnwindArrayIndexIsNotArray
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayUnwindArrayIndexIsNotSubpipeline) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 2}}]
+        }},
+        {$unwind: {path: "$docs", includeArrayIndex: "docsIdx"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "docsIdx.b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, SubPipelineCanPathBeArrayUnknownSubField) {
     setOptimizedPipeline(R"([
         {$lookup: {
@@ -535,6 +551,22 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineGetDeclaringStageThenMatch) {
         auto subDeclaringStage = subGraph->getPrevModifyingStage(nullptr, "b_ssn");
         ASSERT_EQUALS(result.srcStages.back(), subDeclaringStage);
         ASSERT_TRUE(result.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnwindArrayIndexNotFromSubpipeline) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e', "
+        "            pipeline: [{$set: {b_ssn: 2}}]}}, "
+        " {$unwind: {path: '$e', includeArrayIndex: 'idx'}}]");
+    runTest([&] {
+        auto idxResult =
+            graph->getPrevModifyingStageIncludingSubpipelines_forTest(nullptr, "idx.b_ssn");
+        ASSERT_FALSE(idxResult.fromSubpipeline);
+
+        auto embeddedResult =
+            graph->getPrevModifyingStageIncludingSubpipelines_forTest(nullptr, "e.b_ssn");
+        ASSERT_TRUE(embeddedResult.fromSubpipeline);
     });
 }
 
@@ -3405,6 +3437,22 @@ TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginSubpipelineCrossing) {
                      FieldOriginKind::kOther,
                      stages[0].get(),
                      nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginUnwindArrayIndexIsNotSubpipeline) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: {path: '$e', includeArrayIndex: 'idx'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "idx.y"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y");
     });
 }
 
