@@ -181,3 +181,6 @@ filters:
   - "shard_requests_mongos_metrics.js":
     approvers:
       - 10gen/server-networking-and-observability
+  - "invalid_shard_identity_doc.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
