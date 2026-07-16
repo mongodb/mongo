@@ -1,5 +1,9 @@
 /**
  * queryStats test for sharded $search queries.
+ *
+ * TODO (SERVER-131073): Migrate this test to an e2e suite once native $search and $searchMeta query
+ * stats serialization on mongos is fixed.
+ *
  * @tags: [featureFlagQueryStats]
  */
 

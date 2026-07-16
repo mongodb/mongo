@@ -1,5 +1,10 @@
 /**
  * Tests for the `$search` aggregation pipeline stage.
+ *
+ * TODO (SERVER-131069): Remove the success-path cases in this file now that they have been migrated
+ * to an e2e suite (basic search, searchScore, searchScoreDetails, and multi-batch coverage lives in
+ * e2e/search/search.js and e2e/search/search_metadata.js). The malformed-response validation cases
+ * (invalid $searchScoreDetails values) must stay mocked, since real mongot cannot produce them.
  */
 import {assertCreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

@@ -7,6 +7,9 @@
  *
  * Note that you can't access $$SEARCH_META after a stage with a sub-pipeline, so the top-level
  * pipeline can only reference $$SEARCH_META prior to a $lookup or $unionWith.
+ *
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an
+ * e2e suite.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {

@@ -1,6 +1,9 @@
 /**
  * Tests that a pipeline with search followed by lookup can correctly return results when planned
  * from the cache.
+ *
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an
+ * e2e suite.
  */
 
 import {checkSbeCompletelyDisabled, checkSbeRestricted} from "jstests/libs/query/sbe_util.js";

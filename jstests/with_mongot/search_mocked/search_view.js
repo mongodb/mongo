@@ -1,5 +1,8 @@
 /**
  * Test that a $search in a view is desugared on each query against the view.
+ *
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an
+ * e2e suite.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
