@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/s/commands/document_shard_key_query_conversion.h"
 
 namespace mongo {
 
@@ -193,6 +194,13 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
                                           BSONType::Object)
                            .getDocument();
 
+    // Only pay for the Document <-> BSONObj round trip when the document key actually contains
+    // dollar-prefixed field names or values that would otherwise be misread as query operators.
+    boost::optional<Document> escapedKey;
+    if (containsDollarPrefixedFieldNamesOnTopLevel(documentKey)) {
+        escapedKey = Document{convertDocumentIntoQuery(documentKey.toBson())};
+    }
+
     // Extract the resume token data from the input event.
     auto resumeTokenData =
         ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument()).getData();
@@ -213,8 +221,12 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
         auto collectionUUID = pExpCtx->changeStreamSpec->getMatchCollectionUUIDForUpdateLookup()
             ? boost::optional<UUID>(*resumeTokenData.uuid)
             : boost::none;
-        return pExpCtx->mongoProcessInterface->lookupSingleDocument(
-            pExpCtx, nss, std::move(collectionUUID), documentKey, std::move(readConcern));
+        return pExpCtx->mongoProcessInterface->lookupSingleDocument(pExpCtx,
+                                                                    nss,
+                                                                    std::move(collectionUUID),
+                                                                    escapedKey ? *escapedKey
+                                                                               : documentKey,
+                                                                    std::move(readConcern));
     } catch (const ExceptionFor<ErrorCodes::TooManyMatchingDocuments>& ex) {
         uasserted(ErrorCodes::ChangeStreamFatalError, ex.what());
     }

@@ -177,6 +177,29 @@ env.Library(
 )
 
 env.Library(
+    target='document_shard_key_query_conversion',
+    source=[
+        'document_shard_key_query_conversion.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+    ],
+)
+
+env.CppUnitTest(
+    target='document_shard_key_query_conversion_test',
+    source=[
+        'document_shard_key_query_conversion_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/s/commands/document_shard_key_query_conversion',
+    ],
+)
+
+env.Library(
     target='cluster_commands_common',
     source=[
         'cluster_explain.cpp',

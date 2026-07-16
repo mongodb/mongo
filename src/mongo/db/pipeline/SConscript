@@ -466,6 +466,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/update/update_driver',
+        '$BUILD_DIR/mongo/s/commands/document_shard_key_query_conversion',
         '$BUILD_DIR/mongo/s/query/router_exec_stage',
         'change_stream_helpers',
         'change_stream_preimage',
