@@ -1306,7 +1306,6 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                         1,
                         "Ignoring missing shard key index because collection metadata is incorrect",
                         logAttrs(nss),
-                        logAttrs(nss),
                         "inconsistencies"_attr = tmpInconsistencies);
             tmpInconsistencies.clear();
         } else if (!optCollDescr->currentShardHasAnyChunks()) {
