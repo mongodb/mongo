@@ -9,6 +9,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -25,6 +26,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -134,6 +136,18 @@ protected:
         return ExchangeSpec::parse(spec, ctx);
     }
 
+    // Producer pipeline of a mock source feeding $group, which tracks memory.
+    std::unique_ptr<Pipeline> makeGroupProducerPipeline(size_t nInputDocs, size_t nOutputDocs) {
+        const auto mock = getMockSource(static_cast<int>(nInputDocs));
+        BSONObj groupBson = fromjson(fmt::format(R"({{$group: {{
+            _id: {{$mod: ["$a",  {}]}},
+            v: {{$push: "$b"}}
+        }}}})",
+                                                 nOutputDocs));
+        auto group = DocumentSourceGroup::createFromBson(groupBson["$group"], getExpCtx());
+        return Pipeline::create({mock, group}, getExpCtx());
+    }
+
     auto createNProducers(size_t nConsumers, boost::intrusive_ptr<exec::agg::Exchange> ex) {
         std::vector<ThreadInfo> threads;
         for (size_t idx = 0; idx < nConsumers; ++idx) {
@@ -236,21 +250,13 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumerMemoryTracking) {
     const size_t nConsumers = 5;
     ASSERT_EQ(nOutputDocs % nConsumers, 0u);
 
-    const auto mock = getMockSource(nInputDocs);
-    BSONObj groupBson = fromjson(fmt::format(R"({{$group: {{
-        _id: {{$mod: ["$a",  {}]}},
-        v: {{$push: "$b"}}
-    }}}})",
-                                             nOutputDocs));
-    auto group = DocumentSourceGroup::createFromBson(groupBson["$group"], getExpCtx());
-
     ExchangeSpec spec;
     spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<exec::agg::Exchange> ex =
-        new exec::agg::Exchange(getOpCtx(), spec, Pipeline::create({mock, group}, getExpCtx()));
+    boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
+        getOpCtx(), spec, makeGroupProducerPipeline(nInputDocs, nOutputDocs));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -296,6 +302,297 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumerMemoryTracking) {
 
     for (auto& h : handles)
         _executor->wait(h);
+}
+
+TEST_F(DocumentSourceExchangeTest, OwnWithoutReportingTracksProducerMemoryWithoutCurOpReporting) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
+
+    // Create a producer pipeline that uses group, which will track memory.
+    const size_t nInputDocs = 500;
+    const size_t nOutputDocs = 250;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx,
+                                spec,
+                                makeGroupProducerPipeline(nInputDocs, nOutputDocs),
+                                exec::agg::Exchange::InputMemoryPolicy::kOwnWithoutReporting);
+
+    // The Exchange owns the producer's operation tracker, so nothing is left on the opCtx.
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+
+    // Model a consumer-side memory-tracking stage (as in $_internalDocumentResultsAndMetadata):
+    // this creates a fresh operation tracker on the consumer's opCtx that the exchange must not
+    // disturb.
+    const int64_t consumerBytes = 1000;
+    auto consumerTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
+    consumerTracker.add(consumerBytes);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    ASSERT_EQ(CurOp::get(opCtx)->getInUseTrackedMemoryBytes(), consumerBytes);
+
+    size_t docs = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++docs;
+    }
+    ASSERT_EQ(docs, nOutputDocs);
+    ex->dispose(opCtx, 0);
+
+    // The producer's memory was genuinely tracked: the Exchange-owned tracker accumulated the
+    // group's memory (its peak reflects the pushed strings), even though none of it was reported.
+    ASSERT_GT(ex->getOperationMemoryTracker_forTest()->peakTrackedMemoryBytes(),
+              static_cast<int64_t>(strValLen * nInputDocs));
+
+    CurOp* curOp = CurOp::get(opCtx);
+    // ...but never reported to the consumer's CurOp: the consumer's own stats are untouched.
+    ASSERT_EQ(curOp->getPeakTrackedMemoryBytes(), consumerBytes);
+    // The consumer's tracker is still in place and functional.
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    consumerTracker.add(-consumerBytes);
+    ASSERT_EQ(curOp->getInUseTrackedMemoryBytes(), 0);
+}
+
+TEST_F(DocumentSourceExchangeTest, ShareOperationTrackerReportsProducerMemoryToQueryCurOp) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
+
+    // Create a producer pipeline that uses group, which will track memory.
+    const size_t nInputDocs = 500;
+    const size_t nOutputDocs = 250;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx,
+                                spec,
+                                makeGroupProducerPipeline(nInputDocs, nOutputDocs),
+                                exec::agg::Exchange::InputMemoryPolicy::kShareOperationTracker);
+
+    // The operation tracker stays on the opCtx, shared by the producer (and any consumer stages
+    // built on this opCtx).
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+
+    // A consumer-side stage tracker created on the same opCtx chains to that same shared
+    // operation tracker, so producer and consumer memory aggregate into one CurOp.
+    const int64_t consumerBytes = 1000;
+    auto consumerTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
+    consumerTracker.add(consumerBytes);
+    ASSERT_EQ(CurOp::get(opCtx)->getInUseTrackedMemoryBytes(), consumerBytes);
+
+    size_t docs = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++docs;
+    }
+    ASSERT_EQ(docs, nOutputDocs);
+    ex->dispose(opCtx, 0);
+
+    CurOp* curOp = CurOp::get(opCtx);
+    // The producer's memory is accounted and reported as part of the whole query, on top of the
+    // consumer's contribution held throughout the drain.
+    ASSERT_GT(curOp->getPeakTrackedMemoryBytes(),
+              static_cast<int64_t>(strValLen * nInputDocs) + consumerBytes);
+    // Dispose returned the group's memory, leaving exactly the consumer's contribution in use.
+    ASSERT_EQ(curOp->getInUseTrackedMemoryBytes(), consumerBytes);
+    consumerTracker.add(-consumerBytes);
+    ASSERT_EQ(curOp->getInUseTrackedMemoryBytes(), 0);
+    // The tracker still belongs to the operation, not the Exchange.
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+}
+
+TEST_F(DocumentSourceExchangeTest, OwnAndReportRoundTripsTrackerThroughConsumerZeroOpCtx) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
+
+    const size_t nInputDocs = 500;
+    const size_t nOutputDocs = 250;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    // Default policy: kOwnAndReportToCurOp.
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, spec, makeGroupProducerPipeline(nInputDocs, nOutputDocs));
+
+    // The constructor took the producer's tracker off the opCtx.
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+
+    size_t docs = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++docs;
+        // Each getNext publishes the tracker to consumer 0's opCtx while loading and reclaims it
+        // on detach; between calls it must be back in the Exchange, not left on the opCtx.
+        ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    }
+    ASSERT_EQ(docs, nOutputDocs);
+    ex->dispose(opCtx, 0);
+
+    // The dispose flush also publishes, reports, and reclaims the tracker.
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    CurOp* curOp = CurOp::get(opCtx);
+    ASSERT_GT(curOp->getPeakTrackedMemoryBytes(), static_cast<int64_t>(strValLen * nInputDocs));
+    ASSERT_EQ(curOp->getInUseTrackedMemoryBytes(), 0);
+}
+
+TEST_F(DocumentSourceExchangeTest, OwnWithoutReportingMultiConsumerThroughStageLayer) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
+
+    const size_t nInputDocs = 500;
+    const size_t nOutputDocs = 250;
+    const size_t nConsumers = 2;
+    ASSERT_EQ(nOutputDocs % nConsumers, 0u);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(nConsumers);
+    // A buffer large enough to hold the whole producer output, so the consumers can be drained
+    // serially without the producer ever blocking on a full buffer.
+    spec.setBufferSize(1024 * 1024);
+
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(getOpCtx(),
+                                spec,
+                                makeGroupProducerPipeline(nInputDocs, nOutputDocs),
+                                exec::agg::Exchange::InputMemoryPolicy::kOwnWithoutReporting);
+
+    // Drive both consumers through the real stage layer, each on its own opCtx.
+    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    for (size_t id = 0; id < nConsumers; ++id) {
+        auto docSourceExchange = exec::agg::buildStage(threads[id].documentSourceExchange);
+        size_t docs = 0;
+        for (auto input = docSourceExchange->getNext(); input.isAdvanced();
+             input = docSourceExchange->getNext()) {
+            ++docs;
+        }
+        ASSERT_EQ(docs, nOutputDocs / nConsumers);
+        docSourceExchange->dispose();
+
+        // No consumer's CurOp ever receives the producer's memory, and no consumer opCtx holds an
+        // operation tracker.
+        OperationContext* consumerOpCtx = threads[id].opCtx.get();
+        ASSERT_EQ(CurOp::get(consumerOpCtx)->getPeakTrackedMemoryBytes(), 0);
+        ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(consumerOpCtx));
+    }
+
+    // The producer's memory was still tracked by the Exchange-owned tracker.
+    ASSERT_GT(ex->getOperationMemoryTracker_forTest()->peakTrackedMemoryBytes(),
+              static_cast<int64_t>(strValLen * nInputDocs));
+}
+
+TEST_F(DocumentSourceExchangeTest, ErrorInLoadNextBatchReclaimsPublishedTracker) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
+
+    const size_t nInputDocs = 500;
+    const size_t nOutputDocs = 250;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, spec, makeGroupProducerPipeline(nInputDocs, nOutputDocs));
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+
+    {
+        FailPointEnableBlock fp("exchangeFailLoadNextBatch");
+        ASSERT_THROWS_CODE(
+            ex->getNext(opCtx, 0, nullptr), AssertionException, ErrorCodes::FailPointEnabled);
+    }
+
+    // The exception unwound through getNext's catch block, whose detachContext must reclaim the
+    // published tracker rather than leaving it stranded on the opCtx.
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    ASSERT(ex->getOperationMemoryTracker_forTest());
+
+    ex->dispose(opCtx, 0);
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+}
+
+class DocumentSourceExchangeDeathTest : public DocumentSourceExchangeTest {};
+
+// Publishing the producer's tracker requires consumer 0's opCtx to have no operation tracker of
+// its own; installing over one would free it while the consumer's stages still reference it.
+DEATH_TEST_F(DocumentSourceExchangeDeathTest,
+             PublishingProducerTrackerOverConsumerTrackerFails,
+             "Cannot publish the exchange producer's memory tracker") {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+
+    const auto source = getMockSource(10);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, spec, Pipeline::create({source}, getExpCtx()));
+
+    // Creating any consumer-side stage tracker installs an operation tracker on consumer 0's
+    // opCtx as a side effect (owned by the opCtx; the returned handle is not needed).
+    OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+
+    ASSERT_THROWS_CODE(ex->getNext(opCtx, 0, nullptr), AssertionException, 12920100);
+}
+
+// The dispose-time flush has the same precondition as publishing during getNext: consumer 0's
+// opCtx must not already hold an operation tracker, or installing the producer's tracker to
+// propagate its stats would free it.
+DEATH_TEST_F(DocumentSourceExchangeDeathTest,
+             FlushingProducerTrackerOverConsumerTrackerFails,
+             "Cannot flush the exchange producer's memory tracker") {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+
+    const size_t nInputDocs = 10;
+    const size_t nOutputDocs = 5;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, spec, makeGroupProducerPipeline(nInputDocs, nOutputDocs));
+
+    // Drain normally; each getNext publishes the tracker and reclaims it on detach.
+    size_t docs = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++docs;
+    }
+    ASSERT_EQ(docs, nOutputDocs);
+
+    // An operation tracker appearing on consumer 0's opCtx before dispose must trip the flush
+    // guard.
+    OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+
+    ASSERT_THROWS_CODE(ex->dispose(opCtx, 0), AssertionException, 12920101);
 }
 
 TEST_F(DocumentSourceExchangeTest, ExchangeNConsumerEarlyout) {

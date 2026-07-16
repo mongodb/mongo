@@ -125,6 +125,11 @@ public:
         return _spec;
     }
 
+    [[MONGO_MOD_PRIVATE]] const OperationMemoryUsageTracker* getOperationMemoryTracker_forTest()
+        const {
+        return _memoryTracker.get();
+    }
+
     void dispose(OperationContext* opCtx, size_t consumerId);
 
     /**
