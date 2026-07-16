@@ -317,7 +317,6 @@ public:
                 shardId,
                 primaryShardId,
                 shardingCatalogCollections,
-                collCatalogSnapshot,
                 localCatalogCollections,
                 optionalCheckIndexes);
         }
