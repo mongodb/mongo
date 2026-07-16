@@ -2218,6 +2218,14 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
         const bool isCollectionOnlyOnShardingCatalog = cmp < 0;
         const bool isCollectionOnBothCatalogs = cmp == 0;
         if (isCollectionOnlyOnShardingCatalog) {
+            // Ignore the edge-case with logical sessions collection persisted despite at times
+            // missing from the local collection. This can happen only on a node that also is a
+            // config.
+            if (remoteNss == NamespaceString::kLogicalSessionsNamespace &&
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                itCatalogCollections++;
+                continue;
+            }
             // Case where we have found a collection in the sharding catalog that it is not in the
             // local catalog.
             if (_collectionMustExistLocallyButDoesnt(

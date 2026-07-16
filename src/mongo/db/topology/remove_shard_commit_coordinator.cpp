@@ -5,6 +5,8 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -15,6 +17,7 @@
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/remove_shard_exception.h"
 #include "mongo/db/topology/topology_change_helpers.h"
+#include "mongo/util/serialization_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -22,12 +25,14 @@ namespace mongo {
 
 namespace {
 
-void deleteAllDocumentsFromCollection(OperationContext* opCtx, const NamespaceString& nss) {
+void deleteAllDocumentsFromCollection(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      BSONObj filter = BSONObj()) {
     DBDirectClient client(opCtx);
     write_ops::DeleteCommandRequest deleteOp(nss);
     deleteOp.setDeletes({[&] {
         write_ops::DeleteOpEntry entry;
-        entry.setQ(BSONObj());
+        entry.setQ(std::move(filter));
         entry.setMulti(true);
         return entry;
     }()});
@@ -38,9 +43,18 @@ void deleteAllDocumentsFromCollection(OperationContext* opCtx, const NamespaceSt
 void dropShardCatalogMetadata(OperationContext* opCtx) {
     LOGV2(9194400, "Dropping shard catalog metadata before shard removal");
 
+    const auto& sessionsNss = NamespaceString::kLogicalSessionsNamespace;
+    const auto sessionsNssSerialized =
+        NamespaceStringUtil::serialize(sessionsNss, SerializationContext::stateDefault());
+    const BSONObj allButSessionsNssFilter =
+        BSON(CollectionType::kNssFieldName << BSON("$ne" << sessionsNssSerialized));
+
     deleteAllDocumentsFromCollection(opCtx, NamespaceString::kConfigShardCatalogDatabasesNamespace);
-    deleteAllDocumentsFromCollection(opCtx,
-                                     NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    // Excluding config.system.sessions collection entries from being removed from shard catalog
+    // since removing them, can cause config server to enter invalid state after transitioning
+    // to dedicated and back to embedded, marking it as kUnknown, while still the DB primary shard.
+    deleteAllDocumentsFromCollection(
+        opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace, allButSessionsNssFilter);
     deleteAllDocumentsFromCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
 
     for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {

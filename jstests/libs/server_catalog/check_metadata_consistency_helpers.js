@@ -100,14 +100,6 @@ export var MetadataConsistencyChecker = (function () {
                     return false;
                 }
 
-                // TODO (SERVER-130722): Re-enable this check.
-                const isSessionsCollectionPrimaryMismatch =
-                    details.namespace === "config.system.sessions" &&
-                    innerDetails.field === "isPrimary" &&
-                    innerDetails.source === "inMemoryShardCatalog" &&
-                    innerDetails.isUnowned === true &&
-                    innerDetails.isPrimary === true;
-
                 // TODO (SERVER-131045): Re-enable this check.
                 const isPausedMigrationShardCatalogEntryMismatch =
                     innerDetails.field === "shardCatalogEntry" &&
@@ -117,10 +109,7 @@ export var MetadataConsistencyChecker = (function () {
                     !innerDetails.shardCatalog.hasOwnProperty("allowChunkOperations") &&
                     innerDetails.globalCatalog.allowChunkOperations === false;
 
-                return (
-                    isSessionsCollectionPrimaryMismatch ||
-                    isPausedMigrationShardCatalogEntryMismatch
-                );
+                return isPausedMigrationShardCatalogEntryMismatch;
             };
             if (ignoreInconsistenciesTempWorkaround) {
                 inconsistencies = inconsistencies.filter((inconsistency) => {
