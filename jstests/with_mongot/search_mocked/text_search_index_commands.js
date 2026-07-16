@@ -375,40 +375,8 @@ function testAgainstCollection(collName) {
     {
         const runCreateSearchIndexesTest = function (conn) {
             const testDB = conn.getDB(dbName);
-            const manageSearchIndexCommandResponse = {
-                indexesCreated: [{id: "index-Id", name: "index-name"}],
-            };
 
-            // Test with type 'search'.
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(
-                testDB.runCommand({
-                    "createSearchIndexes": collName,
-                    "indexes": [{"definition": {"mappings": {"dynamic": true}}, "type": "search"}],
-                }),
-            );
-
-            // Test with type 'vectorSearch'.
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(
-                testDB.runCommand({
-                    "createSearchIndexes": collName,
-                    "indexes": [
-                        {"definition": {"mappings": {"dynamic": true}}, "type": "vectorSearch"},
-                    ],
-                }),
-            );
-
-            // Test with no type.
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(
-                testDB.runCommand({
-                    "createSearchIndexes": collName,
-                    "indexes": [{"definition": {"mappings": {"dynamic": true}}}],
-                }),
-            );
-
-            // Test with incorrect type.
+            // Incorrect type: mock returns an error to verify propagation.
             const incorrectTypeError = {
                 ok: 0,
                 // Note that this is not the real error code, msg, or name from mongot. We pick a
@@ -427,16 +395,10 @@ function testAgainstCollection(collName) {
                 }),
             );
 
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(
-                testDB.runCommand({
-                    "createSearchIndexes": collName,
-                    "indexes": [
-                        {"name": "indexName", "definition": {"mappings": {"dynamic": true}}},
-                    ],
-                }),
-            );
-
+            // Test creating multiple indexes in one command (batch command syntax).
+            const manageSearchIndexCommandResponse = {
+                indexesCreated: [{id: "index-Id", name: "index-name"}],
+            };
             mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
             assert.commandWorked(
                 testDB.runCommand({
@@ -452,26 +414,21 @@ function testAgainstCollection(collName) {
         runCreateSearchIndexesTest(st.shard0);
     }
 
+    // TODO SERVER-131487: migrate by-ID tests to e2e once sharded createSearchIndexes returns
+    // per-shard index IDs.
+
     // Test updating search indexes.
     {
         const runUpdateSearchIndexTest = function (conn) {
             const testDB = conn.getDB(dbName);
             const manageSearchIndexCommandResponse = {ok: 1};
 
+            // Update by ID. Helpers only support by-name.
             mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
             assert.commandWorked(
                 testDB.runCommand({
                     "updateSearchIndex": collName,
                     "id": "index-ID-number",
-                    "definition": {"testBlob": "blob"},
-                }),
-            );
-
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(
-                testDB.runCommand({
-                    "updateSearchIndex": collName,
-                    "name": "indexName",
                     "definition": {"testBlob": "blob"},
                 }),
             );
@@ -506,11 +463,7 @@ function testAgainstCollection(collName) {
             const testDB = conn.getDB(dbName);
             const manageSearchIndexCommandResponse = {ok: 1};
 
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(
-                testDB.runCommand({"dropSearchIndex": collName, "name": "indexName"}),
-            );
-
+            // Drop by ID. Helpers only support by-name.
             mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
             assert.commandWorked(
                 testDB.runCommand({"dropSearchIndex": collName, "id": "index-ID-number"}),
@@ -566,14 +519,7 @@ function testAgainstCollection(collName) {
                 },
             };
 
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(testDB.runCommand({"listSearchIndexes": collName}));
-
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            assert.commandWorked(
-                testDB.runCommand({"listSearchIndexes": collName, "name": "indexName"}),
-            );
-
+            // List by ID. Helpers only support by-name.
             mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
             assert.commandWorked(
                 testDB.runCommand({"listSearchIndexes": collName, "id": "index-ID-number"}),
@@ -628,33 +574,13 @@ function testAgainstCollection(collName) {
                     ],
                 },
             };
+
+            // List by ID via agg stage. Helpers only support by-name.
             mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
             let result = coll
-                .aggregate([{$listSearchIndexes: {}}], {cursor: {batchSize: 1}})
-                .toArray();
-            let expectedDocs = manageSearchIndexCommandResponse["cursor"]["firstBatch"];
-            assert.eq(result, expectedDocs);
-
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            result = coll
-                .aggregate([{$listSearchIndexes: {"name": "index-name"}}], {cursor: {batchSize: 1}})
-                .toArray();
-            assert.eq(result, expectedDocs);
-
-            mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-            result = coll
                 .aggregate([{$listSearchIndexes: {"id": "index-Id"}}], {cursor: {batchSize: 1}})
                 .toArray();
-            assert.eq(result, expectedDocs);
-
-            // Test that the aggregation stage handles an empty response from 'manageSearchIndex'.
-            const emptyResponse = {
-                ok: 1,
-                cursor: {id: 0, ns: "database-name.collection-name", firstBatch: []},
-            };
-            mongotMock.setMockSearchIndexCommandResponse(emptyResponse);
-            expectedDocs = emptyResponse["cursor"]["firstBatch"];
-            result = coll.aggregate([{$listSearchIndexes: {}}], {cursor: {batchSize: 1}}).toArray();
+            let expectedDocs = manageSearchIndexCommandResponse["cursor"]["firstBatch"];
             assert.eq(result, expectedDocs);
 
             // Not allowed to run list specifying both 'name' and 'id'.
