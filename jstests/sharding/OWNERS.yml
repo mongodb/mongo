@@ -203,3 +203,6 @@ filters:
   - "sharding_statistics_server_status.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "invalid_shard_identity_doc.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
