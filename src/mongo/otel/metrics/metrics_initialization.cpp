@@ -27,6 +27,7 @@
 #include <opentelemetry/exporters/otlp/otlp_file_metric_exporter_options.h>
 #include <opentelemetry/exporters/otlp/otlp_http_metric_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_http_metric_exporter_options.h>
+#include <opentelemetry/metrics/noop.h>
 #include <opentelemetry/metrics/provider.h>
 #include <opentelemetry/proto/resource/v1/resource.pb.h>
 #include <opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_factory.h>
@@ -303,24 +304,16 @@ void shutdown() {
         invariant(metricReader() != nullptr);
         metricReader()->Shutdown();
         metricReader() = nullptr;
-        metrics_api::Provider::SetMeterProvider({});
+        metrics_api::Provider::SetMeterProvider(std::make_shared<metrics_api::NoopMeterProvider>());
     }
 }
 }  // namespace mongo::otel::metrics
 #else
 namespace mongo::otel::metrics {
-// Provide empty definitions.
-/**
- * Initializes OpenTelemetry metrics using either the HTTP or file exporter.
- */
 Status initialize() {
     return Status::OK();
 }
 
-/**
- * Shuts down the OpenTelemetry metric export process by setting the global MeterProvider to a
- * NoopMeterProvider.
- */
 void shutdown() {}
 }  // namespace mongo::otel::metrics
 #endif

@@ -79,7 +79,7 @@ TEST_F(OtelMetricsInitializationTest, Shutdown) {
 
     shutdown();
     provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_EQ(provider.get(), nullptr);
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, FileMeterProvider) {
