@@ -416,8 +416,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
     boost::intrusive_ptr<Expression> expr,
     const timeseries::BucketUnpacker& bucketUnpacker,
     int bucketMaxSpanSeconds,
-    bool fixedBuckets,
-    bool usesExtendedRange) {
+    bool fixedBuckets) {
     // We allow the $group stage to be rewritten if the _id field only consists of these 3 options:
     // 1. If the _id field is constant.
     // 2. If the _id field is an expression whose fieldPaths are at or under the metaField.
@@ -436,7 +435,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
 
     // Option 3: Currently the only allowed field path not on the metaField is $dateTrunc on the
     // timeField if the buckets are fixed and do not use an extended range.
-    if (fixedBuckets && !usesExtendedRange &&
+    if (fixedBuckets && !bucketUnpacker.getUsesExtendedRange() &&
         bucketUnpacker.providesField(bucketUnpacker.getTimeField())) {
         return handleDateTruncRewrite(
             pExpCtx, expr, bucketUnpacker.getTimeField(), bucketMaxSpanSeconds);
@@ -580,8 +579,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByField(
     const std::vector<std::string>& idFieldNames,
     const timeseries::BucketUnpacker& bucketUnpacker,
     int bucketMaxSpanSeconds,
-    bool fixedBuckets,
-    bool usesExtendedRange) {
+    bool fixedBuckets) {
     tassert(7823400,
             "idFieldNames must be empty or the same size as idFieldExpressions",
             (idFieldNames.empty() && idFieldExpressions.size() == 1) ||
@@ -590,12 +588,8 @@ boost::intrusive_ptr<Expression> rewriteGroupByField(
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fieldsAndExprs;
     const bool isIdFieldAnExpr = idFieldNames.empty();
     for (std::size_t i = 0; i < idFieldExpressions.size(); ++i) {
-        auto expr = rewriteGroupByElement(pExpCtx,
-                                          idFieldExpressions[i],
-                                          bucketUnpacker,
-                                          bucketMaxSpanSeconds,
-                                          fixedBuckets,
-                                          usesExtendedRange);
+        auto expr = rewriteGroupByElement(
+            pExpCtx, idFieldExpressions[i], bucketUnpacker, bucketMaxSpanSeconds, fixedBuckets);
         if (!expr) {
             return {};
         }
@@ -1285,8 +1279,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
                                                      idFieldNames,
                                                      _sharedState->_bucketUnpacker,
                                                      _bucketMaxSpanSeconds,
-                                                     _fixedBuckets,
-                                                     _usesExtendedRange);
+                                                     _fixedBuckets);
     if (!rewrittenIdExpression) {
         return {};
     }
@@ -1786,8 +1779,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
         // Unlike other rewrites for this stage, this rewrite affects a $match stage that is
         // *before* the unpack stage. So we need to apply this rewrite first, before the others,
         // which might cause us to return early.
-        if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get()); prevMatch &&
-            !getExpCtx()->getInRouter() && !_sharedState->_bucketUnpacker.getUsesExtendedRange()) {
+        if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get());
+            prevMatch && !getExpCtx()->getInRouter() && !usesExtendedRange()) {
             MatchExpression* matchExpr = prevMatch->getMatchExpression();
             bool updated = generateBucketLevelIdPredicates(matchExpr);
             if (updated) {

@@ -337,6 +337,14 @@ private:
 
     boost::optional<std::string> _metaField = boost::none;
     boost::optional<HashedFieldName> _metaFieldHashed = boost::none;
+
+    // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on the _id
+    // index, as _id is truncated to 32 bits. Note that this is a per-shard attribute (some shards
+    // of a collection may have extended range data while others do not), so when mongos sends a
+    // pipeline containing an unpack stage to mongod, it will omit this value, as it may be
+    // different from the DB primary shard. This is the single source of truth for the flag; the
+    // owning DocumentSourceInternalUnpackBucket and BucketUnpacker expose it via delegating
+    // accessors.
     bool _usesExtendedRange = false;
 };
 

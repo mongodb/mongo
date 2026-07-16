@@ -267,11 +267,11 @@ public:
     }
 
     bool usesExtendedRange() const {
-        return _usesExtendedRange;
+        return _sharedState->_bucketUnpacker.getUsesExtendedRange();
     }
 
     void setUsesExtendedRange(bool val) {
-        _usesExtendedRange = val;
+        _sharedState->_bucketUnpacker.setUsesExtendedRange(val);
     }
 
     void setIncludeMaxTimeAsMetadata() {
@@ -412,13 +412,6 @@ private:
     // This is true if 'bucketRoundingSeconds' and 'bucketMaxSpanSeconds' are set, equal, and
     // unchanged. Then we can push down certain $match and $group queries.
     bool _fixedBuckets = false;
-
-    // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on
-    // the _id index, as _id is truncated to 32 bits. Note that this is a per-shard attribute (some
-    // shards of a collection may have extended range data while others do not), so when mongos
-    // sends a pipeline containing this stage to mongod, it will omit this value, as it may be
-    // different from the DB primary shard.
-    bool _usesExtendedRange = false;
 
     int _bucketMaxSpanSeconds;
 

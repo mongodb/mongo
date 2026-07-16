@@ -1048,5 +1048,46 @@ TEST_F(InternalUnpackBucketExecTest, AssertConstraints) {
     ASSERT_FALSE(constraints.consumesLogicalCollectionData);
 }
 
+// The 'usesExtendedRange' flag has a single source of truth in the BucketSpec. Setting it through
+// the DocumentSource must be observable through the BucketSpec, so that all readers agree
+// regardless of which accessor they use.
+TEST_F(InternalUnpackBucketExecTest, SetUsesExtendedRangeIsVisibleThroughBucketSpec) {
+    auto spec = BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
+                     << BSON(DocumentSourceInternalUnpackBucket::kInclude
+                             << BSON_ARRAY("_id" << kUserDefinedTimeName)
+                             << timeseries::kTimeFieldName << kUserDefinedTimeName
+                             << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
+    auto ds = DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(),
+                                                                         getExpCtx());
+    auto* unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(ds.get());
+    ASSERT(unpack);
+
+    ASSERT_FALSE(unpack->usesExtendedRange());
+    ASSERT_FALSE(unpack->bucketUnpacker().bucketSpec().usesExtendedRange());
+
+    unpack->setUsesExtendedRange(true);
+
+    ASSERT_TRUE(unpack->usesExtendedRange());
+    ASSERT_TRUE(unpack->bucketUnpacker().bucketSpec().usesExtendedRange());
+}
+
+// The reverse direction: a value provided via the 'usesExtendedRange' BSON field (which populates
+// the BucketSpec) must be observable through the DocumentSource accessor.
+TEST_F(InternalUnpackBucketExecTest, UsesExtendedRangeFromBsonIsVisibleThroughDocumentSource) {
+    auto spec = BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
+                     << BSON(DocumentSourceInternalUnpackBucket::kInclude
+                             << BSON_ARRAY("_id" << kUserDefinedTimeName)
+                             << timeseries::kTimeFieldName << kUserDefinedTimeName
+                             << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600
+                             << DocumentSourceInternalUnpackBucket::kUsesExtendedRange << true));
+    auto ds = DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(),
+                                                                         getExpCtx());
+    auto* unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(ds.get());
+    ASSERT(unpack);
+
+    ASSERT_TRUE(unpack->bucketUnpacker().bucketSpec().usesExtendedRange());
+    ASSERT_TRUE(unpack->usesExtendedRange());
+}
+
 }  // namespace
 }  // namespace mongo

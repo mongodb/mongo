@@ -229,6 +229,10 @@ public:
         return _spec.usesExtendedRange();
     }
 
+    void setUsesExtendedRange(bool usesExtendedRange) {
+        _spec.setUsesExtendedRange(usesExtendedRange);
+    }
+
     bool isClosedBucket() const {
         return _closedBucket;
     }
