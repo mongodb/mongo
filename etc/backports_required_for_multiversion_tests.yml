@@ -177,6 +177,8 @@ last-continuous:
       ticket: SERVER-116300
     - test_file: jstests/sharding/resharding_collection_cloner.js
       ticket: SERVER-120210
+    - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
+      ticket: SERVER-131202
     - test_file: jstests/noPassthrough/replication/killOp_against_repl_threads.js
       ticket: SERVER-112273
     - test_file: jstests/change_streams/multiple_invalidate_events.js
@@ -882,6 +884,8 @@ last-lts:
       ticket: SERVER-102165
     - test_file: jstests/sharding/unshard_collection_with_failover_during_commit.js
       ticket: SERVER-117340
+    - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
+      ticket: SERVER-131202
     - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
       ticket: SERVER-117009
     - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js

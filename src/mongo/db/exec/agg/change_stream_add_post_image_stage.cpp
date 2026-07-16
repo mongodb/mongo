@@ -33,6 +33,7 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/s/commands/document_shard_key_query_conversion.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -122,6 +123,12 @@ boost::optional<Document> ChangeStreamAddPostImageStage::lookupLatestPostImage(
                                           DocumentSourceChangeStream::kDocumentKeyField,
                                           BSONType::object)
                            .getDocument();
+    // Only pay for the Document <-> BSONObj round trip when the document key actually contains
+    // dollar-prefixed field names or values that would otherwise be misread as query operators.
+    boost::optional<Document> escapedKey;
+    if (containsDollarPrefixedFieldNamesOnTopLevel(documentKey)) {
+        escapedKey = Document{convertDocumentIntoQuery(documentKey.toBson())};
+    }
 
     // Extract the resume token data from the input event.
     auto resumeTokenData =
@@ -143,8 +150,12 @@ boost::optional<Document> ChangeStreamAddPostImageStage::lookupLatestPostImage(
             pExpCtx->getChangeStreamSpec()->getMatchCollectionUUIDForUpdateLookup()
             ? boost::optional<UUID>(*resumeTokenData.uuid)
             : boost::none;
-        return pExpCtx->getMongoProcessInterface()->lookupSingleDocument(
-            pExpCtx, nss, std::move(collectionUUID), documentKey, std::move(readConcern));
+        return pExpCtx->getMongoProcessInterface()->lookupSingleDocument(pExpCtx,
+                                                                         nss,
+                                                                         std::move(collectionUUID),
+                                                                         escapedKey ? *escapedKey
+                                                                                    : documentKey,
+                                                                         std::move(readConcern));
     } catch (const ExceptionFor<ErrorCodes::TooManyMatchingDocuments>& ex) {
         uasserted(ErrorCodes::ChangeStreamFatalError, ex.what());
     }

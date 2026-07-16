@@ -1007,6 +1007,7 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/db/update:update_driver",
         "//src/mongo/s/change_streams",
+        "//src/mongo/s/commands:document_shard_key_query_conversion",
         "//src/mongo/s/query/exec:router_exec_stage",
         "//src/mongo/util:pcre_util",
     ],

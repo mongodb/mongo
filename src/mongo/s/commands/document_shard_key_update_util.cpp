@@ -40,6 +40,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/commands/document_shard_key_query_conversion.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
@@ -131,40 +132,6 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
             insertResponse.getN() == 1);
 
     return true;
-}
-
-BSONObj convertDocumentIntoQuery(const BSONObj& document) {
-    BSONObjBuilder query;
-    BSONArrayBuilder exprQuery;
-
-    for (BSONElement elem : document) {
-        const StringData fieldName = elem.fieldNameStringData();
-
-        const bool shouldWrapIntoGetField = fieldName.starts_with("$");
-        if (MONGO_unlikely(shouldWrapIntoGetField)) {
-            exprQuery.append(
-                BSON("$eq" << BSON_ARRAY(
-                         BSON("$getField" << BSON("input" << "$$ROOT" << "field"
-                                                          << BSON("$literal" << fieldName)))
-                         << BSON("$literal" << elem))));
-        } else {
-            const bool shouldWrapIntoEq = elem.type() == BSONType::object &&
-                elem.Obj().firstElementFieldNameStringData().starts_with("$");
-            if (shouldWrapIntoEq) {
-                BSONObjBuilder eqOperator = query.subobjStart(fieldName);
-                eqOperator.appendAs(elem, "$eq");
-                eqOperator.doneFast();
-            } else {
-                query.append(elem);
-            }
-        }
-    }
-
-    if (auto exprQueryArray = exprQuery.arr(); !exprQueryArray.isEmpty()) {
-        query.append("$expr", BSON("$and" << exprQueryArray));
-    }
-
-    return query.obj();
 }
 
 /**
