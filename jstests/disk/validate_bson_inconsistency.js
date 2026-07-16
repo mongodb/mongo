@@ -215,8 +215,6 @@ resetDbpath(dbpath);
     db.createCollection(collName);
     let testColl = db[collName];
 
-    // Inserts a rubbish (random string) BSON Column (should fail validation to insert)
-    testColl.insert({a: BinData(7, "O2FkZmdqYWtsamhnJ2xhamhkZzthaCdmZGphZ2hkYQ==")});
     // Inserts one valid BSON Column to check that it doesn't cause a false positive.
     testColl.insert({
         a: BinData(7, "AQAAAAAAAAAAQJN/AAAAAAAAAAIAAAAAAAAABwAAAAAAAAAOAAAAAAAAAAA="),

@@ -10,6 +10,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 [[MONGO_MOD_PUBLIC]];
 
@@ -60,5 +61,9 @@ Status validateBSONColumn(const char* buf,
                           int maxLength,
                           BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault,
                           ValidationVersion validationVersion = currentValidationVersion) noexcept;
+
+// Validates JS-produced BSON. Throws InvalidBSONFromJavaScript on failure, preserves
+// ExceededMemoryLimit.
+void uassertValidBSONFromJavaScript(const BSONObj& obj, std::string_view context);
 
 }  // namespace mongo

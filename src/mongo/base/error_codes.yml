@@ -1313,6 +1313,7 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
   - {code: 514, name: LightweightStepdownConflict}
+  - {code: 515, name: InvalidBSONFromJavaScript, categories: [ValidationError]}
 
   # Extensions API errors that flag an error due to the extension itself.
   # Extension has a malformed vtable.
