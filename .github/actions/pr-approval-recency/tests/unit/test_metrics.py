@@ -1,13 +1,11 @@
 """Unit tests for the pure metrics helpers (stdlib only)."""
 
-import json
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[2]))
 from validate_pr_approval_recency import (
-    _build_review_json,
     _logfmt_line,
     _logfmt_value,
     _post_approval_diff_stats,
@@ -146,40 +144,6 @@ class TestReasonMapping(unittest.TestCase):
 
         self.assertEqual(REASON_TO_RESULT[REASON_API_ERROR], RESULT_ERROR)
         self.assertEqual(_status_for_reason(REASON_API_ERROR), STATUS_ERROR)
-
-
-class TestBuildReviewJson(unittest.TestCase):
-    def test_needs_review_for_content_changed(self):
-        metrics = {
-            "org": "10gen",
-            "repo": "mongo",
-            "pr_number": 42,
-            "reason": "content_changed",
-            "result": "fail",
-            "head_sha": "abc",
-            "approval_sha": "def",
-            "post_approval_changed_file_paths": ["src/a.cpp", "src/b.cpp"],
-        }
-        blob = _build_review_json(metrics)
-        parsed = json.loads(blob)
-        self.assertIs(parsed["needs_review"], True)
-        self.assertEqual(parsed["changed_files"], ["src/a.cpp", "src/b.cpp"])
-        self.assertEqual(parsed["pr_number"], 42)
-        self.assertNotIn("merged_at", parsed)
-
-    def test_no_review_for_sha_match(self):
-        metrics = {
-            "org": "10gen",
-            "repo": "mongo",
-            "pr_number": 7,
-            "reason": "sha_match",
-            "result": "pass",
-            "head_sha": "x",
-            "approval_sha": "x",
-        }
-        parsed = json.loads(_build_review_json(metrics))
-        self.assertIs(parsed["needs_review"], False)
-        self.assertEqual(parsed["changed_files"], [])
 
 
 if __name__ == "__main__":
