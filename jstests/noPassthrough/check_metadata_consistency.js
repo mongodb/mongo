@@ -6,6 +6,7 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Configure initial sharding cluster
@@ -192,7 +193,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 
 (function testMisplacedCollectionOnConfigServer() {
     jsTest.log("Executing testMisplacedCollectionOnConfigServer");
-    // TODO SERVER-107179: do not skip test in multiversion suites
+
     const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
     if (isMultiVersion) {
         jsTestLog("Skipping test because checkMetadataConsistency in the previous binary " +
@@ -219,7 +220,8 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
-    assert.commandWorked(st.configRS.getPrimary().getDB(db.getName()).runCommand({dropDatabase: 1}));
+    assert.commandWorked(
+        st.configRS.getPrimary().getDB(db.getName()).runCommand({dropDatabase: 1}));
     assertNoInconsistencies();
 })();
 
@@ -954,7 +956,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 (function testEmptyChunkHistory() {
     jsTest.log("Executing testEmptyChunkHistory");
 
-    // TODO SERVER-107179: do not skip test in multiversion suites
+    // TODO SERVER-107821: do not skip test in multiversion suites
     const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
     if (isMultiVersion) {
         jsTestLog(
@@ -1152,7 +1154,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
         coll.createIndex(
             {key: 1, extraField: 1},
             {collation: {locale: "en_US", strength: 2}, name: "key_extra_nonSimple_idx"},
-        ),
+            ),
     );
 
     assert.commandWorked(mongos.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
@@ -1164,6 +1166,121 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     );
 
     db.dropDatabase();
+})();
+
+(function testBucketCollectionWithoutValidView() {
+    // TODO (SERVER-110221): Do not ignore MalformedTimeseriesBucketsCollection in multiversion
+    // suites. This error does not exist in 7.0 and will not be backported.
+    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (isMultiVersion) {
+        return;
+    }
+
+    const db = getNewDb();
+
+    jsTest.log("Executing testBucketCollectionWithoutValidView");
+
+    const collName = 'coll';
+    const bucketsCollName = 'system.buckets.' + collName;
+    const fullNs = db.getName() + '.' + bucketsCollName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
+    // Create bucket collection without view backing it
+    assert.commandWorked(st.rs0.getPrimary().getDB(db.getName()).runCommand({
+        applyOps: [{
+            op: "c",
+            ns: db.getName() + ".$cmd",
+            o: {create: bucketsCollName, timeseries: {timeField: 't'}}
+        }]
+    }));
+
+    // Test missing view
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing a valid view backing it",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    // Test view in invalid format
+    assert.commandWorked(db.createView(collName, bucketsCollName, []));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing a valid view backing it",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    // Test collection instead of view
+    assert.commandWorked(db.runCommand({drop: collName}));
+    assert.commandWorked(st.rs0.getPrimary().getDB(db.getName()).runCommand({
+        applyOps: [{
+            op: "c",
+            ns: db.getName() + ".$cmd",
+            o: {create: bucketsCollName, timeseries: {timeField: 't'}}
+        }]
+    }));
+    assert.commandWorked(db.createCollection(collName));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing a valid view backing it",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    db.dropDatabase();
+})();
+
+(function testBucketCollectionWithoutTimeseriesOptions() {
+    // TODO (SERVER-110221): Do not ignore MalformedTimeseriesBucketsCollection in multiversion
+    // suites. This error does not exist in 7.0 and will not be backported.
+    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (isMultiVersion) {
+        return;
+    }
+
+    const db = getNewDb();
+
+    jsTest.log("Executing testBucketCollectionWithoutTimeseriesOptions");
+
+    const collName = 'coll';
+    const bucketsCollName = 'system.buckets.' + collName;
+    const fullNs = db.getName() + '.' + bucketsCollName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
+    const fp =
+        configureFailPoint(st.rs0.getPrimary(), "skipCreateTimeseriesBucketsWithoutOptionsCheck");
+    assert.commandWorked(db.createCollection(bucketsCollName));
+
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing the timeseries options",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    assert.commandWorked(db.createView(collName, bucketsCollName, []));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing the timeseries options",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    db.dropDatabase();
+    fp.off();
 })();
 
 st.stop();

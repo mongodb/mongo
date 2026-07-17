@@ -58,6 +58,7 @@ enums:
             kTrackedUnshardedCollectionHasMultipleChunks: "TrackedUnshardedCollectionHasMultipleChunks"
             kTrackedUnshardedCollectionHasInvalidKey: "TrackedUnshardedCollectionHasInvalidKey"
             kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
+            kMalformedTimeseriesBucketsCollection: "MalformedTimeseriesBucketsCollection"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -83,6 +84,7 @@ enums:
             kTrackedUnshardedCollectionHasMultipleChunks: "Found tracked unsharded collection with more than one chunks"
             kTrackedUnshardedCollectionHasInvalidKey: "Found tracked unsharded collection with invalid shard-key"
             kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
+            kMalformedTimeseriesBucketsCollection: "Found malformed timeseries collection"
 
     MetadataInconsistencySeverity:
         description: "Severity level of a metadata inconsistency."
@@ -343,7 +345,7 @@ structs:
             collectionUUID:
                 type: uuid
                 description: "The UUID of the collection."
-    
+
     ShardMissingCollectionRoutingInfoDetails:
         description: "Details about shard that thinks collection is unsharded."
         strict: false
@@ -377,7 +379,7 @@ structs:
                 type: object
                 description: "The second zone that overlaps with the first zone."
 
-    TrackedUnshardedCollectionHasMultipleChunksDetails: 
+    TrackedUnshardedCollectionHasMultipleChunksDetails:
         description: "Details about tracked unsharded collection with more then one chunks"
         strict: false
         fields:
@@ -390,9 +392,9 @@ structs:
                 type: uuid
             numChunks:
                 description: "The number of chunks found for the collection"
-                type: int 
+                type: int
 
-    TrackedUnshardedCollectionHasInvalidKeyDetails: 
+    TrackedUnshardedCollectionHasInvalidKeyDetails:
         description: "Details about tracked unsharded collection with an invalid shard key"
         strict: false
         fields:
@@ -409,7 +411,7 @@ structs:
 
     TrackedUnshardedCollectionIsMissingLocally:
         description: "Details about unsharded collection tracked on the csrs but not present locally on any shard"
-        strict: false 
+        strict: false
         fields:
             namespace:
                 description: "The namespace of the collection."
@@ -421,7 +423,22 @@ structs:
             shard:
                 description: "The shard where the collection was supposed to be found"
                 type: shard_id
-            
+
+    MalformedTimeseriesBucketsCollectionDetails:
+        description: "Details about a malformed timeseries collection."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the buckets collection."
+            issue:
+                type: string
+                description: "The type of corruption."
+            options:
+                type: object
+                description: "Collection options not matching the expected format."
+
     MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"
         strict: false

@@ -50,6 +50,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
@@ -116,6 +117,99 @@ void logMetadataInconsistency(const MetadataInconsistencyItem& inconsistencyItem
     LOGV2_WARNING(7514800,
                   "Detected sharding metadata inconsistency",
                   "inconsistency"_attr = inconsistencyItem);
+}
+
+// TODO SERVER-108424: get rid of this check once only viewless timeseries are supported
+void _checkBucketCollectionInconsistencies(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
+    const CollectionPtr& localColl,
+    const bool checkView,
+    std::vector<MetadataInconsistencyItem>& inconsistencies) {
+
+    if (!nss.isTimeseriesBucketsCollection()) {
+        return;
+    }
+
+    const std::string errMsgPrefix = str::stream()
+        << nss.toStringForErrorMsg() << " is a bucket collection but is missing";
+
+    // A bucket collection must always have timeseries options
+    const bool hasTimeseriesOptions = localColl->getTimeseriesOptions().has_value();
+    if (!hasTimeseriesOptions) {
+        const std::string errMsg = str::stream() << errMsgPrefix << " the timeseries options";
+        const BSONObj options = localColl->getCollectionOptions().toBSON();
+        inconsistencies.emplace_back(
+            makeInconsistency(MetadataInconsistencyTypeEnum::kMalformedTimeseriesBucketsCollection,
+                              MalformedTimeseriesBucketsCollectionDetails{nss, errMsg, options}));
+        return;
+    }
+
+    if (!checkView) {
+        return;
+    }
+
+    // A bucket collection on the primary shard must always be backed by a view in the proper
+    // format. Check if there is a valid view, otherwise return current view/collection options
+    // (if present).
+    auto [hasValidView, invalidOptions] = [&] {
+        if (const auto& view =
+                localCatalogSnapshot->lookupView(opCtx, nss.getTimeseriesViewNamespace())) {
+            if (view->viewOn() == nss && view->pipeline().size() == 1) {
+                const auto expectedViewPipeline = timeseries::generateViewPipeline(
+                    *localColl->getTimeseriesOptions(), false /* asArray */);
+                const auto expectedInternalUnpackStage =
+                    expectedViewPipeline
+                        .getField(DocumentSourceInternalUnpackBucket::kStageNameInternal)
+                        .Obj();
+                const auto actualPipeline = view->pipeline().front();
+                if (actualPipeline.hasField(
+                        DocumentSourceInternalUnpackBucket::kStageNameInternal)) {
+                    const auto actualInternalUnpackStage =
+                        actualPipeline
+                            .getField(DocumentSourceInternalUnpackBucket::kStageNameInternal)
+                            .Obj()
+                            // Ignore `exclude` field introduced in v5.0 and removed in v5.1
+                            .removeField(DocumentSourceInternalUnpackBucket::kExclude);
+                    if (actualInternalUnpackStage.woCompare(expectedInternalUnpackStage) == 0) {
+                        // The view is in the expected format
+                        return std::make_pair(true, BSONObj());
+                    }
+                }
+            }
+
+            // The view is not in the expected format, return the current options for debugging
+            BSONArrayBuilder pipelineArray;
+            const auto& pipeline = view->pipeline();
+            for (const auto& stage : pipeline) {
+                pipelineArray.append(stage);
+            }
+
+            const BSONObj currentViewOptions = BSON("viewOn" << toStringForLogging(view->viewOn())
+                                                             << "pipeline" << pipelineArray.arr());
+
+            return std::make_pair(false, currentViewOptions);
+        }
+
+        const auto& coll = localCatalogSnapshot->lookupCollectionByNamespace(
+            opCtx, nss.getTimeseriesViewNamespace());
+        if (coll) {
+            // A collection is present rather than a view, return the current options for
+            // debugging
+            return std::make_pair(false, coll->getCollectionOptions().toBSON());
+        }
+
+        return std::make_pair(false, BSONObj());
+    }();
+
+    if (!hasValidView) {
+        const std::string errMsg = str::stream() << errMsgPrefix << " a valid view backing it";
+        inconsistencies.emplace_back(
+            makeInconsistency(MetadataInconsistencyTypeEnum::kMalformedTimeseriesBucketsCollection,
+                              MalformedTimeseriesBucketsCollectionDetails{
+                                  nss, std::move(errMsg), std::move(invalidOptions)}));
+    }
 }
 
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
@@ -291,6 +385,28 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
         _checkShardKeyIndexInconsistencies(
             opCtx, nss, shardId, catalogColl.getKeyPattern().toBSON(), localColl, inconsistencies);
     }
+
+    return inconsistencies;
+}
+
+std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& currentShard,
+    const ShardId& primaryShard,
+    const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
+    const CollectionPtr& localColl) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+
+    if (currentShard != primaryShard) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMisplacedCollection,
+            MisplacedCollectionDetails{
+                nss, currentShard, localColl->uuid(), getNumDocs(opCtx, localColl.get())}));
+    }
+
+    _checkBucketCollectionInconsistencies(
+        opCtx, nss, localCatalogSnapshot, localColl, currentShard == primaryShard, inconsistencies);
 
     return inconsistencies;
 }
@@ -585,6 +701,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& shardingCatalogCollections,
+    const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
     bool optionalCheckIndexes) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
@@ -630,35 +747,40 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
                                        std::make_move_iterator(indexesInconsistencies.begin()),
                                        std::make_move_iterator(indexesInconsistencies.end()));
             }
+
+            _checkBucketCollectionInconsistencies(opCtx,
+                                                  localNss,
+                                                  localCatalogSnapshot,
+                                                  localColl,
+                                                  primaryShardId == shardId /* isPrimaryShard */,
+                                                  inconsistencies);
         } else {
             // Case where we have found a local collection that is not in the sharding catalog.
             const auto& nss = localNss;
 
-            if (!nss.isShardLocalNamespace() && shardId != primaryShardId) {
-                inconsistencies.emplace_back(makeInconsistency(
-                    MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                    MisplacedCollectionDetails{
-                        nss, shardId, localColl->uuid(), getNumDocs(opCtx, localColl.get())}));
+            if (!localNss.isShardLocalNamespace()) {
+                auto localInconsistencies = _checkLocalInconsistencies(
+                    opCtx, nss, shardId, primaryShardId, localCatalogSnapshot, localColl);
+                inconsistencies.insert(inconsistencies.end(),
+                                       std::make_move_iterator(localInconsistencies.begin()),
+                                       std::make_move_iterator(localInconsistencies.end()));
             }
             itLocalCollections++;
         }
     }
 
-    if (shardId != primaryShardId) {
-        // Case where we have found more local collections than in the sharding catalog. It is a
-        // hidden unsharded collection inconsistency if we are not the db primary shard.
-        while (itLocalCollections != localCatalogCollections.end()) {
-            const auto localColl = itLocalCollections->get();
-            if (!localColl->ns().isShardLocalNamespace()) {
-                inconsistencies.emplace_back(
-                    makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                                      MisplacedCollectionDetails{localColl->ns(),
-                                                                 shardId,
-                                                                 localColl->uuid(),
-                                                                 getNumDocs(opCtx, localColl)}));
-            }
-            itLocalCollections++;
+    while (itLocalCollections != localCatalogCollections.end()) {
+        const auto& localColl = *itLocalCollections;
+        const auto& localNss = localColl->ns();
+
+        if (!localNss.isShardLocalNamespace()) {
+            auto localInconsistencies = _checkLocalInconsistencies(
+                opCtx, localNss, shardId, primaryShardId, localCatalogSnapshot, localColl);
+            inconsistencies.insert(inconsistencies.end(),
+                                   std::make_move_iterator(localInconsistencies.begin()),
+                                   std::make_move_iterator(localInconsistencies.end()));
         }
+        itLocalCollections++;
     }
 
     while (itCatalogCollections != shardingCatalogCollections.end()) {

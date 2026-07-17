@@ -114,8 +114,8 @@ void createLocalCollection(OperationContext* opCtx, const CreateCommand& cmd) {
     uassertStatusOK(createCollection(opCtx, cmd));
 }
 
-std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
-                                                      const NamespaceString& nss) {
+std::pair<const std::shared_ptr<const CollectionCatalog>, std::vector<CollectionPtr>>
+getLocalCatalog(OperationContext* opCtx, const NamespaceString& nss) {
     std::vector<CollectionPtr> localCatalogCollections;
     auto collCatalogSnapshot = [&] {
         AutoGetCollection coll(
@@ -129,7 +129,7 @@ std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
     if (auto coll = collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
         localCatalogCollections.emplace_back(CollectionPtr(coll));
     }
-    return localCatalogCollections;
+    return {collCatalogSnapshot, std::move(localCatalogCollections)};
 }
 
 class MetadataConsistencyTest : public ShardServerTestFixture {
@@ -364,7 +364,7 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
     cmd.getCreateCollectionRequest().setSize(100);
     createLocalCollection(opCtx, cmd);
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     // Create a CollectionType for a non-unsplittable collection to mock the collection info
@@ -377,6 +377,7 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*optionalCheckIndexes*/);
     assertCollectionOptionsMismatchInconsistencyFound(
@@ -412,7 +413,7 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
         }
         createLocalCollection(opCtx, cmd);
 
-        const auto localCatalogCollections = getLocalCatalogCollections(opCtx, nss);
+        const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, nss);
         ASSERT_EQ(1, localCatalogCollections.size());
 
         // Create a CollectionType to mock the collection metadata fetched from the config server.
@@ -427,6 +428,7 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
             _shardId,
             _shardId,
             {configColl},
+            localCatalogSnapshot,
             localCatalogCollections,
             false /*optionalCheckIndexes*/);
 
@@ -493,7 +495,8 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
 
             const auto& actualNss = (localTimeseries ? nss.makeTimeseriesBucketsNamespace() : nss);
 
-            const auto localCatalogCollections = getLocalCatalogCollections(opCtx, actualNss);
+            const auto [localCatalogSnapshot, localCatalogCollections] =
+                getLocalCatalog(opCtx, actualNss);
             ASSERT_EQ(1, localCatalogCollections.size());
 
             // Create a CollectionType to mock the collection metadata fetched from the config
@@ -513,6 +516,7 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                     _shardId,
                     _shardId,
                     {configColl},
+                    localCatalogSnapshot,
                     localCatalogCollections,
                     false /*optionalCheckIndexes*/);
 
@@ -608,7 +612,7 @@ TEST_F(MetadataConsistencyTest,
                                      << BSON("locale"
                                              << "en"))});
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     auto configColl = generateCollectionType(
@@ -619,6 +623,7 @@ TEST_F(MetadataConsistencyTest,
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         true /*optionalCheckIndexes*/);
 
@@ -639,7 +644,7 @@ TEST_F(MetadataConsistencyTest, NonUniqueIndexWithNonSimpleCollationDoesNotRepor
                                      << BSON("locale"
                                              << "en"))});
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     auto configColl = generateCollectionType(
@@ -650,6 +655,7 @@ TEST_F(MetadataConsistencyTest, NonUniqueIndexWithNonSimpleCollationDoesNotRepor
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         true /*optionalCheckIndexes*/);
 
@@ -668,7 +674,7 @@ TEST_F(MetadataConsistencyTest, UniqueIndexWithSimpleCollationDoesNotReportIncon
                                      << "x_1_unique"
                                      << "unique" << true)});
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     auto configColl = generateCollectionType(
@@ -679,6 +685,7 @@ TEST_F(MetadataConsistencyTest, UniqueIndexWithSimpleCollationDoesNotReportIncon
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         true /*optionalCheckIndexes*/);
 
@@ -700,7 +707,7 @@ TEST_F(MetadataConsistencyTest,
                                      << BSON("locale"
                                              << "en"))});
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     auto configColl = generateCollectionType(
@@ -711,6 +718,7 @@ TEST_F(MetadataConsistencyTest,
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*optionalCheckIndexes*/);
 
@@ -731,7 +739,7 @@ TEST_F(MetadataConsistencyTest, UniqueIndexWithNonSimpleCollationAllowedInUnspli
                                      << BSON("locale"
                                              << "en"))});
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     auto configColl = generateCollectionType(
@@ -743,6 +751,7 @@ TEST_F(MetadataConsistencyTest, UniqueIndexWithNonSimpleCollationAllowedInUnspli
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         true /*optionalCheckIndexes*/);
 
@@ -979,7 +988,7 @@ TEST_F(MetadataConsistencyTest, CollectionUUIDMismatchOnSessionsNamespaceHasLowS
     CreateCommand cmd(nss);
     createLocalCollection(opCtx, cmd);
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     // Use a different UUID to trigger a CollectionUUIDMismatch.
@@ -990,6 +999,7 @@ TEST_F(MetadataConsistencyTest, CollectionUUIDMismatchOnSessionsNamespaceHasLowS
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*optionalCheckIndexes*/);
 
@@ -1012,7 +1022,7 @@ TEST_F(MetadataConsistencyTest, CollectionOptionsMismatchOnSessionsNamespaceHasL
     cmd.getCreateCollectionRequest().setSize(100);
     createLocalCollection(opCtx, cmd);
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     // Config entry has the same UUID but does not mark it as unsplittable, triggering the mismatch.
@@ -1023,6 +1033,7 @@ TEST_F(MetadataConsistencyTest, CollectionOptionsMismatchOnSessionsNamespaceHasL
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*optionalCheckIndexes*/);
 
