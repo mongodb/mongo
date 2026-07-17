@@ -100,7 +100,7 @@ export var MetadataConsistencyChecker = (function () {
                     return false;
                 }
 
-                // TODO (SERVER-131045): Re-enable this check.
+                // TODO (SERVER-131571): Re-enable this check.
                 const isPausedMigrationShardCatalogEntryMismatch =
                     innerDetails.field === "shardCatalogEntry" &&
                     innerDetails.source === "inMemoryShardCatalog" &&
