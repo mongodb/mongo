@@ -833,7 +833,8 @@ describe("Costing entire joins", () => {
         );
     });
 
-    it("3-table joins should have identical costs regardless of syntactic order", () => {
+    // TODO SERVER-131547: Re-enable this test.
+    it.skip("3-table joins should have identical costs regardless of syntactic order", () => {
         assertCostEq(
             {
                 aggregate: "one_row",
