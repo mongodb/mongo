@@ -22,6 +22,7 @@ import {
     getNestedProperties,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestricted} from "jstests/libs/query/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (!checkSbeRestricted(db)) {
     jsTest.log.info("Skipping test because SBE is not in restricted mode.");
@@ -124,7 +125,23 @@ describe("$LU pushdown", function () {
         assert(this.foreignCollection.drop());
     });
 
+    // These shapes scan the local collection (COLLSCAN) and join on an unindexed foreign
+    // field, so pushdown requires both the collscan access path and the nested-loop
+    // join strategy feature flags to be enabled.
+    function canPushdownCollscanNestedLoopJoin() {
+        return (
+            FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindLocalCollscan") &&
+            FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindNestedLoopJoin")
+        );
+    }
+
     it("Should pushdown lookup-unwind", function () {
+        if (!canPushdownCollscanNestedLoopJoin()) {
+            jsTest.log.info(
+                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan and SbeEqLookupUnwindNestedLoopJoin to be enabled.",
+            );
+            return;
+        }
         const explain = this.collection
             .explain()
             .aggregate([
@@ -145,6 +162,12 @@ describe("$LU pushdown", function () {
     });
 
     it("Should pushdown when preserveNullAndEmptyArrays is set to true", function () {
+        if (!canPushdownCollscanNestedLoopJoin()) {
+            jsTest.log.info(
+                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan and SbeEqLookupUnwindNestedLoopJoin to be enabled.",
+            );
+            return;
+        }
         const explain = this.collection
             .explain()
             .aggregate([
@@ -155,6 +178,12 @@ describe("$LU pushdown", function () {
     });
 
     it("Should pushdown when includeArrayIndex is set", function () {
+        if (!canPushdownCollscanNestedLoopJoin()) {
+            jsTest.log.info(
+                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan and SbeEqLookupUnwindNestedLoopJoin to be enabled.",
+            );
+            return;
+        }
         const explain = this.collection
             .explain()
             .aggregate([

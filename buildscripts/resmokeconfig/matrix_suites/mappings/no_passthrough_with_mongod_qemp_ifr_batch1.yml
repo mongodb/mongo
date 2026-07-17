@@ -1,0 +1,5 @@
+# no_passthrough_with_mongod copy with the QEMP IFR batch 1 feature flags
+base_suite: no_passthrough_with_mongod
+overrides:
+  - "qemp_ifr_batch1.enable_qemp_ifr_batch1_feature_flags_mongod"
+  - "qemp_ifr_batch1.enable_qemp_ifr_batch1_feature_flags_testdata_parameter_mongod"

@@ -25,10 +25,19 @@ filters:
   - "/aggregation_multiversion_fuzzer_last_lts.yml":
     approvers:
       - 10gen/query-optimization
+  - "/aggregation_qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
+  - "/aggregation_sharded_collections_passthrough_qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
   - "/core_ese_gcm.yml":
     approvers:
       - 10gen/server-security
   - "/core_minimum_batch_size.yml":
+    approvers:
+      - 10gen/query-execution
+  - "/core_qemp_ifr_batch1.yml":
     approvers:
       - 10gen/query-execution
   - "/jstestfuzz_replication_last_continuous_new_new_old.yml":
@@ -76,6 +85,12 @@ filters:
   - "/multiversion_sanity_check_last_lts_old_new_new.yml":
     approvers:
       - 10gen/server-jstest-infra
+  - "/no_passthrough_qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
+  - "/no_passthrough_with_mongod_qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
   - "/replica_sets_ese.yml":
     approvers:
       - 10gen/server-security
@@ -136,6 +151,9 @@ filters:
   - "/rollback_fuzzer_last_lts.yml":
     approvers:
       - 10gen/server-recovery
+  - "/sharded_collections_jscore_passthrough_qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
   - "/sharded_retryable_writes_downgrade_last_continuous_new_old_old_new.yml":
     approvers:
       - 10gen/server-catalog-and-routing

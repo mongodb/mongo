@@ -1,0 +1,58 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/no_passthrough_qemp_ifr_batch1.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+description:
+  '"Passthrough" means running a test against different runtime Cluster
+
+  configurations, including topology, runtime flags, fault injections, and other
+
+  parameters. Most tests by default are able to run in "passthrough" suites.
+
+  NoPassthrough is an exception, where tests here only run in the exact
+
+  configuration predefined in the tests themselves.
+
+  '
+executor:
+  archive:
+    tests:
+      - jstests/noPassthrough/oplog_writes_only_permitted_on_standalone.js
+      - jstests/noPassthrough/server_parameters/redact_sensitive_server_parameters.js
+      - jstests/noPassthrough/wt_unclean_shutdown.js
+      - src/mongo/db/modules/*/jstests/live_restore/*.js
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagGetExecutorDeferredEngineChoice: true
+            featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: false
+            featureFlagSbeEqLookupUnwindHashJoin: true
+            featureFlagSbeEqLookupUnwindIndexedLoopJoin: false
+            featureFlagSbeEqLookupUnwindLocalCollscan: true
+            featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+            featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+            featureFlagSbeEqLookupUnwindNestedLoopJoin: false
+            featureFlagSbeNonLeadingMatch: true
+            featureFlagSbeTransformStages: true
+      nodb: ""
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/noPassthrough/libs/**/*.js
+  exclude_with_any_tags:
+    - requires_kernel_619
+    - requires_kernel_7014
+  roots:
+    - jstests/noPassthrough/**/*.js
+    - jstests/libs/property_test_helpers/self_tests/*.js
+    - src/mongo/db/modules/*/jstests/live_import/*.js
+    - src/mongo/db/modules/*/jstests/live_restore/*.js
+    - src/mongo/db/modules/*/jstests/no_passthrough/*.js
+    - jstests/concurrency/*.js
+test_kind: js_test

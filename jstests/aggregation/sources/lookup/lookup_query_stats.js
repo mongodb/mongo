@@ -19,6 +19,7 @@
  *     does_not_support_config_fuzzer,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages, getLookupStageIndexStrategy} from "jstests/libs/query/analyze_plan.js";
 import {
     getQueryInfoAtTopLevelOrFirstStage,
@@ -33,6 +34,22 @@ import {
 const isSBEFullyEnabled = checkSbeFullyEnabled(db);
 const isSBELookupEnabled = checkSbeRestrictedOrFullyEnabled(db);
 const deferredGetExecutorEnabled = isDeferredGetExecutorEnabled(db);
+const eqLookupUnwindCollscanEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEqLookupUnwindLocalCollscan",
+);
+const eqLookupUnwindNestedLoopJoinEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEqLookupUnwindNestedLoopJoin",
+);
+const eqLookupUnwindIndexedLoopJoinEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEqLookupUnwindIndexedLoopJoin",
+);
+const eqLookupUnwindDynamicIndexedLoopJoinEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEqLookupUnwindDynamicIndexedLoopJoin",
+);
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 
@@ -303,6 +320,12 @@ let createIndexForCollection = function (collection, fieldName) {
 };
 
 let testQueryExecutorStatsWithCollectionScan = function (params) {
+    if (
+        params.withUnwind &&
+        (!eqLookupUnwindCollscanEnabled || !eqLookupUnwindNestedLoopJoinEnabled)
+    ) {
+        return;
+    }
     let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: false}, params.withUnwind);
 
     assert.eq(output, params.expectedOutput);
@@ -412,6 +435,12 @@ let testQueryExecutorStatsWithHashLookup = function (params) {
 };
 
 let testQueryExecutorStatsWithIndexScan = function (params) {
+    if (
+        params.withUnwind &&
+        (!eqLookupUnwindCollscanEnabled || !eqLookupUnwindIndexedLoopJoinEnabled)
+    ) {
+        return;
+    }
     createIndexForCollection(fromColl, "foreignField");
 
     let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: false}, params.withUnwind);
@@ -481,6 +510,12 @@ let testQueryExecutorStatsWithIndexScan = function (params) {
 };
 
 let testQueryExecutorStatsWithDynamicIndexedLoopJoin = function (params) {
+    if (
+        params.withUnwind &&
+        (!eqLookupUnwindCollscanEnabled || !eqLookupUnwindDynamicIndexedLoopJoinEnabled)
+    ) {
+        return;
+    }
     createIndexForCollection(fromColl, "foreignField");
 
     let output = doAggregationLookup(

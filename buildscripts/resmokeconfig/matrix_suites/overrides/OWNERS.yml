@@ -15,6 +15,9 @@ filters:
   - "networking.yml":
     approvers:
       - 10gen/server-networking-and-observability
+  - "qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
   - "query_settings.yml":
     approvers:
       - 10gen/query-execution-query-settings

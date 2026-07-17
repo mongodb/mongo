@@ -1,0 +1,4 @@
+# jscore copy with the QEMP IFR batch 1 feature flags
+base_suite: core
+overrides:
+  - "qemp_ifr_batch1.enable_qemp_ifr_batch1_feature_flags_mongod"
