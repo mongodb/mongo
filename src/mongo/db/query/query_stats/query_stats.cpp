@@ -423,6 +423,15 @@ void registerRequestImpl(const OperationContext* opCtx,
     // original query from queryStats metrics collection and let it execute normally.
     try {
         queryStatsInfo.key = makeKey();
+        if (queryStatsInfo.key->size() > static_cast<size_t>(BSONObjMaxUserSize)) {
+            queryStatsStoreWriteErrorsMetric.increment();
+            LOGV2_DEBUG(13146600,
+                        2,
+                        "Query Stats shapification has exceeded the memory limit. Metrics will not "
+                        "be collected");
+            queryStatsInfo.key = nullptr;
+            return;
+        }
         queryStatsInfo.keyHash = absl::HashOf(*queryStatsInfo.key);
         if (MONGO_unlikely(queryStatsFailToSerializeKey.shouldFail())) {
             uasserted(ErrorCodes::FailPointEnabled,
@@ -435,8 +444,8 @@ void registerRequestImpl(const OperationContext* opCtx,
         if (status.code() == ErrorCodes::BSONObjectTooLarge) {
             LOGV2_DEBUG(7979400,
                         2,
-                        "Query Stats shapification has exceeded the 16 MB memory limit. Metrics "
-                        "will not be collected");
+                        "Query Stats shapification has exceeded the MB memory limit. Metrics will "
+                        "not be collected");
             return;
         }
 
