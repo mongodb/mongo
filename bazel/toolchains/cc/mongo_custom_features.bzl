@@ -390,7 +390,8 @@ def get_common_features(ctx):
             ],
         ),
         feature(
-            # The mongo is added because coverage is a used feature already
+            # The mongo is added because coverage is a used feature already.
+            # This is ambiguously named -- it's really meant for gcov-specific coverage.
             name = "coverage_mongo",
             enabled = ctx.attr.coverage_enabled,
             flag_sets = [
@@ -406,6 +407,43 @@ def get_common_features(ctx):
                     flag_groups = [flag_group(flags = [
                         "--coverage",
                         "-fprofile-update=single",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "llvm_coverage_dso",
+            enabled = False,
+            flag_sets = [
+                # -runtime-counter-relocation enables continuous mode on Linux/ELF:
+                # combined with a %c LLVM_PROFILE_FILE, each module's counters are
+                # mmap'd directly to its .profraw and updated live. This is what
+                # -fprofile-continuous expands to (that driver alias is absent in this
+                # clang-19.1.7 build). Continuous counters survive mongod's
+                # quickExit()->_exit(), which bypasses the atexit-based flush the
+                # per-DSO profile runtimes otherwise rely on.
+                #
+                # The actual instrumentation (-fprofile-instr-generate/-fcoverage-mapping)
+                # is added by Bazel's built-in `coverage` feature, which honors
+                # --instrumentation_filter — so this feature deliberately does NOT add it
+                # (doing so would instrument every TU, including third-party deps). This
+                # codegen flag is a no-op on TUs that built-in coverage did not instrument.
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        "-mllvm",
+                        "-runtime-counter-relocation",
+                    ])],
+                ),
+                # Force the LLVM profile runtime into every DSO link so each
+                # instrumented shared library carries its own runtime and mmaps its
+                # own counters. (-fprofile-instr-generate here links the small profile
+                # runtime archive; it does not instrument any source.)
+                flag_set(
+                    actions = all_link_actions + lto_index_actions,
+                    flag_groups = [flag_group(flags = [
+                        "-fprofile-instr-generate",
+                        "-Wl,-u,__llvm_profile_runtime",
                     ])],
                 ),
             ],

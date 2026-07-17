@@ -1,4 +1,7 @@
+"""Resmoke suite test infrastructure for Bazel."""
+
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 load("//bazel/resmoke:.resmoke_suites_derived.bzl", "SUITE_SELECTORS")
 load("@rules_python//python:defs.bzl", "py_binary")
@@ -425,9 +428,6 @@ def resmoke_suite_test(
             "//conditions:default": [],
         })
 
-    # Resmoke test-target attribute values, extracted into locals so the pieces are
-    # named and reusable. The data/deps/args/env of the test target are each built
-    # here and passed to py_test below.
     data_attr = select({
         # Skip user-provided data during cquery — it may include targets that require
         # C++ toolchain resolution, which fails when --noincompatible_enable_cc_toolchain_resolution is set.
@@ -438,8 +438,6 @@ def resmoke_suite_test(
         "//conditions:default": [],
     })
 
-    # The server binaries (mongod/mongos/mongo). Empty under installed-dist-test
-    # (prebuilt servers) and during cquery.
     server_deps_attr = select({
         "//bazel/resmoke:installed_dist_test_enabled": [],
         "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
@@ -484,7 +482,7 @@ def resmoke_suite_test(
         deps = [
             resmoke,
             "//buildscripts:bazel_local_resources",
-        ] + server_deps_attr,
+        ],
         main = resmoke_shim,
         tags = ["manual"],
         target_compatible_with = target_compatible_with,
@@ -552,9 +550,40 @@ def _resmoke_test_impl(ctx):
     if server_bins:
         expanded_env["DEPS_PATH"] = ":".join([b.short_path for b in server_bins])
 
+    # Bazel only auto-populates the C++ coverage collector env (used by
+    # collect_cc_coverage.sh) when the test's own executable is a cc-instrumented
+    # binary. Our launcher is a shell script, so set it explicitly from the resolved
+    # cc toolchain. Under coverage, the clang toolchain maps the "gcov" tool to
+    # llvm-profdata; llvm-cov is its sibling in the same bin dir.
+    cc_toolchain = find_cpp_toolchain(ctx, mandatory = False)
+
+    # Note that gcov_executable can be used for either gcov or llvm-profdata
+    gcov = cc_toolchain.gcov_executable if cc_toolchain else None
+    if gcov:
+        bindir = gcov.rsplit("/", 1)[0]
+
+        # LLVM source-based coverage (.profraw): COVERAGE_GCOV_PATH is the merge tool
+        # (the clang toolchain maps the "gcov" tool_path to llvm-profdata) and LLVM_COV
+        # does the lcov export.
+        expanded_env["COVERAGE_GCOV_PATH"] = gcov
+        expanded_env["LLVM_COV"] = bindir + "/llvm-cov"
+
     env_exports = "".join(
         ["export {}={}\n".format(k, sh_quote(v)) for k, v in expanded_env.items()],
     )
+
+    # Route each instrumented server process's counters into COVERAGE_DIR using
+    # continuous mode (%c) + per-module (%m) online merging. Continuous mode mmaps
+    # counters live so they persist across quickExit()'s _exit() (which skips the
+    # profile runtime's atexit flush); %m gives each DSO its own file and enables the
+    # merge pool across concurrent processes. COVERAGE_DIR is exported at runtime by
+    # Bazel's collect_coverage.sh, so the value must expand there (not at analysis time).
+    profile_override = (
+        'if [[ -n "${COVERAGE_DIR:-}" ]]; then\n' +
+        '  export LLVM_PROFILE_FILE="${COVERAGE_DIR}/server-%p-%m%c.profraw"\n' +
+        "fi\n"
+    )
+
     args_str = " ".join([sh_quote(a) for a in expanded_args])
 
     # The launcher locates the resmoke py_binary under the runfiles tree and execs it.
@@ -572,9 +601,10 @@ if [[ -z "${{RUNFILES_DIR:-}}" && -z "${{RUNFILES_MANIFEST_FILE:-}}" ]]; then
     export RUNFILES_DIR="$0.runfiles"
   fi
 fi
-{env_exports}exec "{resmoke_bin}" {args} "$@"
+{env_exports}{profile_override}exec "{resmoke_bin}" {args} "$@"
 """.format(
             env_exports = env_exports,
+            profile_override = profile_override,
             # The py_binary executable lives in the runfiles under _main/<short_path>.
             resmoke_bin = "${RUNFILES_DIR}/_main/" + resmoke_bin.short_path,
             args = args_str,
@@ -584,7 +614,10 @@ fi
     # Seed with the data files and the server executables that DEPS_PATH points at, so
     # those exact binaries are staged rather than relying on each dep's default_runfiles
     # to carry its own executable.
-    runfiles = ctx.runfiles(files = ctx.files.data + server_bins)
+    runfiles = ctx.runfiles(
+        files = ctx.files.data + server_bins,
+        transitive_files = cc_toolchain.all_files if cc_toolchain else None,
+    )
     runfiles = runfiles.merge(ctx.attr.resmoke_bin[DefaultInfo].default_runfiles)
     for dep in ctx.attr.server_deps + ctx.attr.data:
         runfiles = runfiles.merge(dep[DefaultInfo].default_runfiles)
@@ -592,7 +625,39 @@ fi
     return [
         DefaultInfo(executable = launcher, runfiles = runfiles),
         RunEnvironmentInfo(environment = expanded_env),
+        # Forward coverage info from the instrumented server binaries so that the
+        # coverage manifest lists their objects and sources.
+        coverage_common.instrumented_files_info(
+            ctx,
+            dependency_attributes = ["server_deps", "data"],
+        ),
     ]
+
+# Scope the llvm_coverage_dso feature (see bazel/toolchains/cc/mongo_custom_features.bzl)
+# to the server binaries' build subgraph, and only when coverage is being collected.
+# Enabling it globally (via `.bazelrc coverage --features=`) would add
+# -runtime-counter-relocation to every instrumented TU in the build — including
+# unittests, whose coverage runs must stay as fast as possible. The feature is only
+# needed so mongod's quickExit()->_exit() flushes counters; unittests exit normally
+# and don't need it. A configuration transition (rather than a target `features`
+# attribute) is required because the counters live in the transitively-linked
+# cc_library TUs, which a cc_binary-level `features` attr would not reach.
+def _coverage_dso_transition_impl(settings, _attr):
+    if not settings["//command_line_option:collect_code_coverage"]:
+        return {}
+    features = list(settings["//command_line_option:features"])
+    if "llvm_coverage_dso" not in features:
+        features.append("llvm_coverage_dso")
+    return {"//command_line_option:features": features}
+
+_coverage_dso_transition = transition(
+    implementation = _coverage_dso_transition_impl,
+    inputs = [
+        "//command_line_option:collect_code_coverage",
+        "//command_line_option:features",
+    ],
+    outputs = ["//command_line_option:features"],
+)
 
 _resmoke_test = rule(
     implementation = _resmoke_test_impl,
@@ -604,7 +669,9 @@ _resmoke_test = rule(
             doc = "The resmoke py_binary to run.",
         ),
         "server_deps": attr.label_list(
-            doc = "Server binaries (mongod/mongos/mongo).",
+            cfg = _coverage_dso_transition,
+            doc = "Server binaries (mongod/mongos/mongo). Under coverage, built with the " +
+                  "llvm_coverage_dso feature so each DSO flushes its counters across quickExit().",
         ),
         "data": attr.label_list(
             allow_files = True,
@@ -616,6 +683,20 @@ _resmoke_test = rule(
         "resmoke_env": attr.string_dict(
             doc = "Environment for the test; values support $(location) and make-vars.",
         ),
+        # C++ coverage plumbing (see extract_debuginfo_test).
+        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:optional_current_cc_toolchain"),
+        "_lcov_merger": attr.label(
+            default = configuration_field(fragment = "coverage", name = "output_generator"),
+            executable = True,
+            cfg = config.exec(exec_group = "test"),
+        ),
+        "_collect_cc_coverage": attr.label(
+            default = "@bazel_tools//tools/test:collect_cc_coverage",
+            executable = True,
+            cfg = config.exec(exec_group = "test"),
+        ),
     },
+    toolchains = use_cpp_toolchain(),
+    fragments = ["cpp", "coverage"],
     test = True,
 )

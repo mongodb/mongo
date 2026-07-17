@@ -476,7 +476,8 @@ coverage --linkstatic=False
 coverage --combined_report=lcov
 coverage --experimental_use_llvm_covmap
 coverage --experimental_generate_llvm_lcov
-coverage --remote_download_outputs=all
+# Only pull the coverage reports back from remote execution, not every instrumented output
+coverage --remote_download_regex=.*coverage.*\.dat$
 coverage --fission=no
 coverage --build_runfile_links
 coverage --legacy_external_runfiles
