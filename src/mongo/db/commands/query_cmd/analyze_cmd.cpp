@@ -224,8 +224,8 @@ void runSampleMode(OperationContext* opCtx,
         numChunksOpt = boost::none;
     }
 
-    std::string docId =
-        ce::buildPersistentSampleId(*collUUID, samplingMethodToPersist, sampleSize, numChunksOpt);
+    const BSONObj docId =
+        ce::makePersistentSampleIdObj(*collUUID, samplingMethodToPersist, sampleSize, numChunksOpt);
 
     // Build the sample document using IDL field name constants to guarantee the stored document
     // matches the schema expected by PersistentSampleLoader.
@@ -233,7 +233,8 @@ void runSampleMode(OperationContext* opCtx,
     sampleDocBuilder.append(ce::PersistentSampleDoc::k_idFieldName, docId);
     sampleDocBuilder.append(ce::PersistentSampleDoc::kCollectionUuidFieldName,
                             collUUID->toString());
-    sampleDocBuilder.append(ce::PersistentSampleDoc::kSchemaVersionFieldName, 1);
+    sampleDocBuilder.append(ce::PersistentSampleDoc::kSchemaVersionFieldName,
+                            ce::kPersistentSampleSchemaVersion);
     sampleDocBuilder.appendDate(ce::PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
     sampleDocBuilder.append(ce::PersistentSampleDoc::kSampleSizeFieldName,
                             static_cast<long long>(sampleSize));

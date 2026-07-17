@@ -6,6 +6,9 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 export const samplesCollName = "system.stats.samples";
 
+// Mirrors ce::kPersistentSampleSchemaVersion.
+export const kPersistentSampleSchemaVersion = 1;
+
 // Field names mirroring persistent_sample.idl — update here if the IDL field names change.
 export const sampleDocFieldNames = {
     idField: "_id",
@@ -106,35 +109,41 @@ export function dropSamplesColl(db) {
     );
 }
 
-// Returns the expected full _id for a sample document.
+// Returns the expected _id object for a sample document.
 // samplingType is "random" or "chunk"; sampleSize is the sample count encoded in the _id.
 // numChunks is included in the _id only for chunk mode.
 export function getExpectedId(
     uuid,
     samplingType,
     sampleSize,
-    expectedSchemaVersion = 1,
+    expectedSchemaVersion = kPersistentSampleSchemaVersion,
     numChunks = null,
 ) {
-    let samplingTypeStr = samplingType;
+    const id = {
+        [sampleDocFieldNames.schemaVersionField]: NumberInt(expectedSchemaVersion),
+        [sampleDocFieldNames.uuidField]: UUID(uuid),
+        [sampleDocFieldNames.samplingMethodField]: samplingType,
+        [sampleDocFieldNames.sampleSizeField]: NumberLong(sampleSize),
+    };
     if (numChunks !== null) {
         assert.eq(
             "chunk",
             samplingType,
             `numChunks should only be passed for chunk sampling; got ${samplingType}`,
         );
-        samplingTypeStr += numChunks;
+        id[sampleDocFieldNames.numChunksField] = NumberInt(numChunks);
     }
-    return `${uuid}_${samplingTypeStr}_${sampleSize}_v${expectedSchemaVersion}`;
+    return id;
 }
 
 // Returns a sample document in system.stats.samples for the test collection.
 export function getSampleDoc(samplesColl, expectedId) {
     const results = samplesColl.find({_id: expectedId}).toArray();
+    // TODO SERVER-130448: allow more than one doc here once a sample can span multiple pages.
     assert.eq(
         results.length,
         1,
-        `Expected exactly 1 sample doc with _id=${expectedId}; got ${results.length}`,
+        `Expected exactly 1 sample doc with _id=${tojson(expectedId)}; got ${results.length}`,
     );
     return results[0];
 }
@@ -147,7 +156,7 @@ export function getSampleDoc(samplesColl, expectedId) {
 // requestedSampleSize: expected sample size encoded in the _id.
 // actualSampleSize: expected doc.sampleSize value and length of doc.docs array.
 // expectedSchemaVersion: what version document we expect to find
-// numChunks: expected number of chunks encoded in _id string and numChunks field. Expected null if samplingMethod != chunk
+// numChunks: expected number of chunks encoded in _id and numChunks field. Expected null if samplingMethod != chunk
 // expectedFields: optional list of field names every sampled doc must have. Cursory shape check
 //                 that the sampling pipeline preserved fields from the source docs.
 export function verifySampleDoc(
@@ -158,7 +167,7 @@ export function verifySampleDoc(
         samplingMethod,
         requestedSampleSize,
         actualSampleSize,
-        expectedSchemaVersion = 1,
+        expectedSchemaVersion = kPersistentSampleSchemaVersion,
         numChunks = null,
         expectedFields = [],
     },
@@ -180,10 +189,10 @@ export function verifySampleDoc(
     assert.neq(null, doc, "Expected to find a sample doc, got null");
 
     // Check that _id, samplingMethod, sampleSize, and schemaVersion all match expected values.
-    assert.eq(
+    assert.docEq(
         expectedId,
         doc[sampleDocFieldNames.idField],
-        `Expected: ${sampleDocFieldNames.idField} = ${expectedId}. Sample doc: ${tojson(doc)}`,
+        `Expected: ${sampleDocFieldNames.idField} = ${tojson(expectedId)}. Sample doc: ${tojson(doc)}`,
     );
     assert.eq(
         samplingMethod,

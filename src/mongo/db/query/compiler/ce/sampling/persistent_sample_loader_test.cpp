@@ -10,6 +10,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <vector>
 
 namespace mongo::ce {
 namespace {
@@ -17,53 +18,57 @@ namespace {
 const BSONObj kStubSampleDoc = BSON("_id" << 1);
 const std::vector<BSONObj> kStubSampleDocs{kStubSampleDoc};
 
-// ── buildPersistentSampleId ───────────────────────────────────────────────────────────────────
+// ── makePersistentSampleIdObj ─────────────────────────────────────────────────────────────────
 
-TEST(BuildPersistentSampleId, RandomMethodFormat) {
+TEST(MakePersistentSampleIdObj, EqualIdentitiesProduceEqualIds) {
     const UUID uuid = UUID::gen();
-    const std::string id =
-        buildPersistentSampleId(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
-    ASSERT_EQUALS(id, uuid.toString() + "_random_1000_v1");
+    const auto a =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
+    const auto b =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
+    ASSERT_BSONOBJ_EQ(a, b);
 }
 
-TEST(BuildPersistentSampleId, ChunkMethodFormat) {
+TEST(MakePersistentSampleIdObj, PopulatesFieldsInPrefixOrder) {
     const UUID uuid = UUID::gen();
-    const std::string id =
-        buildPersistentSampleId(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    ASSERT_EQUALS(id, uuid.toString() + "_chunk10_384_v1");
+    const auto randomId =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    // schemaVersion is part of the identity so a schema bump can never match a stale document.
+    ASSERT_EQ(randomId[PersistentSampleId::kSchemaVersionFieldName].numberInt(),
+              kPersistentSampleSchemaVersion);
+    ASSERT_EQ(UUID::parse(randomId[PersistentSampleId::kCollectionUuidFieldName]), uuid);
+    ASSERT_EQ(randomId[PersistentSampleId::kSamplingMethodFieldName].str(), "random");
+    ASSERT_EQ(randomId[PersistentSampleId::kSampleSizeFieldName].numberLong(), 384);
+    ASSERT_TRUE(randomId[PersistentSampleId::kNumChunksFieldName].eoo());
+
+    std::vector<std::string> fieldNames;
+    for (auto&& e : randomId) {
+        fieldNames.push_back(std::string{e.fieldNameStringData()});
+    }
+    ASSERT_EQ(fieldNames.front(), PersistentSampleId::kSchemaVersionFieldName);
+
+    const auto chunkId =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
+    ASSERT_EQ(chunkId[PersistentSampleId::kNumChunksFieldName].numberInt(), 10);
 }
 
-TEST(BuildPersistentSampleId, SchemaVersionIsEmbedded) {
-    // The suffix must be `_v<kPersistentSampleSchemaVersion>` so readers and writers always
-    // agree on the key even when the schema version constant is bumped in the future.
+TEST(MakePersistentSampleIdObj, DifferentConfigurationsProduceDifferentIds) {
     const UUID uuid = UUID::gen();
-    const std::string id =
-        buildPersistentSampleId(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-    const std::string expectedSuffix = "_v" + std::to_string(kPersistentSampleSchemaVersion);
-    ASSERT_TRUE(id.ends_with(expectedSuffix))
-        << "id='" << id << "' expected suffix '" << expectedSuffix << "'";
-}
+    const auto randomId =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    const auto otherUuidId =
+        makePersistentSampleIdObj(UUID::gen(), SamplingTechniqueEnum::kRandom, 384, boost::none);
+    const auto chunkId =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
+    const auto differentSizeId =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
+    const auto differentChunksId =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20);
 
-TEST(BuildPersistentSampleId, DifferentUUIDsProduceDifferentKeys) {
-    const std::string a =
-        buildPersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 384, boost::none);
-    const std::string b =
-        buildPersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 384, boost::none);
-    ASSERT_NOT_EQUALS(a, b);
-}
-
-TEST(BuildPersistentSampleId, DifferentConfigurationsProduceDifferentKeys) {
-    const UUID uuid = UUID::gen();
-    const std::string randomKey =
-        buildPersistentSampleId(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-    const std::string chunkKey =
-        buildPersistentSampleId(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    const std::string differentSizeKey =
-        buildPersistentSampleId(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
-
-    ASSERT_NOT_EQUALS(randomKey, chunkKey);
-    ASSERT_NOT_EQUALS(randomKey, differentSizeKey);
-    ASSERT_NOT_EQUALS(chunkKey, differentSizeKey);
+    ASSERT_BSONOBJ_NE(randomId, otherUuidId);
+    ASSERT_BSONOBJ_NE(randomId, chunkId);
+    ASSERT_BSONOBJ_NE(randomId, differentSizeId);
+    ASSERT_BSONOBJ_NE(chunkId, differentChunksId);
 }
 
 // ── parsePersistentSample ─────────────────────────────────────────────────────────────────────
@@ -265,7 +270,7 @@ TEST(ParsePersistentSample, RejectsMissingDocsField) {
     const UUID uuid = UUID::gen();
     BSONObjBuilder b;
     b.append("_id",
-             buildPersistentSampleId(
+             makePersistentSampleIdObj(
                  uuid, SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), boost::none));
     b.append(PersistentSampleDoc::kCollectionUuidFieldName, uuid.toString());
     b.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);

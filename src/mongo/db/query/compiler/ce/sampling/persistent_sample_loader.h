@@ -22,18 +22,15 @@ inline constexpr std::string_view kSamplesCollectionName = "system.stats.samples
 inline constexpr int kPersistentSampleSchemaVersion = 1;
 
 /**
- * Builds the _id key for a persisted sample document.
+ * Builds the `_id` object for a persisted sample document
  *
- * Format: <UUID>_<method>_<sampleSize>_v<schemaVersion>
- *     or: <UUID>_chunk<numChunks>_<sampleSize>_v<schemaVersion>
- *
- * Exposed so that both the read path (PersistentSampleLoader) and the write path (analyze
- * command) produce identical keys.
+ * Exposed so that both the read path (PersistentSampleLoader) and the write path (analyze command)
+ * produce identical keys.
  */
-std::string buildPersistentSampleId(const UUID& collectionUuid,
-                                    SamplingTechniqueEnum method,
-                                    size_t sampleSize,
-                                    boost::optional<int> numChunks);
+BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
+                                  SamplingTechniqueEnum method,
+                                  size_t sampleSize,
+                                  boost::optional<int> numChunks);
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 

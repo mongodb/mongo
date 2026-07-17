@@ -19,6 +19,27 @@ enums:
             kStrides: "strides"
 
 structs:
+    PersistentSampleId:
+        description: >-
+            Structured _id for a persistent-sample document, holding the identity fields that
+            key a sample.
+        strict: true
+        fields:
+            schemaVersion:
+                type: int
+                validator: {gte: 1}
+            collectionUuid:
+                type: uuid
+            samplingMethod:
+                type: SamplingTechnique
+            sampleSize:
+                type: long
+                validator: {gt: 0}
+            numChunks:
+                type: int
+                optional: true
+                validator: {gt: 0}
+
     PersistentSampleDoc:
         description: >-
             On-disk document stored in <db>.system.stats.samples for a persisted CE sample.
@@ -26,7 +47,7 @@ structs:
         strict: true
         fields:
             _id:
-                type: string
+                type: PersistentSampleId
             schemaVersion:
                 type: int
                 validator: {gte: 1}

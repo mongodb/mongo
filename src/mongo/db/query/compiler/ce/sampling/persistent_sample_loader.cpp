@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -14,43 +15,32 @@
 
 #include <string>
 
-#include <fmt/format.h>
-
 namespace mongo::ce {
 
-std::string buildPersistentSampleId(const UUID& collectionUuid,
-                                    SamplingTechniqueEnum method,
-                                    size_t sampleSize,
-                                    boost::optional<int> numChunks) {
-    std::string methodStr;
-
+BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
+                                  SamplingTechniqueEnum method,
+                                  size_t sampleSize,
+                                  boost::optional<int> numChunks) {
     tassert(12432800,
             "Chunk-based persistent sample ID requires numChunks",
             method != SamplingTechniqueEnum::kChunk || numChunks.has_value());
     tassert(12432801,
             "numChunks must only be set for chunk-technique persistent samples",
             method == SamplingTechniqueEnum::kChunk || !numChunks.has_value());
+    tassert(12832700,
+            "A persistent sample document should never be created or looked up with sampling "
+            "method kFullCollScan",
+            method != SamplingTechniqueEnum::kFullCollScan);
 
-    switch (method) {
-        case SamplingTechniqueEnum::kSeqScan:
-        case SamplingTechniqueEnum::kStrides:
-        case SamplingTechniqueEnum::kRandom:
-            methodStr = idlSerialize(method);
-            break;
-        case SamplingTechniqueEnum::kChunk:
-            methodStr = fmt::format("{}{}", idlSerialize(method), *numChunks);
-            break;
-        case SamplingTechniqueEnum::kFullCollScan:
-            tasserted(12831700,
-                      "A persistent sample document should never be created or looked up with "
-                      "sampling method kFullCollScan");
-            break;
+    PersistentSampleId id;
+    id.setSchemaVersion(kPersistentSampleSchemaVersion);
+    id.setCollectionUuid(collectionUuid);
+    id.setSamplingMethod(method);
+    id.setSampleSize(static_cast<long long>(sampleSize));
+    if (method == SamplingTechniqueEnum::kChunk) {
+        id.setNumChunks(*numChunks);
     }
-    return fmt::format("{}_{}_{}_v{}",
-                       collectionUuid.toString(),
-                       methodStr,
-                       sampleSize,
-                       kPersistentSampleSchemaVersion);
+    return id.toBSON();
 }
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
@@ -80,6 +70,18 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
         parsed.getNumChunks().has_value()) {
         return Status(ErrorCodes::UnsupportedFormat,
                       "persistent sample 'numChunks' must only be set for chunk-technique samples");
+    }
+
+    // The identity fields are stored both inside the structured `_id` and as top-level fields;
+    // a mismatch means a corrupt persisted sample.
+    const PersistentSampleId& id = parsed.get_id();
+    if (id.getSchemaVersion() != parsed.getSchemaVersion() ||
+        id.getCollectionUuid().toString() != parsed.getCollectionUuid() ||
+        id.getSamplingMethod() != parsed.getSamplingMethod() ||
+        id.getNumChunks() != parsed.getNumChunks()) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      "persistent sample '_id' identity fields do not match the document's "
+                      "top-level fields");
     }
 
     const auto sampleSize = static_cast<size_t>(parsed.getSampleSize());
@@ -122,13 +124,13 @@ StatusWith<PersistentSampleDoc> PersistentSampleLoader::tryLoad(
     size_t sampleSize,
     boost::optional<int> numChunks) const {
     const NamespaceString nss = NamespaceStringUtil::deserialize(dbName, kSamplesCollectionName);
-    const std::string id = buildPersistentSampleId(collectionUuid, method, sampleSize, numChunks);
+    const BSONObj idObj = makePersistentSampleIdObj(collectionUuid, method, sampleSize, numChunks);
 
     BSONObj doc;
     try {
         DBDirectClient client(opCtx);
         // No projection is passed here intentionally to ensure query is express-eligible.
-        doc = client.findOne(nss, BSON("_id" << id));
+        doc = client.findOne(nss, BSON("_id" << idObj));
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
