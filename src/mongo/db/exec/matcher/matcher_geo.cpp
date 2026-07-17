@@ -50,7 +50,7 @@ bool geoContains(const GeometryContainer& queryGeom,
     // Project this geometry into the CRS of the larger geometry.
 
     // In the case of index validation, we are projecting the geometry of the query
-    // into the CRS of the index to confirm that the index region convers/includes
+    // into the CRS of the index to confirm that the index region covers/includes
     // the region described by the predicate.
 
     if (!geometry.supportsProject(queryGeom.getNativeCRS())) {

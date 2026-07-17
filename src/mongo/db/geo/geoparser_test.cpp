@@ -13,6 +13,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -514,5 +515,84 @@ TEST(GeoParser, strictPolygonInGeometryCollectionReportsCRS) {
     GeometryContainer storedGeom;
     ASSERT_OK(storedGeom.parseFromStorage(BSON("geo" << storedDoc)["geo"]));
     ASSERT_EQ(storedGeom.getNativeCRS(), STRICT_SPHERE);
+}
+
+class GeoParserStrictWindingDeathTest : public unittest::Test {
+protected:
+    void setUp() override {
+        std::string strictCRS =
+            "crs:{ type: 'name', properties:{name:'" + std::string{CRS_STRICT_WINDING} + "'}}";
+        BSONObj strictGCDoc = fromjson(
+            "{'type':'GeometryCollection','geometries':["
+            "{'type':'Polygon','coordinates':[[[0,0],[5,0],[5,5],[0,5],[0,0]]]," +
+            strictCRS +
+            "}"
+            "]}");
+        ASSERT_OK(strictGC.parseFromStorage(BSON("geo" << strictGCDoc)["geo"]));
+
+        ASSERT_OK(point.parseFromStorage(
+            BSON("geo" << fromjson("{'type':'Point','coordinates':[1,1]}"))["geo"]));
+        ASSERT_OK(line.parseFromStorage(
+            BSON("geo" << fromjson("{'type':'LineString','coordinates':[[1,1],[2,2]]}"))["geo"]));
+        ASSERT_OK(polygon.parseFromStorage(
+            BSON("geo" << fromjson("{'type':'Polygon','coordinates':[[[0,0],[2,0],[2,2],[0,2],"
+                                   "[0,0]]]}"))["geo"]));
+    }
+
+    GeometryContainer strictGC;
+    GeometryContainer point;
+    GeometryContainer line;
+    GeometryContainer polygon;
+};
+
+class GeoParserStrictWindingTest : public GeoParserStrictWindingDeathTest {};
+
+// A GeometryCollection containing a strict-winding polygon parses successfully; getNativeCRS()
+// resolves to STRICT_SPHERE, and hasS2Region() correctly reports false, so a correctly-behaving
+// caller that gates on either never reaches the tasserts exercised below.
+TEST_F(GeoParserStrictWindingTest, ReportsStrictSphereWithNoS2Region) {
+    ASSERT_EQ(strictGC.getNativeCRS(), STRICT_SPHERE);
+    ASSERT_FALSE(strictGC.hasS2Region());
+}
+
+// getS2Region() is separately guarded: reaching it despite hasS2Region() being false fails loudly
+// rather than dereferencing a null _s2Region.
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, GetS2RegionTasserts, "12748600") {
+    strictGC.getS2Region();
+}
+
+// Reaching the GeometryCollection member loops with a null s2Polygon fails loudly rather than
+// crashing, regardless of which contains()/intersects() overload is dispatched to. All 7 call
+// sites share getGeometryCollectionPolygonRegion()'s single crs-check tassert.
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsPointTasserts, "12748601") {
+    strictGC.contains(point);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsLineTasserts, "12748601") {
+    strictGC.contains(line);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsPolygonTasserts, "12748601") {
+    strictGC.contains(polygon);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, IntersectsPointTasserts, "12748601") {
+    strictGC.intersects(point);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, IntersectsLineTasserts, "12748601") {
+    strictGC.intersects(line);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, IntersectsPolygonTasserts, "12748601") {
+    strictGC.intersects(polygon);
+}
+
+// intersects(const GeometryContainer&) also asserts while iterating a GeometryCollection passed in
+// as the *other* argument, independent of what 'this' is.
+DEATH_TEST_F(GeoParserStrictWindingDeathTest,
+             IntersectsOtherGeometryCollectionTasserts,
+             "12748601") {
+    point.intersects(strictGC);
 }
 }  // namespace
