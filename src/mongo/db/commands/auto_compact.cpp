@@ -36,7 +36,7 @@ Status autoCompact(OperationContext* opCtx,
 
     const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     if (!provider.supportsCompaction()) {
-        return Status(ErrorCodes::IllegalOperation,
+        return Status(ErrorCodes::CommandNotSupported,
                       str::stream() << "autoCompact is not supported in this storage mode: "
                                     << provider.name());
     }
