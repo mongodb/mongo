@@ -259,6 +259,15 @@ struct __wt_btree {
     wt_shared uint64_t bytes_updates;     /* Bytes in updates. */
 
     /*
+     * Reserved marker value for leaf_entry_ewma / approx_leaf_pages meaning "never tracked": the
+     * table's checkpoint metadata predates this tracking and no WT_STAT_TYPE_TREE_WALK correction
+     * has run since. Neither field is updated by ordinary split/reconciliation activity while it
+     * holds this value; both are set together, straight to their exact values, by the first
+     * corrective walk.
+     */
+#define WT_LEAF_STATS_UNKNOWN UINT64_MAX
+
+    /*
      * Approximate average number of K/V pairs per row-store leaf page. Maintained as an EWMA
      * updated at page fault-in (for cold pages) and at reconciliation (for modified pages). Not
      * authoritative: use WT_STAT_TYPE_TREE_WALK for exact counts.

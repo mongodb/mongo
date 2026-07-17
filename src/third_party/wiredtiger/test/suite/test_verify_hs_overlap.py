@@ -171,7 +171,16 @@ class test_verify_hs_overlap(test_rollback_to_stable_base):
     def test_verify_hs_overlap(self):
         uri = "table:wt_verify_hs_overlap"
         self.build_skewed_dup(uri, "abcde" * 4, "fghij" * 4, 20, 30, 40)
+
+        before = self.get_stat(stat.conn.session_table_verify_hs_keys_checked)
         self.session.verify(uri, None)
+        self.assertStatGreaterSoon(stat.conn.session_table_verify_hs_keys_checked, before)
+
+        # While we're here, check that we can avoid the expensive per-key operations.
+        before = self.get_stat(stat.conn.session_table_verify_hs_keys_checked)
+        self.session.verify(uri, "skip_per_key_hs")
+        time.sleep(0.1)
+        self.assertStatEqualSoon(stat.conn.session_table_verify_hs_keys_checked, before)
 
     def test_rts_dup_consistency(self):
         # Sanity check that RTS handles the DS/HS duplicate. Having stable < B makes RTS rewrite

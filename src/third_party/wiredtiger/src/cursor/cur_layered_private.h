@@ -36,11 +36,12 @@ struct __wti_cursor_layered {
     WTI_CLAYERED_ROLE last_role;         /* Last-observed leader/follower role (change-detection) */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WTI_CLAYERED_ACTIVE 0x1u       /* Incremented the session count */
-#define WTI_CLAYERED_ITERATE_NEXT 0x2u /* Forward iteration */
-#define WTI_CLAYERED_ITERATE_PREV 0x4u /* Backward iteration */
-#define WTI_CLAYERED_RANDOM 0x8u       /* Random cursor operations only */
-                                       /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WTI_CLAYERED_ACTIVE 0x01u       /* Incremented the session count */
+#define WTI_CLAYERED_ITERATE_NEXT 0x02u /* Forward iteration */
+#define WTI_CLAYERED_ITERATE_PREV 0x04u /* Backward iteration */
+#define WTI_CLAYERED_RANDOM 0x08u       /* Random cursor operations only */
+#define WTI_CLAYERED_SIZE_STAT 0x10u    /* Accumulate the size summary on the active btree */
+                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 

@@ -28,6 +28,26 @@ static const char *const __stats_dsrc_desc[] = {
   "block-manager: file major version number",
   "block-manager: file size in bytes",
   "block-manager: minor version number",
+  "btree-size: internal page bytes",
+  "btree-size: internal pages",
+  "btree-size: key bytes",
+  "btree-size: key count",
+  "btree-size: leaf page bytes",
+  "btree-size: leaf page-size histogram bucket 0",
+  "btree-size: leaf page-size histogram bucket 1",
+  "btree-size: leaf page-size histogram bucket 2",
+  "btree-size: leaf page-size histogram bucket 3",
+  "btree-size: leaf page-size histogram bucket 4",
+  "btree-size: leaf page-size histogram bucket 5",
+  "btree-size: leaf page-size histogram bucket 6",
+  "btree-size: leaf page-size histogram bucket 7",
+  "btree-size: leaf page-size histogram bucket 8 (>= maximum leaf page size)",
+  "btree-size: leaf pages",
+  "btree-size: overflow page bytes",
+  "btree-size: overflow pages",
+  "btree-size: pages skipped for having no on-disk image",
+  "btree-size: value bytes",
+  "btree-size: value count",
   "btree: btree checkpoint generation",
   "btree: btree clean tree checkpoint expiration time",
   "btree: btree compact in-memory pages selected for rewrite",
@@ -52,9 +72,11 @@ static const char *const __stats_dsrc_desc[] = {
   "btree: overflow pages",
   "btree: row-store empty values",
   "btree: row-store internal pages",
-  "btree: row-store leaf page recent average entries (EWMA)",
+  "btree: row-store leaf page recent average entries (EWMA), or UINT64_MAX if never tracked and "
+  "awaiting a tree-walk correction",
   "btree: row-store leaf pages",
-  "btree: row-store leaf pages (approximate, incremental)",
+  "btree: row-store leaf pages (approximate, incremental), or UINT64_MAX if never tracked and "
+  "awaiting a tree-walk correction",
   "btree: time spent walking the tree for checkpoint including dirty page reconciliation time "
   "(usecs)",
   "cache: application threads eviction requested with cache fill ratio < 25%",
@@ -513,6 +535,26 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->block_major = 0;
     stats->block_size = 0;
     stats->block_minor = 0;
+    stats->btree_size_internal_bytes = 0;
+    stats->btree_size_internal_pages = 0;
+    stats->btree_size_key_bytes = 0;
+    stats->btree_size_key_count = 0;
+    stats->btree_size_leaf_bytes = 0;
+    stats->btree_size_leaf_hist_0 = 0;
+    stats->btree_size_leaf_hist_1 = 0;
+    stats->btree_size_leaf_hist_2 = 0;
+    stats->btree_size_leaf_hist_3 = 0;
+    stats->btree_size_leaf_hist_4 = 0;
+    stats->btree_size_leaf_hist_5 = 0;
+    stats->btree_size_leaf_hist_6 = 0;
+    stats->btree_size_leaf_hist_7 = 0;
+    stats->btree_size_leaf_hist_8 = 0;
+    stats->btree_size_leaf_pages = 0;
+    stats->btree_size_overflow_bytes = 0;
+    stats->btree_size_overflow_pages = 0;
+    stats->btree_size_no_image_pages = 0;
+    stats->btree_size_value_bytes = 0;
+    stats->btree_size_value_count = 0;
     /* not clearing btree_checkpoint_generation */
     /* not clearing btree_clean_checkpoint_timer */
     /* not clearing btree_compact_pages_selected_inmem */
@@ -946,6 +988,26 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->block_size += from->block_size;
     if (from->block_minor > to->block_minor)
         to->block_minor = from->block_minor;
+    to->btree_size_internal_bytes += from->btree_size_internal_bytes;
+    to->btree_size_internal_pages += from->btree_size_internal_pages;
+    to->btree_size_key_bytes += from->btree_size_key_bytes;
+    to->btree_size_key_count += from->btree_size_key_count;
+    to->btree_size_leaf_bytes += from->btree_size_leaf_bytes;
+    to->btree_size_leaf_hist_0 += from->btree_size_leaf_hist_0;
+    to->btree_size_leaf_hist_1 += from->btree_size_leaf_hist_1;
+    to->btree_size_leaf_hist_2 += from->btree_size_leaf_hist_2;
+    to->btree_size_leaf_hist_3 += from->btree_size_leaf_hist_3;
+    to->btree_size_leaf_hist_4 += from->btree_size_leaf_hist_4;
+    to->btree_size_leaf_hist_5 += from->btree_size_leaf_hist_5;
+    to->btree_size_leaf_hist_6 += from->btree_size_leaf_hist_6;
+    to->btree_size_leaf_hist_7 += from->btree_size_leaf_hist_7;
+    to->btree_size_leaf_hist_8 += from->btree_size_leaf_hist_8;
+    to->btree_size_leaf_pages += from->btree_size_leaf_pages;
+    to->btree_size_overflow_bytes += from->btree_size_overflow_bytes;
+    to->btree_size_overflow_pages += from->btree_size_overflow_pages;
+    to->btree_size_no_image_pages += from->btree_size_no_image_pages;
+    to->btree_size_value_bytes += from->btree_size_value_bytes;
+    to->btree_size_value_count += from->btree_size_value_count;
     to->btree_checkpoint_generation += from->btree_checkpoint_generation;
     to->btree_clean_checkpoint_timer += from->btree_clean_checkpoint_timer;
     to->btree_compact_pages_selected_inmem += from->btree_compact_pages_selected_inmem;
@@ -1413,6 +1475,26 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->block_size += WT_STAT_DSRC_READ(from, block_size);
     if ((v = WT_STAT_DSRC_READ(from, block_minor)) > to->block_minor)
         to->block_minor = v;
+    to->btree_size_internal_bytes += WT_STAT_DSRC_READ(from, btree_size_internal_bytes);
+    to->btree_size_internal_pages += WT_STAT_DSRC_READ(from, btree_size_internal_pages);
+    to->btree_size_key_bytes += WT_STAT_DSRC_READ(from, btree_size_key_bytes);
+    to->btree_size_key_count += WT_STAT_DSRC_READ(from, btree_size_key_count);
+    to->btree_size_leaf_bytes += WT_STAT_DSRC_READ(from, btree_size_leaf_bytes);
+    to->btree_size_leaf_hist_0 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_0);
+    to->btree_size_leaf_hist_1 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_1);
+    to->btree_size_leaf_hist_2 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_2);
+    to->btree_size_leaf_hist_3 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_3);
+    to->btree_size_leaf_hist_4 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_4);
+    to->btree_size_leaf_hist_5 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_5);
+    to->btree_size_leaf_hist_6 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_6);
+    to->btree_size_leaf_hist_7 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_7);
+    to->btree_size_leaf_hist_8 += WT_STAT_DSRC_READ(from, btree_size_leaf_hist_8);
+    to->btree_size_leaf_pages += WT_STAT_DSRC_READ(from, btree_size_leaf_pages);
+    to->btree_size_overflow_bytes += WT_STAT_DSRC_READ(from, btree_size_overflow_bytes);
+    to->btree_size_overflow_pages += WT_STAT_DSRC_READ(from, btree_size_overflow_pages);
+    to->btree_size_no_image_pages += WT_STAT_DSRC_READ(from, btree_size_no_image_pages);
+    to->btree_size_value_bytes += WT_STAT_DSRC_READ(from, btree_size_value_bytes);
+    to->btree_size_value_count += WT_STAT_DSRC_READ(from, btree_size_value_count);
     to->btree_checkpoint_generation += WT_STAT_DSRC_READ(from, btree_checkpoint_generation);
     to->btree_clean_checkpoint_timer += WT_STAT_DSRC_READ(from, btree_clean_checkpoint_timer);
     to->btree_compact_pages_selected_inmem +=
@@ -2890,6 +2972,7 @@ static const char *const __stats_connection_desc[] = {
   "session: table truncate failed calls",
   "session: table truncate successful calls",
   "session: table verify failed calls",
+  "session: table verify number of keys checked against the history store",
   "session: table verify successful calls",
   "thread-state: active filesystem fsync calls",
   "thread-state: active filesystem read calls",
@@ -3971,6 +4054,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing session_table_truncate_fail */
     /* not clearing session_table_truncate_success */
     /* not clearing session_table_verify_fail */
+    /* not clearing session_table_verify_hs_keys_checked */
     /* not clearing session_table_verify_success */
     /* not clearing thread_fsync_active */
     /* not clearing thread_read_active */
@@ -5290,6 +5374,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->session_table_truncate_fail += WT_STAT_CONN_READ(from, session_table_truncate_fail);
     to->session_table_truncate_success += WT_STAT_CONN_READ(from, session_table_truncate_success);
     to->session_table_verify_fail += WT_STAT_CONN_READ(from, session_table_verify_fail);
+    to->session_table_verify_hs_keys_checked +=
+      WT_STAT_CONN_READ(from, session_table_verify_hs_keys_checked);
     to->session_table_verify_success += WT_STAT_CONN_READ(from, session_table_verify_success);
     to->thread_fsync_active += WT_STAT_CONN_READ(from, thread_fsync_active);
     to->thread_read_active += WT_STAT_CONN_READ(from, thread_read_active);

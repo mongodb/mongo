@@ -743,8 +743,6 @@ __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *
         break;
 
     case WT_LOGREC_SYSTEM:
-        WT_ERR(__wt_struct_unpack(
-          session, p, WT_PTRDIFF(end, p), WT_UNCHECKED_STRING(II), &lsnfile, &lsnoffset));
         WT_ERR(__wt_fprintf(session, args->fs, "    \"type\" : \"system\",\n"));
         WT_ERR(__txn_oplist_printlog(session, &p, end, args));
         break;

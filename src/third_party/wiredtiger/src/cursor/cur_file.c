@@ -1174,6 +1174,21 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
     if (cval.val != 0)
         F_SET(cbt, WT_CBT_READ_ONCE);
 
+    /*
+     * Size-summary accounting accumulates into the shared data-source statistics as the cursor
+     * traverses the tree. Reset here so a fresh open starts from zero. The counters are not
+     * cursor-local: the consumer must not open another size_stats cursor on the same btree while a
+     * walk is in progress, or the reset will wipe a partial accumulation.
+     */
+    WT_ERR(__wt_config_gets_def(session, cfg, "debug.size_stats", 0, &cval));
+    if (cval.val != 0) {
+        if (btree->type != BTREE_ROW)
+            WT_ERR_MSG(
+              session, EINVAL, "debug=(size_stats) is only supported on row-store objects");
+        F_SET(cbt, WT_CBT_SIZE_STAT);
+        __wt_size_stat_reset(session);
+    }
+
     /* Underlying btree initialization. */
     __wt_btcur_open(cbt);
 

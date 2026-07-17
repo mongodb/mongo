@@ -275,7 +275,8 @@ struct __wt_cursor_btree {
 #define WT_CBT_ITERATE_RETRY_PREV 0x040u /* Prepare conflict by prev. */
 #define WT_CBT_READ_ONCE 0x080u          /* Page in with WT_READ_WONT_NEED */
 #define WT_CBT_SEARCH_SMALLEST 0x100u    /* Row-store: small-key insert list */
-#define WT_CBT_VAR_ONPAGE_MATCH 0x200u   /* Var-store: on-page recno match */
+#define WT_CBT_SIZE_STAT 0x200u          /* Accumulate size summary during traversal */
+#define WT_CBT_VAR_ONPAGE_MATCH 0x400u   /* Var-store: on-page recno match */
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_CBT_POSITION_MASK /* Flags associated with position */                      \

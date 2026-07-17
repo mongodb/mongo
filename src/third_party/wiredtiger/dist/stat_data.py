@@ -64,6 +64,10 @@ class BtreeStat(Stat):
     prefix = 'btree'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, BtreeStat.prefix, desc, flags)
+class BtreeSizeStat(Stat):
+    prefix = 'btree-size'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, BtreeSizeStat.prefix, desc, flags)
 class CacheStat(Stat):
     prefix = 'cache'
     def __init__(self, name, desc, flags=''):
@@ -918,6 +922,7 @@ conn_stats = [
     SessionOpStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_truncate_success', 'table truncate successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_verify_fail', 'table verify failed calls', 'no_clear,no_scale'),
+    SessionOpStat('session_table_verify_hs_keys_checked', 'table verify number of keys checked against the history store', 'no_clear,no_scale'),
     SessionOpStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
 
     ##########################################
@@ -1068,8 +1073,32 @@ dsrc_stats = [
     BtreeStat('btree_row_empty_values', 'row-store empty values', 'no_scale,tree_walk'),
     BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,tree_walk'),
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,tree_walk'),
-    BtreeStat('btree_row_leaf_avg_entries', 'row-store leaf page recent average entries (EWMA)', 'no_scale'),
-    BtreeStat('btree_row_leaf_pages', 'row-store leaf pages (approximate, incremental)', 'no_scale'),
+    BtreeStat('btree_row_leaf_avg_entries', 'row-store leaf page recent average entries (EWMA), or UINT64_MAX if never tracked and awaiting a tree-walk correction', 'no_scale'),
+    BtreeStat('btree_row_leaf_pages', 'row-store leaf pages (approximate, incremental), or UINT64_MAX if never tracked and awaiting a tree-walk correction', 'no_scale'),
+
+    ##########################################
+    # Btree size summary statistics (opt-in, accumulated by a debug=(size_stats) cursor scan)
+    ##########################################
+    BtreeSizeStat('btree_size_internal_bytes', 'internal page bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_internal_pages', 'internal pages', 'no_scale'),
+    BtreeSizeStat('btree_size_key_bytes', 'key bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_key_count', 'key count', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_bytes', 'leaf page bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_leaf_hist_0', 'leaf page-size histogram bucket 0', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_1', 'leaf page-size histogram bucket 1', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_2', 'leaf page-size histogram bucket 2', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_3', 'leaf page-size histogram bucket 3', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_4', 'leaf page-size histogram bucket 4', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_5', 'leaf page-size histogram bucket 5', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_6', 'leaf page-size histogram bucket 6', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_7', 'leaf page-size histogram bucket 7', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_8', 'leaf page-size histogram bucket 8 (>= maximum leaf page size)', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_pages', 'leaf pages', 'no_scale'),
+    BtreeSizeStat('btree_size_no_image_pages', 'pages skipped for having no on-disk image', 'no_scale'),
+    BtreeSizeStat('btree_size_overflow_bytes', 'overflow page bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_overflow_pages', 'overflow pages', 'no_scale'),
+    BtreeSizeStat('btree_size_value_bytes', 'value bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_value_count', 'value count', 'no_scale'),
 
     ##########################################
     # Eviction statistics

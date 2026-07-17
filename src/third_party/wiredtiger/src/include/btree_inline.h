@@ -3106,7 +3106,8 @@ __wt_cache_shared_dsk_inmem_decr(WT_SESSION_IMPL *session, uint8_t image_type, s
  * __wt_btree_row_leaf_entries_update --
  *     Update the per-btree EWMA of row-store leaf page K/V pair count with a new sample. Uses
  *     alpha=1/16: new_ewma = (15 * old + sample) / 16. Races between threads are tolerated since
- *     the result is approximate.
+ *     the result is approximate. Left untouched at WT_LEAF_STATS_UNKNOWN until a corrective
+ *     WT_STAT_TYPE_TREE_WALK sets a real starting value.
  */
 static WT_INLINE void
 __wt_btree_row_leaf_entries_update(WT_BTREE *btree, uint64_t sample)
@@ -3114,6 +3115,8 @@ __wt_btree_row_leaf_entries_update(WT_BTREE *btree, uint64_t sample)
     uint64_t old;
 
     old = __wt_atomic_load_uint64_relaxed(&btree->leaf_entry_ewma);
+    if (old == WT_LEAF_STATS_UNKNOWN)
+        return;
     __wt_atomic_store_uint64_relaxed(
       &btree->leaf_entry_ewma, old == 0 ? sample : (15 * old + sample) / 16);
 }

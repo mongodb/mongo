@@ -662,6 +662,10 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     if (truncating)
         LF_SET(WT_READ_TRUNCATE);
 
+    /* Accumulate the size summary as the walk visits each page. */
+    if (F_ISSET(cbt, WT_CBT_SIZE_STAT))
+        LF_SET(WT_READ_SIZE_STAT);
+
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     WT_ERR(__wt_cursor_func_init(cbt, false));

@@ -199,6 +199,14 @@ restart:
             ref = &btree->root;
             WT_INTL_INDEX_GET(session, ref->page, pindex);
             slot = prev ? pindex->entries - 1 : 0;
+            /*
+             * The root is the walk's starting point and is never swapped in below, so account it
+             * here. Only reached when a walk begins at the tree's start; a seek-positioned scan
+             * misses the root and the descent path leading to the first page. A WT_RESTART could
+             * cause re-entry and over accounting. This is a known limitation.
+             */
+            if (LF_ISSET(WT_READ_SIZE_STAT))
+                WT_ERR(__wti_size_stat_page(session, ref->page));
             goto descend;
         }
     }
@@ -334,6 +342,16 @@ descend:
 
                 if (__wt_session_prefetch_check(session, ref))
                     WT_ERR(__wti_btree_prefetch(session, ref));
+
+                /*
+                 * Accumulate the size summary. Every page (leaf and internal) is swapped in here
+                 * exactly once per traversal, so this is the single choke point for per-page
+                 * accounting. The one exception is WT_RESTART: it restarts the descent and
+                 * re-accounts the pages, requiring a concurrent a split. This should be rare to
+                 * impossible for databases being verified as they are read-only.
+                 */
+                if (LF_ISSET(WT_READ_SIZE_STAT))
+                    WT_ERR(__wti_size_stat_page(session, ref->page));
 
                 /* Return leaf pages to our caller. */
                 if (F_ISSET(ref, WT_REF_FLAG_LEAF)) {

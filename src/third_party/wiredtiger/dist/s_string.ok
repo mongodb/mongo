@@ -646,6 +646,7 @@ allocator
 allocators
 allocfile
 allocsize
+analytics
 aor
 ap
 api
@@ -799,6 +800,7 @@ colcheck
 colgap
 colgroup
 colgroups
+collHash
 collatorp
 collist
 columngroup
@@ -1871,6 +1873,7 @@ undeleted
 underflowed
 underflowing
 underflows
+underfull
 unencoded
 unencrypted
 unesc

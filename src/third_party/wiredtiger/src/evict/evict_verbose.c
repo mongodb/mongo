@@ -146,7 +146,7 @@ __verbose_dump_cache_apply(WT_SESSION_IMPL *session, uint64_t *total_bytesp,
 
         /* Skip if the tree is marked discarded by another thread. */
         if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-          F_ISSET(dhandle, WT_DHANDLE_DISCARD | WT_DHANDLE_OUTDATED))
+          F_ISSET(dhandle, WT_DHANDLE_DISCARD))
             continue;
 
         WT_WITH_DHANDLE(session, dhandle,

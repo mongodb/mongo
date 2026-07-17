@@ -251,3 +251,41 @@ class test_disagg_checkpoint_size05(wttest.WiredTigerTestCase):
             "fast-path block_size should reflect the second checkpoint after crash")
         self.assertEqual(self.get_block_size_slow(), size_second_ckpt,
             "slow-path block_size should reflect the second checkpoint after crash")
+
+    # Every statistics cursor type must report the same block_size on a follower as it did on
+    # the leader for the same checkpoint: the non-walk types read it from checkpoint metadata
+    # directly, and the walk types get it from the checkpoint dhandle they open - both must
+    # agree, not fall back to an empty-ingest base.
+    def test_block_size_same_on_leader_and_follower(self):
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.insert_rows(1000)
+        self.session.checkpoint()
+
+        stat_configs = ('fast', 'size', 'all', 'cache_walk', 'tree_walk')
+
+        def block_sizes():
+            sizes = {}
+            for cfg in stat_configs:
+                cstat = self.session.open_cursor(
+                    'statistics:' + self.uri, None, f'statistics=({cfg})')
+                sizes[cfg] = cstat[stat.dsrc.block_size][2]
+                cstat.close()
+            return sizes
+
+        leader_sizes = block_sizes()
+        self.assertEqual(len(set(leader_sizes.values())), 1,
+            f"leader block_size should agree across statistics types: {leader_sizes}")
+
+        # Step down to follower - same connection, same on-disk checkpoint.
+        self.conn.reconfigure('disaggregated=(role="follower")')
+
+        follower_sizes = block_sizes()
+        self.assertEqual(len(set(follower_sizes.values())), 1,
+            f"follower block_size should agree across statistics types: {follower_sizes}")
+
+        leader_size = next(iter(leader_sizes.values()))
+        follower_size = next(iter(follower_sizes.values()))
+        self.assertGreater(follower_size, 0,
+            "follower block_size should reflect the checkpoint, not an empty base")
+        self.assertEqual(follower_size, leader_size,
+            f"follower block_size ({follower_size}) should match leader block_size ({leader_size})")

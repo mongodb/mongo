@@ -1676,6 +1676,8 @@ extern int __wti_session_compact_readonly(WT_SESSION *wt_session, const char *ur
   const char *config) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_session_notsup(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_size_stat_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
@@ -1894,6 +1896,7 @@ extern void __wt_shared_dsk_cache_get(WT_SESSION_IMPL *session, const uint8_t *a
   size_t addr_size, WT_SHARED_DSK_ITEM **shared_dsk_retp);
 extern void __wt_shared_dsk_cache_release(
   WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shared_dsk_item);
+extern void __wt_size_stat_reset(WT_SESSION_IMPL *session);
 extern void __wt_stash_discard(WT_SESSION_IMPL *session);
 extern void __wt_stash_discard_all(WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
 extern void __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *to);

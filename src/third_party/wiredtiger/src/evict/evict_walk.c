@@ -416,8 +416,9 @@ retry:
             continue;
         }
 
-        /* Skip read-only btrees if we are not looking for clean pages. */
-        if (F_ISSET(btree, WT_BTREE_READONLY) && !F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
+        /* Skip read-only btrees if we are not looking for clean/updates pages. */
+        if (F_ISSET(btree, WT_BTREE_READONLY) &&
+          !F_ISSET(evict, WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_UPDATES)) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_read_only);
             __evict_disagg_btree_skip_count(session, btree);
             continue;

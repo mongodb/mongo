@@ -1795,6 +1795,11 @@ methods = {
         Config('release_evict', 'false', r'''
             Configure the cursor to evict the page positioned on when the reset API call is used''',
             type='boolean'),
+        Config('size_stats', 'false', r'''
+            Accumulate a per-b-tree size summary into the data-source statistics as the cursor
+            traverses the tree; row-store only, an error is returned otherwise. Read the results
+            with a statistics cursor''',
+            type='boolean', undoc=True),
         ]),
     Config('dump', '', r'''
         configure the cursor for dump format inputs and outputs: "hex" selects a simple hexadecimal
@@ -1967,6 +1972,10 @@ methods = {
     Config('read_corrupt', 'false', r'''
         A mode that allows verify to continue reading after encountering a checksum error. It
         will skip past the corrupt block and continue with the verification process''',
+        type='boolean'),
+    Config('skip_per_key_hs', 'false', r'''
+        Skip an expensive per-key check for whether data store and history timestamps make sense
+        when considered together''',
         type='boolean'),
     Config('stable_timestamp', 'false', r'''
         Ensure that no data has a start timestamp after the stable timestamp, to be run after
