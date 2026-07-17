@@ -70,7 +70,7 @@ a notice will be included in
 | [tcmalloc]                                           | Apache-2.0                                     | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
 | [timelib]                                            | MIT                                            | 2022.13                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                               | 8.0.0                                    | ✗                    | ✗                               |
-| [valgrind.h]                                         | BSD-4-Clause                                   | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
+| [valgrind.h]                                         | BSD-4-Clause                                   | 3.17.0                                   |                      | ✗                               |
 | [yaml-cpp]                                           | MIT                                            | 0.6.3                                    |                      | ✗                               |
 | [zlib]                                               | Zlib                                           | 1.3.2                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only                   | 1.5.5                                    | ✗                    | ✗                               |

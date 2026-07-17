@@ -307,11 +307,11 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:generic/valgrind/valgrind@{{VERSION}}",
+      "bom-ref": "pkg:generic/valgrind/valgrind@3.17.0",
       "author": "The Valgrind Developers",
       "group": "valgrind",
       "name": "valgrind.h",
-      "version": "{{VERSION}}",
+      "version": "3.17.0",
       "description": "This header file is part of Valgrind, a dynamic binary instrumentation framework.",
       "scope": "required",
       "licenses": [
@@ -322,7 +322,7 @@
         }
       ],
       "copyright": "Copyright (C) 2000-2017 Julian Seward. All rights reserved.",
-      "purl": "pkg:generic/valgrind/valgrind@{{VERSION}}?vcs_url=https%3A%2F%2Fsourceware.org%2Fgit%2F%3Fp%3Dvalgrind.git",
+      "purl": "pkg:generic/valgrind/valgrind@3.17.0?vcs_url=https%3A%2F%2Fsourceware.org%2Fgit%2F%3Fp%3Dvalgrind.git",
       "externalReferences": [
         {
           "url": "https://sourceware.org/git/valgrind.git",
@@ -2437,6 +2437,48 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/mariusbancila/croncpp@{{VERSION}}",
+      "author": "Marius Bancila",
+      "group": "mariusbancila",
+      "name": "croncpp",
+      "version": "{{VERSION}}",
+      "description": "A C++11/14/17 header-only cross-platform library for handling CRON expressions.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2018 Marius Bancila",
+      "purl": "pkg:github/mariusbancila/croncpp@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/mariusbancila/croncpp.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/private/croncpp"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/private/croncpp/scripts/import.sh"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/mongodb/libmongocrypt@{{VERSION}}",
       "supplier": {
         "name": "MongoDB, Inc.",
@@ -3549,7 +3591,7 @@
         "pkg:generic/gnome/libxml2@{{VERSION}}",
         "pkg:generic/intel/IntelRDFPMathLib@{{VERSION}}",
         "pkg:generic/unicode-org/unicode@8.0.0",
-        "pkg:generic/valgrind/valgrind@{{VERSION}}",
+        "pkg:generic/valgrind/valgrind@3.17.0",
         "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
         "pkg:github/abseil/abseil-cpp@{{VERSION}}",
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
