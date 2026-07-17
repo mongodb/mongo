@@ -167,6 +167,18 @@ filters:
   - "index_commands_shard_targeting.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "configsvr_retries_createindex_on_stale_config.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "drop_indexes_with_stale_config_error.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "list_indexes_shard_targeting.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "sharded_index_consistency_metrics_stale_version_retries.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "shard_identity_rollback.js":
     approvers:
       - 10gen/server-catalog-and-routing

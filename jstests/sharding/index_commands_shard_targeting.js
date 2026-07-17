@@ -10,11 +10,11 @@ import {
     unpauseMoveChunkAtStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 // Test deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
@@ -27,53 +27,61 @@ TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckMetadataConsistency = true;
 
 /*
- * Runs the command after performing chunk operations to make the primary shard (shard0) not own
- * any chunks for the collection, and the subset of non-primary shards (shard1 and shard2) that
- * own chunks for the collection have stale catalog cache.
+ * Runs the command after performing chunk operations to make the primary shard (shard1) not own
+ * any chunks for the collection, and the router that issues the command (st.s) have a stale routing
+ * table.
  *
- * Asserts that the command checks shard versions by checking that the shards to refresh their
- * cache after the command is run.
+ * Asserts that the command sends and checks shard versions by asserting that a StaleConfig error is
+ * observed and retried when the command is run through the stale router. A shard can never be
+ * ignorant of its own metadata under authoritative shards, so the staleness lives on the router
+ * rather than on the shards.
  */
 function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     const ns = dbName + "." + collName;
 
-    // Move the initial chunk out of the primary shard.
-    ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard0, st.shard1, {_id: MinKey});
+    // Perform all migrations through a different router than the one that runs the command, so that
+    // the command's router (st.s) is left with a stale routing table.
+    const migrateRouter = st.s1;
 
-    // Split the chunk to create two chunks on shard1. Move one of the chunks to shard2.
-    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-    ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard1, st.shard2, {_id: 0});
+    // Set up the chunk layout through the migrate router:
+    //   shard1: no chunks, shard0: [MinKey, 0) and [0, MaxKey)
+    // The initial chunk is moved off the primary and split into two chunks on shard0.
+    ChunkHelper.moveChunk(
+        migrateRouter.getDB(dbName),
+        collName,
+        [{_id: MinKey}, {_id: MaxKey}],
+        st.shard0.shardName,
+        true /* waitForDelete */,
+    );
+    assert.commandWorked(migrateRouter.adminCommand({split: ns, middle: {_id: 0}}));
 
-    // Assert that primary shard does not have any chunks for the collection.
-    ShardVersioningUtil.assertShardVersionEquals(st.shard0, ns, Timestamp(0, 0));
+    // Assert that the primary shard does not own any chunks for the collection.
+    ShardVersioningUtil.assertShardVersionEquals(st.shard1, ns, Timestamp(0, 0));
 
-    // The donor shard for the last moveChunk will have the latest collection version.
-    let latestCollectionVersion = ShardVersioningUtil.getMetadataOnShard(st.shard1, ns).collVersion;
-
-    // Assert that besides the latest donor shard (shard1), all shards have stale collection
-    // version.
-    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, latestCollectionVersion);
-
-    if (testCase.setUpFuncForCheckShardVersionTest) {
-        testCase.setUpFuncForCheckShardVersionTest();
-    }
-    assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
-
-    if (testCase.bumpExpectedCollectionVersionAfterCommand) {
-        latestCollectionVersion =
-            testCase.bumpExpectedCollectionVersionAfterCommand(latestCollectionVersion);
-    }
-
-    // Assert that the targeted shards have the latest collection version after the command is
-    // run.
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard2, ns, latestCollectionVersion);
+    // Move [0, MaxKey) to shard2 through migrateRouter, then run the command through the stale router
+    // st.s. st.s still believes shard0 owns [0, MaxKey), so it targets shard0 with a stale shard
+    // version; shard0 rejects with a StaleConfig, forcing the command to refresh and retarget
+    // shard2. The observed StaleConfig proves the command sends and checks shard versions.
+    assert.commandWorked(
+        ShardVersioningUtil.runOperationOnStaleRouterAfterMoveChunk({
+            migrateRouter,
+            staleRouter: st.s,
+            ns,
+            toShard: st.shard2,
+            bounds: [{_id: 0}, {_id: MaxKey}],
+            runStaleOperation: (router) => {
+                if (testCase.setUpFuncForCheckShardVersionTest) {
+                    testCase.setUpFuncForCheckShardVersionTest();
+                }
+                return router.getDB(dbName).runCommand(testCase.command);
+            },
+        }),
+    );
 }
 
 /*
- * Runs moveChunk to move one chunk from the primary shard (shard0) to shard1. Pauses the
- * migration after shard0 enters the read-only phase of the critical section, and runs
+ * Runs moveChunk to move one chunk from the primary shard (shard1) to shard0. Pauses the
+ * migration after shard1 enters the read-only phase of the critical section, and runs
  * the given command function. Asserts that the command is blocked behind the critical section.
  */
 function assertCommandBlocksIfCriticalSectionInProgress(
@@ -85,8 +93,8 @@ function assertCommandBlocksIfCriticalSectionInProgress(
     testCase,
 ) {
     const ns = dbName + "." + collName;
-    const fromShard = st.shard0;
-    const toShard = st.shard1;
+    const fromShard = st.shard1;
+    const toShard = st.shard0;
 
     if (testCase.skipCriticalSectionTest && testCase.skipCriticalSectionTest()) {
         jsTestLog(`Skipping critical section test for ${tojson(testCase.command)}`);
@@ -100,7 +108,7 @@ function assertCommandBlocksIfCriticalSectionInProgress(
     // Split the initial chunk.
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 
-    // Turn on the fail point, and move one of the chunks to shard1 so that there are two
+    // Turn on the fail point, and move one of the chunks to shard0 so that there are two
     // shards that own chunks for the collection. Wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, moveChunkStepNames.chunkDataCommitted);
     let joinMoveChunk = moveChunkParallel(
@@ -120,7 +128,7 @@ function assertCommandBlocksIfCriticalSectionInProgress(
     // Assert that the command reached the shard and then timed out.
     // It could be possible that the following check fails on slow clusters because the request
     // expired its maxTimeMS on the mongos before to reach the shard.
-    checkLog.checkContainsOnceJsonStringMatch(st.shard0, 22062, "error", "MaxTimeMSExpired");
+    checkLog.checkContainsOnceJsonStringMatch(st.shard1, 22062, "error", "MaxTimeMSExpired");
 
     allShards.forEach(function (shard) {
         testCase.assertCommandDidNotRunOnShard(shard);
@@ -137,11 +145,23 @@ const nodeOptions = {
     setParameter: {enableShardedIndexConsistencyCheck: false},
 };
 
-const numShards = 3;
-const st = new ShardingTest({shards: numShards, other: {configOptions: nodeOptions}});
+// The critical-section subtest migrates a chunk to a shard that recently owned an overlapping range;
+// the recipient would otherwise reject the migration to preserve point-in-time reachable ownership
+// history (ConflictingOperationInProgress). This test does not rely on point-in-time reads of the
+// migrated range, so allow such migrations to proceed on all shards.
+const allowDropRecipientPITHistory = {allowMigrationsToDropRecipientPITHistory: true};
 
-// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
-skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
+const numShards = 3;
+const st = new ShardingTest({
+    mongos: 2,
+    shards: numShards,
+    other: {
+        configOptions: {
+            setParameter: {...nodeOptions.setParameter, ...allowDropRecipientPITHistory},
+        },
+        rsOptions: {setParameter: allowDropRecipientPITHistory},
+    },
+});
 
 if (!FeatureFlagUtil.isEnabled(st.s.getDB("admin"), "featureFlagDropIndexesDDLCoordinator")) {
     // Do not check index consistency because a dropIndexes command that times out may leave indexes inconsistent.
@@ -186,40 +206,22 @@ const testCases = {
         };
         return {
             command: {dropIndexes: collName, index: index.name},
-            bumpExpectedCollectionVersionAfterCommand: (expectedCollVersion) => {
-                if (
-                    FeatureFlagUtil.isEnabled(testDB, "featureFlagDropIndexesDDLCoordinator") &&
-                    !FeatureFlagUtil.isEnabled(testDB, "featureFlagAuthoritativeShardsDDL")
-                ) {
-                    // When the dropIndexes command spawns a sharding DDL coordinator that stops and
-                    // resumes migrations via setAllowMigrations, the collection version is bumped
-                    // twice: once for stopping migrations, and once for resuming migrations.
-                    return new Timestamp(
-                        expectedCollVersion.getTime(),
-                        expectedCollVersion.getInc() + 2,
-                    );
-                }
-                // With featureFlagAuthoritativeShardsDDL enabled, the coordinator stops/resumes
-                // migrations via setAllowChunkOperations, which updates the collection metadata
-                // without bumping the collection placement version.
-                return expectedCollVersion;
-            },
             setUpFuncForCheckShardVersionTest: () => {
                 // Create the index directly on all the shards. Note that this will not cause stale
                 // shards to refresh their shard versions.
                 createIndexOnAllShards();
             },
             setUpFuncForCriticalSectionTest: () => {
-                // Move the initial chunk from the shard0 (primary shard) to shard1 and then move it
-                // from shard1 back to shard0. This is just to make the collection also exist on
-                // shard1 so that the createIndexes command below won't create the collection on
-                // shard1 with a different UUID which will cause the moveChunk command in the test
+                // Move the initial chunk from the shard1 (primary shard) to shard0 and then move it
+                // from shard0 back to shard1. This is just to make the collection also exist on
+                // shard0 so that the createIndexes command below won't create the collection on
+                // shard0 with a different UUID which will cause the moveChunk command in the test
                 // to fail.
                 assert.commandWorked(
                     st.s.adminCommand({
                         moveChunk: ns,
                         find: {_id: MinKey},
-                        to: st.shard1.shardName,
+                        to: st.shard0.shardName,
                         _waitForDelete: true,
                     }),
                 );
@@ -227,7 +229,7 @@ const testCases = {
                     st.s.adminCommand({
                         moveChunk: ns,
                         find: {_id: MinKey},
-                        to: st.shard0.shardName,
+                        to: st.shard1.shardName,
                         _waitForDelete: true,
                     }),
                 );
@@ -254,12 +256,12 @@ const testCases = {
 };
 
 assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
 );
 
-// Test that the index commands send and check shard vesions, and only target the shards
+// Test that the index commands send and check shard versions, and only target the shards
 // that own chunks for the collection.
-const expectedTargetedShards = new Set([st.shard1, st.shard2]);
+const expectedTargetedShards = new Set([st.shard0, st.shard2]);
 assert.lt(expectedTargetedShards.size, numShards);
 
 for (const command of Object.keys(testCases)) {
