@@ -541,6 +541,16 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
                          "keyValue"_attr = redact(info->getDuplicatedKeyValue()),
                          "error"_attr = redact(e.reason()));
     std::terminate();
+} catch (const DBException& e) {
+    // If we are shutting down, allow the startup process to continue without the fatal assertion so
+    // we can exit cleanly.
+    if (ErrorCodes::isShutdownError(e.code())) {
+        throw;
+    }
+    LOGV2_FATAL_CONTINUE(9687402,
+                         "Caught exception during replication recovery",
+                         "error"_attr = exceptionToStatus());
+    std::terminate();
 } catch (...) {
     LOGV2_FATAL_CONTINUE(
         21570, "Caught exception during replication recovery", "error"_attr = exceptionToStatus());

@@ -37,6 +37,8 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
+#include <functional>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -80,6 +82,7 @@ public:
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
     void clearAppliedThrough(OperationContext* opCtx) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
+    mutable std::function<void(OperationContext*)> getAppliedThroughFn;
 
     Status createInternalCollections(OperationContext* opCtx) override;
 
