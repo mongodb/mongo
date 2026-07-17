@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/unordered_map.h"
@@ -13,13 +14,15 @@
 
 #include <list>
 #include <map>
-#include <memory>
 #include <mutex>
+#include <source_location>
+#include <string>
 #include <vector>
 
 #include <poll.h>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace transport {
@@ -85,17 +88,48 @@ public:
     }
 
 private:
+    struct Caller {
+        std::source_location location;
+        std::string threadName;
+    };
+
+    class AuditedPromise {
+    public:
+        AuditedPromise() = default;
+        explicit AuditedPromise(Promise<void>);
+
+        /** Moves the underlying promise out of this object and return the promise. */
+        Promise<void> release(std::source_location location = std::source_location::current());
+
+        /** Sets the specified status as an error value on the underlying promise. */
+        void setError(Status status,
+                      std::source_location location = std::source_location::current());
+
+    private:
+        logv2::DynamicAttributes logAttributes(const Caller& previous, const Caller& current);
+
+        Promise<void> _promise;
+        boost::optional<Caller> _releaseCaller;
+        boost::optional<Caller> _setErrorCaller;
+    };
+
     struct Timer {
+        Timer() = default;
+        Timer(size_t id, Promise<void> promise);
+
         size_t id;  // Stores the unique identifier for the timer, provided by `ReactorTimer`.
-        Promise<void> promise;
         bool canceled = false;
+        AuditedPromise promise;
     };
 
     struct TransportSession {
+        TransportSession() = default;
+        TransportSession(int fd, short events, bool canceled, Promise<void> promise);
+
         int fd;
         short events;  // Events to consider while polling for this session (e.g., `POLLIN`).
         bool canceled = false;
-        Promise<void> promise;
+        AuditedPromise promise;
     };
 
     bool _cancelTimer(size_t timerId);
