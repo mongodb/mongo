@@ -753,10 +753,6 @@ void createOplog(OperationContext* opCtx,
     Database* db = nullptr;
     writeConflictRetry(opCtx, "createCollection", oplogCollectionName, [&] {
         WriteUnitOfWork uow(opCtx);
-        // The oplog is created before we have timestamping available, so when using schema epochs
-        // we need to explicitly use the minimum epoch.
-        shard_role_details::getRecoveryUnit(opCtx)->setSchemaEpoch(1);
-
         if (!db) {
             auto databaseHolder = DatabaseHolder::get(opCtx);
             db = databaseHolder->openDb(opCtx, oplogCollectionName.dbName(), nullptr);

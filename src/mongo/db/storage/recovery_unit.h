@@ -368,24 +368,6 @@ public:
     virtual void setCommitTimestamp(Timestamp timestamp) {}
 
     /**
-     * Sets a schema epoch for a transaction which creates tables using untimestamped writes. Must
-     * be called inside a WriteUnitOfWork, may only be called once, and is mutually exclusive with
-     * having timestamps set.
-     *
-     * The schema epoch for table creations is normally derived from the commit timestamp, but
-     * timestamps are not available until the oplog table has been created. Any operations which
-     * create tables prior to that must explicitly set a schema epoch to use.
-     */
-    virtual void setSchemaEpoch(uint64_t schemaEpoch) {}
-
-    /**
-     * Returns the schema epoch set via setSchemaEpoch(), or boost::none if not set.
-     */
-    virtual boost::optional<uint64_t> getSchemaEpoch() const {
-        return boost::none;
-    }
-
-    /**
      * Sets a timestamp that decides when all the future writes on this RecoveryUnit will be
      * durable.
      */
