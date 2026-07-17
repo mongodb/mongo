@@ -9,7 +9,7 @@ git clone --branch=v0.3.0-evergreen-master https://x-access-token:${jepsen_githu
 cp -rf src/dist-test jepsen/docker/node
 
 # Clone our internal tests to run
-git clone --branch=v0.3.0 https://x-access-token:${jepsen_io_github_token}@github.com/10gen/jepsen-io-mongodb.git jepsen/docker/control/mongodb
+git clone --branch=v0.4.0 https://x-access-token:${jepsen_io_github_token}@github.com/10gen/jepsen-io-mongodb.git jepsen/docker/control/mongodb
 
 # Kill any running containers
 sudo docker container kill $(docker ps -q) || true
