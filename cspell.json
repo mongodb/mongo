@@ -29,6 +29,8 @@
         "configsvr",
         "constexpr",
         "coverity",
+        "cstring",
+        "cstrings",
         "dbpath",
         "Decorable",
         "defragmentation",

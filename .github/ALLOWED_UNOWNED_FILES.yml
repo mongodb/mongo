@@ -9,3 +9,5 @@ filters:
       defined in a single file.
   - filter: "/.agents/skills/OWNERS.yml"
     justification: Teams should be able to add their own skills and claim them without asking permission.
+  - filter: "/cspell.json"
+    justification: Spell checker configuration file, should be editable by all teams.
