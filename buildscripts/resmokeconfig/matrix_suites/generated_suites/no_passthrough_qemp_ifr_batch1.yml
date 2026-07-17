@@ -30,6 +30,7 @@ executor:
       global_vars:
         TestData:
           setParameters:
+            featureFlagExtensionsApiSignatureValidation: false
             featureFlagGetExecutorDeferredEngineChoice: true
             featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: false
             featureFlagSbeEqLookupUnwindHashJoin: true

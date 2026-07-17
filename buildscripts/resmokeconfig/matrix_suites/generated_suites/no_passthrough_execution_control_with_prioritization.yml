@@ -31,6 +31,7 @@ executor:
         TestData:
           setParameters:
             executionControlDeprioritizationGate: true
+            featureFlagExtensionsApiSignatureValidation: false
       nodb: ""
 matrix_suite: true
 selector:
