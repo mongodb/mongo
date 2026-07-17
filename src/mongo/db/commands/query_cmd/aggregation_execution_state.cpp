@@ -227,9 +227,19 @@ public:
         // top-level binding branch in resolveInvolvedNamespacesOnLiteParsedPipeline is skipped — we
         // don't apply this view to itself, we only recurse into its subpipelines.
         for (auto& [_, entry] : resolvedNamespaces) {
-            if (auto* parsed = entry.getMutableParsedPipeline()) {
+            if (entry.getMutableParsedPipeline()) {
+                // Desugar the view's lite-parsed pipeline before resolving its subpipeline views.
+                // TODO SERVER-131677: combine desugaring and resolveInvolvedNamespaces into a
+                // single API so callers cannot resolve a non-desugared pipeline by mistake.
+                if (!entry.getLiteParserOptions()) {
+                    entry.setLiteParserOptions(std::make_shared<LiteParserOptions>(
+                        LiteParserOptions{.ifrContext = getIfrContext()}));
+                }
+                entry.desugarViewPipeline();
                 PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
-                    &parsed->pipeline(), entry.getResolvedNamespace(), resolvedNamespaces);
+                    &entry.getMutableParsedPipeline()->pipeline(),
+                    entry.getResolvedNamespace(),
+                    resolvedNamespaces);
             }
         }
 

@@ -309,7 +309,8 @@ namespace {
 bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
                                    const NamespaceString& mainNss,
                                    const ResolvedNamespaceMap& resolvedNamespaces,
-                                   stdx::unordered_set<NamespaceString>& inProgress) {
+                                   stdx::unordered_set<NamespaceString>& inProgress,
+                                   bool bindOnly) {
     auto isView = [&](const NamespaceString& nss) {
         auto it = resolvedNamespaces.find(nss);
         return it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView();
@@ -330,7 +331,11 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
     // The delta (post - pre) is the number of newly prepended stages iterated in Pass A below.
     const size_t originalSize = lpp->getStages().size();
 
-    if (search_helpers::isMongotLiteParsedPipeline(*lpp)) {
+    if (bindOnly || search_helpers::isMongotLiteParsedPipeline(*lpp)) {
+        // bindOnly: bind view/namespace info onto the stages without prepending the view pipeline
+        // (the view is already materialized in the resolved pipeline; prepending would
+        // double-apply it). Mongot pipelines likewise handle first-stage view resolution
+        // themselves and must not have the view prepended here.
         lpp->bindResolvedNamespaceToStages(view, resolvedNamespaces);
     } else {
         lpp->handleView(view, resolvedNamespaces);
@@ -368,7 +373,7 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
                     continue;
                 }
                 bound |= resolveInvolvedNamespacesImpl(
-                    sub.operator->(), subNss, resolvedNamespaces, inProgress);
+                    sub.operator->(), subNss, resolvedNamespaces, inProgress, bindOnly);
                 if (isRunningAgainstAView) {
                     inProgress.erase(cycleNss);
                 }
@@ -407,9 +412,10 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
 bool PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
     LiteParsedPipeline* lpp,
     const NamespaceString& mainNss,
-    const ResolvedNamespaceMap& resolvedNamespaces) {
+    const ResolvedNamespaceMap& resolvedNamespaces,
+    bool bindOnly) {
     stdx::unordered_set<NamespaceString> inProgress;
-    return resolveInvolvedNamespacesImpl(lpp, mainNss, resolvedNamespaces, inProgress);
+    return resolveInvolvedNamespacesImpl(lpp, mainNss, resolvedNamespaces, inProgress, bindOnly);
 }
 
 void PipelineResolver::insertTopLevelViewEntry(

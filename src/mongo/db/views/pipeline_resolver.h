@@ -61,11 +61,18 @@ public:
      * Walks 'lpp' and binds any view found at 'mainNss' in 'resolvedNamespaces', then recurses
      * into each stage's subpipelines using the subpipeline's original parse NSS as the recursive
      * 'mainNss'. Returns whether any view was bound.
+     *
+     * When 'bindOnly' is true, every level calls bindResolvedNamespaceToStages() instead of
+     * handleView(), i.e. it binds view/namespace info onto stages WITHOUT prepending the view
+     * pipeline. Callers (e.g. the $lookup execution-time binder) use this when the view pipeline
+     * is already materialized in the resolved pipeline and only namespace binding is needed —
+     * prepending again would double-apply the view.
      */
     static bool resolveInvolvedNamespacesOnLiteParsedPipeline(
         LiteParsedPipeline* lpp,
         const NamespaceString& mainNss,
-        const ResolvedNamespaceMap& resolvedNamespaces);
+        const ResolvedNamespaceMap& resolvedNamespaces,
+        bool bindOnly = false);
 
     /**
      * Inserts a ResolvedView into a ResolvedNamespaceMap.
