@@ -56,11 +56,11 @@ public:
 
     /**
      * Starts a new Span from an ingress source, which may be sampled differently than an
-     * internally-started span (e.g. a separate rate limit).  This method uses the existence of a
-     * uses the existence of a TelemetryContext in the OperationContext to determine if the ingress
-     * span is part of an external trace.
+     * internally-started span (e.g. a separate rate limit). Uses the presence of `telemetryCtx` to
+     * determine if the ingress span is part of an external trace. If a context is created during
+     * this, `telemetryCtx` is updated in place.
      */
-    static Span startIngressSpan(OperationContext* opCtx, SpanName name);
+    static Span startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name);
 
     static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
@@ -125,7 +125,7 @@ public:
     static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName) {
         return Span{};
     }
-    static Span startIngressSpan(OperationContext* opCtx, SpanName name) {
+    static Span startIngressSpan(std::shared_ptr<TelemetryContext>&, SpanName) {
         return Span{};
     }
 

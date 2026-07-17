@@ -470,7 +470,14 @@ void ParseAndRunCommand::_parseCommand() {
     }
 
     _rec->setCommand(command);
-    _rec->setOtelSpan(otel::traces::Span::startIngressSpan(opCtx, command->getTraceSpanName()));
+    auto& telemetryCtx = _rec->getTelemetryContext();
+    _rec->setOtelSpan(
+        otel::traces::Span::startIngressSpan(telemetryCtx, command->getTraceSpanName()));
+    // Keep the OpCtx decoration in sync so later Span::start(opCtx, ...) calls see the same
+    // context. Skip when null so the common no-tracing path never touches the decoration.
+    if (telemetryCtx) {
+        otel::TelemetryContextHolder::getDecoration(opCtx).setTelemetryContext(telemetryCtx);
+    }
 
     _isHello.emplace(command->getName() == "hello"sv || command->getName() == "isMaster"sv);
 
@@ -1196,10 +1203,11 @@ void ClientCommand::_parseMessage() try {
     }
     _rec->setRequest(opMsgReq);
 
-    if (otel::traces::isTracingEnabled(_rec->getOpCtx())) {
-        otel::TelemetryContextHolder::getDecoration(_rec->getOpCtx())
-            .setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
-                _rec->getRequest().telemetryContext));
+    // Check for the presence of a telemetry context in the request first as that is much cheaper
+    // than checking if tracing is enabled.
+    if (_rec->getRequest().telemetryContext && otel::traces::isTracingEnabled(_rec->getOpCtx())) {
+        _rec->setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
+            _rec->getRequest().telemetryContext));
     }
 } catch (const DBException& ex) {
     // If this error needs to fail the connection, propagate it out.

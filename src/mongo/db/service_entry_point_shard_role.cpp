@@ -2227,10 +2227,12 @@ void parseCommand(HandleRequest::ExecutionContext& execContext) try {
     }
     execContext.setRequest(opMsgReq);
 
-    if (otel::traces::isTracingEnabled(execContext.getOpCtx())) {
-        otel::TelemetryContextHolder::getDecoration(execContext.getOpCtx())
-            .setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
-                execContext.getRequest().telemetryContext));
+    // Check for the presence of a telemetry context in the request first as that is much cheaper
+    // than checking if tracing is enabled.
+    if (execContext.getRequest().telemetryContext &&
+        otel::traces::isTracingEnabled(execContext.getOpCtx())) {
+        execContext.setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
+            execContext.getRequest().telemetryContext));
     }
 } catch (const DBException& ex) {
     // Need to set request as `makeCommandResponse` expects an empty request on failure.
@@ -2262,7 +2264,14 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
     }
 
     Command* c = execContext.getCommand();
-    execContext.setOtelSpan(otel::traces::Span::startIngressSpan(opCtx, c->getTraceSpanName()));
+    auto& telemetryCtx = execContext.getTelemetryContext();
+    execContext.setOtelSpan(
+        otel::traces::Span::startIngressSpan(telemetryCtx, c->getTraceSpanName()));
+    // Keep the OpCtx decoration in sync so later Span::start(opCtx, ...) calls see the same
+    // context. Skip when null so the common no-tracing path never touches the decoration.
+    if (telemetryCtx) {
+        otel::TelemetryContextHolder::getDecoration(opCtx).setTelemetryContext(telemetryCtx);
+    }
 
     LOGV2_DEBUG(
         21965,

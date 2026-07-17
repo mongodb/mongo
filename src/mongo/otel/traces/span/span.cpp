@@ -189,16 +189,9 @@ Span Span::start(OperationContext* opCtx, SpanName name) {
     return _start(opCtx, name, false);
 }
 
-Span Span::startIngressSpan(OperationContext* opCtx, SpanName name) {
-    if (!opCtx) {
-        return Span{};
-    }
-
-    const auto& telemetryContext =
-        TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
-    auto bypassSampling = telemetryContext && TracingSampler::get().shouldAcceptExternalTrace();
-
-    return _start(opCtx, name, bypassSampling);
+Span Span::startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
+    auto bypassSampling = telemetryCtx && TracingSampler::get().shouldAcceptExternalTrace();
+    return _start(telemetryCtx, name, bypassSampling);
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {

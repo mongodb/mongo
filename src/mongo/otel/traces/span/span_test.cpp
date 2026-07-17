@@ -393,23 +393,12 @@ TEST_F(SpanTest, ClonedContextSpanOutlivesOriginalContext) {
 
 using IngressSpanTest = SpanTest;
 
-TEST_F(IngressSpanTest, NullOperationContext) {
-    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; },
-                                           [] { return true; });
-    {
-        auto _ = Span::startIngressSpan(nullptr, span_names::kTest1);
-    }
-    EXPECT_TRUE(isEmpty());
-}
-
 TEST_F(IngressSpanTest, ExternalTraceAcceptedBypassesSampling) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
                                            [] { return true; });
-    auto opCtx = makeOperationContext();
-    TelemetryContextHolder::getDecoration(opCtx.get())
-        .setTelemetryContext(Span::createTelemetryContext());
+    auto telemetryCtx = Span::createTelemetryContext();
     {
-        auto _ = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
     EXPECT_FALSE(isEmpty());
 }
@@ -417,11 +406,9 @@ TEST_F(IngressSpanTest, ExternalTraceAcceptedBypassesSampling) {
 TEST_F(IngressSpanTest, ExternalTraceNotAcceptedIsSampled) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
                                            [] { return false; });
-    auto opCtx = makeOperationContext();
-    TelemetryContextHolder::getDecoration(opCtx.get())
-        .setTelemetryContext(Span::createTelemetryContext());
+    auto telemetryCtx = Span::createTelemetryContext();
     {
-        auto _ = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
     EXPECT_TRUE(isEmpty());
 }
@@ -429,9 +416,9 @@ TEST_F(IngressSpanTest, ExternalTraceNotAcceptedIsSampled) {
 TEST_F(IngressSpanTest, NoExternalContextIgnoresAcceptance) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
                                            [] { return true; });
-    auto opCtx = makeOperationContext();
+    std::shared_ptr<TelemetryContext> telemetryCtx;
     {
-        auto _ = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
     EXPECT_TRUE(isEmpty());
 }
@@ -439,23 +426,22 @@ TEST_F(IngressSpanTest, NoExternalContextIgnoresAcceptance) {
 TEST_F(IngressSpanTest, NoExternalContextSampledExports) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; },
                                            [] { return false; });
-    auto opCtx = makeOperationContext();
+    std::shared_ptr<TelemetryContext> telemetryCtx;
     {
-        auto _ = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
     EXPECT_FALSE(isEmpty());
+    EXPECT_NE(telemetryCtx, nullptr);
 }
 
 TEST_F(IngressSpanTest, RemoteParentContinuesTrace) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
                                            [] { return true; });
-    auto opCtx = makeOperationContext();
     BSONObj traceCtxBson =
         BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-01");
-    TelemetryContextHolder::getDecoration(opCtx.get())
-        .setTelemetryContext(TelemetryContextSerializer::fromBSON(traceCtxBson));
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
     {
-        auto _ = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
     ASSERT_FALSE(isEmpty());
     auto record = getSpan(0, span_names::kTest1);
@@ -465,13 +451,11 @@ TEST_F(IngressSpanTest, RemoteParentContinuesTrace) {
 TEST_F(IngressSpanTest, RemoteParentNotAcceptedIsSampledAndDropped) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
                                            [] { return false; });
-    auto opCtx = makeOperationContext();
     BSONObj traceCtxBson =
         BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-01");
-    TelemetryContextHolder::getDecoration(opCtx.get())
-        .setTelemetryContext(TelemetryContextSerializer::fromBSON(traceCtxBson));
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
     {
-        auto _ = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
     EXPECT_TRUE(isEmpty());
 }
@@ -479,13 +463,11 @@ TEST_F(IngressSpanTest, RemoteParentNotAcceptedIsSampledAndDropped) {
 TEST_F(IngressSpanTest, RemoteParentNotAcceptedButSampledContinues) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; },
                                            [] { return false; });
-    auto opCtx = makeOperationContext();
     BSONObj traceCtxBson =
         BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-01");
-    TelemetryContextHolder::getDecoration(opCtx.get())
-        .setTelemetryContext(TelemetryContextSerializer::fromBSON(traceCtxBson));
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
     {
-        auto _ = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
     ASSERT_FALSE(isEmpty());
     auto record = getSpan(0, span_names::kTest1);
@@ -498,10 +480,10 @@ TEST_F(IngressSpanTest, RemoteParentGrandchildrenInheritHeadDecision) {
     auto opCtx = makeOperationContext();
     BSONObj traceCtxBson =
         BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-01");
-    TelemetryContextHolder::getDecoration(opCtx.get())
-        .setTelemetryContext(TelemetryContextSerializer::fromBSON(traceCtxBson));
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
     {
-        auto ingress = Span::startIngressSpan(opCtx.get(), span_names::kTest1);
+        auto ingress = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+        TelemetryContextHolder::getDecoration(opCtx.get()).setTelemetryContext(telemetryCtx);
         auto child = Span::start(opCtx.get(), span_names::kTest2);
         auto grandchild = Span::start(opCtx.get(), span_names::kTest3);
     }

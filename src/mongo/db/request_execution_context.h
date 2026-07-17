@@ -88,6 +88,19 @@ public:
         return *_otelSpan;
     }
 
+    void setTelemetryContext(std::shared_ptr<otel::TelemetryContext> telemetryContext) {
+        dassert(_isOnClientThread());
+        _telemetryContext = std::move(telemetryContext);
+    }
+    std::shared_ptr<otel::TelemetryContext>& getTelemetryContext() {
+        dassert(_isOnClientThread());
+        return _telemetryContext;
+    }
+    const std::shared_ptr<otel::TelemetryContext>& getTelemetryContext() const {
+        dassert(_isOnClientThread());
+        return _telemetryContext;
+    }
+
     void setCommand(Command* command) {
         dassert(_isOnClientThread() && !_command);
         _command = command;
@@ -118,6 +131,7 @@ private:
     boost::optional<OpMsgRequest> _request;
     Command* _command = nullptr;
     std::unique_ptr<rpc::ReplyBuilderInterface> _replyBuilder;
+    std::shared_ptr<otel::TelemetryContext> _telemetryContext;
     boost::optional<otel::traces::Span> _otelSpan;
 };
 
