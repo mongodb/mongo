@@ -135,6 +135,11 @@ executor:
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            # TODO SERVER-108424: get rid of runningWithShardStepdowns once only viewless timeseries are supported
+            runningWithShardStepdowns: true
     - class: CheckOrphansDeleted
     - class: CheckRoutingTableConsistency
     - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
