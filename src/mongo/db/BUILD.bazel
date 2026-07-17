@@ -1732,6 +1732,7 @@ mongo_cc_library(
         "client_strand.cpp",
         "default_baton.cpp",
         "hierarchical_cancelable_operation_context_factory.cpp",
+        "ifr_context_decoration.cpp",
         "operation_context.cpp",
         "operation_context_group.cpp",
         "operation_context_options_gen",

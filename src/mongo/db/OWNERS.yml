@@ -65,6 +65,10 @@ filters:
   - "generic_argument_util.*":
     approvers:
       - 10gen/server-programmability
+  - "ifr_context_decoration.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
   - "ifr_flag_registry.yml":
     approvers:
       - 10gen/rollout-flag-managers
