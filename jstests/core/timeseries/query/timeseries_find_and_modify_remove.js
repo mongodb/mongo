@@ -25,9 +25,15 @@ import {
     testFindOneAndRemove,
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-// findAndModify with a sort option is tested separately in
-// timeseries_find_and_modify_remove_sort.js because the expected behavior depends on whether the
-// collection is sharded and on the binary version.
+
+// findAndModify with a sort option is not supported.
+(function testSortOptionFails() {
+    testFindOneAndRemove({
+        initialDocList: [doc1_a_nofields, doc4_b_f103, doc6_c_f105],
+        cmd: {filter: {f: {$gt: 100}}, sort: {f: 1}},
+        res: {errorCode: ErrorCodes.InvalidOptions},
+    });
+})();
 
 // Query on the 'f' field leads to zero measurement delete.
 (function testZeroMeasurementDelete() {

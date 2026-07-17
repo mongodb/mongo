@@ -444,10 +444,9 @@ CollectionRoutingInfo getCollectionRoutingInfo(
 
     if (cri.hasRoutingTable()) {
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform findAndModify with sort on a sharded timeseries collection",
+                "Cannot perform findAndModify with sort on a timeseries collection",
                 !cri.getChunkManager().isNewTimeseriesWithoutView() ||
-                    !request.getSort().has_value() || isRawDataOperation(opCtx) ||
-                    !cri.getChunkManager().isSharded());
+                    !request.getSort().has_value() || isRawDataOperation(opCtx));
         return cri;
     }
 
@@ -478,9 +477,8 @@ CollectionRoutingInfo getCollectionRoutingInfo(
     }
 
     uassert(ErrorCodes::InvalidOptions,
-            "Cannot perform findAndModify with sort on a sharded timeseries collection",
-            !request.getSort().has_value() || isRawDataOperation(opCtx) ||
-                !bucketCollCri.getChunkManager().isSharded());
+            "Cannot perform findAndModify with sort on a timeseries collection",
+            !request.getSort().has_value() || isRawDataOperation(opCtx));
 
     return bucketCollCri;
 }
