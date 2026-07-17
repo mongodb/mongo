@@ -43,6 +43,8 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:collection_query_info",
+        "//src/mongo/db/query:memory_util",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/compiler/optimizer/join:join_method",
         "//src/mongo/db/query/compiler/optimizer/join:join_ordering",
         "//src/mongo/db/query/compiler/optimizer/join:join_predicate",

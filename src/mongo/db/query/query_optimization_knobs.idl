@@ -1454,6 +1454,24 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: enableJoinPlanCache
+
+    internalQueryJoinPlanCacheSize:
+        # Marked as public as this knob cannot be accessed via the QueryKnobConfiguration framework.
+        # It is accessed only during startup during global initialization of the server at which
+        # point there is no OperationContext available to access the QueryKnobConfiguration.
+        mod_visibility: public
+        description: >-
+            The maximum amount of memory that the system will allocate for the join plan cache.
+            It takes a value in one of the two formats:
+            1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%. Capped at 25%.
+            2. <number>(GB|MB|KB|B), indicates the amount of memory in GB, MB, KB or bytes. E.g.: 1.5GB, 100MB. Capped at 500GB.
+        set_at: [startup]
+        cpp_varname: "internalQueryJoinPlanCacheSize"
+        cpp_vartype: synchronized_value<std::string>
+        default: "16MB"
+        validator:
+            callback: memory_util::validatePlanCacheSize
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

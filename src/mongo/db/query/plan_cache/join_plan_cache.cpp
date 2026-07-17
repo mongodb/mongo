@@ -4,6 +4,8 @@
 #include "mongo/db/query/plan_cache/join_plan_cache.h"
 
 #include "mongo/db/exec/container_size_helper.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/util/memory_util.h"
 #include "mongo/logv2/log.h"
 
 #include <variant>
@@ -16,14 +18,19 @@ namespace {
 const ServiceContext::Decoration<std::unique_ptr<JoinPlanCache>> getJoinPlanCacheDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<JoinPlanCache>>();
 
-// Default to 5MiB
-constexpr size_t kDefaultJoinPlanCacheSizeBytes = 5 * 1024 * 1024;
-constexpr size_t kDefaultJoinPlanCacheNumPartitions = 32;
+// Partition count, mirroring the SBE plan cache (sbe_plan_cache.cpp).
+constexpr size_t kJoinPlanCacheNumPartitions = 32;
 
 ServiceContext::ConstructorActionRegisterer joinPlanCacheRegisterer{
     "JoinPlanCacheRegisterer", [](ServiceContext* serviceCtx) {
-        getJoinPlanCacheDecoration(serviceCtx) = std::make_unique<JoinPlanCache>(
-            kDefaultJoinPlanCacheSizeBytes, kDefaultJoinPlanCacheNumPartitions);
+        // Parse and cap the configured cache size, following the SBE plan cache pattern.
+        auto status = memory_util::MemorySize::parse(internalQueryJoinPlanCacheSize.get());
+        uassertStatusOK(status);
+        auto requestedBytes = memory_util::getRequestedMemSizeInBytes(status.getValue());
+        auto cappedBytes = memory_util::capMemorySize(
+            requestedBytes, /*maximumSizeGB*/ 500, /*percentTotalSystemMemory*/ 25);
+        getJoinPlanCacheDecoration(serviceCtx) =
+            std::make_unique<JoinPlanCache>(cappedBytes, kJoinPlanCacheNumPartitions);
     }};
 
 // Heap bytes backing a FieldPath.
