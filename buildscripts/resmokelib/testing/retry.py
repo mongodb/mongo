@@ -21,6 +21,8 @@ retryable_codes = [
     9001,  # SocketException
     262,  # ExceededTimeLimit
     202,  # NetworkInterfaceExceededTimeLimit
+    515,  # ConnectionClosedByPeer
+    516,  # ConnectionEstablishmentTimeout
 ]
 
 # The names for the error codes above.
@@ -39,6 +41,8 @@ retryable_code_names = [
     "SocketException",
     "ExceededTimeLimit",
     "NetworkInterfaceExceededTimeLimit",
+    "ConnectionClosedByPeer",
+    "ConnectionEstablishmentTimeout",
 ]
 
 
