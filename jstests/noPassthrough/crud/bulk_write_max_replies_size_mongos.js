@@ -13,10 +13,9 @@
 import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
-import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 const st = new ShardingTest({
-    mongos: 1,
+    mongos: 2,
     shards: 2,
     rs: {nodes: 1},
     mongosOptions: {
@@ -26,9 +25,6 @@ const st = new ShardingTest({
         },
     },
 });
-
-// TODO (SERVER-129875): Adapt test to work with authoritative shards commits.
-skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 const dbName = "test";
 const db = st.getDB(dbName);
@@ -50,11 +46,8 @@ assert.commandWorked(db.adminCommand({split: ns1, middle: {a: 2}}));
 assert.commandWorked(db.adminCommand({moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName}));
 assert.commandWorked(db.adminCommand({moveChunk: ns1, find: {a: 3}, to: st.shard1.shardName}));
 
-// Ensure coll2 initially is on shard0.
-assert.commandWorked(db.adminCommand({moveChunk: ns2, find: {a: 0}, to: st.shard0.shardName}));
-// Then move its only chunk to shard1 but do not refresh shard1, so that the first write to the
-// collection will get a staleness error.
-ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns2, null, st.shard1, {a: 0});
+// Ensure coll2 initially is on shard1, alongside ns1's a >= 2 chunk (op2's target).
+assert.commandWorked(db.adminCommand({moveChunk: ns2, find: {a: 0}, to: st.shard1.shardName}));
 
 assert.commandWorked(
     st.s.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(20)}),
@@ -71,15 +64,30 @@ assert.commandWorked(
 // point, before doing another round of execution, we will check and see we have hit
 // bulkWriteMaxRepliesSize and abort execution, marking the second write as failed due to exceeding
 // the memory limit.
-let res = st.s.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {insert: 0, document: {a: -1}},
-        {insert: 1, document: {a: 1}},
-        {insert: 0, document: {a: 4}},
-    ],
-    nsInfo: [{ns: ns1}, {ns: ns2}],
-    ordered: false,
+//
+// To make the write to coll2 hit a staleness error, move coll2's chunk away from shard1 (to
+// shard0) through a different router (st.s1), leaving the router that issues the bulkWrite (st.s)
+// still believing coll2 is on shard1. The bulkWrite then targets op1 (coll2) and op2 (ns1, a >= 2)
+// together at shard1, which rejects them with a StaleConfig, while op0 completes on shard0. A shard
+// can never be ignorant of its own metadata under authoritative shards, so the staleness must live
+// on the router.
+let res = ShardVersioningUtil.runOperationOnStaleRouterAfterMoveChunk({
+    migrateRouter: st.s1,
+    staleRouter: st.s,
+    ns: ns2,
+    toShard: st.shard0,
+    bounds: [{a: MinKey}, {a: MaxKey}],
+    runStaleOperation: (router) =>
+        router.adminCommand({
+            bulkWrite: 1,
+            ops: [
+                {insert: 0, document: {a: -1}},
+                {insert: 1, document: {a: 1}},
+                {insert: 0, document: {a: 4}},
+            ],
+            nsInfo: [{ns: ns1}, {ns: ns2}],
+            ordered: false,
+        }),
 });
 
 jsTestLog("RES");
@@ -96,6 +104,10 @@ cursorEntryValidator(res.cursor.firstBatch[1], {
     n: 0,
     code: ErrorCodes.ExceededMemoryLimit,
 });
+
+// The previous step left coll2 on shard0. Move it back to shard1 through st.s (so that router's
+// routing table is refreshed) so the ordered bulkWrite below targets op0 alone at shard0.
+assert.commandWorked(db.adminCommand({moveChunk: ns2, find: {a: 0}, to: st.shard1.shardName}));
 
 // Test that replies size limit is hit when bulkWriteMaxRepliesSize is set and ordered = true.
 // This request should generate a child request to shard0 containing the first write, which
