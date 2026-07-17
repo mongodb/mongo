@@ -225,9 +225,6 @@ void lockAndCall(std::unique_lock<ObservableMutex<std::mutex>>* lk,
     fn();
 }
 
-constexpr std::string_view kQuiesceModeShutdownMessage =
-    "The server is in quiesce mode and will shut down"sv;
-
 }  // namespace
 
 ReplicationCoordinatorImpl::WaiterList::WaiterList(Counter64& waiterCountMetric)

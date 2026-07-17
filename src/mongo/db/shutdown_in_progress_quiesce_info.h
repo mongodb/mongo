@@ -10,8 +10,12 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
+
+inline constexpr std::string_view kQuiesceModeShutdownMessage =
+    "The server is in quiesce mode and will shut down";
 
 /**
  * Represents an error returned from a mongod or a mongos when it is in quiesce mode. The
