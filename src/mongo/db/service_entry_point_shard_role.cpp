@@ -17,6 +17,7 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/admission/write_throttler.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/admission/write_throttler_parameters_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_contract.h"
@@ -182,16 +183,36 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 
+bool isWriteThrottlerOperation(Command::ReadWriteType readWriteType) {
+    return readWriteType == Command::ReadWriteType::kWrite ||
+        readWriteType == Command::ReadWriteType::kTransaction;
+}
+
 void admitWriteThrottlerIfNeeded(OperationContext* opCtx,
                                  CommandInvocation* invocation,
                                  bool isExemptFromAdmissionControl) {
-    if (!gWriteThrottlerEnabled.load() || isExemptFromAdmissionControl ||
-        !invocation->supportsWriteConcern() || invocation->isReadOperation()) {
+    if (isExemptFromAdmissionControl || !invocation->supportsWriteConcern() ||
+        !isWriteThrottlerOperation(invocation->definition()->getReadWriteType())) {
         return;
     }
     if (auto* throttler = WriteThrottler::get(opCtx)) {
         throttler->admitOperation(opCtx);
     }
+}
+
+bool shouldFinalizeWriteThrottlerAdmission(OperationContext* opCtx,
+                                           Command::ReadWriteType readWriteType) {
+    if (!isWriteThrottlerOperation(readWriteType)) {
+        return false;
+    }
+
+    if (gWriteThrottlerEnabled.load()) {
+        return true;
+    }
+
+    // Preserve command-end reconciliation for writes admitted before a runtime disable, while
+    // keeping reads out of the write-throttler finalization path.
+    return WriteThrottlerAdmissionContext::get(opCtx).getAdmissions() > 0;
 }
 
 void runCommandInvocation(const RequestExecutionContext& rec, CommandInvocation* invocation) {
@@ -1878,7 +1899,9 @@ void ExecCommandDatabase::_initiateCommand() {
         _admissionTicket = admissionController.admitOperation(opCtx);
     }
 
-    admitWriteThrottlerIfNeeded(opCtx, getInvocation(), isExemptFromAdmissionControl);
+    if (gWriteThrottlerEnabled.load()) {
+        admitWriteThrottlerIfNeeded(opCtx, getInvocation(), isExemptFromAdmissionControl);
+    }
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
@@ -2444,9 +2467,12 @@ DbResponse HandleRequest::runOperation() {
 void HandleRequest::completeOperation(DbResponse& response) {
     auto opCtx = executionContext.getOpCtx();
     auto& currentOp = executionContext.currentOp();
+    const auto readWriteType = currentOp.getReadWriteType();
 
-    if (auto* throttler = WriteThrottler::get(opCtx)) {
-        throttler->finalizeAdmission(opCtx);
+    if (shouldFinalizeWriteThrottlerAdmission(opCtx, readWriteType)) {
+        if (auto* throttler = WriteThrottler::get(opCtx)) {
+            throttler->finalizeAdmission(opCtx);
+        }
     }
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
@@ -2464,7 +2490,7 @@ void HandleRequest::completeOperation(DbResponse& response) {
         .increment(opCtx,
                    currentOp.elapsedTimeExcludingPauses(),
                    currentOp.debug().workingTimeMillis,
-                   currentOp.getReadWriteType());
+                   readWriteType);
 
     if (shouldProfile) {
         // Performance profiling is on

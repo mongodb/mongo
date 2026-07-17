@@ -20,6 +20,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/topology/cluster_role.h"
@@ -329,6 +330,38 @@ public:
     }
 };
 
+class TestCmdWriteThrottlerRead : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerRead";
+    TestCmdWriteThrottlerRead() : TestCmdBase(kCommandName) {}
+
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kRead;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        return true;
+    }
+};
+
+class TestCmdWriteThrottlerCommand : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerCommand";
+    TestCmdWriteThrottlerCommand() : TestCmdBase(kCommandName) {}
+
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kCommand;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        return true;
+    }
+};
+
 // A top-level write command that issues a nested write via DBDirectClient on the same opCtx.
 class TestCmdWriteThrottlerDirectClientParent : public TestCmdBase {
 public:
@@ -360,8 +393,40 @@ public:
     }
 };
 
+class TestCmdWriteThrottlerDisablesDuringRun : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerDisablesDuringRun";
+    TestCmdWriteThrottlerDisablesDuringRun() : TestCmdBase(kCommandName) {}
+
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kWrite;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        uassert(ErrorCodes::InternalError, "runWithBuilderOnly not implemented", false);
+    }
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj&,
+             BSONObjBuilder&) override {
+        WriteThrottlerAdmissionContext::get(opCtx).recordWriteCostForReconciliation(10);
+        auto* enabledParameter =
+            ServerParameterSet::getNodeParameterSet()->get("writeThrottlerEnabled");
+        uassertStatusOK(enabledParameter->setFromString("false", boost::none));
+        return true;
+    }
+};
+
 MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerNestedWrite).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerRead).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerCommand).testOnly().forShard();
 MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerDirectClientParent).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerDisablesDuringRun).testOnly().forShard();
 
 TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerAdmitsWriteCommandOnceAtServiceEntry) {
     installWriteThrottler(getGlobalServiceContext());
@@ -372,10 +437,22 @@ TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerAdmitsWriteCommandOnceAtS
     auto opCtx = makeOperationContext();
     runCommandTestWithResponse(BSON(TestCmdWriteThrottlerNestedWrite::kCommandName << 1),
                                opCtx.get());
-    ASSERT_EQ(WriteThrottlerAdmissionContext::get(opCtx.get()).getAdmissions(), 1);
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
 
     Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
-    ASSERT_EQ(WriteThrottlerAdmissionContext::get(opCtx.get()).getAdmissions(), 1);
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
+}
+
+TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerSkipsReadCommands) {
+    installWriteThrottler(getGlobalServiceContext());
+    unittest::ServerParameterGuard targetRate{"writeThrottlerTargetRatePerSec",
+                                              WriteThrottler::kMaxRate};
+    unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
+
+    auto opCtx = makeOperationContext();
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerRead::kCommandName << 1), opCtx.get());
+    ASSERT_EQ(WriteThrottlerAdmissionContext::get(opCtx.get()).getAdmissions(), 0);
 }
 
 TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerSkipsNonWriteCommands) {
@@ -385,7 +462,7 @@ TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerSkipsNonWriteCommands) {
     unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
 
     auto opCtx = makeOperationContext();
-    runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerCommand::kCommandName << 1), opCtx.get());
     ASSERT_EQ(WriteThrottlerAdmissionContext::get(opCtx.get()).getAdmissions(), 0);
 }
 
@@ -401,7 +478,25 @@ TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerSkipsDirectClientReentryW
     // must not take a second write-throttler admission.
     runCommandTestWithResponse(BSON(TestCmdWriteThrottlerDirectClientParent::kCommandName << 1),
                                opCtx.get());
-    ASSERT_EQ(WriteThrottlerAdmissionContext::get(opCtx.get()).getAdmissions(), 1);
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
+}
+
+TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerFinalizesAdmissionWhenDisabledDuringRun) {
+    unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
+    unittest::ServerParameterGuard targetRate{"writeThrottlerTargetRatePerSec", 1};
+    unittest::ServerParameterGuard burstCapacity{"writeThrottlerBurstCapacitySecs", 100.0};
+    installWriteThrottler(getGlobalServiceContext());
+    auto* throttler = WriteThrottler::get(getGlobalServiceContext());
+
+    const auto before = throttler->tokenBalance_forTest();
+    auto opCtx = makeOperationContext();
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerDisablesDuringRun::kCommandName << 1),
+                               opCtx.get());
+
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
+    ASSERT_EQ(throttler->tokenBalance_forTest(), before - 10);
 }
 
 TEST_F(ServiceEntryPointShardServerTest,
