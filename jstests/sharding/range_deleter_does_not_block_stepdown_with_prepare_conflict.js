@@ -52,6 +52,10 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShar
 }
 st.refreshCatalogCacheForNs(st.s, ns);
 
+// Wait for the MaxKey orphan guard to finish classifying tasks before preparing the transaction, so
+// the range deletion below and not the MaxKey classification read meets the prepare conflict.
+checkLog.containsJson(st.rs0.getPrimary(), 13018004);
+
 // Insert a doc into the chunk still owned by the donor shard in a transaction then prepare the
 // transaction so readers of that doc will enter a prepare conflict retry loop.
 const lsid = {
