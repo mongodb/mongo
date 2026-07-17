@@ -956,6 +956,14 @@ public:
         _gotTemporarilyUnavailableException = v;
     }
 
+    /**
+     * Returns true on the first call and false on subsequent calls. Intended to let the caller
+     * update the 'maxEstimatedScanBytes' metric exactly once per query.
+     */
+    bool tryClaimMaxEstimatedScanBytesMetric() {
+        return !std::exchange(_maxEstimatedScanBytesMetricCounted, true);
+    }
+
     // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
     const query_settings::QuerySettings& getQuerySettings() const {
         return query_settings::forOp(getOperationContext());
@@ -1420,6 +1428,9 @@ private:
     boost::optional<SimpleMemoryUsageTracker> _expressionFallbackTracker;
 
     bool _gotTemporarilyUnavailableException = false;
+
+    // See tryClaimMaxEstimatedScanBytesMetric().
+    bool _maxEstimatedScanBytesMetricCounted = false;
 
     bool _isCappedDelete = false;
 

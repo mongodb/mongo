@@ -87,6 +87,47 @@ describe("maxEstimatedScanBytes", function () {
         });
     });
 
+    it("2b. rooted $or with no indexed branches: rejected counter increments exactly once (SERVER-130688)", function () {
+        withParam(belowHeavy, () => {
+            const beforeRejected = getCounters().rejected;
+            assert.commandFailedWithCode(
+                db.runCommand({find: "heavy", filter: {$or: [{a: 5}, {a: 7}]}}),
+                ErrorCodes.NoQueryExecutionPlans,
+                "unbounded COLLSCAN required by a rooted $or with no indexed branches should be rejected",
+            );
+            assert.eq(
+                getCounters().rejected,
+                beforeRejected + 1,
+                "rejected counter should increment exactly once for one rejected $or query",
+            );
+        });
+    });
+
+    it("2c. dryRun: rooted $or with no indexed branches: dryRunWouldReject increments exactly once (SERVER-130688)", function () {
+        withParam(belowHeavy, () => {
+            setDryRun(true);
+            try {
+                const beforeDryRun = getCounters().dryRunWouldReject;
+                const beforeRejected = getCounters().rejected;
+                assert.commandWorked(
+                    db.runCommand({find: "heavy", filter: {$or: [{a: 5}, {a: 7}]}}),
+                );
+                assert.eq(
+                    getCounters().dryRunWouldReject,
+                    beforeDryRun + 1,
+                    "dryRunWouldReject should increment exactly once for one would-be-rejected $or query",
+                );
+                assert.eq(
+                    getCounters().rejected,
+                    beforeRejected,
+                    "rejected should NOT increment while dry-run mode is on",
+                );
+            } finally {
+                setDryRun(false);
+            }
+        });
+    });
+
     it("3. collection below threshold: COLLSCAN allowed", function () {
         withParam(aboveHeavy, () => {
             assert.commandWorked(db.runCommand({find: "heavy", filter: {a: 1}}));
@@ -432,8 +473,6 @@ describe("maxEstimatedScanBytes", function () {
             setDryRun(false);
         });
     });
-
-    // TODO SERVER-130345: add integration tests for PQS $natural hint override path.
 });
 
 // setQuerySettings requires a replica set; it is not supported on a standalone mongod.

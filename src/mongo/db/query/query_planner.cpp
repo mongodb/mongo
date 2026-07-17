@@ -753,16 +753,21 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         // runtime takes effect even for queries whose COLLSCAN was already cached.
         if (rejectsUnboundedCollscan(query, params, soln.get())) {
             if (QueryPlannerCommon::isMaxEstimatedScanBytesDryRun(params.mainCollectionInfo)) {
-                LOGV2(10130231,
-                      "maxEstimatedScanBytesDryRun: query would be rejected by "
-                      "maxEstimatedScanBytes",
-                      "namespace"_attr = query.nss().toStringForErrorMsg(),
-                      "estimatedSize"_attr =
-                          params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
-                      "threshold"_attr = params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
-                maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+                if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
+                    LOGV2(10130231,
+                          "maxEstimatedScanBytesDryRun: query would be rejected by "
+                          "maxEstimatedScanBytes",
+                          "namespace"_attr = query.nss().toStringForErrorMsg(),
+                          "estimatedSize"_attr =
+                              params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
+                          "threshold"_attr =
+                              params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
+                    maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+                }
             } else {
-                maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+                if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
+                    maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+                }
                 return Status(
                     ErrorCodes::NoQueryExecutionPlans,
                     "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
@@ -930,16 +935,20 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
     // scans (minRecord/maxRecord) and resumeScanPoint from rejection.
     if (soln && rejectsUnboundedCollscan(query, params, soln.get())) {
         if (QueryPlannerCommon::isMaxEstimatedScanBytesDryRun(params.mainCollectionInfo)) {
-            LOGV2(10130232,
-                  "maxEstimatedScanBytesDryRun: query would be rejected by "
-                  "maxEstimatedScanBytes",
-                  "namespace"_attr = query.nss().toStringForErrorMsg(),
-                  "estimatedSize"_attr =
-                      params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
-                  "threshold"_attr = params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
-            maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+            if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
+                LOGV2(10130232,
+                      "maxEstimatedScanBytesDryRun: query would be rejected by "
+                      "maxEstimatedScanBytes",
+                      "namespace"_attr = query.nss().toStringForErrorMsg(),
+                      "estimatedSize"_attr =
+                          params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
+                      "threshold"_attr = params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
+                maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+            }
         } else {
-            maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+            if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
+                maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+            }
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
                           "COLLSCAN on a collection that exceeds the configured size threshold");
@@ -1785,16 +1794,21 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         !isClusteredIDXScan) {
         if (!QueryPlannerCommon::hasEffectiveLimit(query)) {
             if (QueryPlannerCommon::isMaxEstimatedScanBytesDryRun(params.mainCollectionInfo)) {
-                LOGV2(10130233,
-                      "maxEstimatedScanBytesDryRun: query would be rejected by "
-                      "maxEstimatedScanBytes",
-                      "namespace"_attr = query.nss().toStringForErrorMsg(),
-                      "estimatedSize"_attr =
-                          params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
-                      "threshold"_attr = params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
-                maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+                if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
+                    LOGV2(10130233,
+                          "maxEstimatedScanBytesDryRun: query would be rejected by "
+                          "maxEstimatedScanBytes",
+                          "namespace"_attr = query.nss().toStringForErrorMsg(),
+                          "estimatedSize"_attr =
+                              params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
+                          "threshold"_attr =
+                              params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
+                    maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+                }
             } else {
-                maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+                if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
+                    maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+                }
                 return Status(
                     ErrorCodes::NoQueryExecutionPlans,
                     "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
