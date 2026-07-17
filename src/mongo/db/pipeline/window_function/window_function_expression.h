@@ -874,6 +874,9 @@ public:
                               << " must be specified with a top level sortBy expression with "
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << accumulatorName << " requires a non-expression sortBy",
+                !sortBy->begin()->expression);
 
         return make_intrusive<ExpressionLinearFill>(
             expCtx, std::string{*accumulatorName}, std::move(input), std::move(bounds));
