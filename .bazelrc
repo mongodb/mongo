@@ -5,7 +5,10 @@
 info --config=local
 
 # Used if we need to reset the cache for some reason, just change the value
+# Third party rust code doesnt get passed the --action_env
 common --action_env=RESET_CACHE=A
+common --@rules_rust//rust/settings:extra_rustc_flag=--cfg=reset_cache_A
+common --@rules_rust//rust/settings:extra_exec_rustc_flag=--cfg=reset_cache_A
 
 # Don't use legacy toolchain resolution.
 common --incompatible_enable_cc_toolchain_resolution
