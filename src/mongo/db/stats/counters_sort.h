@@ -33,4 +33,18 @@ public:
 };
 extern SortCounters sortCounters;
 
+/**
+ * Placeholder gauge of the current on-disk size of query spilling that lands in temporary files on
+ * the local dbpath.
+ * TODO(SERVER-129889): Maintain this gauge from sorter::File, which underlies all file-based
+ * spilling.
+ */
+class FileSpillingMetrics {
+public:
+    // Current on-disk size of temporary spill files on the local dbpath.
+    Atomic64Metric& fileSpilledStorageSize =
+        *MetricBuilder<Atomic64Metric>{"query.spilling.fileSpilledStorageSize"};
+};
+extern FileSpillingMetrics fileSpillingMetrics;
+
 }  // namespace mongo

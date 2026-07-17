@@ -6,5 +6,6 @@
 namespace mongo {
 
 SortCounters sortCounters;
+FileSpillingMetrics fileSpillingMetrics;
 
-}
+}  // namespace mongo
