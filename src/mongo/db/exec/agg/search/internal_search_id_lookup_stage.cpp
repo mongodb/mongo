@@ -9,8 +9,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/search/internal_search_id_lookup_local_read_executor.h"
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
-#include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
+#include "mongo/db/exec/single_doc_lookup/sbe_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -29,16 +29,16 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeResultsInInternalSearchIdLookup);
 
 namespace {
 /**
- * Batch limits for the $_internalSearchIdLookup stage. The event count is pinned to 1 unless the
- * optimization is on, so with the flag off the stage is byte-for-byte the old per-result path.
- * Batching only pays off behind a caching/SBE executor (SERVER-130900), so the knob stays at 1 in
- * production for now and is raised only by tests. Byte budgets always come from their knobs.
+ * Batch limits for $_internalSearchIdLookup. Only the caching (SBE) executor gains from a batch
+ * larger than one -- it reuses its parameterized plan and acquisition across the window -- so the
+ * event count uses the knob only when 'shouldBatch'; other paths run batch-of-one. Byte budgets
+ * always come from their knobs.
  */
 exec::agg::BatchedEnrichmentStage::Limits buildIdLookupLimits(
-    const QueryKnobConfiguration& queryKnobsConfig, bool isOptimized) {
+    const QueryKnobConfiguration& queryKnobsConfig, bool shouldBatch) {
     return exec::agg::BatchedEnrichmentStage::Limits{
         .maxInputEvents =
-            isOptimized ? static_cast<size_t>(queryKnobsConfig.getSearchIdLookupMaxBatchSize()) : 1,
+            shouldBatch ? static_cast<size_t>(queryKnobsConfig.getSearchIdLookupMaxBatchSize()) : 1,
         .maxInputBytes = static_cast<size_t>(queryKnobsConfig.getSearchIdLookupMaxInputBytes()),
         .maxOutputBytes = static_cast<size_t>(queryKnobsConfig.getSearchIdLookupMaxOutputBytes())};
 }
@@ -55,8 +55,15 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
     const bool isOptimized = ifrContext &&
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchOptimizedIdLookup);
 
+    auto viewPipeline = documentSource->_spec.getViewPipeline();
+
+    // Batching pays behind the caching SBE executor, which serves the optimized, non-view path (see
+    // buildIdLookupExecutor). A view forces the per-lookup local-read executor, which gains nothing
+    // from a larger batch, so it runs batch-of-one.
+    const bool shouldBatch = isOptimized && !viewPipeline;
+
     auto lookupExecutor = exec::agg::buildIdLookupExecutor(
-        expCtx, documentSource->_catalogResourceHandle, documentSource->_spec.getViewPipeline());
+        expCtx, documentSource->_catalogResourceHandle, std::move(viewPipeline));
 
     return make_intrusive<exec::agg::InternalSearchIdLookUpStage>(
         documentSource->kStageName,
@@ -65,7 +72,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
         documentSource->_catalogResourceHandle,
         documentSource->_searchIdLookupMetrics,
         std::move(lookupExecutor),
-        buildIdLookupLimits(expCtx->getQueryKnobConfiguration(), isOptimized));
+        buildIdLookupLimits(expCtx->getQueryKnobConfiguration(), shouldBatch));
 }
 
 namespace exec::agg {
@@ -83,11 +90,12 @@ std::unique_ptr<SingleDocumentLookupExecutor> buildIdLookupExecutor(
     const bool optimizedLookupEnabled = ifrContext &&
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchOptimizedIdLookup);
 
-    // Express fast path: flag on and no view. idLookup is always local, so Express uses
-    // AlwaysLocalEligibility, drops orphans via the acquisition's shard filter, and reuses the
-    // stage's upfront acquisition through PreAcquiredCollectionAcquirer.
+    // Optimized fast path (flag on, no view): the SBE point-read executor, reusing the stage's
+    // upfront acquisition and caching a parameterized '{_id}' plan across the batch window. The
+    // lookup always runs local (search index is on-shard), so AlwaysLocalEligibility; a sharded
+    // collection's orphans are dropped by the SHARDING_FILTER the executor adds above the scan.
     if (optimizedLookupEnabled && !viewPipeline) {
-        return std::make_unique<ExpressSingleDocumentLookupExecutor>(
+        return std::make_unique<SbeSingleDocumentLookupExecutor>(
             std::make_unique<PreAcquiredCollectionAcquirer>(
                 catalogResourceHandle->getStasher(),
                 catalogResourceHandle->getCollectionForLookupExecutor()),
@@ -168,11 +176,16 @@ void InternalSearchIdLookUpStage::closeBatch() noexcept {
     _batch.reset();
 }
 
-bool InternalSearchIdLookUpStage::shouldStopEmittingDocuments() const {
-    // Honour the spec's 'limit' (0 or unset means no cap): stop once that many documents have been
-    // returned. Mirrors the previous per-getNext() limit check.
+boost::optional<size_t> InternalSearchIdLookUpStage::remainingDocumentsToEmit() const {
+    // Honour the spec's 'limit' (0 or unset means no cap): the remaining allowance is the limit
+    // minus what has already been returned. The base treats 0 as "stop" and uses a positive value
+    // to cap the upstream pull, so a batch never advances mongot past what the limit needs.
     auto limit = _spec.getLimit();
-    return limit && *limit != 0 && _searchIdLookupMetrics->getDocsReturnedByIdLookup() >= *limit;
+    if (!limit || *limit == 0) {
+        return boost::none;
+    }
+    auto returned = _searchIdLookupMetrics->getDocsReturnedByIdLookup();
+    return returned >= *limit ? 0u : static_cast<size_t>(*limit - returned);
 }
 
 void InternalSearchIdLookUpStage::onExhausted() {
@@ -213,8 +226,8 @@ boost::optional<Document> InternalSearchIdLookUpStage::enrich(Document event) {
             "Collection should exist when using $_internalSearchIdLookup",
             pExpCtx->getUUID().has_value());
 
-    // Resolve the _id via the installed strategy. documentKey always carries an _id, so the result
-    // is found or not found, never kNotHandled; a miss (deleted doc or orphan) is dropped.
+    // Resolve the _id. The executor always handles a bare _id lookup, so the result is found or
+    // not-found (a miss -- deleted doc or orphan -- is dropped below), never kNotHandled.
     using HandledStatus = SingleDocumentLookupExecutor::LookupResult::HandledStatus;
     auto lookupResult = _lookupExecutor->performLookup(pExpCtx,
                                                        pExpCtx->getNamespaceString(),

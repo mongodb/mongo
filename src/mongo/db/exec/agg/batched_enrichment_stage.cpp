@@ -7,6 +7,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
+#include <algorithm>
+
 namespace mongo::exec::agg {
 
 BatchedEnrichmentStage::BatchedEnrichmentStage(
@@ -74,13 +76,19 @@ void BatchedEnrichmentStage::fillBatch() {
     // The subclass has capped its own output (e.g. idLookup's 'limit' is already met): don't pull
     // any more upstream. Queue EOF so emit() surfaces it (and fires onExhausted()). enrichBatch()
     // then no-ops on the empty input.
-    if (shouldStopEmittingDocuments()) {
+    auto remaining = remainingDocumentsToEmit();
+    if (remaining && *remaining == 0) {
         _bufferedNonAdvancedResult = GetNextResult::makeEOF();
         _phase = Phase::kEnrich;
         return;
     }
 
-    while (_inputBuffer.size() < _limits.maxInputEvents) {
+    // Cap the fill at the subclass's remaining allowance so a limit-bounded stage doesn't over-read
+    // upstream. The allowance is >= 1 here (0 is handled above), so fill still progresses.
+    const size_t maxThisFill =
+        remaining ? std::min(_limits.maxInputEvents, *remaining) : _limits.maxInputEvents;
+
+    while (_inputBuffer.size() < maxThisFill) {
         // Stop once the buffered input crosses the byte budget, so a few large events cannot blow
         // memory before enrichment. Always admit at least one event.
         if (!_inputBuffer.empty() &&
@@ -145,7 +153,7 @@ void BatchedEnrichmentStage::enrichBatch() {
         pExpCtx->checkForInterrupt();
 
         // The subclass hit its cap mid-window: stop before enriching (and paying for) more.
-        if (shouldStopEmittingDocuments()) {
+        if (atEmitCap()) {
             break;
         }
 
@@ -170,7 +178,7 @@ void BatchedEnrichmentStage::enrichBatch() {
     // invariant (input drained before refilling) holds. The doGetNext() loop then re-enters
     // fillBatch(), which queues EOF; emit() surfaces it and fires onExhausted(). Only the
     // mandatory leftover-drain lives here.
-    if (shouldStopEmittingDocuments()) {
+    if (atEmitCap()) {
         discardInputBuffer();
     }
 }
@@ -230,6 +238,11 @@ void BatchedEnrichmentStage::discardInputBuffer() {
         trackPop(event.getDocument());
     }
     _inputBuffer.clear();
+}
+
+bool BatchedEnrichmentStage::atEmitCap() const {
+    auto remaining = remainingDocumentsToEmit();
+    return remaining && *remaining == 0;
 }
 
 void BatchedEnrichmentStage::doDispose() {

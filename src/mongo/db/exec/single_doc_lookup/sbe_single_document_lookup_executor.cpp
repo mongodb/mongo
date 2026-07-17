@@ -245,6 +245,16 @@ SbeSingleDocumentLookupExecutor::PreparedExecutor::make(OperationContext* opCtx,
         .collections = collections,
         .plannerOptions = plannerOptions,
     });
+
+    if (applyShardFilter) {
+        // The QueryPlannerParams constructor above runs requiresShardFiltering(), which drops
+        // INCLUDE_SHARD_FILTER when the query fully targets one shard by its shard key -- valid
+        // only because a shard can't own orphans in its own ranges. That fails here: mongot's
+        // index also yields orphan _ids, so an _id equality on an _id-sharded collection would
+        // skip filtering. Re-apply the option so the filter is always planned.
+        plannerParams.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        plannerParams.shardKey = coll.getCollectionPtr().getShardKeyPattern().toBSON();
+    }
     auto solutions = uassertStatusOK(QueryPlanner::plan(*cq, plannerParams));
     if (solutions.empty()) {
         return boost::none;

@@ -1006,28 +1006,29 @@ protected:
         _expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kShardedNss);
     }
 
-    // Shard key "sk", split at 'splitPoint': documents with sk < splitPoint are owned by this
-    // shard, sk >= splitPoint are orphans physically present here but owned by "otherShard".
-    CollectionMetadata setupShardingMetadata(int splitPoint) {
+    // Shard key 'shardKeyField' split at 'splitPoint': values < splitPoint are owned, >= are
+    // orphans owned by "otherShard". Pass "_id" to mirror an _id-sharded collection.
+    CollectionMetadata setupShardingMetadata(int splitPoint,
+                                             const std::string& shardKeyField = "sk") {
         OperationContext* opCtx = operationContext();
         const UUID uuid = [&] {
             AutoGetCollection autoColl(opCtx, kShardedNss, MODE_IS);
             return autoColl->uuid();
         }();
 
-        const ShardKeyPattern shardKeyPattern(BSON("sk" << 1));
+        const ShardKeyPattern shardKeyPattern(BSON(shardKeyField << 1));
         const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
         const OID epoch = OID::gen();
         const Timestamp timestamp(1, 1);
         ChunkVersion version({epoch, timestamp}, {1, 0});
 
         ChunkType ownedChunk(uuid,
-                             ChunkRange{keyPattern.globalMin(), BSON("sk" << splitPoint)},
+                             ChunkRange{keyPattern.globalMin(), BSON(shardKeyField << splitPoint)},
                              version,
                              kMyShardName);
         version.incMinor();
         ChunkType orphanChunk(uuid,
-                              ChunkRange{BSON("sk" << splitPoint), keyPattern.globalMax()},
+                              ChunkRange{BSON(shardKeyField << splitPoint), keyPattern.globalMax()},
                               version,
                               ShardId("otherShard"));
 
@@ -1104,6 +1105,86 @@ TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
     auto strategy = makeStrategy(std::make_unique<AlwaysLocalEligibility>());
     auto result = lookup(&strategy, fromjson("{_id: 1}"));
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
+}
+
+// Mirrors buildIdLookupExecutor: the shard filter comes from the pre-acquired acquisition, not from
+// a per-lookup ScopedSetShardRole.
+TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
+       PreAcquiredShardVersionedAcquisitionDropsOrphanWithoutPerLookupShardRole) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
+
+    // Acquire under the shard version, then stash so PreAcquired swaps it back on per lookup.
+    boost::optional<CollectionAcquisition> acquisition;
+    {
+        ScopedSetShardRole scopedSetShardRole{
+            operationContext(), kShardedNss, ShardVersionFactory::make(metadata), boost::none};
+        acquisition.emplace(
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), kShardedNss, AcquisitionPrerequisites::kRead),
+                              MODE_IS));
+    }
+    auto stasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+    stashTransactionResourcesFromOperationContext(operationContext(), stasher.get());
+
+    SbeSingleDocumentLookupExecutor strategy(
+        std::make_unique<PreAcquiredCollectionAcquirer>(stasher, std::move(*acquisition)),
+        std::make_unique<AlwaysLocalEligibility>());
+
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
+}
+
+// The cached plan's shardFilterer slot is set once at build time, so a reused strategy must keep
+// dropping orphans across lookups.
+TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
+       ReusedPlanKeepsDroppingOrphansAcrossBatchLookups) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 1));    // owned:  sk < 10
+    _client->insert(kShardedNss, BSON("_id" << 2 << "sk" << 99));   // orphan: sk >= 10
+    _client->insert(kShardedNss, BSON("_id" << 3 << "sk" << 100));  // orphan: sk >= 10
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto strategy = makeStrategy(std::make_unique<AlwaysLocalEligibility>());
+
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound) << "owned doc must be found";
+
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
+    ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentNotFound)
+        << "orphan must be dropped on a reused plan (2nd lookup)";
+
+    auto r3 = lookup(&strategy, fromjson("{_id: 3}"));
+    ASSERT_EQ(r3.status, LookupResult::HandledStatus::kDocumentNotFound)
+        << "orphan must be dropped on a reused plan (3rd lookup)";
+}
+
+// When sharded on _id, the scan field and shard key coincide; the filter must still drop orphans.
+TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
+       IdShardKeyDropsOrphansAcrossBatchLookups) {
+    auto metadata = setupShardingMetadata(/*splitPoint*/ 2, /*shardKeyField*/ "_id");
+    _client->insert(kShardedNss, BSON("_id" << 1));  // owned:  _id < 2
+    _client->insert(kShardedNss, BSON("_id" << 2));  // orphan: _id >= 2
+    _client->insert(kShardedNss, BSON("_id" << 3));  // orphan: _id >= 2
+
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kShardedNss, ShardVersionFactory::make(metadata), boost::none};
+
+    auto strategy = makeStrategy(std::make_unique<AlwaysLocalEligibility>());
+
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound) << "owned doc must be found";
+
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
+    ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentNotFound)
+        << "orphan must be dropped when the shard key is _id (2nd lookup)";
+
+    auto r3 = lookup(&strategy, fromjson("{_id: 3}"));
+    ASSERT_EQ(r3.status, LookupResult::HandledStatus::kDocumentNotFound)
+        << "orphan must be dropped when the shard key is _id (3rd lookup)";
 }
 
 // An eligibility whose Local decision already resolved ownership from the shard key: the planner

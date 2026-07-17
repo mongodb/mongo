@@ -2,6 +2,7 @@
  * Test the basic operation of a `$search` aggregation stage.
  * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
@@ -12,6 +13,9 @@ const mongotConn = mongotmock.getConnection();
 
 const conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host}});
 const db = conn.getDB("test");
+// When enabled, idLookup resolves _ids in batches, draining mongot's cursor in one window rather
+// than one doc per client getMore. That changes when mongot getMores (and their errors) are issued.
+const batchedIdLookup = FeatureFlagUtil.isEnabled(db, "SearchOptimizedIdLookup");
 const coll = db.search;
 coll.drop();
 
@@ -154,22 +158,26 @@ assert.eq(expected, cursor.toArray());
         mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
     );
 
-    // The aggregate() (and search command) should succeed.
-    // Note that 'batchSize' here only tells mongod how many docs to return per batch and has
-    // no effect on the batches between mongod and mongotmock.
+    // 'batchSize' only tells mongod how many docs to return per client batch; it has no effect on
+    // the batches between mongod and mongotmock.
     const kBatchSize = 4;
-    const cursor = coll.aggregate([{$search: searchQuery}], {batchSize: kBatchSize});
-
-    // Iterate the first batch until it is exhausted.
-    for (let i = 0; i < kBatchSize; i++) {
-        cursor.next();
+    if (batchedIdLookup) {
+        // idLookup drains mongot's cursor in one window while building the first batch, so the
+        // getMore that hits mongot's error is issued during aggregate() itself.
+        const err = assert.throws(() =>
+            coll.aggregate([{$search: searchQuery}], {batchSize: kBatchSize}),
+        );
+        assert.commandFailedWithCode(err, ErrorCodes.InternalError);
+    } else {
+        // Reading one doc at a time, aggregate() succeeds; the error only surfaces on the getMore
+        // sent to mongot once the first batch is exhausted.
+        const cursor = coll.aggregate([{$search: searchQuery}], {batchSize: kBatchSize});
+        for (let i = 0; i < kBatchSize; i++) {
+            cursor.next();
+        }
+        const err = assert.throws(() => cursor.next());
+        assert.commandFailedWithCode(err, ErrorCodes.InternalError);
     }
-
-    // The next call to next() will result in a 'getMore' being sent to mongod. $search's
-    // internal cursor to mongot will have no results left, and thus, a 'getMore' will be sent
-    // to mongot. The error should propagate back to the client.
-    const err = assert.throws(() => cursor.next());
-    assert.commandFailedWithCode(err, ErrorCodes.InternalError);
 }
 
 // Run $search on an empty collection.

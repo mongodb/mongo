@@ -37,8 +37,9 @@ namespace mongo::exec::agg {
  *
  * enrich() may drop an event by returning boost::none (e.g. $search idLookup drops a document whose
  * _id no longer resolves, or an orphan). A subclass may also cap its own output via
- * shouldStopEmittingDocuments(): once it returns true the stage stops pulling upstream, drops any
- * still-buffered input, and surfaces EOF after the already-enriched output drains. Because a whole
+ * remainingDocumentsToEmit(): once it hits 0 the stage stops pulling upstream, drops any
+ * still-buffered input, and surfaces EOF after the already-enriched output drains; a positive value
+ * also caps how far the next fill advances upstream. Because a whole
  * fill window can be dropped, doGetNext() refills (loops back to the fill phase) instead of
  * assuming every fill yields at least one emittable result; the loop is bounded because each fill
  * consumes at least one upstream event or records a boundary (EOF/pause/control) and upstream is
@@ -125,20 +126,27 @@ protected:
     virtual boost::optional<Document> enrich(Document event) = 0;
 
     /**
-     * When a subclass wants to stop emitting before its upstream is exhausted (e.g. $search
-     * idLookup honouring a 'limit'), this returns true once no further output should be produced.
-     * Note the source may still have data -- the subclass is choosing to stop, not observing EOF.
-     * The base then stops pulling upstream, drops any still-buffered input, and surfaces EOF after
-     * the already-enriched output drains. Checked per-event during enrichment as well, so a window
-     * never emits past the cap. The default never caps (a stage bounded only by its upstream).
+     * How many more documents this stage may still emit before it must stop, or boost::none for no
+     * self-imposed cap (bounded only by upstream). One value drives two behaviours so a subclass
+     * expresses its budget once:
+     *   - 0 means "stop now": the base stops pulling upstream, drops any still-buffered input, and
+     *     surfaces EOF after the already-enriched output drains. The source may still have data --
+     *     the subclass is choosing to stop, not observing EOF. Checked per-event during enrichment
+     *     as well, so a window never emits past the cap.
+     *   - a positive value caps the next fill at min(maxInputEvents, this), so a stage stopping
+     *     after a fixed count (e.g. $search idLookup honouring a 'limit') doesn't advance -- and do
+     *     work in -- the upstream stage for documents it would discard (which would inflate the
+     *     upstream stage's explain 'nReturned'). Safe as a fill cap because enrich() emits at most
+     *     one output per input; only an upper bound, since drops are topped up by the refill loop.
+     * The default never caps.
      */
-    virtual bool shouldStopEmittingDocuments() const {
-        return false;
+    virtual boost::optional<size_t> remainingDocumentsToEmit() const {
+        return boost::none;
     }
 
     /**
      * Invoked when the stage observes that its input is exhausted -- either upstream returned EOF
-     * or shouldStopEmittingDocuments() tripped. Fired by emit() as the terminating EOF is surfaced
+     * or remainingDocumentsToEmit() hit 0. Fired by emit() as the terminating EOF is surfaced
      * (the single exhaustion signal for both causes). May fire on more than one getNext() once
      * exhausted, so implementations must be idempotent. Default is a no-op.
      */
@@ -190,10 +198,15 @@ private:
     GetNextResult emit();
 
     /**
-     * Drops all still-buffered input events (accounting for the freed memory). Used when
-     * shouldStopEmittingDocuments() ends the stage with input still buffered.
+     * Drops all still-buffered input events (accounting for the freed memory). Used when the emit
+     * cap ends the stage with input still buffered.
      */
     void discardInputBuffer();
+
+    /**
+     * True once remainingDocumentsToEmit() reaches 0: the stage has emitted its cap and must stop.
+     */
+    bool atEmitCap() const;
 
     /**
      * Account for a document entering (trackPush) or leaving (trackPop) a buffer.
