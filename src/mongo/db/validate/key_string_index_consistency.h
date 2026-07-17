@@ -28,6 +28,8 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/flat_hash_set.h>
+
 namespace mongo {
 
 class IndexCatalogEntry;
@@ -35,32 +37,29 @@ class IndexCatalogEntry;
 /**
  * Contains all the index information and stats throughout the validation.
  */
-struct IndexInfo {
-    IndexInfo(const IndexCatalogEntry& descriptor);
-    // Index name.
-    const std::string indexName;
-    // Contains the indexes key pattern.
-    const BSONObj keyPattern;
-    // Contains the pre-computed hash of the index name.
-    const uint32_t indexNameHash;
-    // More efficient representation of the ordering of the descriptor's key pattern.
-    const Ordering ord;
-    // The number of index entries belonging to the index.
+class IndexInfo {
+public:
+    explicit IndexInfo(const IndexCatalogEntry& entry);
+
+    const IndexCatalogEntry& getEntry() const {
+        return *_entry;
+    }
+    uint32_t indexNameHash() const {
+        return _indexNameHash;
+    }
+    const Ordering& ord() const {
+        return _ord;
+    }
     int64_t numKeys = 0;
-    // The number of records that have a key in their document that referenced back to the this
-    // index.
     int64_t numRecords = 0;
-    // A hashed set of indexed multikey paths (applies to $** indexes only).
-    std::set<uint32_t> hashedMultikeyMetadataPaths;
-    // Indicates whether or not there are documents that make this index multikey.
+    absl::flat_hash_set<uint32_t> hashedMultikeyMetadataPaths;
     bool multikeyDocs = false;
-    // The set of multikey paths generated from all documents. Only valid when multikeyDocs is also
-    // set and an index tracks path-level information.
     MultikeyPaths docMultikeyPaths;
-    // Indicates whether key entries must be unique.
-    const bool unique;
-    // Index access method pointer.
-    const IndexAccessMethod* accessMethod;
+
+private:
+    std::shared_ptr<const IndexCatalogEntry> _entry;
+    uint32_t _indexNameHash = 0;
+    Ordering _ord;
 };
 
 /**

@@ -89,13 +89,9 @@ BSONObj _rehydrateKey(const BSONObj& keyPattern, const BSONObj& indexKey) {
 }  // namespace
 
 IndexInfo::IndexInfo(const IndexCatalogEntry& entry)
-    : indexName(entry.descriptor()->indexName()),
-      keyPattern(entry.descriptor()->keyPattern()),
-      indexNameHash(hash(entry.descriptor()->indexName())),
-      ord(Ordering::make(entry.descriptor()->keyPattern())),
-      unique(entry.descriptor()->unique()),
-      accessMethod(entry.accessMethod()) {}
-
+    : _entry(entry.shared_from_this()),
+      _indexNameHash(hash(entry.descriptor()->indexName())),
+      _ord(Ordering::make(entry.descriptor()->keyPattern())) {}
 
 void KeyStringIndexConsistency::setSecondPhase() {
     invariant(_phase == Phase::kFirst);
@@ -126,11 +122,11 @@ KeyStringIndexConsistency::KeyStringIndexConsistency(const KeyStringIndexConsist
     // which may be destroyed before this object. Rebuild them with pointers into our own
     // _indexesInfo.
     for (const auto& [key, recordId] : other._missingIndexEntries) {
-        IndexInfo* newPtr = &_indexesInfo.at(key.first->indexName);
+        IndexInfo* newPtr = &_indexesInfo.at(key.first->getEntry().descriptor()->indexName());
         _missingIndexEntries.insert({{newPtr, key.second}, recordId});
     }
     for (const auto& [key, recordIds] : other._extraIndexEntries) {
-        IndexInfo* newPtr = &_indexesInfo.at(key.first->indexName);
+        IndexInfo* newPtr = &_indexesInfo.at(key.first->getEntry().descriptor()->indexName());
         _extraIndexEntries.insert({{newPtr, key.second}, recordIds});
     }
 }
@@ -217,7 +213,7 @@ void KeyStringIndexConsistency::merge(const KeyStringIndexConsistency& other) {
 
 void KeyStringIndexConsistency::addMultikeyMetadataPath(const key_string::Value& ks,
                                                         IndexInfo* indexInfo) {
-    auto hash = _hashKeyString(ks, indexInfo->indexNameHash);
+    auto hash = _hashKeyString(ks, indexInfo->indexNameHash());
     if (MONGO_unlikely(_validateState->logDiagnostics())) {
         LOGV2(6208500,
               "[validate](multikeyMetadataPath) Adding with the hash",
@@ -229,7 +225,7 @@ void KeyStringIndexConsistency::addMultikeyMetadataPath(const key_string::Value&
 
 void KeyStringIndexConsistency::removeMultikeyMetadataPath(const key_string::Value& ks,
                                                            IndexInfo* indexInfo) {
-    auto hash = _hashKeyString(ks, indexInfo->indexNameHash);
+    auto hash = _hashKeyString(ks, indexInfo->indexNameHash());
     if (MONGO_unlikely(_validateState->logDiagnostics())) {
         LOGV2(6208501,
               "[validate](multikeyMetadataPath) Removing with the hash",
@@ -273,7 +269,7 @@ void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
         const key_string::Value& ks = it->first.second;
         const KeyFormat keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
 
-        const std::string& indexName = it->first.first->indexName;
+        const std::string& indexName = it->first.first->getEntry().descriptor()->indexName();
         const auto entry =
             _validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx, indexName);
         int64_t numInserted = index_repair::repairMissingIndexEntry(opCtx,
@@ -318,7 +314,7 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
 
     for (const auto& [missingIndexKey, missingRecordId] : _missingIndexEntries) {
         const IndexInfo& info = *missingIndexKey.first;
-        const std::string& indexName = info.indexName;
+        const std::string& indexName = info.getEntry().descriptor()->indexName();
 
         // Check if the access method has an alternative explanation for this missing entry.
         const auto entry =
@@ -373,7 +369,7 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
                                 *results,
                                 /*isMissing=*/false);
 
-            const std::string& indexName = item.first.first->indexName;
+            const std::string& indexName = item.first.first->getEntry().descriptor()->indexName();
             if (!results->getIndexResultsMap().at(indexName).isValid()) {
                 continue;
             }
@@ -414,7 +410,7 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
                                           IndexInfo* indexInfo,
                                           const RecordId& recordId,
                                           ValidateResults* results) {
-    const auto rawHash = ks.hash(indexInfo->indexNameHash);
+    const auto rawHash = ks.hash(indexInfo->indexNameHash());
     const auto numBuckets = _indexKeyBuckets.size();
     const auto hashLower = rawHash % numBuckets;
     const auto hashUpper = (rawHash / numBuckets) % numBuckets;
@@ -435,9 +431,9 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
                   "[validate](record) Adding with hashes",
                   "hashUpper"_attr = hashUpper,
                   "hashLower"_attr = hashLower);
-            const BSONObj& keyPatternBson = indexInfo->keyPattern;
+            const BSONObj& keyPatternBson = (indexInfo->getEntry().descriptor()->keyPattern());
             auto keyStringBson =
-                key_string::toBsonSafe(ks.getView(), indexInfo->ord, ks.getTypeBits());
+                key_string::toBsonSafe(ks.getView(), indexInfo->ord(), ks.getTypeBits());
             key_string::logKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](record)");
         }
@@ -454,7 +450,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                                             IndexInfo* indexInfo,
                                             const RecordId& recordId,
                                             ValidateResults* results) {
-    const auto rawHash = ks.hash(indexInfo->indexNameHash);
+    const auto rawHash = ks.hash(indexInfo->indexNameHash());
     const auto numBuckets = _indexKeyBuckets.size();
     const auto hashLower = rawHash % numBuckets;
     const auto hashUpper = (rawHash / numBuckets) % numBuckets;
@@ -475,9 +471,9 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                   "[validate](index) Adding with hashes",
                   "hashUpper"_attr = hashUpper,
                   "hashLower"_attr = hashLower);
-            const BSONObj& keyPatternBson = indexInfo->keyPattern;
+            const BSONObj& keyPatternBson = indexInfo->getEntry().descriptor()->keyPattern();
             auto keyStringBson =
-                key_string::toBsonSafe(ks.getView(), indexInfo->ord, ks.getTypeBits());
+                key_string::toBsonSafe(ks.getView(), indexInfo->ord(), ks.getTypeBits());
             key_string::logKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](index)");
         }
@@ -491,11 +487,11 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
             if (_validateState->fixErrors()) {
                 // Removing extra index entries.
                 InsertDeleteOptions options;
-                options.dupsAllowed = !indexInfo->unique;
+                options.dupsAllowed = !indexInfo->getEntry().descriptor()->unique();
                 int64_t numDeleted = 0;
                 auto nss = entry->getNSSFromCatalog(opCtx);
                 WriteUnitOfWork wunit(opCtx);
-                Status status = indexInfo->accessMethod->asSortedData()->removeKeys(
+                Status status = indexInfo->getEntry().accessMethod()->asSortedData()->removeKeys(
                     opCtx,
                     *shard_role_details::getRecoveryUnit(opCtx),
                     _validateState->getCollection(),
@@ -505,7 +501,8 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                     &numDeleted);
                 uassertStatusOK(status);
                 wunit.commit();
-                auto& indexResults = results->getIndexValidateResult(indexInfo->indexName);
+                auto& indexResults = results->getIndexValidateResult(
+                    indexInfo->getEntry().descriptor()->indexName());
                 indexResults.addKeysTraversed(-numDeleted);
                 results->addNumRemovedExtraIndexEntries(numDeleted);
                 results->setRepaired(true);
@@ -731,7 +728,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         index->accessMethod()->asSortedData()->getSortedDataInterface()->getKeyStringVersion();
 
     key_string::Builder firstKeyStringBuilder(
-        version, BSONObj(), indexInfo.ord, key_string::Discriminator::kExclusiveBefore);
+        version, BSONObj(), indexInfo.ord(), key_string::Discriminator::kExclusiveBefore);
     std::span firstKeyString = firstKeyStringBuilder.finishAndGetBuffer();
     boost::optional<KeyStringEntry> prevIndexKeyStringEntry;
 
@@ -781,7 +778,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
             results->addWarning(
                 fmt::format("Unique index {} has one or more keys in the old format (without "
                             "embedded record id). First record: {}",
-                            indexInfo.indexName,
+                            descriptor->indexName(),
                             indexEntry->loc.toString()));
             foundOldUniqueIndexKeys = true;
         }
@@ -795,7 +792,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                     opCtx, index, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
             } catch (const DBException& e) {
                 StringBuilder ss;
-                ss << "Parsing index key for " << indexInfo.indexName << " recId "
+                ss << "Parsing index key for " << descriptor->indexName() << " recId "
                    << indexEntry->loc << " threw exception " << e.toString();
                 results->addError(ss.str());
             }
@@ -1120,14 +1117,17 @@ void KeyStringIndexConsistency::_foundInconsistency(OperationContext* opCtx,
     // Print the metadata associated with the inconsistency.
     _validateState->getCollection()->getRecordStore()->printRecordMetadata(
         recordId, results.getRecordTimestampsPtr());
-    info.accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), ks);
+    info.getEntry()
+        .accessMethod()
+        ->asSortedData()
+        ->getSortedDataInterface()
+        ->printIndexEntryMetadata(opCtx, *shard_role_details::getRecoveryUnit(opCtx), ks);
 
-    const BSONObj& indexKey = key_string::toBsonSafe(ks.getView(), info.ord, ks.getTypeBits());
-    BSONObj rehydratedKey = _rehydrateKey(info.keyPattern, indexKey);
+    const BSONObj& indexKey = key_string::toBsonSafe(ks.getView(), info.ord(), ks.getTypeBits());
+    BSONObj rehydratedKey = _rehydrateKey(info.getEntry().descriptor()->keyPattern(), indexKey);
 
     BSONObjBuilder infoBuilder;
-    infoBuilder.append("indexName", info.indexName);
+    infoBuilder.append("indexName", info.getEntry().descriptor()->indexName());
     recordId.serializeToken("recordId", &infoBuilder);
     infoBuilder.append("indexKey", rehydratedKey);
 
@@ -1168,9 +1168,11 @@ uint32_t KeyStringIndexConsistency::_hashKeyString(const key_string::Value& ks,
 
 bool KeyStringIndexConsistency::AlphabeticalByIndexNameComparator::operator()(
     const IndexKey& lhs, const IndexKey& rhs) const {
-    if (lhs.first->indexName < rhs.first->indexName) {
+    const std::string& lhsName = lhs.first->getEntry().descriptor()->indexName();
+    const std::string& rhsName = rhs.first->getEntry().descriptor()->indexName();
+    if (lhsName < rhsName) {
         return true;
-    } else if (rhs.first->indexName < lhs.first->indexName) {
+    } else if (rhsName < lhsName) {
         return false;
     }
     return lhs.second < rhs.second;
