@@ -230,13 +230,6 @@ structs:
                 optional: true
                 description: "Snapshot of the FCV used by the operation,
                     which ensures that feature flag checks are stable through its execution."
-            h:
-                cpp_name: docHash
-                type: safeInt64
-                optional: true
-                description:
-                    "Hash of the document affected by this operation. For inserts and updates,
-                    this is the post-image. For deletes, this is the pre-image."
 
     DropAndRenameOplogEntryO2:
         description: "The 'o2' field of a 'drop' or 'rename' oplog entry."

@@ -757,10 +757,6 @@ const boost::optional<OplogEntrySizeMetadata>& OplogEntry::getSizeMetadata() con
     return _entry.getSizeMetadata();
 }
 
-boost::optional<std::int64_t> OplogEntry::getDocHash() const {
-    return _entry.getDocHash();
-}
-
 boost::optional<bool> OplogEntry::getUpsert() const {
     return _entry.getUpsert();
 }

@@ -376,10 +376,6 @@ public:
         getDurableReplOperation().setSizeMetadata(std::move(value));
     }
 
-    void setDocHash(boost::optional<std::int64_t> value) & {
-        getDurableReplOperation().setDocHash(std::move(value));
-    }
-
     void setRecordId(RecordId rid) & {
         getDurableReplOperation().setRecordId(std::move(rid));
     }
@@ -552,7 +548,6 @@ public:
     using MutableOplogEntry::getCheckExistenceForDiffInsert;
     using MutableOplogEntry::getContainer;
     using MutableOplogEntry::getDestinedRecipient;
-    using MutableOplogEntry::getDocHash;
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
     using MutableOplogEntry::getIsTimeseries;
@@ -889,7 +884,6 @@ public:
     const mongo::BSONObj& getObject() const;
     const boost::optional<mongo::BSONObj>& getObject2() const;
     boost::optional<bool> getIsTimeseries() const;
-    boost::optional<std::int64_t> getDocHash() const;
     const boost::optional<mongo::repl::OplogEntrySizeMetadata>& getSizeMetadata() const;
     boost::optional<bool> getUpsert() const;
     const boost::optional<mongo::repl::OpTime>& getPreImageOpTime() const;

@@ -127,6 +127,8 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
     const std::int64_t hash = 8622950721748590592LL;
+    SingleOpSizeMetadata expectedMetadata;
+    expectedMetadata.setH(hash);
 
     MutableOplogEntry op;
     op.setOpType(repl::OpTypeEnum::kInsert);
@@ -134,7 +136,7 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
     op.setUuid(UUID::gen());
     op.setObject(BSON("_id" << 0 << "x" << 10));
     op.setWallClockTime(Date_t::now());
-    op.setDocHash(hash);
+    op.setSizeMetadata(OplogEntrySizeMetadata{expectedMetadata});
 
     {
         auto acq = acquireCollection(opCtx.get(),
@@ -147,7 +149,11 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
     }
 
     const OplogEntry entry = _getSingleOplogEntry(opCtx.get());
-    const boost::optional<std::int64_t> parsedDocHash = entry.getDocHash();
+    const auto& sizeMetadata = entry.getSizeMetadata();
+    ASSERT_TRUE(sizeMetadata.has_value());
+    ASSERT_TRUE(std::holds_alternative<SingleOpSizeMetadata>(*sizeMetadata));
+    const boost::optional<std::int64_t> parsedDocHash =
+        std::get<SingleOpSizeMetadata>(*sizeMetadata).getH();
     ASSERT_TRUE(parsedDocHash.has_value());
     EXPECT_EQ(hash, *parsedDocHash);
 }
