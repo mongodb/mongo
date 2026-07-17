@@ -90,6 +90,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAcrossDatabasesBeforeFinalize);
+MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeButBeforeSourceDrop);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
@@ -654,6 +655,11 @@ Status copySourceToTemporaryCollectionOnTargetDB(
             opCtx, tmpName);
         auto collectionOptions = sourceColl->getCollectionOptions();
         collectionOptions.uuid = tmpCollUUID.uuid();
+        // Setting the collection as temporary ensures it is cleaned up after a stepdown. This isn't
+        // strictly necessary due to the dropPriorTemporaryCollectionIfNeeded call in
+        // renameCollectionAcrossDatabases, but having it keeps us consistent with other DDL
+        // operations and helps ensure cleanup in replica sets where retries aren't guaranteed.
+        collectionOptions.temp = true;
 
         writeConflictRetry(opCtx, "renameCollection", tmpName, [&] {
             WriteUnitOfWork wunit(opCtx);
@@ -818,6 +824,54 @@ Status finalizeWithinDbRenameWithLocksHeld(OperationContext* opCtx,
                                          {});
 }
 
+void dropPriorTemporaryCollectionIfNeeded(OperationContext* opCtx,
+                                          const NamespaceString& targetNS,
+                                          const boost::optional<UUID>& targetUUID,
+                                          bool fromMigrate) {
+    if (!targetUUID) {
+        return;
+    }
+    try {
+        auto tempAcquisition =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx,
+                                  NamespaceStringOrUUID{targetNS.dbName(), *targetUUID},
+                                  AcquisitionPrerequisites::OperationType::kWrite),
+                              MODE_X);
+        if (tempAcquisition.exists()) {
+            // We do this acquisition before doing the acquisitions for the to/from collections
+            // because we don't know how to order the UUID amongst the other acquisitions. So here,
+            // we need to double check whether the rename already completed.
+            if (tempAcquisition.nss() == targetNS) {
+                return;
+            }
+            // We also double check if this is some entirely unrelated collection just in case we
+            // hit some UUID conflict with the rename operation's chosen UUID.
+            tassert(
+                ErrorCodes::NamespaceExists,
+                fmt::format("Collection for UUID {} already exists with a non-temporary name {}",
+                            targetUUID->toString(),
+                            tempAcquisition.nss().toStringForErrorMsg()),
+                tempAcquisition.nss().coll().find("tmp") != std::string_view::npos &&
+                    tempAcquisition.nss().coll().ends_with(".renameCollection"));
+            // Now we drop the old temp collection.
+            DropReply unused;
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               tempAcquisition.nss(),
+                               &unused,
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
+                               fromMigrate));
+        }
+    } catch (const DBException& e) {
+        if (e.code() == ErrorCodes::NamespaceNotFound) {
+            return;
+        }
+        throw;
+    }
+}
+
 Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                        const NamespaceString& source,
                                        const NamespaceString& target,
@@ -847,6 +901,9 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(
             opCtx, target, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
     }
+
+    dropPriorTemporaryCollectionIfNeeded(
+        opCtx, target, options.newTargetCollectionUuid, options.markFromMigrate);
 
     // Acquire database locks, which are held for the entire duration (data copy, then rename+drop).
     auto [sourceDB, targetDB] = [&]() -> std::pair<AutoGetDb, AutoGetDb> {
@@ -978,6 +1035,17 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     const auto targetColl =
         targetDB.getDb() ? catalog->lookupCollectionByNamespace(opCtx, target) : nullptr;
     if (targetColl) {
+        // If the target collection already exists and has the correct UUID, then a prior run of the
+        // operation completed and simply failed to drop the source collection.
+        if (targetColl->uuid() == options.newTargetCollectionUuid) {
+            return dropCollectionForApplyOps(
+                opCtx,
+                source,
+                {},
+                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
+                false);
+        }
+
         if (locks.sourceColl.get()->uuid() == targetColl->uuid()) {
             invariant(source == target);
             return Status::OK();
@@ -1004,31 +1072,6 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         return status;
     }
 
-    // Dismissed on success
-    ScopeGuard tmpCollectionDropper([&] {
-        Status status = Status::OK();
-        try {
-            status = dropCollectionForApplyOps(
-                opCtx,
-                tmpName,
-                {},
-                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
-                options.markFromMigrate);
-        } catch (...) {
-            status = exceptionToStatus();
-        }
-        if (!status.isOK()) {
-            // Ignoring failure case when dropping the temporary collection during cleanup because
-            // the rename operation has already failed for another reason.
-            LOGV2(705521,
-                  "Unable to drop temporary collection while renaming",
-                  "tempCollection"_attr = tmpName,
-                  "source"_attr = source,
-                  "target"_attr = target,
-                  "error"_attr = status);
-        }
-    });
-
     Status copyStatus = copySourceToTemporaryCollectionOnTargetDB(opCtx,
                                                                   **locks.sourceColl,
                                                                   targetDB.ensureDbExists(opCtx),
@@ -1048,12 +1091,16 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     // ResourceId order above and remain held through this phase.
     invariant(tmpName.isEqualDb(target));
     RenameCollectionOptions tempOptions(options);
+    tempOptions.stayTemp = options.stayTemp && locks.sourceColl.get()->isTemporary();
     Status status = finalizeWithinDbRenameWithLocksHeld(
         opCtx, targetDB.ensureDbExists(opCtx), tmpName, target, tempOptions);
     if (!status.isOK())
         return status;
 
-    tmpCollectionDropper.dismiss();
+    uassert(ErrorCodes::BadValue,
+            "Failing rename due to failpoint after rename but before source drop",
+            !failRenameAfterFinalizeButBeforeSourceDrop.shouldFail());
+
     // The source drop is only reached on the data-bearing shard (non-data-bearing shards get
     // NamespaceNotFound before this point), so it is always a user-visible DDL event.
     return dropCollectionForApplyOps(
