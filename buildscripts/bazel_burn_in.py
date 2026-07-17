@@ -401,7 +401,9 @@ def generate_tasks(
 
     targets = query_targets_to_burn_in(origin_rev, test_changed_files)
 
-    evg_conf = parse_evergreen_file("etc/evergreen.yml")
+    evg_conf = parse_evergreen_file(
+        expansions.get("evergreen_config_file_path", "etc/evergreen.yml")
+    )
 
     project = {"tasks": [], "task_groups": [], "buildvariants": []}
 
