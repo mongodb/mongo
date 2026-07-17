@@ -303,12 +303,20 @@ class IdLookupViaIndex {
 public:
     IdLookupViaIndex(const BSONObj& queryFilter) : _queryFilter(queryFilter.getOwned()) {}
 
-    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx,
+              CollectionAcquisition collection,
+              bool forWrite,
+              IteratorStats* stats) {
         _indexCatalogEntry =
             IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, accessCollection(collection));
         _collection = std::move(collection);
         _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
+
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        _providerSupportsCursorReuse = provider.supportsCursorReuseForExpressPathQueries();
+        _reuseCursor = (!forWrite || internalQueryReuseCursorForExpressPathUpdates.load()) &&
+            _providerSupportsCursorReuse;
 
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN"sv);
@@ -354,23 +362,12 @@ public:
             return Exhausted();
         }
 
-        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-        const bool reuseCursor = internalQueryReuseCursorForExpressPathUpdates.load() &&
-            provider.supportsCursorReuseForExpressPathQueries();
-
-        // When the cursor will be reused (typical WiredTiger path), the cursor — held as a
-        // member — outlives this call, so the non-owning BSONObj view remains valid. Skip the
-        // full-record memcpy (`makeOwned`) here and let the caller materialize an owned BSON
-        // after the stage's scoped timer has ended, matching the classic FETCH path.
-        //
-        // When cursor reuse is disabled (e.g. for disaggregated storage), we are about to destroy
-        // the cursor and must take ownership of the record bytes before the underlying buffer
-        // becomes invalid.
-        if (!reuseCursor) {
+        if (!_reuseCursor) {
+            // Cursor will relinquish its resources; need to make a local copy.
             record->data.makeOwned();
-
-            // Guard against torn reads on the non-cursor-reuse path (e.g. disaggregated storage);
-            // the hot WiredTiger path skips this branch and is unaffected.
+        }
+        if (!_providerSupportsCursorReuse) {
+            // Guard against torn reads in disaggregated storage.
             assertFetchedRecordIsValidBson(
                 record->data.data(), record->data.size(), accessCollection(collection).ns(), rid);
         }
@@ -379,7 +376,7 @@ public:
 
         _stats->incNumDocumentsFetched(1);
 
-        if (!reuseCursor) {
+        if (!_reuseCursor) {
             // Reusing the cursor lowers write latency. For YCSB-style workloads, this causes the
             // cache to run dirtier. This results in increased preemption of application threads to
             // do eviction. With storage providers where eviction has a higher cost (e.g: for
@@ -461,6 +458,8 @@ private:
     std::unique_ptr<SeekableRecordCursor> _cursor;
     IteratorStats* _stats{nullptr};
     bool _exhausted{false};
+    bool _providerSupportsCursorReuse{false};
+    bool _reuseCursor{false};
 };
 
 /**
@@ -475,7 +474,10 @@ public:
     IdLookupOnClusteredCollection(const BSONObj& queryFilter)
         : _queryFilter(queryFilter.getOwned()) {}
 
-    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx,
+              CollectionAcquisition collection,
+              bool forWrite,
+              IteratorStats* stats) {
         _collection = std::move(collection);
         _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
@@ -641,7 +643,10 @@ public:
           _collator(collator),
           _projection(projection) {}
 
-    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx,
+              CollectionAcquisition collection,
+              bool forWrite,
+              IteratorStats* stats) {
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
             opCtx, accessCollection(collection), _indexIdent, _indexName);
         _collection = std::move(collection);
@@ -1159,8 +1164,9 @@ public:
               PlanStats* planStats,
               IteratorStats* iteratorStats,
               WriteOperationStats* writeOperationStats) {
+        constexpr bool forWrite = !std::is_same<WriteOperationChoice, NoWriteOperation>::value;
         _planStats = planStats;
-        _iterator.open(opCtx, collection, iteratorStats);
+        _iterator.open(opCtx, collection, forWrite, iteratorStats);
         _exceptionRecoveryPolicy = exceptionRecoveryPolicy;
         _writeOperation.open(writeOperationStats);
     }

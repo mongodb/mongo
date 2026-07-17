@@ -142,7 +142,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -179,7 +179,7 @@ TEST_F(ExpressPlanTest,
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     boost::optional<bool> seenIsOwned;
     bool seenCursor = false;
@@ -208,7 +208,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexBsonRemainsValidAndOwnableAfterConsu
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     boost::optional<BSONObj> captured;
     auto result = iterator.consumeOne(operationContext(),
@@ -238,7 +238,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 4}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -260,7 +260,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupOnClusteredCollection iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -285,7 +285,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupOnClusteredCollection iterator(fromjson("{_id: 4}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -316,7 +316,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
         filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -353,7 +353,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
     auto filter = fromjson("{a: 'iii'}");
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
         filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -387,7 +387,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
         filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -433,7 +433,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
                                                             std::string{indexName},
                                                             collator,
                                                             &projection);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
