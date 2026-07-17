@@ -10,7 +10,7 @@ namespace sbe {
 namespace vm {
 value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
-    value::TagValueOwned field{moveRawOwnedFromStack(1)};
+    value::TagValueOwned field = moveOwnedFromStack(1);
 
     // Create a new array is it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
@@ -52,7 +52,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSetCapped(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto collView = viewFromStack(1);
-    value::TagValueOwned field{moveRawOwnedFromStack(2)};
+    value::TagValueOwned field = moveOwnedFromStack(2);
 
     // If the collator is Nothing or if it's some unexpected type, don't push back the value
     // and just return the accumulator.

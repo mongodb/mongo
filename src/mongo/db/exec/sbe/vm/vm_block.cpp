@@ -2274,9 +2274,8 @@ value::TagValueOwned ByteCode::builtinValueBlockNewFill(ArityType arity) {
             count.tag() == value::TypeTags::NumberInt32);
 
     // Take ownership of the value, we are transferring it to the block.
-    auto [leftTag, leftVal] = moveRawOwnedFromStack(0);
-    auto blockOut = std::make_unique<value::MonoBlock>(
-        value::bitcastTo<int32_t>(count.value()), leftTag, leftVal);
+    auto blockOut = std::make_unique<value::MonoBlock>(value::bitcastTo<int32_t>(count.value()),
+                                                       moveOwnedFromStack(0));
     return value::TagValueOwned(value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(blockOut.release()));
 }
