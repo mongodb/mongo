@@ -313,6 +313,64 @@ TEST(PathArraynessTest, FieldRefTooManyComponents) {
     ASSERT_EQ(pathArrayness.canPathBeArray(fieldRefLong, &expCtx), true);
 }
 
+// A durably-committed index can contain an over-deep dotted field name (more path components than
+// maxBSONDepth allows) if it was created with an elevated maxBSONDepth. addPathsFromIndexKeyPattern
+// must not throw on such a key pattern (which would crash the server on startup); it should skip
+// the offending path conservatively.
+TEST(PathArraynessTest, AddPathsFromIndexKeyPatternSkipsOverDeepFieldName) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+
+    // Build a dotted field name with more components than the FieldPath limit of 200.
+    std::string overDeepField = "x";
+    for (int i = 0; i < BSONDepth::kDefaultMaxAllowableDepth + 10; ++i) {
+        overDeepField += ".x";
+    }
+
+    BSONObj keyPattern = BSON(overDeepField << 1);
+    MultikeyPaths multikeyPaths{MultikeyComponents{0U}};
+
+    PathArrayness pathArrayness;
+    auto initialState = pathArrayness.exportToMap_forTest();
+
+    // Must not throw even though the field name exceeds the FieldPath depth limit.
+    ASSERT_DOES_NOT_THROW(pathArrayness.addPathsFromIndexKeyPattern(
+        keyPattern, multikeyPaths, true /* isFullRebuild */));
+
+    // The over-deep path is skipped, so the trie is unchanged.
+    ASSERT_EQ(initialState, pathArrayness.exportToMap_forTest());
+
+    // Looking up the (absent) path conservatively reports it can be an array.
+    FieldRef overDeepRef(overDeepField);
+    ASSERT_EQ(pathArrayness.canPathBeArray(overDeepRef, &expCtx), true);
+}
+
+// A compound index that mixes a valid field with an over-deep field should still add the valid
+// field to the trie while skipping only the over-deep one.
+TEST(PathArraynessTest, AddPathsFromIndexKeyPatternSkipsOnlyOverDeepComponent) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+
+    std::string overDeepField = "x";
+    for (int i = 0; i < BSONDepth::kDefaultMaxAllowableDepth + 10; ++i) {
+        overDeepField += ".x";
+    }
+
+    // Compound: {"a": 1, "<overDeep>": 1}. "a" is non-multikey (empty components).
+    BSONObj keyPattern = BSON("a" << 1 << overDeepField << 1);
+    MultikeyPaths multikeyPaths{MultikeyComponents{}, MultikeyComponents{0U}};
+
+    PathArrayness pathArrayness;
+    ASSERT_DOES_NOT_THROW(pathArrayness.addPathsFromIndexKeyPattern(
+        keyPattern, multikeyPaths, true /* isFullRebuild */));
+
+    auto state = pathArrayness.exportToMap_forTest();
+    // Only the valid "a" component was added.
+    ASSERT_EQ(state.size(), 1U);
+    ASSERT_EQ(state["a"], false);
+
+    FieldRef aRef("a");
+    ASSERT_EQ(pathArrayness.canPathBeArray(aRef, &expCtx), false);
+}
+
 // FieldRef allows any field name starting with $, but FieldPath only allows certain
 // dollar-prefixed fields (like "$ref", "$id", etc.). A field like "$invalidField" should fail
 // FieldPath validation.
