@@ -3,3 +3,6 @@ filters:
   - "replicaset.py":
     approvers:
       - 10gen/server-replication-reviewers
+  - "mongot.py":
+    approvers:
+      - 10gen/query-integration-search
