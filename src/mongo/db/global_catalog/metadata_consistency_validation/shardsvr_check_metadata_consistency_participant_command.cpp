@@ -124,12 +124,16 @@ public:
             }
 
             const auto secondaryCheckMode = request().getCommonFields().get_checkSecondariesMode();
-            uassert(
-                ErrorCodes::BadValue,
-                "Called _shardsvrCheckMetadataConsistencyParticipant with empty secondaryCheckMode",
-                secondaryCheckMode);
+            // TODO (SERVER-98118): this should be a uassert or even a tassert.
+            if (!secondaryCheckMode) {
+                LOGV2_WARNING(
+                    13165400,
+                    "Called _shardsvrCheckMetadataConsistencyParticipant with empty "
+                    "secondaryCheckMode, skipping checkMetadataConsistency on secondary nodes");
+                return;
+            }
 
-            if (*secondaryCheckMode ==
+            if (secondaryCheckMode ==
                 CheckMetadataConsistencySecondaryModeEnum::kNoSecondaryCheck) {
                 return;
             }
