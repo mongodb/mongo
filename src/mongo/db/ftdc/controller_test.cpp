@@ -57,6 +57,17 @@ namespace mongo {
 
 class FTDCControllerTest : public FTDCTest {};
 
+class MockFailCollector : public FTDCCollectorInterface {
+public:
+    void collect(OperationContext*, BSONObjBuilder&) final {
+        throw std::logic_error("MockFailController");
+    }
+
+    std::string name() const final {
+        return "MockFailCollector";
+    }
+};
+
 class FTDCMetricsCollectorMockTee : public FTDCCollectorInterface {
 public:
     ~FTDCMetricsCollectorMockTee() {
@@ -402,6 +413,30 @@ DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
 
     FTDCController c(dir, config);
     c.addPeriodicCollector(std::make_unique<MockBSONObjectTooLargeCollector>());
+
+    c.start();
+
+    // The controller background thread will terminate the process after encountering the
+    // unhandled exception. Sleep to allow the thread to run and crash.
+    mongo::sleepFor(Seconds(60));
+}
+
+DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
+                   LogAndTerminateWhenExceptionThrown,
+                   "9761500.*MockFailCollector") {
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path dir(tempdir.path());
+
+    createDirectoryClean(dir);
+
+    FTDCConfig config;
+    config.enabled = true;
+    config.period = Milliseconds(1);
+    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
+    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
+
+    FTDCController c(dir, config);
+    c.addPeriodicCollector(std::make_unique<MockFailCollector>());
 
     c.start();
 
