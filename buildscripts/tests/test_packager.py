@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from unittest import TestCase
 
 from buildscripts.packager import Distro, Spec
+from buildscripts.packager_enterprise import EnterpriseDistro
 
 
 class TestPackager(TestCase):
@@ -106,6 +107,13 @@ class TestPackager(TestCase):
     def test_suse_build_os_includes_suse16(self) -> None:
         """Test SUSE build OS choices include SUSE 16."""
         self.assertIn("suse16", Distro("suse").build_os("x86_64"))
+
+    def test_enterprise_rhel10_includes_ibm_architectures(self) -> None:
+        """Test Enterprise RHEL 10 build OS choices include IBM architectures."""
+        distro = EnterpriseDistro("redhat")
+
+        self.assertIn("rhel10", distro.build_os("ppc64le"))
+        self.assertIn("rhel10", distro.build_os("s390x"))
 
 
 if __name__ == "__main__":

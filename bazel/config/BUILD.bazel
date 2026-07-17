@@ -189,6 +189,17 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "rhel10_ppc64le_gcc_linkstatic",
+    match_all = [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc64le",
+        ":compiler_type_gcc",
+        "//bazel/platforms:rhel10",
+        ":linkstatic_enabled",
+    ],
+)
+
+selects.config_setting_group(
     name = "linux_clang",
     match_all = [
         "@platforms//os:linux",
