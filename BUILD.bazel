@@ -534,24 +534,6 @@ mongo_install(
     ],
 )
 
-sh_binary(
-    name = "scip-clang",
-    srcs = ["//bazel:run_under_working_dir.sh"],
-    data = ["@scip-clang//file"],
-    env = {
-        "BINARY_PATH": "$(location @scip-clang//file)",
-    },
-)
-
-sh_binary(
-    name = "scip-src",
-    srcs = ["//bazel:run_under_working_dir.sh"],
-    data = ["@scip-src//file"],
-    env = {
-        "BINARY_PATH": "$(location @scip-src//file)",
-    },
-)
-
 py_binary(
     name = "gen_dts",
     srcs = [
