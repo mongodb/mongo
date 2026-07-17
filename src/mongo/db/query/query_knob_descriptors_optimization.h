@@ -234,6 +234,10 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryNumChunksForChunkBasedSamplingName,                                \
          internalQueryNumChunksForChunkBasedSampling,                                     \
          getNumChunksForChunkBasedSampling)                                               \
+    KNOB(kEnablePersistentNDVStats,                                                       \
+         kInternalQueryEnablePersistentNDVStatsName,                                      \
+         internalQueryEnablePersistentNDVStats,                                           \
+         getEnablePersistentNDVStats)                                                     \
     /* Pipeline rewrites */                                                               \
     KNOB(kEnablePathArrayness,                                                            \
          kInternalEnablePathArraynessName,                                                \

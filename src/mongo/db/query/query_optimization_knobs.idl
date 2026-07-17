@@ -1221,6 +1221,20 @@ server_parameters:
             query_knob:
                 wire_name: samplingByStrides
 
+    internalQueryEnablePersistentNDVStats:
+        description: >-
+            Enables consulting persistent NDV (number of distinct values) statistics, built by the
+            analyze command, during sampling-based cardinality estimation. Only takes effect when
+            featureFlagPersistentStats is also enabled.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryEnablePersistentNDVStats"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enablePersistentNDVStats
+
     internalJoinPlanSamplingSize:
         description: For queries running through join optimization, control the sample size.
         set_at: [startup, runtime]
