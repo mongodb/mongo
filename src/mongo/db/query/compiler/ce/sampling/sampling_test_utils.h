@@ -51,6 +51,13 @@ public:
         _wasSamplePersisted = wasPersisted;
     }
 
+    /**
+     * Overrides the persisted-sample method independently of the on-the-fly sampling style.
+     */
+    void setPersistentSampleMethodForTesting(SamplingCEMethodEnum method) {
+        _persistentSampleMethod = method;
+    }
+
     static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError) {
         return SamplingEstimatorImpl::calculateSampleSize(ci, marginOfError);
     }

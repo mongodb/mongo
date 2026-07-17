@@ -268,6 +268,10 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQuerySamplingCEMethodName,                                              \
          CBRSamplingCEMethod,                                                             \
          getInternalQuerySamplingCEMethod)                                                \
+    KNOB(kSamplingCEMethodForPersistentSamples,                                           \
+         kInternalQuerySamplingCEMethodForPersistentSamplesName,                          \
+         PersistentSampleCEMethod,                                                        \
+         getInternalQuerySamplingCEMethodForPersistentSamples)                            \
     KNOB(kJoinReorderMode,                                                                \
          kInternalJoinReorderModeName,                                                    \
          JoinReorderMode,                                                                 \

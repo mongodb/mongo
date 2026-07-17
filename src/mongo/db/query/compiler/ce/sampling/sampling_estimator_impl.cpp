@@ -470,19 +470,6 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 }
 
 void SamplingEstimatorImpl::generateFullCollScanSample() {
-    // The persistent sample is stored under the _samplingStyle key (random or chunk) regardless of
-    // whether a full coll scan was used to generate it, so look it up the same way.
-    auto tryLoadStatus = tryLoadPersistentSample(samplingMethodToTechnique(_samplingStyle));
-    if (tryLoadStatus.isOK()) {
-        return;
-    }
-    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
-        LOGV2_WARNING(12432808,
-                      "Persistent sample not usable; falling back to full coll scan sampling",
-                      "nss"_attr = _nss.toStringForErrorMsg(),
-                      "error"_attr = tryLoadStatus);
-    }
-
     // Create a CanonicalQuery for the CollScan plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
@@ -517,58 +504,19 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
     return;
 }
 
-void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
-    _sampleSize = sampleSize;
-    auto tryLoadStatus = tryLoadPersistentSample(SamplingTechniqueEnum::kRandom);
-    if (tryLoadStatus.isOK()) {
-        return;
+void SamplingEstimatorImpl::generateSampleForTechnique(SamplingTechniqueEnum technique) {
+    if (technique == SamplingTechniqueEnum::kChunk) {
+        tassert(9372901, "The number of chunks should be positive.", _numChunks && *_numChunks > 0);
     }
-    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
-        LOGV2_WARNING(12432806,
-                      "Persistent sample not usable; falling back to on-the-fly sampling",
-                      "nss"_attr = _nss.toStringForErrorMsg(),
-                      "error"_attr = tryLoadStatus);
-    }
+
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
-    auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
+    auto plan = technique == SamplingTechniqueEnum::kRandom
+        ? generateRandomSamplingPlan(sbeYieldPolicy.get())
+        : generateChunkSamplingPlan(sbeYieldPolicy.get());
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
-
-    return;
-}
-
-void SamplingEstimatorImpl::generateRandomSample() {
-    generateRandomSample(_sampleSize);
-    return;
-}
-
-void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
-    _sampleSize = sampleSize;
-    auto tryLoadStatus = tryLoadPersistentSample(SamplingTechniqueEnum::kChunk);
-    if (tryLoadStatus.isOK()) {
-        return;
-    }
-    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
-        LOGV2_WARNING(12432807,
-                      "Persistent sample not usable; falling back to on-the-fly sampling",
-                      "nss"_attr = _nss.toStringForErrorMsg(),
-                      "error"_attr = tryLoadStatus);
-    }
-    // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
-
-    auto plan = generateChunkSamplingPlan(sbeYieldPolicy.get());
-    executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
-
-    return;
-}
-
-void SamplingEstimatorImpl::generateChunkSample() {
-    generateChunkSample(_sampleSize);
-    return;
 }
 
 void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams) {
@@ -592,23 +540,44 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
             return fpNss.isEmpty() || _nss == fpNss;
         });
 
-    if (boost::optional<SamplingTechniqueEnum> testOnlySamplingMode =
-            getTestOnlySamplingModeIfSet()) {
-        // This is only used for testing purposes when a repeatable sample is needed.
+    // Every sampling technique first tries to reuse a previously persisted sample. Persisted
+    // samples are keyed by _persistentSampleMethod.
+    auto testOnlySamplingMode = getTestOnlySamplingModeIfSet();
+    const SamplingTechniqueEnum loadTechnique = testOnlySamplingMode
+        ? testOnlySamplingMode.value()
+        : samplingMethodToTechnique(_persistentSampleMethod);
+    auto tryLoadStatus = tryLoadPersistentSample(loadTechnique);
+    if (!tryLoadStatus.isOK() && tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
+        LOGV2_WARNING(12432806,
+                      "Persistent sample not usable; falling back to on-the-fly sampling",
+                      "nss"_attr = _nss.toStringForErrorMsg(),
+                      "error"_attr = tryLoadStatus);
+    }
+    const bool foundPersistedSample = tryLoadStatus.isOK();
+
+    // Determines technique to use. Test-only wins first, then full coll scan else
+    // persisted sample's technique if found, otherwise on-the-fly technique.
+    // TODO SERVER-129240: revisit if/else blocks after SamplingCEMethodEnum/SamplingTechniqueEnum
+    // are unified.
+    if (testOnlySamplingMode) {
         _usedSamplingTechnique = testOnlySamplingMode.value();
-        generateSampleForTesting(testOnlySamplingMode.value());
-    } else if (_sampleSize >= _collectionCard.toDouble()) {
-        // If the required sample is larger than the collection, the sample is generated from all
-        // the documents on the collection.
+    } else if (_requestedSampleSize >= _collectionCard.toDouble()) {
         _usedSamplingTechnique = SamplingTechniqueEnum::kFullCollScan;
-        generateFullCollScanSample();
-    } else if (_samplingStyle == SamplingCEMethodEnum::kRandom) {
-        _usedSamplingTechnique = SamplingTechniqueEnum::kRandom;
-        generateRandomSample();
+    } else if (foundPersistedSample) {
+        _usedSamplingTechnique = samplingMethodToTechnique(_persistentSampleMethod);
     } else {
-        tassert(9372901, "The number of chunks should be positive.", _numChunks && *_numChunks > 0);
-        _usedSamplingTechnique = SamplingTechniqueEnum::kChunk;
-        generateChunkSample();
+        _usedSamplingTechnique = samplingMethodToTechnique(_samplingStyle);
+    }
+
+    // Generate the sample on-the-fly if we didn't load a persisted one.
+    if (!foundPersistedSample) {
+        if (testOnlySamplingMode) {
+            generateSampleForTesting(testOnlySamplingMode.value());
+        } else if (_requestedSampleSize >= _collectionCard.toDouble()) {
+            generateFullCollScanSample();
+        } else {
+            generateSampleForTechnique(_usedSamplingTechnique.value());
+        }
     }
     if (!_wasSamplePersisted) {
         _sampleCreatedAt = Date_t::now();
@@ -627,18 +596,6 @@ void SamplingEstimatorImpl::generateSampleForTesting(SamplingTechniqueEnum techn
             "generateSampleForTesting only supports kSeqScan and kStrides",
             technique == SamplingTechniqueEnum::kSeqScan ||
                 technique == SamplingTechniqueEnum::kStrides);
-
-    // First check if there's a persistent sample.
-    auto tryLoadStatus = tryLoadPersistentSample(technique);
-    if (tryLoadStatus.isOK()) {
-        return;
-    }
-    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
-        LOGV2_WARNING(12871300,
-                      "Persistent sample not usable; falling back to on-the-fly sampling",
-                      "nss"_attr = _nss.toStringForErrorMsg(),
-                      "error"_attr = tryLoadStatus);
-    }
 
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
@@ -1065,14 +1022,16 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
     boost::optional<int> numChunks,
     CardinalityEstimate collectionCard,
     boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-    SamplingSourceEnum samplingSource)
+    SamplingSourceEnum samplingSource,
+    SamplingCEMethodEnum persistentSampleMethod)
     : _sampleSize(sampleSize),
+      _persistentSampleMethod(persistentSampleMethod),
+      _samplingStyle(samplingStyle),
       _opCtx(opCtx),
       _collections(collections),
       _customerQueryExpCtx(std::move(customerQueryExpCtx)),
       _nss(nss),
       _yieldPolicy(yieldPolicy),
-      _samplingStyle(samplingStyle),
       _numChunks(numChunks),
       _collectionCard(collectionCard),
       _samplingSource(samplingSource) {
@@ -1090,7 +1049,8 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
     double marginOfError,
     boost::optional<int> numChunks,
     boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-    SamplingSourceEnum samplingSource)
+    SamplingSourceEnum samplingSource,
+    SamplingCEMethodEnum persistentSampleMethod)
     : SamplingEstimatorImpl(opCtx,
                             collections,
                             nss,
@@ -1100,7 +1060,8 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
                             numChunks,
                             collectionCard,
                             std::move(customerQueryExpCtx),
-                            samplingSource) {}
+                            samplingSource,
+                            persistentSampleMethod) {}
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(
     OperationContext* opCtx,
@@ -1329,7 +1290,8 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
                                       qkc.getNumChunksForChunkBasedSampling(),
                                       collCard,
                                       cq.getExpCtx(),
-                                      samplingSource));
+                                      samplingSource,
+                                      qkc.getInternalQuerySamplingCEMethodForPersistentSamples()));
 }
 
 }  // namespace mongo::ce
