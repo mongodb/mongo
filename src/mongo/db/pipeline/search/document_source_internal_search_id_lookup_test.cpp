@@ -148,6 +148,16 @@ struct IdLookupTestComponents {
 };
 
 /**
+ * Holds the components created by the explicit-batch-size idLookup helper (built directly, so the
+ * metrics are owned here rather than reachable through a DocumentSource).
+ */
+struct BatchedIdLookupComponents {
+    exec::agg::StagePtr stage;
+    std::shared_ptr<exec::agg::InternalSearchIdLookUpStage::SearchIdLookupMetrics> metrics;
+    MultipleCollectionAccessor collections;
+};
+
+/**
  * Builds an IdLookup stage from catalog resources.
  */
 IdLookupTestComponents buildIdLookup(
@@ -210,6 +220,32 @@ protected:
     }
     IdLookupTestComponents createIdLookup() {
         return buildIdLookup(expCtx, createCatalogResources());
+    }
+
+    // Builds an idLookup stage with an explicit batch size, bypassing the factory's production
+    // batch-of-one, so tests can drive several _ids through a single BatchedEnrichmentStage window.
+    // Uses the local-read executor directly, so it is independent of the feature flag.
+    BatchedIdLookupComponents createBatchedIdLookup(size_t maxInputEvents, long long limit = 0) {
+        auto [sharedStasher, collections] = createCatalogResources();
+        auto catalogResourceHandle = make_intrusive<DSInternalSearchIdLookUpCatalogResourceHandle>(
+            sharedStasher, collections.getMainCollectionAcquisition());
+        DocumentSourceIdLookupSpec spec;
+        spec.setLimit(limit);
+        auto metrics =
+            std::make_shared<exec::agg::InternalSearchIdLookUpStage::SearchIdLookupMetrics>();
+        auto executor = std::make_unique<exec::agg::InternalSearchIdLookUpLocalReadExecutor>(
+            catalogResourceHandle, boost::none /* view */);
+        exec::agg::StagePtr stage = make_intrusive<exec::agg::InternalSearchIdLookUpStage>(
+            DocumentSourceInternalSearchIdLookUp::kStageName,
+            std::move(spec),
+            expCtx,
+            catalogResourceHandle,
+            metrics,
+            std::move(executor),
+            exec::agg::BatchedEnrichmentStage::Limits{.maxInputEvents = maxInputEvents,
+                                                      .maxInputBytes = 16 * 1024 * 1024,
+                                                      .maxOutputBytes = 16 * 1024 * 1024});
+        return {std::move(stage), std::move(metrics), std::move(collections)};
     }
 
     UUID collectionUUID() {
@@ -356,7 +392,10 @@ DEATH_TEST_F(InternalSearchIdLookupWithCatalogDeathTest,
         expCtx,
         catalogResourceHandle,
         metrics,
-        std::make_unique<AlwaysNotHandledLookupExecutor>());
+        std::make_unique<AlwaysNotHandledLookupExecutor>(),
+        exec::agg::BatchedEnrichmentStage::Limits{.maxInputEvents = 1,
+                                                  .maxInputBytes = 16 * 1024 * 1024,
+                                                  .maxOutputBytes = 16 * 1024 * 1024});
 
     auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 0}}}, expCtx);
     exec::agg::MockStage::setSource_forTest(stage, mockLocalStage.get());
@@ -563,6 +602,129 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotErrorOnEmptyResult) {
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
 
     // Clearing collections as it needs to be destroyed before the stasher.
+    collections.clear();
+}
+
+// --- BatchedEnrichmentStage behavior, exercised at batch sizes > 1 -----------------------------
+//
+// The production factory pins the batch size to 1, so these tests build the stage directly with a
+// larger 'maxInputEvents' to cover the batched paths specific to idLookup: several _ids resolved in
+// one window, drops that don't disturb ordering, a whole window dropped (which must refill rather
+// than EOF), and the 'limit' cap tripping mid-window.
+
+// Several _ids resolved in a single batch window come back in arrival order.
+TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedResolvesAllIdsInArrivalOrder) {
+    expCtx->setUUID(UUID::gen());
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv),
+                              BSON("_id" << 1 << "color" << "blue"sv),
+                              BSON("_id" << 2 << "color" << "green"sv),
+                              BSON("_id" << 3 << "color" << "yellow"sv),
+                              BSON("_id" << 4 << "color" << "purple"sv)};
+    insertDocuments(kTestNss, docs);
+
+    auto [idLookupStage, metrics, collections] = createBatchedIdLookup(/*maxInputEvents=*/3);
+    auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 0}},
+                                                               Document{{"_id", 1}},
+                                                               Document{{"_id", 2}},
+                                                               Document{{"_id", 3}},
+                                                               Document{{"_id", 4}}},
+                                                              expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    for (int i = 0; i < 5; ++i) {
+        auto next = idLookupStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_EQ(next.getDocument()["_id"].getInt(), i);
+    }
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    ASSERT_EQ(5, metrics->getDocsSeenByIdLookup());
+    ASSERT_EQ(5, metrics->getDocsReturnedByIdLookup());
+
+    collections.clear();
+}
+
+// Missing _ids are dropped mid-window without disturbing the order of the resolved documents.
+TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedSkipsMissingIdsWithinWindow) {
+    expCtx->setUUID(UUID::gen());
+    // Only the even _ids exist; the odd ones fed below resolve to nothing.
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv),
+                              BSON("_id" << 2 << "color" << "green"sv),
+                              BSON("_id" << 4 << "color" << "purple"sv)};
+    insertDocuments(kTestNss, docs);
+
+    auto [idLookupStage, metrics, collections] = createBatchedIdLookup(/*maxInputEvents=*/5);
+    auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 0}},
+                                                               Document{{"_id", 1}},
+                                                               Document{{"_id", 2}},
+                                                               Document{{"_id", 3}},
+                                                               Document{{"_id", 4}}},
+                                                              expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    for (int expectedId : {0, 2, 4}) {
+        auto next = idLookupStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_EQ(next.getDocument()["_id"].getInt(), expectedId);
+    }
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    ASSERT_EQ(5, metrics->getDocsSeenByIdLookup());
+    ASSERT_EQ(3, metrics->getDocsReturnedByIdLookup());
+
+    collections.clear();
+}
+
+// A whole window that resolves to nothing must refill (not report EOF early) until upstream ends.
+TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedWholeWindowDroppedRefillsUntilEof) {
+    expCtx->setUUID(UUID::gen());
+    // Collection is empty, so every fed _id misses.
+    auto [idLookupStage, metrics, collections] = createBatchedIdLookup(/*maxInputEvents=*/2);
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        {Document{{"_id", 10}}, Document{{"_id", 11}}, Document{{"_id", 12}}}, expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    // All three seen across the (dropped) windows, none returned.
+    ASSERT_EQ(3, metrics->getDocsSeenByIdLookup());
+    ASSERT_EQ(0, metrics->getDocsReturnedByIdLookup());
+
+    collections.clear();
+}
+
+// The 'limit' cap trips mid-window: the stage returns exactly 'limit' documents, and the leftover
+// buffered input is dropped without being resolved (never enriched, so never "seen").
+TEST_F(InternalSearchIdLookupWithCatalogTest, BatchedLimitStopsMidWindowAndDropsLeftover) {
+    expCtx->setUUID(UUID::gen());
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv),
+                              BSON("_id" << 1 << "color" << "blue"sv),
+                              BSON("_id" << 2 << "color" << "green"sv),
+                              BSON("_id" << 3 << "color" << "yellow"sv),
+                              BSON("_id" << 4 << "color" << "purple"sv)};
+    insertDocuments(kTestNss, docs);
+
+    auto [idLookupStage, metrics, collections] =
+        createBatchedIdLookup(/*maxInputEvents=*/5, /*limit=*/2);
+    auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 0}},
+                                                               Document{{"_id", 1}},
+                                                               Document{{"_id", 2}},
+                                                               Document{{"_id", 3}},
+                                                               Document{{"_id", 4}}},
+                                                              expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    for (int expectedId : {0, 1}) {
+        auto next = idLookupStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_EQ(next.getDocument()["_id"].getInt(), expectedId);
+    }
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    // Only the two enriched up to the cap are seen; _ids 2..4 are discarded without a lookup.
+    ASSERT_EQ(2, metrics->getDocsSeenByIdLookup());
+    ASSERT_EQ(2, metrics->getDocsReturnedByIdLookup());
+
     collections.clear();
 }
 

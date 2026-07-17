@@ -91,6 +91,20 @@ public:
      */
     SimpleMemoryUsageTracker makeFreshSimpleMemoryUsageTracker() const;
 
+    /**
+     * Re-point this tracker's parent ('base') to 'base', moving this tracker's current in-use bytes
+     * off the old base and onto the new one so the ancestor chain's totals (and CurOp stats) stay
+     * consistent across the rebind. Pass nullptr to detach from the base entirely. Intended for
+     * stages whose lifetime spans getMore opCtx swaps: they detach from the (about-to-be-freed)
+     * operation tracker and later re-bind to the current operation's tracker on reattach. Callers
+     * must invoke this while the current base is still alive.
+     *
+     * TODO SERVER-131203: this is a stopgap and is NOT for general use -- it exists specifically to
+     * let BatchedEnrichmentStage rebind its tracker base across getMore opCtx swaps. Remove it once
+     * that stage's memory tracking is properly integrated with the operation memory tracker.
+     */
+    void resetBase(SimpleMemoryUsageTracker* base);
+
     friend class MemoryUsageTracker;
 
 protected:

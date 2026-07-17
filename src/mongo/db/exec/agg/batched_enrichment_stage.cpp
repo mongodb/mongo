@@ -22,6 +22,19 @@ BatchedEnrichmentStage::BatchedEnrichmentStage(
     tassert(12916802, "maxOutputBytes must be at least 1", _limits.maxOutputBytes >= 1);
 }
 
+void BatchedEnrichmentStage::detachFromOperationContext() {
+    // The buffers (and thus '_memTracker') outlive a getMore, but the operation memory tracker the
+    // tracker's base points at lives on the OperationContext and is only carried across opCtx swaps
+    // for ClientCursorPin-managed cursors. The $search results pipeline is reattached outside that
+    // transfer, so release the base now -- while the old operation tracker is still alive -- rather
+    // than let it dangle once the opCtx is destroyed. reattach re-binds to the new operation.
+    _memTracker.resetBase(nullptr);
+}
+
+void BatchedEnrichmentStage::reattachToOperationContext(OperationContext* opCtx) {
+    OperationMemoryUsageTracker::rebindToOperation(_memTracker, opCtx);
+}
+
 void BatchedEnrichmentStage::trackPush(const Document& doc) {
     _memTracker.add(static_cast<int64_t>(doc.getApproximateSize()));
 }
@@ -31,19 +44,25 @@ void BatchedEnrichmentStage::trackPop(const Document& doc) {
 }
 
 GetNextResult BatchedEnrichmentStage::doGetNext() {
-    // Resume at current '_phase' and fall through the later phases, so each runs at most once and
-    // the call terminates without looping.
-    switch (_phase) {
-        case Phase::kBuffer:
+    // A dropping subclass ($search idLookup skipping orphans / unresolved _ids) can enrich an
+    // entire window to nothing. That is not EOF, so refill rather than reporting EOF early. The
+    // loop is bounded: it refills only after the input buffer is drained (asserted below), so each
+    // pass consumes >=1 fresh upstream event and stops once there is output, a buffered
+    // non-advanced result (EOF/pause/control), or a buffered exception to surface.
+    while (_phase != Phase::kEmit) {
+        if (_phase == Phase::kBuffer) {
             fillBatch();
-            [[fallthrough]];
-        case Phase::kEnrich:
-            enrichBatch();
-            [[fallthrough]];
-        case Phase::kEmit:
-            return emit();
+        }
+        enrichBatch();
+        if (_outputBuffer.empty() && !_bufferedNonAdvancedResult.has_value() &&
+            !_bufferedException.has_value()) {
+            tassert(12916809,
+                    "input must be drained before refilling after a fully-dropped window",
+                    _inputBuffer.empty());
+            _phase = Phase::kBuffer;
+        }
     }
-    MONGO_UNREACHABLE_TASSERT(12916804);
+    return emit();
 }
 
 void BatchedEnrichmentStage::fillBatch() {
@@ -51,6 +70,15 @@ void BatchedEnrichmentStage::fillBatch() {
             "fillBatch() runs only in the kBuffer phase with nothing buffered or pending",
             _phase == Phase::kBuffer && _outputBuffer.empty() && _inputBuffer.empty() &&
                 !_bufferedNonAdvancedResult.has_value() && !_bufferedException.has_value());
+
+    // The subclass has capped its own output (e.g. idLookup's 'limit' is already met): don't pull
+    // any more upstream. Queue EOF so emit() surfaces it (and fires onExhausted()). enrichBatch()
+    // then no-ops on the empty input.
+    if (shouldStopEmittingDocuments()) {
+        _bufferedNonAdvancedResult = GetNextResult::makeEOF();
+        _phase = Phase::kEnrich;
+        return;
+    }
 
     while (_inputBuffer.size() < _limits.maxInputEvents) {
         // Stop once the buffered input crosses the byte budget, so a few large events cannot blow
@@ -77,6 +105,7 @@ void BatchedEnrichmentStage::fillBatch() {
             // Only data events are buffered. Anything else (a control event, pause, or EOF) ends
             // the batch: cache it to surface in order once the buffered data drains, then stop
             // filling. A non-advanced event is thus a natural boundary, never buffered or enriched.
+            // If it is EOF, emit() fires onExhausted() when it surfaces it.
             _bufferedNonAdvancedResult = std::move(*upstream);
             break;
         }
@@ -94,7 +123,8 @@ void BatchedEnrichmentStage::enrichBatch() {
     // Advance the state. Even in case of an exception we should stay in kEmit, not kEnrich.
     _phase = Phase::kEmit;
 
-    // Early exit if there is nothing to enrich.
+    // Input is empty when fill only cached a non-advanced result (EOF/pause) or the subclass
+    // capped its output up front; nothing to enrich.
     if (_inputBuffer.empty()) {
         return;
     }
@@ -114,18 +144,34 @@ void BatchedEnrichmentStage::enrichBatch() {
         // check. checkForInterrupt() only throws on a killed operation, it never yields.
         pExpCtx->checkForInterrupt();
 
+        // The subclass hit its cap mid-window: stop before enriching (and paying for) more.
+        if (shouldStopEmittingDocuments()) {
+            break;
+        }
+
         auto event = std::move(_inputBuffer.front());
         _inputBuffer.pop_front();
         tassert(12916803, "only advanced events are buffered for enrichment", event.isAdvanced());
 
-        // The event leaves the input buffer and its enriched form enters the output buffer.
-        // Track both so the net delta reflects any size change from enrichment.
+        // Track pop then push so the net memory delta reflects any size change from enrichment.
+        // enrich() may drop the event (boost::none), in which case nothing enters the output.
         trackPop(event.getDocument());
         auto enriched = enrich(event.releaseDocument());
-        trackPush(enriched);
+        if (!enriched) {
+            continue;
+        }
 
-        outputBytes += static_cast<size_t>(enriched.getApproximateSize());
-        _outputBuffer.push_back(GetNextResult{std::move(enriched)});
+        trackPush(*enriched);
+        outputBytes += static_cast<size_t>(enriched->getApproximateSize());
+        _outputBuffer.push_back(GetNextResult{std::move(*enriched)});
+    }
+
+    // The cap tripped mid-window with input still buffered: drop the remainder so the refill
+    // invariant (input drained before refilling) holds. The doGetNext() loop then re-enters
+    // fillBatch(), which queues EOF; emit() surfaces it and fires onExhausted(). Only the
+    // mandatory leftover-drain lives here.
+    if (shouldStopEmittingDocuments()) {
+        discardInputBuffer();
     }
 }
 
@@ -133,7 +179,7 @@ GetNextResult BatchedEnrichmentStage::emit() {
     tassert(12916807, "emit() runs only in the kEmit phase", _phase == Phase::kEmit);
 
     // When entering kEmit phase the output buffer is empty only when fill stopped on a non-advanced
-    // result or a buffered exception, so one of the two must be set here.
+    // result or a buffered exception, or the subclass capped its output; one of those must be set.
     if (_outputBuffer.empty()) {
         _phase = Phase::kBuffer;
 
@@ -149,6 +195,14 @@ GetNextResult BatchedEnrichmentStage::emit() {
                 _bufferedNonAdvancedResult.has_value());
         auto result = std::move(*_bufferedNonAdvancedResult);
         _bufferedNonAdvancedResult.reset();
+
+        // Fire onExhausted() exactly as the terminating EOF is surfaced -- the single place that
+        // signals exhaustion, whether it came from upstream EOF or the subclass's own cap. A
+        // control event or pause is not exhaustion, so it does not fire. The stage may return EOF
+        // more than once, so onExhausted() must be idempotent.
+        if (result.isEOF()) {
+            onExhausted();
+        }
         return result;
     }
 
@@ -156,9 +210,9 @@ GetNextResult BatchedEnrichmentStage::emit() {
     _outputBuffer.pop_front();
     trackPop(next.getDocument());
 
-    // Resume the next call from what is still buffered: more output to drain, a window
-    // suspended by the output-byte cap, a buffered non-advanced result or exception to surface, or
-    // nothing left so refill.
+    // Resume the next call from what is still buffered: more output to drain, a window suspended by
+    // the output-byte cap, a buffered non-advanced result or exception to surface, or nothing left
+    // so refill.
     if (!_outputBuffer.empty()) {
         _phase = Phase::kEmit;
     } else if (!_inputBuffer.empty()) {
@@ -169,6 +223,13 @@ GetNextResult BatchedEnrichmentStage::emit() {
         _phase = Phase::kBuffer;
     }
     return next;
+}
+
+void BatchedEnrichmentStage::discardInputBuffer() {
+    for (const auto& event : _inputBuffer) {
+        trackPop(event.getDocument());
+    }
+    _inputBuffer.clear();
 }
 
 void BatchedEnrichmentStage::doDispose() {

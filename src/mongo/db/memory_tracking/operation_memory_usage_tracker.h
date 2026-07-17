@@ -114,6 +114,18 @@ public:
      */
     static bool hasTrackerOnOpCtx(OperationContext* opCtx);
 
+    /**
+     * Re-point 'tracker' at the operation memory tracker for 'opCtx'. For stages whose lifetime
+     * spans getMore opCtx swaps to re-bind after being detached, since the operation tracker lives
+     * on the OperationContext. No-op when memory tracking is disabled, matching the
+     * create*ForStage() factories, so a stage built without a base stays standalone.
+     *
+     * TODO SERVER-131203: this is a stopgap and is NOT for general use -- it exists specifically to
+     * let BatchedEnrichmentStage rebind its tracker base across getMore opCtx swaps. Remove it once
+     * that stage's memory tracking is properly integrated with the operation memory tracker.
+     */
+    static void rebindToOperation(SimpleMemoryUsageTracker& tracker, OperationContext* opCtx);
+
     explicit OperationMemoryUsageTracker(OperationContext* opCtx);
 
 private:

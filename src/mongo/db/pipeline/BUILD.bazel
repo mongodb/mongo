@@ -1052,6 +1052,8 @@ mongo_cc_library(
         "//src/mongo/db/exec/single_doc_lookup:express_single_document_lookup_executor",
         "//src/mongo/db/exec/single_doc_lookup:local_lookup_eligibility",
         "//src/mongo/db/exec/single_doc_lookup:single_document_lookup_executor",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
     ],
 )
 

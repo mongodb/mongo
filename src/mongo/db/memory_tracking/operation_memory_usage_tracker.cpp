@@ -151,4 +151,12 @@ bool OperationMemoryUsageTracker::hasTrackerOnOpCtx(OperationContext* opCtx) {
     return _getFromOpCtx(opCtx) != nullptr;
 }
 
+void OperationMemoryUsageTracker::rebindToOperation(SimpleMemoryUsageTracker& tracker,
+                                                    OperationContext* opCtx) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+        return;
+    }
+    tracker.resetBase(getOperationMemoryUsageTracker(opCtx));
+}
+
 }  // namespace mongo

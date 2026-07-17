@@ -126,6 +126,19 @@ void SimpleMemoryUsageTracker::addInternal(int64_t diff, bool report) {
     }
 }
 
+void SimpleMemoryUsageTracker::resetBase(SimpleMemoryUsageTracker* base) {
+    // Move our contribution off the old base and onto the new one so the ancestor chain's totals
+    // stay consistent. When old and new are the same object (e.g. the operation tracker was carried
+    // across a getMore) this nets to zero rather than double-counting.
+    if (_base) {
+        _base->add(-_inUseTrackedMemoryBytes);
+    }
+    _base = base;
+    if (_base) {
+        _base->add(_inUseTrackedMemoryBytes);
+    }
+}
+
 SimpleMemoryUsageTracker SimpleMemoryUsageTracker::makeFreshSimpleMemoryUsageTracker() const {
     // Copy the limit holder itself rather than a resolved byte count, so that any future
     // lazily-resolved limit stays lazy in the fresh tracker.
