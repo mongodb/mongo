@@ -68,6 +68,7 @@ public:
     void setObject(const char* field, const BSONObj& obj, bool readOnly = true) override;
     void setBoolean(const char* field, bool val) override;
     void setFunction(const char* field, const char* code) override;
+    void deleteGlobal(std::string_view name) override;
     int type(const char* field) override;
     void rename(const char* from, const char* to) override;
     std::string getError() override;

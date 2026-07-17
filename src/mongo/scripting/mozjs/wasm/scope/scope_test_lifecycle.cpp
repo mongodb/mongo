@@ -199,3 +199,30 @@ TEST(WasmtimeScope, ScopeIsolation_IndependentGlobals) {
     ASSERT_EQ(2.0, scope2->getNumber("x"));
 }
 
+// --- deleteGlobal() ---
+
+// deleteGlobal() removes a function from scope.
+TEST(WasmtimeScope, DeleteGlobal_RemovesInstalledGlobal) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    BSONObj doc = BSON("myFunc" << BSONCode("function() { return 1; }"));
+    scope->setElement("myFunc", doc["myFunc"], doc);
+
+    ScriptingFunction callFn = scope->createFunction("return myFunc();");
+    ASSERT_EQ(0, scope->invoke(callFn, nullptr, nullptr, 0));
+    ASSERT_EQ(1.0, scope->getNumber("__returnValue"));
+
+    scope->deleteGlobal("myFunc");
+
+    ScriptingFunction checkFn = scope->createFunction("return typeof myFunc === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(checkFn, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// deleteGlobal() on a name that does not exist is a no-op (no throw, no crash).
+TEST(WasmtimeScope, DeleteGlobal_NonExistentIsNoOp) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT_NO_THROW(scope->deleteGlobal("doesNotExist"));
+}

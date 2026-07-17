@@ -1299,6 +1299,27 @@ err_code_t MozJSScriptEngine::setGlobalValue(const char* name,
     return SM_OK;
 }
 
+err_code_t MozJSScriptEngine::deleteGlobal(const char* name,
+                                           size_t name_len,
+                                           wasm_mozjs_error_t* err) {
+    clear_error(err);
+    if (!_initialized || !_cx || !_global)
+        return SM_E_BAD_STATE;
+    if (!name || name_len == 0)
+        return SM_E_INVALID_ARG;
+
+    JSAutoRealm ar(_cx, _global);
+    ExecutionCheck chk(_cx, err);
+
+    std::string nameStr(name, name_len);
+    // Performs a best effort delete. A non-configurable global delete is a silent no-op rather than
+    // an error.
+    if (!chk.ok(JS_DeleteProperty(_cx, _global, nameStr.c_str()), SM_E_INTERNAL)) {
+        return err ? err->code : SM_E_INTERNAL;
+    }
+    return SM_OK;
+}
+
 err_code_t MozJSScriptEngine::reset(wasm_mozjs_error_t* err) {
     clear_error(err);
     if (!_initialized || !_cx || !_global)
