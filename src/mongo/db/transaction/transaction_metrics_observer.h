@@ -66,12 +66,16 @@ public:
     /**
      * Updates relevant metrics when a transaction stashes its resources.
      */
-    void onStash(ServerTransactionsMetrics* serverTransactionMetrics, TickSource* tickSource);
+    void onStash(OperationContext* opCtx,
+                 ServerTransactionsMetrics* serverTransactionMetrics,
+                 TickSource* tickSource);
 
     /**
      * Updates relevant metrics when a transaction unstashes its resources.
      */
-    void onUnstash(ServerTransactionsMetrics* serverTransactionsMetrics, TickSource* tickSource);
+    void onUnstash(OperationContext* opCtx,
+                   ServerTransactionsMetrics* serverTransactionsMetrics,
+                   TickSource* tickSource);
 
     /**
      * Updates relevant metrics when a transaction commits.
