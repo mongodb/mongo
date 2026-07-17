@@ -364,6 +364,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # When this is True, we are running in Antithesis & modify the config to surface more bugs
         if self.config.NOOP_MONGO_D_S_PROCESSES:
             repl_config["settings"]["electionTimeoutMillis"] = 2000
+            # electionTimeoutMillis must be strictly greater than heartbeatIntervalMillis
+            # (default 2000), so shorten the heartbeat interval rather than lengthening the
+            # election timeout.
+            repl_config["settings"]["heartbeatIntervalMillis"] = 1000
             repl_config["settings"]["chainingAllowed"] = False
             repl_config["settings"]["heartbeatTimeoutSecs"] = 1
             repl_config["settings"]["catchUpTimeoutMillis"] = 0
