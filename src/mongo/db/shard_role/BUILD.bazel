@@ -118,6 +118,17 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "post_resharding_placement_test",
+    srcs = [
+        "post_resharding_placement_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":shard_role",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "direct_shard_client_tracker_test",
     srcs = [
         "direct_shard_client_tracker_test.cpp",

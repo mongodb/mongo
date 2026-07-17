@@ -9,6 +9,7 @@
 
 namespace mongo {
 
+// TODO: SERVER-127295 Remove this class after we stop using resharding fields.
 /**
  * Represents the post resharding placement for a collection undergoing resharding at acquisition
  * time. It is based on the given temporary resharding collection chunk manager, which cannot change
@@ -36,8 +37,11 @@ public:
     const ShardRef& getReshardingDestinedRecipientFromShardKey(const BSONObj& reshardingKey) const;
 
 private:
+    void _checkIsValid() const;
+
     boost::optional<ShardKeyPattern> _reshardingKeyPattern;
     boost::optional<ChunkManager> _tmpReshardingCollectionChunkManager;
+    std::string _invalidReason;
 };
 
 }  // namespace mongo
