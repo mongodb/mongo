@@ -59,7 +59,8 @@ public:
      * a 'finalize()' call will produce the output expected from accumulating an exmpty list. Must
      * be called before executing any accumulate or merge operations.
      */
-    virtual void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const = 0;
+    virtual void initialize(vm::ByteCode& bytecode,
+                            value::AssignableSlotAccessor& accumulatorState) const = 0;
 
     /**
      * Reads the current accumulator state and a new value and writes out the updated accumulator
@@ -68,7 +69,8 @@ public:
      * The sources of the input accumulator state and input value are defined by the child
      * implementations of this method.
      */
-    virtual void accumulate(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const = 0;
+    virtual void accumulate(vm::ByteCode& bytecode,
+                            value::AssignableSlotAccessor& accumulatorState) const = 0;
 
     /**
      * Reads the current accumulator state, updates the accumulator's state with the recovered state
@@ -157,9 +159,11 @@ public:
 
     void prepareForMerge(CompileCtx& ctx, value::SlotAccessor* accumulatorAccessor) final;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
-    void accumulate(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final {
+    void accumulate(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final {
         accumulatorState.reset(bytecode.run(_accumulatorCode.get()));
     };
 
@@ -238,7 +242,8 @@ public:
 
     void prepareForMerge(CompileCtx& ctx, value::SlotAccessor* accumulatorAccessor) final;
 
-    void accumulate(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void accumulate(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void merge(vm::ByteCode& bytecode,
                value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -268,8 +273,8 @@ protected:
      * (owned, type tag, value) pair and update the accumulator state stored in the
      * 'accumulatorState' accessor to incorporate the new value.
      */
-    virtual void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                            HashAggAccessor& accumulatorState) const = 0;
+    virtual void accumulateTransformedValue(
+        value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accumulatorState) const = 0;
 
     /**
      * Child implementations of this class must override this method to accept the recovered state
@@ -323,11 +328,12 @@ class ArithmeticAverageHashAggAccumulatorBase : public SinglePurposeHashAggAccum
 public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -391,13 +397,14 @@ public:
             _outSlot, _spillSlot, _transformExpr->clone(), _collatorSlot, _sizeCap);
     }
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void singlePurposePrepare(CompileCtx& ctx) final;
 
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -432,11 +439,12 @@ public:
             _outSlot, _spillSlot, _transformExpr->clone(), boost::none, _sizeCap);
     }
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -456,7 +464,8 @@ class FirstHashAggAccumulator : public SinglePurposeHashAggAccumulator {
 public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     std::unique_ptr<HashAggAccumulator> clone() const final {
         return std::make_unique<FirstHashAggAccumulator>(
@@ -465,7 +474,7 @@ public:
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -485,11 +494,12 @@ class CountHashAggAccumulatorBase : public SinglePurposeHashAggAccumulator {
 public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;

@@ -52,7 +52,7 @@ void CompiledHashAggAccumulator::prepareForMerge(CompileCtx& ctx,
 }
 
 void CompiledHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                            HashAggAccessor& accumulatorState) const {
+                                            value::AssignableSlotAccessor& accumulatorState) const {
     if (_optionalInitializerCode) {
         accumulatorState.reset(bytecode.run(_optionalInitializerCode.get()));
     }
@@ -107,8 +107,8 @@ void SinglePurposeHashAggAccumulator::prepareForMerge(CompileCtx& ctx,
     _recoverSpilledStateCode = _recoverSpilledStateExpr->compile(ctx);
 }
 
-void SinglePurposeHashAggAccumulator::accumulate(vm::ByteCode& bytecode,
-                                                 HashAggAccessor& accumulatorState) const {
+void SinglePurposeHashAggAccumulator::accumulate(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
     value::TagValueMaybeOwned field = bytecode.run(_transformCode.get());
 
     accumulateTransformedValue(std::move(field), accumulatorState);
@@ -167,8 +167,8 @@ std::vector<DebugPrinter::Block> SinglePurposeHashAggAccumulator::debugPrintMerg
     return debugOutput;
 }
 
-void ArithmeticAverageHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
-                                                         HashAggAccessor& accumulatorState) const {
+void ArithmeticAverageHashAggAccumulatorBase::initialize(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
     // Create the array for the sum of inputs. See enum AggSumValueElems for documentation of what
     // these fields mean. The kNonDecimalTotalSum and kNonDecimalTotalAddend must be NumberDouble
     // per tassert 5755312.
@@ -197,7 +197,7 @@ void ArithmeticAverageHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
 }
 
 void ArithmeticAverageHashAggAccumulatorBase::accumulateTransformedValue(
-    value::TagValueMaybeOwned field, HashAggAccessor& accState) const {
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     if (!value::isNumber(field.tag())) {
         return;
     }
@@ -330,12 +330,12 @@ void AddToSetHashAggAccumulator::singlePurposePrepare(CompileCtx& ctx) {
 }
 
 void AddToSetHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                            HashAggAccessor& accumulatorState) const {
+                                            value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
-void AddToSetHashAggAccumulator::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                            HashAggAccessor& accState) const {
+void AddToSetHashAggAccumulator::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     CollatorInterface* collator = nullptr;
     if (_collatorAccessor != nullptr) {
         auto [tagCollator, valCollator] = _collatorAccessor->getViewOfValue();
@@ -404,12 +404,12 @@ void AddToSetHashAggAccumulator::finalizePartialAggregate(
 }
 
 void PushHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                        HashAggAccessor& accumulatorState) const {
+                                        value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
-void PushHashAggAccumulator::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                        HashAggAccessor& accState) const {
+void PushHashAggAccumulator::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     value::TagValueMaybeOwned updatedState = vm::ByteCode::builtinAddToArrayCappedImpl(
         accState.copyOrMoveValue(), std::move(field), _sizeCap);
     accState.reset(std::move(updatedState));
@@ -473,12 +473,12 @@ void PushHashAggAccumulator::finalizePartialAggregate(value::TagValueOwned parti
 }
 
 void FirstHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                         HashAggAccessor& accumulatorState) const {
+                                         value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
-void FirstHashAggAccumulator::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                         HashAggAccessor& accState) const {
+void FirstHashAggAccumulator::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     auto [tagAccumulatorState, _] = accState.getViewOfValue();
     if (tagAccumulatorState != value::TypeTags::Nothing) {
         // The accumulator state already has the first value.
@@ -515,13 +515,13 @@ void FirstHashAggAccumulator::finalizePartialAggregate(
     result.reset(std::move(partialAggregate));
 }
 
-void CountHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
-                                             HashAggAccessor& accumulatorState) const {
+void CountHashAggAccumulatorBase::initialize(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::numberInt64(0));
 }
 
-void CountHashAggAccumulatorBase::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                             HashAggAccessor& accState) const {
+void CountHashAggAccumulatorBase::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     auto [tagAccumulatorState, valAccumulatorState] = accState.getViewOfValue();
     tassert(11004208,
             "Expected count to have 64-bit integer type",
