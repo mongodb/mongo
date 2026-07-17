@@ -7,6 +7,8 @@
 #include "mongo/db/commands/db_command_test_fixture.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -16,7 +18,9 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/util/str.h"
 
 #include <string_view>
 
@@ -402,19 +406,42 @@ private:
      * an internal error with the given message.
      */
     GetNextResult doGetNext() override {
-        GetNextResult result = MockStage::doGetNext();
+        auto result = MockStage::doGetNext();
         if (result.isAdvanced()) {
-            const Document& doc = result.getDocument();
-            FieldIterator it = doc.fieldIterator();
-            if (it.more() && it.fieldName() == "error") {
-                std::string errMsg = it.next().second.getString();
-                uasserted(ErrorCodes::InternalError, errMsg);
+            const auto& doc = result.getDocument();
+            auto it = doc.fieldIterator();
+            if (it.more()) {
+                const auto fieldName = it.fieldName();
+                const auto value = it.next().second;
+                if (fieldName == "error") {
+                    uasserted(ErrorCodes::InternalError, value.getString());
+                }
+                if (fieldName == "ifrRetry") {
+                    const auto flagName = value.getString();
+                    auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
+                    tassert(13130500,
+                            str::stream()
+                                << "Unknown IFR flag requested by $trackingMock: " << flagName,
+                            flag);
+                    auto ifrContext = getContext()->getIfrContext();
+                    tassert(
+                        13130501, "$trackingMock IFR retry requires an IFR context", ifrContext);
+                    if (ifrContext->getSavedFlagValue(*flag)) {
+                        uassertStatusOK(Status(IFRFlagRetryInfo(flagName),
+                                               "$trackingMock forced an IFR retry for testing"));
+                    }
+                }
+                if (fieldName == "ifrRetryUnknown") {
+                    // The unknown flag name resolves to null in disableIfrFlagAndResetResult,
+                    // hitting the tassert.
+                    uassertStatusOK(Status(IFRFlagRetryInfo(value.getString()),
+                                           "$trackingMock forced IFR retry with unknown flag"));
+                }
             }
             _tracker.add(doc.getApproximateSize());
         } else if (result.isEOF()) {
             _tracker.add(-_tracker.inUseTrackedMemoryBytes());
         }
-
         return result;
     }
 
@@ -602,5 +629,63 @@ TEST_F(RunAggregateTest, RunAggregateReadsIFRFlagsFromRequest) {
     // Validate that runAggregate correctly reads and processes IFR flags.
     ASSERT_TRUE(status.isOK());
 }
+
+TEST_F(RunAggregateTest, IFRRetryResetsPartiallyBuiltExplainReply) {
+    const auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
+    NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    AggregateCommandRequest request(std::move(nss));
+    request.setIfrFlags(std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << true)});
+    request.setPipeline({BSON("$trackingMock" << BSON_ARRAY(BSON("ifrRetry" << flag.getName())))});
+    LiteParsedPipeline liteParsedPipeline(request, false);
+    const BSONObj cmdObj = request.toBSON();
+    rpc::OpMsgReplyBuilder replyBuilder;
+
+    ASSERT_OK(runAggregate(opCtx,
+                           request,
+                           liteParsedPipeline,
+                           cmdObj,
+                           {},
+                           ExplainOptions::Verbosity::kExecStats,
+                           &replyBuilder));
+
+    // Explain writes explainVersion before executing the pipeline. Without resetting the
+    // reply builder, the successful retry leaves two explainVersion fields.
+    const BSONObj reply = replyBuilder.releaseBody();
+    size_t explainVersionCount = 0;
+    for (const auto& element : reply) {
+        if (element.fieldNameStringData() == "explainVersion") {
+            ++explainVersionCount;
+        }
+    }
+    ASSERT_EQ(explainVersionCount, 1U) << reply;
+    ASSERT_TRUE(reply.hasField("stages")) << reply;
+}
+
+using RunAggregateDeathTest = RunAggregateTest;
+
+DEATH_TEST_F(RunAggregateDeathTest,
+             IFRRetryWithUnknownFlagTriggersAssertion,
+             "IFR retry referenced an unknown feature flag") {
+    const auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
+    NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    AggregateCommandRequest request(std::move(nss));
+    request.setIfrFlags(std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << true)});
+    request.setPipeline(
+        {BSON("$trackingMock" << BSON_ARRAY(BSON("ifrRetryUnknown" << "noSuchFlag")))});
+    LiteParsedPipeline liteParsedPipeline(request, false);
+    const BSONObj cmdObj = request.toBSON();
+    rpc::OpMsgReplyBuilder replyBuilder;
+
+    [[maybe_unused]] auto status = runAggregate(opCtx,
+                                                request,
+                                                liteParsedPipeline,
+                                                cmdObj,
+                                                {},
+                                                ExplainOptions::Verbosity::kExecStats,
+                                                &replyBuilder);
+}
+
 }  // namespace
 }  // namespace mongo
