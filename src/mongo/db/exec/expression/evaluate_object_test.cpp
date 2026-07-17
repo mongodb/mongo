@@ -9,7 +9,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
@@ -119,22 +119,40 @@ boost::intrusive_ptr<Expression> makeFieldPathObject(ExpressionContextForTest* e
 }
 }  // namespace
 
-TEST(ExpressionObjectEvaluate, TracksOutputMemoryAndReleasesAfterEvaluation) {
+TEST(ExpressionObjectEvaluate, WithinPerExpressionCapDoesNotThrow) {
     auto expCtx = ExpressionContextForTest{};
     auto object = makeFieldPathObject(&expCtx);
 
-    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{4096}};
-    EvaluationContext ctx{.tracker = &tracker};
-
+    // Default cap is large; a small object stays well under it.
     Document doc{{"a", "hello"sv}, {"b", "world"sv}};
+    EvaluationContext ctx{};
     ASSERT_VALUE_EQ(object->evaluate(doc, &expCtx.variables, ctx),
                     Value(Document{{"a", "hello"sv}, {"b", "world"sv}}));
-
-    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
-    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
 }
 
-TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenOverLimit) {
+TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenOverPerExpressionCap) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    // Sets the knob so the lowered cap is observed by ExpressionObject::evaluate.
+    QueryKnobGuardForTest limitGuard{
+        expCtx.getOperationContext(), "internalQueryMaxSingleExpressionMemoryUsageBytes", 8};
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    EvaluationContext ctx{};
+    try {
+        object->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$object");
+    }
+}
+
+TEST(ExpressionObjectEvaluate, OutputAccountingDoesNotChargeCtxTracker) {
+    // $object accounts its output locally against the per-expression cap. The tracker wired into
+    // the EvaluationContext is therefore not charged by $object itself (child expressions may still
+    // consult it).
     auto expCtx = ExpressionContextForTest{};
     auto object = makeFieldPathObject(&expCtx);
 
@@ -142,108 +160,10 @@ TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenOverLimit) {
     EvaluationContext ctx{.tracker = &tracker};
 
     Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
-    try {
-        object->evaluate(doc, &expCtx.variables, ctx);
-        FAIL("Expected ExceededMemoryLimit to be thrown");
-    } catch (const AssertionException& ex) {
-        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
-        ASSERT_STRING_CONTAINS(ex.reason(), "$object");
-    }
-
-    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
-}
-
-TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = makeFieldPathObject(&expCtx);
-
-    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{8}};
-    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
-    EvaluationContext ctx{.tracker = &stageTracker};
-
-    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
-    try {
-        object->evaluate(doc, &expCtx.variables, ctx);
-        FAIL("Expected ExceededMemoryLimit to be thrown");
-    } catch (const AssertionException& ex) {
-        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
-        ASSERT_STRING_CONTAINS(ex.reason(), "$object");
-    }
-
-    ASSERT_EQ(stageTracker.inUseTrackedMemoryBytes(), 0);
-}
-
-TEST(ExpressionObjectEvaluate, FallbackTrackerWithinLimitDoesNotThrow) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = makeFieldPathObject(&expCtx);
-
-    Document doc{{"a", "hello"sv}, {"b", "world"sv}};
-
-    const int64_t limit = 10 * 1024 * 1024;
-    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
-    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
-    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
-                                              limit};
-
-    // Within the configured limit, evaluation succeeds and charges the fallback tracker.
-    EvaluationContext ctx{};
     ASSERT_VALUE_EQ(object->evaluate(doc, &expCtx.variables, ctx),
-                    Value(Document{{"a", "hello"sv}, {"b", "world"sv}}));
-
-    auto& tracker = expCtx.getExpressionFallbackTracker();
-    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
-    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+                    Value(Document{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}}));
+    ASSERT_EQ(tracker.peakTrackedMemoryBytes(), 0);
     ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
-}
-
-TEST(ExpressionObjectEvaluate, FallbackTrackerEnforcesLimit) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = makeFieldPathObject(&expCtx);
-
-    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
-
-    const int64_t limit = 8;
-    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
-    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
-    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
-                                              limit};
-
-    EvaluationContext ctx{};
-    try {
-        object->evaluate(doc, &expCtx.variables, ctx);
-        FAIL("Expected ExceededMemoryLimit to be thrown");
-    } catch (const AssertionException& ex) {
-        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
-        ASSERT_STRING_CONTAINS(ex.reason(), "$object");
-    }
-    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
-    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
-}
-
-TEST(ExpressionObjectEvaluate, ExcludedContextUsesFallbackTrackerEvenWithStageTracker) {
-    auto expCtx = ExpressionContextForTest{};
-    expCtx.setExcludeOperationMemoryTracking(true);
-    auto object = makeFieldPathObject(&expCtx);
-
-    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
-
-    const int64_t limit = 8;
-    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
-                                              limit};
-
-    // Wire an unlimited stage tracker into the EvaluationContext: if evaluation charged it, no
-    // limit would trip. A context excluded from operation-wide memory tracking (e.g. stream
-    // processing) must route expression memory to the fallback tracker instead, which is
-    // standalone and enforces the per-expression safety cap.
-    SimpleMemoryUsageTracker stageTracker{MemoryUsageLimit{std::numeric_limits<int64_t>::max()}};
-    EvaluationContext ctx{};
-    ctx.tracker = &stageTracker;
-
-    ASSERT_THROWS_CODE(object->evaluate(doc, &expCtx.variables, ctx),
-                       AssertionException,
-                       ErrorCodes::ExceededMemoryLimit);
-    ASSERT_EQ(stageTracker.peakTrackedMemoryBytes(), 0);
-    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
 }
 
 }  // namespace expression_evaluation_test
