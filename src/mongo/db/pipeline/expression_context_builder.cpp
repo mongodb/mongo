@@ -112,6 +112,12 @@ ExpressionContextBuilder& ExpressionContextBuilder::excludeOperationMemoryTracki
     return *this;
 }
 
+ExpressionContextBuilder&
+ExpressionContextBuilder::excludeExpressionFallbackFromOperationMemoryTracking(bool exclude) {
+    params.excludeExpressionFallbackFromOperationMemoryTracking = exclude;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::allowDiskUse(bool allowDiskUse) {
     params.allowDiskUse = allowDiskUse;
     return *this;
@@ -599,6 +605,8 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
         .mergeType(other->mergeType())
         .forPerShardCursor(other->getForPerShardCursor())
         .excludeOperationMemoryTracking(other->getExcludeOperationMemoryTracking())
+        .excludeExpressionFallbackFromOperationMemoryTracking(
+            other->getExcludeExpressionFallbackFromOperationMemoryTracking())
         .allowDiskUse(other->getAllowDiskUse())
         .allowPartialResults(other->getAllowPartialResults())
         .bypassDocumentValidation(other->getBypassDocumentValidation())
