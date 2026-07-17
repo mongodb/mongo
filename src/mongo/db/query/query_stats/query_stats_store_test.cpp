@@ -57,6 +57,16 @@ int countAllEntries(const QueryStatsStore& store) {
     return numKeys;
 }
 
+BSONObj buildLargeAndFilter(int numClauses) {
+    BSONObjBuilder bob;
+    BSONArrayBuilder andBob(bob.subarrayStart("$and"));
+    for (int i = 1; i <= numClauses; i++) {
+        andBob.append(BSON("x" << BSON("$lt" << i << "$gte" << i)));
+    }
+    andBob.doneFast();
+    return bob.obj();
+}
+
 static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 class QueryStatsStoreTest : public ServiceContextTest {
@@ -235,28 +245,19 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     ASSERT_EQ(countAllEntries(queryStatsStoreTwo), 0);
 }
 
-TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
+TEST_F(QueryStatsStoreTest, RegisterRequestSkipsShapeExceedingMaxUserSize) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
     FindCommandRequest fcr((NamespaceStringOrUUID(nss)));
     // This creates a query that is just below the 16 MB memory limit.
     int limit = 225500;
-    BSONObjBuilder bob;
-    BSONArrayBuilder andBob(bob.subarrayStart("$and"));
-    for (int i = 1; i <= limit; i++) {
-        BSONObjBuilder childrenBob;
-        childrenBob.append("x", BSON("$lt" << i << "$gte" << i));
-        andBob.append(childrenBob.obj());
-    }
-    andBob.doneFast();
-    fcr.setFilter(bob.obj());
+    fcr.setFilter(buildLargeAndFilter(limit));
     auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
     auto opCtx = makeOperationContext();
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
-    unittest::ServerParameterGuard controller("featureFlagQueryStats", true);
 
-    auto&& globalQueryStatsStoreManager = QueryStatsStoreManager::get(opCtx->getServiceContext());
-    globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
+    QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext())
+        .configureSampleBased(1000, 0);
 
     // The shapification process will bloat the input query over the 16 MB memory limit. Assert
     // that calling registerRequest() doesn't throw and that the opDebug isn't registered with a
@@ -276,6 +277,42 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     })());
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.getQueryStatsInfo().keyHash, boost::none);
+}
+
+TEST_F(QueryStatsStoreTest, RegisterRequestSkipsKeyExceedingMaxUserSize) {
+    // The shapified filter is under BSONObjMaxUserSize, but the full key exceeds it, so
+    // registerRequest() must not record it.
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
+    FindCommandRequest fcr((NamespaceStringOrUUID(nss)));
+    // ~100000 clauses shapify to a filter of ~7.5MB, which is under BSONObjMaxUserSize.
+    fcr.setFilter(buildLargeAndFilter(100000));
+    // Inflate the key with a large hint so the serialized key exceeds BSONObjMaxUserSize while the
+    // query shape stays under it.
+    BSONObjBuilder hintBob;
+    for (int i = 0; i < 800000; i++) {
+        hintBob.append("f" + std::to_string(i), 1);
+    }
+    fcr.setHint(hintBob.obj());
+    auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
+
+    QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext())
+        .configureSampleBased(1000, 0);
+
+    auto statusWithShape =
+        shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
+    ASSERT_OK(statusWithShape.getStatus());
+    ASSERT_DOES_NOT_THROW(([&]() {
+        query_stats::registerRequest(opCtx.get(), nss, [&]() {
+            return std::make_unique<query_stats::FindKey>(expCtx,
+                                                          *parsedFind->findCommandRequest,
+                                                          std::move(statusWithShape.getValue()),
+                                                          query_shape::CollectionType::kCollection);
+        });
+    })());
+    ASSERT_EQ(CurOp::get(*opCtx)->debug().getQueryStatsInfo().keyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {

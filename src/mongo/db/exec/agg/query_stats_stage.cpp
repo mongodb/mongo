@@ -139,6 +139,9 @@ boost::optional<Document> QueryStatsStage::toDocument(
     const auto& key = queryStatsEntry.key;
     try {
         auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
+        // Skip entries that are over BSONObjMaxUserSize.
+        uassertStatusOK(queryStatsKey.validateBSONObjSize(BSONObjMaxUserSize)
+                            .addContext("Query stats key exceeds maximum BSON size"));
         // We use the representative shape to generate the key and shape hashes. This avoids
         // returning duplicate hashes if we have bugs that cause two different representative shapes
         // to re-parse into the same debug shape.
