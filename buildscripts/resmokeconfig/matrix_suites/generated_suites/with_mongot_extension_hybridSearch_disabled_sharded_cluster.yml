@@ -79,7 +79,6 @@ selector:
     - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_network_interruption.js
     - jstests/with_mongot/e2e/explain_execution_stats/search_union_with_lookup_explain.js
     - jstests/with_mongot/e2e/explain_execution_stats/search_meta_union_with_lookup_explain.js
-    - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition_graph_lookup.js
     - jstests/with_mongot/e2e/views/search/unionWith_lookup_nested_deep.js
     - jstests/with_mongot/e2e/search/search_sequence_token.js
     - jstests/with_mongot/e2e/search/search_sequence_token_in_lookup.js

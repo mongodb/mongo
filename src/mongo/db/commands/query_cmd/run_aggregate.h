@@ -39,8 +39,7 @@ Status runAggregate(
     boost::optional<ExplainOptions::Verbosity> verbosity,
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
-        usedExternalDataSources = {},
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
+        usedExternalDataSources = {});
 
 /**
  * Tracks explicit use of allowDiskUse:false with find and aggregate commands.

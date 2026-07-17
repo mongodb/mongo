@@ -1096,17 +1096,15 @@ ResolvedNamespace chainViews(boost::optional<ResolvedNamespace> currentView,
 }  // namespace
 
 
-Status ClusterAggregate::runAggregate(
-    OperationContext* opCtx,
-    const Namespaces& namespaces,
-    AggregateCommandRequest& request,
-    const PrivilegeVector& privileges,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    BSONObjBuilder* result,
-    std::string_view comment,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+Status ClusterAggregate::runAggregate(OperationContext* opCtx,
+                                      const Namespaces& namespaces,
+                                      AggregateCommandRequest& request,
+                                      const PrivilegeVector& privileges,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
+                                      BSONObjBuilder* result,
+                                      std::string_view comment) {
     return runAggregate(
-        opCtx, namespaces, request, {request}, privileges, verbosity, result, comment, ifrContext);
+        opCtx, namespaces, request, {request}, privileges, verbosity, result, comment);
 }
 
 void makeEOFExplainResult(OperationContext* opCtx,
@@ -1371,13 +1369,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result,
                                       std::string_view comment,
-                                      std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
                                       bool alreadyDesugared) {
-    // Use the provided IFRContext if available, otherwise create a new one. This ensures consistent
-    // flag values throughout the operation, including retries on view errors.
-    if (!ifrContext) {
-        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-    }
+    // Source the per-operation IFRContext from the opCtx
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
 
     RetryState retryState;
     retryState.currentNamespaces = namespaces;
@@ -1645,7 +1639,6 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
     bool alreadyDesugared) {
 
     return runAggregateImpl(opCtx,
@@ -1658,7 +1651,7 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
                             originalRequest,
                             verbosity,
                             result,
-                            ifrContext,
+                            IncrementalFeatureRolloutContext::get(opCtx),
                             alreadyDesugared);
 }
 
@@ -1669,13 +1662,9 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     const NamespaceString& requestedNss,
     const PrivilegeVector& privileges,
     boost::optional<ExplainOptions::Verbosity> verbosity,
-    BSONObjBuilder* result,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    // Create IFRContext if not provided.
-    if (!ifrContext) {
-        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-    }
-
+    BSONObjBuilder* result) {
+    // Source the per-operation IFRContext from the opCtx.
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
     result->resetToEmpty();
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
@@ -1696,8 +1685,7 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
                             privileges,
                             verbosity,
                             result,
-                            "ClusterAggregate::retryOnViewOrIFRKickbackError"sv,
-                            ifrContext);
+                            "ClusterAggregate::retryOnViewOrIFRKickbackError"sv);
     }
 
     // For view retries, we need to build the resolved request before calling runAggregate.
@@ -1726,7 +1714,6 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
                         verbosity,
                         result,
                         "ClusterAggregate::retryOnViewOrIFRKickbackError"sv,
-                        ifrContext,
                         alreadyDesugared);
 }
 

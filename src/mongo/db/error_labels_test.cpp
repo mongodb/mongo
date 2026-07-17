@@ -302,6 +302,26 @@ TEST_F(ErrorLabelBuilderTest, NonRetryableWriteErrorsHaveNoRetryableWriteErrorLa
     ASSERT_FALSE(builder.isRetryableWriteError());
 }
 
+TEST_F(ErrorLabelBuilderTest, IFRFlagRetryHasNoRetryableWriteErrorLabel) {
+    // IFRFlagRetry is an internal query-layer kickback handled exclusively by the retryOnWithState
+    // handlers. It must not be surfaced to clients as a retryable error, otherwise drivers or the
+    // transaction machinery would retry the whole operation.
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    std::string commandName = "aggregate";
+    ErrorLabelBuilder builder(opCtx(),
+                              sessionInfo,
+                              commandName,
+                              ErrorCodes::IFRFlagRetry,
+                              boost::none,
+                              false /* isInternalClient */,
+                              false /* isMongos */,
+                              false /* isComingFromRouter */,
+                              repl::OpTime{},
+                              repl::OpTime{});
+    ASSERT_FALSE(builder.isRetryableWriteError());
+}
+
 TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsHaveRetryableWriteErrorLabel) {
     OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
     sessionInfo.setTxnNumber(1);

@@ -1689,14 +1689,8 @@ Status runAggregate(
     boost::optional<ExplainOptions::Verbosity> verbosity,
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
-        usedExternalDataSources,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    // Creates or passes IFRContext for the aggregation, which will be shared among the root
-    // ExpressionContext and any child ExpressionContexts that are created, for example, as part
-    // of sub-pipeline execution.
-    if (ifrContext == nullptr) {
-        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-    }
+        usedExternalDataSources) {
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
 
     stdx::unordered_set<IncrementalRolloutFeatureFlag*> initialFlagsToDisable;
     std::unique_ptr<LiteParsedPipeline> updatedLiteParsed;

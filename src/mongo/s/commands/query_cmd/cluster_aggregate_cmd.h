@@ -121,8 +121,7 @@ public:
                                                            _privileges,
                                                            verbosity,
                                                            result,
-                                                           "ClusterAggregate::runAggregate"sv,
-                                                           _ifrContext));
+                                                           "ClusterAggregate::runAggregate"sv));
             _extensionMetrics.markSuccess();
         }
 

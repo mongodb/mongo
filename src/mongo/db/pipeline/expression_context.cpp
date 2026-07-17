@@ -66,9 +66,13 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
 
     _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);
 
-    // Default IFRContext for code paths that don't go through run_aggregate or cluster_aggregate.
+    // The IFRContext is per-operation: it is installed on the opCtx in the command's
+    // InvocationBaseInternal ctor, so any ExpressionContext built while executing a command
+    // observes the operation's feature-flag values -- including any disabled on an IFR retry --
+    // through get(opCtx).
     if (!_params.ifrContext) {
-        _params.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+        _params.ifrContext = _params.opCtx ? IncrementalFeatureRolloutContext::get(_params.opCtx)
+                                           : std::make_shared<IncrementalFeatureRolloutContext>();
     }
 
     // Disallow disk use if in read-only mode.

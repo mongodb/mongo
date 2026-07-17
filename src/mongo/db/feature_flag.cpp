@@ -477,8 +477,10 @@ void IncrementalRolloutFeatureFlag::registerFlag(IncrementalRolloutFeatureFlag* 
 std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::get(
     OperationContext* opCtx) {
     auto& deferred = getIfrContextOnOpCtx(opCtx).deferred;
-    // A nested DBDirectClient op (e.g. view resolution, or the auth user-cache lookup) can run on
-    // the parent's opCtx before the parent installs its wire IFR context. The context installs
+    // A nested DBDirectClient op (e.g. the auth user-cache lookup) can run on the parent's opCtx
+    // before the parent installs its wire IFR context -- the install happens in the
+    // InvocationBaseInternal ctor, so anything running earlier (auth/pre-parse) precedes it,
+    // whereas command-body work like view resolution always runs after it. The context installs
     // once, so materializing it here with local defaults would make the parent's wire install a
     // no-op and silently drop a value the router set -- e.g. a flag it disabled after a kickback.
     // Hand nested ops a detached context instead; once the parent installs, nested ops inherit it.

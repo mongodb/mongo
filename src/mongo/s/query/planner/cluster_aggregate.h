@@ -72,30 +72,26 @@ public:
      * It manages the collection routing, meaning that the aggregation may be implicitly retried by
      * `runAggregate` if the placement of the collection has changed.
      */
-    static Status runAggregate(
-        OperationContext* opCtx,
-        const Namespaces& namespaces,
-        AggregateCommandRequest& request,
-        const LiteParsedPipeline& liteParsedPipeline,
-        const PrivilegeVector& privileges,
-        boost::optional<ExplainOptions::Verbosity> verbosity,
-        BSONObjBuilder* result,
-        std::string_view comment = "ClusterAggregate::runAggregate"sv,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
-        bool alreadyDesugared = false);
+    static Status runAggregate(OperationContext* opCtx,
+                               const Namespaces& namespaces,
+                               AggregateCommandRequest& request,
+                               const LiteParsedPipeline& liteParsedPipeline,
+                               const PrivilegeVector& privileges,
+                               boost::optional<ExplainOptions::Verbosity> verbosity,
+                               BSONObjBuilder* result,
+                               std::string_view comment = "ClusterAggregate::runAggregate"sv,
+                               bool alreadyDesugared = false);
 
     /**
      * Convenience version that internally constructs the LiteParsedPipeline.
      */
-    static Status runAggregate(
-        OperationContext* opCtx,
-        const Namespaces& namespaces,
-        AggregateCommandRequest& request,
-        const PrivilegeVector& privileges,
-        boost::optional<ExplainOptions::Verbosity> verbosity,
-        BSONObjBuilder* result,
-        std::string_view comment = "ClusterAggregate::runAggregate"sv,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
+    static Status runAggregate(OperationContext* opCtx,
+                               const Namespaces& namespaces,
+                               AggregateCommandRequest& request,
+                               const PrivilegeVector& privileges,
+                               boost::optional<ExplainOptions::Verbosity> verbosity,
+                               BSONObjBuilder* result,
+                               std::string_view comment = "ClusterAggregate::runAggregate"sv);
 
     /**
      * Convenience version to inject the routingCtx by the caller. This function skips the
@@ -114,7 +110,6 @@ public:
         boost::optional<AggregateCommandRequest> originalRequest,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
         bool alreadyDesugared = false);
 
     /**
@@ -139,8 +134,7 @@ public:
         const NamespaceString& requestedNss,
         const PrivilegeVector& privileges,
         boost::optional<ExplainOptions::Verbosity> verbosity,
-        BSONObjBuilder* result,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
+        BSONObjBuilder* result);
 };
 
 }  // namespace mongo

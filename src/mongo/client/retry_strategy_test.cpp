@@ -5,6 +5,7 @@
 
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
@@ -284,6 +285,11 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyDefaultCallbackErrorLabelNonRetrya
                                                         /*baseBackoffMS=*/boost::none));
     ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
         statusNonRetriable, target1, errorLabelsNonRetriable, /*baseBackoffMS=*/boost::none));
+}
+
+TEST_F(RetryStrategyTest, DefaultRetryCriteriaDoesNotRetryIFRFlagRetry) {
+    const Status ifrStatus{IFRFlagRetryInfo{"someFlag"}, "flag retry"};
+    ASSERT_FALSE(DefaultRetryStrategy::defaultRetryCriteria(ifrStatus, {}));
 }
 
 TEST_F(RetryStrategyTest, DefaultRetryStrategyTargetingMetadataInitiallyEmpty) {
