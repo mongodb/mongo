@@ -367,7 +367,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # electionTimeoutMillis must be strictly greater than heartbeatIntervalMillis
             # (default 2000), so shorten the heartbeat interval rather than lengthening the
             # election timeout.
-            repl_config["settings"]["heartbeatIntervalMillis"] = 1000
+            repl_config["settings"]["heartbeatIntervalMillis"] = 1800
             repl_config["settings"]["chainingAllowed"] = False
             repl_config["settings"]["heartbeatTimeoutSecs"] = 1
             repl_config["settings"]["catchUpTimeoutMillis"] = 0
