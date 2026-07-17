@@ -245,10 +245,8 @@ def gen_dts_files():
     # Parse all IDL files in the src directory.
     for file in [*Path("src").rglob("*.idl")]:
         with open(file, "r", encoding="utf-8") as f:
-            # Skip any files that don't have any commands.
             try:
-                if "commands:" in f.read():
-                    print_progress(file, gen_dts_from_file(file, declarations))
+                print_progress(file, gen_dts_from_file(file, declarations))
             except Exception as e:
                 print(" " * COLS, end="\r")
                 print(str(e))
