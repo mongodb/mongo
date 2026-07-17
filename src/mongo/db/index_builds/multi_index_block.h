@@ -283,13 +283,6 @@ public:
     void persistResumeState(OperationContext* opCtx, const CollectionPtr& collection);
 
     /**
-     * Writes the "tearable side write" abort sentinel.
-     *
-     * TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-     */
-    void writeTearableSideWriteAbortRecord(OperationContext* opCtx) const;
-
-    /**
      * May be called at any time after construction but before a successful commit(). Suppresses
      * the default behavior on destruction of removing all traces of uncommitted index builds. May
      * delete internal tables, but this is not transactional. Writes the resumable index build

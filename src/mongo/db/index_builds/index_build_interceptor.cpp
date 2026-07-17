@@ -16,7 +16,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
 #include "mongo/db/index_builds/index_builds_common.h"
-#include "mongo/db/index_builds/primary_driven/tearable_side_write_redo_state.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -53,17 +52,7 @@ auto& sideWritesDeletedCounter = otel::metrics::MetricsService::instance().creat
     otel::metrics::MetricNames::kIndexBuildSideWritesDeleted,
     "Total number of side write deletes written",
     otel::metrics::MetricUnit::kOperations);
-
-const auto getOnTearableSideWriteRedoHookDecoration =
-    ServiceContext::declareDecoration<OnTearableSideWriteRedoFn>();
 }  // namespace
-
-void setOnTearableSideWriteRedoHook(ServiceContext* svcCtx, OnTearableSideWriteRedoFn hook) {
-    getOnTearableSideWriteRedoHookDecoration(svcCtx) = std::move(hook);
-}
-const OnTearableSideWriteRedoFn& getOnTearableSideWriteRedoHook(ServiceContext* svcCtx) {
-    return getOnTearableSideWriteRedoHookDecoration(svcCtx);
-}
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              const IndexBuildInfo& indexBuildInfo,
@@ -261,18 +250,6 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
             BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
             toInsert.emplace_back(BSON("op" << "i"
                                             << "key" << binData));
-        }
-    }
-
-    // If a primary-driven index build is redoing a write that produced a tearable side write, write
-    // an abort sentinel into the affected collection's builds before this side write is buffered,
-    // so the sentinel replicates ahead of it.
-    auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-    if (auto redoCollectionUUID = redoState.armedCollectionUUID();
-        redoCollectionUUID && !redoState.flagPersisted()) {
-        redoState.setFlagPersisted();
-        if (auto& hook = getOnTearableSideWriteRedoHook(opCtx->getServiceContext())) {
-            hook(opCtx, *redoCollectionUUID);
         }
     }
 

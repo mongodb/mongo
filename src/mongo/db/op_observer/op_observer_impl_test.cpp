@@ -21,7 +21,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
-#include "mongo/db/index_builds/primary_driven/tearable_side_write_redo_state.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
@@ -4328,66 +4327,6 @@ TEST_F(BatchedWriteOutputsTest, WriteWithoutPdibIsNotGrouped) {
         EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kInsert);
         EXPECT_NE(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
     }
-}
-
-// The "tearable side write" redo state decorates the OperationContext: onBatchedWriteCommit arms it
-// (with the affected collection) when it throws a write conflict to redo a write. The armed UUID
-// must survive the WUOW rollback so the redo can read it, but must be consumed once a batched write
-// commits so it cannot leak onto a later write that shares the OperationContext (which would
-// suppress that write's own redo). The per-attempt "flag persisted" marker must reset on both
-// terminal paths. These two tests pin that lifecycle.
-//
-// TODO (SERVER-126257): Remove these tests once index build side writes cannot be torn.
-TEST_F(BatchedWriteOutputsTest, TearableSideWriteRedoStateConsumedOnBatchedWriteCommit) {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    reset(opCtx, _nss);
-    reset(opCtx, NamespaceString::kRsOplogNamespace);
-
-    // Simulate a prior attempt that armed the redo and marked the flag persisted.
-    auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-    redoState.arm(UUID::gen());
-    redoState.setFlagPersisted();
-
-    {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForTransaction};
-        AutoGetCollection autoColl{opCtx, _nss, MODE_IX};
-        auto doc = BSON("_id" << 0);
-        OplogDeleteEntryArgs args;
-        opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, getDocumentKey(*autoColl, doc), args);
-        wuow.commit();
-    }
-
-    // Committing consumes both signals so they cannot leak onto later writes on this opCtx.
-    EXPECT_FALSE(redoState.armedCollectionUUID().has_value());
-    EXPECT_FALSE(redoState.flagPersisted());
-}
-TEST_F(BatchedWriteOutputsTest, TearableSideWriteRedoStateSurvivesBatchedWriteAbort) {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    reset(opCtx, _nss);
-    reset(opCtx, NamespaceString::kRsOplogNamespace);
-
-    auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-    auto collectionUUID = UUID::gen();
-    redoState.arm(collectionUUID);
-    redoState.setFlagPersisted();
-
-    {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForTransaction};
-        AutoGetCollection autoColl{opCtx, _nss, MODE_IX};
-        auto doc = BSON("_id" << 0);
-        OplogDeleteEntryArgs args;
-        opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, getDocumentKey(*autoColl, doc), args);
-    }
-
-    // The armed UUID must survive the rollback (the redo reads it on the retry), but the
-    // per-attempt flag must be cleared so the retry re-persists the sentinel.
-    ASSERT_TRUE(redoState.armedCollectionUUID().has_value());
-    EXPECT_EQ(*redoState.armedCollectionUUID(), collectionUUID);
-    EXPECT_FALSE(redoState.flagPersisted());
 }
 
 // Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction consisting of an

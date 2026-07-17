@@ -14,8 +14,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
-// TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-#include "mongo/db/index_builds/primary_driven/tearable_side_write_redo_state.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_reserved.h"
@@ -2342,23 +2340,11 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     auto* batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
 
-    // Consume the "tearable side write" redo state on every committing path of this function, so an
-    // armed redo UUID never leaks onto the OperationContext and the per-attempt "flag persisted"
-    // marker is reset.
-    //
-    // TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-    auto consumeTearableSideWriteRedoState = [&] {
-        auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-        redoState.disarm();
-        redoState.resetFlagPersisted();
-    };
-
     // Ensure that no one previously reserved any timestamps for this operation.
     invariant(batchedOps->isEmpty() ||
               !shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
 
     if (batchedOps->isEmpty()) {
-        consumeTearableSideWriteRedoState();
         return;
     } else if (batchedOps->numOperations() == 1) {
         MutableOplogEntry oplogEntry;
@@ -2397,7 +2383,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                 onWriteOpCompleted(
                     opCtx, oplogEntry.getStatementIds(), sessionTxnRecord, oplogEntry.getNss());
 
-                consumeTearableSideWriteRedoState();
                 return;
             }
             default:
@@ -2439,10 +2424,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                         /*prepare=*/false,
                                         /*respectAtomicGroups=*/true);
     }
-
-    // The multi-op path commits below; consume the redo state so it does not leak onto a later
-    // write on this OperationContext.
-    consumeTearableSideWriteRedoState();
 
     std::size_t opTimeOffset = 0;
     if (applyOpsOplogSlotAndOperationAssignment.numOperationsWithNeedsRetryImage > 0) {
@@ -2572,13 +2553,6 @@ void OpObserverImpl::onBatchedWriteAbort(OperationContext* opCtx) {
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     batchedWriteContext.clearBatchedOperations(opCtx);
     batchedWriteContext.setWritesAreBatched(false);
-
-    // Clear the per-attempt "flag persisted" marker so the next batched-write attempt on this
-    // OperationContext re-detects a tearable side write. The armed redo UUID is intentionally left
-    // set so it survives this rollback and is visible to the redo.
-    //
-    // TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-    index_builds::primary_driven::getTearableSideWriteRedoState(opCtx).resetFlagPersisted();
 }
 
 void OpObserverImpl::onPreparedTransactionCommit(OperationContext* opCtx,
