@@ -10,7 +10,6 @@ namespace mongo {
 class ServiceContext;
 
 /**
->>>>>>> 2e55574d775 (Address nits)
  * Installs all OpenTelemetry instrumentation metrics for mongod. Intended to be called once at
  * startup from mongod_main.
  */
