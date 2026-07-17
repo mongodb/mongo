@@ -350,10 +350,10 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue_DoNotUse(WT_SESSION* sess
     if (ret != 0) {
         // The numerical 'statisticsKey' can be located in the WT_STATS_* preprocessor macros in
         // wiredtiger.h.
-        return StatusWith<int64_t>(ErrorCodes::CursorNotFound,
-                                   str::stream() << "unable to open cursor at URI " << uri
-                                                 << " for statistic: " << statisticsKey
-                                                 << ". reason: " << wiredtiger_strerror(ret));
+        return StatusWith<int64_t>(wtRCToStatus(ret, session, [&]() {
+            return fmt::format(
+                "unable to open cursor at URI {} for statistic: {}", uri, statisticsKey);
+        }));
     }
     invariant(cursor);
     ON_BLOCK_EXIT([&] { cursor->close(cursor); });
@@ -384,8 +384,13 @@ int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& ur
         s, "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     const Status& status = result.getStatus();
     if (!status.isOK()) {
-        if (status.code() == ErrorCodes::CursorNotFound) {
-            // ident gone, so its 0
+        // A missing file (NoSuchKey) means the ident is gone, so it contributes 0.
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            return 0;
+        }
+        // ObjectIsBusy means the data handle is transiently held by a concurrent operation. We
+        // treat the ident as gone.
+        if (status.code() == ErrorCodes::ObjectIsBusy) {
             return 0;
         }
         uassertStatusOK(status);
@@ -401,8 +406,15 @@ int64_t WiredTigerUtil::getEphemeralIdentSize(WiredTigerSession& session, const 
     auto getStats = [&](int key) -> int64_t {
         auto result = getStatisticsValue(session, statsUri, "statistics=(fast)", key);
         if (!result.isOK()) {
-            if (result.getStatus().code() == ErrorCodes::CursorNotFound)
-                return 0;  // ident gone, so return 0
+            // A missing file (NoSuchKey) means the ident is gone, so it contributes 0.
+            if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
+                return 0;
+            }
+            // ObjectIsBusy means the data handle is transiently held by a concurrent operation. We
+            // treat the ident as gone.
+            if (result.getStatus().code() == ErrorCodes::ObjectIsBusy) {
+                return 0;
+            }
 
             uassertStatusOK(result.getStatus());
         }

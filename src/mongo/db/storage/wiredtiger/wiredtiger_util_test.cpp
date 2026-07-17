@@ -275,7 +275,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     auto result = WiredTigerUtil::getStatisticsValue(
         session, "statistics:table:no_such_table", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
@@ -285,7 +285,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     auto result = WiredTigerUtil::getStatisticsValue(
         session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {

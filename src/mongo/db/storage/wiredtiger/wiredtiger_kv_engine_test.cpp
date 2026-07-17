@@ -972,6 +972,28 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
     ASSERT_OK(_helper->getWiredTigerKVEngine()->recoverToStableTimestamp(*opCtxPtr.get()));
 }
 
+TEST_F(WiredTigerKVEngineTest, GetIndexStorageSizeReturnsBusyWhenStableFileBusy) {
+    auto opCtxPtr = _makeOperationContext();
+    FailPointEnableBlock failPoint("WTIndexStorageSizeReturnBusy");
+    // With the failpoint active, the stable-file statistics open is treated as EBUSY.
+    // getIndexStorageSize must surface this as the retryable ObjectIsBusy rather than a hard error.
+    EXPECT_EQ(ErrorCodes::ObjectIsBusy,
+              _helper->getWiredTigerKVEngine()
+                  ->getIndexStorageSize(opCtxPtr.get(), {"some-index-ident"})
+                  .getStatus()
+                  .code());
+}
+
+TEST_F(WiredTigerKVEngineTest, GetIndexStorageSizeAbsentStableFileContributesZero) {
+    auto opCtxPtr = _makeOperationContext();
+    // No .wt_stable checkpoint file exists for this ident, so the statistics open fails with
+    // NoSuchKey and the ident contributes zero without erroring.
+    const StatusWith<int64_t> swSize = _helper->getWiredTigerKVEngine()->getIndexStorageSize(
+        opCtxPtr.get(), {"nonexistent-index-ident"});
+    ASSERT_OK(swSize.getStatus());
+    EXPECT_EQ(swSize.getValue(), 0);
+}
+
 // Background auto-compact reconfigures are applied asynchronously, so a reconfigure issued while a
 // previous one is still being consumed is transiently rejected with ObjectIsBusy. Production wraps
 // these calls in a retry loop (see StorageEngineImpl::pauseOrResumeAutoCompactForWriteBlock);

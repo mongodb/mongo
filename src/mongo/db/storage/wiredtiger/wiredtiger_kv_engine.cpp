@@ -98,6 +98,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTDropEBUSY);
+MONGO_FAIL_POINT_DEFINE(WTIndexStorageSizeReturnBusy);
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
@@ -3528,17 +3529,24 @@ StatusWith<int64_t> WiredTigerKVEngineBase::getIndexStorageSize(
         // Read the on-disk block size statistic for the stable index file.
         auto swSize = WiredTigerUtil::getStatisticsValue(
             *session, "statistics:" + fileUri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
+        // A real busy state requires a concurrent operation holding the stable file's data handle,
+        // which cannot be produced deterministically in a unit test. Simulate the EBUSY mapping.
+        if (MONGO_unlikely(WTIndexStorageSizeReturnBusy.shouldFail())) {
+            swSize = Status(ErrorCodes::ObjectIsBusy, "Injected transient busy stable index file");
+        }
         if (!swSize.isOK()) {
-            // A missing stable file surfaces as an open_cursor failure, which getStatisticsValue
-            // maps to CursorNotFound. Only that case is ambiguous, so confirm the file is genuinely
-            // absent from the metadata table before treating it as zero. Any other error (or a
-            // CursorNotFound whose file still exists) is real and must be surfaced.
-            if (swSize.getStatus() == ErrorCodes::CursorNotFound &&
-                WiredTigerUtil::getMetadata(*session, fileUri).getStatus() ==
-                    ErrorCodes::NoSuchKey) {
+            const Status& status = swSize.getStatus();
+            // The stable file's data handle is being held by a concurrent operation. Return the
+            // error code so the caller can retry.
+            if (status == ErrorCodes::ObjectIsBusy) {
+                return status;
+            }
+            // A missing stable file (NoSuchKey) means the index has no on-disk checkpoint yet, so
+            // it contributes zero. Any other error is real and must be surfaced.
+            if (status == ErrorCodes::NoSuchKey) {
                 continue;
             }
-            return swSize.getStatus();
+            return status;
         }
         if (overflow::add(total, swSize.getValue(), &total)) {
             return Status(ErrorCodes::Overflow,
