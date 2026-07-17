@@ -31,6 +31,7 @@ BigSimplePolygon::BigSimplePolygon(S2Loop* loop)
 BigSimplePolygon::~BigSimplePolygon() {}
 
 void BigSimplePolygon::Init(S2Loop* loop) {
+    std::lock_guard<std::mutex> lk(_borderMu);
     _loop.reset(loop);
     _isNormalized = loop->IsNormalized();
     _borderLine.reset();
@@ -42,7 +43,8 @@ double BigSimplePolygon::GetArea() const {
 }
 
 bool BigSimplePolygon::Contains(const S2Polygon& polygon) const {
-    const S2Polygon& polyBorder = GetPolygonBorder();
+    std::lock_guard<std::mutex> lk(_borderMu);
+    const S2Polygon& polyBorder = _getPolygonBorderLocked();
 
     if (_isNormalized) {
         // Polygon border is the same as the loop
@@ -71,7 +73,8 @@ bool BigSimplePolygon::Contains(const S2Polyline& line) const {
     // Intersects().  A point might Intersect() a boundary exactly, but not be Contain()ed
     // within the Polygon.  Think the right thing to do here is custom intersection functions.
     //
-    const S2Polygon& polyBorder = GetPolygonBorder();
+    std::lock_guard<std::mutex> lk(_borderMu);
+    const S2Polygon& polyBorder = _getPolygonBorderLocked();
 
     std::vector<S2Polyline*> clipped;
     ScopeGuard clippedGuard = [&] {
@@ -96,8 +99,8 @@ bool BigSimplePolygon::Contains(S2Point const& point) const {
 bool BigSimplePolygon::Intersects(const S2Polygon& polygon) const {
     // If the loop area is at most 2*Pi, treat it as a simple Polygon.
     if (_isNormalized) {
-        const S2Polygon& polyBorder = GetPolygonBorder();
-        return polyBorder.Intersects(&polygon);
+        std::lock_guard<std::mutex> lk(_borderMu);
+        return _getPolygonBorderLocked().Intersects(&polygon);
     }
 
     // The loop area is greater than 2*Pi, so it intersects a polygon (even with holes) if it
@@ -128,7 +131,8 @@ bool BigSimplePolygon::Intersects(const S2Polyline& line) const {
     //
     // TODO: Make a general Polygon/Line relation tester which uses S2 primitives
     //
-    return GetLineBorder().Intersects(&line) || _loop->Contains(line.vertex(0));
+    std::lock_guard<std::mutex> lk(_borderMu);
+    return _getLineBorderLocked().Intersects(&line) || _loop->Contains(line.vertex(0));
 }
 
 bool BigSimplePolygon::Intersects(S2Point const& point) const {
@@ -136,39 +140,36 @@ bool BigSimplePolygon::Intersects(S2Point const& point) const {
 }
 
 void BigSimplePolygon::Invert() {
+    std::lock_guard<std::mutex> lk(_borderMu);
     _loop->Invert();
     _isNormalized = _loop->IsNormalized();
+    _borderLine.reset();
+    _borderPoly.reset();
 }
 
-const S2Polygon& BigSimplePolygon::GetPolygonBorder() const {
-    if (_borderPoly)
-        return *_borderPoly;
-
-    std::unique_ptr<S2Loop> cloned(_loop->Clone());
-
-    // Any loop in polygon should be than a hemisphere (2*Pi).
-    cloned->Normalize();
-
-    std::vector<S2Loop*> loops;
-    loops.push_back(cloned.release());
-    _borderPoly = std::make_unique<S2Polygon>(&loops);
+const S2Polygon& BigSimplePolygon::_getPolygonBorderLocked() const {
+    if (!_borderPoly) {
+        std::unique_ptr<S2Loop> cloned(_loop->Clone());
+        // Any loop in polygon should be than a hemisphere (2*Pi).
+        cloned->Normalize();
+        std::vector<S2Loop*> loops;
+        loops.push_back(cloned.release());
+        _borderPoly = std::make_unique<S2Polygon>(&loops);
+    }
     return *_borderPoly;
 }
 
-const S2Polyline& BigSimplePolygon::GetLineBorder() const {
-    if (_borderLine)
-        return *_borderLine;
-
-    std::vector<S2Point> points;
-    int numVertices = _loop->num_vertices();
-    for (int i = 0; i <= numVertices; ++i) {
-        // vertex() maps "numVertices" to 0 internally, so we don't have to deal with
-        // the index out of range.
-        points.push_back(_loop->vertex(i));
+const S2Polyline& BigSimplePolygon::_getLineBorderLocked() const {
+    if (!_borderLine) {
+        std::vector<S2Point> points;
+        int numVertices = _loop->num_vertices();
+        for (int i = 0; i <= numVertices; ++i) {
+            // vertex() maps "numVertices" to 0 internally, so we don't have to deal with
+            // the index out of range.
+            points.push_back(_loop->vertex(i));
+        }
+        _borderLine = std::make_unique<S2Polyline>(points);
     }
-
-    _borderLine.reset(new S2Polyline(points));
-
     return *_borderLine;
 }
 
