@@ -36,6 +36,14 @@ last-patch:
   suites: null
 last-continuous:
   all:
+    - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
+      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/convert_bindata.js
+      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
+      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/subtype.js
+      ticket: SERVER-129103
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
       ticket: SERVER-121533
     - test_file: jstests/core/administrative/filemd5.js
@@ -141,10 +149,18 @@ last-lts:
       ticket: SERVER-92668
     - test_file: jstests/aggregation/bugs/server94212.js
       ticket: SERVER-94212
+    - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
+      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/convert_bindata.js
+      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
+      ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/null_chars_string_input.js
       ticket: SERVER-95687
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
+    - test_file: jstests/aggregation/expressions/subtype.js
+      ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/trim.js
       ticket: SERVER-120668
     - test_file: jstests/aggregation/group_by_objectid.js
