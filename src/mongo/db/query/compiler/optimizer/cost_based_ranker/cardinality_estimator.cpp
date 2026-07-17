@@ -82,31 +82,46 @@ CEResult CardinalityEstimator::estimatePlan(const QuerySolution& plan) {
     return _qsnEstimates.at(plan.root())->outCE;
 }
 
-void CardinalityEstimator::clampZeroEstimates() {
-    const auto clamp = [](CardinalityEstimate ce) -> CardinalityEstimate {
-        if (ce != zeroCE) {
-            return ce;
-        }
-        switch (ce.source()) {
-            case EstimationSource::Sampling:
-            case EstimationSource::Histogram:
-            case EstimationSource::Heuristics:
-            case EstimationSource::Mixed:
-                return CardinalityEstimate{CardinalityType{kMinCE}, ce.source()};
-            case EstimationSource::Metadata:
-            case EstimationSource::Code:
-                return ce;
-            case EstimationSource::Unknown:
-                tasserted(12307002, "Encountered a CE with unknown source during clamping");
-        }
-        MONGO_UNREACHABLE;
-    };
+CEResult CardinalityEstimator::estimateFilter(const MatchExpression* filter) {
+    // Restore initial state so the estimator can be reused across filters/plans.
+    _inputCard = _collCard;
+    _conjSels.clear();
 
+    auto ceRes = estimate(filter, true /* isFilterRoot */);
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    // A stanalone filter returns directly and never populates _qsnEstimates, so
+    // clampZeroEstimates() (which walks that map) would not see it. Apply the same policy to the
+    // scalar result here.
+    return clampZeroEstimate(ceRes.getValue());
+}
+
+CardinalityEstimate CardinalityEstimator::clampZeroEstimate(CardinalityEstimate ce) {
+    if (ce != zeroCE) {
+        return ce;
+    }
+    switch (ce.source()) {
+        case EstimationSource::Sampling:
+        case EstimationSource::Histogram:
+        case EstimationSource::Heuristics:
+        case EstimationSource::Mixed:
+            return CardinalityEstimate{CardinalityType{kMinCE}, ce.source()};
+        case EstimationSource::Metadata:
+        case EstimationSource::Code:
+            return ce;
+        case EstimationSource::Unknown:
+            tasserted(12307002, "Encountered a CE with unknown source during clamping");
+    }
+    MONGO_UNREACHABLE;
+}
+
+void CardinalityEstimator::clampZeroEstimates() {
     for (auto& [node, est] : _qsnEstimates) {
         if (est->inCE) {
-            est->inCE = clamp(*est->inCE);
+            est->inCE = clampZeroEstimate(*est->inCE);
         }
-        est->outCE = clamp(est->outCE);
+        est->outCE = clampZeroEstimate(est->outCE);
     }
 }
 

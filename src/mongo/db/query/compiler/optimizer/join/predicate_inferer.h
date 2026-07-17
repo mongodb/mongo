@@ -36,4 +36,15 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
     size_t maxNodes,
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+/**
+ * Builds a new CanonicalQuery over 'nss' whose filter is 'expr', reusing the projection from
+ * 'cqOld'. Used to snapshot a node's filter as parsed, before predicate inference mutates the
+ * node's access path by ANDing in inferred single-table predicates.
+ */
+StatusWith<std::unique_ptr<CanonicalQuery>> cloneCQWithUpdatedFilter(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    NamespaceString nss,
+    std::unique_ptr<MatchExpression> expr,
+    const CanonicalQuery& cqOld);
+
 }  // namespace mongo::join_ordering

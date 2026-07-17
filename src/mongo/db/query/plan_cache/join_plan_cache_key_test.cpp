@@ -375,67 +375,6 @@ protected:
     const AggModelBuildParams kBuildParams{.maxNumberNodesConsideredForImplicitEdges = 4};
 };
 
-// Unlike the other tests in this file, which are true unit tests that construct
-// JoinGraph nodes directly, this test drives AggJoinModel::constructJoinModel.
-// Single-table predicate inference only occurs during AggJoinModel construction
-// (via addImplicitEdgesAndInferPredicates in predicate_inferer.cpp); it cannot
-// be triggered through the MutableJoinGraph API used elsewhere.
-//
-// The test uses the same pipeline twice, toggling `internalInferSingleTablePredicates`
-// between calls. When inference is enabled (default), the predicate {a: 3} from the
-// inner pipeline is propagated to the main collection's access path, changing the
-// cache key shape. When inference is disabled, the predicate is not propagated and
-// the key reflects only the raw graph structure.
-TEST_F(JoinPlanCacheKeyAggModelTest, InferredSingleTablePredicateAppearsInKey) {
-    // The inner pipeline matches on the join field `a`. With inference enabled,
-    // AggJoinModel propagates {a: {$eq: 3}} to the main collection's access path.
-    std::string_view pipelineJson = R"([
-        {
-            "$lookup": {
-                "from": "foreign_coll",
-                "localField": "a",
-                "foreignField": "a",
-                "pipeline": [{"$match": {"a": 3}}],
-                "as": "result"
-            }
-        },
-        {"$unwind": "$result"}
-    ])";
-
-    auto buildKey = [&]() {
-        auto expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kMainNss);
-        auto pipeline = makePipelineForTest(pipelineJson, {"foreign_coll"}, expCtx);
-
-        // Mark join field as scalar on both collections so path-arrayness analysis does not block
-        // join reordering eligibility.
-        AggJoinModelFixture::markFieldsAsScalar(*pipeline, {"a"}, {{"foreign_coll", {"a"}}});
-
-        ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-        auto swModel = AggJoinModel::constructJoinModel(*pipeline, kBuildParams);
-        ASSERT_OK(swModel);
-
-        const auto& graph = swModel.getValue().getGraph();
-        const auto& resolvedPaths = swModel.getValue().getResolvedPaths();
-
-        std::vector<NamespaceString> namespaces;
-        for (size_t i = 0; i < graph.numNodes(); ++i) {
-            namespaces.push_back(graph.getNode(static_cast<NodeId>(i)).collectionName);
-        }
-        return makeJoinPlanCacheKey(
-            graph, resolvedPaths, multipleCollectionAccessor(operationContext(), namespaces));
-    };
-
-    auto keyWithInference = buildKey();
-
-    // Disable inference: the predicate is no longer propagated to the main
-    // collection's access path, so the key reflects only the raw graph shape.
-    QueryKnobGuardForTest noInference{
-        operationContext(), "internalInferSingleTablePredicates", false};
-    auto keyWithoutInference = buildKey();
-
-    ASSERT_NE(keyWithInference, keyWithoutInference);
-}
-
 TEST_F(JoinPlanCacheKeyAggModelTest, DifferentSyntacticJoinOrderResultsInDifferentKey) {
     std::string_view pipelineJson = R"([
         {

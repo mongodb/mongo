@@ -26,7 +26,8 @@ JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& 
             _edgeSelectivities.size() == _ctx.joinGraph.numEdges());
     tassert(11514701,
             "Missing node cardinalities",
-            _ctx.singleTableAccess.nodeCardinalities.size() == _ctx.joinGraph.numNodes());
+            _ctx.singleTableAccess.nodeCardinalitiesOriginalFilter.size() ==
+                _ctx.joinGraph.numNodes());
 }
 
 JoinCardinalityEstimator JoinCardinalityEstimator::make(
@@ -192,7 +193,8 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     // Finally, note that we have the pre-computed combination of (2) and (3) in '_nodeCEs'.
     cost_based_ranker::CardinalityEstimate ce = cost_based_ranker::oneCE;
     for (auto nodeIdx : iterable(nodes, _ctx.joinGraph.numNodes())) {
-        ce = cost_based_ranker::product(ce, _ctx.singleTableAccess.nodeCardinalities[nodeIdx]);
+        ce = cost_based_ranker::product(
+            ce, _ctx.singleTableAccess.nodeCardinalitiesOriginalFilter[nodeIdx]);
     }
 
     auto edges = _cycleBreaker.breakCycles(_ctx.joinGraph.getEdgesForSubgraph(nodes));

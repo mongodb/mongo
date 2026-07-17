@@ -97,7 +97,7 @@ public:
         SingleTableAccessPlansResult singleTableAccess{
             .cbrCqQsns = std::move(cbrCqQsns),
             .estimate = {},
-            .nodeCardinalities = std::move(nodeCardinalities),
+            .nodeCardinalitiesOriginalFilter = std::move(nodeCardinalities),
             .collCardinalities = std::move(collCardinalities),
             .nodeCBRCosts = std::move(costs)};
 

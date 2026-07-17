@@ -17,18 +17,6 @@ import {
 import {populateTPCHDataset} from "jstests/libs/query/tpch_dataset.js";
 import {commands} from "jstests/query_golden/test_inputs/plan_stability_pipelines_tpch_fuzzed.js";
 
-// TODO SERVER-127575 remove this setParameter call once we correct cardinality estimates from inferred predicates.
-const oldParams = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalInferSingleTablePredicates: 1}),
-).internalInferSingleTablePredicates;
-
-assert.commandWorked(
-    db.adminCommand({
-        setParameter: 1,
-        internalInferSingleTablePredicates: false,
-    }),
-);
-
 // Report only subjoins with cardinality estimates that differ from the actual cardinality
 // by more than this many orders of magnitude.
 const ORDERS_OF_MAGNITUDE_REPORTING_THRESHOLD = 2;
@@ -556,11 +544,3 @@ for (const command of commands) {
         }
     }
 }
-
-// TODO SERVER-127575 remove this setParameter call once we correct cardinality estimates from inferred predicates.
-assert.commandWorked(
-    db.adminCommand({
-        setParameter: 1,
-        internalInferSingleTablePredicates: oldParams,
-    }),
-);

@@ -193,10 +193,6 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalMaxEdgesInJoinGraphName,                                                \
          internalMaxEdgesInJoinGraph,                                                     \
          getMaxEdgesInJoinGraph)                                                          \
-    KNOB(kInferSingleTablePredicates,                                                     \
-         kInternalInferSingleTablePredicatesName,                                         \
-         internalInferSingleTablePredicates,                                              \
-         getInferSingleTablePredicates)                                                   \
     KNOB(kMaxNumberNodesConsideredForImplicitEdges,                                       \
          kInternalMaxNumberNodesConsideredForImplicitEdgesName,                           \
          internalMaxNumberNodesConsideredForImplicitEdges,                                \

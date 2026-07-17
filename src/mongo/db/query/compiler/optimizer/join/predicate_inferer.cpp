@@ -515,11 +515,7 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
             pathSet.push_back(currentPathId);
         }
     }
-    // TODO SERVER-117385 remove this flag and this check once we can handle inferred predicates in
-    // our CE.
-    if (!expCtx->getQueryKnobConfiguration().getInferSingleTablePredicates()) {
-        return std::vector<BSONObj>{};
-    }
+
     return inferSingleTablePredicate(graph, resolvedPaths, pathSets, expCtx);
 }
 

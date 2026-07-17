@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 #include "mongo/db/query/util/bitset_util.h"
 
 #include <string>
@@ -116,7 +117,21 @@ boost::optional<NodeId> MutableJoinGraph::addNode(NamespaceString collectionName
         return boost::none;
     }
 
-    _nodes.emplace_back(std::move(collectionName), std::move(cq), std::move(embedPath));
+    std::unique_ptr<CanonicalQuery> originalFilter;
+    if (cq) {
+        // 'originalFilter' is a snapshot of the node's filter as parsed, before predicate
+        // inference mutates 'accessPath' by ANDing in inferred single-table predicates.
+        auto swOriginalFilter = cloneCQWithUpdatedFilter(
+            cq->getExpCtx(), cq->nss(), cq->getPrimaryMatchExpression()->clone(), *cq);
+        uassertStatusOK(swOriginalFilter.getStatus());
+        originalFilter = std::move(swOriginalFilter.getValue());
+    }
+
+    _nodes.push_back(JoinNode{.collectionName = std::move(collectionName),
+                              .originalFilter = std::move(originalFilter),
+                              .accessPath = std::move(cq),
+                              .embedPath = std::move(embedPath)});
+
     return static_cast<NodeId>(_nodes.size()) - 1;
 }
 

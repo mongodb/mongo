@@ -5,6 +5,7 @@
 
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cardinality_estimator.h"
 #include "mongo/db/query/query_planner.h"
 
 #include <fmt/format.h>
@@ -57,6 +58,105 @@ SamplingEstimatorMap makeSamplingEstimators(
     return samplingEstimators;
 }
 
+// For cardinality estimation, we ignore the selectivies of derived predicates and thus just
+// estimate the selectivity of the filter provided in the original user query.
+StatusWith<cost_based_ranker::CardinalityEstimate> cardinalityEstimateOnOriginalFilter(
+    OperationContext* opCtx,
+    const JoinNode& node,
+    const MultipleCollectionAccessor& singleMca,
+    size_t plannerOptions,
+    const ce::SamplingEstimator* samplingEstimator,
+    const cost_based_ranker::CardinalityEstimate& collCard) {
+    if (collCard.toDouble() == 0.0) {
+        // Sampling-based selectivity estimation divides by the collection cardinality, which
+        // is undefined for an empty collection. An empty collection trivially has 0 matching
+        // documents regardless of the filter.
+        return cost_based_ranker::zeroMetadataCE;
+    }
+
+    QueryPlannerParams ceParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
+        .opCtx = opCtx,
+        .canonicalQuery = *node.originalFilter,
+        .collections = singleMca,
+        .plannerOptions = plannerOptions,
+        .planRanker = QueryPlanRankerEnum::kCostBased,
+    });
+
+    cost_based_ranker::EstimateMap ceEstimates;
+    cost_based_ranker::CardinalityEstimator ce{
+        ceParams.mainCollectionInfo,
+        samplingEstimator,
+        ceEstimates,
+        QueryCBRCEModeEnum::kSamplingCE,
+    };
+
+    const MatchExpression* filter = node.originalFilter->getPrimaryMatchExpression();
+    return ce.estimateFilter(filter);
+}
+
+// Holds the winning single-table plan for a filter that includes derived predicates, along with its
+// CBR cost and the estimates for every QSN considered while ranking it.
+struct SingleTablePlanResult {
+    std::unique_ptr<QuerySolution> solution;
+    cost_based_ranker::CostEstimate cbrCost;
+    cost_based_ranker::EstimateMap estimates;
+};
+
+// Plans and cost-based-ranks the access path with derived predicates, returning the
+// single winning solution together with its cost and estimates.
+StatusWith<SingleTablePlanResult> accessPlanForFilterWithDerivedPredicates(
+    OperationContext* opCtx,
+    const JoinNode& node,
+    const MultipleCollectionAccessor& singleMca,
+    size_t plannerOptions,
+    ce::SamplingEstimator* samplingEstimator) {
+    QueryPlannerParams querySolutionParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
+        .opCtx = opCtx,
+        .canonicalQuery = *node.accessPath,
+        .collections = singleMca,
+        .plannerOptions = plannerOptions,
+        .planRanker = QueryPlanRankerEnum::kCostBased,
+    });
+
+    auto swSolns = QueryPlanner::plan(*node.accessPath, querySolutionParams);
+    if (!swSolns.isOK()) {
+        return swSolns.getStatus();
+    }
+    auto swCbrResult = QueryPlanner::planWithCostBasedRanking(querySolutionParams,
+                                                              samplingEstimator,
+                                                              nullptr /*exactCardinality*/,
+                                                              std::move(swSolns.getValue()),
+                                                              *node.accessPath,
+                                                              QueryCBRCEModeEnum::kSamplingCE);
+    // Return bad status if CBR is unable to produce a plan
+    if (!swCbrResult.isOK()) {
+        return swCbrResult.getStatus();
+    }
+    auto& cbrResult = swCbrResult.getValue();
+    if (cbrResult.solutions.size() != 1) {
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      fmt::format("CBR failed to find best plan for nss: {}",
+                                  node.accessPath->nss().toStringForErrorMsg()));
+    }
+    tassert(11540201,
+            "Expected to have estimation data for single table access plan",
+            cbrResult.maybeExplainData.has_value());
+
+    auto& winningSolution = cbrResult.solutions.front();
+    const auto* rootQsn = winningSolution->root();
+
+    auto rootEstIt = cbrResult.maybeExplainData->estimates.find(rootQsn);
+    tassert(11514601,
+            "Missing estimate for winning single-table plan's root QSN",
+            rootEstIt != cbrResult.maybeExplainData->estimates.end());
+
+    return SingleTablePlanResult{
+        .solution = std::move(winningSolution),
+        .cbrCost = rootEstIt->second->cost,
+        .estimates = std::move(cbrResult.maybeExplainData->estimates),
+    };
+}
+
 StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
@@ -66,11 +166,11 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     QuerySolutionMap solns;
     cost_based_ranker::EstimateMap estimates;
 
-    NodeCardinalities nodeCardinalities;
+    NodeCardinalities nodeCardinalitiesOriginalFilter;
     NodeCardinalities collCardinalities;
     NodeCBRCosts nodeCBRCosts;
 
-    nodeCardinalities.reserve(numNodes);
+    nodeCardinalitiesOriginalFilter.reserve(numNodes);
     collCardinalities.reserve(numNodes);
     nodeCBRCosts.reserve(numNodes);
 
@@ -109,51 +209,27 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
             options |= QueryPlannerParams::INCLUDE_COLLSCAN;
         }
 
-        QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
-            .opCtx = opCtx,
-            .canonicalQuery = *node.accessPath,
-            .collections = singleMca,
-            .plannerOptions = options,
-            .planRanker = QueryPlanRankerEnum::kCostBased,
-        });
+        auto nodeCardinalityEstimateOrigFilterRes = cardinalityEstimateOnOriginalFilter(
+            opCtx, node, singleMca, options, samplingEstimator.get(), collCardinalities.back());
 
-        auto swSolns = QueryPlanner::plan(*node.accessPath, params);
-        if (!swSolns.isOK()) {
-            return swSolns.getStatus();
+        if (!nodeCardinalityEstimateOrigFilterRes.isOK()) {
+            return nodeCardinalityEstimateOrigFilterRes.getStatus();
         }
-        auto swCbrResult = QueryPlanner::planWithCostBasedRanking(params,
-                                                                  samplingEstimator.get(),
-                                                                  nullptr /*exactCardinality*/,
-                                                                  std::move(swSolns.getValue()),
-                                                                  *node.accessPath,
-                                                                  QueryCBRCEModeEnum::kSamplingCE);
-        // Return bad status if CBR is unable to produce a plan
-        if (!swCbrResult.isOK()) {
-            return swCbrResult.getStatus();
+        nodeCardinalitiesOriginalFilter.push_back(nodeCardinalityEstimateOrigFilterRes.getValue());
+
+
+        auto swPlan = accessPlanForFilterWithDerivedPredicates(
+            opCtx, node, singleMca, options, samplingEstimator.get());
+        if (!swPlan.isOK()) {
+            return swPlan.getStatus();
         }
-        auto& cbrResult = swCbrResult.getValue();
-        if (cbrResult.solutions.size() != 1) {
-            return Status(
-                ErrorCodes::NoQueryExecutionPlans,
-                fmt::format("CBR failed to find best plan for nss: {}", nss.toStringForErrorMsg()));
-        }
-        tassert(11540201,
-                "Expected to have estimation data for single table access plan",
-                cbrResult.maybeExplainData.has_value());
+        auto& plan = swPlan.getValue();
 
-        // Save solution and corresponding estimates for the best plan
-        auto& winningSolution = cbrResult.solutions.front();
-        const auto* rootQsn = winningSolution->root();
-        solns[node.accessPath.get()] = std::move(winningSolution);
+        // Save access plan solution and corresponding CBR estimates for the best plan
+        solns[node.accessPath.get()] = std::move(plan.solution);
+        nodeCBRCosts.push_back(plan.cbrCost);
 
-        auto rootEstIt = cbrResult.maybeExplainData->estimates.find(rootQsn);
-        tassert(11514601,
-                "Missing estimate for winning single-table plan's root QSN",
-                rootEstIt != cbrResult.maybeExplainData->estimates.end());
-        nodeCardinalities.push_back(rootEstIt->second->outCE);
-        nodeCBRCosts.push_back(rootEstIt->second->cost);
-
-        for (auto& [k, v] : cbrResult.maybeExplainData->estimates) {
+        for (auto& [k, v] : plan.estimates) {
             // Take care to use 'insert_or_assign' which will override existing entries in
             // estimates. It is possible that a QSN for a rejected plan of a previous table which
             // has been destroyed contains an entry in this map. The allocator may reuse the same
@@ -166,7 +242,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     return SingleTableAccessPlansResult{
         .cbrCqQsns = std::move(solns),
         .estimate = std::move(estimates),
-        .nodeCardinalities = std::move(nodeCardinalities),
+        .nodeCardinalitiesOriginalFilter = std::move(nodeCardinalitiesOriginalFilter),
         .collCardinalities = std::move(collCardinalities),
         .nodeCBRCosts = std::move(nodeCBRCosts),
     };

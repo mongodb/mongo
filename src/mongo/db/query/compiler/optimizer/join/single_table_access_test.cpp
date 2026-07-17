@@ -86,19 +86,19 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
         assertQuerySolutionHasEstimate(soln->root(), res.estimate);
     }
 
-    ASSERT_EQ(graph.numNodes(), res.nodeCardinalities.size());
+    ASSERT_EQ(graph.numNodes(), res.nodeCardinalitiesOriginalFilter.size());
     ASSERT_EQ(graph.numNodes(), res.nodeCBRCosts.size());
     ASSERT_EQ(graph.numNodes(), res.collCardinalities.size());
 
     // Illustrates the difference between the cardinalities before & after predicates
     // are applied. The predicate only matches a single document.
     ASSERT_EQ(10.0, res.collCardinalities[0].toDouble());
-    ASSERT_EQ(1.0, res.nodeCardinalities[0].toDouble());
+    ASSERT_EQ(1.0, res.nodeCardinalitiesOriginalFilter[0].toDouble());
     ASSERT_GT(res.nodeCBRCosts[0].toDouble(), 0.0);
 
     // Predicate matches every document so cardinalities are the same.
     ASSERT_EQ(100.0, res.collCardinalities[1].toDouble());
-    ASSERT_EQ(100.0, res.nodeCardinalities[1].toDouble());
+    ASSERT_EQ(100.0, res.nodeCardinalitiesOriginalFilter[1].toDouble());
     ASSERT_GT(res.nodeCBRCosts[1].toDouble(), 0.0);
 }
 

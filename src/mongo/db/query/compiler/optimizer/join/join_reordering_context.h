@@ -36,8 +36,9 @@ struct SingleTableAccessPlansResult {
     QuerySolutionMap cbrCqQsns;
     cost_based_ranker::EstimateMap estimate;
 
-    // Stores cardinality estimates for nodes after single-table predicates are applied.
-    NodeCardinalities nodeCardinalities;
+    // Stores cardinality estimates for nodes without derived single-table predicates for the
+    // purposes of not double counting predicates in join subset cardinality estimations.
+    NodeCardinalities nodeCardinalitiesOriginalFilter;
 
     // Stores cardinalities for the underlying collections as reported by the catalog.
     NodeCardinalities collCardinalities;

@@ -106,7 +106,12 @@ join graph.
  */
 struct JoinNode {
     NamespaceString collectionName;
-
+    // We hold onto the filter original to the user query for cardinality estimation purposes,
+    // which requires us to ignore the selectivies of derived predicates.
+    std::unique_ptr<mongo::CanonicalQuery> originalFilter;
+    // This filter contains both predicates original to the user query AND may also contain
+    // derived predicates; because it contains all applicable STPs, it is used to generate
+    // the most efficient single table access plan on the base collection.
     std::unique_ptr<mongo::CanonicalQuery> accessPath;
 
     /* Prefix path for the collection's fields. This path indicates where the field will be stored
