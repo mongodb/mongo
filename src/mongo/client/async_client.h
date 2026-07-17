@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_session.h"
@@ -15,6 +16,9 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/otel/telemetry_context.h"
+#include "mongo/otel/traces/span/span.h"
+#include "mongo/otel/traces/span/span_names.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
@@ -35,6 +39,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -128,6 +133,30 @@ public:
     [[nodiscard]] static boost::optional<TelemetryContextSection> makeEgressTelemetrySection(
         const executor::RemoteCommandRequest& request, int maxWireVersion);
 
+    /**
+     * Starts a Span for an outgoing `commandName`, using the span name registered for it (via
+     * `registerCommandSpanName`) if one exists, or falling back to the generic
+     * `span_names::kMongoRPC` otherwise. The span is started on `telemetryContext`, which is
+     * mutated in place: if it was null and a new trace should be started, it will be populated
+     * with a newly created TelemetryContext so that the caller can propagate it (e.g. via
+     * `makeEgressTelemetrySection`).
+     *
+     * This is a static helper to allow unit testing without a live connection.
+     */
+    [[nodiscard]] static otel::traces::Span startEgressSpan(
+        std::shared_ptr<otel::TelemetryContext>& telemetryContext, std::string_view commandName);
+
+    /**
+     * If `isMoreToComeSet` is false and `span` holds a value, sets `status` on the span and then
+     * ends it (by resetting `span`). Otherwise, leaves `span` untouched. Returns whether the span
+     * was ended.
+     *
+     * This is a static helper to allow unit testing without a live connection.
+     */
+    static bool maybeEndExhaustSpan(boost::optional<otel::traces::Span>& span,
+                                    bool isMoreToComeSet,
+                                    const Status& status);
+
 private:
     static const inline Status kCanceledStatus{ErrorCodes::CallbackCanceled,
                                                "Async network operation was canceled"};
@@ -219,6 +248,12 @@ private:
     MessageCompressorManager _compressorManager;
     transport::ReactorHandle _reactor;
     int _negotiatedMaxWireVersion = 0;
+
+    // The Span covering the full exhaust stream for the command currently in flight on this
+    // connection, if any. Started in `beginExhaustCommandRequest` and ended (via
+    // `maybeEndExhaustSpan`) in `_continueReceiveExhaustResponse` once a response with
+    // `isMoreToComeSet == false` is received, or once the exhaust stream fails.
+    boost::optional<otel::traces::Span> _exhaustSpan;
 };
 
 }  // namespace mongo

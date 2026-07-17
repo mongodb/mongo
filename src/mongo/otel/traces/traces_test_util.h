@@ -175,14 +175,18 @@ MATCHER(HasError, "") {
     return arg.isError();
 }
 
-/** Matches a CapturedSpan that has an attribute with the given key and value. */
-MATCHER_P2(HasAttribute, key, value, "") {
+/**
+ * Matches a CapturedSpan that has an attribute with the given key whose value satisfies
+ * `valueMatcher`. A plain string may be passed for `valueMatcher`, in which case the value is
+ * matched for equality.
+ */
+MATCHER_P2(HasAttribute, key, valueMatcher, "") {
     auto it = arg.attributes().find(std::string_view(key));
     if (it == arg.attributes().end()) {
         *result_listener << "has no attribute with key " << key;
         return false;
     }
-    return it->second == std::string_view(value);
+    return testing::ExplainMatchResult(valueMatcher, it->second, result_listener);
 }
 
 /**

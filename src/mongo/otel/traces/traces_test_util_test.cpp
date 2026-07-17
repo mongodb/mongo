@@ -22,6 +22,7 @@ using ::testing::AllOf;
 using ::testing::Contains;
 using ::testing::ElementsAre;
 using ::testing::Eq;
+using ::testing::HasSubstr;
 using ::testing::IsEmpty;
 using ::testing::Ne;
 using ::testing::Not;
@@ -235,6 +236,20 @@ TEST_F(AttributesMatcherTest, DistinguishesEmptyValueAndMissing) {
     std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
     EXPECT_THAT(spans,
                 ElementsAre(AllOf(HasAttribute("db", ""), Not(HasAttribute("missing", "")))));
+}
+
+TEST_F(AttributesMatcherTest, ValueSatisfiesInnerMatcher) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        Span span = Span::start(telemetryCtx, span_names::kTest1);
+        TRACING_SPAN_ATTR(span, "command", "findAndModify");
+    }
+
+    std::vector<CapturedSpan> spans = capturer.getSpans(span_names::kTest1);
+    EXPECT_THAT(spans,
+                ElementsAre(AllOf(HasAttribute("command", HasSubstr("Modify")),
+                                  Not(HasAttribute("command", HasSubstr("aggregate"))),
+                                  Not(HasAttribute("missing", HasSubstr("x"))))));
 }
 
 using ErrorMatcherTest = OtelTracesCapturerTest;
