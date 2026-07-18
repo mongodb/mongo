@@ -440,9 +440,9 @@ public:
     }
 
     /**
-     * Stage-specific validation. Called by LiteParsedPipeline::validate().
+     * Stage-specific validation. Called by LiteParsedPipeline::validate() after parsing.
      */
-    virtual void validate() const {};
+    virtual void validate(const OperationContext* opCtx) const {};
 
     /**
      * Returns true if this stage is allowed inside a $lookup sub-pipeline.

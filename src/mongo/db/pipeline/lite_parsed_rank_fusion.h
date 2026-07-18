@@ -135,7 +135,7 @@ public:
         return {.canRunOnTimeseries = false};
     }
 
-    void validate() const override;
+    void validate(const OperationContext* opCtx) const override;
 
     bool hasExtensionVectorSearchStage() const override {
         return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& ownedPipeline) {

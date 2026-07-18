@@ -11,10 +11,12 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -30,6 +32,23 @@ namespace {
 using boost::intrusive_ptr;
 using std::list;
 using std::vector;
+
+// One spec per internal-only field. Used by both the external-client rejection test and the
+// internal-client acceptance test so the two stay in lock-step as fields are added.
+static const std::vector<std::pair<std::string, std::string>> kInternalSearchMetaFieldCases = {
+    {"mongotQuery",
+     R"({$searchMeta: {mongotQuery: {index: "default", text: {query: "hello", path: "body"}}}})"},
+    {"mergingPipeline", R"({$searchMeta: {mergingPipeline: [{$merge: {into: "secret"}}]}})"},
+    {"metadataMergeProtocolVersion", R"({$searchMeta: {metadataMergeProtocolVersion: 1}})"},
+    {"requiresSearchSequenceToken", R"({$searchMeta: {requiresSearchSequenceToken: true}})"},
+    {"requiresSearchMetaCursor", R"({$searchMeta: {requiresSearchMetaCursor: true}})"},
+    {"view",
+     R"({$searchMeta: {view: {name: "secretView", effectivePipeline: [{$match: {leaked: true}}]}}})"},
+    {"limit", R"({$searchMeta: {limit: 100}})"},
+    {"sortSpec", R"({$searchMeta: {sortSpec: {field: 1}}})"},
+    {"mongotDocsRequested", R"({$searchMeta: {mongotDocsRequested: 50}})"},
+    {"docsNeededBounds", R"({$searchMeta: {docsNeededBounds: {minBounds: 1, maxBounds: 100}}})"},
+};
 
 class SearchMetaTest : service_context_test::WithSetupTransportLayer,
                        public AggregationContextFixture {};
@@ -112,6 +131,56 @@ TEST_F(SearchMetaTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
     // Should successfully parse using the fallback legacy implementation.
     ASSERT_DOES_NOT_THROW(LiteParsedDocumentSource::parse(
         nss, spec, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx}));
+}
+
+// Each internal routing field must be individually rejected when supplied by an external client.
+TEST_F(SearchMetaTest, ExternalClientCannotSupplyInternalSearchMetaFields) {
+    auto session = transport::MockSession::create(nullptr);
+    auto externalClient = getServiceContext()->getService()->makeClient("externalClient", session);
+    auto externalOpCtx = externalClient->makeOperationContext();
+
+    auto nss = getExpCtx()->getNamespaceString();
+    for (const auto& [fieldName, specJson] : kInternalSearchMetaFieldCases) {
+        SCOPED_TRACE(fieldName);
+        const auto specBson = fromjson(specJson);
+        auto lpds = SearchMetaLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
+        ASSERT_THROWS_CODE(lpds->validate(externalOpCtx.get()), AssertionException, 5491300);
+    }
+}
+
+// Internal clients (no transport session) must still be able to supply internal routing fields.
+// Iterates the same case list as the external-client test so the two stay in sync.
+TEST_F(SearchMetaTest, InternalClientCanSupplyInternalSearchMetaFields) {
+    auto opCtx = getExpCtx()->getOperationContext();
+    auto nss = getExpCtx()->getNamespaceString();
+
+    for (const auto& [fieldName, specJson] : kInternalSearchMetaFieldCases) {
+        SCOPED_TRACE(fieldName);
+        const auto specBson = fromjson(specJson);
+        auto lpds = SearchMetaLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
+        ASSERT_DOES_NOT_THROW(lpds->validate(opCtx));
+    }
+}
+
+// createFromBson must accept a spec already in its serialized internal ('mongotQuery') form;
+// validation of those fields belongs to the LiteParse layer.
+TEST_F(SearchMetaTest, CreateFromBsonAcceptsSerializedInternalSpec) {
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    auto fromNs = NamespaceString::createNamespaceString_forTest("unittests.$cmd.aggregate");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    const auto serializedSpec = fromjson(R"({
+        $searchMeta: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}, count: {type: "total"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: []
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceSearchMeta::createFromBson(serializedSpec.firstElement(), expCtx));
 }
 
 }  // namespace

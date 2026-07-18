@@ -60,7 +60,7 @@ std::unique_ptr<LiteParsedRankFusion> LiteParsedRankFusion::parse(
                                                   extensionsInHybridSearchEnabled);
 }
 
-void LiteParsedRankFusion::validate() const {
+void LiteParsedRankFusion::validate(const OperationContext* opCtx) const {
     static const std::string rankPipelineMsg =
         "All input pipelines to the $rankFusion stage must begin with one of $search, "
         "$vectorSearch, $geoNear, or have a $sort in the pipeline.";

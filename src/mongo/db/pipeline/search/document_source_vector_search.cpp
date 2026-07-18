@@ -138,6 +138,14 @@ StageConstraints DocumentSourceVectorSearch::constraints(PipelineSplitState pipe
 }
 
 Value DocumentSourceVectorSearch::serialize(const query_shape::SerializationOptions& opts) const {
+    // For re-parseable output, strip the synthesized 'view' field — the LiteParse layer rejects
+    // it from non-internal clients, and it will be re-bound on re-parse.
+    if (opts.serializeForReparse) {
+        auto spec = _stageSpec.hasField(kViewFieldName) ? _stageSpec.removeField(kViewFieldName)
+                                                        : _stageSpec;
+        return Value(Document{{kStageName, std::move(spec)}});
+    }
+
     if (!opts.isKeepingLiteralsUnchanged()) {
         BSONObjBuilder builder;
 
@@ -207,12 +215,13 @@ intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
 
     auto spec = elem.embeddedObject();
 
-    // Validate the source of the view if it exists on the spec, otherwise check expCtx for the
-    // view.
+    // Source the view from the spec if present, otherwise from expCtx. Rejection of an
+    // externally-supplied 'view' field happens at the LiteParse layer
+    // (validateInternalSearchFieldsNotSetByUser); by the time we reach createFromBson, a 'view'
+    // field on the spec is either internal-client-supplied or was synthesized by a prior parse
+    // (e.g. $rankFusion's hybrid-search reparse path).
     boost::optional<SearchQueryViewSpec> view = search_helpers::getViewFromBSONObj(spec);
-    if (view) {
-        search_helpers::validateViewNotSetByUser(expCtx, spec);
-    } else if ((view = search_helpers::getViewFromExpCtx(expCtx))) {
+    if (!view && (view = search_helpers::getViewFromExpCtx(expCtx))) {
         spec = spec.addField(BSON(kViewFieldName << view->toBSON()).firstElement());
     }
 
