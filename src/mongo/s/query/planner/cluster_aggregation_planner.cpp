@@ -625,9 +625,13 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         collectQueryStatsMongos(opCtx, ccc);
     }
 
-    ccc->detachFromOperationContext();
     CursorId clusterCursorId = 0;
     if (!exhausted) {
+        // Detach only when registering the cursor, so a later getMore can reattach a fresh opCtx.
+        // An exhausted cursor is instead disposed from its destructor, which needs a valid opCtx to
+        // kill the remotes. Detaching first would dispose with a null opCtx (backstopped by
+        // MergeCursorsStage::doDispose).
+        ccc->detachFromOperationContext();
         auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
         clusterCursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
             opCtx,

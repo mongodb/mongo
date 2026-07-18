@@ -108,7 +108,9 @@ GetNextResult MergeCursorsStage::doGetNext() {
 }
 
 void MergeCursorsStage::doDispose() {
-    _blockingResultsMerger->kill(getContext()->getOperationContext());
+    auto* opCtx = getContext()->getOperationContext();
+    tassert(13159600, "requires a valid operation context", opCtx);
+    _blockingResultsMerger->kill(opCtx);
 }
 
 void MergeCursorsStage::doForceSpill() {

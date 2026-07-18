@@ -43,6 +43,7 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -432,6 +433,32 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
         return BSON("ok" << 1);
     });
     future.default_timed_get();
+}
+
+using DocumentSourceMergeCursorsDeathTest = DocumentSourceMergeCursorsTest;
+
+DEATH_TEST_F(DocumentSourceMergeCursorsDeathTest,
+             DisposeAfterDetachTripsAssert,
+             "requires a valid operation context") {
+    const auto& expCtx = getExpCtx();
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(getTenantIdNss());
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[1],
+                         kTestShardHosts[1],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+    auto pipeline = Pipeline::create({}, expCtx);
+    pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    execPipeline->detachFromOperationContext();
+    execPipeline->dispose();
 }
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
