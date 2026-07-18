@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/scripting/engine.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -23,6 +24,13 @@ namespace mozjs {
 
 class ModuleLoader {
 public:
+    /**
+     * Module loading is a shell-only feature; a ModuleLoader must never be constructed in the
+     * server execution environment (it would expose a filesystem-read primitive to server-side
+     * JavaScript via import()). The constructor tasserts that this invariant holds.
+     */
+    explicit ModuleLoader(ExecutionEnvironment executionEnvironment);
+
     bool init(JSContext* ctx, const std::string& loadPath);
     JSObject* loadRootModuleFromPath(JSContext* cx, const std::string& path);
     JSObject* loadRootModuleFromSource(JSContext* cx,
