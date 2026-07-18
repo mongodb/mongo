@@ -105,6 +105,13 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
     // Replace any occurences of the metaField in the top-level required fields of the JSON Schema
     // object with "meta".
     if (fieldName == "$jsonSchema") {
+        // Mirror the error thrown by the $jsonSchema match expression parser for a non-object
+        // argument. Without this check, the calls to findFirstChildNamed() below would trip an
+        // invariant for non-object (e.g. array) values.
+        uassert(ErrorCodes::TypeMismatch,
+                "$jsonSchema must be an object",
+                elem.isType(BSONType::object));
+
         mutablebson::Element requiredElem = elem.findFirstChildNamed("required");
         if (requiredElem.ok()) {
             for (auto subElem = requiredElem.leftChild(); subElem.ok();

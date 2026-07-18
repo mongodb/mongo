@@ -1,0 +1,82 @@
+/**
+ * Regression test for an invariant failure (server crash) when running an update or delete on a
+ * time-series collection with a query predicate of the form {$jsonSchema: <non-object>}.
+ *
+ * The time-series write path rewrites the query (to rename the metaField) before it is parsed into
+ * a match expression. That rewrite special-cased $jsonSchema and assumed its argument was an
+ * object, tripping an invariant for a non-object value (e.g. an array). A malformed $jsonSchema
+ * argument should instead be rejected with a TypeMismatch error, matching the behavior on a regular
+ * (non-time-series) collection.
+ *
+ * @tags: [
+ *   # We need a time-series collection.
+ *   requires_timeseries,
+ *   # Uses multi:true updates.
+ *   requires_multi_updates,
+ *   # This test depends on writes targeting buckets by metaField; stepdowns may split writes.
+ *   does_not_support_stepdowns,
+ * ]
+ */
+import {beforeEach, describe, it} from "jstests/libs/mochalite.js";
+
+const timeFieldName = "t";
+const metaFieldName = "m";
+
+describe("time-series writes with a non-object $jsonSchema predicate", function () {
+    const testDB = db.getSiblingDB(jsTestName());
+    const coll = testDB.getCollection("ts");
+
+    beforeEach(function () {
+        coll.drop();
+        assert.commandWorked(
+            testDB.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
+        );
+        assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, x: 1}));
+    });
+
+    // Non-object $jsonSchema arguments that previously tripped an invariant during the time-series
+    // query rewrite.
+    const nonObjectSchemas = [[], "string", 1, true];
+
+    for (const schema of nonObjectSchemas) {
+        it(`rejects the update with TypeMismatch for $jsonSchema ${tojson(schema)}`, function () {
+            assert.commandFailedWithCode(
+                testDB.runCommand({
+                    update: coll.getName(),
+                    updates: [
+                        {q: {$jsonSchema: schema}, u: {$set: {[metaFieldName]: 2}}, multi: true},
+                    ],
+                }),
+                ErrorCodes.TypeMismatch,
+            );
+        });
+
+        it(`rejects the delete with TypeMismatch for $jsonSchema ${tojson(schema)}`, function () {
+            assert.commandFailedWithCode(
+                testDB.runCommand({
+                    delete: coll.getName(),
+                    deletes: [{q: {$jsonSchema: schema}, limit: 0}],
+                }),
+                ErrorCodes.TypeMismatch,
+            );
+        });
+    }
+
+    it("still accepts a valid object $jsonSchema predicate on the metaField", function () {
+        assert.commandWorked(
+            testDB.runCommand({
+                update: coll.getName(),
+                updates: [
+                    {
+                        q: {$jsonSchema: {required: [metaFieldName]}},
+                        u: {$set: {[metaFieldName]: 2}},
+                        multi: true,
+                    },
+                ],
+            }),
+        );
+        assert.eq(1, coll.find({[metaFieldName]: 2}).itcount());
+    });
+});

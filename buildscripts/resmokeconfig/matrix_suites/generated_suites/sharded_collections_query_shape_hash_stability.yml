@@ -100,6 +100,7 @@ selector:
     - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
     - jstests/core/timeseries/write/timeseries_insert_after_update.js
     - jstests/core/timeseries/write/timeseries_closed_update_delete.js
+    - jstests/core/timeseries/write/timeseries_write_jsonschema_non_object.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
