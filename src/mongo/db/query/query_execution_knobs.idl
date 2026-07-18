@@ -86,6 +86,7 @@ server_parameters:
                     min: "9.0"
 
     internalQueryMaxSingleExpressionMemoryUsageBytes:
+        mod_visibility: needs_replacement
         description: >-
             Maximum amount of memory in bytes that a single expression evaluation may use when no
             stage-level tracker has been wired to the EvaluationContext. If an OperationContext is

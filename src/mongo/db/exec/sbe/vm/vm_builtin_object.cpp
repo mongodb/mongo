@@ -131,6 +131,9 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
     values.reserve(tmpVectorLen);
     names.reserve(tmpVectorLen);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; idx += 2) {
         {
             auto nameView = viewFromStack(idx);
@@ -143,6 +146,15 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
         }
         {
             auto fieldView = viewFromStack(idx + 1);
+            currentMemoryBytes +=
+                names.back().size() + value::getApproximateSize(fieldView.tag, fieldView.value);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$object would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
             typeTags.push_back(fieldView.tag);
             values.push_back(fieldView.value);
         }
