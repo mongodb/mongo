@@ -3,14 +3,13 @@
 
 #pragma once
 
-#include "mongo/db/exec/agg/exec_pipeline.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface_factory.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/resharding/resharding_executable_pipeline.h"
 #include "mongo/util/modules.h"
 
 #include <vector>
@@ -97,18 +96,7 @@ private:
 
     const NamespaceString _oplogBufferNss;
 
-    // The raw pipeline that contains the stages for fetching the oplog entries.
-    // This by itself is not executable but is kept alive for _execPipeline.
-    std::unique_ptr<Pipeline> _pipeline;
-
-    // The pipeline that is for fetching the oplog entries and is fully executable.
-    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
-
-    // The stages in '_execPipeline' report memory usage into the OperationMemoryUsageTracker owned
-    // by the operation context they were built with. We stash that tracker here while detached so
-    // it outlives the operation context it came from, and restore it onto the new operation context
-    // on reattach.
-    std::unique_ptr<OperationMemoryUsageTracker> _memoryUsageTracker;
+    resharding::ReshardingExecutablePipeline _pipeline;
 
     std::unique_ptr<MongoProcessInterfaceFactory> _mongoProcessInterfaceFactory;
 };

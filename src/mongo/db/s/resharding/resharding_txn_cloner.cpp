@@ -12,7 +12,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -143,13 +142,9 @@ std::unique_ptr<Pipeline> ReshardingTxnCloner::_restartPipeline(
 }
 
 boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
-    OperationContext* opCtx, Pipeline& pipeline, exec::agg::Pipeline& execPipeline) {
-    execPipeline.reattachToOperationContext(opCtx);
-    pipeline.reattachToOperationContext(opCtx);
-    ON_BLOCK_EXIT([&pipeline, &execPipeline] {
-        execPipeline.detachFromOperationContext();
-        pipeline.detachFromOperationContext();
-    });
+    OperationContext* opCtx, resharding::ReshardingExecutablePipeline& pipeline) {
+    pipeline.reattachToOpCtx(opCtx);
+    ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOpCtx(); });
 
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
     // recipient spent waiting for documents from the donor shard. It doing so requires the CurOp to
@@ -158,7 +153,7 @@ boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
     curOp->ensureStarted();
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
-    auto doc = execPipeline.getNext();
+    auto doc = pipeline.get().getNext();
     return doc ? SessionTxnRecord::parse(doc->toBson(),
                                          IDLParserContext{"resharding config.transactions cloning"})
                : boost::optional<SessionTxnRecord>{};
@@ -220,8 +215,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest) {
     struct ChainContext {
-        std::unique_ptr<Pipeline> pipeline;
-        std::unique_ptr<exec::agg::Pipeline> execPipeline;
+        resharding::ReshardingExecutablePipeline pipeline;
         boost::optional<SessionTxnRecord> donorRecord;
         bool moreToCome = true;
         int progressCounter = 0;
@@ -231,17 +225,14 @@ SemiFuture<void> ReshardingTxnCloner::run(
 
     return resharding::WithAutomaticRetry(
                [this, chainCtx, cancelToken, factory, mongoProcessInterface_forTest] {
-                   if (!chainCtx->pipeline) {
+                   if (!chainCtx->pipeline.isInitialized()) {
                        auto opCtx = factory->makeOperationContext(&cc());
-                       chainCtx->pipeline =
+                       chainCtx->pipeline.reinitialize(
                            _restartPipeline(opCtx.get(),
                                             MONGO_unlikely(mongoProcessInterface_forTest)
                                                 ? mongoProcessInterface_forTest
-                                                : MongoProcessInterface::create(opCtx.get()));
-                       chainCtx->execPipeline =
-                           exec::agg::buildPipeline(chainCtx->pipeline->freeze());
-                       chainCtx->execPipeline->detachFromOperationContext();
-                       chainCtx->pipeline->detachFromOperationContext();
+                                                : MongoProcessInterface::create(opCtx.get())));
+                       chainCtx->pipeline.detachFromOpCtx();
                        chainCtx->donorRecord = boost::none;
                    }
 
@@ -249,14 +240,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    // due to a prepared transaction having been in progress.
                    if (!chainCtx->donorRecord) {
                        auto opCtx = factory->makeOperationContext(&cc());
-                       ScopeGuard guard([&] {
-                           chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
-                           chainCtx->execPipeline->dispose();
-                           chainCtx->pipeline.reset();
-                           chainCtx->execPipeline.reset();
-                       });
-                       chainCtx->donorRecord = _getNextRecord(
-                           opCtx.get(), *chainCtx->pipeline, *chainCtx->execPipeline);
+                       ScopeGuard guard([&] { chainCtx->pipeline.dispose(opCtx.get()); });
+                       chainCtx->donorRecord = _getNextRecord(opCtx.get(), chainCtx->pipeline);
                        guard.dismiss();
                    }
 
@@ -309,12 +294,9 @@ SemiFuture<void> ReshardingTxnCloner::run(
                       "readTimestamp"_attr = _fetchTimestamp,
                       "error"_attr = redact(status));
             }
-            if (chainCtx->pipeline) {
+            if (chainCtx->pipeline.isInitialized()) {
                 auto opCtx = factory->makeOperationContext(&cc());
-                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
-                chainCtx->execPipeline->dispose();
-                chainCtx->pipeline.reset();
-                chainCtx->execPipeline.reset();
+                chainCtx->pipeline.dispose(opCtx.get());
             }
         })
         .onUnrecoverableError([this](const Status& status) {
@@ -332,7 +314,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
         // RecipientStateMachine, along with its ReshardingTxnCloner member, may have already been
         // destructed.
         .onCompletion([chainCtx](Status status) {
-            if (chainCtx->pipeline) {
+            if (chainCtx->pipeline.isInitialized()) {
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
                 auto client = cc().getServiceContext()->getService()->makeClient(
                     "ReshardingTxnClonerCleanupClient", Client::noSession());
@@ -340,10 +322,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                 AlternativeClientRegion acr(client);
                 auto opCtx = cc().makeOperationContext();
 
-                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
-                chainCtx->execPipeline->dispose();
-                chainCtx->pipeline.reset();
-                chainCtx->execPipeline.reset();
+                chainCtx->pipeline.dispose(opCtx.get());
             }
 
             // Propagate the result of the AsyncTry.

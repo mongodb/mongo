@@ -10,6 +10,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/s/resharding/resharding_executable_pipeline.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -95,9 +96,8 @@ private:
     std::unique_ptr<Pipeline> _restartPipeline(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
-    boost::optional<SessionTxnRecord> _getNextRecord(OperationContext* opCtx,
-                                                     Pipeline& pipeline,
-                                                     exec::agg::Pipeline& execPipeline);
+    boost::optional<SessionTxnRecord> _getNextRecord(
+        OperationContext* opCtx, resharding::ReshardingExecutablePipeline& pipeline);
 
     void _updateProgressDocument(OperationContext* opCtx, const LogicalSessionId& progress);
 
