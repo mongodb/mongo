@@ -1,0 +1,20 @@
+test_kind: js_test
+
+# This suite is exclusively used to test that a CheckMetadataConsistencyInBackground inconsistency
+# causes the test infrastructure to report a failure as part of the resmoke end-to-end tests.
+selector:
+  roots:
+    - buildscripts/tests/resmoke_end2end/testfiles/check_metadata_consistency_fail.js
+
+executor:
+  hooks:
+    - class: CheckMetadataConsistencyInBackground
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 1
