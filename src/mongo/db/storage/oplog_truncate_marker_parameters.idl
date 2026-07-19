@@ -66,3 +66,19 @@ server_parameters:
         default: 100
         validator: {gte: -1}
         redact: false
+
+    oplogTruncationMaxSpanHoursPerPass:
+        description: >-
+            Maximum hours of oplog that time-based truncation may remove in a single pass, so a
+            large backlog is reclaimed gradually instead of in one large truncate. 0 disables the
+            cap. Currently only honored by persistence providers that support time-based oplog
+            truncation; size-based truncation paths ignore it for now.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gOplogTruncationMaxSpanHoursPerPass
+        default: 1
+        validator:
+            gte: 0
+            # ~100 years.
+            lte: 876000
+        redact: false
