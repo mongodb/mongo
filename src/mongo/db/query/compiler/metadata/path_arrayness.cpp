@@ -68,8 +68,13 @@ void PathArrayness::addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
 
     size_t indexCounter = 0;
     for (const auto& key : indexKeyPattern) {
-        FieldPath path(key.fieldNameStringData());
-        addPath(path, multikeyPaths[indexCounter], isFullRebuild);
+        // Ignore the key path if it doesn't pass the validation, in this case this field path is
+        // considered to be an array by default.
+        StatusWith<FieldPath> fieldPath =
+            fieldPathWithValidationStatus(std::string(key.fieldNameStringData()));
+        if (fieldPath.isOK()) {
+            addPath(fieldPath.getValue(), multikeyPaths[indexCounter], isFullRebuild);
+        }
         ++indexCounter;
     }
 }
