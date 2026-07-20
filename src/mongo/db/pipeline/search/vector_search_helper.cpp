@@ -23,7 +23,15 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
             expCtx->getUUID());
     expCtx->getUUID().value().appendToBuilder(&cmdBob, mongot_cursor::kCollectionUuidField);
     if (expCtx->getExplain()) {
-        cmdBob.append("explain",
+        // mongod owns the "explain" field when the aggregate is being explained. A user-supplied
+        // "explain" in the stage spec would collide with the field appended here and produce a
+        // mongot command with duplicate top-level keys, so reject it. Outside of explain a
+        // user-supplied "explain" is intentionally passed through untouched.
+        uassert(10804601,
+                "Cannot specify the 'explain' field in a $vectorSearch stage when the aggregate "
+                "command is run with explain",
+                !request.hasField(mongot_cursor::kExplainField));
+        cmdBob.append(mongot_cursor::kExplainField,
                       BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->getExplain())));
     }
 
@@ -36,11 +44,11 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
         request.removeField(search_helpers::kViewFieldName);
     }
 
-    auto commandObj = cmdBob.obj();
+    // Pass through remaining user-supplied fields from the request.
+    cmdBob.appendElements(request);
 
-    // Copy over all fields from the original object for passthrough.
     return mongot_cursor::getRemoteCommandRequest(
-        expCtx->getOperationContext(), expCtx->getNamespaceString(), commandObj.addFields(request));
+        expCtx->getOperationContext(), expCtx->getNamespaceString(), cmdBob.obj());
 }
 }  // namespace
 

@@ -28,6 +28,7 @@
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/assert_util.h"
 
+#include <array>
 #include <list>
 #include <set>
 #include <string>
@@ -188,6 +189,13 @@ parseMongotResponseCursors(std::vector<std::unique_ptr<executor::TaskExecutorCur
     }
     return result;
 }
+
+// Single source of truth for the security-trusted, mongod-owned $vectorSearch field names. mongod
+// derives these from trusted sources (the target collection name, its UUID, and the authorized view
+// name) when building the command sent to mongot.
+constexpr std::array kVectorSearchTrustedFields{mongot_cursor::kVectorSearchCmd,
+                                                mongot_cursor::kCollectionUuidField,
+                                                mongot_cursor::kViewNameField};
 
 static const std::vector<std::string_view>& getInternalOnlyFieldNames() {
     static const std::vector<std::string_view> fields = {
@@ -716,6 +724,15 @@ void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, con
         if (spec.hasField(name)) {
             assertAllowedInternalIfRequired(opCtx, name, AllowedWithClientType::kInternal);
         }
+    }
+}
+
+void validateUserSpecDoesNotOverrideTrustedFields(const BSONObj& spec) {
+    for (const auto& field : kVectorSearchTrustedFields) {
+        uassert(12961800,
+                str::stream() << "Cannot specify the reserved field '" << field
+                              << "' in a $vectorSearch stage",
+                !spec.hasField(field));
     }
 }
 
