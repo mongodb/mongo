@@ -18,6 +18,7 @@
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
@@ -92,7 +93,8 @@ private:
  * DocumentSourceExtensionOptimizable is the concrete implementation for extension stages that can
  * participate in query optimization and execution.
  */
-class DocumentSourceExtensionOptimizable : public DocumentSource {
+class DocumentSourceExtensionOptimizable : public DocumentSource,
+                                           public WrappedExtensionSourceHooks {
 public:
     /**
      * A LiteParsedDocumentSource implementation for extension stages mapping to an
@@ -522,10 +524,6 @@ public:
         return _logicalStage->getDocsNeededBounds();
     }
 
-    void skipMetadataStream() override {
-        _logicalStage->skipMetadataStream();
-    }
-
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
@@ -574,10 +572,28 @@ public:
     void applyPipelineSuffixDependencies(const host_connector::PipelineDependenciesAdapter& deps);
 
     /**
-     * Builds the boundary adapter and forwards to applyPipelineSuffixDependencies.
+     * Overridden from WrappedExtensionSourceHooks. Builds the boundary adapter and forwards to the
+     * overload above.
      */
-    void propagatePipelineSuffixDependencies(const DepsTracker& deps,
-                                             const std::set<std::string>& builtinVarRefs) override;
+    void applyPipelineSuffixDependencies(const DepsTracker& deps,
+                                         const std::set<std::string>& builtinVarRefs) override;
+
+    /**
+     * Overridden from WrappedExtensionSourceHooks. Notifies the underlying extension logical stage
+     * that the metadata stream has been elided.
+     */
+    void skipMetadataStream() override {
+        _logicalStage->skipMetadataStream();
+    }
+
+    /**
+     * Overridden from WrappedExtensionSourceHooks. Enqueues this stage's own in-place extension
+     * rules onto 'ctx'.
+     */
+    void dispatchInPlaceRules(
+        rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) const override {
+        dispatchExtensionRules(ctx, kInPlace);
+    }
 
 protected:
     /**

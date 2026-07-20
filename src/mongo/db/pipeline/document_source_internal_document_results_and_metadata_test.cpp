@@ -12,7 +12,6 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/agg/stage.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
@@ -27,6 +26,7 @@
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -198,15 +198,14 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
               StageConstraints::TransactionRequirement::kNotAllowed);
 }
 
-class DocumentSourceMockForDRMOptimization final : public DocumentSourceMock {
+// Tracks whether elideMetadata() skipped the metadata stream on the wrapped source, for tests
+// exercising optimizeAt()'s metadata-elision decision directly.
+class DocumentSourceMockTrackingMetadataStreamSkip final : public DocumentSourceMock,
+                                                           public WrappedExtensionSourceHooks {
 public:
-    static boost::intrusive_ptr<DocumentSourceMockForDRMOptimization> create(
+    static boost::intrusive_ptr<DocumentSourceMockTrackingMetadataStreamSkip> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        boost::intrusive_ptr<DocumentSourceMockForDRMOptimization> mock(
-            new DocumentSourceMockForDRMOptimization(expCtx));
-        mock->mockConstraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        mock->mockConstraints.requiresInputDocSource = false;
-        return mock;
+        return new DocumentSourceMockTrackingMetadataStreamSkip(expCtx);
     }
 
     void skipMetadataStream() override {
@@ -217,149 +216,19 @@ public:
         return _metadataStreamSkipped;
     }
 
-    void propagatePipelineSuffixDependencies(const DepsTracker& deps,
-                                             const std::set<std::string>& builtinVarRefs) override {
-        _suffixDependenciesApplied = true;
-        _appliedMetadataDeps = deps.metadataDeps();
-        _appliedVariableRefs = builtinVarRefs;
-    }
+    void applyPipelineSuffixDependencies(const DepsTracker& deps,
+                                         const std::set<std::string>& builtinVarRefs) override {}
 
-    bool wereSuffixDependenciesApplied() const {
-        return _suffixDependenciesApplied;
-    }
-
-    const QueryMetadataBitSet& appliedMetadataDeps() const {
-        return _appliedMetadataDeps;
-    }
-
-    const std::set<std::string>& appliedVariableRefs() const {
-        return _appliedVariableRefs;
-    }
+    void dispatchInPlaceRules(
+        rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) const override {}
 
 private:
-    DocumentSourceMockForDRMOptimization(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceMockTrackingMetadataStreamSkip(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMock({}, expCtx) {}
 
     bool _metadataStreamSkipped = false;
-    bool _suffixDependenciesApplied = false;
-    QueryMetadataBitSet _appliedMetadataDeps;
-    std::set<std::string> _appliedVariableRefs;
 };
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeElidesMetadataWhenNoSearchMetaRef) {
-    auto sourceStage = DocumentSourceMockForDRMOptimization::create(getExpCtx());
-    auto* sourcePtr = sourceStage.get();
-    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
-        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
-    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
-    ASSERT(ds);
-    ASSERT(ds->getMetadata().has_value());
-
-    // Downstream $project does not reference $$SEARCH_META.
-    auto downstreamStage =
-        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(stage);
-    pipeline.push_back(downstreamStage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    ASSERT_FALSE(ds->getMetadata().has_value());
-    ASSERT_TRUE(sourcePtr->isMetadataStreamSkipped());
-}
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeAppliesSuffixDependenciesToSource) {
-    auto sourceStage = DocumentSourceMockForDRMOptimization::create(getExpCtx());
-    auto* sourcePtr = sourceStage.get();
-    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
-        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
-    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
-    ASSERT(ds);
-
-    // Downstream $project references the searchSequenceToken metadata field and the $$NOW built-in
-    // variable, so both the metadata dep and the variable ref must reach the wrapped source.
-    auto downstreamStage =
-        DocumentSource::parse(
-            getExpCtx(),
-            BSON("$project" << BSON("tok" << BSON("$meta" << "searchSequenceToken") << "ts"
-                                          << "$$NOW")))
-            .front();
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(stage);
-    pipeline.push_back(downstreamStage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    ASSERT_TRUE(sourcePtr->wereSuffixDependenciesApplied());
-    ASSERT_TRUE(
-        sourcePtr->appliedMetadataDeps()[DocumentMetadataFields::MetaType::kSearchSequenceToken]);
-    ASSERT_EQ(sourcePtr->appliedVariableRefs().count("NOW"), 1u);
-}
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeSkipsSuffixDepsWhenNeedsMerge) {
-    // On shards, the merge pipeline's dependencies are invisible, so suffix dependencies must not
-    // be forwarded to the wrapped source.
-    getExpCtx()->setNeedsMerge(true);
-    auto sourceStage = DocumentSourceMockForDRMOptimization::create(getExpCtx());
-    auto* sourcePtr = sourceStage.get();
-    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
-        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
-    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
-    ASSERT(ds);
-
-    auto downstreamStage =
-        DocumentSource::parse(
-            getExpCtx(), BSON("$project" << BSON("tok" << BSON("$meta" << "searchSequenceToken"))))
-            .front();
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(stage);
-    pipeline.push_back(downstreamStage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    ASSERT_FALSE(sourcePtr->wereSuffixDependenciesApplied());
-}
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeSkipsSuffixDepsWhenNoDownstreamStages) {
-    // When this is the last stage in the pipeline there is no suffix from which to derive
-    // dependencies, so nothing should be forwarded to the wrapped source.
-    auto sourceStage = DocumentSourceMockForDRMOptimization::create(getExpCtx());
-    auto* sourcePtr = sourceStage.get();
-    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
-        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
-    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
-    ASSERT(ds);
-
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(stage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    ASSERT_FALSE(sourcePtr->wereSuffixDependenciesApplied());
-}
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeAppliesEmptySuffixDepsWhenNoDownstreamRef) {
-    // A downstream stage that references neither metadata nor built-in variables still triggers
-    // forwarding, but with an empty dependency set and no variable refs.
-    auto sourceStage = DocumentSourceMockForDRMOptimization::create(getExpCtx());
-    auto* sourcePtr = sourceStage.get();
-    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
-        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
-    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
-    ASSERT(ds);
-
-    auto downstreamStage =
-        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(stage);
-    pipeline.push_back(downstreamStage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    ASSERT_TRUE(sourcePtr->wereSuffixDependenciesApplied());
-    ASSERT_FALSE(sourcePtr->appliedMetadataDeps().any());
-    ASSERT_TRUE(sourcePtr->appliedVariableRefs().empty());
-}
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        OptimizeRetainsMetadataWhenNeedsMergeTrue) {
@@ -385,7 +254,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        OptimizeSkipsMetadataStreamWhenMetadataAlreadyAbsent) {
-    auto sourceStage = DocumentSourceMockForDRMOptimization::create(getExpCtx());
+    auto sourceStage = DocumentSourceMockTrackingMetadataStreamSkip::create(getExpCtx());
     auto* sourcePtr = sourceStage.get();
     auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
         getExpCtx(), std::move(sourceStage), /*metadata=*/boost::none);
@@ -435,7 +304,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        OptimizeRetainsMetadataWhenDownstreamStageReferencesSearchMeta) {
-    auto sourceStage = DocumentSourceMockForDRMOptimization::create(getExpCtx());
+    auto sourceStage = DocumentSourceMockTrackingMetadataStreamSkip::create(getExpCtx());
     auto* sourcePtr = sourceStage.get();
     auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
         getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));

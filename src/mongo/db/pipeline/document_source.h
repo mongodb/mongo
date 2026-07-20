@@ -384,18 +384,6 @@ public:
     static Id allocateId(std::string_view name);
 
     /**
-     * Notifies this stage that the metadata stream has been elided and will not produce documents.
-     */
-    virtual void skipMetadataStream() {}
-
-    /**
-     * Forwards pipeline-suffix dependencies and referenced built-in variable names to a wrapped
-     * stage that the rule-based rewriter's dependency pass does not visit.
-     */
-    virtual void propagatePipelineSuffixDependencies(const DepsTracker& deps,
-                                                     const std::set<std::string>& builtinVarRefs) {}
-
-    /**
      * Returns true if the DocumentSource has a query.
      */
     virtual bool hasQuery() const;

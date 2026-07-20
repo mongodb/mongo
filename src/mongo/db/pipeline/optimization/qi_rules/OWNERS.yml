@@ -1,0 +1,13 @@
+version: 1.0.0
+filters:
+  # QI-owned optimization rules and tests. This directory lets QI add and migrate pipeline
+  # optimizations without depending on QO ownership of the parent optimization directory.
+  - "*":
+    approvers:
+      - 10gen/query-integration-features
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-integration-staff-leads
+  - "internal_document_results_and_metadata_rules.cpp":
+    approvers:
+      - 10gen/query-integration-extensions-api
