@@ -65,12 +65,10 @@ BSONObj DbMessage::nextJsObj() {
             "Client Error: Remaining data too small for BSON object",
             _nextjsobj != nullptr && _theEnd - _nextjsobj >= 5);
 
-    if (serverGlobalParams.objcheck) {
-        Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj);
-        uassert(ErrorCodes::InvalidBSON,
-                str::stream() << "Client Error: bad object in message: " << status.reason(),
-                status.isOK());
-    }
+    Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj);
+    uassert(ErrorCodes::InvalidBSON,
+            str::stream() << "Client Error: bad object in message: " << status.reason(),
+            status.isOK());
 
     BSONObj js(_nextjsobj);
     MONGO_verify(js.objsize() >= 5);

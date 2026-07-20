@@ -7,7 +7,6 @@ executor:
   config:
     shell_options:
       crashOnInvalidBSONError: ""
-      objcheck: ""
       eval: |
         // histogramCE is banned except if test commands are enabled,
         // so we cannot set it in mongod_options.set_parameters

@@ -66,20 +66,8 @@ configs:
         description: "disable all features deprecated in the MongoDB Stable API"
         arg_vartype: Switch
         cpp_varname: shellGlobalParams.apiDeprecationErrors
-    "objcheck":
-        description: "inspect client data for validity on receipt"
-        arg_vartype: Switch
-        source: [cli, ini]
-        conflicts: "noobjcheck"
-        hidden: true
-    "noobjcheck":
-        description: "do NOT inspect client data for validity on receipt (DEFAULT)"
-        arg_vartype: Switch
-        source: [cli, ini]
-        conflicts: "objcheck"
-        hidden: true
     "crashOnInvalidBSONError":
-        description: "Crashes the shell if invalid BSON is returned from a call to the server. Must be paired with objcheck to provoke a BSON validation check."
+        description: "Crashes the shell if invalid BSON is returned from a call to the server."
         arg_vartype: Switch
         source: [cli, ini]
         hidden: true

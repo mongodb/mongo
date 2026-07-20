@@ -11,7 +11,6 @@ executor:
   config:
     shell_options:
       crashOnInvalidBSONError: ""
-      objcheck: ""
   hooks:
     - class: FuzzerRestoreSettings
     - class: RunQueryStats

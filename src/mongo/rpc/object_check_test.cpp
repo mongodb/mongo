@@ -25,12 +25,6 @@ using std::begin;
 using std::end;
 
 TEST(DataTypeValidated, BSONValidationEnabled) {
-    bool wasEnabled = serverGlobalParams.objcheck;
-    const auto setValidation = [&](bool enabled) {
-        serverGlobalParams.objcheck = enabled;
-    };
-    ON_BLOCK_EXIT([=] { setValidation(wasEnabled); });
-
     BSONObj valid = BSON("baz" << "bar"
                                << "garply" << BSON("foo" << "bar"));
     char buf[1024] = {0};
@@ -55,21 +49,9 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
         ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
-
-    {
-        // disable validation
-        setValidation(false);
-        ValidatedBSONObj v;
-        ConstDataRangeCursor cdrc(begin(buf), end(buf));
-        ASSERT_OK(cdrc.readAndAdvanceNoThrow(&v));
-    }
 }
 
 DEATH_TEST(ObjectCheckDeathTest, BSONValidationEnabledWithCrashOnError, "50761") {
-    bool objcheckValue = serverGlobalParams.objcheck;
-    serverGlobalParams.objcheck = true;
-    ON_BLOCK_EXIT([=] { serverGlobalParams.objcheck = objcheckValue; });
-
     bool crashOnErrorValue = serverGlobalParams.crashOnInvalidBSONError;
     serverGlobalParams.crashOnInvalidBSONError = true;
     ON_BLOCK_EXIT([&] { serverGlobalParams.crashOnInvalidBSONError = crashOnErrorValue; });

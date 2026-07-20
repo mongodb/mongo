@@ -23,9 +23,6 @@ namespace mongo {
 
 /**
  * Canonicalize server options for the given environment.
- *
- * For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
- * merged into "net.wireObjectCheck".
  */
 [[MONGO_MOD_PUBLIC]] Status canonicalizeServerOptions(optionenvironment::Environment* params);
 

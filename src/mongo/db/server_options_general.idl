@@ -158,24 +158,30 @@ configs:
         arg_vartype: String
 
     objcheck:
-        description: "Inspect client data for validity on receipt (DEFAULT)"
+        description: >-
+            (DEPRECATED) This option used to control client data validation, but is no longer
+            supported. Data validation is always performed
         arg_vartype: Switch
         source: [cli, ini]
         conflicts: noobjcheck
         hidden: true
     noobjcheck:
-        description: "Do NOT inspect client data for validity on receipt"
+        description: >-
+            (DEPRECATED) This option used to control client data validation, but is no longer
+            supported. Data validation is always performed
         arg_vartype: Switch
         source: [cli, ini]
         conflicts: objcheck
         hidden: true
     "net.wireObjectCheck":
-        description: "Inspect client data for validity on receipt (DEFAULT)"
+        description: >-
+            (DEPRECATED) This option used to control client data validation, but is no longer
+            supported. Data validation is always performed
         arg_vartype: Bool
         source: yaml
         hidden: true
     crashOnInvalidBSONError:
-        description: "Crashes the shell if invalid BSON is returned from a call to the server. Must be paired with objcheck to provoke a BSON validation check."
+        description: "Crashes the shell if invalid BSON is returned from a call to the server."
         arg_vartype: Switch
         source: [cli, ini]
         hidden: true

@@ -34,9 +34,6 @@ Status validateBaseOptions(const moe::Environment& params);
 
 /**
  * Canonicalize base options for the given environment.
- *
- * For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
- * merged into "net.wireObjectCheck".
  */
 Status canonicalizeBaseOptions(moe::Environment* params);
 

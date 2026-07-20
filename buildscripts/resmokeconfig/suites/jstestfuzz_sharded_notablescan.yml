@@ -17,7 +17,6 @@ executor:
           # Other fuzzers test commands against sharded clusters with logical session ids.
           disableImplicitSessions: true
       crashOnInvalidBSONError: ""
-      objcheck: ""
   hooks:
     - class: FuzzerRestoreSettings
     - class: RunQueryStats

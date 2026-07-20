@@ -36,9 +36,6 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
         return;
     }
 
-    // Make sure that we do BSON validation on all incoming messages
-    serverGlobalParams.objcheck = true;
-
     auto sb = SharedBuffer::allocate(fuzzedData.length());
     memcpy(sb.get(), fuzzedData.data(), fuzzedData.length());
     Message msg(std::move(sb));

@@ -19,7 +19,6 @@ executor:
         TestData:
           disableImplicitSessions: true
           enableOTELTracing: false
-      objcheck: ""
   fixture:
     class: ReplicaSetFixture
     mixed_bin_versions: new_old_new

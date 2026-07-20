@@ -22,7 +22,6 @@ executor:
         TestData:
           setParameters:
             internalQueryPlannerUseMultiplannerForSingleSolutions: true
-      objcheck: ""
   fixture:
     class: MongoDFixture
     mongod_options:
