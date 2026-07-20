@@ -64,6 +64,10 @@ IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), kI
 IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_"], [kIndexName]);
 IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], [kIndexName]);
 
+// Wait for the secondary's build to reach "waiting for next action", so the skipped record is
+// recorded before the step-up check runs. Otherwise the check may never abort the build.
+checkLog.containsJson(secondary, 3856203);
+
 rst.stepUp(secondary);
 
 createIdx();
@@ -73,11 +77,14 @@ IndexBuildTest.assertIndexesSoon(primaryColl, 1, ["_id_"]);
 IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ["_id_"]);
 
 // Verify failure reason is due to step-up check.
-checkLog.checkContainsOnceJsonStringMatch(
-    secondaryColl,
-    4656003,
-    "error",
-    "Skipped records retry failed on step-up",
+assert(
+    checkLog.checkContainsOnceJsonStringMatch(
+        secondary,
+        4656003,
+        "errmsg",
+        "Skipped records retry failed on step-up",
+    ),
+    "expected the index build to have been aborted by the step-up skipped records retry",
 );
 
 rst.stopSet();
