@@ -1284,7 +1284,9 @@ void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCt
         if (ar->empty()) {
             updateUnsetBuilder.append("authenticationRestrictions", "");
         } else {
-            updateSetBuilder.append("authenticationRestrictions", vectorToBSON(ar.get()));
+            auto arBSON = vectorToBSON(ar.get());
+            uassertStatusOK(parseAuthenticationRestriction(arBSON));
+            updateSetBuilder.append("authenticationRestrictions", arBSON);
         }
     }
 
@@ -1508,6 +1510,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     boost::optional<BSONArray> bsonAuthRestrictions;
     if (auto ar = cmd.getAuthenticationRestrictions(); ar && !ar->empty()) {
         bsonAuthRestrictions = vectorToBSON(ar.get());
+        uassertStatusOK(parseAuthenticationRestriction(bsonAuthRestrictions.get()));
         roleObjBuilder.append("authenticationRestrictions", bsonAuthRestrictions.get());
     }
 
@@ -1563,6 +1566,7 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
             updateUnsetBuilder.append("authenticationRestrictions", "");
         } else {
             authRest = vectorToBSON(ar.get());
+            uassertStatusOK(parseAuthenticationRestriction(authRest));
             updateSetBuilder.append("authenticationRestrictions", authRest);
         }
     }
