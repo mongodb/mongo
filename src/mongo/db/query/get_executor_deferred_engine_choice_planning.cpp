@@ -15,6 +15,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/engine_selection.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/get_executor_fast_paths.h"
 #include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
@@ -280,6 +281,14 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     // TODO SERVER-120492: Investigate if we can remove the replanning restriction on
     // subplanning. If not, add a descriptive comment here about why.
     if (!replanning && SubplanStage::needsSubplanning(*cq)) {
+        // The V3 explain verbosity modes (planSummary, plannerChoice, plannerStats, execStats)
+        // are not yet supported for rooted $or queries.
+        if (auto verbosity = cq->getExplain()) {
+            uassert(13145001,
+                    "V3 explain verbosity is not supported for rooted $or queries",
+                    !ExplainOptions::isV3Verbosity(*verbosity));
+        }
+
         LOGV2_DEBUG(12507600,
                     2,
                     "Running query as sub-queries",

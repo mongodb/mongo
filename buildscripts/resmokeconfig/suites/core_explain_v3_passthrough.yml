@@ -25,6 +25,31 @@ selector:
     - jstests/core/query/query_settings/**/*.js
     # Shard level user write block is not supported on standalone.
     - jstests/core/administrative/block_replica_set_writes.js
+
+    # The following tests run explain of a rooted $or query, which is not currently supported in V3
+    # explain.
+    # TODO SERVER-131818 enable these tests once CBR supports rooted $or queries.
+    - jstests/core/index/indexn.js
+    - jstests/core/query/or_use_clustered_collection.js
+    - jstests/core/query/or/oro.js
+    - jstests/core/query/or/or_to_in.js
+    - jstests/core/index/not_index_tagging.js
+    - jstests/core/query/or/subplanning_plan_quality.js
+    - jstests/core/index/wildcard/wildcard_index_multikey.js
+    - jstests/core/query/force_plan.js
+    - jstests/core/query/internal_strip_invalid_assignment.js
+    - jstests/core/query/explain/explain_plan_cache.js
+    - jstests/core/query/sort/sort_merge_collation.js
+    - jstests/core/index/wildcard/wildcard_index_collation.js
+    - jstests/core/index/wildcard/compound_wildcard_index_residual.js
+    - jstests/core/query/distinct/distinct_subplanning.js
+    - jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
+    - jstests/core/query/sort/sort_merge.js
+    - jstests/core/query/or/ord.js
+    - jstests/core/index/wildcard/wildcard_and_text_indexes.js
+    - jstests/core/index/index_for_sort.js
+    - jstests/core/index/wildcard/compound_wildcard_index_or.js
+    - jstests/core/query/explain/explain6.js
 executor:
   archive:
     hooks:

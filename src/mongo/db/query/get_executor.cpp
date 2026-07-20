@@ -51,6 +51,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/engine_selection.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor_deferred_engine_choice.h"
 #include "mongo/db/query/get_executor_fast_paths.h"
@@ -370,6 +371,14 @@ public:
         // TODO SERVER-120492: Investigate if we can remove the replanning restriction on
         // subplanning. If not, add a descriptive comment here about why.
         if (!isReplanning() && SubplanStage::needsSubplanning(*_cq)) {
+            // The V3 explain verbosity modes (planSummary, plannerChoice, plannerStats, execStats)
+            // are not yet supported for rooted $or queries.
+            if (auto verbosity = _cq->getExplain()) {
+                uassert(13145000,
+                        "V3 explain verbosity is not supported for rooted $or queries",
+                        !ExplainOptions::isV3Verbosity(*verbosity));
+            }
+
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
