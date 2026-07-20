@@ -94,11 +94,15 @@ Status OpenTelemetryTracingResourceAttributes::set(const BSONElement& newValueEl
     return Status::OK();
 }
 
-Status OpenTelemetryTracingResourceAttributes::setFromString(std::string_view,
-                                                             const boost::optional<TenantId>&) {
-    return Status(ErrorCodes::BadValue,
-                  "openTelemetryTracingResourceAttributes cannot be set via string; "
-                  "provide a BSON document");
+Status OpenTelemetryTracingResourceAttributes::setFromString(
+    std::string_view s, const boost::optional<TenantId>& tenant) {
+    try {
+        auto b = BSON("v" << fromjson(s));
+        return set(b.firstElement(), tenant);
+    } catch (std::exception& e) {
+        return Status(ErrorCodes::BadValue,
+                      fmt::format("Failed to convert string to BSON object: {}", e.what()));
+    }
 }
 
 }  // namespace mongo::otel::traces

@@ -148,8 +148,18 @@ TEST_F(ResourceAttributesTest, DuplicateKeyFails) {
     EXPECT_THAT(getTracingResourceAttributes(), IsEmpty());
 }
 
-TEST_F(ResourceAttributesTest, SetFromStringFails) {
-    EXPECT_THAT(attrs.setFromString("{\"env\": \"prod\"}", /*tenantId=*/boost::none),
+TEST_F(ResourceAttributesTest, SetFromStringParsesJson) {
+    ASSERT_OK(attrs.setFromString("{\"env\": \"prod\"}", /*tenantId=*/boost::none));
+    EXPECT_THAT(getTracingResourceAttributes(), ElementsAre(Pair("env", "prod")));
+}
+
+TEST_F(ResourceAttributesTest, SetFromStringRejectsInvalidJson) {
+    EXPECT_THAT(attrs.setFromString("{\"BadBson\":", /*tenantId=*/boost::none),
+                StatusIs(ErrorCodes::BadValue, HasSubstr("convert string to BSON")));
+}
+
+TEST_F(ResourceAttributesTest, SetFromStringRejectsNonStringValues) {
+    EXPECT_THAT(attrs.setFromString("{\"service.version\": 3}", /*tenantId=*/boost::none),
                 Not(StatusIsOK()));
 }
 
