@@ -3,10 +3,13 @@
 
 #pragma once
 
+#include "mongo/platform/atomic.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
+#include <cstdint>
 #include <mutex>
 
 #include <boost/move/utility_core.hpp>
@@ -63,6 +66,35 @@ public:
 
 private:
     /**
+     * Packs the primary status and the latest count of sharded collections with inconsistent
+     * indexes into a single 64-bit word: the top bit stores the primary status and the remaining 63
+     * bits store the count. Keeping both fields in one word allows them to be checked and updated
+     * atomically without holding a mutex.
+     */
+    class State {
+    public:
+        State() = default;
+        State(bool isPrimary, long long count)
+            : _bits((isPrimary ? kPrimaryBit : 0) | (static_cast<uint64_t>(count) & kCountMask)) {
+            dassert(count >= 0);
+        }
+
+        bool isPrimary() const {
+            return _bits & kPrimaryBit;
+        }
+
+        long long count() const {
+            return static_cast<long long>(_bits & kCountMask);
+        }
+
+    private:
+        static constexpr uint64_t kPrimaryBit = 1ULL << 63;
+        static constexpr uint64_t kCountMask = kPrimaryBit - 1;
+
+        uint64_t _bits = 0;
+    };
+
+    /**
      * Initializes and starts the periodic job.
      */
     void _launchShardedIndexConsistencyChecker(WithLock, ServiceContext* serviceContext);
@@ -87,17 +119,8 @@ private:
     // Periodic job for counting inconsistent indexes in the cluster.
     PeriodicJobAnchor _shardedTimeseriesShardkeyChecker;
 
-    // The latest count of sharded collections with inconsistent indexes. Kept as a separate struct
-    // in order to atomically check and update both fields without the need to hold a mutex.
-    struct State {
-        bool isPrimary;
-        long long numShardedCollsWithInconsistentIndexes;
-    };
-
-    // We use std::atomic rather than Atomic since std::atomic<State>::is_always_lock_free returns
-    // false and there is a static_assert for it on Atomic<>. Note that this isn't a problem here
-    // since this code is not performance critical and even if the code uses mutexes it's not an
-    // issue here.
-    std::atomic<State> _state{State{false, 0}};  // NOLINT
+    // Tracks the primary status and the latest count of sharded collections with inconsistent
+    // indexes.
+    Atomic<State> _state{State{false, 0}};
 };
 }  // namespace mongo

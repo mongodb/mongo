@@ -70,7 +70,7 @@ PeriodicShardedIndexConsistencyChecker& PeriodicShardedIndexConsistencyChecker::
 
 long long PeriodicShardedIndexConsistencyChecker::getNumShardedCollsWithInconsistentIndexes()
     const {
-    return _state.load().numShardedCollsWithInconsistentIndexes;
+    return _state.load().count();
 }
 
 void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyChecker(
@@ -191,16 +191,14 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 // Update the count if this node is still primary. This is necessary because a
                 // stepdown may complete while this job is running and the count should always be
                 // zero on a non-primary node.
-                auto expectedState = _state.load();
+                State expectedState = _state.load();
                 State newState;
                 do {
-                    if (!expectedState.isPrimary) {
+                    if (!expectedState.isPrimary()) {
                         return;
                     }
-                    newState = expectedState;
-                    newState.numShardedCollsWithInconsistentIndexes =
-                        numShardedCollsWithInconsistentIndexes;
-                } while (!_state.compare_exchange_strong(expectedState, newState));
+                    newState = State(true /* isPrimary */, numShardedCollsWithInconsistentIndexes);
+                } while (!_state.compareAndSwap(&expectedState, newState));
             } catch (DBException& ex) {
                 LOGV2(22052,
                       "Error while checking sharded index consistency",
@@ -249,9 +247,8 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedTimeseriesShardkeyChe
 void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceContext) {
     std::lock_guard<std::mutex> lk(_mutex);
     auto state = _state.load();
-    if (!state.isPrimary) {
-        state.isPrimary = true;
-        _state.store(state);
+    if (!state.isPrimary()) {
+        _state.store(State(true /* isPrimary */, state.count()));
 
         _launchShardedIndexConsistencyChecker(lk, serviceContext);
         _launchShardedTimeseriesShardkeyChecker(lk, serviceContext);
@@ -261,11 +258,9 @@ void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceCon
 void PeriodicShardedIndexConsistencyChecker::onStepDown() {
     std::lock_guard<std::mutex> lk(_mutex);
     auto state = _state.load();
-    if (state.isPrimary) {
-        state.isPrimary = false;
+    if (state.isPrimary()) {
         // Clear the counter to prevent a secondary from reporting an out-of-date count.
-        state.numShardedCollsWithInconsistentIndexes = 0;
-        _state.store(state);
+        _state.store(State(false /* isPrimary */, 0));
 
         invariant(_shardedIndexConsistencyChecker.isValid());
         _shardedIndexConsistencyChecker.stop();
