@@ -782,7 +782,8 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                         if (exec::matcher::matches(&m, obj)) {
                             LOGV2(9918500,
                                   "stopReplProducerOnDocument matched a document.",
-                                  "doc"_attr = doc,
+                                  "opTime"_attr = OpTime::parse(doc),
+                                  "doc"_attr = redact(doc),
                                   "batchSize"_attr = documents.size(),
                                   "firstTimestamp"_attr = documents.front()["ts"],
                                   "lastTimestamp"_attr = documents.back()["ts"]);

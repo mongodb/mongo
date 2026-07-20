@@ -157,7 +157,8 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
         if (entry.shouldLogAsDDLOperation() && !serverGlobalParams.quiet.load()) {
             LOGV2(7360109,
                   "Processing DDL command oplog entry in OplogApplierBatcher",
-                  "oplogEntry"_attr = entry.toBSONForLogging());
+                  "opTime"_attr = entry.getOpTime(),
+                  "oplogEntry"_attr = redact(entry.toBSONForLogging()));
         }
 
         if (!feature_flags::gReduceMajorityWriteLatency.isEnabled()) {

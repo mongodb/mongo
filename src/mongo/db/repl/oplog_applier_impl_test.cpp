@@ -3962,7 +3962,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
     ASSERT_EQUALS(
         ErrorCodes::InvalidOptions,
         oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, nullptr, dataIsConsistent));
-    ASSERT_EQUALS(1,
+    ASSERT_EQUALS(2,
                   logs.countBSONContainingSubset(BSON(
                       "attr" << BSON("opTime" << BSON("ts" << Timestamp(1, 0) << "t" << 1LL)))));
 }
