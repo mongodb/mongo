@@ -748,6 +748,45 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 }
 
+TEST(CurOpTest, AppendReportsUserAcquisitionAndLDAPOperationStatsAsDistinctObjects) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    SingleThreadedLockStats ls;
+
+    auto curop = CurOp::get(*opCtx);
+    const OpDebug& od = curop->debug();
+
+    // Record one user-cache acquisition (authorization)and one LDAP bind (LDAPOperations) so that
+    // both sets of stats report.
+    auto userAcquisitionStats = curop->getUserAcquisitionStats();
+    auto* tickSource = opCtx->getServiceContext()->getTickSource();
+    {
+        UserAcquisitionStatsHandle handle(userAcquisitionStats.get(), tickSource, kCache);
+    }
+    {
+        UserAcquisitionStatsHandle handle(userAcquisitionStats.get(), tickSource, kBind);
+    }
+    ASSERT_TRUE(userAcquisitionStats->shouldReportUserCacheAccessStats());
+    ASSERT_TRUE(userAcquisitionStats->shouldReportLDAPOperationStats());
+
+    BSONObjBuilder builder;
+    od.append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+    BSONObj bs = builder.done();
+
+    ASSERT_TRUE(bs.hasField("authorization")) << bs;
+    ASSERT_EQ(bs["authorization"].type(), BSONType::object) << bs;
+    ASSERT_FALSE(bs.getObjectField("authorization").isEmpty()) << bs;
+
+    ASSERT_TRUE(bs.hasField("LDAPOperations")) << bs;
+    ASSERT_EQ(bs["LDAPOperations"].type(), BSONType::object) << bs;
+    BSONObj ldapObj = bs.getObjectField("LDAPOperations");
+    ASSERT_TRUE(ldapObj.hasField("LDAPNumberOfReferrals")) << ldapObj;
+    ASSERT_TRUE(ldapObj.hasField("bindStats")) << ldapObj;
+
+    // The two objects are distinct top-level fields.
+    ASSERT_BSONOBJ_NE(bs.getObjectField("authorization"), bs.getObjectField("LDAPOperations"));
+}
+
 TEST(CurOpTest, PlanRankerMethodAppendedToProfilerOutput) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();

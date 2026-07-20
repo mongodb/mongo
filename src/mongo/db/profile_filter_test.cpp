@@ -73,6 +73,7 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
                                                                   "planRanker",
                                                                   "locks",
                                                                   "authorization",
+                                                                  "LDAPOperations",
                                                                   "flowControl",
                                                                   "writeConcern",
                                                                   "storage",
@@ -109,6 +110,26 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
 
         ASSERT_DOES_NOT_THROW(profileFilter.matches(opCtx, *opDebug, *curop));
     }
+}
+
+TEST_F(ProfileFilterTest, FilterOnLDAPOperationsField) {
+    auto filterExpr = BSON("LDAPOperations" << BSON("$exists" << true));
+    ProfileFilterImpl profileFilter{filterExpr, expCtx};
+
+    ASSERT_TRUE(profileFilter.dependsOn("LDAPOperations"))
+        << "Profile filter failed to report dependency on LDAPOperations";
+
+    ASSERT_FALSE(profileFilter.matches(opCtx, *opDebug, *curop));
+
+    // Record an LDAP bind so the stats report, then the filter should match.
+    auto userAcquisitionStats = curop->getUserAcquisitionStats();
+    auto* tickSource = opCtx->getServiceContext()->getTickSource();
+    {
+        UserAcquisitionStatsHandle handle(userAcquisitionStats.get(), tickSource, kBind);
+    }
+    ASSERT_TRUE(userAcquisitionStats->shouldReportLDAPOperationStats());
+
+    ASSERT_TRUE(profileFilter.matches(opCtx, *opDebug, *curop));
 }
 
 TEST_F(ProfileFilterTest, FilterOnNestedField) {
