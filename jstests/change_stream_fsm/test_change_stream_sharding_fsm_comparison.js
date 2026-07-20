@@ -17,6 +17,8 @@
  *   # Too slow on TSAN (sanitizer overhead on a multi-shard cluster), causing timeouts.
  *   # TODO SERVER-127099: Enable test on TSAN variant.
  *   incompatible_disaggregated_storage_tsan,
+ *   tsan_incompatible,
+ *   incompatible_aubsan,
  *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
