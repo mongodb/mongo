@@ -55,7 +55,7 @@ std::vector<std::span<const char>> unpackBinDataValues(const auto& arr) {
     keys.reserve(arr.nFields());  // Pre-allocate based on number of array elements
     std::transform(arr.begin(), arr.end(), std::back_inserter(keys), [](const BSONElement& val) {
         uassert(ErrorCodes::TypeMismatch,
-                "Container key array must be BinData Generic",
+                "Container array must be BinData Generic",
                 val.isBinData(BinDataType::BinDataGeneral));
         return getBinDataSpan(val);
     });

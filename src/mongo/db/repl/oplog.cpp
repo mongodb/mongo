@@ -3248,19 +3248,34 @@ Status applyContainerOperations(OperationContext* opCtx,
                 const auto& maybeVal = parsed.getValue();
                 s = parsed.getKey().visit(OverloadedVisitor{
                     [&](std::vector<std::span<const char>> keys) -> Status {
-                        // Bytes-keyed range insert (SERVER-130645): an array of keys, each written
-                        // with an empty value. The batch commits together with the enclosing wuow.
-                        // An array key carries no value; construction validation (13064100) permits
-                        // a value here, so reject it gracefully rather than tripping an invariant.
-                        uassert(13064104,
-                                "A container insert with an array of keys must not carry a value",
-                                !maybeVal);
-                        const auto emptyVal = std::span<const char>{};
+                        // Bytes-keyed range insert: supports a single value for all keys, an empty
+                        // value for all keys, or an array of values, with one for each key. The
+                        // batch commits together with the enclosing wuow.
+                        if (maybeVal && maybeVal->isArrayVal()) {
+                            const auto values = maybeVal->getArrayVal();
+                            uassert(13064104,
+                                    "A container insert with arrays of keys and values must be of "
+                                    "matching length",
+                                    keys.size() == values.size());
+                            for (size_t i = 0; i < keys.size(); i++) {
+                                auto k = keys[i];
+                                auto v = values[i];
+                                auto status = storage_engine_direct_crud::insert(
+                                    *engine, *ru, ident, k, v, policy);
+                                if (!status.isOK()) {
+                                    return status;
+                                }
+                                opObserver->onContainerInsert(opCtx, ident, k, v);
+                            }
+                            return Status::OK();
+                        }
+
+                        const auto valSpan = maybeVal.value_or(ContainerVal{}).data();
                         auto status = storage_engine_direct_crud::insert(
-                            *engine, *ru, ident, keys, emptyVal, policy);
+                            *engine, *ru, ident, keys, valSpan, policy);
                         if (status.isOK()) {
                             for (const auto& k : keys) {
-                                opObserver->onContainerInsert(opCtx, ident, k, emptyVal);
+                                opObserver->onContainerInsert(opCtx, ident, k, valSpan);
                             }
                         }
                         return status;
@@ -3282,9 +3297,8 @@ Status applyContainerOperations(OperationContext* opCtx,
                             }
                             return Status::OK();
                         }
-                        // Single int-keyed insert.
-                        invariant(maybeVal);
-                        const auto valSpan = maybeVal->data();
+                        // Single int-keyed insert. 'v' is optional; an absent value is empty.
+                        const auto valSpan = maybeVal.value_or(ContainerVal{}).data();
                         auto status = storage_engine_direct_crud::insert(
                             *engine, *ru, ident, key, valSpan, policy);
                         if (status.isOK()) {

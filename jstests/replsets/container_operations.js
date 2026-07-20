@@ -27,17 +27,13 @@ if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "ContainerWrites")) {
     quit();
 }
 
-function makeCI(ns, uri, k, v) {
-    return {op: "ci", ns, container: uri, o: {k, v}};
+function makeOp(op, ns, uri, o) {
+    return {op, ns, container: uri, o};
 }
 
-function makeCU(ns, uri, k, v) {
-    return {op: "cu", ns, container: uri, o: {k, v, "$v": NumberLong(1)}};
-}
-
-function makeCD(ns, uri, k) {
-    return {op: "cd", ns, container: uri, o: {k}};
-}
+const ci = (ns, uri, k, v) => makeOp("ci", ns, uri, v !== undefined ? {k, v} : {k});
+const cu = (ns, uri, k, v) => makeOp("cu", ns, uri, {k, v, "$v": NumberLong(1)});
+const cd = (ns, uri, k) => makeOp("cd", ns, uri, {k});
 
 function restartAndGetDB(dbName) {
     rst.stopSet(SIGTERM, /*forRestart*/ true);
@@ -63,15 +59,17 @@ const ns = "admin.$container";
 const binA = BinData(0, "QQ==");
 const binB = BinData(0, "Qg==");
 const binC = BinData(0, "Qw==");
+const binD = BinData(0, "RA==");
+const binEmpty = BinData(0, "");
 
 const cases = [
     {
         uri: "index-intkeys",
         cfg: "key_format=q,value_format=u",
         ops: [
-            (uri) => makeCI(ns, uri, NumberLong(1), binA),
-            (uri) => makeCI(ns, uri, NumberLong(2), binB),
-            (uri) => makeCD(ns, uri, NumberLong(1)),
+            (uri) => ci(ns, uri, NumberLong(1), binA),
+            (uri) => ci(ns, uri, NumberLong(2), binB),
+            (uri) => cd(ns, uri, NumberLong(1)),
         ],
         expected: {
             2: "B",
@@ -81,21 +79,64 @@ const cases = [
         uri: "index-stringkeys",
         cfg: "key_format=u,value_format=u",
         ops: [
-            (uri) => makeCI(ns, uri, binA, binA),
-            (uri) => makeCI(ns, uri, binB, binB),
-            (uri) => makeCD(ns, uri, binA),
+            (uri) => ci(ns, uri, binA, binA),
+            (uri) => ci(ns, uri, binB, binB),
+            (uri) => cd(ns, uri, binA),
         ],
         expected: {
             "B": "B",
         },
     },
     {
+        uri: "index-multistringkeys",
+        cfg: "key_format=u,value_format=u",
+        ops: [
+            (uri) => ci(ns, uri, [binA, binB, binC]),
+            (uri) => ci(ns, uri, binD, binEmpty),
+            (uri) => cd(ns, uri, [binC, binD]),
+        ],
+        expected: {
+            "A": "(null)",
+            "B": "(null)",
+        },
+    },
+    {
+        uri: "index-multistringkeysvalues",
+        cfg: "key_format=u,value_format=u",
+        ops: [
+            (uri) => ci(ns, uri, [binA, binB], binA),
+            (uri) => ci(ns, uri, [binC, binD], [binC, binD]),
+        ],
+        expected: {
+            "A": "A",
+            "B": "A",
+            "C": "C",
+            "D": "D",
+        },
+    },
+    {
+        uri: "index-intkeymultistringvalues",
+        cfg: "key_format=q,value_format=u",
+        ops: [
+            (uri) => ci(ns, uri, NumberLong(122), [binA, binB, binB]),
+            (uri) => cu(ns, uri, NumberLong(123), binA),
+            (uri) => ci(ns, uri, NumberLong(125), [binC, binD]),
+            (uri) => cd(ns, uri, NumberLong(122)),
+        ],
+        expected: {
+            123: "A",
+            124: "B",
+            125: "C",
+            126: "D",
+        },
+    },
+    {
         uri: "index-intkeys-update",
         cfg: "key_format=q,value_format=u",
         ops: [
-            (uri) => makeCI(ns, uri, NumberLong(1), binA),
-            (uri) => makeCI(ns, uri, NumberLong(2), binB),
-            (uri) => makeCU(ns, uri, NumberLong(1), binC),
+            (uri) => ci(ns, uri, NumberLong(1), binA),
+            (uri) => ci(ns, uri, NumberLong(2), binB),
+            (uri) => cu(ns, uri, NumberLong(1), binC),
         ],
         expected: {
             1: "C",
@@ -106,9 +147,9 @@ const cases = [
         uri: "index-stringkeys-update",
         cfg: "key_format=u,value_format=u",
         ops: [
-            (uri) => makeCI(ns, uri, binA, binA),
-            (uri) => makeCI(ns, uri, binB, binB),
-            (uri) => makeCU(ns, uri, binA, binC),
+            (uri) => ci(ns, uri, binA, binA),
+            (uri) => ci(ns, uri, binB, binB),
+            (uri) => cu(ns, uri, binA, binC),
         ],
         expected: {
             "A": "C",

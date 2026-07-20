@@ -578,9 +578,9 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsRejectMismatchedExistingCommitTimestam
  *   "op": "ci" | "cd" | "cu",
  *   "container": <string>,
  *   "o": {
- *     "k": <BinData | NumberLong>,
- *     "v": <BinData>               // only allowed for "ci" and "cu"
- *     "$v": <NumberLong>           // only allowed for "cu"
+ *     "k": <BinData | NumberLong> | Array[BinData]>,
+ *     "v": <BinData | Array[BinData]>                  // only allowed for "ci" and "cu"
+ *     "$v": <NumberLong>                               // only allowed for "cu"
  *   }
  * }
  */
@@ -669,11 +669,10 @@ TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeUpdate) 
     ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
 }
 
-// missing value - an integer key must specify a value
-TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingValueInsert) {
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeInsertWithoutValue) {
     auto p = BaseInsert();
-    p.oField = BSON("k" << _k);
-    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13064100);
+    p.oField = BSON("k" << _wrongTypeK);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
 }
 
 TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingValueUpdate) {
@@ -687,6 +686,30 @@ TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidValueTypeInsert
     auto p = BaseInsert();
     p.oField = BSON("k" << _k << "v" << _wrongTypeV);
     ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+}
+
+// key type must be int or array of binData with array-type value
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeArrayValueInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _wrongTypeK << "v" << BSON_ARRAY(BSONBinData("V", 1, BinDataGeneral)));
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+// key type must be int or array of binData with array-type value
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidBinDataKeyTypeArrayValueInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << BSONBinData("K", 1, BinDataGeneral) << "v"
+                        << BSON_ARRAY(BSONBinData("V", 1, BinDataGeneral)));
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13174600);
+}
+
+// array lengths must match with array-typed keys and values
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MismatchedKeyValueArrayLengthsInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << BSON_ARRAY(BSONBinData("K1", 2, BinDataGeneral)
+                                      << BSONBinData("K2", 2, BinDataGeneral))
+                        << "v" << BSON_ARRAY(BSONBinData("V", 1, BinDataGeneral)));
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13174600);
 }
 
 TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidValueTypeUpdate) {
@@ -789,20 +812,50 @@ TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRange) {
     }
 }
 
-// An array of keys carries no value. Construction validation permits a value alongside an array
-// key, so the apply path must reject it gracefully (a DBException) rather than tripping an
-// invariant and crashing the server.
-TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeWithValueIsRejected) {
-    const char k1[] = "K1", k2[] = "K2";
-    auto v = BSONBinData("A", 1, BinDataGeneral);
+// An array of keys with a single value. Each key should have the same value applied.
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeWithSingleValue) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+    auto v = BSONBinData("V", 1, BinDataGeneral);
 
-    auto o = BSON(
-        "k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral) << BSONBinData(k2, 2, BinDataGeneral))
-            << "v" << v);
-    // The entry is constructible (validation 13064100 allows a value with an array key)...
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k2, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral))
+                      << "v" << v);
     auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o);
-    // ...but applying it fails with a graceful error rather than an invariant/fassert.
-    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), entry), DBException, 13064104);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (const char* k : {k1, k2, k3}) {
+        auto val = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k, 2));
+        ASSERT_OK(val);
+        EXPECT_EQ(0, std::memcmp(val.getValue().get(), v.data, v.length));
+    }
+}
+
+// An array of keys with multiple values. Each key should have its own value.
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeWithValueRange) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+    auto v1 = BSONBinData("V1", 2, BinDataGeneral);
+    auto v2 = BSONBinData("V2", 2, BinDataGeneral);
+    auto v3 = BSONBinData("V3", 2, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k2, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral))
+                      << "v" << BSON_ARRAY(v1 << v2 << v3));
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    auto getK1 = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k1, 2));
+    ASSERT_OK(getK1);
+    EXPECT_EQ(0, std::memcmp(getK1.getValue().get(), v1.data, v1.length));
+
+    auto getK2 = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k2, 2));
+    ASSERT_OK(getK2);
+    EXPECT_EQ(0, std::memcmp(getK2.getValue().get(), v2.data, v2.length));
+
+    auto getK3 = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k3, 2));
+    ASSERT_OK(getK3);
+    EXPECT_EQ(0, std::memcmp(getK3.getValue().get(), v3.data, v3.length));
 }
 
 // Bytes-keyed range delete: an array of BinData keys to remove.
