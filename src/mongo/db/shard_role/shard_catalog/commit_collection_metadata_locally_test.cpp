@@ -11,6 +11,7 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
@@ -26,6 +27,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -39,6 +41,7 @@ const NamespaceString kFromNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "FromColl");
 const NamespaceString kToNss = NamespaceString::createNamespaceString_forTest("TestDB", "ToColl");
 const std::string kShardKey = "_id";
+const ShardId kCurrentShardId{"myShardName"};
 
 // Builds a point on the shard key, e.g. key(50) -> {_id: 50}. Accepts MINKEY/MAXKEY too.
 BSONObj key(const auto& value) {
@@ -145,7 +148,7 @@ CollectionAndChunksMetadata makeCollectionMetadata(const NamespaceString& nss, i
         auto min = i == 0 ? key(MINKEY) : key((i * 100));
         auto max = i == (nChunks - 1) ? key(MAXKEY) : key(((i + 1) * 100));
         auto range = ChunkRange(min, max);
-        auto& chunk = chunks.emplace_back(uuid, std::move(range), chunkVersion, ShardId("0"));
+        auto& chunk = chunks.emplace_back(uuid, std::move(range), chunkVersion, kCurrentShardId);
         chunk.setName(OID::gen());
         chunkVersion.incMajor();
     }
@@ -161,7 +164,7 @@ ChunkType makeChunk(const CollectionType& collType,
                     BSONObj min,
                     BSONObj max,
                     ChunkVersion version,
-                    ShardId shardId = ShardId("0")) {
+                    ShardId shardId = kCurrentShardId) {
     ChunkType chunk(collType.getUuid(),
                     ChunkRange(std::move(min), std::move(max)),
                     version,
@@ -182,10 +185,10 @@ std::vector<BSONObj> toConfigBSONVector(const std::vector<ChunkType>& chunks) {
 std::vector<ChunkType> makeSplitChunks(const CollectionType& collType, const ChunkType& chunk) {
     auto splitVersion = chunk.getVersion();
     splitVersion.incMajor();
-    auto splitFirst = makeChunk(collType, chunk.getMin(), key(50), splitVersion);
+    auto splitFirst = makeChunk(collType, chunk.getMin(), key(50), splitVersion, chunk.getShard());
 
     splitVersion.incMinor();
-    auto splitSecond = makeChunk(collType, key(50), chunk.getMax(), splitVersion);
+    auto splitSecond = makeChunk(collType, key(50), chunk.getMax(), splitVersion, chunk.getShard());
 
     return {std::move(splitFirst), std::move(splitSecond)};
 }
@@ -1818,6 +1821,47 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitNotifiesInFlightRecoverer) {
     ASSERT_FALSE(recoverer->drainAndApply(operationContext(), roundId));
 }
 
+TEST_F(CommitCollectionMetadataLocallyTest,
+       CommitCollectionMetadataRestartsInFlightRecovererWithLatestDiskState) {
+    const auto originalTestingSnapshotBehaviorInIsolation = gTestingSnapshotBehaviorInIsolation;
+    ON_BLOCK_EXIT(
+        [&] { gTestingSnapshotBehaviorInIsolation = originalTestingSnapshotBehaviorInIsolation; });
+    gTestingSnapshotBehaviorInIsolation = true;
+
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    // Persist the first catalog view locally. The recoverer below reads this view before the commit
+    // replaces it with the newer global-catalog view.
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto recoverer =
+        std::make_shared<CollectionCacheRecoverer>(kTestNss, CancellationToken::uncancelable());
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
+        scopedCsr->setCollectionRecoverer(recoverer);
+    }
+    auto roundId = recoverer->start(operationContext(), nullptr);
+    ASSERT_OK(recoverer->waitForInitialPass(operationContext(), roundId));
+
+    // Bump the shard version by splitting one chunk and call commitCollectionMetadataLocally()
+    // accordingly.
+    auto updatedChunks = makeSplitChunks(collType, chunks[0]);
+    mockCatalogClient()->setCollectionMetadata(collType, updatedChunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    // The previous recovery should have been invalidated.
+    ASSERT_FALSE(recoverer->drainAndApply(operationContext(), roundId));
+
+    // Next recovery trigger will install the new metadata.
+    roundId = recoverer->start(operationContext(), nullptr);
+    ASSERT_OK(recoverer->waitForInitialPass(operationContext(), roundId));
+
+    auto recoveredMetadata = recoverer->drainAndApply(operationContext(), roundId);
+    ASSERT_TRUE(recoveredMetadata);
+    ASSERT_EQ(recoveredMetadata->getShardPlacementVersion(), updatedChunks.back().getVersion());
+}
+
 TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionIsNoOpOnEmptyCatalog) {
     auto uuid = UUID::gen();
     shard_catalog_commit::commitDropCollectionLocally(operationContext(), kTestNss, uuid);
@@ -1841,7 +1885,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionOnlyDeletesTargetColle
         ChunkType chunk(uuid,
                         ChunkRange(key(MINKEY), key(MAXKEY)),
                         ChunkVersion({epoch, ts}, {1, 0}),
-                        ShardId("0"));
+                        kCurrentShardId);
         chunk.setName(OID::gen());
         return CollectionAndChunksMetadata{std::move(coll), {std::move(chunk)}};
     }();
