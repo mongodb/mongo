@@ -58,7 +58,6 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -785,9 +784,7 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
 
     ShardingCatalogManager::SplitChunkInTransactionResult splitChunkResult;
     auto updateChunksFn = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        // TODO SERVER-127411: use ShardRef/UUID instead of std::string for shardName
-        ChunkType chunk(
-            origChunk.getCollectionUUID(), range, collPlacementVersion, ShardRef{shardName});
+        ChunkType chunk(origChunk.getCollectionUUID(), range, collPlacementVersion, shardName);
 
         // Verify that the range matches exactly a single chunk
         auto countRequest = buildCountSingleChunkCommand(chunk);
@@ -3010,12 +3007,12 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
         uassertStatusOK(getStatusFromWriteCommandReply(distinctCommandResponse));
 
         // 4. Persist new data to the config.placementHistory collection.
-        std::vector<ShardRef> shardRefs;
+        std::vector<ShardId> shardIds;
         for (const auto& valueElement : distinctCommandResponse.getField("values").Array()) {
-            shardRefs.emplace_back(ShardRef::parse(valueElement));
+            shardIds.emplace_back(valueElement.String());
         }
         NamespacePlacementType placementInfo(
-            nss, migratedChunk.getHistory().front().getValidAfter(), std::move(shardRefs));
+            nss, migratedChunk.getHistory().front().getValidAfter(), std::move(shardIds));
         placementInfo.setUuid(migratedChunk.getCollectionUUID());
         write_ops::InsertCommandRequest insertPlacementEntry(
             NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});

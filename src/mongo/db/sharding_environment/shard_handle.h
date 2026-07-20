@@ -4,10 +4,10 @@
 #pragma once
 
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <functional>
 #include <utility>
 
 [[MONGO_MOD_PUBLIC]];
@@ -31,10 +31,6 @@ public:
 
     const boost::optional<UUID>& uuid() const {
         return _uuid;
-    }
-
-    ShardRef toShardRef() const {
-        return _uuid ? ShardRef{*_uuid} : ShardRef{_name.toString()};
     }
 
     bool operator==(const ShardHandle& other) const {

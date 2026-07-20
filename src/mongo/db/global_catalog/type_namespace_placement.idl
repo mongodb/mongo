@@ -56,9 +56,9 @@ structs:
                     "The point in time at which this version of NamespacePlacementType
                     for 'nss' has been generated."
             shards:
-                type: array<shard_ref>
+                type: array<shard_id>
                 description:
-                    "The list of shard references containing one or more chunks of 'nss'
+                    "The list of shard IDs containing one of more chunks of 'nss'
                     at time 'timestamp' (may be empty)."
 
     HistoricalPlacement:
@@ -68,13 +68,13 @@ structs:
         strict: false
         fields:
             shards:
-                type: array<shard_ref>
+                type: array<shard_id>
                 description:
-                    "The set of shard references containing data on the requested nss/cluster at
+                    "The set of shard IDs containing data on the requested nss/cluster at
                     the point in time.
                     In 'ignoreRemovedShards' mode, all shards that are not present anymore in the
-                    current cluster topology will be removed from the result, i.e. only shard
-                    references of currently still-present shards are returned."
+                    current cluster topology will be removed from the result, i.e. only shard IDs of
+                    currently still-present shards are returned."
             status:
                 type: HistoricalPlacementStatus
                 description: "The status of historical placement information"

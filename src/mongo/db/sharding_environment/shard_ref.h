@@ -6,7 +6,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -23,8 +22,8 @@ namespace mongo {
 class [[MONGO_MOD_PUBLIC]] ShardRef {
 public:
     // Required for IDL-generated code which default-constructs the field before parsing.
-    ShardRef() : _ref(ShardId{}) {}
-    explicit ShardRef(std::string name) : _ref(ShardId(std::move(name))) {}
+    ShardRef() : _ref(std::string{}) {}
+    explicit ShardRef(std::string name) : _ref(std::move(name)) {}
     explicit ShardRef(UUID uuid) : _ref(std::move(uuid)) {}
 
     /**
@@ -35,10 +34,10 @@ public:
      * constructor.
      */
     // NOLINTNEXTLINE(google-explicit-constructor)
-    ShardRef(const ShardId& id) : _ref(id) {}
+    ShardRef(const ShardId& id) : _ref(std::string{id.toString()}) {}
 
     bool isString() const {
-        return std::holds_alternative<ShardId>(_ref);
+        return std::holds_alternative<std::string>(_ref);
     }
 
     bool isUUID() const {
@@ -46,34 +45,17 @@ public:
     }
 
     const std::string& getString() const {
-        return std::get<ShardId>(_ref).toString();
+        return std::get<std::string>(_ref);
     }
 
     const UUID& getUUID() const {
         return std::get<UUID>(_ref);
     }
 
-    /**
-     * Returns the stored ShardId by reference. Only valid when this ShardRef holds a string (i.e.
-     * isString() is true); invariants otherwise.
-     *
-     * TODO SERVER-127411: this is a transitional convenience while ShardId still exists. Once all
-     * catalog types and APIs have been migrated to ShardRef and ShardId has been removed, drop this
-     * accessor.
-     */
-    const ShardId& getShardId() const {
-        invariant(isString());
-        return std::get<ShardId>(_ref);
-    }
-
     std::string toString() const;
 
     /**
      * Implicit conversion to ShardId.
-     *
-     * Returns by value on purpose: lifetime extension does not propagate through a reference
-     * returned by a conversion operator, so a reference-returning conversion would dangle for
-     * temporaries. Callers that want a reference into this ShardRef should use getShardId().
      *
      * TODO SERVER-127411: this is a transitional convenience while ShardId still exists. Once all
      * catalog types and APIs have been migrated to ShardRef and ShardId has been removed, drop this
@@ -90,25 +72,8 @@ public:
         return !(*this == other);
     }
 
-    bool operator<(const ShardRef& other) const {
-        return _ref < other._ref;
-    }
-
-    bool operator>(const ShardRef& other) const {
-        return other < *this;
-    }
-
-    bool operator<=(const ShardRef& other) const {
-        return !(*this > other);
-    }
-
-    bool operator>=(const ShardRef& other) const {
-        return !(*this < other);
-    }
-
     static ShardRef parse(const BSONElement& element);
     void serialize(std::string_view fieldName, BSONObjBuilder* builder) const;
-    void serialize(BSONArrayBuilder* builder) const;
 
     friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, const ShardRef& ref) {
         ref.serialize(fieldName, &bob);
@@ -123,7 +88,7 @@ public:
     }
 
 private:
-    std::variant<ShardId, UUID> _ref;
+    std::variant<std::string, UUID> _ref;
 };
 
 /**
@@ -152,21 +117,6 @@ private:
 
 [[MONGO_MOD_PUBLIC]] inline bool operator!=(const ShardId& id, const ShardRef& ref) {
     return !(id == ref);
-}
-
-/**
- * Streaming operators that route through ShardRef::toString(), which renders both the string and
- * UUID variants safely. These must exist so that streaming a ShardRef does not fall back to the
- * implicit ShardId conversion, which invariants when the ref holds a UUID.
- */
-inline std::ostream& operator<<(std::ostream& os, const ShardRef& ref) {
-    return os << ref.toString();
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,
-                                         const ShardRef& ref) {
-    return stream << ref.toString();
 }
 
 }  // namespace mongo

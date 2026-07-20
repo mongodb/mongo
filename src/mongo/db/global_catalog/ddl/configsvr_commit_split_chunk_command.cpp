@@ -129,14 +129,14 @@ public:
                 repl::ReadConcernArgs::get(newOpCtxPtr.get()) =
                     repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-                changedChunks = uassertStatusOK(
-                    ShardingCatalogManager::get(newOpCtxPtr.get())
-                        ->commitSplit(newOpCtxPtr.get(),
-                                      nss,
-                                      request().getShardVersionPreSplit(),
-                                      request().getRange(),
-                                      request().getSplitPoints(),
-                                      request().getShard().getShardId().toString()));
+                changedChunks =
+                    uassertStatusOK(ShardingCatalogManager::get(newOpCtxPtr.get())
+                                        ->commitSplit(newOpCtxPtr.get(),
+                                                      nss,
+                                                      request().getShardVersionPreSplit(),
+                                                      request().getRange(),
+                                                      request().getSplitPoints(),
+                                                      request().getShard().toString()));
             }
 
             // The commit ran on a separate opCtx, so make a dummy write here to advance the

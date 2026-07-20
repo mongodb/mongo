@@ -36,7 +36,6 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_gen.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -735,7 +734,7 @@ protected:
         Timestamp fetchTimestamp,
         std::vector<ChunkType> expectedChunks,
         std::vector<TagsType> expectedZones) {
-        std::set<ShardRef> reshardedCollectionPlacement;
+        std::set<ShardId> reshardedCollectionPlacement;
         for (const auto& chunk : expectedChunks) {
             reshardedCollectionPlacement.insert(chunk.getShard());
         }
@@ -745,8 +744,8 @@ protected:
                                     expectedCoordinatorDoc,
                                     _finalEpoch,
                                     _finalTimestamp,
-                                    std::vector<ShardRef>(reshardedCollectionPlacement.begin(),
-                                                          reshardedCollectionPlacement.end()));
+                                    std::vector<ShardId>(reshardedCollectionPlacement.begin(),
+                                                         reshardedCollectionPlacement.end()));
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly

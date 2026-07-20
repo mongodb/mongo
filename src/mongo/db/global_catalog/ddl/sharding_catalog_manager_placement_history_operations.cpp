@@ -20,7 +20,6 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
@@ -276,7 +275,7 @@ AggregateCommandRequest findAllShardsAggRequest(OperationContext* opCtx) {
  */
 void setInitializationMetadataOnPlacementHistory(OperationContext* opCtx,
                                                  Timestamp initializationTime,
-                                                 std::vector<ShardRef> clusterTopologyAtInitTime) {
+                                                 std::vector<ShardId> clusterTopologyAtInitTime) {
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
                                 ExecutorPtr txnExec) -> SemiFuture<void> {
         write_ops::DeleteCommandRequest deleteOldMetadata(
@@ -620,20 +619,20 @@ public:
         const std::string_view sourceField =
             isComputedPlacementAccurate ? "computedPlacement"sv : "placementAtInitTime"sv;
 
-        std::vector<ShardRef> shardRefs = [&]() {
-            // Extract all shard refs from the 'fieldName' field of 'result'. The 'sourceField'
-            // field value is expected to be an array of string or UUID values.
-            std::vector<ShardRef> shards;
+        std::vector<ShardId> shardIds = [&]() {
+            // Extract all shard ids from the 'fieldName' field of 'result'. The 'sourceField' field
+            // value is expected to be an array of string values.
+            std::vector<ShardId> shards;
             auto shardsArray = result.getField(sourceField).Obj();
             for (const auto& shardObj : shardsArray) {
-                shards.push_back(ShardRef::parse(shardObj));
+                shards.push_back(shardObj.String());
             }
             return shards;
         }();
 
         HistoricalPlacement historicalPlacementResult;
         historicalPlacementResult.setStatus(HistoricalPlacementStatus::OK);
-        historicalPlacementResult.setShards(std::move(shardRefs));
+        historicalPlacementResult.setShards(std::move(shardIds));
         return historicalPlacementResult;
     }
 
@@ -1055,25 +1054,21 @@ private:
         return Pipeline::create({std::move(facetStage), std::move(projectStage)}, _expCtx);
     }
 
-    // Removes all shard references from the 'HistoricalPlacement' that are not present in the
+    // Removes all shard ids from the 'HistoricalPlacement' that are not present in the
     // 'allAvailableShardIds' vector. The 'allAvailableShardIds' vector values must be sorted. Also
     // sets the 'anyRemovedShardDetected' value of the 'HistoricalPlacement' value as a side-effect.
-    //
-    // TODO(SERVER-127411): once change-stream routing is UUID-aware, update to also resolve UUID
-    // ShardRefs through the shard registry for the availability check.
     void _removeAllNonAvailableShards(HistoricalPlacement& historicalPlacementResult,
                                       const std::vector<ShardId>& allAvailableShardIds) {
         // Intentionally create a copy here, because we are about to remove shards from the vector.
-        auto shardRefs = historicalPlacementResult.getShards();
-        const size_t originalNumberOfShards = shardRefs.size();
-        std::erase_if(shardRefs, [&](const ShardRef& shardRef) {
-            const ShardId asShardId{shardRef.toString()};
+        auto shardIds = historicalPlacementResult.getShards();
+        const size_t originalNumberOfShards = shardIds.size();
+        std::erase_if(shardIds, [&](const ShardId& shardId) {
             return !std::binary_search(
-                allAvailableShardIds.begin(), allAvailableShardIds.end(), shardRef.getShardId());
+                allAvailableShardIds.begin(), allAvailableShardIds.end(), shardId);
         });
-        historicalPlacementResult.setAnyRemovedShardDetected(shardRefs.size() <
+        historicalPlacementResult.setAnyRemovedShardDetected(shardIds.size() <
                                                              originalNumberOfShards);
-        historicalPlacementResult.setShards(std::move(shardRefs));
+        historicalPlacementResult.setShards(std::move(shardIds));
     }
 
     // Builds a partial match expression to be used on the 'nss' field for a placement history query
@@ -1175,7 +1170,7 @@ Status ShardingCatalogManager::createIndexesForConfigPlacementHistory(OperationC
 
 write_ops::InsertCommandRequest
 ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-    const Timestamp& initializationTime, const std::vector<ShardRef>& defaultPlacement) {
+    const Timestamp& initializationTime, const std::vector<ShardId>& defaultPlacement) {
     /*
      * The 'operational boundaries' of config.placementHistory are described through two 'metadata'
      * documents, both identified by the kConfigPlacementHistoryInitializationMarker namespace:
@@ -1345,11 +1340,11 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
         findAllShardsReq.setUnwrappedReadPref({});
         findAllShardsReq.setReadConcern(snapshotReadConcern);
 
-        std::vector<ShardRef> shardsAtInitializationTime;
+        std::vector<ShardId> shardsAtInitializationTime;
         auto consumeBatchResponse = [&](const auto& batch, const boost::optional<BSONObj>&) {
             for (const auto& doc : batch) {
                 shardsAtInitializationTime.emplace_back(
-                    ShardRef(std::string(doc.getStringField(ShardType::name.name()))));
+                    ShardId(std::string(doc.getStringField(ShardType::name.name()))));
             }
 
             return true;

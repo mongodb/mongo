@@ -8,7 +8,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/flush_routing_table_cache_updates_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -41,7 +40,7 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 const std::vector<ShardRef>& reshardedCollectionPlacement);
+                                 const std::vector<ShardId>& reshardedCollectionPlacement);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
                               const ReshardingCoordinatorDocument& coordinatorDoc,

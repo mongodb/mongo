@@ -43,7 +43,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -218,14 +217,14 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     ChunkType chunk1(cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
-                     ShardRef{"0"});
+                     {"0"});
     chunk1.setName(OID::gen());
     version.incMinor();
 
     ChunkType chunk2(cm.getUUID(),
                      {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
-                     ShardRef{"1"});
+                     {"1"});
     chunk2.setName(OID::gen());
     version.incMinor();
 
@@ -306,21 +305,19 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     ChunkType chunk1(cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
-                     ShardRef{shards[0].getName()});
+                     {shards[0].getName()});
     chunk1.setName(OID::gen());
     version.incMinor();
 
-    ChunkType chunk2(cm.getUUID(),
-                     {BSON("_id" << 0), BSON("_id" << 10)},
-                     version,
-                     ShardRef{shards[1].getName()});
+    ChunkType chunk2(
+        cm.getUUID(), {BSON("_id" << 0), BSON("_id" << 10)}, version, {shards[1].getName()});
     chunk2.setName(OID::gen());
     version.incMinor();
 
     ChunkType chunk3(cm.getUUID(),
                      {BSON("_id" << 10), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
-                     ShardRef{shards[0].getName()});
+                     {shards[0].getName()});
     chunk3.setName(OID::gen());
 
     expectCollectionAndChunksAggregation(
@@ -410,7 +407,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
         cm.getUUID(),
         {shardKeyPattern.getKeyPattern().globalMin(), shardKeyPattern.getKeyPattern().globalMax()},
         version,
-        ShardRef{shards[0].getName()});
+        {shards[0].getName()});
     chunk1.setName(OID::gen());
 
     expectCollectionAndChunksAggregation(
@@ -471,14 +468,14 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     ChunkType chunk1(cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
-                     ShardRef{"0"});
+                     {"0"});
     chunk1.setName(OID::gen());
     version.incMinor();
 
     ChunkType chunk2(cm.getUUID(),
                      {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
-                     ShardRef{"1"});
+                     {"1"});
     chunk2.setName(OID::gen());
     version.incMinor();
 

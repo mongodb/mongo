@@ -19,7 +19,6 @@
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -548,7 +547,7 @@ getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,
  * Returns the list of shards that currently own chunks for the given collection UUID.
  * Queries config.chunks to determine the current placement.
  */
-[[MONGO_MOD_PRIVATE]] std::vector<ShardRef> getListOfShardsOwningChunksForCollection(
+[[MONGO_MOD_PRIVATE]] std::vector<ShardId> getListOfShardsOwningChunksForCollection(
     OperationContext* opCtx, const UUID& collUuid);
 
 /**
@@ -560,7 +559,7 @@ getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& uuid,
     const Timestamp& timestamp,
-    const std::vector<ShardRef>& shards,
+    const std::vector<ShardId>& shards,
     int stmtId);
 
 /**

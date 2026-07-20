@@ -37,7 +37,6 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
@@ -952,7 +951,7 @@ protected:
             chunk.setCollectionUUID(_collUuid);
             chunk.setVersion(collPlacementVersion);
             collPlacementVersion.incMinor();
-            chunk.setShard(ShardRef{shard.getName()});
+            chunk.setShard(shard.getName());
             chunk.setRange({min, max});
 
             // When `onCurrentShardSince` is set to "Timestamp(0, 1)", the chunk is mergeable
@@ -960,7 +959,7 @@ protected:
             // mergeable because the snapshot window did not pass
             auto randomValidAfter = _random.nextInt64() % 2 ? Timestamp(0, 1) : Timestamp::max();
             chunk.setOnCurrentShardSince(randomValidAfter);
-            chunk.setHistory({ChunkHistory{randomValidAfter, ShardRef{shard.getName()}}});
+            chunk.setHistory({ChunkHistory{randomValidAfter, shard.getName()}});
 
             // Rarely create a jumbo chunk (not mergeable)
             chunk.setJumbo(_random.nextInt64() % 10 == 0);
@@ -1111,7 +1110,7 @@ protected:
                 !(*(prevChunk.getOnCurrentShardSince()) == Timestamp::max()) &&
                 !currChunk.getJumbo() &&
                 !(*(currChunk.getOnCurrentShardSince()) == Timestamp::max())) {
-                if (prevChunk.getShard() != currChunk.getShard()) {
+                if (prevChunk.getShard().compare(currChunk.getShard()) != 0) {
                     // Chunks belong to different shards
                     continue;
                 }

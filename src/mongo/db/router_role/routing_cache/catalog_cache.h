@@ -210,7 +210,7 @@ public:
      * TODO SERVER-127411: Check if this method is still used and if so, migrate the callers to use
      * getDbPrimaryShardRef().
      */
-    const ShardId& getDbPrimaryShardId() const;
+    ShardId getDbPrimaryShardId() const;
     /**
      * Returns the primary shard reference for the database.
      *

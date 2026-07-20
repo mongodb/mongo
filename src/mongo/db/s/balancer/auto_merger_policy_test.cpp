@@ -232,8 +232,8 @@ protected:
     inline const static auto _shards =
         std::vector<ShardType>{ShardType{"shard0", "host0:123"}, ShardType{"shard1", "host1:123"}};
 
-    const ShardId _shard0{_shards[0].getName()};
-    const ShardId _shard1{_shards[1].getName()};
+    const std::string _shard0 = _shards[0].getName();
+    const std::string _shard1 = _shards[1].getName();
 
     const OID _epoch = OID::gen();
     const Timestamp _ts = Timestamp(43);

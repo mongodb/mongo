@@ -39,10 +39,8 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kPattern = "key";
 const KeyPattern kShardKeyPattern(BSON(kPattern << 1));
-// TODO SERVER-127411: use ShardRef instead of ShardId when all consumers have been migrated to
-// ShardRef
-const ShardId kThisShard{"thisShard"};
-const ShardId kOtherShard{"otherShard"};
+const std::string kThisShard{"thisShard"};
+const std::string kOtherShard{"otherShard"};
 
 class MetadataManagerTest : public ShardServerTestFixture {
 protected:

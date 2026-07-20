@@ -20,7 +20,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
@@ -47,7 +47,7 @@ public:
     using ChunkHistoryBase::toBSON;
 
     ChunkHistory() : ChunkHistoryBase() {}
-    ChunkHistory(mongo::Timestamp ts, mongo::ShardRef shard) : ChunkHistoryBase() {
+    ChunkHistory(mongo::Timestamp ts, mongo::ShardId shard) : ChunkHistoryBase() {
         setValidAfter(std::move(ts));
         setShard(std::move(shard));
     }
@@ -122,7 +122,7 @@ public:
     static const BSONField<bool> historyIsAt40;
 
     ChunkType();
-    ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardRef shard);
+    ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardId shardId);
 
     /**
      * Constructs a new ChunkType object from BSON with the following format:
@@ -219,10 +219,10 @@ public:
     }
     void setVersion(const ChunkVersion& version);
 
-    const ShardRef& getShard() const {
+    const ShardId& getShard() const {
         return _shard.get();
     }
-    void setShard(const ShardRef& shard);
+    void setShard(const ShardId& shard);
 
     boost::optional<int64_t> getEstimatedSizeBytes() const {
         return _estimatedSizeBytes;
@@ -298,7 +298,7 @@ private:
     // (M)(C)(S)  version of this chunk
     boost::optional<ChunkVersion> _version;
     // (M)(C)(S)  shard this chunk lives in
-    boost::optional<ShardRef> _shard;
+    boost::optional<ShardId> _shard;
     // (O)(C)     chunk size used for chunk merging operation
     boost::optional<int64_t> _estimatedSizeBytes;
     // (O)(C)     too big to move?

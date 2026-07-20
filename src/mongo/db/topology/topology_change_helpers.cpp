@@ -1762,7 +1762,7 @@ void addShardInTransaction(OperationContext* opCtx,
                            [&](const DatabaseName& dbName) {
                                return NamespacePlacementType(NamespaceString(dbName),
                                                              newShard.getTopologyTime(),
-                                                             {ShardRef(newShard.getName())})
+                                                             {newShard.getName()})
                                    .toBSON();
                            });
             write_ops::InsertCommandRequest insertPlacementEntries(
@@ -1774,7 +1774,7 @@ void addShardInTransaction(OperationContext* opCtx,
         if (insertPlacementHistoryInitMetadata) {
             auto insertRequest =
                 ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-                    newShard.getTopologyTime(), {ShardRef(newShard.getName())});
+                    newShard.getTopologyTime(), {newShard.getName()});
             auto insertResponse = txnClient.runCRUDOpSync(insertRequest, {});
             uassertStatusOK(insertResponse.toStatus());
         }

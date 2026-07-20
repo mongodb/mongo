@@ -12,7 +12,6 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
@@ -47,11 +46,11 @@ struct ExpectedResponseBuilder {
     }
 
     ExpectedResponseBuilder& setShards(std::vector<std::string> shards) {
-        std::vector<ShardRef> transformed;
+        std::vector<ShardId> transformed;
         std::transform(shards.begin(),
                        shards.end(),
                        std::back_inserter(transformed),
-                       [](const auto& value) { return ShardRef(value); });
+                       [](const auto& value) { return ShardId(value); });
         value.setShards(std::move(transformed));
         return *this;
     }
@@ -85,7 +84,7 @@ struct ExpectedResponseBuilder {
 
 // Check if the two placements are completely equal.
 void assertPlacementsEqual(const HistoricalPlacement& expected, const HistoricalPlacement& actual) {
-    auto sortShards = [](std::vector<ShardRef> values) {
+    auto sortShards = [](std::vector<ShardId> values) {
         std::sort(values.begin(), values.end());
         return values;
     };
@@ -161,9 +160,9 @@ public:
 
         // Convert the entries into the format expected by the config.placementHistory collection
         for (const auto& entry : entries) {
-            std::vector<ShardRef> shardIds;
+            std::vector<ShardId> shardIds;
             for (const auto& shardId : entry.shardsIds) {
-                shardIds.push_back(ShardRef(shardId));
+                shardIds.push_back(ShardId(shardId));
             }
             auto nss = NamespaceString::createNamespaceString_forTest(entry.ns);
             auto uuid = [&] {

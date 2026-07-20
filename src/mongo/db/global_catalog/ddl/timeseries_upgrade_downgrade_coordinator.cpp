@@ -17,7 +17,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/topology/sharding_state.h"

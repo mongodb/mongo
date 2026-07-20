@@ -129,24 +129,22 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
     ChunkType chunk1(reshardingUUID,
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
                      version,
-                     ShardRef{"0"});
+                     {"0"});
     chunk1.setName(OID::gen());
     version.incMajor();
 
-    ChunkType chunk2(
-        reshardingUUID, {BSON("_id" << -100), BSON("_id" << 0)}, version, ShardRef{"1"});
+    ChunkType chunk2(reshardingUUID, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
     chunk2.setName(OID::gen());
     version.incMajor();
 
-    ChunkType chunk3(
-        reshardingUUID, {BSON("_id" << 0), BSON("_id" << 100)}, version, ShardRef{"0"});
+    ChunkType chunk3(reshardingUUID, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
     chunk3.setName(OID::gen());
     version.incMajor();
 
     ChunkType chunk4(reshardingUUID,
                      {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
-                     ShardRef{"1"});
+                     {"1"});
     chunk4.setName(OID::gen());
     version.incMajor();
 
@@ -228,7 +226,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionNotFound) {
     auto cri = *future.default_timed_get();
     ASSERT(!cri.isSharded());
     ASSERT(!cri.getChunkManager().isSharded());
-    ASSERT_EQ(ShardRef{"0"}, cri.getDbPrimaryShardId());
+    ASSERT_EQ(ShardId{"0"}, cri.getDbPrimaryShardId());
 }
 
 TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
@@ -343,7 +341,7 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
             ChunkType(coll.getUuid(),
                       {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
-                      ShardRef{"0"});
+                      {"0"});
         return std::vector<BSONObj>{
             /* collection */
             coll.toBSON(),
@@ -379,18 +377,18 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithLowestVersion) {
         // concurrently) and has the lowest version.
         version.incMinor();
 
-        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, ShardRef{"1"});
+        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 
-        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, ShardRef{"0"});
+        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
         chunk3.setName(OID::gen());
         version.incMinor();
 
         ChunkType chunk4(uuid,
                          {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                          version,
-                         ShardRef{"1"});
+                         {"1"});
         chunk4.setName(OID::gen());
         version.incMinor();
 
@@ -421,18 +419,18 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
         // concurrently) and has the higest version.
         version.incMinor();
 
-        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, ShardRef{"1"});
+        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 
-        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, ShardRef{"0"});
+        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
         chunk3.setName(OID::gen());
         version.incMinor();
 
         ChunkType chunk4(uuid,
                          {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                          version,
-                         ShardRef{"1"});
+                         {"1"});
         chunk4.setName(OID::gen());
         version.incMinor();
 
@@ -473,18 +471,18 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
         // concurrently) and has the lowest version.
         version.incMinor();
 
-        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, ShardRef{"1"});
+        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 
-        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, ShardRef{"0"});
+        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
         chunk3.setName(OID::gen());
         version.incMinor();
 
         ChunkType chunk4(uuid,
                          {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                          version,
-                         ShardRef{"1"});
+                         {"1"});
         chunk4.setName(OID::gen());
         version.incMinor();
 
@@ -525,18 +523,18 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the higest version.
 
-        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, ShardRef{"1"});
+        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 
-        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, ShardRef{"0"});
+        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
         chunk3.setName(OID::gen());
         version.incMinor();
 
         ChunkType chunk4(uuid,
                          {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                          version,
-                         ShardRef{"1"});
+                         {"1"});
         chunk4.setName(OID::gen());
         version.incMinor();
 
@@ -593,14 +591,14 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
         ChunkType chunk1(uuid,
                          {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                          newVersion,
-                         ShardRef{"0"});
+                         {"0"});
         chunk1.setName(OID::gen());
         newVersion.incMinor();
 
         ChunkType chunk2(uuid,
                          {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                          newVersion,
-                         ShardRef{"1"});
+                         {"1"});
         chunk2.setName(OID::gen());
 
         const auto chunk1BSON = BSON("chunks" << chunk1.toConfigBSON());
@@ -657,14 +655,14 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
         ChunkType chunk1(coll.getUuid(),
                          {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                          version,
-                         ShardRef{"0"});
+                         {"0"});
         chunk1.setName(OID::gen());
 
         version.incMinor();
         ChunkType chunk2(coll.getUuid(),
                          {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                          version,
-                         ShardRef{"0"});
+                         {"0"});
         chunk2.setName(OID::gen());
 
         const auto chunk1BSON = BSON("chunks" << chunk1.toConfigBSON());
@@ -702,17 +700,13 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
     // Return set of chunks, which represent a move
     version.incMajor();
     expectedDestPlacementVersion = version;
-    ChunkType chunk1(uuid,
-                     {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                     version,
-                     ShardRef{"1"});
+    ChunkType chunk1(
+        uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"1"});
     chunk1.setName(OID::gen());
 
     version.incMinor();
-    ChunkType chunk2(uuid,
-                     {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
-                     version,
-                     ShardRef{"0"});
+    ChunkType chunk2(
+        uuid, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"0"});
     chunk2.setName(OID::gen());
 
     expectCollectionAndChunksAggregationWithReshardingFields(
@@ -754,7 +748,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
         initialCm.getUUID(),
         {shardKeyPattern.getKeyPattern().globalMin(), shardKeyPattern.getKeyPattern().globalMax()},
         version,
-        ShardRef{"1"});
+        {"1"});
     chunk1.setName(OID::gen());
 
     expectCollectionAndChunksAggregation(

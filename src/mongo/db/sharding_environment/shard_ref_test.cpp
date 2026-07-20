@@ -6,7 +6,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -41,25 +40,6 @@ TEST(ShardRef, ImplicitConversionToShardId) {
     ShardRef ref{std::string{"someShardName"}};
     ShardId id = ref;
     ASSERT_EQUALS(id.toString(), std::string{"someShardName"});
-}
-
-TEST(ShardRef, GetShardIdReturnsReferenceIntoShardRef) {
-    ShardRef ref{std::string{"someShardName"}};
-    const ShardId& id = ref.getShardId();
-    ASSERT_EQUALS(id.toString(), std::string{"someShardName"});
-    // The returned reference must alias the ShardId stored inside the ShardRef, not a temporary.
-    ASSERT_EQUALS(&id, &ref.getShardId());
-}
-
-TEST(ShardRef, StreamingUsesToStringAndDoesNotInvariantOnUUID) {
-    ShardRef strRef{std::string{"myShard"}};
-    ASSERT_EQUALS(str::stream() << strRef, std::string{"myShard"});
-
-    // Streaming a UUID-backed ShardRef must render via toString() rather than routing through the
-    // implicit ShardId conversion, which would invariant.
-    UUID uuid = UUID::gen();
-    ShardRef uuidRef{uuid};
-    ASSERT_EQUALS(str::stream() << uuidRef, uuid.toString());
 }
 
 TEST(ShardRef, EqualityStringVsString) {
@@ -139,53 +119,6 @@ TEST(ShardRef, EqualityWithShardId) {
     ASSERT_FALSE(id == uuidRef);
     ASSERT_TRUE(uuidRef != id);
     ASSERT_TRUE(id != uuidRef);
-}
-
-TEST(ShardRef, OrderingStringVsString) {
-    ShardRef a{std::string{"aaa"}};
-    ShardRef b{std::string{"bbb"}};
-
-    ASSERT_TRUE(a < b);
-    ASSERT_FALSE(b < a);
-    ASSERT_FALSE(a < a);
-
-    ASSERT_TRUE(b > a);
-    ASSERT_FALSE(a > b);
-
-    ASSERT_TRUE(a <= b);
-    ASSERT_TRUE(a <= a);
-    ASSERT_FALSE(b <= a);
-
-    ASSERT_TRUE(b >= a);
-    ASSERT_TRUE(a >= a);
-    ASSERT_FALSE(a >= b);
-}
-
-TEST(ShardRef, OrderingUUIDvsUUID) {
-    // Generate two distinct UUIDs and verify strict ordering is consistent.
-    UUID uuid1 = UUID::gen();
-    UUID uuid2 = UUID::gen();
-    ShardRef a{uuid1};
-    ShardRef b{uuid2};
-
-    // Exactly one of a<b or b<a must hold (strict weak ordering), and neither a<a nor b<b.
-    ASSERT_TRUE((a < b) != (b < a));
-    ASSERT_FALSE(a < a);
-    ASSERT_FALSE(b < b);
-}
-
-TEST(ShardRef, UsableInSort) {
-    // Verify that ShardRef is sortable (required by IDL comparison operators on
-    // NamespacePlacementType which has generate_comparison_operators: true).
-    std::vector<ShardRef> refs{
-        ShardRef{std::string{"zzz"}},
-        ShardRef{std::string{"aaa"}},
-        ShardRef{std::string{"mmm"}},
-    };
-    std::sort(refs.begin(), refs.end());
-    ASSERT_EQUALS(refs[0].getString(), std::string{"aaa"});
-    ASSERT_EQUALS(refs[1].getString(), std::string{"mmm"});
-    ASSERT_EQUALS(refs[2].getString(), std::string{"zzz"});
 }
 
 }  // namespace

@@ -701,7 +701,7 @@ public:
 
             // Check that the shardId matches the expected.
             if (expectedShardIds[i]) {
-                ASSERT_EQ(*expectedShardIds[i], shardCollectionConfig.chunks[i].getShard());
+                ASSERT_EQ(expectedShardIds[i], shardCollectionConfig.chunks[i].getShard());
             } else {
                 // Boundary/hole chunks are assigned to any shard in a round-robin fashion.
                 // Note this assert is only valid if there's more than one shard.
@@ -1559,7 +1559,7 @@ public:
             // Check that the shardId matches the expected.
             const auto& actualShardId = shardCollectionConfig.chunks[i].getShard();
             if (expectedShardIds[i]) {
-                ASSERT_EQ(*expectedShardIds[i], actualShardId);
+                ASSERT_EQ(expectedShardIds[i], actualShardId);
             } else {
                 // If not in a zone, this chunk goes to whatever shard owns the least number of
                 // chunks.

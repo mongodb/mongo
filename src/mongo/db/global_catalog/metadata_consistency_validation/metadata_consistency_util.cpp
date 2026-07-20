@@ -564,7 +564,7 @@ const stdx::unordered_set<std::string_view> kStrictChunkValidationIgnoredFields 
 BSONObj chunkToStrictComparableBSON(const ChunkType& chunk) {
     BSONObjBuilder builder;
     chunk.getRange().serialize(&builder);
-    chunk.getShard().serialize(ChunkType::shard.name(), &builder);
+    builder.append(ChunkType::shard.name(), chunk.getShard().toString());
     builder.appendTimestamp(ChunkType::lastmod.name(), chunk.getVersion().toLong());
     if (const auto& onCurrentShardSince = chunk.getOnCurrentShardSince()) {
         builder.append(ChunkType::onCurrentShardSince.name(), *onCurrentShardSince);
@@ -3054,11 +3054,11 @@ runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
         // On a delayed secondary, the primaryShardId as reported in the command arguments can be
         // stale. In that case, trust the CSRS and get the primary shardID from it.
         try {
-            return Grid::get(opCtx)
-                ->catalogClient()
-                ->getDatabase(opCtx, nss.dbName(), getReadConcernForConfigServer(opCtx))
-                .getPrimary()
-                .getShardId();
+            return ShardId(
+                Grid::get(opCtx)
+                    ->catalogClient()
+                    ->getDatabase(opCtx, nss.dbName(), getReadConcernForConfigServer(opCtx))
+                    .getPrimary());
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
             // The collection didn't exist at the current snapshot, so return a snapshot error.
             uasserted(ErrorCodes::SnapshotUnavailable,

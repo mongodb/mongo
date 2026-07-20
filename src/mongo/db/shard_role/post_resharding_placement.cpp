@@ -47,7 +47,7 @@ PostReshardingCollectionPlacement::PostReshardingCollectionPlacement(
         tmpNssRoutingInfoWithStatus.getValue().getCurrentChunkManager();
 }
 
-const ShardRef& PostReshardingCollectionPlacement::getReshardingDestinedRecipient(
+const ShardId& PostReshardingCollectionPlacement::getReshardingDestinedRecipient(
     const BSONObj& fullDocument) const {
     _checkIsValid();
     auto newShardKey = extractReshardingKeyFromDocument(fullDocument);
@@ -60,12 +60,12 @@ BSONObj PostReshardingCollectionPlacement::extractReshardingKeyFromDocument(
     return _reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
 }
 
-const ShardRef& PostReshardingCollectionPlacement::getReshardingDestinedRecipientFromShardKey(
+const ShardId& PostReshardingCollectionPlacement::getReshardingDestinedRecipientFromShardKey(
     const BSONObj& reshardingKey) const {
     _checkIsValid();
     return _tmpReshardingCollectionChunkManager
         ->findIntersectingChunkWithSimpleCollation(reshardingKey)
-        .getShardRef();
+        .getShardId();
 }
 
 void PostReshardingCollectionPlacement::_checkIsValid() const {

@@ -27,7 +27,6 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -133,7 +132,7 @@ public:
 
     NamespacePlacementType insertPlacementChangeDoc(const std::string& nss,
                                                     const Timestamp& timestamp,
-                                                    const std::vector<ShardRef>& shards = {}) {
+                                                    const std::vector<ShardId>& shards = {}) {
         NamespacePlacementType doc(
             NamespaceString::createNamespaceString_forTest(nss), timestamp, shards);
         doc.setUuid(UUID::gen());
@@ -146,7 +145,7 @@ public:
     // Insert the operational initialization marker at the given timestamp.
     // `shards` is empty for the "real" init marker (the one used by getHistoricalPlacement to
     // determine that accurate data is available) and non-empty for the dawn-of-time approximation.
-    void insertInitMarker(Timestamp ts, std::vector<ShardRef> shards = {}) {
+    void insertInitMarker(Timestamp ts, std::vector<ShardId> shards = {}) {
         NamespacePlacementType marker(
             ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker, ts, shards);
         ASSERT_OK(insertToConfigCollection(operationContext(),

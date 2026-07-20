@@ -60,17 +60,13 @@ public:
         ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
         UUID uuid{UUID::gen()};
 
-        ChunkType chunk1(uuid,
-                         {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                         version,
-                         ShardRef{"0"});
+        ChunkType chunk1(
+            uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
         chunk1.setName(OID::gen());
         version.incMinor();
 
-        ChunkType chunk2(uuid,
-                         {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
-                         version,
-                         ShardRef{"1"});
+        ChunkType chunk2(
+            uuid, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 
@@ -121,22 +117,22 @@ public:
             ChunkType chunk1(uuid,
                              {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                              latestVersion,
-                             ShardRef{"0"});
+                             {"0"});
             chunk1.setOnCurrentShardSince(Timestamp(300, 0));
-            chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardRef{"0"}),
-                               ChunkHistory(Timestamp(200, 300), ShardRef{"1"}),
-                               ChunkHistory(Timestamp(100, 200), ShardRef{"0"})});
+            chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardId("0")),
+                               ChunkHistory(Timestamp(200, 300), ShardId("1")),
+                               ChunkHistory(Timestamp(100, 200), ShardId("0"))});
             chunk1.setName(OID::gen());
 
             latestVersion.incMinor();
             ChunkType chunk2(uuid,
                              {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                              latestVersion,
-                             ShardRef{"1"});
+                             {"1"});
             chunk2.setOnCurrentShardSince(Timestamp(300, 0));
-            chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardRef{"1"}),
-                               ChunkHistory(Timestamp(200, 300), ShardRef{"0"}),
-                               ChunkHistory(Timestamp(100, 200), ShardRef{"1"})});
+            chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardId("1")),
+                               ChunkHistory(Timestamp(200, 300), ShardId("0")),
+                               ChunkHistory(Timestamp(100, 200), ShardId("1"))});
             chunk2.setName(OID::gen());
 
             results.push_back(BSON("chunks" << chunk1.toConfigBSON()));
@@ -438,7 +434,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryForSubRouter) {
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -463,7 +459,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnStaleConfigInTxnForNonSu
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -509,7 +505,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
                               _nss,
                               ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
                               boost::none,
-                              ShardRef{"0"}),
+                              ShardId{"0"}),
                           "StaleConfig error");
             }
         });
@@ -618,7 +614,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterRetryOnTransactionParticipantFailedUny
                                                             ShardVersionFactory::make(ChunkVersion(
                                                                 {epoch, timestamp}, {2, 0})),
                                                             boost::none,
-                                                            ShardRef{"0"}),
+                                                            ShardId{"0"}),
                                             "StaleConfig error");
                                         uasserted(TransactionParticipantFailedUnyieldInfo(status),
                                                   "StaleConfig error");
@@ -644,7 +640,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextDoesNotRetryForSubRo
                                                          ShardVersionFactory::make(ChunkVersion(
                                                              {epoch, timestamp}, {2, 0})),
                                                          boost::none,
-                                                         ShardRef{"0"}),
+                                                         ShardId{"0"}),
                                          "StaleConfig error");
                            }),
                        DBException,
@@ -670,7 +666,7 @@ TEST_F(RouterRoleTestTxn,
                                                          ShardVersionFactory::make(ChunkVersion(
                                                              {epoch, timestamp}, {2, 0})),
                                                          boost::none,
-                                                         ShardRef{"0"}),
+                                                         ShardId{"0"}),
                                          "StaleConfig error");
                            }),
                        DBException,
@@ -698,7 +694,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetryOnStaleConfigWitho
                                               ShardVersionFactory::make(
                                                   ChunkVersion({epoch, timestamp}, {2, 0})),
                                               boost::none,
-                                              ShardRef{"0"}),
+                                              ShardId{"0"}),
                               "StaleConfig error");
                 } else {
                     routingCtx.onRequestSentForNss(_nss);
@@ -821,7 +817,7 @@ TEST_F(RouterRoleTestTxn, MultiCollectionRouterDoesNotRetryForSubRouter) {
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -847,7 +843,7 @@ TEST_F(RouterRoleTestTxn, MultiCollectionRouterDoesNotRetryOnStaleConfigForNonSu
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -879,7 +875,7 @@ TEST_F(RouterRoleTest, MultiCollectionRouterRetryOnStaleConfig) {
                                                        ShardVersionFactory::make(ChunkVersion(
                                                            {epoch, timestamp}, {2, 0})),
                                                        boost::none,
-                                                       ShardRef{"0"}),
+                                                       ShardId{"0"}),
                                        "StaleConfig error");
                          }
                      });
@@ -915,7 +911,7 @@ TEST_F(RouterRoleTest,
                               NamespaceString::createNamespaceString_forTest("test.foo_not_exist"),
                               ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
                               ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 1})),
-                              ShardRef{"0"}),
+                              ShardId{"0"}),
                           "StaleConfig error");
             });
     });
@@ -1319,7 +1315,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigTimeseriesBucket) {
                                                        ShardVersionFactory::make(ChunkVersion(
                                                            {epoch, timestamp}, {2, 0})),
                                                        boost::none,
-                                                       ShardRef{"0"}),
+                                                       ShardId{"0"}),
                                        "StaleConfig error");
                          }
                      });

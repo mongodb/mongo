@@ -2070,7 +2070,7 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
         // chunk under the new key pattern).
         auto reshardedCollectionPlacement = [&] {
             std::set<ShardId> collectionPlacement;
-            std::vector<ShardRef> collectionPlacementAsVector;
+            std::vector<ShardId> collectionPlacementAsVector;
 
             const auto cm =
                 uassertStatusOK(RoutingInformationCache::get(opCtx.get())

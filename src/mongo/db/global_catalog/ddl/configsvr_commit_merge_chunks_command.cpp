@@ -135,7 +135,7 @@ public:
                                                       nss,
                                                       request().getShardVersionPreMerge(),
                                                       request().getChunkRange(),
-                                                      request().getShard().getShardId()));
+                                                      request().getShard()));
             }
 
             // The commit ran on a separate opCtx, so make a dummy write here to advance the

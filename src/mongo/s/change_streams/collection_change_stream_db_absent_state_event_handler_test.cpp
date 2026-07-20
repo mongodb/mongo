@@ -8,7 +8,6 @@
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
 #include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
 #include "mongo/s/change_streams/control_events.h"
@@ -192,7 +191,7 @@ TEST_F(
     Timestamp clusterTime(77, 0);
     DatabaseCreatedControlEvent event;
     event.clusterTime = clusterTime;
-    std::vector<ShardRef> shards = {ShardRef("shardA"), ShardRef("shardB")};
+    std::vector<ShardId> shards = {ShardId("shardA"), ShardId("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -253,7 +252,7 @@ TEST_F(
     Timestamp clusterTime(77, 0);
     DatabaseCreatedControlEvent event;
     event.clusterTime = clusterTime;
-    std::vector<ShardRef> shards = {ShardRef("shardA"), ShardRef("shardB")};
+    std::vector<ShardId> shards = {ShardId("shardA"), ShardId("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
