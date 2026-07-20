@@ -806,10 +806,13 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         provider, nss, isReplSet, shouldRecoverFromOplogAsStandalone);
     params.forceUpdateWithFullDocument = false;
     params.inMemory = false;
-    params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
 
     const auto wtKvEngine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
+    WiredTigerSizeStorer sizeStorer(&wtKvEngine->getConnection(),
+                                    "table:clusteredRecordStoreSizeStorer");
+    params.sizeStorer = &sizeStorer;
+
     auto rs = std::make_unique<WiredTigerRecordStore>(
         wtKvEngine,
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
@@ -850,6 +853,9 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     ASSERT_TRUE(
         rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
     ASSERT_EQ(0, memcmp(dataUpdated, rd.data(), strlen(dataUpdated)));
+
+    // Clear the dirty buffered SizeInfo before the size storer is destroyed.
+    sizeStorer.flush(/*syncToDisk=*/false);
 }
 
 TEST(WiredTigerRecordStoreTest, AdoptSharedSizeState) {
@@ -1124,21 +1130,25 @@ TEST(WiredTigerRecordStoreTest, AdjustAccurateSizeCount) {
     EXPECT_EQ(rs->accurateNumRecords(), 500 + 200 - 100);
 }
 
-TEST(WiredTigerRecordStoreTest, AccurateSizeCountIndependentOfLegacy) {
+TEST(WiredTigerRecordStoreTest, NumRecordsAndDataSizeUseAccurateValuesWhenNoSizeStorer) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
+    auto* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
+    wtRS->setSizeStorer(nullptr);
+
+    // Accurate values.
     rs->setAccurateSizeCount(/*size=*/42, /*count=*/1024);
 
-    // Set legacy size and count.
+    // Values stored in _sizeInfo.
     rs->setSize(/*numRecords=*/24, /*dataSize=*/512);
 
-    // The legacy numRecords/dataSize should be independent.
-    EXPECT_EQ(rs->numRecords(), 24);
-    EXPECT_EQ(rs->dataSize(), 512);
+    // numRecords()/dataSize() return the accurate values.
+    EXPECT_EQ(rs->numRecords(), 1024);
+    EXPECT_EQ(rs->dataSize(), 42);
 
-    EXPECT_EQ(rs->accurateDataSize(), 42);
     EXPECT_EQ(rs->accurateNumRecords(), 1024);
+    EXPECT_EQ(rs->accurateDataSize(), 42);
 }
 
 }  // namespace

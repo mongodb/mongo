@@ -13,6 +13,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/server_options.h"
@@ -1971,6 +1972,82 @@ TEST_F(WiredTigerKVEngineTest, IsColdCollectionRecordStore) {
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtxPtr.get())),
         params);
     ASSERT_TRUE(coldRs->isColdCollection());
+}
+
+// Creates a record store via getRecordStore(), inserts a few records, and reads the in-memory
+// _sizeInfo, which _changeNumRecordsAndDataSize only mutates when the store was created with
+// tracksSizeAdjustments=true.
+int64_t insertRecordsAndGetSizeInfoCount(WiredTigerKVEngine* engine,
+                                         OperationContext* opCtx,
+                                         RecoveryUnit& ru,
+                                         const NamespaceString& nss,
+                                         const std::string& ident) {
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    const RecordStore::Options rsOptions;
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, rsOptions));
+        txn.commit();
+    }
+    auto rs = engine->getRecordStore(opCtx, nss, ident, rsOptions, UUID::gen());
+    ASSERT(rs);
+
+    constexpr int64_t kNumRecords = 3;
+    {
+        StorageWriteTransaction txn(ru);
+        for (int64_t i = 0; i < kNumRecords; ++i) {
+            const std::string doc = "record";
+            ASSERT_OK(
+                rs->insertRecord(opCtx, ru, doc.c_str(), doc.size() + 1, Timestamp()).getStatus());
+        }
+        txn.commit();
+    }
+    return rs->numRecords();
+}
+
+TEST_F(WiredTigerKVEngineTest, GetRecordStoreTracksSizeAdjustmentsWhenNotUsingReplicatedFastCount) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+
+    // The attached provider does not use replicated fast count, so getRecordStore() sets
+    // tracksSizeAdjustments=true and inserts are reflected in the sizeInfo.
+    ASSERT_FALSE(rss::ReplicatedStorageService::get(opCtxPtr.get())
+                     .getPersistenceProvider()
+                     .shouldUseReplicatedFastCount());
+    ASSERT_EQ(3,
+              insertRecordsAndGetSizeInfoCount(
+                  engine,
+                  opCtxPtr.get(),
+                  ru,
+                  NamespaceString::createNamespaceString_forTest("test.tracked"),
+                  "collection-tracked"));
+}
+
+TEST_F(WiredTigerKVEngineTest,
+       GetRecordStoreDoesNotTrackSizeAdjustmentsWhenUsingReplicatedFastCount) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+
+    // A provider that uses replicated fast count makes getRecordStore() set
+    // tracksSizeAdjustments=false, so _changeNumRecordsAndDataSize is a no-op and the sizeInfo
+    // stays zero even though records were inserted.
+    class ReplicatedFastCountProvider : public rss::AttachedPersistenceProvider {
+    public:
+        bool shouldUseReplicatedFastCount() const override {
+            return true;
+        }
+    };
+    rss::ReplicatedStorageService::get(getServiceContext())
+        .setPersistenceProvider(std::make_unique<ReplicatedFastCountProvider>());
+    ASSERT_EQ(0,
+              insertRecordsAndGetSizeInfoCount(
+                  engine,
+                  opCtxPtr.get(),
+                  ru,
+                  NamespaceString::createNamespaceString_forTest("test.untracked"),
+                  "collection-untracked"));
 }
 
 TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsNone) {

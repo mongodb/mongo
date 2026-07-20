@@ -854,12 +854,10 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
     const UUID internalUuid = internalColl.uuid();
     const long long docsToInsertCount = 10;
 
-    long long expectedSize = 0;
     WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
     for (size_t i = 0; i < docsToInsertCount; ++i) {
         const BSONObj document = docGeneratorForInsert(i);
         ASSERT_OK(Helpers::insert(_opCtx, internalColl.getCollectionPtr(), document));
-        expectedSize += document.objsize();
     }
 
     checkCommittedSizeCount(
@@ -872,10 +870,8 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
     checkCommittedSizeCount(
         operationContext(), internalUuid, CollectionSizeCount{.size = 0, .count = 0});
     checkUncommittedSizeCount(_opCtx, internalUuid, {.size = 0, .count = 0});
-
-    // Size and count data for `internalColl` are still tracked through the record store.
-    EXPECT_EQ(internalColl.getCollectionPtr()->numRecords(_opCtx), docsToInsertCount);
-    EXPECT_EQ(internalColl.getCollectionPtr()->dataSize(_opCtx), expectedSize);
+    EXPECT_EQ(internalColl.getCollectionPtr()->numRecords(_opCtx), 0);
+    EXPECT_EQ(internalColl.getCollectionPtr()->dataSize(_opCtx), 0);
 }
 
 TEST_P(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollections) {

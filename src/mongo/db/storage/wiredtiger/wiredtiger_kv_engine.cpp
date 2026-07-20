@@ -1809,16 +1809,16 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
         ret = std::make_unique<WiredTigerRecordStore::Oplog>(
             this,
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
-            WiredTigerRecordStore::Oplog::Params{.uuid = *uuid,
-                                                 .ident = std::string{ident},
-                                                 .engineName = _canonicalName,
-                                                 .inMemory = _wtConfig.inMemory,
-                                                 .oplogMaxSize = options.oplogMaxSize,
-                                                 .sizeStorer = _sizeStorer.get(),
-                                                 .tracksSizeAdjustments = true,
-                                                 .isLogged = isLogged,
-                                                 .forceUpdateWithFullDocument =
-                                                     options.forceUpdateWithFullDocument});
+            WiredTigerRecordStore::Oplog::Params{
+                .uuid = *uuid,
+                .ident = std::string{ident},
+                .engineName = _canonicalName,
+                .inMemory = _wtConfig.inMemory,
+                .oplogMaxSize = options.oplogMaxSize,
+                .sizeStorer = _sizeStorer.get(),
+                .tracksSizeAdjustments = !provider.shouldUseReplicatedFastCount(),
+                .isLogged = isLogged,
+                .forceUpdateWithFullDocument = options.forceUpdateWithFullDocument});
     } else {
         bool isLogged = [&] {
             if (!nss.isEmpty()) {
@@ -1844,7 +1844,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             .forceUpdateWithFullDocument = options.forceUpdateWithFullDocument,
             .inMemory = _wtConfig.inMemory,
             .sizeStorer = _sizeStorer.get(),
-            .tracksSizeAdjustments = true,
+            .tracksSizeAdjustments = !provider.shouldUseReplicatedFastCount(),
             .isColdCollection = isColdCollection,
         };
 

@@ -478,6 +478,10 @@ public:
     bool supportsPersistentOplogCapMaintainerThread() const override {
         return true;
     }
+
+    bool shouldUseReplicatedFastCount() const override {
+        return false;
+    }
 };
 
 TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequiresIt_Fails) {

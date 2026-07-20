@@ -537,6 +537,9 @@ public:
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         return true;
     }
+    bool shouldUseReplicatedFastCount() const override {
+        return false;
+    }
 };
 
 class ApplyCreateWithRecordIdsReplicatedTest : public OplogTest {

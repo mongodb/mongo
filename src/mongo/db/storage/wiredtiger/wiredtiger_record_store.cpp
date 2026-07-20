@@ -696,11 +696,19 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx, RecoveryUnit& ru)
 }
 
 long long WiredTigerRecordStore::dataSize() const {
+    if (!_sizeStorer) {
+        return _accurateDataSize.load();
+    }
+
     auto dataSize = _sizeInfo->dataSize.load();
     return dataSize > 0 ? dataSize : 0;
 }
 
 long long WiredTigerRecordStore::numRecords() const {
+    if (!_sizeStorer) {
+        return _accurateNumRecords.load();
+    }
+
     auto numRecords = _sizeInfo->numRecords.load();
     return numRecords > 0 ? numRecords : 0;
 }
