@@ -519,7 +519,9 @@ assert.commandWorked(bulk.execute());
         );
         return;
     }
-    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+    // $object memory is tracked locally against a per-expression cap; it does not count against the
+    // operation-wide limit. Lower that cap to make the $object result exceed it.
+    const knob = "internalQueryMaxSingleExpressionMemoryUsageBytes";
 
     const pipeline = [
         {$limit: 1},
@@ -533,7 +535,7 @@ assert.commandWorked(bulk.execute());
 
     assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
 
-    // Lower the operation-wide limit so the $object result exceeds it.
+    // Lower the per-expression cap so the $object result exceeds it.
     const originalVal = setParam(knob, 1024);
 
     const err = assert.throwsWithCode(

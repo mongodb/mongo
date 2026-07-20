@@ -5,8 +5,8 @@
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
-#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 
 namespace mongo {
 
@@ -19,16 +19,22 @@ Value evaluate(const ExpressionObject& expr,
     auto& expressions = expr.getChildExpressions();
     MutableDocument outputDoc(expressions.size());
 
-    auto& tracker = getMemoryTracker(expr, ctx);
-    SimpleMemoryUsageToken memToken(0, &tracker);
+    // Account the expression's memory in a plain local counter and enforce the per-expression cap.
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes =
+        static_cast<size_t>(internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed());
 
     for (auto&& pair : expressions) {
         Value fieldVal = pair.second->evaluate(root, variables, ctx);
 
-        // Account for the evaluated value plus the field name
-        memToken.add(static_cast<int64_t>(pair.first.size() + 1 + fieldVal.getApproximateSize()));
-        tracker.assertWithinMemoryLimit(
-            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
+        const size_t fieldBytes = pair.first.size() + 1 + fieldVal.getApproximateSize();
+        currentMemoryBytes += fieldBytes;
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream()
+                          << "$object needs too much memory. Needs: " << currentMemoryBytes
+                          << " bytes. Memory limit: " << maxMemoryBytes << " bytes");
+        }
 
         outputDoc.addField(pair.first, std::move(fieldVal));
     }
