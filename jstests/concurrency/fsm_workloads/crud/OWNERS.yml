@@ -3,6 +3,11 @@ filters:
   - "*":
     approvers:
       - 10gen/server-collection-write-path
+  # TODO SERVER-130945: Remove this ownership rule after moving the file.
+  - "random_ddl_crud_operations.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-collection-write-path
   - "crud_and_commands_with_dynamic_execution_control.js":
     approvers:
       - 10gen/server-workload-resilience

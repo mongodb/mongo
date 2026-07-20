@@ -79,3 +79,7 @@ filters:
   - "implicit_persistent_samples.js":
     approvers:
       - 10gen/query-optimization
+  - "implicitly_retry_on_migration_in_progress.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+      - 10gen/server-cluster-scalability
