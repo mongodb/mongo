@@ -42,8 +42,8 @@ class test_prefetch01(wttest.WiredTigerTestCase):
     ]
 
     conn_default = [
-        ('default-off', dict(default=True)),
-        ('default-on', dict(default=False)),
+        ('default-off', dict(default=False)),
+        ('default-on', dict(default=True)),
     ]
 
     session_cfg = [
