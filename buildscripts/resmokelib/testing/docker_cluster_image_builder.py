@@ -145,6 +145,11 @@ class DockerComposeImageBuilder:
                 "image": f'{"workload" if name == "workload" else "mongo-binaries"}:{self.tag}',
                 "volumes": volumes,
                 "command": f"/bin/bash /scripts/{name}.sh",
+                # s2n-tls (used by the handoff transport layer) calls mlock() on startup to keep
+                # crypto memory out of swap. Antithesis containers default to a low RLIMIT_MEMLOCK,
+                # which makes s2n_config_new_minimal() fail and aborts transport layer setup. Lift
+                # the memlock limit so mongo{d,s} can start.
+                "ulimits": {"memlock": {"soft": -1, "hard": -1}},
                 "networks": {"antithesis-net": {"ipv4_address": f"10.20.20.{ip_suffix}"}},
                 "depends_on": depends_on,
             }
