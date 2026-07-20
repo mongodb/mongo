@@ -35,12 +35,14 @@ respectively. The FTDC controller owns a collection of collector objects that ga
 process information for the controller. These sets of collector objects are stored in a
 [`FTDCCollectorCollection`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ftdc/collector.h#L77-L116)
 object, allowing all the data to be collected through one call to collect on the
-`FTDCCollectorCollection`. There are two sets of `FTDCCollectorCollection` objects on the
-controller:
+`FTDCCollectorCollection`. The controller owns several such collections. The two primary ones are
 [\_periodicCollectors](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ftdc/controller.h#L200-L201)
 that collects data at a specified time interval, and
 [\_rotateCollectors](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ftdc/controller.h#L207-L208)
-that collects one set of data every time a file is created.
+that collects one set of data every time a file is created. There is also a
+[\_periodicMetadataCollectors](https://github.com/mongodb/mongo/blob/dc868a6/src/mongo/db/ftdc/controller.h#L257-L258)
+collection for slowly-changing metadata that is sampled periodically and delta encoded (see
+[Metadata Delta encoding](#metadata-delta-encoding)).
 
 At specified time intervals, the FTDC Controller calls collect on the `_periodicCollectors`
 collection. To collect the data, most collectors run existing commands via
@@ -128,24 +130,15 @@ ftdc_doc = metadata
 metadata =
     _id : DateTime
     type: 0
-    doc : role_based_collectors_doc | collectors_doc
+    doc : collectors_doc
 
-// sharded cluster 8.0+ - metrics reference doc
-role_based_collectors_doc =
-    start: DateTime
-    shard: collectors_doc
-    router: collectors_doc
-    common: collectors_doc
-    end: DateTime
-
-// 8.0 non-sharded cluster or pre-8.0 sharded cluster - metrics reference doc
-collectors_doc = // pre-8.0
+collectors_doc = // metrics reference doc
     start: DateTime
     collect_doc+
     end: DateTime
 
 collect_doc =
-    string : {  // string is an arbitrary field name here
+    string : {  // string is an arbitrary field name here - the collector name
         start: DateTime
         bson_elements+
         end: DateTime
@@ -154,28 +147,35 @@ collect_doc =
 metric =
     _id : DateTime
     type: 1
-    doc : BinData(0) // see metrics_chunk
+    data : BinData(0) // see metrics_chunk
 
 metrics_chunk = // Not a BSON document, raw bytes
     uncompressed_size : uint32_t
     compressed_chunk: uint8_t[] // zlib compressed
 
 compressed_chunk = // Not a BSON document, raw bytes
-    reference_document uint8_t[] // a BSON Document -see role_based_collectors_doc
-    sample_count uint32_t
+    reference_document uint8_t[] // a BSON Document - see collectors_doc
     metric_count uint32_t
+    sample_count uint32_t
     compressed_metrics_array uint8_t[] // See compressed chunk format below
 
 metadata_delta =
     _id : DateTime
     type: 2
-    index: uint32_t
+    count: int32
     doc : collectors_doc | collectors_delta_doc
 
-collectors_delta_doc = // collect_doc exclude unchanged fields from previous metadata_delta
+collectors_delta_doc = // collectors_doc excluding unchanged collector sub-documents and unchanged fields
     start: DateTime
-    collect_doc+
+    collect_delta_doc+
     end: DateTime
+
+collect_delta_doc = // only present for collectors whose sub-document changed
+    string : {  // the collector name
+        start: DateTime
+        changed_bson_elements+
+        end: DateTime
+    }
 ```
 
 ### Compressed Chunk Format
@@ -191,7 +191,7 @@ numeric fields from certain BSON types. These types are `double`, `int64`, `int3
 cast to `uint64_t`.
 
 FTDC extracts these metrics and stores them in a column oriented format. These numbers are then
-processed in three phases
+processed in the following steps
 
 1. Extraction
 2. Delta encode
@@ -216,8 +216,8 @@ document as its baseline.
 #### Run length encoding of zeros
 
 A sequence of zeros is compressed to a pair of numbers `[0, x]` where `x` is non-zero positive
-integer that indicates the number of zeros in a sequence. For instance, an array of zeros
-`[0, 0, 0, 0]` is transformed to `[0, 4]`.
+integer that indicates the number of _additional_ zeros in a sequence. For instance, an array of
+zeros `[0, 0, 0, 0]` is transformed to `[0, 3]`.
 
 #### Varint compression
 
@@ -242,13 +242,13 @@ For instance, for the following sequence of documents:
 {"a": 4, "x" : 2, "s" : "t"}
 ```
 
-The first `a : 1` is stored as the reference document. FTDC then builds an array of
-`[2, 3, 4, 2, 2, 2]` to represent the `a` field followed by the `x` field.
+The first document `{"a": 1, "x": 2, "s": "t"}` is stored as the reference document. FTDC then
+builds an array of `[2, 3, 4, 2, 2, 2]` to represent the `a` field followed by the `x` field.
 
 Next, FTDC computes the delta for each sample in the chunk from the previous chunk. Nothing changes
 in the reference document but array is transformed to `[1, 1, 1, 0, 0, 0]`.
 
-Next the array is encoded with run length encoding for zeros `[1, 1, 1, 0, 3]`. Notice the length of
+Next the array is encoded with run length encoding for zeros `[1, 1, 1, 0, 2]`. Notice the length of
 the array is shorter.
 
 Next, these numbers are written to a block of memory with VarInt encoding. If these numbers are
@@ -265,8 +265,13 @@ preserve string values.
 
 #### Delta Algorithm
 
-The deltas are computed by comparing the previous document and the current document for a periodic
-metadata sample together. This algorithm is not recursive as it only compares one level of fields.
+The deltas are computed by comparing the previous periodic metadata sample and the current sample.
+The sample is expected to have two levels: top-level `start`/`end` timestamps plus one sub-document
+per collector, where each sub-document has its own `start`/`end` timestamps and fields. The
+algorithm compares both levels but is not fully recursive - it does not descend below a collector's
+sub-document. If the sequence of field names changes at either level, delta tracking is reset and
+the full sample is emitted. The `counter` returned here is the value written to the `count` field of
+the `metadata_delta` document.
 
 Python like pseudo code:
 
@@ -275,28 +280,46 @@ previous_doc = None
 counter = 0
 
 def delta_doc(doc):
-   # reset delta tracking
-   if previous_doc is None or doc.field_count != previous_doc.field_count:
+   # Reset delta tracking if the top-level field names changed.
+   if previous_doc is None or not same_field_names(doc, previous_doc):
        previous_doc = doc
        counter = 0
        return (counter, doc)
 
    out_doc = {}
    has_changes = False
-   for i in range(0, previous_doc.field_count):
-       if doc[i].name != previous_doc[i]:
-            # reset delta tracking, omitted for brevity
+   for name in doc.field_names():            # top level
+       if name == "start" or name == "end":
+           out_doc[name] = doc[name]          # top-level start/end always copied
+           continue
+
+       sub = doc[name]                         # collector sub-document
+       prev_sub = previous_doc[name]
+
+       # Reset if this collector's field names changed.
+       if not same_field_names(sub, prev_sub):
+           previous_doc = doc
+           counter = 0
            return (counter, doc)
 
-       if doc[i].name == "start" or doc[i].name == "end":
-           out_doc.append(doc[i])
-       else doc[i] != previous_doc[i]:
-           out_doc.append(doc[i])
+       sub_out = {}
+       sub_changed = False
+       for field in sub.field_names():         # second level
+           if field == "start" or field == "end":
+               sub_out[field] = sub[field]     # collected, but only kept if the sub-doc changed
+           elif sub[field] != prev_sub[field]:
+               sub_out[field] = sub[field]
+               sub_changed = True
+
+       # Include the collector sub-document only if one of its fields changed.
+       if sub_changed:
+           out_doc[name] = sub_out
            has_changes = True
 
    if not has_changes:
-       return None
+       return None                             # nothing is emitted for this sample
 
+   previous_doc = doc                          # the baseline is the previous sample
    counter += 1
    return (counter, out_doc)
 ```
@@ -304,9 +327,10 @@ def delta_doc(doc):
 #### Reconstruction algorithm
 
 To reconstruct a periodic metadata sample at a point in time, you can replay all the previous
-deltas. If you treat the document as dictionary/map, simply update a field with the most recent
-value to get a complete snapshot. Note that FTDC does not currently implement this algorithm since
-it does not need to reconstruct point-in-time snapshots
+deltas. Treating each document as a dictionary/map, merge each delta into the snapshot, descending
+one level into the collector sub-documents so that only the changed fields are updated. Note that
+FTDC does not currently implement this algorithm since it does not need to reconstruct point-in-time
+snapshots.
 
 Python like pseudo code:
 
@@ -314,9 +338,14 @@ Python like pseudo code:
 def reconstruct(docs[]):
    out_doc = {}
    for doc in docs:
-       for i in range(0, doc.field_count):
-           out_doc[doc[i].name] = doc[i].value
-
+       for name in doc.field_names():
+           if name == "start" or name == "end":
+               out_doc[name] = doc[name]
+           else:
+               # merge the collector sub-document field by field
+               out_doc.setdefault(name, {})
+               for field in doc[name].field_names():
+                   out_doc[name][field] = doc[name][field]
 
    return out_doc
 ```
