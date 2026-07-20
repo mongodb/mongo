@@ -18,6 +18,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/profile_settings.h"
@@ -33,9 +34,12 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/version_context.h"
@@ -209,8 +213,9 @@ void runSampleMode(OperationContext* opCtx,
     }
 
     tassert(12433002, "collUUID must be initialized by end of sampling block", collUUID);
-    tassert(
-        12873101, "collUUID must be initialized by end of sampling block", actualSamplingMethod);
+    tassert(12873101,
+            "actualSamplingMethod must be initialized by end of sampling block",
+            actualSamplingMethod);
 
     // A full collection scan is performed whenever sample size is >= collection size regardless
     // of requested sampling method, so the value persisted in the sample doc should still reflect
@@ -245,6 +250,19 @@ void runSampleMode(OperationContext* opCtx,
     }
     sampleDocBuilder.append(ce::PersistentSampleDoc::kDocsFieldName, docsArr.arr());
     BSONObj sampleDoc = sampleDocBuilder.obj();
+
+    // Create a clustered collection for persistent sample.
+    const NamespaceString samplesNss = NamespaceStringUtil::deserialize(
+        nss.dbName(), NamespaceString::kStatsSamplesCollectionName);
+    auto createCollectionStatus = repl::StorageInterface::get(opCtx)->createCollection(
+        opCtx,
+        samplesNss,
+        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
+    // Samples collection may already exist, in which case the createCollection command
+    // was a no-op.
+    if (createCollectionStatus != ErrorCodes::NamespaceExists) {
+        uassertStatusOK(createCollectionStatus);
+    }
 
     DBDirectClient client(opCtx);
 

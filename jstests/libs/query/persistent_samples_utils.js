@@ -109,6 +109,22 @@ export function dropSamplesColl(db) {
     );
 }
 
+// Asserts that the persistent samples collection exists and is clustered on _id.
+export function assertSamplesCollClustered(db) {
+    const collInfos = db.getCollectionInfos({name: samplesCollName});
+    assert.eq(1, collInfos.length, `Expected exactly one ${samplesCollName} collection to exist`, {
+        collInfos,
+    });
+    const clusteredIndex = collInfos[0].options.clusteredIndex;
+    assert(clusteredIndex, `Expected ${samplesCollName} to be clustered`, {collInfos});
+    assert.eq(
+        {[sampleDocFieldNames.idField]: 1},
+        clusteredIndex.key,
+        `Expected ${samplesCollName} to be clustered on _id`,
+        {collInfos},
+    );
+}
+
 // Returns the expected _id object for a sample document.
 // samplingType is "random" or "chunk"; sampleSize is the sample count encoded in the _id.
 // numChunks is included in the _id only for chunk mode.

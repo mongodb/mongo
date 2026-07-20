@@ -38,6 +38,13 @@ function insertDocs(n) {
     assert.commandWorked(coll.insertMany(docs));
 }
 
+// Runs an analyze command expected to succeed and asserts the persistent samples collection
+// created remains clustered on _id.
+function runAnalyze(analyzeCmd) {
+    assert.commandWorked(db.runCommand(analyzeCmd));
+    PersistentSamplesUtils.assertSamplesCollClustered(db);
+}
+
 const sourceDocFields = ["a", "b"];
 
 // =============================================================================
@@ -48,14 +55,12 @@ const sourceDocFields = ["a", "b"];
 cleanup();
 insertDocs(20);
 {
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 10,
-            samplingMethod: "random",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 10,
+        samplingMethod: "random",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -71,14 +76,12 @@ insertDocs(20);
 cleanup();
 insertDocs(20);
 {
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 100,
-            samplingMethod: "random",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 100,
+        samplingMethod: "random",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -101,7 +104,7 @@ insertDocs(20);
         sampleSize: 10,
         samplingMethod: "random",
     };
-    assert.commandWorked(db.runCommand(analyzeCmd));
+    runAnalyze(analyzeCmd);
     const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
     const expectedId = PersistentSamplesUtils.getExpectedId(
         uuid,
@@ -113,7 +116,8 @@ insertDocs(20);
         PersistentSamplesUtils.sampleDocFieldNames.createdAtField
     ];
 
-    assert.commandWorked(db.runCommand(analyzeCmd));
+    // Re-running analyze against an already-clustered samples collection must be a no-op create.
+    runAnalyze(analyzeCmd);
     // verifySampleDoc() asserts count == 1, confirming the re-run upserted rather than inserted.
     const secondDoc = PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
@@ -136,14 +140,12 @@ insertDocs(20);
 cleanup();
 assert.commandWorked(db.createCollection(collName));
 {
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 10,
-            samplingMethod: "random",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 10,
+        samplingMethod: "random",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -170,9 +172,7 @@ assert.commandFailedWithCode(
 cleanup();
 insertDocs(500);
 {
-    assert.commandWorked(
-        db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
-    );
+    runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -188,9 +188,7 @@ insertDocs(500);
 cleanup();
 insertDocs(50);
 {
-    assert.commandWorked(
-        db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
-    );
+    runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -211,15 +209,13 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: sampleSize,
-            samplingMethod: "chunk",
-            numChunks: 5,
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+        numChunks: 5,
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -237,14 +233,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: sampleSize,
-            samplingMethod: "chunk",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -456,14 +450,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: sampleSize,
-            samplingMethod: "chunk",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -480,14 +472,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: sampleSize,
-            samplingMethod: "random",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "random",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -507,14 +497,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: sampleSize,
-            samplingMethod: "random",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "random",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -536,14 +524,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: sampleSize,
-            samplingMethod: "chunk",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -560,14 +546,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: sampleSize,
-            samplingMethod: "random",
-        }),
-    );
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "random",
+    });
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",

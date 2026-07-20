@@ -94,6 +94,7 @@ function assertSampleDocReplicatedExactly(expectedId) {
         secondaryDoc,
         "sample document on secondary does not exactly match the primary",
     );
+    PersistentSamplesUtils.assertSamplesCollClustered(secondaryDB);
 }
 
 describe("analyze sample on replica sets", function () {
