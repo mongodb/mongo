@@ -1,23 +1,39 @@
-// On OSX this test assumes that jstests/libs/trusted-ca.pem has been added as a trusted
-// certificate to the login keychain of the evergreen user. See,
-// https://github.com/10gen/buildslave-cookbooks/commit/af7cabe5b6e0885902ebd4902f7f974b64cc8961
+// On MacOS this test assumes that certificates exist at
+// /opt/x509/macos-trusted-[ca|server|client].pem, and that /opt/x509/macos-trusted-ca.pem has
+// been added as a trusted certificate to the login keychain of the evergreen user. See,
+// https://github.com/10gen/buildhost-configuration/blob/1c1fcb51924cd4f1bc9eaf5db23f6e4365d6ba17/roles/macos/tasks/keychains.yml#L58-L87
 // for details.
-// To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
-//   security add-trusted-cert -d jstests/libs/trusted-ca.pem
-// TODO BUILD-17503 Remove this tag
-// @tags: [incompatible_with_macos]
+// To install certificates for local testing on OSX, invoke the following at a console:
+//   security add-trusted-cert -d /opt/x509/macos-trusted-ca.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-server.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-client.pem
 
 load('jstests/libs/python.js');
 
+const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
+
+let ca = 'jstests/libs/ca.pem';
+let server = 'jstests/libs/server.pem';
+let client = 'jstests/libs/client.pem';
+
+if (HOST_TYPE == "macOS") {
+    ca = "/opt/x509/macos-trusted-ca.pem";
+    server = "/opt/x509/macos-trusted-server.pem";
+    client = "/opt/x509/macos-trusted-client.pem";
+    // Ensure the CA is properly installed on MacOS hosts.
+    // (MacOS is the only OS where it is installed outside of this test)
+    let exitCode = runProgram("security", "verify-cert", "-c", client);
+    assert.eq(0, exitCode, "Check for proper installation of Trusted CA on MacOS host");
+}
 if (_isWindows()) {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
 
     // OpenSSL backed imports Root CA and intermediate CA
-    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\ca.pem");
+    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", ca);
 
     // SChannel backed follows Windows rules and only trusts the Root store in Local Machine and
     // Current User.
-    runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\ca.pem");
+    runProgram("certutil.exe", "-addstore", "-f", "Root", ca);
 }
 
 try {
@@ -26,7 +42,7 @@ try {
         nodes: 1,
         nodeOptions: {
             sslMode: "requireSSL",
-            sslPEMKeyFile: "jstests/libs/server.pem",
+            sslPEMKeyFile: server,
             setParameter: {tlsUseSystemCA: true},
         },
         host: "localhost",
@@ -35,7 +51,7 @@ try {
 
     replTest.startSet({
         env: {
-            SSL_CERT_FILE: 'jstests/libs/ca.pem',
+            SSL_CERT_FILE: ca,
         },
     });
 
@@ -49,13 +65,13 @@ try {
         var argv = ['mongo', url, '--eval', ('db.runCommand({replSetGetStatus: 1})')];
 
         if (url.endsWith('&ssl=true')) {
-            argv.push('--tls', '--tlsCertificateKeyFile', 'jstests/libs/client.pem');
+            argv.push('--tls', '--tlsCertificateKeyFile', client);
         }
 
         if (!_isWindows()) {
             // On Linux we override the default path to the system CA store to point to our
             // system CA. On Windows, this CA will have been added to the user's trusted CA list
-            argv.unshift("env", "SSL_CERT_FILE=jstests/libs/ca.pem");
+            argv.unshift("env", "SSL_CERT_FILE=" + ca);
         }
         var ret = runMongoProgram(...argv);
         return ret;
