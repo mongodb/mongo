@@ -117,7 +117,7 @@ filters:
       - 10gen/server-jstest-infra
   - "/replica_sets_kill_primary_jscore_passthrough.yml":
     approvers:
-      - 10gen/server-jstest-infra
+      - 10gen/server-replication-reviewers
   - "/replica_sets_kill_primary_jscore_passthrough_last_lts_new_new_old.yml":
     approvers:
       - 10gen/server-jstest-infra
@@ -138,7 +138,7 @@ filters:
       - 10gen/server-jstest-infra
   - "/replica_sets_max_mirroring.yml":
     approvers:
-      - 10gen/server-jstest-infra
+      - 10gen/server-replication-reviewers
   - "/retryable_writes_downgrade_last_continuous.yml":
     approvers:
       - 10gen/server-transactions
