@@ -17,7 +17,7 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {ServerStatusMetrics} from "jstests/change_streams/change_stream_metrics_util.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});

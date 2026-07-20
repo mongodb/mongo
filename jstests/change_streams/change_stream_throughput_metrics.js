@@ -24,7 +24,7 @@ import {CursorList} from "jstests/libs/query/change_stream_util.js";
 import {
     ServerStatusMetrics,
     TestDataModifyGuard,
-} from "jstests/change_streams/change_stream_metrics_util.js";
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 describe("change stream throughput counters", function () {
     const testDB = db.getSiblingDB(jsTestName());

@@ -31,7 +31,7 @@ import {
 import {
     ServerStatusMetrics,
     UpdateLookupExecutor,
-} from "jstests/change_streams/change_stream_metrics_util.js";
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 // The engine expected to handle an updateLookup given the optimized-updateLookup flag state. When
 // the flag is off, the Aggregation executor is the entire lookup path regardless of topology. When

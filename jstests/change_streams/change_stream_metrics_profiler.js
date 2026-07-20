@@ -21,7 +21,7 @@ import {
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {CursorList} from "jstests/libs/query/change_stream_util.js";
-import {TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
+import {TestDataModifyGuard} from "jstests/libs/query/change_stream_metrics_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 
 describe("change stream cursor metrics profiler / slow query output", function () {
