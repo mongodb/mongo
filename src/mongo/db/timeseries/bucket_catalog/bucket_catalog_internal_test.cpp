@@ -4,13 +4,19 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -176,7 +182,45 @@ TEST_F(BucketCatalogInternalTest, ReopenQueriedBucketPreservesIsRawDataOperation
 
     ASSERT_FALSE(isRawDataOperation(_opCtx));
 }
+class BucketCatalogInternalShardServerTest : public ShardServerTestFixture {
+protected:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+        createTestCollection(operationContext(),
+                             _ns,
+                             BSON("create" << _ns.coll() << "timeseries"
+                                           << BSON("timeField" << "time" << "metaField" << "tag")));
+    }
 
+    NamespaceString _ns = NamespaceString::createNamespaceString_forTest(
+        "bucket_catalog_internal_shard_server_test", "ts");
+    ExecutionStats _globalStats;
+};
+
+TEST_F(BucketCatalogInternalShardServerTest, StaleConfigWhenReopeningArchivedBucketDoesNotThrow) {
+    auto* opCtx = operationContext();
+    const auto bucketsNss = timeseries::test_util::resolveTimeseriesNss(_ns);
+
+    // Acquire the buckets collection before attaching a shard version, so obtaining the handle
+    // itself doesn't trip the version check.
+    AutoGetCollection autoColl(opCtx, bucketsNss, MODE_IS);
+    const Collection* bucketsColl = (*autoColl).get();
+
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+
+    const ShardVersion staleVersion =
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
+    ScopedSetShardRole scopedShardRole{
+        opCtx, bucketsNss, staleVersion, boost::none /* dbVersion */};
+
+    // Ensure that reopenFetchedBucket returns an empty BSONObj instead of throwing when the fetch
+    // encounters a StaleConfig exception.
+    BSONObj reopenedBucketDoc;
+    ASSERT_DOES_NOT_THROW(reopenedBucketDoc =
+                              internal::reopenFetchedBucket(opCtx, bucketsColl, OID::gen(), stats));
+    ASSERT_TRUE(reopenedBucketDoc.isEmpty());
+}
 
 struct GenerateBucketOIDExtendedRangeParam {
     static GenerateBucketOIDExtendedRangeParam create(int64_t millisSinceEpoch, bool setsFlag) {

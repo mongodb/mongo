@@ -44,6 +44,8 @@ last-continuous:
   all:
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
       ticket: SERVER-121079
+    - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_reopening_stale_config.js
+      ticket: SERVER-131302
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
       ticket: SERVER-121533
     - test_file: jstests/core/administrative/block_replica_set_writes.js
@@ -243,6 +245,8 @@ last-lts:
       ticket: SERVER-94787
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_multi_update_delete_paused_migrations.js
       ticket: SERVER-97297
+    - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_reopening_stale_config.js
+      ticket: SERVER-131302
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
       ticket: SERVER-121533
     - test_file: jstests/concurrency/fsm_workloads/random_update_delete_with_move_collection.js

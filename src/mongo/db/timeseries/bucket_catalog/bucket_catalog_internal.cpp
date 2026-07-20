@@ -59,6 +59,7 @@ namespace mongo::timeseries::bucket_catalog::internal {
 namespace {
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
 MONGO_FAIL_POINT_DEFINE(hangTimeSeriesBatchPrepareWaitingForConflictingOperation);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesReopenArchivedBucketBeforeFetch);
 
 std::mutex _bucketIdGenLock;
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
@@ -273,11 +274,23 @@ BSONObj reopenFetchedBucket(OperationContext* opCtx,
     const bool savedRawData = rawDataFlag;
     ScopeGuard restoreRawData([&] { rawDataFlag = savedRawData; });
 
-    const auto reopenedBucketDoc = [&] {
-        FindCommandRequest findReq{bucketsColl->ns()};
-        findReq.setFilter(BSON("_id" << bucketId));
-        findReq.setRawData(true);
-        return DBDirectClient{opCtx}.findOne(std::move(findReq));
+    hangTimeseriesReopenArchivedBucketBeforeFetch.execute([&](const BSONObj& data) {
+        if (auto elem = data["sleepMillis"]; elem.ok()) {
+            opCtx->sleepFor(Milliseconds(elem.safeNumberLong()));
+        } else {
+            hangTimeseriesReopenArchivedBucketBeforeFetch.pauseWhileSet(opCtx);
+        }
+    });
+
+    const auto reopenedBucketDoc = [&]() -> BSONObj {
+        try {
+            FindCommandRequest findReq{bucketsColl->ns()};
+            findReq.setFilter(BSON("_id" << bucketId));
+            findReq.setRawData(true);
+            return DBDirectClient{opCtx}.findOne(std::move(findReq));
+        } catch (const DBException&) {
+            return BSONObj{};
+        }
     }();
 
     if (!reopenedBucketDoc.isEmpty()) {
