@@ -2442,7 +2442,466 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 12. Example with a cycle in the join graph
+## 12. Basic example with a $project + rename adding synthetic fields
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$project" : {
+			"a" : "my-computed-field",
+			"extra" : "$a"
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "extra",
+			"foreignField" : "a"
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign3",
+			"as" : "z",
+			"localField" : "x.c",
+			"foreignField" : "c"
+		}
+	},
+	{
+		"$unwind" : "$z"
+	}
+]
+```
+### Results
+```json
+{ "_id" : 0, "a" : "my-computed-field", "extra" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
+{ "_id" : 1, "a" : "my-computed-field", "extra" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
+{ "_id" : 2, "a" : "my-computed-field", "extra" : 2, "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+{ "_id" : 2, "a" : "my-computed-field", "extra" : 2, "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : "my-computed-field", "extra" : null, "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : "my-computed-field", "extra" : null, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "a" : "my-computed-field", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "a" : "my-computed-field", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+```
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [x.a = extra]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [c = c]
+  leftEmbeddingField: "z"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [extra = x.a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  HASH_JOIN_EMBEDDING [c = c]
+  |  leftEmbeddingField: "z"
+  |  rightEmbeddingField: "x"
+  |  |  |
+  |  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  |  direction: "forward"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [x.a = extra]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [c = c]
+  leftEmbeddingField: "z"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+### With random order, seed 44
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [c = x.c]
+leftEmbeddingField: "z"
+rightEmbeddingField: "none"
+  |  |
+  |  HASH_JOIN_EMBEDDING [a = extra]
+  |  leftEmbeddingField: "x"
+  |  rightEmbeddingField: "none"
+  |  |  |
+  |  |  PROJECTION_DEFAULT
+  |  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |  |
+  |  |  COLLSCAN [test.basic_joins_md]
+  |  |  direction: "forward"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+### With random order, seed 45
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [x.a = extra]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [c = c]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "z"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  direction: "forward"
+```
+### With random order, index join
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [x.a = extra]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [c = c]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "z"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [x.a = extra]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [c = c]
+  leftEmbeddingField: "z"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+## 13. Basic example with a $project + rename adding synthetic fields
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"pipeline" : [
+				{
+					"$project" : {
+						"a" : "my-computed-field",
+						"extra" : "$a"
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign3",
+			"as" : "z",
+			"localField" : "x.c",
+			"foreignField" : "c"
+		}
+	},
+	{
+		"$unwind" : "$z"
+	},
+	{
+		"$match" : {
+			"$expr" : {
+				"$eq" : [
+					"$x.extra",
+					"$a"
+				]
+			}
+		}
+	}
+]
+```
+### Results
+```json
+
+```
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+EQ_LOOKUP_UNWIND
+foreignCollection: "test.basic_joins_md_foreign3"
+localField: "x.c"
+foreignField: "c"
+asField: "z"
+strategy: "HashJoin"
+unwinding: { "preserveNullAndEmptyArrays" : false, "includeArrayIndex" : "" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= extra]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+EQ_LOOKUP_UNWIND
+foreignCollection: "test.basic_joins_md_foreign3"
+localField: "x.c"
+foreignField: "c"
+asField: "z"
+strategy: "HashJoin"
+unwinding: { "preserveNullAndEmptyArrays" : false, "includeArrayIndex" : "" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= extra]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+EQ_LOOKUP_UNWIND
+foreignCollection: "test.basic_joins_md_foreign3"
+localField: "x.c"
+foreignField: "c"
+asField: "z"
+strategy: "HashJoin"
+unwinding: { "preserveNullAndEmptyArrays" : false, "includeArrayIndex" : "" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= extra]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, seed 44
+usedJoinOptimization: true
+
+```
+EQ_LOOKUP_UNWIND
+foreignCollection: "test.basic_joins_md_foreign3"
+localField: "x.c"
+foreignField: "c"
+asField: "z"
+strategy: "HashJoin"
+unwinding: { "preserveNullAndEmptyArrays" : false, "includeArrayIndex" : "" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= extra]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, seed 45
+usedJoinOptimization: true
+
+```
+EQ_LOOKUP_UNWIND
+foreignCollection: "test.basic_joins_md_foreign3"
+localField: "x.c"
+foreignField: "c"
+asField: "z"
+strategy: "HashJoin"
+unwinding: { "preserveNullAndEmptyArrays" : false, "includeArrayIndex" : "" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [a $= extra]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, index join
+usedJoinOptimization: true
+
+```
+EQ_LOOKUP_UNWIND
+foreignCollection: "test.basic_joins_md_foreign3"
+localField: "x.c"
+foreignField: "c"
+asField: "z"
+strategy: "HashJoin"
+unwinding: { "preserveNullAndEmptyArrays" : false, "includeArrayIndex" : "" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [a $= extra]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+EQ_LOOKUP_UNWIND
+foreignCollection: "test.basic_joins_md_foreign3"
+localField: "x.c"
+foreignField: "c"
+asField: "z"
+strategy: "HashJoin"
+unwinding: { "preserveNullAndEmptyArrays" : false, "includeArrayIndex" : "" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= extra]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : { "$const" : "my-computed-field" }, "extra" : "$a" }
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+## 14. Example with a cycle in the join graph
 ### No join opt
 ### Pipeline
 ```json
@@ -2702,7 +3161,7 @@ rightEmbeddingField: "x"
   filter: { "b" : { "$eq" : "foo" } }
   direction: "forward"
 ```
-## 13. Basic example with $expr predicates
+## 15. Basic example with $expr predicates
 ### No join opt
 ### Pipeline
 ```json
@@ -2985,7 +3444,7 @@ rightEmbeddingField: "y"
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
-## 14. Example with a $lookup with no join predicate but the rest of the pipeline establishes a connected join graph. 
+## 16. Example with a $lookup with no join predicate but the rest of the pipeline establishes a connected join graph. 
 ### No join opt
 ### Pipeline
 ```json
@@ -3188,7 +3647,7 @@ rightEmbeddingField: "coll12"
   COLLSCAN [test.basic_joins_md_foreign3]
   direction: "forward"
 ```
-## 15. Projection on ambiguous field
+## 17. Projection on ambiguous field
 ### No join opt
 ### Pipeline
 ```json
@@ -3335,7 +3794,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 16. Non-pipeline $lookup with single absorbed $match on as field
+## 18. Non-pipeline $lookup with single absorbed $match on as field
 ### No join opt
 ### Pipeline
 ```json
@@ -3469,7 +3928,7 @@ rightEmbeddingField: "none"
   filter: { "c" : { "$eq" : "blah" } }
   direction: "forward"
 ```
-## 17. Non-pipeline $lookup with two absorbed $match stages both on as field
+## 19. Non-pipeline $lookup with two absorbed $match stages both on as field
 ### No join opt
 ### Pipeline
 ```json
@@ -3610,7 +4069,7 @@ rightEmbeddingField: "none"
   filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
   direction: "forward"
 ```
-## 18. Non-pipeline $lookup with absorbed $match on as field followed by $match on base field
+## 20. Non-pipeline $lookup with absorbed $match on as field followed by $match on base field
 ### No join opt
 ### Pipeline
 ```json
@@ -3758,7 +4217,7 @@ rightEmbeddingField: "none"
   filter: { "c" : { "$eq" : "blah" } }
   direction: "forward"
 ```
-## 19. Two joins where second join has absorbed filter
+## 21. Two joins where second join has absorbed filter
 ### No join opt
 ### Pipeline
 ```json
@@ -3958,7 +4417,7 @@ rightEmbeddingField: "x"
   filter: { "d" : { "$gt" : 2 } }
   direction: "forward"
 ```
-## 20. $match referencing the as-field placed before the $lookup that introduces it is a base collection filter and is not absorbed into the joined collection
+## 22. $match referencing the as-field placed before the $lookup that introduces it is a base collection filter and is not absorbed into the joined collection
 ### No join opt
 ### Pipeline
 ```json
@@ -4100,7 +4559,7 @@ rightEmbeddingField: "x"
   filter: { "x.c" : { "$eq" : "blah" } }
   direction: "forward"
 ```
-## 21. Pipeline $lookup with pipeline:[] and absorbed $match on as field
+## 23. Pipeline $lookup with pipeline:[] and absorbed $match on as field
 ### No join opt
 ### Pipeline
 ```json
@@ -4235,7 +4694,7 @@ rightEmbeddingField: "none"
   filter: { "c" : { "$eq" : "blah" } }
   direction: "forward"
 ```
-## 22. Pipeline $lookup with pipeline:[$match] and absorbed $match on as field
+## 24. Pipeline $lookup with pipeline:[$match] and absorbed $match on as field
 ### No join opt
 ### Pipeline
 ```json
@@ -4378,7 +4837,7 @@ rightEmbeddingField: "none"
   filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
   direction: "forward"
 ```
-## 23. Pipeline $lookup with correlated sub-pipeline and absorbed $match on as field
+## 25. Pipeline $lookup with correlated sub-pipeline and absorbed $match on as field
 ### No join opt
 ### Pipeline
 ```json
@@ -4525,7 +4984,7 @@ rightEmbeddingField: "none"
   filter: { "c" : { "$eq" : "blah" } }
   direction: "forward"
 ```
-## 24. Basic example with a $project including fields from the base collection
+## 26. Basic example with a $project including fields from the base collection
 ### No join opt
 ### Pipeline
 ```json
@@ -4746,7 +5205,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 25. Basic example with a $project including join-predicate fields from foreign collections
+## 27. Basic example with a $project including join-predicate fields from foreign collections
 ### No join opt
 ### Pipeline
 ```json
@@ -4996,7 +5455,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 26. $project as only stage in subpipeline (no $match), excluding non-join-predicate fields
+## 28. $project as only stage in subpipeline (no $match), excluding non-join-predicate fields
 ### No join opt
 ### Pipeline
 ```json
@@ -5152,7 +5611,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
-## 27. $project in prefix excluding a non-join-predicate field with single join
+## 29. $project in prefix excluding a non-join-predicate field with single join
 ### No join opt
 ### Pipeline
 ```json
@@ -5306,7 +5765,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
-## 28. Subpipeline with $match followed by multi-field $project excluding non-join fields
+## 30. Subpipeline with $match followed by multi-field $project excluding non-join fields
 ### No join opt
 ### Pipeline
 ```json
@@ -5471,7 +5930,7 @@ rightEmbeddingField: "none"
   filter: { "d" : { "$lt" : 3 } }
   direction: "forward"
 ```
-## 29. Two joins: first with $match and $project subpipeline, second with $project-only subpipeline
+## 31. Two joins: first with $match and $project subpipeline, second with $project-only subpipeline
 ### No join opt
 ### Pipeline
 ```json

@@ -577,7 +577,262 @@ rightEmbeddingField: "y"
   direction: "forward"
 ```
 
-## 4. 4-Node graph + potentially inferred edges & filters
+## 4. 3-Node graph + intermediate exclusion projection & rename
+### No join opt
+### Random reordering with seed 0
+```
+HASH_JOIN_EMBEDDING [m = x]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "x" : "$a", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [z = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
+  |  |
+  |  PROJECTION_SIMPLE
+  |  transformBy: { "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
+### Random reordering with seed 1
+```
+HASH_JOIN_EMBEDDING [z = b]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  PROJECTION_SIMPLE
+  |  transformBy: { "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [m = x]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "x" : "$a", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
+### Random reordering with seed 2
+```
+HASH_JOIN_EMBEDDING [b = z]
+leftEmbeddingField: "y"
+rightEmbeddingField: "none"
+  |  |
+  |  HASH_JOIN_EMBEDDING [x = m]
+  |  leftEmbeddingField: "x"
+  |  rightEmbeddingField: "none"
+  |  |  |
+  |  |  PROJECTION_DEFAULT
+  |  |  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |  |  |
+  |  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  |  direction: "forward"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "x" : "$a", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  PROJECTION_SIMPLE
+  transformBy: { "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_b]
+  direction: "forward"
+```
+### Random reordering with seed 3
+```
+HASH_JOIN_EMBEDDING [b = z]
+leftEmbeddingField: "y"
+rightEmbeddingField: "none"
+  |  |
+  |  NESTED_LOOP_JOIN_EMBEDDING [x = m]
+  |  leftEmbeddingField: "x"
+  |  rightEmbeddingField: "none"
+  |  |  |
+  |  |  PROJECTION_DEFAULT
+  |  |  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |  |  |
+  |  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  |  direction: "forward"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "x" : "$a", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  PROJECTION_SIMPLE
+  transformBy: { "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_b]
+  direction: "forward"
+```
+### Random reordering with seed 5
+```
+HASH_JOIN_EMBEDDING [x = m]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  NESTED_LOOP_JOIN_EMBEDDING [b = z]
+  |  leftEmbeddingField: "y"
+  |  rightEmbeddingField: "none"
+  |  |  |
+  |  |  PROJECTION_DEFAULT
+  |  |  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |  |  |
+  |  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  |  direction: "forward"
+  |  |
+  |  PROJECTION_SIMPLE
+  |  transformBy: { "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "x" : "$a", "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_a]
+  direction: "forward"
+```
+### Random reordering with seed 6
+```
+HASH_JOIN_EMBEDDING [m = x]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "x" : "$a", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [z = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
+  |  |
+  |  PROJECTION_SIMPLE
+  |  transformBy: { "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
+### Random reordering with seed 8
+```
+HASH_JOIN_EMBEDDING [x = m]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  NESTED_LOOP_JOIN_EMBEDDING [z = b]
+  |  leftEmbeddingField: "none"
+  |  rightEmbeddingField: "y"
+  |  |  |
+  |  |  PROJECTION_SIMPLE
+  |  |  transformBy: { "_id" : false }
+  |  |  |
+  |  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  |  direction: "forward"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "x" : "$a", "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_a]
+  direction: "forward"
+```
+### Random reordering with seed 10
+```
+HASH_JOIN_EMBEDDING [m = x]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "x" : "$a", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = z]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  PROJECTION_SIMPLE
+  transformBy: { "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_b]
+  direction: "forward"
+```
+### Random reordering with seed 11
+```
+NESTED_LOOP_JOIN_EMBEDDING [z = b]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  PROJECTION_SIMPLE
+  |  transformBy: { "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [m = x]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "x" : "$a", "_id" : false }
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "m" : "$a", "z" : "$b", "_id" : false }
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
+
+## 5. 4-Node graph + potentially inferred edges & filters
 ### No join opt
 ### Random reordering with seed 0
 ```
@@ -888,7 +1143,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 
-## 5. 5-Node graph + filters
+## 6. 5-Node graph + filters
 ### No join opt
 ### Random reordering with seed 0
 ```

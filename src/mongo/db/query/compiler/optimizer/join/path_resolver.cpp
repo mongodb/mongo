@@ -3,8 +3,11 @@
 
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
+#include "mongo/util/string_map.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -99,16 +102,64 @@ bool PathResolver::trackEmbedPath(const DocumentSourceLookUp& lookup, NodeId nod
     return true;
 }
 
+boost::optional<ResolvedPath> PathResolver::_resolve(
+    const pipeline::dependency_graph::DependencyGraph& graph,
+    const FieldPath& fieldPath,
+    const DocumentSource* at,
+    NodeId nodeId) {
+    auto origin = graph.resolveFieldOrigin(at, fieldPath.fullPath());
+    switch (origin.kind) {
+        case pipeline::dependency_graph::FieldOriginKind::kBaseDocument: {
+            // Path originates at base of pipeline for this graph.
+            return ResolvedPath{nodeId, fieldPath};
+        }
+        case pipeline::dependency_graph::FieldOriginKind::kAlias: {
+            // This is a rename! Get the base field name.
+            tassert(12836501, "Expected an input field", origin.inputField);
+            auto resolved =
+                _resolve(graph, *origin.inputField, origin.modifyingStage.get(), nodeId);
+            if (resolved) {
+                resolved->fieldPathAfterRenames = fieldPath;
+            }
+            return resolved;
+        }
+        case pipeline::dependency_graph::FieldOriginKind::kSubpipeline: {
+            // We don't support nested $lookups.
+            tassert(12836500, "Don't support nested $lookups", nodeId == _baseNodeId);
+
+            auto lookup = dynamic_cast<const DocumentSourceLookUp*>(origin.modifyingStage.get());
+            if (!lookup) {
+                // We only support $lookup sub-pipelines.
+                return boost::none;
+            }
+
+            auto nodeIt = _lookupNodes.find(lookup);
+            tassert(12835903, "Unexpected prior $lookup", nodeIt != _lookupNodes.end());
+
+            // This comes from a previous $lookup! 'origin.inputField' already strips the embed
+            // path for us.
+            auto subGraph = _graph.getSubpipelineGraph(lookup);
+            tassert(12836502, "Expected a dependency graph to be available", subGraph);
+            return _resolve(*subGraph, *origin.inputField, nullptr, nodeIt->second);
+        }
+
+        case pipeline::dependency_graph::FieldOriginKind::kOther: {
+            // Possible field computation/modification- bail.
+            return boost::none;
+        }
+    }
+    MONGO_UNREACHABLE_TASSERT(234);
+}
+
 boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
                                               const DocumentSource* at,
                                               boost::optional<NodeId> nodeId) {
     const pipeline::dependency_graph::DependencyGraph* graph = nullptr;
-    if (nodeId && *nodeId != _baseNodeId) {
-        if (auto it = _nodeLookups.find(*nodeId); it != _nodeLookups.end()) {
-            graph = _graph.getSubpipelineGraph(it->second.sourceLookup);
-        }
-    } else {
+    const bool mainPipelineResolution = !nodeId || nodeId == _baseNodeId;
+    if (mainPipelineResolution) {
         graph = &_graph;
+    } else if (auto it = _nodeLookups.find(*nodeId); it != _nodeLookups.end()) {
+        graph = _graph.getSubpipelineGraph(it->second.sourceLookup);
     }
     tassert(12835902, "Expected to find a dependency graph", graph);
 
@@ -118,65 +169,33 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
         return boost::none;
     }
 
-    boost::optional<ResolvedPath> resolved;
-    auto src = graph->getPrevModifyingStage(at, fieldPath.fullPath());
-    if (src == nullptr) {
-        // Path originates at base of pipeline for this graph.
-        resolved = ResolvedPath{nodeId.get_value_or(_baseNodeId), fieldPath};
-
-    } else if (auto lookup = dynamic_cast<const DocumentSourceLookUp*>(src.get()); lookup) {
-        // Path comes from a $lookup!
-        tassert(
-            12835903, "Unexpected prior $lookup", _lookupNodes.find(lookup) != _lookupNodes.end());
-
-        // This comes from a previous $lookup! Strip the embedding field.
-        auto asEmbedding = lookup->getAsField();
-        // Ensure this in fact is prefixed by the "as" field.
-        if (!asEmbedding.isPrefixOf(fieldPath)) {
-            // Can happen if our path is actually an ancestor of a previous $lookup embedding field.
-            // This is a conflict.
-            return boost::none;
-        } else if (asEmbedding.getPathLength() == fieldPath.getPathLength()) {
-            // Path matches embedding path. Bail out of join opt.
-            return boost::none;
-        }
-
-        // One last check: did the $lookup sub-pipeline modify this field? If so, bail- only support
-        // fields coming directly from a collection.
-        auto strippedPath = fieldPath.subtractPrefix(asEmbedding.getPathLength());
-        auto subGraph = _graph.getSubpipelineGraph(src.get());
-        tassert(12835904, "Expected to find a dependency graph for lookup", subGraph);
-        // Note: nullptr here indicates "end of subpipeline".
-        if (subGraph->getPrevModifyingStage(nullptr, strippedPath.fullPath())) {
-            // This must have been modified in the $lookup subpipeline! Bail.
-            return boost::none;
-        }
-
-        // Validate the original path where it is referenced for arrayness.
-        if (!isPathValid(*graph, at, fieldPath)) {
-            return boost::none;
-        }
-
-        resolved = ResolvedPath{_lookupNodes[lookup], strippedPath};
-    }
-
-    // This comes from a rename/ field computation! Bail- we don't support this.
+    boost::optional<ResolvedPath> resolved =
+        _resolve(*graph, fieldPath, at, nodeId.get_value_or(_baseNodeId));
     if (!resolved) {
         return boost::none;
     }
 
-    // One last check! If this is not originating from the base node, ensure that it is not in
-    // fact modified in any way by the sub-pipeline of the node that produced it. This is
-    // because we rely on the CQ we generate for this node not modifying this field. We don't do
-    // this for the base node, because we allow a trailing suffix after our join-opt-eligible prefix
-    // to modify any path.
-    // TODO SERVER-128365: Support renames.
-    if (resolved->nodeId != _baseNodeId) {
-        graph = _graph.getSubpipelineGraph(_nodeLookups[resolved->nodeId].sourceLookup);
-        tassert(12836400, "Expected to find a dependency graph for lookup", graph);
+    // One last check! If this is not originating from the base node, ensure that we check if it was
+    // modified in any way by the sub-pipeline of the node that produced it (e.g. report renames/
+    // ban computations). We don't do this for the base node, because we allow a trailing suffix
+    // after our join-opt-eligible prefix to modify any path.
+    if (!mainPipelineResolution) {
+        tassert(12836400,
+                "Expected to be resolving within a subpipeline, or unsupported nested $lookups",
+                nodeId && resolved->nodeId == *nodeId);
 
-        if (graph->getPrevModifyingStage(nullptr, resolved->underlyingFieldPath.fullPath())) {
-            // This path was modified at some point by our sub-pipeline! Bail.
+        // We need to look for aliases- but we still need to check for any field modifications after
+        // this was resolved.
+        auto alias =
+            graph->getBaseDocumentFieldAlias(nullptr, resolved->underlyingFieldPath.fullPath());
+        auto subOrigin =
+            graph->resolveFieldOrigin(nullptr, resolved->underlyingFieldPath.fullPath());
+        if (alias) {
+            // We have some rename of the base path after the point where our join predicate was
+            // defined- track it.
+            resolved->fieldPathAfterRenames = *alias;
+        } else if (subOrigin.kind != pipeline::dependency_graph::FieldOriginKind::kBaseDocument) {
+            // Path was modified- bail.
             return boost::none;
         }
     }

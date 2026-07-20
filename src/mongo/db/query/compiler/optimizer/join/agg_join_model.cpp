@@ -211,8 +211,12 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
 }
 
 BSONObj resolvedPathToBSON(const ResolvedPath& rp) {
-    return BSON("nodeId" << rp.nodeId << "underlyingFieldPath"
-                         << rp.underlyingFieldPath.fullPath());
+    BSONObjBuilder bob;
+    bob << "nodeId" << rp.nodeId << "underlyingFieldPath" << rp.underlyingFieldPath.fullPath();
+    if (rp.fieldPathAfterRenames) {
+        bob << "fieldPathAfterRenames" << rp.fieldPathAfterRenames->fullPath();
+    }
+    return bob.obj();
 }
 
 std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {

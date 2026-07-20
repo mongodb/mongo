@@ -90,6 +90,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "join_ordering_test",
     srcs = [
+        "agg_join_model_renames_test.cpp",
         "agg_join_model_test.cpp",
         "cardinality_estimator_join_test.cpp",
         "catalog_stats_test.cpp",
@@ -105,6 +106,7 @@ mongo_cc_unit_test(
     ],
     data = [
         "//src/mongo/db/test_output/query/join/agg_join_model/pipeline_analyzer_test:test_data",
+        "//src/mongo/db/test_output/query/join/agg_join_model/renames_test:test_data",
         "//src/mongo/db/test_output/query/join/join_plan_enumerator_hinting_test:test_data",
         "//src/mongo/db/test_output/query/join/join_plan_enumerator_test:test_data",
         "//src/mongo/db/test_output/query/join/reorder_graph_test:test_data",

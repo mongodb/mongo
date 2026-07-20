@@ -32,5 +32,8 @@ struct ResolvedPath {
     NodeId nodeId;
     // Field path directly on the base collection that the join node 'nodeId' refers to.
     FieldPath underlyingFieldPath;
+    // If this path was renamed by the CQ for this node, then 'fieldPathAfterRenames' refers to the
+    // name after the CQ has been applied to the base collection.
+    boost::optional<FieldPath> fieldPathAfterRenames;
 };
 }  // namespace mongo::join_ordering

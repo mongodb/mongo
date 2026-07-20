@@ -88,6 +88,12 @@ private:
     PathId addPath(ResolvedPath path);
     boost::optional<PathId> addPathOrGetExisting(ResolvedPath path);
 
+    // Helper to support recursive path resolution with renames.
+    boost::optional<ResolvedPath> _resolve(const pipeline::dependency_graph::DependencyGraph& graph,
+                                           const FieldPath& fieldPath,
+                                           const DocumentSource* at,
+                                           NodeId nodeId);
+
     const pipeline::dependency_graph::DependencyGraph& _graph;
     NodeId _baseNodeId;
 

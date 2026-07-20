@@ -94,15 +94,17 @@ std::unique_ptr<QuerySolutionNode> createIndexProbeQSN(
  */
 FieldPath expandEmbeddedPath(const JoinReorderingContext& ctx, PathId pathId, bool expand) {
     const auto& resolvedPath = ctx.resolvedPaths[pathId];
+    const auto& strippedPath =
+        resolvedPath.fieldPathAfterRenames.value_or(resolvedPath.underlyingFieldPath);
     if (!expand) {
-        return resolvedPath.underlyingFieldPath;
+        return strippedPath;
     }
 
     const auto& node = ctx.joinGraph.getNode(resolvedPath.nodeId);
     if (node.embedPath.has_value()) {
-        return node.embedPath->concat(resolvedPath.underlyingFieldPath);
+        return node.embedPath->concat(strippedPath);
     }
-    return resolvedPath.underlyingFieldPath;
+    return strippedPath;
 }
 
 QSNJoinPredicate makePhysicalPredicate(const JoinReorderingContext& ctx,

@@ -132,6 +132,32 @@ joinTestWrapper(db, () => {
         {$project: {_id: 0, "x._id": 0, "y._id": 0}},
     ]);
 
+    // A - BASE - B, with an exclusion projection & rename.
+    section("3-Node graph + intermediate exclusion projection & rename");
+    runRandomReorderTests([
+        {$project: {_id: 0, m: "$a", z: "$b"}},
+        {
+            $lookup: {
+                from: a.getName(),
+                as: "x",
+                localField: "m",
+                foreignField: "a",
+                pipeline: [{$project: {_id: 0, x: "$a"}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: b.getName(),
+                as: "y",
+                localField: "z",
+                foreignField: "b",
+                pipeline: [{$project: {_id: 0}}],
+            },
+        },
+        {$unwind: "$y"},
+    ]);
+
     section("4-Node graph + potentially inferred edges & filters");
     runRandomReorderTests([
         {$match: {b: {$eq: 3}}},

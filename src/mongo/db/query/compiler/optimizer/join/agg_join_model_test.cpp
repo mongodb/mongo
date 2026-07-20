@@ -1854,63 +1854,6 @@ TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicatesUnmodifiedOk) {
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
-TEST_F(PipelineAnalyzerTest, PipelineWithRenamedBaseCollectionJoinPredFieldBails) {
-    const auto query = R"([
-            {$project: {a: "$foo"}},
-            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x"}},
-            {$unwind: "$x"}
-        ])";
-
-    auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a", "foo"}, {{"A", {"b"}}});
-
-    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-
-    // We bail because we detect that field "a" was last modified by a non-$lookup stage.
-    // TODO SERVER-128365: Support renames within CQ.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_NOT_OK(swJoinModel);
-}
-
-TEST_F(PipelineAnalyzerTest, PipelineWithRenamedBaseCollectionExprJoinPredFieldBails) {
-    const auto query = R"([
-            {$project: {a: "$foo"}},
-            {$lookup: {from: "A", as: "x", let: {aa: "$a"}, pipeline: [
-                {$match: {$expr: {$eq: ["$$aa", "$b"]}}}
-            ]}},
-            {$unwind: "$x"}
-        ])";
-
-    auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a", "foo"}, {{"A", {"b"}}});
-
-    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-
-    // We bail because we detect that field "a" was last modified by a non-$lookup stage.
-    // TODO SERVER-128365: Support renames within CQ.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_NOT_OK(swJoinModel);
-}
-
-TEST_F(PipelineAnalyzerTest, PipelineWithRenamedBaseCollectionTrailingExprJoinPredFieldBails) {
-    const auto query = R"([
-            {$project: {a: "$foo"}},
-            {$lookup: {from: "A", as: "x", pipeline: []}},
-            {$unwind: "$x"},
-            {$match: {$expr: {$eq: ["$a", "$x.b"]}}}
-        ])";
-
-    auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a", "foo"}, {{"A", {"b"}}});
-
-    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-
-    // We bail because we detect that field "a" was last modified by a non-$lookup stage.
-    // TODO SERVER-128365: Support renames within CQ.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_NOT_OK(swJoinModel);
-}
-
 TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicateModifiedForJoinBails) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
@@ -1924,7 +1867,7 @@ TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicateModifiedForJoinBai
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    // TODO SERVER-128365: Support renames within CQ.
+    // We can't support a query where a join predicate field is modified in the subpipeline.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
 }
@@ -1943,7 +1886,7 @@ TEST_F(PipelineAnalyzerTest, PipelineWithProjectsExprJoinPredicateModifiedForJoi
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    // TODO SERVER-128365: Support renames within CQ.
+    // We can't support a query where a join predicate field is modified in the subpipeline.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
 }

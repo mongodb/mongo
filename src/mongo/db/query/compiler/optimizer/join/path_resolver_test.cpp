@@ -38,6 +38,23 @@ void testResolve(PathResolver& pr,
     ASSERT_EQ(pr.resolve(field, at, nodeId), pathId);
 }
 
+// Like testResolve(), but additionally asserts that the resolved path tracks the given rename
+// (the field name as it appears after any renaming projections have been applied).
+void testResolveRename(PathResolver& pr,
+                       const FieldPath& field,
+                       const FieldPath& expectedPath,
+                       const NodeId expectedNode,
+                       const FieldPath& expectedRename,
+                       const DocumentSource* at = nullptr,
+                       boost::optional<NodeId> nodeId = boost::none) {
+    auto pathId = pr.resolve(field, at, nodeId);
+    validatePath(pathId, pr, expectedPath, expectedNode);
+    ASSERT_EQ(pr.resolve(field, at, nodeId), pathId);
+    const auto& path = pr.resolvedPaths()[*pathId];
+    ASSERT(path.fieldPathAfterRenames.has_value());
+    ASSERT_EQ(path.fieldPathAfterRenames->fullPath(), expectedRename.fullPath());
+}
+
 class PathResolverTest : public AggJoinModelFixture {
 public:
     std::unique_ptr<Pipeline> makeBasicTestPipeline(std::string_view lf1,
@@ -520,6 +537,109 @@ TEST_F(PathResolverTest, HandleMainPipelineProject) {
 
     // BUT we can't resolve the computed local field!
     ASSERT_FALSE(pr.resolve("lf2", nullptr));
+}
+
+TEST_F(PathResolverTest, HandleMainPipelineConsecutiveProjectsSameField) {
+    // Rename a to r1 then to r2- note that this isn't yet supported by pushdown to CQ, so wouldn't
+    // actually participate in join reordering.
+    auto pipeline =
+        makeBasicTestPipeline("r2",
+                              "ff",
+                              "embed",
+                              "lf2",
+                              "ff2",
+                              "embed2",
+                              /* prefix */ R"({$project: {r1: "$a"}}, {$project: {r2: "$r1"}},)");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // The first $lookup is the third stage, after the two $project stages.
+    auto it = pipeline->getSources().begin();
+    std::advance(it, 2);
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Resolving the local field "r2" traces the two renames back to base field "a", and records
+    // "r2" as the field name after renames.
+    testResolveRename(pr, "r2", "a", 0, "r2", dsLookup);
+    testResolve(pr, "ff", "ff", 1, nullptr, 1);
+
+    // Tracking the second embed path is fine.
+    const auto* dsLookup2 = (++it)->get();
+    const auto* lookup2 = dynamic_cast<const DocumentSourceLookUp*>(dsLookup2);
+    ASSERT(lookup2);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup2, 2));
+
+    // The intermediate names "r1" and the now-dropped "a" no longer resolve on the post-project
+    // pipeline.
+    ASSERT_FALSE(pr.resolve("a", dsLookup));
+    ASSERT_FALSE(pr.resolve("r1", dsLookup));
+}
+
+TEST_F(PathResolverTest, HandleMainPipelineConsecutiveProjectsDottedPath) {
+    // Same as above, but now with dotted paths.
+    auto pipeline = makeBasicTestPipeline(
+        "r2",
+        "ff",
+        "embed",
+        "lf2",
+        "ff2",
+        "embed2",
+        /* prefix */ R"({$project: {r1: "$a.b"}}, {$project: {"r2.c": "$r1"}},)");
+    markFieldsAsScalar(*pipeline, {"r2"}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    // The first $lookup is the third stage, after the two $project stages.
+    auto it = pipeline->getSources().begin();
+    std::advance(it, 2);
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // Resolving the local field "r2.c" traces the renames back to the dotted base path "a.b", and
+    // records "r2.c" as the field path after renames. Note that we must resolve "r2.c" (the field
+    // the second $project actually produces), not "r2": "r2" is a computed subdocument {c: <a.b>},
+    // not a plain rename, so it has no alias origin.
+    testResolveRename(pr, "r2.c", "a.b", 0, "r2.c", dsLookup);
+    testResolve(pr, "ff", "ff", 1, nullptr, 1);
+}
+
+TEST_F(PathResolverTest, HandleSubpipelineConsecutiveRenamesSameField) {
+    // Same as above, but now in a sub-pipeline.
+    auto pipeline = makeSubpipelineTestPipeline(
+        R"({aaa: "$lf"})",
+        R"([{$match: {$expr: ["$$aaa", "$ff"]}}, {$project: {renamedFF: "$ff"}}, {$project: {renamedFF2: "$renamedFF"}}])",
+        "embed",
+        "lf2",
+        "ff2",
+        "embed2");
+    markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
+    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
+                                                   mainCollPathAlwaysScalar);
+    PathResolver pr(0, dg);
+
+    auto it = pipeline->getSources().begin();
+    const auto* dsLookup = it->get();
+    const auto* lookup = dynamic_cast<const DocumentSourceLookUp*>(dsLookup);
+    ASSERT(lookup);
+    ASSERT_TRUE(pr.trackEmbedPath(*lookup, 1));
+
+    // The local field resolves normally to the base node.
+    testResolve(pr, "lf", "lf", 0, dsLookup);
+
+    // Resolving the foreign field "ff" (scoped to the foreign node, at the subpipeline $match)
+    // traces back to base field "ff", while tracking the final subpipeline rename "renamedFF2".
+    ASSERT(lookup->getSubPipeline());
+    auto subPipelineIt = lookup->getSubPipeline()->begin();
+    ASSERT_NE(subPipelineIt, lookup->getSubPipeline()->end());
+    testResolveRename(pr, "ff", "ff", 1, "renamedFF2", subPipelineIt->get(), 1);
 }
 
 }  // namespace mongo::join_ordering
