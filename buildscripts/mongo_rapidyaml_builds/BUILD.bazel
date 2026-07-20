@@ -1,0 +1,18 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("@rules_python//python:defs.bzl", "py_binary")
+
+# Standalone helper for republishing the mdb-build-public PEP 503 simple
+# index for rapidyaml wheels with `#sha256=<hex>` fragments on every
+# anchor. Human-invoked (not part of any build graph); the BUILD file
+# exists only so `bazel run lint` recognizes the module.
+py_binary(
+    name = "regenerate_simple_index",
+    srcs = ["regenerate_simple_index.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+    ],
+)
