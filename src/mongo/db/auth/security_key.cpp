@@ -104,7 +104,6 @@ using std::string;
 bool setUpSecurityKey(const string& filename, ClusterAuthMode mode) {
     auto swKeyStrings = mongo::readSecurityFile(filename);
     if (!swKeyStrings.isOK()) {
-        LOGV2(20254, "Read security file failed", "error"_attr = swKeyStrings.getStatus());
         return false;
     }
 

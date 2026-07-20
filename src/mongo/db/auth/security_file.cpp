@@ -39,7 +39,7 @@ std::string stripString(const std::string& filename, const std::string& str) {
         } else if ((ch < 'A' || ch > 'Z') && (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') &&
                    ch != '+' && ch != '/' && ch != '=') {
             uasserted(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "invalid char in key file " << filename << ": " << str);
+                      str::stream() << "invalid char in key file " << filename);
         }
         return true;
     });
