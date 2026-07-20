@@ -4,6 +4,7 @@
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/write_ops/write_ops_exec_util.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
@@ -947,10 +948,7 @@ Status performAtomicTimeseriesWrites(
     curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                    .getDatabaseProfileLevel(ns.dbName()));
 
-    const bool pdibEnabled =
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx);
 
     WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
     const bool shouldGroup = pdibEnabled ? (insertOps.size() + updateOps.size() > 1)

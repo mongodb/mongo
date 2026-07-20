@@ -10,6 +10,7 @@
 #include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -22,7 +23,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -71,11 +71,7 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
     StackBufBuilder builder;
     key.serializeWithoutRecordId(builder);
 
-    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+    if (index_builds::primary_driven::enabled(opCtx)) {
         LOGV2_DEBUG(10966700,
                     1,
                     "Index build: writing to duplicate key tracker container for primary-driven "
@@ -146,6 +142,8 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
                      opCtx);
     }
 
+    const bool primaryDrivenIndexBuild = index_builds::primary_driven::enabled(opCtx);
+
     int resolved = 0;
     while (record) {
         resolved++;
@@ -160,10 +158,7 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
         constraintsCursor->save();
         writeConflictRetry(opCtx, "DuplicateKeyTracker::checkConstraints", coll->ns(), [&] {
             WriteUnitOfWork wuow{opCtx};
-            if (auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                fcvSnapshot.isVersionInitialized() &&
-                feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+            if (primaryDrivenIndexBuild) {
                 uassertStatusOK(container_write::remove(
                     opCtx,
                     *shard_role_details::getRecoveryUnit(opCtx),

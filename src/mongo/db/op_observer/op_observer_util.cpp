@@ -45,11 +45,6 @@ bool shouldSetIsTimeseriesField(const VersionContext& vCtx) {
     return gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(vCtx, fcvSnapshot);
 }
 
-bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcvSnapshot);
-}
 
 /**
  * Given a raw collMod command object and associated collection metadata, create and return the

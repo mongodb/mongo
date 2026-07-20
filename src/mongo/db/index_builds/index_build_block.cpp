@@ -11,6 +11,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
@@ -24,7 +25,6 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -147,11 +147,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
         // Primary-driven index builds use replicated tables rather than temporary local tables, so
         // they need to be created at a consistent timestamp on all nodes. Currently this is done by
         // creating them eagerly rather than as needed.
-        // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot);
+        auto isPrimaryDrivenIndexBuild = index_builds::primary_driven::enabled(opCtx);
         auto mode = isPrimaryDrivenIndexBuild ? LazyRecordStore::CreateMode::immediate
                                               : LazyRecordStore::CreateMode::deferred;
 

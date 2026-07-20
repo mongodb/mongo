@@ -16,6 +16,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -25,7 +26,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -75,11 +75,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
             opCtx, *indexBuildInfo.constraintViolationsIdent, createMode);
     }
-    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot);
+    auto isPrimaryDrivenIndexBuild = index_builds::primary_driven::enabled(opCtx);
     if (isPrimaryDrivenIndexBuild) {
         uassert(11411100, "sorterIdent is not provided", indexBuildInfo.sorterIdent);
         uassert(11411101,

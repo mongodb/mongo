@@ -10,6 +10,22 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "enabled",
+    srcs = [
+        "enabled.cpp",
+    ],
+    hdrs = [
+        "enabled.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:write_unit_of_work",
+    ],
+)
+
+mongo_cc_library(
     name = "primary_driven_index_builds",
     srcs = [
         "registry.cpp",
@@ -35,6 +51,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "primary_driven_index_builds_test",
     srcs = [
+        "enabled_test.cpp",
         "util_test.cpp",
     ],
     tags = [
@@ -42,11 +59,15 @@ mongo_cc_unit_test(
         "server-index-builds",
     ],
     deps = [
+        ":enabled",
         ":primary_driven_index_builds",
+        "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/collection_crud:container_write",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:record_store_test_harness",
         # TODO SERVER-127391: Remove dependency on wiredtiger_record_store_test_harness.
         "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )

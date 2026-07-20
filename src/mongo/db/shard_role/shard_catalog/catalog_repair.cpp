@@ -3,13 +3,13 @@
 
 #include "mongo/db/shard_role/shard_catalog/catalog_repair.h"
 
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -325,9 +325,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         }
     }
 
-    if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (index_builds::primary_driven::enabled(opCtx)) {
         return reconcileResult;
     }
 

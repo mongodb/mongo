@@ -29,6 +29,7 @@
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
@@ -1009,11 +1010,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
 
           const auto& entry = *op;
+          const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
           auto swOplogEntry = IndexBuildOplogEntry::parse(
-              opCtx,
-              entry,
-              shouldReplicateLocalCatalogIdentifiers(
-                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider()));
+              opCtx, entry, shouldReplicateLocalCatalogIdentifiers(provider));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'startIndexBuild' oplog entry");
@@ -1037,10 +1036,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               }
           }
 
-          if (mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-                  .isEnabledUseLastLTSFCVWhenUninitialized(
-                      VersionContext::getDecoration(opCtx),
-                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+          if (index_builds::primary_driven::enabled(opCtx)) {
               return index_builds::primary_driven::start(opCtx,
                                                          entry.getNss().dbName(),
                                                          oplogEntry.collUUID,
@@ -1075,21 +1071,16 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
 
           const auto& entry = *op;
+          const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
           auto swOplogEntry = IndexBuildOplogEntry::parse(
-              opCtx,
-              entry,
-              shouldReplicateLocalCatalogIdentifiers(
-                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider()));
+              opCtx, entry, shouldReplicateLocalCatalogIdentifiers(provider));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'commitIndexBuild' oplog entry");
           }
           auto oplogEntry = std::move(swOplogEntry.getValue());
 
-          if (mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-                  .isEnabledUseLastLTSFCVWhenUninitialized(
-                      VersionContext::getDecoration(opCtx),
-                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+          if (index_builds::primary_driven::enabled(opCtx)) {
               return index_builds::primary_driven::commit(opCtx,
                                                           entry.getNss().dbName(),
                                                           oplogEntry.collUUID,
@@ -1115,21 +1106,16 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                       "The abortIndexBuild operation is not supported in applyOps mode"};
           }
 
+          const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
           auto swOplogEntry = IndexBuildOplogEntry::parse(
-              opCtx,
-              *op,
-              shouldReplicateLocalCatalogIdentifiers(
-                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider()));
+              opCtx, *op, shouldReplicateLocalCatalogIdentifiers(provider));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'abortIndexBuild' oplog entry");
           }
           auto oplogEntry = std::move(swOplogEntry.getValue());
 
-          if (mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-                  .isEnabledUseLastLTSFCVWhenUninitialized(
-                      VersionContext::getDecoration(opCtx),
-                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+          if (index_builds::primary_driven::enabled(opCtx)) {
               return index_builds::primary_driven::abort(opCtx,
                                                          op->getNss().dbName(),
                                                          oplogEntry.collUUID,
