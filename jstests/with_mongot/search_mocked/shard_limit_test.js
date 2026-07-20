@@ -1,5 +1,8 @@
 /**
  * Test that a $limit gets pushed to the shards.
+ *
+ * TODO (SERVER-131069): Mock-only explain format (mongotDocsRequested, limit absorption). Cannot
+ * migrate to real-mongot E2E.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";

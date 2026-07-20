@@ -38,38 +38,7 @@ prepCollection(mongos, dbName, collName);
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
 st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 
-// The following tests will test the commands and $listSearchIndexes aggregation stage succeed.
-(function createIndexSuccedsOneIndex() {
-    const manageSearchIndexCommandResponse = {
-        indexesCreated: [{id: "index-Id", name: "index-name"}],
-    };
-
-    mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(
-        testDB.runCommand({
-            "createSearchIndexes": collName,
-            "indexes": [{"definition": {"mappings": {"dynamic": true}}, "type": "vectorSearch"}],
-        }),
-    );
-})();
-
-(function createIndexSuccedsMultipleIndexes() {
-    const manageSearchIndexCommandResponse = {
-        indexesCreated: [{id: "index-Id", name: "index-name"}],
-    };
-
-    mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(
-        testDB.runCommand({
-            "createSearchIndexes": collName,
-            "indexes": [
-                {"name": "indexName", "definition": {"mappings": {"dynamic": true}}},
-                {"definition": {"mappings": {"dynamic": false}}},
-            ],
-        }),
-    );
-})();
-
+// Mock-dependent behavior on a multi-shard topology.
 (function updateIndexSucceeds() {
     const manageSearchIndexCommandResponse = {ok: 1};
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
@@ -80,108 +49,6 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
             "definition": {"testBlob": "blob"},
         }),
     );
-})();
-
-(function dropIndexSucceeds() {
-    const manageSearchIndexCommandResponse = {ok: 1};
-    mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({"dropSearchIndex": collName, "name": "indexName"}));
-})();
-
-(function listSearchIndexCommandSucceeds() {
-    const manageSearchIndexCommandResponse = {
-        ok: 1,
-        cursor: {
-            id: 0,
-            ns: "database-name.collection-name",
-            firstBatch: [
-                {
-                    id: "index-Id",
-                    name: "index-name",
-                    status: "INITIAL-SYNC",
-                    definition: {
-                        mappings: {
-                            dynamic: true,
-                        },
-                    },
-                },
-                {
-                    id: "index-Id",
-                    name: "index-name",
-                    status: "ACTIVE",
-                    definition: {
-                        mappings: {
-                            dynamic: true,
-                        },
-                        synonyms: [{"synonym-mapping": "thing"}],
-                    },
-                },
-            ],
-        },
-    };
-
-    mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({"listSearchIndexes": collName}));
-})();
-
-(function listSearchIndexCommandSucceeds_EmptyResponse() {
-    const emptyResponse = {
-        ok: 1,
-        cursor: {id: 0, ns: "database-name.collection-name", firstBatch: []},
-    };
-    mongotMock.setMockSearchIndexCommandResponse(emptyResponse);
-    assert.commandWorked(testDB.runCommand({"listSearchIndexes": collName}));
-})();
-
-(function listSearchIndexAggStageSucceeds() {
-    const manageSearchIndexCommandResponse = {
-        ok: 1,
-        cursor: {
-            id: 0,
-            ns: "database-name.collection-name",
-            firstBatch: [
-                {
-                    id: "index-Id",
-                    name: "index-name",
-                    status: "INITIAL-SYNC",
-                    definition: {
-                        mappings: {
-                            dynamic: true,
-                        },
-                    },
-                },
-                {
-                    id: "index-Id",
-                    name: "index-name",
-                    status: "ACTIVE",
-                    definition: {
-                        mappings: {
-                            dynamic: true,
-                        },
-                        synonyms: [{"synonym-mapping": "thing"}],
-                    },
-                },
-            ],
-        },
-    };
-
-    const expectedDocs = manageSearchIndexCommandResponse["cursor"]["firstBatch"];
-    mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    const result = testColl.aggregate([{$listSearchIndexes: {}}]).toArray();
-    assert.eq(result, expectedDocs);
-})();
-
-(function listSearchIndexAggStageSucceeds_EmptyResponse() {
-    const emptyResponse = {
-        ok: 1,
-        cursor: {id: 0, ns: "database-name.collection-name", firstBatch: []},
-    };
-    mongotMock.setMockSearchIndexCommandResponse(emptyResponse);
-    const expectedDocs = emptyResponse["cursor"]["firstBatch"];
-    const result = testColl
-        .aggregate([{$listSearchIndexes: {}}], {cursor: {batchSize: 1}})
-        .toArray();
-    assert.eq(result, expectedDocs);
 })();
 
 // The following tests will validate that a search index management server error propagates back

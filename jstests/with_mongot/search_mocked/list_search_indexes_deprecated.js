@@ -1,6 +1,9 @@
 /**
  * Test that listSearchIndexes logs a deprecation message. It should log whether or not
  * mongot/search is configured, so don't configure search for this test.
+ *
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an
+ * e2e suite.
  */
 
 import {iterateMatchingLogLines} from "jstests/libs/log.js";

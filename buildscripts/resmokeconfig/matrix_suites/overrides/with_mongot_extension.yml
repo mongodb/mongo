@@ -56,11 +56,6 @@
       # contain either an operator or a collector" (error 65330 via planShardedSearch).
       - jstests/with_mongot/e2e/search/search_beta.js
       - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_network_interruption.js
-      # TODO SERVER-131305: Remove these exclusions. Sharded explain of extension $search/$searchMeta
-      # inside $unionWith + $lookup double-serializes the explain response, failing with
-      # "BSON field 'VectorClockComponents.explainVersion' is a duplicate field" (error 40413).
-      - jstests/with_mongot/e2e/explain_execution_stats/search_union_with_lookup_explain.js
-      - jstests/with_mongot/e2e/explain_execution_stats/search_meta_union_with_lookup_explain.js
       # TODO SERVER-131306: Remove this exclusion. Extension $search in a $graphLookup-on-view
       # subpipeline fails on a sharded cluster with CursorNotFound (error 43) on the remote shard.
       - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition_graph_lookup.js
@@ -178,6 +173,7 @@
       # $_internalDocumentResultsAndMetadata, and view resolution in a $lookup/$unionWith
       # subpipeline prepends the view's stages, pushing it out of first position (Location40602) --
       # the $search variant of the same view-resolution bug.
+      - jstests/with_mongot/e2e/search/search_union_with_lookup.js
       - jstests/with_mongot/e2e/views/search/lookup.js
       - jstests/with_mongot/e2e/views/search/lookup_nested.js
       - jstests/with_mongot/e2e/views/search/lookup_nested_deep.js
