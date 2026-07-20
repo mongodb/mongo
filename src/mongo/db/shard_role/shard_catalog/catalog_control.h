@@ -24,7 +24,8 @@ struct [[MONGO_MOD_PRIVATE]] PreviousCatalogState {
 
 /**
  * Closes the catalog, destroying all associated in-memory data structures for all databases. After
- * a call to this function, it is illegal to access the catalog before calling openCatalog().
+ * a call to this function, it is illegal to access the catalog before calling one of the catalog
+ * opening functions (e.g. openCatalogAfterRollbackToStable or openCatalogAfterStorageChange).
  *
  * Must be called with the global lock acquired in exclusive mode.
  */
@@ -35,9 +36,8 @@ struct [[MONGO_MOD_PRIVATE]] PreviousCatalogState {
  * after it recovers to the stable timestamp, whereas initial sync goes through a different sequence
  * that reinitializes storage engine and restores the catalog, and so does not use this function.
  */
-[[MONGO_MOD_NEEDS_REPLACEMENT]] void openCatalog(OperationContext* opCtx,
-                                                 const PreviousCatalogState& catalogState,
-                                                 Timestamp stableTimestamp);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void openCatalogAfterRollbackToStable(
+    OperationContext* opCtx, const PreviousCatalogState& catalogState, Timestamp stableTimestamp);
 
 /**
  * Restores the catalog and all in-memory state after a call to

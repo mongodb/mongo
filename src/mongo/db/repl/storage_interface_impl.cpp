@@ -1528,7 +1528,7 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
         serviceContext->getStorageEngine()->dump();
     }
     fassert(31049, swStableTimestamp);
-    catalog::openCatalog(opCtx, state, swStableTimestamp.getValue());
+    catalog::openCatalogAfterRollbackToStable(opCtx, state, swStableTimestamp.getValue());
     DurableHistoryRegistry::get(opCtx)->reconcilePins(opCtx);
     serviceContext->getStorageEngine()->restartTimestampMonitor();
 

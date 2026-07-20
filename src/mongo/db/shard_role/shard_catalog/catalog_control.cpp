@@ -72,12 +72,15 @@ public:
         Timestamp stableTimestamp) {
 
         // Open all databases and repopulate the CollectionCatalog.
-        LOGV2(20276, "openCatalog: reopening all databases");
+        LOGV2(20276, "reopenAllDatabasesAndReloadCollectionCatalog: reopening all databases");
         auto databaseHolder = DatabaseHolder::get(opCtx);
         std::vector<DatabaseName> databasesToOpen = catalog::listDatabases();
         for (auto&& dbName : databasesToOpen) {
             LOGV2_FOR_RECOVERY(
-                23992, 1, "openCatalog: dbholder reopening database", logAttrs(dbName));
+                23992,
+                1,
+                "reopenAllDatabasesAndReloadCollectionCatalog: dbholder reopening database",
+                logAttrs(dbName));
             auto db = databaseHolder->openDb(opCtx, dbName);
             invariant(
                 db, str::stream() << "failed to reopen database " << dbName.toStringForErrorMsg());
@@ -124,7 +127,9 @@ public:
                 // If this is the oplog collection, re-establish the replication system's cached
                 // pointer to the oplog.
                 if (collNss.isOplog()) {
-                    LOGV2(20277, "openCatalog: updating cached oplog pointer");
+                    LOGV2(20277,
+                          "reopenAllDatabasesAndReloadCollectionCatalog: updating cached oplog "
+                          "pointer");
                     repl::establishOplogRecordStoreForLogging(opCtx, collection->getRecordStore());
                 }
             }
@@ -134,7 +139,9 @@ public:
         // catalog. Clear the pre-closing state.
         CollectionCatalog::write(opCtx,
                                  [&](CollectionCatalog& catalog) { catalog.onOpenCatalog(); });
-        LOGV2(20278, "openCatalog: finished reloading collection catalog");
+        LOGV2(
+            20278,
+            "reopenAllDatabasesAndReloadCollectionCatalog: finished reloading collection catalog");
     }
 };
 
@@ -214,27 +221,23 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     return previousCatalogState;
 }
 
-void openCatalog(OperationContext* opCtx,
-                 const PreviousCatalogState& previousCatalogState,
-                 Timestamp stableTimestamp) {
+void openCatalogAfterRollbackToStable(OperationContext* opCtx,
+                                      const PreviousCatalogState& previousCatalogState,
+                                      Timestamp stableTimestamp) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
     invariant(!isCatalogOpen(opCtx));
 
     // Load the catalog in the storage engine.
-    LOGV2(20273, "openCatalog: loading storage engine catalog");
+    LOGV2(20273, "openCatalogAfterRollbackToStable: loading storage engine catalog");
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-
-    // Remove catalogId mappings for larger timestamp than 'stableTimestamp'.
-    CollectionCatalog::write(opCtx, [stableTimestamp](CollectionCatalog& catalog) {
-        catalog.catalogIdTracker().rollback(stableTimestamp);
-    });
 
     // Ignore orphaned idents because this function is used during rollback and not at
     // startup recovery, when we may try to recover orphaned idents.
     storageEngine->loadMDBCatalog(opCtx, StorageEngine::LastShutdownState::kClean);
-    catalog::initializeCollectionCatalog(opCtx, storageEngine, stableTimestamp);
+    catalog::initializeCollectionCatalog(
+        opCtx, storageEngine, InitMode::kRollback, stableTimestamp);
 
-    LOGV2(20274, "openCatalog: reconciling catalog and idents");
+    LOGV2(20274, "openCatalogAfterRollbackToStable: reconciling catalog and idents");
     auto reconcileResult =
         fassert(40688,
                 catalog_repair::reconcileCatalogAndIdents(opCtx,

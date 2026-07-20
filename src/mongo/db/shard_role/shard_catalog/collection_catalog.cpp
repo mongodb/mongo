@@ -93,21 +93,46 @@ const SharedCollectionDecorations::Decoration<Atomic<bool>>
         SharedCollectionDecorations::declareDecoration<Atomic<bool>>();
 
 namespace catalog {
-void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine) {
-    initializeCollectionCatalog(opCtx, engine, engine->getEngine()->getRecoveryTimestamp());
+
+std::string toStringForLogging(const InitMode mode) {
+    switch (mode) {
+        case InitMode::kStartup:
+            return "Startup";
+        case InitMode::kRollback:
+            return "Rollback";
+        case InitMode::kStorageChange:
+            return "StorageChange";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine, InitMode mode) {
+    initializeCollectionCatalog(opCtx, engine, mode, engine->getEngine()->getRecoveryTimestamp());
 }
 
 void initializeCollectionCatalog(OperationContext* opCtx,
                                  StorageEngine* engine,
+                                 InitMode mode,
                                  boost::optional<Timestamp> stableTs) {
-    LOGV2(11503103, "Initializing collection catalog");
+    LOGV2(11503103,
+          "Initializing collection catalog",
+          "mode"_attr = mode,
+          "stableTs"_attr = stableTs);
     // Use the stable timestamp as minValid. We know for a fact that the collection exist at
     // this point and is in sync. If we use an earlier timestamp than replication rollback we
     // may be out-of-order for the collection catalog managing this namespace.
     const Timestamp minValidTs = stableTs ? *stableTs : Timestamp::min();
-    CollectionCatalog::write(opCtx, [&minValidTs](CollectionCatalog& catalog) {
-        // Let the CollectionCatalog know that we are maintaining timestamps from minValidTs
-        catalog.catalogIdTracker().rollback(minValidTs);
+    CollectionCatalog::write(opCtx, [&minValidTs, mode](CollectionCatalog& catalog) {
+        // The HistoricalCatalogIdTracker can track the catalogId of collections across rollbacks as
+        // long as we prune the history of catalogIds that are no longer valid, but must be reset on
+        // storage changes. On startup, it is already empty.
+        if (mode == InitMode::kStorageChange) {
+            catalog.resetCatalogIdTracker();
+        } else if (mode == InitMode::kRollback) {
+            // Let the CollectionCatalog know that we are maintaining timestamps from minValidTs
+            catalog.catalogIdTracker().rollback(minValidTs);
+        }
     });
 
     bool setMinVisibleToOldestFailpointSet = false;
@@ -2921,4 +2946,7 @@ HistoricalCatalogIdTracker& CollectionCatalog::catalogIdTracker() {
     return _catalogIdTracker;
 }
 
+void CollectionCatalog::resetCatalogIdTracker() {
+    _catalogIdTracker = HistoricalCatalogIdTracker();
+}
 }  // namespace mongo

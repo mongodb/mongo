@@ -353,7 +353,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         catalog::closeCatalog(opCtx.get());
         _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     }
 
     ASSERT(!identExists(opCtx.get(), collInfo.ident));
@@ -991,7 +992,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         catalog::closeCatalog(opCtx.get());
         _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     }
 
     ASSERT(identExists(opCtx.get(), collInfo.ident));
@@ -1048,7 +1050,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
 
     // When in a repair context, loadMDBCatalog() recreates catalog entries for orphaned idents.
     _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-    catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+    catalog::initializeCollectionCatalog(
+        opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     auto identNs = collInfo.ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs =
@@ -1085,7 +1088,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         _storageEngine->closeMDBCatalog(opCtx.get());
         _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     }
     // reconcileCatalogAndIdents() drops orphaned idents.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -1126,7 +1130,9 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         });
     {
         Lock::GlobalWrite globalLk(opCtx.get());
-        catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
+        catalog::initializeCollectionCatalog(opCtx.get(),
+                                             getServiceContext()->getStorageEngine(),
+                                             catalog::InitMode::kStorageChange);
     }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     LOGV2(5781103, "Started up storage engine in alternate location");
@@ -1155,7 +1161,9 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         });
     {
         Lock::GlobalWrite globalLk(opCtx.get());
-        catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
+        catalog::initializeCollectionCatalog(opCtx.get(),
+                                             getServiceContext()->getStorageEngine(),
+                                             catalog::InitMode::kStorageChange);
     }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
@@ -1240,7 +1248,8 @@ TEST_F(StorageEngineTest, IdentMissingForReadyIndex) {
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
         catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
     });
-    catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
+    catalog::initializeCollectionCatalog(
+        opCtx.get(), getServiceContext()->getStorageEngine(), catalog::InitMode::kStartup);
 
     // Startup recovery currently does not handle this invalid state, but throws an appropriate
     // exception rather than segfaulting or otherwise crashing uncleanly
