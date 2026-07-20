@@ -11,6 +11,26 @@ import time
 import unittest
 from unittest.mock import call, patch
 
+import yaml
+
+
+def _is_nightly_project() -> bool:
+    """Return True if running under the mongodb-mongo-master-nightly Evergreen project."""
+
+    # The nightly project runs against etc/evergreen_nightly.yml, which (unlike release branches)
+    # has the test_dev variants commented out, so it defines no variant with the resmoke_tests
+    # burn-in task. Burn-in task generation therefore produces nothing there and the burn-in-task
+    # end-to-end test cannot assert on it.
+    NIGHTLY_PROJECT_NAME = "mongodb-mongo-master-nightly"
+    try:
+        with open("../expansions.yml", encoding="utf8") as f:
+            expansions = yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        # No expansions (e.g. local runs) means this is not the nightly project.
+        return False
+    return expansions.get("project") == NIGHTLY_PROJECT_NAME
+
+
 BAZEL_NO_REMOTE_EXEC_CONFIG = "--config=no-remote-exec"
 # Query only the resmoke suites subtree instead of all targets to keep this
 # end-to-end test's runtime reasonable.
@@ -112,6 +132,10 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
         if os.path.exists("resmoke_suite_configs.yml"):
             os.remove("resmoke_suite_configs.yml")
 
+    @unittest.skipIf(
+        _is_nightly_project(),
+        "The nightly project's Evergreen config has no burn-in variants, so no tasks are generated",
+    )
     def test_generate_tasks(self):
         mock_changed_files = "jstests/core/js/jssymbol.js"
 
