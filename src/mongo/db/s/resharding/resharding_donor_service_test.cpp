@@ -1237,25 +1237,16 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
     createSourceCollection(opCtx.get(), doc);
     DonorStateMachine::insertStateDocument(opCtx.get(), doc);
 
-    // This acquires the critical sections required by resharding donor machine when it is in
+    // This acquires the critical section required by resharding donor machine when it is in
     // kBlockingWrites.
-    const auto critSecReason =
-        BSON("command" << "resharding_donor"
-                       << "collection" << doc.getSourceNss().toString_forTest());
     ShardingRecoveryService::get(opCtx.get())
         ->acquireRecoverableCriticalSectionBlockWrites(
             opCtx.get(),
             doc.getSourceNss(),
-            critSecReason,
+            BSON("command" << "resharding_donor"
+                           << "collection" << doc.getSourceNss().toString_forTest()),
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
             true /* clearShardCatalogCache */);
-    ShardingRecoveryService::get(opCtx.get())
-        ->acquireRecoverableCriticalSectionBlockWrites(
-            opCtx.get(),
-            doc.getTempReshardingNss(),
-            critSecReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            false /* clearShardCatalogCache */);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     notifyReshardingCommitting(opCtx.get(), *donor, doc);

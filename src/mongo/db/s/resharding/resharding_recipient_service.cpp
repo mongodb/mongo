@@ -589,14 +589,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                 _critSecReason,
                                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                 *customAction);
-
-                        ShardingRecoveryService::get(opCtx.get())
-                            ->releaseRecoverableCriticalSection(
-                                opCtx.get(),
-                                _metadata.getTempReshardingNss(),
-                                _critSecReason,
-                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                                *customAction);
                     }
                 })
                 .then([this, executor, factory] {
@@ -925,7 +917,7 @@ void ReshardingRecipientService::RecipientStateMachine::
         auto opCtx = _makeOperationContext(factory);
 
         _externalState->ensureTempReshardingCollectionExistsWithIndexes(
-            opCtx.get(), _metadata, *_cloneTimestamp, _critSecReason);
+            opCtx.get(), _metadata, *_cloneTimestamp);
 
         if (!_metadata.getProvenance() ||
             _metadata.getProvenance() == ReshardingProvenanceEnum::kReshardCollection) {
@@ -1480,13 +1472,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         _critSecReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         mustClearCollectionMetadata);
-                ShardingRecoveryService::get(opCtx.get())
-                    ->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx.get(),
-                        _metadata.getTempReshardingNss(),
-                        _critSecReason,
-                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                        mustClearCollectionMetadata);
             }
             reshardingPauseRecipientBeforeEnteringStrictConsistency.pauseWhileSet();
             _transitionState(RecipientStateEnum::kStrictConsistency, factory);
@@ -1545,13 +1530,6 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
             ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                 opCtx.get(),
                 _metadata.getSourceNss(),
-                _critSecReason,
-                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
-
-        ShardingRecoveryService::get(opCtx.get())
-            ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                opCtx.get(),
-                _metadata.getTempReshardingNss(),
                 _critSecReason,
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
