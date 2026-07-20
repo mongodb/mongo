@@ -42,7 +42,7 @@ public:
      */
     inline TagValueOwned getCopyOfValue() const {
         auto [tag, val] = getViewOfValue();
-        return sbe::value::copyValue(tag, val);
+        return TagValueOwned::fromRaw(sbe::value::copyValue(tag, val));
     }
 
     /**
@@ -114,7 +114,7 @@ public:
      * Returns a copy of the value.
      */
     TagValueOwned copyOrMoveValue() override {
-        return copyValue(_tag, _val);
+        return TagValueOwned::fromRaw(copyValue(_tag, _val));
     }
 
     void reset() {
@@ -195,9 +195,9 @@ public:
         SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         if (_owned) {
             _owned = false;
-            return {_tag, _val};
+            return TagValueOwned::fromRaw(_tag, _val);
         } else {
-            return copyValue(_tag, _val);
+            return TagValueOwned::fromRaw(copyValue(_tag, _val));
         }
     }
 
@@ -261,7 +261,7 @@ public:
     TagValueOwned copyOrMoveValue() override {
         // We can never move out values from array.
         auto [tag, val] = getViewOfValue();
-        return copyValue(tag, val);
+        return TagValueOwned::fromRaw(copyValue(tag, val));
     }
 
     bool atEnd() const {
@@ -332,7 +332,7 @@ public:
     TagValueOwned copyOrMoveValue() override {
         // We can never move out values from keys.
         auto [tag, val] = getViewOfValue();
-        return copyValue(tag, val);
+        return TagValueOwned::fromRaw(copyValue(tag, val));
     }
 
 private:
@@ -364,7 +364,7 @@ public:
             return _it->second.copyOrMoveValue(_slot);
         } else {
             auto [tag, val] = getViewOfValue();
-            return copyValue(tag, val);
+            return TagValueOwned::fromRaw(copyValue(tag, val));
         }
     }
 
@@ -462,7 +462,7 @@ public:
         using PointedType = std::remove_pointer_t<T>;
         if constexpr (std::is_const_v<PointedType>) {
             auto [tag, val] = getViewOfValue();
-            return copyValue(tag, val);
+            return TagValueOwned::fromRaw(copyValue(tag, val));
         } else {
             return _ptr->copyOrMoveValue();
         }
@@ -588,9 +588,9 @@ public:
         SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         if (_owned && !_hasBsonObj) {
             _owned = false;
-            return {_tag, _val};
+            return TagValueOwned::fromRaw(_tag, _val);
         } else {
-            return copyValue(_tag, _val);
+            return TagValueOwned::fromRaw(copyValue(_tag, _val));
         }
     }
 

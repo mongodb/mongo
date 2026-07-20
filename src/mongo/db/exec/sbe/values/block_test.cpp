@@ -32,11 +32,10 @@ using ColumnOpType = value::ColumnOpType;
 TEST(SbeBlockTest, SbeValueBlockTypeIsCopyable) {
     value::MonoBlock block(1, TypeTags::NumberInt32, value::bitcastFrom<int32_t>(123));
 
-    auto [cpyTag, cpyValue] =
-        value::copyValue(TypeTags::valueBlock, value::bitcastFrom<value::MonoBlock*>(&block));
-    value::ValueGuard cpyGuard(cpyTag, cpyValue);
-    ASSERT_EQ(cpyTag, TypeTags::valueBlock);
-    auto cpy = value::getValueBlock(cpyValue);
+    value::TagValueOwned cpyOwned = value::TagValueOwned::fromRaw(
+        value::copyValue(TypeTags::valueBlock, value::bitcastFrom<value::MonoBlock*>(&block)));
+    ASSERT_EQ(cpyOwned.tag(), TypeTags::valueBlock);
+    auto cpy = value::getValueBlock(cpyOwned.value());
 
     auto extracted = cpy->extract();
     ASSERT_EQ(extracted.count(), 1);
@@ -47,11 +46,10 @@ TEST(SbeBlockTest, SbeValueBlockTypeIsCopyable) {
 TEST(SbeBlockTest, SbeCellBlockTypeIsCopyable) {
     value::ScalarMonoCellBlock block(1, TypeTags::NumberInt32, value::bitcastFrom<int32_t>(123));
 
-    auto [cpyTag, cpyValue] = value::copyValue(
-        TypeTags::cellBlock, value::bitcastFrom<value::ScalarMonoCellBlock*>(&block));
-    value::ValueGuard cpyGuard(cpyTag, cpyValue);
-    ASSERT_EQ(cpyTag, TypeTags::cellBlock);
-    auto cpy = value::getCellBlock(cpyValue);
+    value::TagValueOwned cpyOwned = value::TagValueOwned::fromRaw(value::copyValue(
+        TypeTags::cellBlock, value::bitcastFrom<value::ScalarMonoCellBlock*>(&block)));
+    ASSERT_EQ(cpyOwned.tag(), TypeTags::cellBlock);
+    auto cpy = value::getCellBlock(cpyOwned.value());
 
     auto& vals = cpy->getValueBlock();
     auto extracted = vals.extract();

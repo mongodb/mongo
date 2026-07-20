@@ -602,14 +602,14 @@ TEST_F(TsSbeValueTest, FillType) {
         // Tests on the "time" field.
         auto timeBlock = makeTsBlockFromBucket(kBucketWithMixedNumbers, "time");
 
-        auto [fillTag, fillVal] = makeDecimal("1234.5678");
-        value::ValueGuard fillGuard{fillTag, fillVal};
+        value::TagValueOwned fillValue = value::TagValueOwned::fromRaw(makeDecimal("1234.5678"));
 
         {
             uint32_t nullUndefinedTypeMask = static_cast<uint32_t>(
                 getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined));
 
-            auto out = timeBlock->fillType(nullUndefinedTypeMask, fillTag, fillVal);
+            auto out =
+                timeBlock->fillType(nullUndefinedTypeMask, fillValue.tag(), fillValue.value());
 
             // The type mask won't match the control min/max tags, so no work needs to be done.
             ASSERT_EQ(out, nullptr);
@@ -618,12 +618,14 @@ TEST_F(TsSbeValueTest, FillType) {
         {
             uint32_t dateTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::date));
 
-            auto out = timeBlock->fillType(dateTypeMask, fillTag, fillVal);
+            auto out = timeBlock->fillType(dateTypeMask, fillValue.tag(), fillValue.value());
             ASSERT_NE(out, nullptr);
             auto outVal = value::bitcastFrom<value::ValueBlock*>(out.get());
             assertBlockEq(value::TypeTags::valueBlock,
                           outVal,
-                          TypedValues{{fillTag, fillVal}, {fillTag, fillVal}, {fillTag, fillVal}});
+                          TypedValues{{fillValue.tag(), fillValue.value()},
+                                      {fillValue.tag(), fillValue.value()},
+                                      {fillValue.tag(), fillValue.value()}});
         }
     }
 
@@ -633,14 +635,13 @@ TEST_F(TsSbeValueTest, FillType) {
 
         auto extracted = numBlock->extract();
 
-        auto [fillTag, fillVal] = makeDecimal("1234.5678");
-        value::ValueGuard fillGuard{fillTag, fillVal};
+        value::TagValueOwned fillValue = value::TagValueOwned::fromRaw(makeDecimal("1234.5678"));
 
         {
             uint32_t arrayStringTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::array) |
                                                                  getBSONTypeMask(BSONType::string));
 
-            auto out = numBlock->fillType(arrayStringTypeMask, fillTag, fillVal);
+            auto out = numBlock->fillType(arrayStringTypeMask, fillValue.tag(), fillValue.value());
 
             // The type mask won't match the control min/max tags, so no work needs to be done.
             ASSERT_EQ(out, nullptr);
@@ -651,12 +652,13 @@ TEST_F(TsSbeValueTest, FillType) {
             // in the block that should match this tag.
             uint32_t int32TypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::numberInt));
 
-            auto out = numBlock->fillType(int32TypeMask, fillTag, fillVal);
+            auto out = numBlock->fillType(int32TypeMask, fillValue.tag(), fillValue.value());
             ASSERT_NE(out, nullptr);
             auto outVal = value::bitcastFrom<value::ValueBlock*>(out.get());
-            assertBlockEq(value::TypeTags::valueBlock,
-                          outVal,
-                          TypedValues{extracted[0], {fillTag, fillVal}, extracted[2]});
+            assertBlockEq(
+                value::TypeTags::valueBlock,
+                outVal,
+                TypedValues{extracted[0], {fillValue.tag(), fillValue.value()}, extracted[2]});
         }
     }
 }

@@ -89,13 +89,17 @@ void ExtractFieldPathsFixture::perfectTree(benchmark::State& state,
         recorders.emplace_back();
         tree.add(tc.path, nullptr, &recorders.back());
     }
-    auto [inputTag, inputVal] = stage_builder::makeValue(root.done());
-    value::ValueGuard vg{inputTag, inputVal};  // Free input value's memory on exit.
+    value::TagValueOwned input =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(root.done()));
 
     // Extract paths from input data in a single pass.
     for (auto _ : state) {
-        walkField<value::ScalarProjectionPositionInfoRecorder>(
-            &tree, inputTag, inputVal, nullptr /* bsonPtr */, callback, true /*traverseArrays*/);
+        walkField<value::ScalarProjectionPositionInfoRecorder>(&tree,
+                                                               input.tag(),
+                                                               input.value(),
+                                                               nullptr /* bsonPtr */,
+                                                               callback,
+                                                               true /*traverseArrays*/);
     }
 }
 

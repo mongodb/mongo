@@ -93,7 +93,7 @@ public:
         RowType row(N);
         for (size_t i = 0; i < row.size(); i++) {
             auto expected = value::makeNewString(longStrings[i % longStringsSize]);
-            value::ValueGuard expectedGuard(expected);
+            value::TagValueOwned expectedOwner = value::TagValueOwned::fromRaw(expected);
 
             setValue(row, i, true, value::makeNewString(longStrings[i % longStringsSize]));
 
@@ -159,7 +159,7 @@ private:
     }
 
     void verifyValue(RowType& row, int idx, TypedValue p) {
-        value::ValueGuard guard(p);
+        value::TagValueOwned pOwner = value::TagValueOwned::fromRaw(p);
         ASSERT_THAT(row.getViewOfValue(idx), ValueEq(p));
     }
 

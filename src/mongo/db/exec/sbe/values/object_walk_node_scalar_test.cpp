@@ -109,8 +109,9 @@ public:
             << ", converted value: " << obj << ".";
 
         // Free value memory on exit.
-        value::ValueGuard inputGuard{inputTag, inputVal};
-        value::ValueGuard convertedGuard{convertedTag, convertedVal};
+        value::TagValueOwned inputOwner = value::TagValueOwned::fromRaw(inputTag, inputVal);
+        value::TagValueOwned convertedOwner =
+            value::TagValueOwned::fromRaw(convertedTag, convertedVal);
 
         auto verifyWalk = [&](value::TypeTags t, value::Value v) {
             // Extract paths from input data in a single pass.
@@ -121,9 +122,8 @@ public:
             size_t idx = 0;
             for (auto& tc : testCases) {
                 value::TagValueMaybeOwned output = recorders[idx].extractValue();
-                auto [resultsTag, resultsVal] = output.raw();
                 BSONObjBuilder tmp;
-                bson::appendValueToBsonObj(tmp, "result", resultsTag, resultsVal);
+                bson::appendValueToBsonObj(tmp, "result", output.tag(), output.value());
                 BSONObj resultObj = tmp.obj();  // Frees memory in tmp.
                 ASSERT_TRUE(
                     SimpleBSONObjComparator::kInstance.evaluate(resultObj == tc.projectValue))

@@ -82,7 +82,7 @@ public:
         SlotType slot;
 
         auto expected = value::makeNewString(longString);
-        value::ValueGuard expectedGuard(expected);
+        value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expected);
 
         setValue(slot, true, value::makeNewString(longString));
 
@@ -120,7 +120,7 @@ private:
     }
 
     void verifyValue(SlotType& slot, TypedValue p) {
-        value::ValueGuard guard(p);
+        value::TagValueOwned pOwned = value::TagValueOwned::fromRaw(p);
         ASSERT_THAT(slot.getViewOfValue(), ValueEq(p));
     }
 

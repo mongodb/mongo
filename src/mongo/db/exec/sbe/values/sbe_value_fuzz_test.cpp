@@ -79,7 +79,8 @@ FUZZ_TEST(SBEValueFuzz, FuzzScalarCopyRelease).WithDomains(getScalarDomain());
 void FuzzScalarCompare(SBEScalarSpec specA, SBEScalarSpec specB) {
     auto a = toTagValueOwned(specA);
     auto b = toTagValueOwned(specB);
-    value::TagValueOwned cmp(value::compareValue(a.tag(), a.value(), b.tag(), b.value()));
+    value::TagValueOwned cmp =
+        value::TagValueOwned::fromRaw(value::compareValue(a.tag(), a.value(), b.tag(), b.value()));
     ASSERT_TRUE(cmp.tag() == value::TypeTags::NumberInt32 || cmp.tag() == value::TypeTags::Nothing);
     if (cmp.tag() == value::TypeTags::Nothing) {
         ASSERT_TRUE(a.tag() == value::TypeTags::Nothing || b.tag() == value::TypeTags::Nothing);

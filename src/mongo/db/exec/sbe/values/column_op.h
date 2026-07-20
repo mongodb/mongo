@@ -108,7 +108,12 @@ public:
                                                 TypeTags tag,
                                                 Value val) {
         const ColumnOpFunctor& cof = *static_cast<const ColumnOpFunctor*>(cofd);
-        return cof.getSingleFn()(tag, val);
+        if constexpr (std::is_same_v<std::invoke_result_t<SingleFn&, TypeTags, Value>,
+                                     value::TagValueOwned>) {
+            return cof.getSingleFn()(tag, val);
+        } else {
+            return value::TagValueOwned::fromRaw(cof.getSingleFn()(tag, val));
+        }
     }
 
     static void processBatchFn(const ColumnOpFunctorData* cofd,

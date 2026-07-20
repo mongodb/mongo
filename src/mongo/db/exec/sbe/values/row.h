@@ -64,9 +64,9 @@ public:
         SlotAccessorHelper::dassertValidSlotValue(self.tags()[idx], self.values()[idx]);
         if (self.owned()[idx]) {
             self.owned()[idx] = false;
-            return {self.tags()[idx], self.values()[idx]};
+            return TagValueOwned::fromRaw(self.tags()[idx], self.values()[idx]);
         } else {
-            return value::copyValue(self.tags()[idx], self.values()[idx]);
+            return TagValueOwned::fromRaw(value::copyValue(self.tags()[idx], self.values()[idx]));
         }
     }
 

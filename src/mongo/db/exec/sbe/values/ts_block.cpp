@@ -473,8 +473,8 @@ TsBlock::TsBlock(size_t ncells,
       _count(ncells),
       _bucketVersion(bucketVersion),
       _isTimeField(isTimeField),
-      _controlMin(copyValue(controlMin.first, controlMin.second)),
-      _controlMax(copyValue(controlMax.first, controlMax.second)) {
+      _controlMin(TagValueOwned::fromRaw(copyValue(controlMin.first, controlMin.second))),
+      _controlMax(TagValueOwned::fromRaw(copyValue(controlMax.first, controlMax.second))) {
     tassert(11093604,
             "Expected bsonObject or bsonBinData tag type",
             blockTag == TypeTags::bsonObject || blockTag == TypeTags::bsonBinData);
