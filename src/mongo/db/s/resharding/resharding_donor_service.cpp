@@ -507,6 +507,15 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                         *onReleaseCriticalSectionAction,
                         false /*throwIfReasonDiffers*/);
 
+                ShardingRecoveryService::get(opCtx.get())
+                    ->releaseRecoverableCriticalSection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _critSecReason,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                        *onReleaseCriticalSectionAction,
+                        false /*throwIfReasonDiffers*/);
+
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                     resharding::getCurrentTime());
 
@@ -925,6 +934,14 @@ void ReshardingDonorService::DonorStateMachine::
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                 mustClearMetadata);
 
+        ShardingRecoveryService::get(opCtx.get())
+            ->acquireRecoverableCriticalSectionBlockWrites(
+                opCtx.get(),
+                _metadata.getTempReshardingNss(),
+                _critSecReason,
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                mustClearMetadata);
+
         _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                               resharding::getCurrentTime());
     }
@@ -981,6 +998,14 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
                 _metadata.getSourceNss(),
                 _critSecReason,
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+
+        ShardingRecoveryService::get(opCtx.get())
+            ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                opCtx.get(),
+                _metadata.getTempReshardingNss(),
+                _critSecReason,
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+
         reshardingPauseDonorAfterBlockingReads.pauseWhileSet(opCtx.get());
     }
 
