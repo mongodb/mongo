@@ -15,6 +15,7 @@
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 load(":common.bzl", "SHARDING_DATA")
 load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
+load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_base",
@@ -450,6 +451,261 @@ resmoke_suite_test(
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_with_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_with_config_shard.yml",
+    shard_count = 23,
+    tags = [
+        "ci-release-critical",
+        "cluster_scalability_only",
+        "jscore",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/sharding_config_shard.yml",
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "cluster_scalability_only",
+        "common",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_task_executor_pool_size_8",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_task_executor_pool_size_8.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "common",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_config_shard.yml",
+    shard_count = 27,
+    tags = [
+        "ci-release-critical",
+        "cluster_scalability_only",
+        "common",
+        "jscore",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_max_mirroring_opportunistic_secondary_targeting",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_max_mirroring_opportunistic_secondary_targeting.yml",
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+[
+    resmoke_suite_test(
+        name = suite_name,
+        config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/{}.yml".format(suite_name),
+        multiversion_deps = [
+            "//bazel/resmoke/multiversion:{}".format(multiversion),
+        ],
+        resmoke_args = [
+            "--runNoFeatureFlagTests",
+        ],
+        shard_count = 36,
+        tags = [
+            "ci-default",
+            "multiversion",
+            "multiversion_passthrough",
+            "resources:cpu:2",
+        ],
+        deps = [
+            "//src/mongo/db:mongod",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+        ],
+    )
+    for suite_name, multiversion in {
+        "sharding_jscore_passthrough_last_lts_new_old_old_new": "last-lts",
+        "sharding_jscore_passthrough_last_continuous_new_old_old_new": "last-continuous",
+    }.items()
+]
+
+[
+    resmoke_suite_test(
+        name = suite_name,
+        config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/{}.yml".format(suite_name),
+        data = [
+            "//jstests/libs/config_files:set_shardingrole_configsvr.json",
+            "//jstests/libs/config_files:set_shardingrole_shardsvr.json",
+            "//jstests/libs/config_files:timezone_info",
+            "//jstests/sharding/libs:proxy_protocol_server",
+        ],
+        multiversion_deps = [
+            "//bazel/resmoke/multiversion:{}".format(multiversion),
+        ],
+        resmoke_args = [
+            "--runNoFeatureFlagTests",
+        ],
+        shard_count = 50,
+        tags = [
+            "ci-default",
+            "default",
+            "incompatible_with_bazel_remote_test",  # Even with 50 shards, some shards frequently time out
+            "multiversion",
+            "random_multiversion_ds",
+            "requires_replicated_fast_count_recovery",
+            "resources:cpu:2",
+        ],
+        deps = [
+            "//src/mongo/db:mongod",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+            "//src/mongo/tools/mongobridge_tool:mongobridge",
+        ],
+    )
+    for suite_name, multiversion in {
+        "sharding_last_continuous": "last-continuous",
+        "sharding_last_lts": "last-lts",
+    }.items()
+]
+
+jstestfuzz_generate(
+    name = "resharding_fuzzer_idempotency_tests",
+    extra_args = [
+        "--numDonors",
+        "3",
+        "--numRecipients",
+        "3",
+        "--inPlace",
+        "no",
+    ],
+    npm_command = "resharding-fuzzer",
+    num_generated_files = 50,
+    target_compatible_with = select({
+        "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
+    }),
+)
+
+resmoke_suite_test(
+    name = "resharding_fuzzer_idempotency",
+    srcs = [":resharding_fuzzer_idempotency_tests"],
+    config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
+    tags = [
+        "incompatible_with_bazel_remote_test",  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
+        "non_deterministic",
+        "random_name",
+        "require_npm",
+        "resharding_fuzzer",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "resharding_timeseries_fuzzer_tests",
+    extra_args = [
+        "--opType",
+        "timeseriesReshardCollection",
+        "--numDonors",
+        "3",
+        "--numRecipients",
+        "3",
+        "--inPlace",
+        "yes",
+        "--electionMech",
+        "stepup",
+        "--electionRole",
+        "donor",
+        "--electionRole",
+        "recipient",
+    ],
+    npm_command = "resharding-fuzzer",
+    num_generated_files = 50,
+    target_compatible_with = select({
+        "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
+    }),
+)
+
+resmoke_suite_test(
+    name = "resharding_timeseries_fuzzer",
+    srcs = [":resharding_timeseries_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
+    tags = [
+        "ci-default",
+        "feature_flag_guarded",
+        "incompatible_with_bazel_remote_test",  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
+        "random_name",
+        "require_npm",
+        "requires_all_feature_flags",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",
     ],
 )
