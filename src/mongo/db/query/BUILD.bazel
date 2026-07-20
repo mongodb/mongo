@@ -66,6 +66,23 @@ mongo_cc_library(
     ],
 )
 
+# Tailable-cursor await-data state (an OperationContext decoration). Kept as its own leaf
+# library so lower layers (e.g. the aggregation pipeline) can read it without depending on
+# 'query_common', which pulls in 'canonical_query_base' and would form a dependency cycle.
+mongo_cc_library(
+    name = "await_data_state",
+    srcs = [
+        "await_data_state.cpp",
+    ],
+    hdrs = [
+        "await_data_state.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
 # Shared mongod/mongos query code.
 mongo_cc_library(
     name = "query_common",
@@ -74,6 +91,7 @@ mongo_cc_library(
         "find_common.cpp",
     ],
     deps = [
+        ":await_data_state",
         ":canonical_query_base",
         ":replanning_required_info",
         "//src/mongo:base",

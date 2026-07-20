@@ -9,6 +9,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/await_data_state.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -199,6 +200,44 @@ TEST_F(BatchedEnrichmentStageTest, MaxEventsOfOneEnrichesEachEventInItsOwnScope)
     ASSERT_EQ(stage->beginCalls, 3);
     ASSERT_EQ(stage->closeCalls, 3);
     ASSERT_EQ(stage->enrichCalls, 3);
+}
+
+TEST_F(BatchedEnrichmentStageTest, AwaitingInsertsFlushesFirstEventThenBatchesOnceFlagClears) {
+    // Models the real getMore lifecycle. Entering the batch, 'shouldWaitForInserts' is set: the
+    // stage must not accumulate: each buffered event has to reach the top of the pipeline so
+    // getMore can observe it and clear the flag, mirroring what CursorStage does one stage lower.
+    // Otherwise the fill would block on the insert notifier until 'maxInputEvents' events arrive,
+    // turning per-event latency into per-batch latency. getMore then clears the flag the moment it
+    // delivers that first event, so the events still available are batched normally from there on.
+    auto source = MockStage::createForTest(
+        std::vector<Document>{dataEvent(1), dataEvent(2), dataEvent(3)}, _expCtx);
+    auto stage = makeStage(std::move(source), looseLimits());
+    awaitDataState(_expCtx->getOperationContext()).shouldWaitForInserts = true;
+
+    // First getNext: despite batchSize of 100, the guard stops the fill after one event, so it is
+    // enriched alone in its own scope. Contrast EnrichesAllEventsInArrivalOrderInOneScope (flag
+    // unset), where the identical input enriches all three under a single scope on this call.
+    auto first = stage->getNext();
+    ASSERT_TRUE(first.isAdvanced());
+    ASSERT_EQ(first.getDocument()["_id"].getInt(), 1);
+    ASSERT_TRUE(first.getDocument()["enriched"].getBool());
+    ASSERT_EQ(stage->enrichCalls, 1);
+    ASSERT_EQ(stage->beginCalls, 1);
+
+    // getMore clears the flag once the first event has been delivered.
+    awaitDataState(_expCtx->getOperationContext()).shouldWaitForInserts = false;
+
+    // The two remaining events are now batched together under a single scope.
+    auto out = drainToEOF(*stage);
+    ASSERT_EQ(out.size(), 2u);
+    ASSERT_EQ(out[0].getDocument()["_id"].getInt(), 2);
+    ASSERT_EQ(out[1].getDocument()["_id"].getInt(), 3);
+
+    // Three events enriched total, across two scopes: one for the awaited first event, then one for
+    // the batched remainder.
+    ASSERT_EQ(stage->enrichCalls, 3);
+    ASSERT_EQ(stage->beginCalls, 2);
+    ASSERT_EQ(stage->closeCalls, 2);
 }
 
 TEST_F(BatchedEnrichmentStageTest, MaxInputBytesStopsFillButAlwaysAdmitsAtLeastOneEvent) {
