@@ -86,4 +86,5 @@ selector:
     - jstests/with_mongot/e2e/**/*.js
     - jstests/with_mongot/e2e_infrastructure_tests/*.js
     - jstests/with_mongot/e2e_lib/*_test.js
+    - jstests/with_mongot/e2e_search_extension/**/*.js
 test_kind: js_test

@@ -10,6 +10,14 @@
 #   - with_mongot_extension_vectorSearch_disabled_*
 #   - with_mongot_extension_fully_enabled_*
 
+# Adds the search-extension-only test root, which lives outside the base-suite roots so it is
+# picked up only by the suites that enable the mongot SEARCH extension.
+- name: search_extension_only_roots
+  value:
+    selector:
+      roots:
+        - jstests/with_mongot/e2e_search_extension/**/*.js
+
 # Tests the mongot-extension cannot run.
 - name: exclude_incompatible_tests
   value:
