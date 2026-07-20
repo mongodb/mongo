@@ -92,10 +92,19 @@ public:
      */
     constexpr static ErrorCodes::Error kRejectedErrorCode = ErrorCodes::RateLimitExceeded;
 
+    /**
+     * Variant used to specify ownership. Using a unique_ptr indicates that the RateLimiter will
+     * own the RateLimiterMetricsRecorder, and using a raw pointer indicates that it's owned
+     * elsewhere. If using a raw pointer, you must ensure that the RateLimiterMetricsRecorder
+     * outlives the RateLimiter. In most cases, the RateLimiter should own the
+     * RateLimiterMetricsRecorder.
+     */
+    using MetricsRecorderType =
+        std::variant<std::unique_ptr<RateLimiterMetricsRecorder>, RateLimiterMetricsRecorder*>;
+
     struct Options {
         TickSource* tickSource{globalSystemTickSource()};
-        std::unique_ptr<RateLimiterMetricsRecorder> metricsRecorder{
-            std::make_unique<RateLimiterCounterMetricsRecorder>()};
+        MetricsRecorderType metricsRecorder{std::make_unique<RateLimiterCounterMetricsRecorder>()};
     };
 
     RateLimiter(double refreshRatePerSec,

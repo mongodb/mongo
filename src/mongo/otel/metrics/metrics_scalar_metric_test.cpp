@@ -323,6 +323,48 @@ TEST(DoubleGaugeTest, SetsFractionalValues) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// NoopCounter tests
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename T>
+class NoopCounterTest : public testing::Test {};
+
+TYPED_TEST_SUITE(NoopCounterTest, ScalarMetricTypes);
+
+TYPED_TEST(NoopCounterTest, AddIsDiscardedAndReadsBackZero) {
+    Counter<TypeParam>& counter = *NoopCounter<TypeParam>::instance();
+    EXPECT_EQ(counter.valueForLegacyUse(), 0);
+    counter.add(5);
+    counter.add(7);
+    EXPECT_EQ(counter.valueForLegacyUse(), 0);
+}
+
+TYPED_TEST(NoopCounterTest, InstanceIsShared) {
+    EXPECT_EQ(NoopCounter<TypeParam>::instance(), NoopCounter<TypeParam>::instance());
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// NoopGauge tests
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename T>
+class NoopGaugeTest : public testing::Test {};
+
+TYPED_TEST_SUITE(NoopGaugeTest, ScalarMetricTypes);
+
+TYPED_TEST(NoopGaugeTest, SetDoesNotThrow) {
+    Gauge<TypeParam>& gauge = *NoopGauge<TypeParam>::instance();
+    // The Gauge interface exposes no read-back, so there is nothing on the NoopGauge itself to
+    // observe; this only confirms set() is callable and does not throw.
+    gauge.set(5);
+    gauge.set(0);
+}
+
+TYPED_TEST(NoopGaugeTest, InstanceIsShared) {
+    EXPECT_EQ(NoopGauge<TypeParam>::instance(), NoopGauge<TypeParam>::instance());
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // MinGauge tests
 ///////////////////////////////////////////////////////////////////////////////
 

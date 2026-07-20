@@ -224,6 +224,20 @@ public:
     static constexpr MetricName kIngressRequestRateLimiterTimeQueuedMicros = MetricNameMaker::make(
         "mongodb.serverStatus.network.ingressRequestRateLimiter.timeQueuedMicros");
 
+    // OpenTelemetry Tracing Sampler Metrics
+    static constexpr MetricName kOtelTracingSamplerInternalSpanRateLimiterSuccessfulAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.internalSpans.rateLimiter.successfulAdmissions");
+    static constexpr MetricName kOtelTracingSamplerInternalSpanRateLimiterRejectedAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.internalSpans.rateLimiter.rejectedAdmissions");
+    static constexpr MetricName kOtelTracingSamplerExternalSpanRateLimiterSuccessfulAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.externalSpan.rateLimiter.successfulAdmissions");
+    static constexpr MetricName kOtelTracingSamplerExternalSpanRateLimiterRejectedAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.externalSpan.rateLimiter.rejectedAdmissions");
+
     // Query Execution Team Metrics
     static constexpr MetricName kChangeStreamCursorsTotalOpened =
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.totalOpened");

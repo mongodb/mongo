@@ -7,6 +7,7 @@
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/static_immortal.h"
 
 #include <memory>
 #include <string>
@@ -69,6 +70,34 @@ public:
 
 protected:
     virtual void addNonNegative(T value, const std::tuple<>& attributes) = 0;
+};
+
+/**
+ * A no-op, attribute-free Counter that silently discards all writes and always reads back zero. The
+ * single shared instance is obtained via instance(); it is stateless and therefore safe to share
+ * across threads and recorders.
+ */
+template <typename T>
+class [[MONGO_MOD_PUBLIC]] NoopCounter final : public Counter<T> {
+public:
+    static NoopCounter* instance() {
+        static StaticImmortal<NoopCounter> counter;
+        return &*counter;
+    }
+
+    void setReportingPolicy(const std::tuple<>&, ReportingPolicy) override {}
+
+    T valueForLegacyUse() const override {
+        return 0;
+    }
+
+protected:
+    void addNonNegative(T, const std::tuple<>&) override {}
+
+private:
+    friend class StaticImmortal<NoopCounter>;
+
+    NoopCounter() = default;
 };
 
 }  // namespace mongo::otel::metrics

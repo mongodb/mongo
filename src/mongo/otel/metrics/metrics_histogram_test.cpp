@@ -412,4 +412,22 @@ TEST(HistogramImplWithAttributesTest, SerializationWithMultipleAttributesBucketC
                                      << 4LL)));
 }
 
+template <typename T>
+class NoopHistogramTest : public testing::Test {};
+
+TYPED_TEST_SUITE(NoopHistogramTest, HistogramTypes);
+
+TYPED_TEST(NoopHistogramTest, RecordDoesNotThrow) {
+    Histogram<TypeParam>& histogram = *NoopHistogram<TypeParam>::instance();
+    // The Histogram interface exposes no read-back, so there is nothing on the NoopHistogram itself
+    // to observe; this only confirms record() is callable and does not throw.
+    histogram.record(0);
+    histogram.record(std::numeric_limits<TypeParam>::max());
+    histogram.record(42, {});
+}
+
+TYPED_TEST(NoopHistogramTest, InstanceIsShared) {
+    EXPECT_EQ(NoopHistogram<TypeParam>::instance(), NoopHistogram<TypeParam>::instance());
+}
+
 }  // namespace mongo::otel::metrics

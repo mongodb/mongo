@@ -18,12 +18,27 @@
 #include <fmt/format.h>
 
 namespace mongo::admission {
+namespace {
+
+template <typename T>
+bool isNoopGauge(const otel::metrics::Gauge<T>* gauge) {
+    return gauge == otel::metrics::NoopGauge<T>::instance();
+}
+
+}  // namespace
 
 RateLimiterOtelMetricsRecorder::RateLimiterOtelMetricsRecorder(MetricsSpec spec) {
     auto& svc = otel::metrics::MetricsService::instance();
 
-    const auto makeInt64Counter = [&](otel::metrics::MetricName name, const char* description) {
-        return &svc.createInt64Counter(name, description, otel::metrics::MetricUnit::kCount);
+    // Each instrument is only created when its name is supplied in the spec; an unset name leaves
+    // the corresponding pointer at the shared no-op counter, which record() writes to and the
+    // accessors read back as zero.
+    const auto makeInt64Counter = [&](const boost::optional<otel::metrics::MetricName>& name,
+                                      const char* description) -> otel::metrics::Counter<int64_t>* {
+        if (!name) {
+            return otel::metrics::NoopCounter<int64_t>::instance();
+        }
+        return &svc.createInt64Counter(*name, description, otel::metrics::MetricUnit::kCount);
     };
 
     _attemptedCounter =
@@ -39,37 +54,49 @@ RateLimiterOtelMetricsRecorder::RateLimiterOtelMetricsRecorder(MetricsSpec spec)
     _exemptedAdmissionsCounter =
         makeInt64Counter(spec.exemptedAdmissions, "Number of exempted admissions");
 
-    _tokensAcquiredCounter = &svc.createDoubleCounter(
-        spec.tokensAcquired, "Cumulative tokens acquired", otel::metrics::MetricUnit::kCount);
+    if (spec.tokensAcquired) {
+        _tokensAcquiredCounter = &svc.createDoubleCounter(
+            *spec.tokensAcquired, "Cumulative tokens acquired", otel::metrics::MetricUnit::kCount);
+    }
 
-    _queueDepthGauge = &svc.createInt64Gauge(
-        spec.currentQueueDepth, "Current queue depth", otel::metrics::MetricUnit::kCount);
+    if (spec.currentQueueDepth) {
+        _queueDepthGauge = &svc.createInt64Gauge(
+            *spec.currentQueueDepth, "Current queue depth", otel::metrics::MetricUnit::kCount);
+    }
 
-    _tokensAvailableGauge = &svc.createDoubleGauge(
-        spec.totalAvailableTokens, "Total available tokens", otel::metrics::MetricUnit::kCount);
+    if (spec.totalAvailableTokens) {
+        _tokensAvailableGauge = &svc.createDoubleGauge(*spec.totalAvailableTokens,
+                                                       "Total available tokens",
+                                                       otel::metrics::MetricUnit::kCount);
+    }
 
-    _averageTimeQueuedMicrosGauge =
-        &svc.createDoubleGauge(spec.averageTimeQueuedMicros,
-                               "Exponential moving average of queue time (micros)",
-                               otel::metrics::MetricUnit::kMicroseconds);
+    if (spec.averageTimeQueuedMicros) {
+        _averageTimeQueuedMicrosGauge =
+            &svc.createDoubleGauge(*spec.averageTimeQueuedMicros,
+                                   "Exponential moving average of queue time (micros)",
+                                   otel::metrics::MetricUnit::kMicroseconds);
+    }
 
-    _timeQueuedMicrosHistogram = &svc.createInt64Histogram(
-        spec.timeQueuedMicros,
-        "Distribution of per-request queue time (micros)",
-        otel::metrics::MetricUnit::kMicroseconds,
-        otel::metrics::HistogramOptions{.explicitBucketBoundaries = std::vector<double>{50,
-                                                                                        100,
-                                                                                        250,
-                                                                                        500,
-                                                                                        1000,
-                                                                                        2500,
-                                                                                        5000,
-                                                                                        10000,
-                                                                                        25000,
-                                                                                        50000,
-                                                                                        100000,
-                                                                                        250000,
-                                                                                        1000000}});
+    if (spec.timeQueuedMicros) {
+        _timeQueuedMicrosHistogram = &svc.createInt64Histogram(
+            *spec.timeQueuedMicros,
+            "Distribution of per-request queue time (micros)",
+            otel::metrics::MetricUnit::kMicroseconds,
+            otel::metrics::HistogramOptions{.explicitBucketBoundaries =
+                                                std::vector<double>{50,
+                                                                    100,
+                                                                    250,
+                                                                    500,
+                                                                    1000,
+                                                                    2500,
+                                                                    5000,
+                                                                    10000,
+                                                                    25000,
+                                                                    50000,
+                                                                    100000,
+                                                                    250000,
+                                                                    1000000}});
+    }
 }
 
 void RateLimiterOtelMetricsRecorder::record(const RateLimiterMetricsRecorderEvent& event) noexcept {
@@ -139,7 +166,9 @@ int64_t RateLimiterOtelMetricsRecorder::attemptedAdmissions() const {
 }
 
 boost::optional<double> RateLimiterOtelMetricsRecorder::averageTimeQueuedMicros() const {
-    return _averageTimeQueuedMicros.get();
+    return MONGO_unlikely(isNoopGauge(_averageTimeQueuedMicrosGauge))
+        ? boost::none
+        : _averageTimeQueuedMicros.get();
 }
 
 double RateLimiterOtelMetricsRecorder::tokensAcquired() const {
@@ -147,11 +176,11 @@ double RateLimiterOtelMetricsRecorder::tokensAcquired() const {
 }
 
 double RateLimiterOtelMetricsRecorder::tokensAvailable() const {
-    return _tokensAvailable.loadRelaxed();
+    return MONGO_unlikely(isNoopGauge(_tokensAvailableGauge)) ? 0 : _tokensAvailable.loadRelaxed();
 }
 
 int64_t RateLimiterOtelMetricsRecorder::currentQueueDepth() const {
-    return _queueDepthCounter.loadRelaxed();
+    return MONGO_unlikely(isNoopGauge(_queueDepthGauge)) ? 0 : _queueDepthCounter.loadRelaxed();
 }
 
 PeriodicRunner::JobAnchor RateLimiterOtelMetricsRecorder::installOtelMetrics(

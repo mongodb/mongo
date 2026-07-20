@@ -114,5 +114,51 @@ TEST(RateLimiterMetricsRecorderOtelTest, RecordsQueueTimeDistributionHistogram) 
     ASSERT_EQ(histogram.counts[4], 1u);  // (500, 1000]  : 600
 }
 
+TEST(RateLimiterMetricsRecorderOtelTest, PartialSpecTracksOnlyProvidedMetrics) {
+    OtelMetricsCapturer capturer;
+
+    RateLimiterOtelMetricsRecorder recorder{RateLimiterOtelMetricsRecorder::MetricsSpec{
+        .successfulAdmissions = MetricNames::kTest5,
+        .rejectedAdmissions = MetricNames::kTest6,
+    }};
+
+    recorder.record(SuccessfulAdmission{3.0});
+    recorder.record(SuccessfulAdmission{1.0});
+    recorder.record(RejectedAdmission{});
+
+    // Events whose instruments were not created are silently dropped.
+    recorder.record(AttemptedAdmission{});
+    recorder.record(ExemptedAdmission{});
+    recorder.record(AddedToQueue{});
+    recorder.record(AddedToQueue{});
+    recorder.record(RemovedFromQueue{});
+    recorder.record(InterruptedInQueue{});
+    recorder.record(TokensAcquired{2.5});
+    recorder.record(TokensAvailable{42.0});
+    recorder.record(AverageTimeQueuedMicros{100.0});
+
+    // The provided metrics are tracked.
+    ASSERT_EQ(recorder.successfulAdmissions(), 2);
+    ASSERT_EQ(recorder.rejectedAdmissions(), 1);
+
+    // Everything else reads back its zero-valued default (boost::none for the moving average).
+    ASSERT_EQ(recorder.attemptedAdmissions(), 0);
+    ASSERT_EQ(recorder.exemptedAdmissions(), 0);
+    ASSERT_EQ(recorder.addedToQueue(), 0);
+    ASSERT_EQ(recorder.removedFromQueue(), 0);
+    ASSERT_EQ(recorder.interruptedInQueue(), 0);
+    ASSERT_EQ(recorder.tokensAcquired(), 0);
+    ASSERT_EQ(recorder.tokensAvailable(), 0);
+    ASSERT_EQ(recorder.currentQueueDepth(), 0);
+    ASSERT_FALSE(recorder.averageTimeQueuedMicros());
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kTest5), 2);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kTest6), 1);
+}
+
 }  // namespace
 }  // namespace mongo::admission

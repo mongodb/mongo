@@ -123,10 +123,7 @@ public:
     SamplingConfig getConfig() const override;
     void sampleByDefault(SpanName name) override;
 
-    /**
-     * Returns a TracingSamplerStats by summing the succeeded and rejected admissions across the
-     * currently-configured rate limiters.
-     */
+    /** Returns a TracingSamplerStats reporting the succeeded and rejected admissions. */
     TracingSamplerStats getStats() const override;
 
 private:

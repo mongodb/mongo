@@ -18,7 +18,9 @@ mongo_cc_library(
         ":sampling_config",
         "//src/mongo:base",
         "//src/mongo/db/admission:rate_limiter",
+        "//src/mongo/db/admission:rate_limiter_otel_metrics_recorder",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/otel/traces/span:span_name",
     ],
 )
@@ -33,6 +35,7 @@ mongo_cc_unit_test(
     deps = [
         ":sampler",
         ":sampling_config",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 

@@ -6,6 +6,7 @@
 #include "mongo/otel/metrics/metrics_attributes.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo::otel::metrics {
 
@@ -42,6 +43,29 @@ protected:
 
     virtual void setReportingPolicy(const Attributes& attributes,
                                     ReportingPolicy reportingPolicy) = 0;
+};
+
+/**
+ * A no-op, attribute-free Gauge that silently discards all writes. The single shared instance is is
+ * obtained via instance(); it is stateless and therefore safe to share across threads and
+ * recorders.
+ */
+template <typename T>
+class [[MONGO_MOD_PUBLIC]] NoopGauge final : public Gauge<T> {
+public:
+    static NoopGauge* instance() {
+        static StaticImmortal<NoopGauge> gauge;
+        return &*gauge;
+    }
+
+protected:
+    void set(T, const std::tuple<>&) override {}
+    void setReportingPolicy(const std::tuple<>&, ReportingPolicy) override {}
+
+private:
+    friend class StaticImmortal<NoopGauge>;
+
+    NoopGauge() = default;
 };
 
 /**

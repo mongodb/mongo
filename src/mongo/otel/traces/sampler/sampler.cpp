@@ -3,11 +3,56 @@
 
 #include "mongo/otel/traces/sampler/sampler.h"
 
+#include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/tick_source.h"
 
 namespace mongo::otel::traces {
+namespace {
+
+using admission::RateLimiter;
+using admission::RateLimiterMetricsRecorder;
+using admission::RateLimiterOtelMetricsRecorder;
+using otel::metrics::MetricName;
+using otel::metrics::MetricNames;
+
+// Builds rate limiter options that record into the given metrics recorder. Use this function if the
+// rate limiter should own the RateLimiterMetricsRecorder.
+RateLimiter::Options makeRateLimiterOptions(
+    TickSource* tickSource, std::unique_ptr<RateLimiterMetricsRecorder> metricsRecorder) {
+    return RateLimiter::Options{.tickSource = tickSource,
+                                .metricsRecorder = std::move(metricsRecorder)};
+}
+
+// Builds rate limiter options that record into the given metrics recorder. Use this function if the
+// rate limiter should NOT own the RateLimiterMetricsRecorder.
+RateLimiter::Options makeRateLimiterOptions(TickSource* tickSource,
+                                            RateLimiterMetricsRecorder* metricsRecorder) {
+    return RateLimiter::Options{.tickSource = tickSource, .metricsRecorder = metricsRecorder};
+}
+
+// Builds a RateLimiterOtelMetricsRecorder that records only successful and rejected admissions for
+// the otel metrics referred to by the given metric names.
+std::unique_ptr<RateLimiterOtelMetricsRecorder> makeMetricsRecorder(MetricName successfulAdmissions,
+                                                                    MetricName rejectedAdmissions) {
+    return std::make_unique<RateLimiterOtelMetricsRecorder>(
+        RateLimiterOtelMetricsRecorder::MetricsSpec{.successfulAdmissions = successfulAdmissions,
+                                                    .rejectedAdmissions = rejectedAdmissions});
+}
+
+// Returns the process-wide metrics recorder shared by every internal span rate limiter. Sharing a
+// single recorder means all internal spans record into the same instruments, so their stats are
+// aggregated together across spans. It is an immortal singleton so that it outlives the rate
+// limiters stored in TracingSamplerImpl::_samplerState, which reference it via raw pointers.
+RateLimiterMetricsRecorder* internalMetricsRecorder() {
+    static StaticImmortal<std::unique_ptr<RateLimiterMetricsRecorder>> recorder(makeMetricsRecorder(
+        MetricNames::kOtelTracingSamplerInternalSpanRateLimiterSuccessfulAdmissions,
+        MetricNames::kOtelTracingSamplerInternalSpanRateLimiterRejectedAdmissions));
+    return recorder->get();
+}
+}  // namespace
 
 VersionedValue<const SamplerState> TracingSamplerImpl::_samplerState;
 thread_local VersionedValue<const SamplerState>::Snapshot TracingSamplerImpl::_snapshot =
@@ -24,11 +69,16 @@ TracingSamplerImpl::TracingSamplerImpl(TickSource* tickSource) : _tickSource(tic
     _samplerState.update(std::make_shared<const SamplerState>(
         SamplerState::SamplingFactorMap{},
         SamplerState::RateLimiterMap{},
-        std::make_shared<admission::RateLimiter>(externalRateLimitParams.refillRate,
-                                                 externalBurstCapacitySecs,
-                                                 0 /* maxQueueDepth */,
-                                                 "external",
-                                                 tickSource)));
+        std::make_shared<RateLimiter>(
+            externalRateLimitParams.refillRate,
+            externalBurstCapacitySecs,
+            0 /* maxQueueDepth */,
+            "external",
+            makeRateLimiterOptions(
+                tickSource,
+                makeMetricsRecorder(
+                    MetricNames::kOtelTracingSamplerExternalSpanRateLimiterSuccessfulAdmissions,
+                    MetricNames::kOtelTracingSamplerExternalSpanRateLimiterRejectedAdmissions)))));
 }
 
 bool TracingSamplerImpl::shouldSample(std::string_view spanName, double sampleValue) {
@@ -84,11 +134,8 @@ TracingSamplerStats TracingSamplerImpl::getStats() const {
     auto snapshot = _samplerState.makeSnapshot();
 
     TracingSamplerStats stats;
-    for (const auto& [name, rateLimiter] : snapshot->rateLimiterMap) {
-        const auto& rateLimiterStats = rateLimiter->stats();
-        stats.internalSpans.admitted += rateLimiterStats.successfulAdmissions();
-        stats.internalSpans.rejected += rateLimiterStats.rejectedAdmissions();
-    }
+    stats.internalSpans.admitted = internalMetricsRecorder()->successfulAdmissions();
+    stats.internalSpans.rejected = internalMetricsRecorder()->rejectedAdmissions();
 
     const auto& externalStats = snapshot->externalRateLimiter->stats();
     stats.externalSpan.admitted = externalStats.successfulAdmissions();
@@ -125,11 +172,14 @@ void TracingSamplerImpl::_rebuild(WithLock) {
             newRateLimiters[name] = it->second;
         } else {
             // Rate limiter didn't exist so create a new one with the correct parameters.
-            newRateLimiters[name] = std::make_shared<admission::RateLimiter>(refillRate,
-                                                                             burstCapacitySecs,
-                                                                             0 /* maxQueueDepth */,
-                                                                             std::string(name),
-                                                                             _tickSource);
+            newRateLimiters[name] = std::make_shared<RateLimiter>(
+                refillRate,
+                burstCapacitySecs,
+                0 /* maxQueueDepth */,
+                std::string(name),
+                // TODO(SERVER-131083): Once the rate limiter otel stats have span name attributes,
+                // each recorder should write to its attribute rather than the aggregated total.
+                makeRateLimiterOptions(_tickSource, internalMetricsRecorder()));
         }
     };
 
@@ -140,6 +190,9 @@ void TracingSamplerImpl::_rebuild(WithLock) {
     // Per-span overrides intentionally overwrite the default-seeded entries above, and also
     // apply to spans that were never registered via sampleByDefault.
     for (const auto& [name, params] : _samplingConfig.perSpanOverrides) {
+        // TODO(SERVER-130984): Since these names come from a set parameter, we need to verify that
+        // they actually belong to a span. Otherwise, we will create a rate limiter for a span that
+        // doesn't exist.
         setSamplingFactorAndRateLimits(name, params);
     }
 

@@ -3,17 +3,23 @@
 
 #include "mongo/otel/traces/sampler/sampler.h"
 
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/otel/traces/sampler/sampling_config.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::otel::traces {
 namespace {
+
+using otel::metrics::MetricNames;
+using otel::metrics::OtelMetricsCapturer;
 
 TEST(SamplerTest, UnregisteredSpanIsNeverSampled) {
     TracingSamplerImpl sampler;
@@ -313,6 +319,10 @@ TEST(SamplerTest, ExternalRateLimiterPreservedAfterRebuild) {
 }
 
 TEST(SamplerTest, StatsStartAtZero) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
     TracingSamplerImpl sampler;
     const auto stats = sampler.getStats();
     EXPECT_EQ(stats.internalSpans.admitted, 0);
@@ -322,6 +332,10 @@ TEST(SamplerTest, StatsStartAtZero) {
 }
 
 TEST(SamplerTest, InternalStatsRecordAdmissionAndRejection) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
     sampler.updateInternalConfig(SamplingParameters{.factor = 1.0, .rateLimits = {.maxTokens = 1}},
@@ -346,6 +360,10 @@ TEST(SamplerTest, InternalStatsRecordAdmissionAndRejection) {
 }
 
 TEST(SamplerTest, InternalStatsUnchangedForUnregisteredSpan) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
     TracingSamplerImpl sampler;
     sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
 
@@ -357,6 +375,10 @@ TEST(SamplerTest, InternalStatsUnchangedForUnregisteredSpan) {
 }
 
 TEST(SamplerTest, InternalStatsUnchangedWhenDroppedByFactor) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
     TracingSamplerImpl sampler;
     sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     sampler.sampleByDefault(span_names::kTest1);
@@ -369,6 +391,10 @@ TEST(SamplerTest, InternalStatsUnchangedWhenDroppedByFactor) {
 }
 
 TEST(SamplerTest, ExternalStatsRecordAdmissionAndRejection) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
     sampler.updateExternalConfig({.refillRate = 1.0, .maxTokens = 1});
@@ -391,6 +417,10 @@ TEST(SamplerTest, ExternalStatsRecordAdmissionAndRejection) {
 }
 
 TEST(SamplerTest, StatsAccumulateAcrossMultipleCalls) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
     // Internal limiter with 3 tokens, external limiter with 2 tokens; frozen clock, no refills.
@@ -417,6 +447,10 @@ TEST(SamplerTest, StatsAccumulateAcrossMultipleCalls) {
 }
 
 TEST(SamplerTest, StatsAccumulateAcrossDifferentSpans) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
     // Default internal limiters with 3 tokens, override limiter with 2 tokens.
@@ -439,6 +473,66 @@ TEST(SamplerTest, StatsAccumulateAcrossDifferentSpans) {
     auto stats = sampler.getStats();
     EXPECT_EQ(stats.internalSpans.admitted, 8);
     EXPECT_EQ(stats.internalSpans.rejected, 7);
+}
+
+TEST(SamplerTest, InternalOtelMetricsAggregatedAcrossSpans) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    // Two default spans with a 1-token limiter each
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0, .rateLimits = {.maxTokens = 1}},
+                                 {});
+    sampler.sampleByDefault(span_names::kTest1);
+    sampler.sampleByDefault(span_names::kTest2);
+
+    for (int i = 0; i < 2; ++i) {
+        sampler.shouldSample(span_names::kTest1.getName(), 0.0);
+        sampler.shouldSample(span_names::kTest2.getName(), 0.0);
+    }
+
+    // All internal spans report into a single shared instrument pair, so admissions and rejections
+    // are aggregated across spans: each of the two spans admits its first call and rejects its
+    // second, giving 2 admitted and 2 rejected in total.
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kOtelTracingSamplerInternalSpanRateLimiterSuccessfulAdmissions),
+              2);
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kOtelTracingSamplerInternalSpanRateLimiterRejectedAdmissions),
+              2);
+
+    // The external instruments stay untouched.
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kOtelTracingSamplerExternalSpanRateLimiterSuccessfulAdmissions),
+              0);
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kOtelTracingSamplerExternalSpanRateLimiterRejectedAdmissions),
+              0);
+}
+
+TEST(SamplerTest, ExternalOtelMetricsRecordAdmissionAndRejection) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    sampler.updateExternalConfig({.refillRate = 1.0, .maxTokens = 1});
+
+    // First call is admitted, second is rejected.
+    sampler.shouldAcceptExternalTrace();
+    sampler.shouldAcceptExternalTrace();
+
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kOtelTracingSamplerExternalSpanRateLimiterSuccessfulAdmissions),
+              1);
+    ASSERT_EQ(capturer.readInt64Counter(
+                  MetricNames::kOtelTracingSamplerExternalSpanRateLimiterRejectedAdmissions),
+              1);
 }
 
 TEST(SamplerTest, ConcurrentAccessTest) {

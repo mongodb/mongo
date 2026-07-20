@@ -11,6 +11,7 @@
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/moving_average.h"
 #include "mongo/util/periodic_runner.h"
 
@@ -27,32 +28,40 @@ namespace mongo::admission {
  * events into OTel instruments and reads the values back to satisfy the RateLimiterMetricsRecorder
  * accessors. The counter-backed accessors read directly from the OTel instruments, while the
  * moving average (gauge-only, no read-back) is tracked in process to keep it in sync.
+ *
+ * Only the metrics whose instrument names are supplied in the MetricsSpec are instantiated. For any
+ * metric left unset, recording the corresponding event is a no-op and its accessor returns a
+ * zero-valued default (or boost::none for averageTimeQueuedMicros). This lets lightweight callers
+ * mirror only the admission outcomes they care about without paying for the full instrument set.
  */
-class RateLimiterOtelMetricsRecorder final : public RateLimiterMetricsRecorder {
+class [[MONGO_MOD_PUBLIC]] RateLimiterOtelMetricsRecorder final
+    : public RateLimiterMetricsRecorder {
 public:
     /**
      * Identifies the OTel instrument names (from the central MetricNames registry) and the
-     * serverStatus dotted-path prefix used by a particular rate limiter. Every rate limiter that
-     * records metrics must use its own distinct instrument names (the MetricsService registry
-     * rejects re-registering a name with a different definition), so each caller supplies the spec
-     * appropriate for its limiter.
+     * serverStatus dotted-path prefix used by a particular rate limiter. Each recorder must use its
+     * own distinct instrument names. Having multiple recorders share the same MetricNames will
+     * cause each rate limiter to influence the same OTel instruments.
+     *
+     * Each field is optional: an unset field means the corresponding instrument is not created, so
+     * recording that metric is a no-op and its accessor returns a default value.
      */
     struct MetricsSpec {
-        otel::metrics::MetricName attemptedAdmissions;
-        otel::metrics::MetricName successfulAdmissions;
-        otel::metrics::MetricName rejectedAdmissions;
-        otel::metrics::MetricName exemptedAdmissions;
-        otel::metrics::MetricName addedToQueue;
-        otel::metrics::MetricName removedFromQueue;
-        otel::metrics::MetricName interruptedInQueue;
-        otel::metrics::MetricName tokensAcquired;
-        otel::metrics::MetricName currentQueueDepth;
-        otel::metrics::MetricName totalAvailableTokens;
-        otel::metrics::MetricName averageTimeQueuedMicros;
-        otel::metrics::MetricName timeQueuedMicros;
+        boost::optional<otel::metrics::MetricName> attemptedAdmissions;
+        boost::optional<otel::metrics::MetricName> successfulAdmissions;
+        boost::optional<otel::metrics::MetricName> rejectedAdmissions;
+        boost::optional<otel::metrics::MetricName> exemptedAdmissions;
+        boost::optional<otel::metrics::MetricName> addedToQueue;
+        boost::optional<otel::metrics::MetricName> removedFromQueue;
+        boost::optional<otel::metrics::MetricName> interruptedInQueue;
+        boost::optional<otel::metrics::MetricName> tokensAcquired;
+        boost::optional<otel::metrics::MetricName> currentQueueDepth;
+        boost::optional<otel::metrics::MetricName> totalAvailableTokens;
+        boost::optional<otel::metrics::MetricName> averageTimeQueuedMicros;
+        boost::optional<otel::metrics::MetricName> timeQueuedMicros;
     };
 
-    /** Creates the OTel instruments described by `spec`. */
+    /** Creates the OTel instruments described by the set fields of `spec`. */
     explicit RateLimiterOtelMetricsRecorder(MetricsSpec spec);
 
     void record(const RateLimiterMetricsRecorderEvent& event) noexcept override;
@@ -80,18 +89,29 @@ public:
                                                  std::function<double()> sampleAvailableTokens);
 
 private:
-    otel::metrics::Counter<int64_t>* _attemptedCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _successfulCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _rejectedCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _addedToQueueCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _removedFromQueueCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _interruptedInQueueCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _exemptedAdmissionsCounter{nullptr};
-    otel::metrics::Counter<double>* _tokensAcquiredCounter{nullptr};
-    otel::metrics::Gauge<int64_t>* _queueDepthGauge{nullptr};
-    otel::metrics::Gauge<double>* _tokensAvailableGauge{nullptr};
-    otel::metrics::Gauge<double>* _averageTimeQueuedMicrosGauge{nullptr};
-    otel::metrics::Histogram<int64_t>* _timeQueuedMicrosHistogram{nullptr};
+    otel::metrics::Counter<int64_t>* _attemptedCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _successfulCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _rejectedCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _addedToQueueCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _removedFromQueueCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _interruptedInQueueCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _exemptedAdmissionsCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<double>* _tokensAcquiredCounter{
+        otel::metrics::NoopCounter<double>::instance()};
+    otel::metrics::Gauge<int64_t>* _queueDepthGauge{otel::metrics::NoopGauge<int64_t>::instance()};
+    otel::metrics::Gauge<double>* _tokensAvailableGauge{
+        otel::metrics::NoopGauge<double>::instance()};
+    otel::metrics::Gauge<double>* _averageTimeQueuedMicrosGauge{
+        otel::metrics::NoopGauge<double>::instance()};
+    otel::metrics::Histogram<int64_t>* _timeQueuedMicrosHistogram{
+        otel::metrics::NoopHistogram<int64_t>::instance()};
 
     Atomic<int64_t> _queueDepthCounter{0};
     Atomic<double> _tokensAvailable{0};
