@@ -41,14 +41,16 @@ public:
 private:
   OPENTELEMETRY_API_SINGLETON static nostd::shared_ptr<TextMapPropagator> &GetPropagator() noexcept
   {
-    static nostd::shared_ptr<TextMapPropagator> propagator(new NoOpPropagator());
-    return propagator;
+    // intentionally leak
+    static auto propagator = new nostd::shared_ptr<TextMapPropagator>(new NoOpPropagator());
+    return *propagator;
   }
 
   OPENTELEMETRY_API_SINGLETON static common::SpinLockMutex &GetLock() noexcept
   {
-    static common::SpinLockMutex lock;
-    return lock;
+    // intentionally leak
+    static auto lock = new common::SpinLockMutex();
+    return *lock;
   }
 };
 

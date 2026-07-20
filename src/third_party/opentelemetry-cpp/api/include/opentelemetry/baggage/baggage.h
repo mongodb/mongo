@@ -36,8 +36,9 @@ public:
 
   OPENTELEMETRY_API_SINGLETON static nostd::shared_ptr<Baggage> GetDefault()
   {
-    static nostd::shared_ptr<Baggage> baggage{new Baggage()};
-    return baggage;
+    // intentionally leak
+    static auto baggage = new nostd::shared_ptr<Baggage>{new Baggage()};
+    return *baggage;
   }
 
   /* Get value for key in the baggage

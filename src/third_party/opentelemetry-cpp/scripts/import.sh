@@ -81,3 +81,4 @@ rm -rf ${DIST}
 PATCHES_DIR="${LIBDIR}/patches"
 git apply "${PATCHES_DIR}/0001-compile-1.24.patch"
 git apply "${PATCHES_DIR}/0002-SERVER-117299-prometheus-utils.patch"
+git apply "${PATCHES_DIR}/0003-SERVER-131811-leak-statics.patch"

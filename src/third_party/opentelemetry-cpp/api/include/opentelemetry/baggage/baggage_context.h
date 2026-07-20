@@ -22,8 +22,9 @@ inline nostd::shared_ptr<Baggage> GetBaggage(const context::Context &context) no
   {
     return nostd::get<nostd::shared_ptr<Baggage>>(context_value);
   }
-  static nostd::shared_ptr<Baggage> empty_baggage{new Baggage()};
-  return empty_baggage;
+  // intentionally leak
+  static auto empty_baggage = new nostd::shared_ptr<Baggage>{new Baggage()};
+  return *empty_baggage;
 }
 
 inline context::Context SetBaggage(context::Context &context,

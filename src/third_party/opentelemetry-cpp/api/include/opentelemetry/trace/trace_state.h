@@ -42,8 +42,9 @@ public:
 
   OPENTELEMETRY_API_SINGLETON static nostd::shared_ptr<TraceState> GetDefault()
   {
-    static nostd::shared_ptr<TraceState> ts{new TraceState()};
-    return ts;
+    // intentionally leak
+    static auto ts = new nostd::shared_ptr<TraceState>{new TraceState()};
+    return *ts;
   }
 
   /**
