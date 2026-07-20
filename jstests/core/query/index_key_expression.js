@@ -1,5 +1,9 @@
 /**
- * Tests that '$_internalIndexKey' expression works as expected under various scenarios.
+ * Tests that the internal '$_internalIndexKey' expression works as expected under various scenarios.
+ *
+ * '$_internalIndexKey' may only be used by internal (intra-cluster) clients, so this test issues the
+ * aggregation through a connection that has completed the internal client handshake. It also
+ * verifies that an external (non-internal) client is not allowed to use the expression.
  *
  * @tags: [
  *   does_not_support_stepdowns,
@@ -7,22 +11,53 @@
  *   # transition.
  *   config_shard_incompatible,
  *   requires_fcv_63,
- *   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
- *   # first stage in a pipeline. This will be incomplatible with timeseries.
+ *   # This test asserts that external clients are rejected with a specific error code. That
+ *   # restriction is a binary-version behavior change, so it is not enforced by older binaries in a
+ *   # mixed-version cluster.
+ *   multiversion_incompatible,
+ *   # Each scenario expects exactly one document from '$$ROOT'; sharded passthroughs would route
+ *   # the internal-client aggregation and its expected error codes through mongos, which the raw
+ *   # internal connection is not set up for.
+ *   assumes_unsharded_collection,
+ *   assumes_against_mongod_not_mongos,
+ *   # The '$_internalIndexKey' aggregation is issued on a separate internal-client connection that
+ *   # is not wired into a passthrough's read-preference/causal-consistency overrides, so the test
+ *   # cannot tolerate the read preference being changed (e.g. secondary reads).
+ *   assumes_read_preference_unchanged,
+ *   # Internal-client connections require explicit readConcern/writeConcern on commands, which is
+ *   # incompatible with suites that override them (e.g. multi-statement transaction passthroughs,
+ *   # where writeConcern is not allowed inside a transaction).
+ *   assumes_read_concern_unchanged,
+ *   assumes_write_concern_unchanged,
+ *   # The server closes internal-client connections on FCV transitions (their negotiated wire
+ *   # version becomes stale), which drops this test's internal connection mid-run.
+ *   cannot_run_during_upgrade_downgrade,
+ *   # The test drops/recreates the collection per scenario and relies on plain collection inserts;
+ *   # the timeseries CRUD passthrough's implicit timeseries collections would change the documents
+ *   # that '$$ROOT' observes.
  *   exclude_from_timeseries_crud_passthrough,
+ *   # With query stats enabled for internal clients, the recorded '$_internalIndexKey' query shape
+ *   # cannot be re-parsed by the $queryStats reader (an external client), since the expression is
+ *   # restricted to internal clients. Skip the RunQueryStats hook for this test.
+ *   known_query_shape_computation_problem
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 
-// TODO (SERVER-117130): Remove the mongos pinning once the related issue is resolved.
-// When a database is dropped, a stale router will report "database not found" error for
-// deletes (instead of "ok") when pauseMigrationsDuringMultiUpdates is enabled.
-if (TestData.pauseMigrationsDuringMultiUpdates) {
-    TestData.pinToSingleMongos = true;
-}
-
+// '$_internalIndexKey' is restricted to internal clients. Establish a connection that identifies
+// itself as an internal client via the 'hello' handshake so that the expression is permitted. Only
+// the '$_internalIndexKey' aggregation is issued through this connection; collection writes are done
+// through the regular connection since internal clients must specify an explicit write concern.
+const internalConn = new Mongo(db.getMongo().host);
+assert.commandWorked(
+    internalConn.getDB("admin").runCommand({
+        hello: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+    }),
+);
 const collection = db.index_key_expression;
+const internalCollection = internalConn.getDB(db.getName()).index_key_expression;
 
 /**
  * Helper function to get the appropriate 2dsphere index version based on feature flag.
@@ -1100,7 +1135,7 @@ testScenarios.forEach((testScenario) => {
     // Insert the document to the collection if the field 'doc' exists in the
     // test-scenario dictionary.
     if (testScenario.doc) {
-        assert.commandWorked(collection.insert(testScenario.doc));
+        assert.commandWorked(collection.insert(testScenario.doc, {writeConcern: {w: "majority"}}));
     }
 
     // Prepare the pipeline that consists of the '$_internalIndexKey' expression. The
@@ -1123,14 +1158,46 @@ testScenarios.forEach((testScenario) => {
     // throw an exception.
     if (testScenario.expectedIndexKeys) {
         assert.eq(
-            collection.aggregate(pipeline).toArray()[0],
+            internalCollection
+                .aggregate(pipeline, {readConcern: {}, writeConcern: {w: "majority"}})
+                .toArray()[0],
             {_id: testScenario.expectedIndexKeys},
             testScenario,
         );
     } else {
         assert.throwsWithCode(
-            () => collection.aggregate(pipeline).toArray(),
+            () =>
+                internalCollection
+                    .aggregate(pipeline, {readConcern: {}, writeConcern: {w: "majority"}})
+                    .toArray(),
             testScenario.expectedErrorCode,
         );
     }
 });
+
+// Verify the security restriction itself: an external (non-internal) client must not be able to use
+// '$_internalIndexKey'. The regular 'db' connection has not performed the internal client handshake,
+// so the aggregation must be rejected with error code 5491300 ("... is not allowed in user
+// requests").
+collection.deleteMany({});
+assert.commandWorked(collection.insert({a: 1}));
+assert.throwsWithCode(
+    () =>
+        collection
+            .aggregate([
+                {
+                    $replaceRoot: {
+                        newRoot: {
+                            _id: {
+                                $_internalIndexKey: {
+                                    doc: "$$ROOT",
+                                    spec: {key: {a: 1}, name: "a_1"},
+                                },
+                            },
+                        },
+                    },
+                },
+            ])
+            .toArray(),
+    5491300,
+);
