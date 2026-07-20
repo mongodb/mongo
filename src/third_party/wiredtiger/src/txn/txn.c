@@ -2767,7 +2767,7 @@ __wt_verbose_dump_txn_one(
     WT_DECL_RET;
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
-    uint32_t i, buf_len;
+    uint32_t i;
     char ckpt_lsn_str[WT_MAX_LSN_STRING];
     char ts_string[6][WT_TS_INT_STRING_SIZE];
     const char *iso_tag;
@@ -2787,11 +2787,10 @@ __wt_verbose_dump_txn_one(
       !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         return (0);
 
-    buf_len = 512;
-    WT_RET(__wt_scr_alloc(session, buf_len, &buf));
+    WT_RET(__wt_scr_alloc(session, 0, &buf));
 
     const char *session_name = __wt_atomic_load_ptr_relaxed(&txn_session->name);
-    WT_ERR(__wt_snprintf((char *)buf->data, buf_len,
+    WT_ERR(__wt_buf_fmt(session, buf,
       "session ID: %" PRIu32 ", txn ID: %" PRIu64 ", pinned ID: %" PRIu64
       ", metadata pinned ID: %" PRIu64 ", name: %s",
       txn_session->id, __wt_atomic_load_uint64_v_relaxed(&txn_shared->id),
@@ -2829,10 +2828,7 @@ __wt_verbose_dump_txn_one(
         WT_ERR(__wt_buf_catfmt(
           session, snapshot_buf, "%s%" PRIu64, i == 0 ? "" : ", ", txn->snapshot_data.snapshot[i]));
     WT_ERR(__wt_buf_catfmt(session, snapshot_buf, "%s", "]\0"));
-    buf_len = (uint32_t)snapshot_buf->size + 512;
-    if (txn_err_info->err_msg != NULL)
-        buf_len += strlen(txn_err_info->err_msg);
-    WT_ERR(__wt_scr_alloc(session, buf_len, &buf));
+    WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
     WT_ERR(__wt_lsn_string(&txn->ckpt_lsn, sizeof(ckpt_lsn_str), ckpt_lsn_str));
 
@@ -2841,7 +2837,7 @@ __wt_verbose_dump_txn_one(
      * error message.
      */
     WT_ERR(
-      __wt_snprintf((char *)buf->data, buf_len,
+      __wt_buf_fmt(session, buf,
         "transaction id: %" PRIu64 ", mod count: %u"
         ", snap min: %" PRIu64 ", snap max: %" PRIu64 ", snapshot count: %u"
         ", snapshot: %s"

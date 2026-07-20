@@ -130,7 +130,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     static const char *oldest_timestamp_str = "oldest_timestamp=";
     static const char *stable_timestamp_str = "stable_timestamp=";
     WT_CONNECTION *conn;
-    wt_timestamp_t oldest_timestamp, stable_timestamp, stop_timestamp;
+    wt_timestamp_t lag, oldest_timestamp, stable_timestamp, stop_timestamp;
     char buf[WT_TS_HEX_STRING_SIZE * 2 + 64];
 
     /* Ensure timestamps are used. */
@@ -168,6 +168,17 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
          */
         if (allow_lag)
             oldest_timestamp -= (oldest_timestamp - g.oldest_timestamp) / 2;
+
+        /*
+         * Under precise checkpoint this thread ticks every few milliseconds and the halving above
+         * converges to a near-zero gap between oldest and stable, so snap_repeat's historical reads
+         * age out almost immediately and repeatable-read verification is silently lost. Trail
+         * oldest behind stable far enough that recorded operations stay readable, never moving
+         * oldest backwards: populate and role-switch callers pin oldest to stable.
+         */
+        lag = snap_repeat_ts_span();
+        if (allow_lag && GV(PRECISE_CHECKPOINT) && stable_timestamp > lag)
+            oldest_timestamp = WT_MAX(stable_timestamp - lag, g.oldest_timestamp);
     }
 
     testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,

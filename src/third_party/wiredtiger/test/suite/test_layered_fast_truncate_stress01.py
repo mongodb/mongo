@@ -250,7 +250,8 @@ class test_layered_fast_truncate_stress01(wttest.WiredTigerTestCase):
             return
         if op is operations.REMOVE and not key_present:
             return
-        cursor = session.open_cursor(self.uri)
+        config = 'overwrite=false' if op is operations.REMOVE else 'overwrite=true'
+        cursor = session.open_cursor(self.uri, None, config)
         try:
             session.begin_transaction()
             if op is operations.REMOVE:

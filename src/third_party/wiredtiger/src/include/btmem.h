@@ -270,7 +270,13 @@ struct __wt_page_block_meta {
     uint64_t page_id;
     uint64_t disagg_lsn;
 
+    /*
+     * LSN of the previous write this one links back to: the immediately preceding delta or base
+     * image for a delta, or the previous full image for a full page. Zero for a page's first write,
+     * including the first write after a discard.
+     */
     uint64_t backlink_lsn;
+    /* LSN of the base page at the bottom of the delta chain; 0 for a base page. */
     uint64_t base_lsn;
 
     uint32_t checksum;

@@ -31,6 +31,18 @@
 #define SNAP_LIST_SIZE 512
 
 /*
+ * snap_repeat_ts_span --
+ *     Return the span of global timestamps a thread's snap list covers: one timestamp is allocated
+ *     per operation across all threads, and each thread keeps its last SNAP_LIST_SIZE operations.
+ *     Timestamps within this distance of stable must stay readable for snap_repeat.
+ */
+wt_timestamp_t
+snap_repeat_ts_span(void)
+{
+    return ((wt_timestamp_t)SNAP_LIST_SIZE * GV(RUNS_THREADS));
+}
+
+/*
  * snap_init --
  *     Initialize the repeatable operation tracking.
  */

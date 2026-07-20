@@ -101,7 +101,7 @@ class test_layered_cursor13(wttest.WiredTigerTestCase):
     def remove_ingest(self, keys):
         """Remove keys (list of ints) from the follower's local table."""
         session = self.session_follow
-        cursor = session.open_cursor(self.uri)
+        cursor = session.open_cursor(self.uri, None, 'overwrite=false')
         for i in keys:
             key = self.fmt_key(i)
             session.begin_transaction()

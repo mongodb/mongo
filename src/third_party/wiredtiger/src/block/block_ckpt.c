@@ -1212,13 +1212,26 @@ __wti_block_checkpoint_extlist_dump(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     WT_BLOCK_CKPT *ci;
     WT_CKPT *ckpt_iter, *ckptbase;
+    WT_DECL_ITEM(name_buf);
     WT_DECL_RET;
-    size_t ckpt_bytes_allocated;
+    char *config;
+    const char *fname;
 
     ckptbase = NULL;
+    config = NULL;
 
-    WT_ERR(__wt_meta_ckptlist_get(
-      session, session->dhandle->name, false, &ckptbase, &ckpt_bytes_allocated));
+    /*
+     * Build a private checkpoint list from the metadata rather than calling __wt_meta_ckptlist_get,
+     * which in its cached path hands back the btree's live checkpoint list by reference. This
+     * function attaches transient block manager state to every entry and frees the list when done,
+     * so operating on the shared list would corrupt it. It also runs in the middle of checkpoint
+     * processing after a read error, where the cached list legitimately differs from the metadata
+     * and would trip the checkpoint-validate diagnostics.
+     */
+    fname = session->dhandle->name;
+    WT_ERR(__wt_btree_shared_base_name(session, &fname, NULL, &name_buf));
+    WT_ERR(__wt_metadata_search(session, fname, &config));
+    WT_ERR(__wt_meta_ckptlist_get_from_config(session, false, &ckptbase, NULL, config));
     WT_CKPT_FOREACH (ckptbase, ckpt_iter) {
         WT_ERR(__wt_calloc(session, 1, sizeof(WT_BLOCK_CKPT), &ckpt_iter->bpriv));
         ci = ckpt_iter->bpriv;
@@ -1249,6 +1262,9 @@ err:
             __wti_block_ckpt_destroy(session, ci);
 
     __wt_ckptlist_free(session, &ckptbase);
+
+    __wt_scr_free(session, &name_buf);
+    __wt_free(session, config);
 
     return (ret);
 }

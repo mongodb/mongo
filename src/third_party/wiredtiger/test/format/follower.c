@@ -149,6 +149,7 @@ follower_read_latest_checkpoint(void)
 
     conn = g.wts_conn;
     disagg_page_log = (char *)GVS(DISAGG_PAGE_LOG);
+    memset(&sap, 0, sizeof(sap));
     memset(&args, 0, sizeof(args));
 
     /* Only follower can pickup checkpoints. */

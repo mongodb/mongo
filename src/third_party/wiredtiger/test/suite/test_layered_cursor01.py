@@ -104,9 +104,9 @@ class test_layered_cursor01(wttest.WiredTigerTestCase):
         # Create some oplog traffic, a mix of inserts and updates
         self.oplog.insert(self.table_oplog_id, self.ninserts)
         if (self.nupdates > 0):
-            self.oplog.update(self.table_oplog_id, self.nupdates, self.nitems + self.update_offset)
+            self.oplog.update(self.table_oplog_id, self.nupdates, self.posoplog + self.update_offset)
         if (self.nremoves > 0):
-            self.oplog.remove(self.table_oplog_id, self.nremoves, self.nitems + self.remove_offset)
+            self.oplog.remove(self.table_oplog_id, self.nremoves, self.posoplog + self.remove_offset)
 
         # Apply on both leader and follower
         nops = self.ninserts + self.nupdates + self.nremoves

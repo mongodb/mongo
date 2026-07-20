@@ -141,7 +141,7 @@ class test_layered_cursor22(wttest.WiredTigerTestCase):
         cursor = self.position_follower(1)
 
         # Delete the key with a second cursor before the positional remove runs.
-        delete_cursor = self.session_follow.open_cursor(self.uri)
+        delete_cursor = self.session_follow.open_cursor(self.uri, None, 'overwrite=false')
         self.session_follow.begin_transaction()
         delete_cursor.set_key(1)
         self.assertEqual(delete_cursor.remove(), 0)

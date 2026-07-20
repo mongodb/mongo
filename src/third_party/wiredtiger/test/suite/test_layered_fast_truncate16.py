@@ -67,7 +67,7 @@ class test_layered_fast_truncate_stepup(LayeredFastTruncateConfigMixin, wttest.W
         cursor.close()
 
     def remove_kv(self, key, ts):
-        cursor = self.session_follow.open_cursor(self.uri)
+        cursor = self.session_follow.open_cursor(self.uri, None, 'overwrite=false')
         cursor.set_key(key)
         self.session_follow.begin_transaction()
         cursor.remove()

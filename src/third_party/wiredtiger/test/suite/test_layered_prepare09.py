@@ -310,7 +310,7 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         conn_follow = self._open_follower(checkpoint_meta)
 
         session_f = conn_follow.open_session()
-        cursor_f = session_f.open_cursor(self.uri)
+        cursor_f = session_f.open_cursor(self.uri, None, 'overwrite=false')
         session_f.begin_transaction()
         cursor_f.set_key(1)
         self.assertEqual(0, cursor_f.remove())
@@ -397,7 +397,7 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         conn_follow = self._open_follower(checkpoint_meta)
 
         session_f = conn_follow.open_session()
-        prep_cursor = session_f.open_cursor(self.uri)
+        prep_cursor = session_f.open_cursor(self.uri, None, 'overwrite=false')
         session_f.begin_transaction()
         prep_cursor.set_key(1)
         self.assertEqual(0, prep_cursor.remove())

@@ -95,7 +95,7 @@ class test_layered_cursor21(wttest.WiredTigerTestCase):
         c2.close()
 
     def remove_range(self, start, stop, ts):
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(self.uri, None, 'overwrite=false')
         self.session.begin_transaction()
         for i in range(start, stop + 1):
             cursor.set_key(self.key(i))

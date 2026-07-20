@@ -94,7 +94,7 @@ class test_layered_cursor14(wttest.WiredTigerTestCase):
         cursor.close()
 
     def remove_on(self, session, keys):
-        cursor = session.open_cursor(self.uri)
+        cursor = session.open_cursor(self.uri, None, 'overwrite=false')
         for k in keys:
             session.begin_transaction()
             cursor.set_key(self.fmt_key(k))

@@ -1592,7 +1592,12 @@ cursor_runtime_config = [
         configures whether the cursor's insert and update methods check the existing state of
         the record. If \c overwrite is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
         if the record exists, and WT_CURSOR::update fails with ::WT_NOTFOUND if the record does
-        not exist''',
+        not exist. On a follower of a layered table with no read timestamp, \c overwrite set to
+        \c true causes WT_CURSOR::remove to write a tombstone to the ingest table without checking
+        the stable table; the caller must guarantee that the key being removed exists. If the key is
+        already deleted in ingest or by the truncate list, the operation violates that guarantee.
+        A write conflict with a concurrent, not-yet-visible change to the same key can still fail
+        the call. This layered-follower remove behavior does not apply on a leader.''',
         type='boolean'),
     Config('prefix_search', 'false', r'''
         this option is no longer supported, retained for backward compatibility.''',

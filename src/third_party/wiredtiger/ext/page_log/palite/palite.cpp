@@ -2174,12 +2174,8 @@ public:
         /* Ensure exclusive access to storage since we update multiple tables. */
         std::unique_lock write_lock(store_access);
 
-        int ret = 0;
-        if (checkpoint_lsn == WT_PAGE_LOG_LSN_MAX) {
-            ret =
-              checkpoints.get(checkpoint_lsn, nullptr, nullptr, Checkpoints::AccessMode::BYPASS);
-        }
-
+        int ret =
+          checkpoints.get(checkpoint_lsn, nullptr, nullptr, Checkpoints::AccessMode::BYPASS);
         if (ret == WT_NOTFOUND) {
             LOG_DEBUG("No checkpoint found to abandon; lsn = {}", checkpoint_lsn);
             return;

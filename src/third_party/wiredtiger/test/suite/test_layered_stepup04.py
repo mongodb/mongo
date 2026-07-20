@@ -409,7 +409,7 @@ class test_layered_stepup04(wttest.WiredTigerTestCase):
         # live prepared DELETE present when step-up fires in Phase 3.
         conn_follow = self._open_follower(checkpoint_meta)
         session_f = conn_follow.open_session()
-        follower_cursors = [session_f.open_cursor(uri) for uri in uris]
+        follower_cursors = [session_f.open_cursor(uri, None, 'overwrite=false') for uri in uris]
         session_f.begin_transaction()
         for c in follower_cursors:
             for i in range(1, 4):

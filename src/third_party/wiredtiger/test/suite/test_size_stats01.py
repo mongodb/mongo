@@ -56,48 +56,48 @@ class test_size_stats01(wttest.WiredTigerTestCase):
     # Neither step is an extra scan. The statistics are then read with a statistics=(fast) cursor that
     # does not re-walk the tree. Overhead and the uncompressed total are derived here, mirroring the
     # analysis the engine leaves to the consumer.
+    #
+    # Reopen first so every page image is loaded from the last checkpoint. Size_stats counts cells in
+    # page->dsk; an in-cache page can keep a pre-delete image while the cursor skips tombstones, so
+    # without a reopen the summary and the scan disagree.
     def size_summary(self, uri=None, enable=True):
         if uri is None:
             uri = self.uri
-        self.close_conn()
-        conn = self.wiredtiger_open(self.home, 'statistics=(fast)')
-        try:
-            session = conn.open_session()
+        self.reopen_conn(config='statistics=(fast)')
+        session = self.session
 
-            config = 'debug=(size_stats)' if enable else None
-            cursor = session.open_cursor(uri, None, config)
-            scanned = 0
-            if cursor.next() == 0:
-                # The probe discovered the first key; seek back to it and traverse forward, reusing
-                # one cursor rather than scanning a second time.
-                first_key = cursor.get_key()
-                cursor.set_key(first_key)
-                self.assertEqual(cursor.search(), 0)
-                scanned = 1
-                while cursor.next() == 0:
-                    scanned += 1
-            cursor.close()
+        config = 'debug=(size_stats)' if enable else None
+        cursor = session.open_cursor(uri, None, config)
+        scanned = 0
+        if cursor.next() == 0:
+            # The probe discovered the first key; seek back to it and traverse forward, reusing
+            # one cursor rather than scanning a second time.
+            first_key = cursor.get_key()
+            cursor.set_key(first_key)
+            self.assertEqual(cursor.search(), 0)
+            scanned = 1
+            while cursor.next() == 0:
+                scanned += 1
+        cursor.close()
 
-            statc = session.open_cursor('statistics:' + uri, None, 'statistics=(fast)')
-            def g(key):
-                return statc[key][2]
-            s = dict(
-                leaf=g(stat.dsrc.btree_size_leaf_pages),
-                internal=g(stat.dsrc.btree_size_internal_pages),
-                overflow=g(stat.dsrc.btree_size_overflow_pages),
-                leaf_bytes=g(stat.dsrc.btree_size_leaf_bytes),
-                internal_bytes=g(stat.dsrc.btree_size_internal_bytes),
-                overflow_bytes=g(stat.dsrc.btree_size_overflow_bytes),
-                key=g(stat.dsrc.btree_size_key_bytes),
-                value=g(stat.dsrc.btree_size_value_bytes),
-                key_count=g(stat.dsrc.btree_size_key_count),
-                value_count=g(stat.dsrc.btree_size_value_count),
-                maxleaf=g(stat.dsrc.btree_maxleafpage),
-            )
-            s['hist'] = [g(getattr(stat.dsrc, 'btree_size_leaf_hist_%d' % i)) for i in range(9)]
-            statc.close()
-        finally:
-            conn.close()
+        statc = session.open_cursor('statistics:' + uri, None, 'statistics=(fast)')
+        def g(key):
+            return statc[key][2]
+        s = dict(
+            leaf=g(stat.dsrc.btree_size_leaf_pages),
+            internal=g(stat.dsrc.btree_size_internal_pages),
+            overflow=g(stat.dsrc.btree_size_overflow_pages),
+            leaf_bytes=g(stat.dsrc.btree_size_leaf_bytes),
+            internal_bytes=g(stat.dsrc.btree_size_internal_bytes),
+            overflow_bytes=g(stat.dsrc.btree_size_overflow_bytes),
+            key=g(stat.dsrc.btree_size_key_bytes),
+            value=g(stat.dsrc.btree_size_value_bytes),
+            key_count=g(stat.dsrc.btree_size_key_count),
+            value_count=g(stat.dsrc.btree_size_value_count),
+            maxleaf=g(stat.dsrc.btree_maxleafpage),
+        )
+        s['hist'] = [g(getattr(stat.dsrc, 'btree_size_leaf_hist_%d' % i)) for i in range(9)]
+        statc.close()
 
         s['scanned'] = scanned
         s['total'] = s['leaf_bytes'] + s['internal_bytes'] + s['overflow_bytes']
@@ -106,67 +106,64 @@ class test_size_stats01(wttest.WiredTigerTestCase):
 
     # Build a tree spanning many leaf pages, then delete most of the keys so the pages are left
     # underfull (WiredTiger does not merge pages back together). Every keep_mod-th key survives, so
-    # keep_mod=10 deletes ~90% and keep_mod=100 deletes ~99%.
+    # keep_mod=10 deletes ~90% and keep_mod=100 deletes ~99%. Leave the connection open; size_summary
+    # reopens to load post-checkpoint page images.
     def populate_underfull(self, keep_mod=10, nrecords=None):
         if nrecords is None:
             nrecords = self.nrecords
         self.close_conn()
-        conn = self.wiredtiger_open(self.home, 'create')
-        session = conn.open_session()
-        session.create(self.uri, self.params)
+        self.open_conn()
+        self.session.create(self.uri, self.params)
 
-        cursor = session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(self.uri)
         value = 'v' * 100
         for i in range(nrecords):
             cursor['key%08d' % i] = value
         cursor.close()
-        session.checkpoint()
+        self.session.checkpoint()
 
-        cursor = session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(self.uri)
         for i in range(nrecords):
             if i % keep_mod != 0:
                 cursor.set_key('key%08d' % i)
                 self.assertEqual(cursor.remove(), 0)
         cursor.close()
-        session.checkpoint()
-        conn.close()
+        self.session.checkpoint()
 
     # Populate with large values that exceed the leaf-value limit, forcing overflow pages.
     def populate_overflow(self, nrecords, valuesize):
         self.close_conn()
-        conn = self.wiredtiger_open(self.home, 'create')
-        session = conn.open_session()
-        session.create(self.uri, 'key_format=S,value_format=S,leaf_page_max=4KB,internal_page_max=4KB')
-        cursor = session.open_cursor(self.uri)
+        self.open_conn()
+        self.session.create(self.uri,
+          'key_format=S,value_format=S,leaf_page_max=4KB,internal_page_max=4KB')
+        cursor = self.session.open_cursor(self.uri)
         value = 'v' * valuesize
         for i in range(nrecords):
             cursor['key%08d' % i] = value
         cursor.close()
-        session.checkpoint()
-        conn.close()
+        self.session.checkpoint()
 
     # Append-only workload: a single btree filled with monotonically increasing keys, never updated
     # or deleted. Leaf pages pack tightly, the opposite end of the spectrum from the underfull tree.
     def populate_append(self, nrecords, valuesize):
         self.close_conn()
-        conn = self.wiredtiger_open(self.home, 'create,cache_size=2GB')
-        session = conn.open_session()
-        session.create(self.uri,
+        self.open_conn(config='cache_size=2GB')
+        self.session.create(self.uri,
           'key_format=Q,value_format=u,leaf_page_max=32KB,internal_page_max=16KB')
-        cursor = session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(self.uri)
         value = b'\xa5' * valuesize
         for i in range(nrecords):
             cursor[i + 1] = value
         cursor.close()
-        session.checkpoint()
-        conn.close()
+        self.session.checkpoint()
 
     def test_size_metrics(self):
         self.populate_underfull()
 
         s = self.size_summary()
 
-        # The scan visited every record; each surviving key has exactly one (non-empty) value.
+        # After reopen, the scan and size_stats see the same post-checkpoint page images: every live
+        # record has one on-page key and one on-page value.
         self.assertGreater(s['key_count'], 0)
         self.assertEqual(s['key_count'], s['value_count'])
         self.assertEqual(s['scanned'], s['key_count'])

@@ -417,7 +417,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         mods.append(mod)
         mods = self.fix_mods(mods)
         xc.set_key(ds.key(30))
-        self.assertEqual(xc.modify(mods), wiredtiger.WT_NOTFOUND)
+        self.assertRaises(wiredtiger.WiredTigerRollbackError, lambda: xc.modify(mods))
         xs.rollback_transaction()
 
         # Rollback our transaction.

@@ -451,8 +451,15 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
           session->reconcile_timeline.total_reentry_hs_eviction_time;
 
 err:
-    if (ret != 0)
+    if (ret != 0) {
+        /*
+         * The reconcile-local block array is normally freed by cleanup when wrapping up the
+         * reconciliation, which this path skips. If cleanup has not run, free it here.
+         */
+        if (r->multi != NULL)
+            WT_TRET(__rec_cleanup(session, r));
         WT_RET_PANIC(session, ret, "reconciliation failed after building the disk image");
+    }
     return (ret);
 }
 

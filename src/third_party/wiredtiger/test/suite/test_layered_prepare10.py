@@ -103,7 +103,7 @@ class test_layered_prepare10(wttest.WiredTigerTestCase):
 
     def _remove(self, session, key, ts):
         with (
-            wttest.open_cursor(session, self.uri) as cursor,
+            wttest.open_cursor(session, self.uri, config='overwrite=false') as cursor,
             self.transaction(session=session, commit_timestamp=ts),
         ):
             cursor.set_key(key)

@@ -27,8 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # The stable cursor on a follower must not open until the first read after the
-# follower has picked up a checkpoint. Writes with default overwrite must never
-# open stable; non-overwrite writes and all reads must open it.
+# follower has picked up a checkpoint. Insert, update, and remove with overwrite=true
+# must never open stable; all other writes and all reads must open it.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -64,7 +64,12 @@ def _op_prev(cursor):
     return cursor.prev()
 
 def _op_remove(cursor):
-    cursor.set_key('key_0')
+    # A follower's overwrite=true remove asserts the key is still live, so repeat calls (this test
+    # calls do_op twice, before and after the checkpoint) must each target a distinct, still-live
+    # key rather than removing the same key twice; insert_keys populates key_0 through key_4.
+    idx = getattr(cursor, '_remove_key_idx', 0)
+    cursor.set_key(f'key_{idx}')
+    cursor._remove_key_idx = idx + 1
     return cursor.remove()
 
 def _op_reserve(cursor):
@@ -149,8 +154,9 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         # Replicate the leader's writes to the follower's ingest.
         self.insert_keys(session_follow, 5, 10)
 
-        # Open the follower cursor.
-        cursor_config = 'overwrite=false' if not self.overwrite else None
+        # Explicitly configure overwrite=true to gate the skip-stable path for every write --
+        # insert, update, and remove alike.
+        cursor_config = 'overwrite=true' if self.overwrite else 'overwrite=false'
         cursor_follow = session_follow.open_cursor(self.uri, None, cursor_config)
 
         # Any operation before a checkpoint must not open stable.
@@ -168,7 +174,7 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         if self.txn_mode != 'survive':
             session_follow.begin_transaction()
 
-        opens_stable = not (self.overwrite and self.do_op in (_op_insert, _op_update))
+        opens_stable = not (self.overwrite and self.do_op in (_op_insert, _op_update, _op_remove))
 
         # After the checkpoint arrives, repeat the same operation.
         self.do_op(cursor_follow)

@@ -10,6 +10,7 @@
 
 static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
+static bool __evict_page_victim_cache_eligible(WT_SESSION_IMPL *, WT_REF *);
 static bool __evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *);
 static int __evict_reconcile(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t, bool *);
@@ -79,47 +80,47 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
  */
 
 /*
- * __evict_page_victim_cache --
- *     Check eligibility and put page in victim cache if applicable.
+ * __evict_page_victim_cache_eligible --
+ *     Check whether a page is eligible to be put in the victim cache.
  */
-static void
-__evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
+static bool
+__evict_page_victim_cache_eligible(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
-        return;
+        return (false);
 
     WT_BM *bm = S2BT(session)->bm;
     if (bm == NULL)
-        return;
+        return (false);
 
     WT_BLOCK_DISAGG *block_disagg = (WT_BLOCK_DISAGG *)bm->block;
     if (block_disagg == NULL)
-        return;
+        return (false);
 
     WT_PAGE_LOG_HANDLE *plh = block_disagg->plhandle;
     if (plh == NULL)
-        return;
+        return (false);
 
     if (plh->plh_cache_put == NULL || plh->plh_cache_available == NULL ||
       !plh->plh_cache_available(plh, &session->iface))
-        return;
+        return (false);
 
     WT_PAGE *page = ref->page;
 
     /* Only cache clean pages without modify. */
     if (__wt_page_is_modified(page))
-        return;
+        return (false);
 
     /* Must be a leaf page with disagg info and disk image. */
     if (!F_ISSET(ref, WT_REF_FLAG_LEAF) || page->disagg_info == NULL || page->dsk == NULL)
-        return;
+        return (false);
 
     if (page->disagg_info->block_meta.page_id == WT_BLOCK_INVALID_PAGE_ID)
-        return;
+        return (false);
 
     /* Cannot cache root pages. */
     if (__wt_ref_is_root(ref))
-        return;
+        return (false);
 
     /*
      * Pages from cold collections must never enter the victim cache: caching cold data wastes
@@ -128,8 +129,25 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     if (S2BT(session)->storage_tier == WT_BTREE_STORAGE_TIER_COLD) {
         WT_STAT_CONN_INCR(session, block_cache_cold_not_cached);
-        return;
+        return (false);
     }
+
+    return (true);
+}
+
+/*
+ * __evict_page_victim_cache --
+ *     Check eligibility and put page in victim cache if applicable.
+ */
+static void
+__evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+    if (!__evict_page_victim_cache_eligible(session, ref))
+        return;
+
+    /* Eligibility has already confirmed the disagg page log handle exists. */
+    WT_PAGE_LOG_HANDLE *plh = ((WT_BLOCK_DISAGG *)S2BT(session)->bm->block)->plhandle;
+    WT_PAGE *page = ref->page;
 
     /*
      * Time the victim-cache work - compression, checksum and put - and count the pages cached.
