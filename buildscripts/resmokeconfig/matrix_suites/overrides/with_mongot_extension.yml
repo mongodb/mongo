@@ -59,10 +59,6 @@
       # "BSON field 'VectorClockComponents.explainVersion' is a duplicate field" (error 40413).
       - jstests/with_mongot/e2e/explain_execution_stats/search_union_with_lookup_explain.js
       - jstests/with_mongot/e2e/explain_execution_stats/search_meta_union_with_lookup_explain.js
-      # TODO SERVER-131409: Remove this exclusion. With featureFlagSearchExtension on, a nested
-      # $unionWith/$lookup with an extension $search on views returns wrong results on single_node
-      # (assertArrayEq mismatch: deeply-nested results dropped). Excluded family-wide.
-      - jstests/with_mongot/e2e/views/search/unionWith_lookup_nested_deep.js
 
 - name: extension_flags_hybridSearch_disabled
   value:
