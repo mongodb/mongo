@@ -1314,6 +1314,13 @@ export class ShardingTest {
                     startOptions.setParameter = startOptions.setParameter ?? {};
                     startOptions.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
                 }
+                // Enable resharding document-count validation (off by default) in test clusters.
+                if (!clusterVersionInfo.isMixedVersion) {
+                    startOptions.setParameter = startOptions.setParameter ?? {};
+                    if (startOptions.setParameter.reshardingDocumentVerification === undefined) {
+                        startOptions.setParameter.reshardingDocumentVerification = true;
+                    }
+                }
                 rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
 
                 let nodeOptions = [];
@@ -1392,6 +1399,11 @@ export class ShardingTest {
                 if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
                     MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(rsDefaults.binVersion || "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
                     rsDefaults.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
+                }
+                // Enable resharding document-count validation (off by default) in test clusters.
+                if (!clusterVersionInfo.isMixedVersion &&
+                    rsDefaults.setParameter.reshardingDocumentVerification === undefined) {
+                    rsDefaults.setParameter.reshardingDocumentVerification = true;
                 }
 
                 let rsSettings = rsDefaults.settings;

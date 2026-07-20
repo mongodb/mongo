@@ -106,7 +106,8 @@ const kExpectedValidationOutcomes = {
 main();
 
 function main() {
-    const verificationEnabled = FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
+    // TODO(SERVER-94583): Remove this check when featureFlagReshardingVerification is removed.
+    const verificationEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
 
     const testCases = [
         TestMode.kSuccess,

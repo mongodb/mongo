@@ -693,6 +693,8 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ConstructDonorDocumentFromRe
 
             unittest::ServerParameterGuard verificationFeatureFlagController(
                 "featureFlagReshardingVerification", enableVerification);
+            unittest::ServerParameterGuard documentVerificationController(
+                "reshardingDocumentVerification", true);
 
             auto reshardingFields = createCommonReshardingFields(
                 kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
@@ -737,6 +739,8 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
 
             unittest::ServerParameterGuard verificationFeatureFlagController(
                 "featureFlagReshardingVerification", enableVerification);
+            unittest::ServerParameterGuard documentVerificationController(
+                "reshardingDocumentVerification", true);
 
             auto reshardingFields = createCommonReshardingFields(
                 kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
