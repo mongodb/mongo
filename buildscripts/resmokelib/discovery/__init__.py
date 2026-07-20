@@ -31,21 +31,25 @@ class SuiteTestList(BaseModel):
 class TestDiscoverySubcommand(Subcommand):
     """Subcommand for test discovery."""
 
-    def __init__(self, suite_name: str) -> None:
+    def __init__(self, suite_names: list[str]) -> None:
         """
         Initialize the subcommand.
 
-        :param suite_name: Suite to discover.
+        :param suite_names: Suites to discover.
         """
-        self.suite_name = suite_name
+        self.suite_names = suite_names
         self.suite_config = suitesconfig
 
     def execute(self):
         """Execute the subcommand."""
-        suite = self.suite_config.get_suite(self.suite_name)
-        test_list = self.gather_tests(suite)
+        test_lists = [
+            self.gather_tests(self.suite_config.get_suite(suite_name)).dict()
+            for suite_name in self.suite_names
+        ]
 
-        print(yaml.safe_dump(test_list.dict()))
+        # A single suite keeps the historical single-document output; multiple suites
+        # are emitted as a multi-document YAML stream in the order they were requested.
+        print(yaml.safe_dump_all(test_lists))
 
     @staticmethod
     def gather_tests(suite: Suite) -> SuiteTestList:
@@ -99,7 +103,17 @@ class DiscoveryPlugin(PluginInterface):
         parser = subparsers.add_parser(
             TEST_DISCOVERY_SUBCOMMAND, help="Discover what tests are run by a suite."
         )
-        parser.add_argument("--suite", metavar="SUITE", help="Suite to run against.")
+        parser.add_argument(
+            "--suite",
+            metavar="SUITE",
+            action="append",
+            required=True,
+            help=(
+                "Suite to run against. May be repeated to discover several suites in one"
+                " invocation; the output is then a multi-document YAML stream with one"
+                " document per suite, in the requested order."
+            ),
+        )
         parser.add_argument(
             "--skipTestsCoveredByMoreComplexSuites",
             dest="skip_tests_covered_by_more_complex_suites",
