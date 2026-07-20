@@ -19,6 +19,7 @@ export const sampleDocFieldNames = {
     createdAtField: "createdAt",
     docsField: "docs",
     schemaVersionField: "schemaVersion",
+    pageNoField: "pageNo",
 };
 
 export function getExpectedSamplingMethod(db, requestedSamplingMethod) {
@@ -125,15 +126,18 @@ export function assertSamplesCollClustered(db) {
     );
 }
 
-// Returns the expected _id object for a sample document.
+// Returns the expected _id object for a sample document. The field order here must mirror
+// ce::PersistentSampleId in persistent_sample.idl in order to successfully match the _id object.
 // samplingType is "random" or "chunk"; sampleSize is the sample count encoded in the _id.
 // numChunks is included in the _id only for chunk mode.
+// pageNo defaults to 0 (expected when only 1 page exists) and is always present in the _id.
 export function getExpectedId(
     uuid,
     samplingType,
     sampleSize,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
     numChunks = null,
+    pageNo = 0,
 ) {
     const id = {
         [sampleDocFieldNames.schemaVersionField]: NumberInt(expectedSchemaVersion),
@@ -149,6 +153,7 @@ export function getExpectedId(
         );
         id[sampleDocFieldNames.numChunksField] = NumberInt(numChunks);
     }
+    id[sampleDocFieldNames.pageNoField] = NumberInt(pageNo);
     return id;
 }
 

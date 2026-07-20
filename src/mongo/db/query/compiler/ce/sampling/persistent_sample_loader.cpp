@@ -20,7 +20,8 @@ namespace mongo::ce {
 BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
                                   SamplingTechniqueEnum method,
                                   size_t sampleSize,
-                                  boost::optional<int> numChunks) {
+                                  boost::optional<int> numChunks,
+                                  int pageNo) {
     tassert(12432800,
             "Chunk-based persistent sample ID requires numChunks",
             method != SamplingTechniqueEnum::kChunk || numChunks.has_value());
@@ -40,6 +41,7 @@ BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
     if (method == SamplingTechniqueEnum::kChunk) {
         id.setNumChunks(*numChunks);
     }
+    id.setPageNo(pageNo);
     return id.toBSON();
 }
 

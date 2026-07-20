@@ -30,7 +30,8 @@ inline constexpr int kPersistentSampleSchemaVersion = 1;
 BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
                                   SamplingTechniqueEnum method,
                                   size_t sampleSize,
-                                  boost::optional<int> numChunks);
+                                  boost::optional<int> numChunks,
+                                  int pageNo = 0);
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 

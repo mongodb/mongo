@@ -40,6 +40,7 @@ TEST(MakePersistentSampleIdObj, PopulatesFieldsInPrefixOrder) {
     ASSERT_EQ(randomId[PersistentSampleId::kSamplingMethodFieldName].str(), "random");
     ASSERT_EQ(randomId[PersistentSampleId::kSampleSizeFieldName].numberLong(), 384);
     ASSERT_TRUE(randomId[PersistentSampleId::kNumChunksFieldName].eoo());
+    ASSERT_EQ(randomId[PersistentSampleId::kPageNoFieldName].numberInt(), 0);
 
     std::vector<std::string> fieldNames;
     for (auto&& e : randomId) {
@@ -50,6 +51,20 @@ TEST(MakePersistentSampleIdObj, PopulatesFieldsInPrefixOrder) {
     const auto chunkId =
         makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
     ASSERT_EQ(chunkId[PersistentSampleId::kNumChunksFieldName].numberInt(), 10);
+    ASSERT_EQ(chunkId[PersistentSampleId::kPageNoFieldName].numberInt(), 0);
+}
+
+TEST(MakePersistentSampleIdObj, PageNoDefaultsToZeroAndIsSettable) {
+    const UUID uuid = UUID::gen();
+    // Omitting the argument yields page 0.
+    const auto defaulted =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    ASSERT_EQ(defaulted[PersistentSampleId::kPageNoFieldName].numberInt(), 0);
+
+    // An explicit page number is threaded through to the _id.
+    const auto page7 =
+        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 7);
+    ASSERT_EQ(page7[PersistentSampleId::kPageNoFieldName].numberInt(), 7);
 }
 
 TEST(MakePersistentSampleIdObj, DifferentConfigurationsProduceDifferentIds) {
@@ -64,11 +79,14 @@ TEST(MakePersistentSampleIdObj, DifferentConfigurationsProduceDifferentIds) {
         makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
     const auto differentChunksId =
         makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20);
+    const auto differentPageId = makePersistentSampleIdObj(
+        uuid, SamplingTechniqueEnum::kRandom, 384, boost::none, /*pageNo=*/1);
 
     ASSERT_BSONOBJ_NE(randomId, otherUuidId);
     ASSERT_BSONOBJ_NE(randomId, chunkId);
     ASSERT_BSONOBJ_NE(randomId, differentSizeId);
     ASSERT_BSONOBJ_NE(chunkId, differentChunksId);
+    ASSERT_BSONOBJ_NE(randomId, differentPageId);
 }
 
 // ── parsePersistentSample ─────────────────────────────────────────────────────────────────────
@@ -92,6 +110,7 @@ TEST(ParsePersistentSample, ValidRandomSamplePopulatesAllFields) {
     ASSERT_EQUALS(sample.getSamplingMethod(), SamplingTechniqueEnum::kRandom);
     ASSERT_EQUALS(static_cast<size_t>(sample.getSampleSize()), docs.size());
     ASSERT_FALSE(sample.getNumChunks().has_value());
+    ASSERT_EQUALS(sample.get_id().getPageNo(), 0);
 
     ASSERT_EQUALS(sample.getCreatedAt(),
                   sampleDoc[PersistentSampleDoc::kCreatedAtFieldName].date());
@@ -252,6 +271,28 @@ TEST(ParsePersistentSample, RejectsNonPositiveNumChunks) {
                                                        /*docs=*/kStubSampleDocs,
                                                        /*numChunks=*/-1));
     ASSERT_NOT_OK(negativeResult.getStatus());
+}
+
+TEST(ParsePersistentSample, RejectsNegativePageNo) {
+    // pageNo is defined in the idl to be >= 0
+    const UUID uuid = UUID::gen();
+    const BSONObj badId = BSON(
+        PersistentSampleId::kSchemaVersionFieldName
+        << kPersistentSampleSchemaVersion << PersistentSampleId::kCollectionUuidFieldName << uuid
+        << PersistentSampleId::kSamplingMethodFieldName
+        << idlSerialize(SamplingTechniqueEnum::kRandom) << PersistentSampleId::kSampleSizeFieldName
+        << static_cast<long long>(kStubSampleDocs.size()) << PersistentSampleId::kPageNoFieldName
+        << -1);
+    auto result =
+        parsePersistentSample(buildPersistentSampleDoc(uuid,
+                                                       SamplingTechniqueEnum::kRandom,
+                                                       /*sampleSize=*/kStubSampleDocs.size(),
+                                                       /*docs=*/kStubSampleDocs,
+                                                       /*numChunks=*/boost::none,
+                                                       /*schemaVersion=*/
+                                                       kPersistentSampleSchemaVersion,
+                                                       BSON("_id" << badId)));
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ParsePersistentSample, RejectsNonDateCreatedAt) {

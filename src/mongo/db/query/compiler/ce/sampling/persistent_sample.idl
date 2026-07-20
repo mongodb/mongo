@@ -39,6 +39,9 @@ structs:
                 type: int
                 optional: true
                 validator: {gt: 0}
+            pageNo:
+                type: int
+                validator: {gte: 0}
 
     PersistentSampleDoc:
         description: >-

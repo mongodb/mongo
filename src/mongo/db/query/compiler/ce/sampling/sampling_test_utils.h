@@ -316,5 +316,6 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  const std::vector<BSONObj>& docs,
                                  boost::optional<int> numChunks = boost::none,
                                  int schemaVersion = kPersistentSampleSchemaVersion,
-                                 BSONObj overrides = BSONObj());
+                                 BSONObj overrides = BSONObj(),
+                                 int pageNo = 0);
 }  // namespace mongo::ce
