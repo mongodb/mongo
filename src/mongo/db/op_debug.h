@@ -706,6 +706,12 @@ public:
     // mode. This is a bool to ensure it's set only once per query.
     bool nlpReplaceRoot{false};
 
+    // 'true' if the query has a leading match filter.
+    bool pathArraynessLeadingFilter{false};
+    // 'true' if the query has simplified a leading match filter by leveraging path arrayness
+    // information.
+    bool pathArraynessSimplified{false};
+
     // Tracks the number of spilled bytes by hash lookup in a pushed down lookup stage. The spilled
     // storage size after compression might be different from the bytes spilled.
     long long hashLookupSpillToDiskBytes{0};

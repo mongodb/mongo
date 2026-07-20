@@ -464,6 +464,7 @@ QueryFrameworkCounters queryFrameworkCounters;
 LookupPushdownCounters lookupPushdownCounters;
 LookupUnwindPushdownCounters lookupUnwindPushdownCounters;
 NonLeadingPushdownCounters nonLeadingPushdownCounters;
+PathArraynessCounters pathArraynessCounters;
 ValidatorCounters validatorCounters;
 ValidationLevelCounters validationLevelCounters;
 GroupCounters groupCounters;

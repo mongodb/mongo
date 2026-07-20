@@ -498,6 +498,37 @@ public:
 };
 extern NonLeadingPushdownCounters nonLeadingPushdownCounters;
 
+/**
+ * Counters tracking pathArrayness usage and behavior.
+ *
+ * TODO(SERVER-131708): add remaining metrics related to pathArrayness usage.
+ */
+class PathArraynessCounters {
+public:
+    PathArraynessCounters() = default;
+    PathArraynessCounters(const PathArraynessCounters&) = delete;
+    PathArraynessCounters& operator=(const PathArraynessCounters&) = delete;
+
+    void incrementPerQuery(bool leadingFilter, bool leadingFilterSimplified) {
+        if (leadingFilter)
+            leadingFilterCounter.incrementRelaxed(1);
+        if (leadingFilterSimplified)
+            leadingFilterSimplifiedCounter.incrementRelaxed(1);
+    }
+
+    void incrementInvalidation() {
+        queriesFailedDueToInvalidationCounter.incrementRelaxed(1);
+    }
+
+    Counter64& leadingFilterCounter =
+        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilter"};
+    Counter64& leadingFilterSimplifiedCounter =
+        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilterSimplified"};
+    Counter64& queriesFailedDueToInvalidationCounter =
+        *MetricBuilder<Counter64>{"query.pathArrayness.queriesFailedDueToInvalidation"};
+};
+extern PathArraynessCounters pathArraynessCounters;
+
 /** Counters tracking group stats across all execution engines. */
 class GroupCounters : public SpillingCounters {
 public:
