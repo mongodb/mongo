@@ -581,6 +581,16 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
     MONGO_UNREACHABLE;
 }
 
+
+namespace {
+inline boost::optional<int64_t> operationTimeoutArg(Milliseconds timeout) {
+    if (timeout.count() > 0) {
+        return durationCount<Milliseconds>(timeout);
+    }
+    return boost::none;
+}
+}  // namespace
+
 void WiredTigerRecoveryUnit::_txnOpen() {
     invariant(!_isActive(), toString(_getState()));
     invariant(!_isCommittingOrAborting(),
@@ -629,7 +639,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kNoRoundError,
                                     _untimestampedWriteAssertionLevel,
-                                    _preparedId)
+                                    _preparedId,
+                                    operationTimeoutArg(_operationTimeout))
                 .done();
             break;
         }
@@ -638,7 +649,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                 _session,
                 _prepareConflictBehavior,
                 _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
-                _untimestampedWriteAssertionLevel);
+                _untimestampedWriteAssertionLevel,
+                operationTimeoutArg(_operationTimeout));
             break;
         }
         case ReadSource::kLastApplied: {
@@ -661,7 +673,9 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                             _prepareConflictBehavior,
                                             _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                             RoundUpReadTimestamp::kNoRoundError,
-                                            _untimestampedWriteAssertionLevel);
+                                            _untimestampedWriteAssertionLevel,
+                                            boost::none /* claimPreparedId */,
+                                            operationTimeoutArg(_operationTimeout));
             auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
 
             if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
@@ -690,7 +704,9 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp() {
                                     _prepareConflictBehavior,
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _untimestampedWriteAssertionLevel);
+                                    _untimestampedWriteAssertionLevel,
+                                    boost::none /* claimPreparedId */,
+                                    operationTimeoutArg(_operationTimeout));
     Timestamp txnTimestamp = _connection->getKVEngine()->getAllDurableTimestamp();
     auto status = txnOpen.setReadSnapshot(txnTimestamp);
     fassert(50948, status);
@@ -718,7 +734,9 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp() {
                                         _prepareConflictBehavior,
                                         _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
-                                        _untimestampedWriteAssertionLevel);
+                                        _untimestampedWriteAssertionLevel,
+                                        boost::none /* claimPreparedId */,
+                                        operationTimeoutArg(_operationTimeout));
         LOGV2_DEBUG(4847500, 2, "no read timestamp available for kLastApplied");
         txnOpen.done();
         return;
@@ -728,7 +746,9 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp() {
                                     _prepareConflictBehavior,
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _untimestampedWriteAssertionLevel);
+                                    _untimestampedWriteAssertionLevel,
+                                    boost::none /* claimPreparedId */,
+                                    operationTimeoutArg(_operationTimeout));
     auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
     fassert(4847501, status);
 
@@ -783,7 +803,9 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp() {
                                         _prepareConflictBehavior,
                                         _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
-                                        _untimestampedWriteAssertionLevel);
+                                        _untimestampedWriteAssertionLevel,
+                                        boost::none /* claimPreparedId */,
+                                        operationTimeoutArg(_operationTimeout));
         LOGV2_DEBUG(4452900, 1, "no read timestamp available for kNoOverlap");
         txnOpen.done();
         return readTimestamp;
@@ -793,7 +815,9 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp() {
                                     _prepareConflictBehavior,
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _untimestampedWriteAssertionLevel);
+                                    _untimestampedWriteAssertionLevel,
+                                    boost::none /* claimPreparedId */,
+                                    operationTimeoutArg(_operationTimeout));
     auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);
 
@@ -1139,6 +1163,11 @@ void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
             fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
             "cache_max_wait_ms=0");
     }
+}
+
+void WiredTigerRecoveryUnit::setOperationTimeout(Milliseconds timeout) {
+    invariant(!_isActive());
+    _operationTimeout = timeout;
 }
 
 size_t WiredTigerRecoveryUnit::getCacheDirtyBytes() {

@@ -896,6 +896,15 @@ public:
     virtual void setCacheMaxWaitTimeout(Milliseconds) {}
 
     /**
+     * Bounds every storage operation on this recovery unit's session: once exceeded, WiredTiger
+     * fails the operation with WT_ROLLBACK (surfaced as a WriteConflict/TemporarilyUnavailable
+     * error) instead of waiting indefinitely. Unlike a cache-wait bound, this also makes a
+     * read-only transaction eligible for rollback when it is stuck behind cache eviction that
+     * cannot progress. 0 disables.
+     */
+    virtual void setOperationTimeout(Milliseconds) {}
+
+    /**
      * Marks this recovery unit as exempt from participating in optional cache eviction.
      */
     virtual void optOutOfCacheEviction() {}

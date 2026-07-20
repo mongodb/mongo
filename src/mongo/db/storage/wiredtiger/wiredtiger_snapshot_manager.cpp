@@ -60,7 +60,8 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WiredTigerSession* session,
     PrepareConflictBehavior prepareConflictBehavior,
     bool roundUpPreparedTimestamps,
-    RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion) const {
+    RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion,
+    boost::optional<int64_t> operationTimeoutMs) const {
 
     auto committedSnapshot = [this]() {
         std::lock_guard<std::mutex> lock(_committedSnapshotMutex);
@@ -80,7 +81,9 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
                                     prepareConflictBehavior,
                                     roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    untimestampedWriteAssertion);
+                                    untimestampedWriteAssertion,
+                                    boost::none /* claimPreparedId */,
+                                    operationTimeoutMs);
     auto status = txnOpen.setReadSnapshot(committedSnapshot);
     fassert(30635, status);
 

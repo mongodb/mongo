@@ -166,6 +166,8 @@ public:
 
     void setCacheMaxWaitTimeout(Milliseconds) override;
 
+    void setOperationTimeout(Milliseconds) override;
+
     void optOutOfCacheEviction() override {
         // 1 is a magic number in WiredTiger that opts this thread out of all optional eviction.
         setCacheMaxWaitTimeout(Milliseconds(1));
@@ -319,6 +321,7 @@ private:
     WiredTigerStats _sessionStatsAfterLastOperation;
 
     Milliseconds _cacheMaxWaitTimeout{0};
+    Milliseconds _operationTimeout{0};
 
     // Detects any attempt to reconfigure options used by an open transaction.
     OpenSnapshotOptions _optionsUsedToOpenSnapshot;

@@ -41,7 +41,8 @@ public:
                             bool roundUpPreparedTimestamps,
                             RoundUpReadTimestamp roundUpReadTimestamp,
                             RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite,
-                            boost::optional<uint64_t> claimPreparedId = boost::none);
+                            boost::optional<uint64_t> claimPreparedId = boost::none,
+                            boost::optional<int64_t> operationTimeoutMs = boost::none);
     WiredTigerBeginTxnBlock(WiredTigerSession* session, const char* config);
     ~WiredTigerBeginTxnBlock();
 

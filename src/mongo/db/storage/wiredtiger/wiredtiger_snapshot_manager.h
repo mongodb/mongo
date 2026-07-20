@@ -47,7 +47,8 @@ public:
         WiredTigerSession* session,
         PrepareConflictBehavior prepareConflictBehavior,
         bool roundUpPreparedTimestamps,
-        RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion) const;
+        RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion,
+        boost::optional<int64_t> operationTimeoutMs = boost::none) const;
 
     /**
      * Returns lowest SnapshotName that could possibly be used by a future call to

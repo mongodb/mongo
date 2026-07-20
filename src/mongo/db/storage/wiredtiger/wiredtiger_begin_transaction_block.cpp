@@ -78,7 +78,8 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     bool roundUpPreparedTimestamps,
     RoundUpReadTimestamp roundUpReadTimestamp,
     RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite,
-    boost::optional<uint64_t> claimPreparedId)
+    boost::optional<uint64_t> claimPreparedId,
+    boost::optional<int64_t> operationTimeoutMs)
     : _session(session) {
     invariant(!_rollback);
 
@@ -98,16 +99,27 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
         compiled_config = compiledBeginTransactions[config - 1].getConfig(_session);
     }
 
-    if (claimPreparedId) {
-        // Slow path used on startup recovery to take ownership of a prepared transaction as part of
-        // the transaction.
+    if (claimPreparedId || operationTimeoutMs) {
+        // Slow path used when we need to append options that are not part of the precompiled
+        // begin_transaction configurations (e.g. claim_prepared_id or operation_timeout_ms).
         std::stringstream rawConfig;
         if (config > 0) {
             // We need to get the raw config because the compiled config is not a human readable
             // string that allows us to concatenate the claim_prepared_id.
             rawConfig << compiledBeginTransactions[config - 1].getRawConfig() << ",";
         }
-        rawConfig << fmt::format("claim_prepared_id={}", unsignedHex(*claimPreparedId));
+        if (claimPreparedId) {
+            rawConfig << fmt::format("claim_prepared_id={}", unsignedHex(*claimPreparedId));
+        }
+        if (operationTimeoutMs) {
+            if (claimPreparedId) {
+                rawConfig << ",";
+            }
+            // Bounds every operation in this transaction: once exceeded, WiredTiger fails the
+            // operation with WT_ROLLBACK instead of waiting indefinitely (e.g. in optional
+            // application eviction).
+            rawConfig << fmt::format("operation_timeout_ms={}", *operationTimeoutMs);
+        }
         std::string rawConfigStr = rawConfig.str();
         invariantWTOK(_session->begin_transaction(rawConfigStr.c_str()), *_session);
     } else {
