@@ -364,14 +364,6 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
                                                    std::shared_ptr<Timer> fromConnAcquiredTimer,
                                                    const CancellationToken& token) {
     auto msgId = nextMessageId();
-    LOGV2_DEBUG(9484002,
-                4,
-                "Sending command to peer",
-                "peer"_attr = _peer,
-                "sessionId"_attr = _session->id(),
-                "msgId"_attr = msgId,
-                "request"_attr = redact(request.body),
-                "fireAndForget"_attr = fireAndForget);
     auto requestMsg = request.serialize();
     if (fireAndForget) {
         OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
@@ -497,13 +489,6 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::awaitExhaustCommand(
 Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(
     OpMsgRequest request, const BatonHandle& baton, const CancellationToken& token) {
     auto msgId = nextMessageId();
-    LOGV2_DEBUG(9484004,
-                4,
-                "Sending exhaust command to peer",
-                "peer"_attr = _peer,
-                "sessionId"_attr = _session->id(),
-                "msgId"_attr = msgId,
-                "request"_attr = redact(request.body));
     auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kExhaustSupported);
 

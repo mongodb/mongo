@@ -155,8 +155,6 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
     if (!status.isOK())
         return status;
 
-    LOGV2_DEBUG(20197, saslLogLevel, "sasl client input", "payload"_attr = base64::encode(payload));
-
     // Create new payload for our response
     std::string responsePayload;
     status = [&] {
@@ -183,11 +181,6 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
 
     if (!status.isOK())
         return status;
-
-    LOGV2_DEBUG(20198,
-                saslLogLevel,
-                "sasl client output",
-                "payload"_attr = base64::encode(responsePayload));
 
     // Handle a done from the server which comes before the client is complete.
     const bool serverDone = inputObj[saslCommandDoneFieldName].trueValue();
