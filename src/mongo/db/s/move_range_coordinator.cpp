@@ -618,7 +618,19 @@ void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
     migrationutil::MigrationCoordinator coordinator(*doc);
     coordinator.setShardKeyPattern(
         rangedeletionutil::getShardKeyPatternFromRangeDeletionTask(opCtx, doc->getId()));
-    coordinator.completeMigration(opCtx, false);
+
+    const auto cleanupFuture = coordinator.completeMigration(opCtx, false);
+    if (cleanupFuture && _request.getWaitForDelete()) {
+        const auto cleanupStatus = cleanupFuture->getNoThrow(opCtx);
+        if (!cleanupStatus.isOK()) {
+            uasserted(
+                ErrorCodes::OrphanedRangeCleanUpFailed,
+                str::stream()
+                    << "Migration committed but failed to clean up orphans for a waitForDelete "
+                       "request due to: "
+                    << redact(cleanupStatus));
+        }
+    }
 }
 
 void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* opCtx,
