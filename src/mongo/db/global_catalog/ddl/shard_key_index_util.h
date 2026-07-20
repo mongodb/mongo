@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -19,6 +20,11 @@ namespace mongo {
 class Collection;
 class CollectionPtr;
 class IndexDescriptor;
+
+/**
+ * Returns whether an index type can be used to support a shard key.
+ */
+bool isAcceptableShardKeyIndexType(IndexType indexType);
 
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardKeyIndex {
 public:

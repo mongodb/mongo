@@ -21,6 +21,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
+#include <array>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -28,6 +30,43 @@ namespace mongo {
 namespace {
 
 constexpr int kIndexVersion = 2;
+
+struct ShardKeyIndexTypeTestCase {
+    IndexType indexType;
+    bool acceptable;
+};
+
+constexpr std::array kShardKeyIndexTypeTestCases{
+    ShardKeyIndexTypeTestCase{INDEX_BTREE, true},
+    ShardKeyIndexTypeTestCase{INDEX_COLUMN, false},
+    ShardKeyIndexTypeTestCase{INDEX_2D, false},
+    ShardKeyIndexTypeTestCase{INDEX_ENCRYPTED_RANGE, false},
+    ShardKeyIndexTypeTestCase{INDEX_HAYSTACK, false},
+    ShardKeyIndexTypeTestCase{INDEX_2DSPHERE, false},
+    ShardKeyIndexTypeTestCase{INDEX_2DSPHERE_BUCKET, false},
+    ShardKeyIndexTypeTestCase{INDEX_TEXT, false},
+    ShardKeyIndexTypeTestCase{INDEX_HASHED, true},
+    ShardKeyIndexTypeTestCase{INDEX_WILDCARD, false},
+};
+
+constexpr bool hasTestCaseForEachIndexType() {
+    for (auto indexType = INDEX_BTREE; indexType != INDEX_TYPE_COUNT;
+         indexType = static_cast<IndexType>(static_cast<int>(indexType) + 1)) {
+        int matches = 0;
+        for (const auto& testCase : kShardKeyIndexTypeTestCases) {
+            matches += testCase.indexType == indexType;
+        }
+        if (matches != 1) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static_assert(kShardKeyIndexTypeTestCases.size() == INDEX_TYPE_COUNT,
+              "Add a shard key eligibility test case for each new IndexType");
+static_assert(hasTestCaseForEachIndexType(),
+              "Add exactly one shard key eligibility test case for each new IndexType");
 
 class ShardKeyIndexUtilTest : public CatalogTestFixture {
 public:
@@ -72,6 +111,21 @@ private:
     const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.user");
     boost::optional<AutoGetCollection> _coll;
 };
+
+class ShardKeyIndexTypeTest : public unittest::Test,
+                              public testing::WithParamInterface<ShardKeyIndexTypeTestCase> {};
+
+TEST_P(ShardKeyIndexTypeTest, ShardKeyEligibility) {
+    const auto& testCase = GetParam();
+    ASSERT_EQ(isAcceptableShardKeyIndexType(testCase.indexType), testCase.acceptable);
+}
+
+INSTANTIATE_TEST_SUITE_P(AllIndexTypes,
+                         ShardKeyIndexTypeTest,
+                         testing::ValuesIn(kShardKeyIndexTypeTestCases),
+                         [](const testing::TestParamInfo<ShardKeyIndexTypeTestCase>& info) {
+                             return std::string{"IndexType_"} + toString(info.param.indexType);
+                         });
 
 TEST_F(ShardKeyIndexUtilTest, SimpleKeyPattern) {
     createIndex(BSON("key" << BSON("y" << 1) << "name"

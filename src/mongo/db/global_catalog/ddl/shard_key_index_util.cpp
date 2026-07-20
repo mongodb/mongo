@@ -74,6 +74,32 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
 
 }  // namespace
 
+bool isAcceptableShardKeyIndexType(IndexType indexType) {
+    switch (indexType) {
+        case INDEX_BTREE:
+        case INDEX_HASHED:
+            return true;
+        case INDEX_COLUMN:
+        case INDEX_2D:
+        case INDEX_ENCRYPTED_RANGE:
+        case INDEX_HAYSTACK:
+        case INDEX_2DSPHERE:
+        case INDEX_2DSPHERE_BUCKET:
+        case INDEX_TEXT:
+        case INDEX_WILDCARD:
+            return false;
+        case INDEX_TYPE_COUNT:
+            MONGO_UNREACHABLE;
+        default:
+            tasserted(12867401,
+                      str::stream()
+                          << "All index types must be explicitly classified as allowed or "
+                             "disallowed for shard key use. "
+                          << "Index type " << toString(indexType) << " is not classified.");
+    }
+    MONGO_UNREACHABLE;
+}
+
 ShardKeyIndex::ShardKeyIndex(const IndexCatalogEntry* indexEntry) : _indexEntry(indexEntry) {
     tassert(6012300,
             "The indexEntry for ShardKeyIndex(const IndexCatalogEntry* indexEntry) must not "
@@ -105,6 +131,7 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
     const int kErrorCollation = 0x08;
     const int kErrorNotPrefix = 0x10;
     const int kErrorWildcard = 0x20;
+    const int kErrorIndexType = 0x40;
     int reasons = 0;
 
     auto desc = indexEntry->descriptor();
@@ -114,11 +141,13 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         reasons |= kErrorPartial;
     }
 
+    if (!isAcceptableShardKeyIndexType(desc->getIndexType())) {
+        reasons |=
+            desc->getIndexType() == IndexType::INDEX_WILDCARD ? kErrorWildcard : kErrorIndexType;
+    }
+
     if (desc->behavesAsSparse()) {
         reasons |= kErrorSparse;
-        if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-            reasons |= kErrorWildcard;
-        }
     }
 
     if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance)) {
@@ -161,6 +190,9 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         }
         if (reasons & kErrorWildcard) {
             errors += " Index key is a wildcard index.";
+        }
+        if (reasons & kErrorIndexType) {
+            errors += " Index type cannot be used for sharding.";
         }
 
         if (errMsg) {
