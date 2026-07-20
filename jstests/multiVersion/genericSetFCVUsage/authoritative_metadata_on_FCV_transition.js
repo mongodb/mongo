@@ -3,10 +3,6 @@
  * and collection metadata, and does not block setFCV.
  *
  * TODO (SERVER-98118): Remove this test.
- *
- * @tags: [
- *   requires_fcv_90,
- * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

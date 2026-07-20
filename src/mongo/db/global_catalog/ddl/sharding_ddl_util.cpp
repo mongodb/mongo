@@ -977,6 +977,15 @@ void cloneAuthoritativeCollectionMetadataToShards(
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
 
+    // Shards that currently own no chunks, but historically owned some, must clone the metadata to
+    // be able to satisfy point in time reads.
+    cm.forEachChunk([&](const auto& chunk) {
+        for (const auto& h : chunk.getHistory()) {
+            shardIds.insert(h.getShard());
+        }
+        return true;
+    });
+
     // The DB primary must always know that a collection is tracked, even when it owns no chunks.
     shardIds.insert(primaryShardId);
 
