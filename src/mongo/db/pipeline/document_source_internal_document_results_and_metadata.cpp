@@ -3,6 +3,7 @@
 
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
@@ -15,6 +16,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
+#include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
 #include "mongo/db/query/explain_policy.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -298,33 +300,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDocumentResultsAndMet
 
 void DocumentSourceInternalDocumentResultsAndMetadata::elideMetadata() {
     _metadata = boost::none;
-    _sourceStage->skipMetadataStream();
+    if (auto* wrapper = dynamic_cast<WrappedExtensionSourceHooks*>(_sourceStage.get())) {
+        wrapper->skipMetadataStream();
+    }
 }
 
 DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetadata::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(12615007, "Expecting DocumentSource iterator pointing to this stage.", *itr == this);
-
-    // Relay the pipeline-suffix dependencies to the wrapped source. Skip on shards (which don't see
-    // merge pipeline dependencies) or when this is the last stage in the pipeline.
-    if (!getExpCtx()->getNeedsMerge() && std::next(itr) != container->end()) {
-        const auto& expCtx = getExpCtx();
-        DocumentSourceContainer suffix(std::next(itr), container->end());
-        DepsTracker suffixDeps = Pipeline::getDependenciesForContainer(
-            expCtx, suffix, DepsTracker::NoMetadataValidation{});
-        std::set<Variables::Id> varRefs;
-        for (auto next = std::next(itr); next != container->end(); ++next) {
-            (*next)->addVariableRefs(&varRefs);
-        }
-        std::set<std::string> builtinVarRefs;
-        for (const auto& [id, name] : Variables::kIdToBuiltinVarName) {
-            if (varRefs.contains(id) ||
-                (expCtx->getFromRouter() && expCtx->variables.hasValue(id))) {
-                builtinVarRefs.insert(name);
-            }
-        }
-        _sourceStage->propagatePipelineSuffixDependencies(suffixDeps, builtinVarRefs);
-    }
 
     // If metadata was already elided (e.g. by the router before serializing to shards),
     // propagate that to the source stage so it stops producing the metadata stream.

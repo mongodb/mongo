@@ -1,0 +1,38 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "qi_rules",
+    srcs = [
+        "internal_document_results_and_metadata_rules.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query/compiler/dependency_analysis:document_transformation",
+        "//src/mongo/db/query/compiler/dependency_analysis:pipeline_dependency_graph",
+        "//src/mongo/db/query/compiler/metadata:path_arrayness",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "internal_document_results_and_metadata_rules_test",
+    srcs = [
+        "internal_document_results_and_metadata_rules_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":qi_rules",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:document_source_mock",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)

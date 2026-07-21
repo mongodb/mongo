@@ -3,6 +3,7 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 #include "mongo/db/extension/host/extension_search_server_status.h"
@@ -635,7 +636,7 @@ void DocumentSourceExtensionOptimizable::applyPipelineSuffixDependencies(
     _logicalStage->applyPipelineSuffixDependencies(&deps);
 }
 
-void DocumentSourceExtensionOptimizable::propagatePipelineSuffixDependencies(
+void DocumentSourceExtensionOptimizable::applyPipelineSuffixDependencies(
     const DepsTracker& deps, const std::set<std::string>& builtinVarRefs) {
     const host_connector::PipelineDependenciesAdapter adapter(deps, builtinVarRefs);
     applyPipelineSuffixDependencies(adapter);
@@ -664,7 +665,7 @@ bool extensionApplyDependenciesPrecondition(
 
 bool extensionApplyDependenciesTransform(
     rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
-    auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
+    auto* stage = checked_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
     const host_connector::PipelineDependenciesAdapter adapter(
         ctx.getPipelineSuffixDependencies(), ctx.getBuiltInVariableRefsInPipelineSuffix());
     stage->applyPipelineSuffixDependencies(adapter);

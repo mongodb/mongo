@@ -336,3 +336,6 @@ filters:
   - "document_source_list_extensions*":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "wrapped_extension_source_hooks*":
+    approvers:
+      - 10gen/query-integration-extensions-api
