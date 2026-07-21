@@ -203,8 +203,13 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _isSearchQuery = isSearchQuery;
     _aggWithNonEmptyPipeline = aggWithNonEmptyPipeline;
 
-    _disablePlanCache = _expCtx->getQueryKnobConfiguration().getDisablePlanCache() ||
-        _expCtx->getPlanCache() == ExpressionContext::PlanCacheOptions::kDisablePlanCache;
+    _disablePlanCache =
+        // IDHACK should never be cached.
+        _expCtx->isIdHackQuery() ||
+        // The plan cache has been explicitly disabled for this query.
+        _expCtx->getPlanCache() == ExpressionContext::PlanCacheOptions::kDisablePlanCache ||
+        // Obey the caching configuration set by the user.
+        _expCtx->getQueryKnobConfiguration().getDisablePlanCache();
     _maxMatchExpressionParams = loadMaxMatchExpressionParams();
     // The tree must always be valid after normalization.
     dassert(parsed_find_command::validateAndGetAvailableMetadata(_primaryMatchExpression.get(),
