@@ -197,6 +197,8 @@ private:
         queryFrameworkCounters.incrementQueryEngineCounters(curOp);
         nonLeadingPushdownCounters.incrementCounters(
             debug.nlpMatch, debug.nlpProject, debug.nlpAddFields, debug.nlpReplaceRoot);
+        pathArraynessCounters.incrementPerQuery(debug.pathArraynessLeadingFilter,
+                                                debug.pathArraynessSimplified);
     }
 
 public:

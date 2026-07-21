@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -270,6 +271,8 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     };
 
     if (omitTraverseF) {
+        auto& opDebug = CurOp::get(state.opCtx)->debug();
+        opDebug.pathArraynessSimplified = true;
         return makeResultExpr(fieldExpr, false /* canPathBeArray */);
     }
 
@@ -422,6 +425,12 @@ void generatePredicate(MatchExpressionVisitorContext* context,
     const bool canPathBeArray = !context->canUsePathArrayness ||
         context->state.expCtx->canPathBeArrayForNss(path,
                                                     context->state.expCtx->getNamespaceString());
+
+    // Update metrics.
+    if (context->canUsePathArrayness) {
+        auto& opDebug = CurOp::get(context->state.opCtx)->debug();
+        opDebug.pathArraynessLeadingFilter = true;
+    }
 
     frame.pushExpr(generateTraverseF(frame.inputExpr.clone(),
                                      topLevelFieldSlot,
