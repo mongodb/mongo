@@ -17,6 +17,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -297,6 +298,7 @@ Status IndexBuildBlock::buildEmptyIndex(OperationContext* opCtx,
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         CollectionQueryInfo::get(collection).rebuildPathArrayness(opCtx, collection);
     }
+    join_ordering::bumpCollectionVersionForDDL(collection);
 
     return Status::OK();
 }

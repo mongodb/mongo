@@ -173,6 +173,18 @@ using JoinPlanCacheStore = PartitionedCache<JoinPlanCacheKey,
                                             JoinPlanCacheKeyPartitioner,
                                             NoopInsertionEvictionListener>;
 
+namespace join_ordering {
+/*
+ * Bumps the live 'collectionVersion' on 'writableColl' so that any join plan cached against the
+ * collection's pre-DDL state is detected as stale on the next plan cache lookup. Must be called
+ * from a strict DDL operation that holds the X lock on the collection and operates on the
+ * writable (copy-on-write) Collection clone inside the mutating WriteUnitOfWork; the bump is only
+ * published when that WUOW commits. See CollectionVersionTag's field comments for the
+ * synchronization guarantees that make the non-atomic increment safe.
+ */
+[[MONGO_MOD_PUBLIC]] void bumpCollectionVersionForDDL(Collection* writableColl);
+}  // namespace join_ordering
+
 /**
  * Global cache for join plans, keyed on a normalized join graph shape string. The cache is
  * registered as a ServiceContext decoration. The underlying PartitionedCache is internally

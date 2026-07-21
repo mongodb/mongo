@@ -382,6 +382,7 @@ mongo_cc_library(
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/matcher/doc_validation",
         "//src/mongo/db/op_observer",
+        "//src/mongo/db/query/plan_cache:join_plan_cache",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/query/virtual_collection",
         "//src/mongo/db/repl:local_oplog_info",

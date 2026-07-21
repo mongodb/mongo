@@ -23,6 +23,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -1497,6 +1498,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
     }
+    join_ordering::bumpCollectionVersionForDDL(collection);
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext* opCtx, boost::optional<Timestamp> ts) {
             _buildIsCleanedUp = true;

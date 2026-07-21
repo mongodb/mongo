@@ -15,6 +15,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -214,6 +215,7 @@ Status commit(OperationContext* opCtx,
         if (mongo::feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
             collectionQueryInfo.rebuildPathArrayness(opCtx, writableColl);
         }
+        join_ordering::bumpCollectionVersionForDDL(writableColl);
 
         audit::logCreateIndex(opCtx->getClient(),
                               &index.spec,

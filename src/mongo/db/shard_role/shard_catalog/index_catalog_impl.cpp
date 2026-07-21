@@ -40,6 +40,7 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -1483,6 +1484,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
     }
+    join_ordering::bumpCollectionVersionForDDL(collection);
     CollectionIndexUsageTrackerDecoration::write(collection).unregisterIndex(indexName);
     _deleteIndexFromDisk(opCtx, collection, indexName, std::move(ownedEntry));
 
@@ -1750,6 +1752,7 @@ const IndexCatalogEntry* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
     }
+    join_ordering::bumpCollectionVersionForDDL(collection);
 
     // Return the new entry.
     return newEntry;

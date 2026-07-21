@@ -116,6 +116,16 @@ JoinPlanCache& JoinPlanCache::get(ServiceContext* svc) {
     return *getJoinPlanCacheDecoration(svc);
 }
 
+namespace join_ordering {
+void bumpCollectionVersionForDDL(Collection* writableColl) {
+    // Safe as a plain (non-atomic) increment: the caller holds the X lock and mutates the
+    // copy-on-write Collection clone inside a WUOW, so the bumped value is only published on
+    // commit and no reader can observe a torn value. The clone copy-constructs the decoration
+    // from the currently-published Collection, so this increment yields 'previous + 1'.
+    ++JoinPlanCache::currentVersionTags(writableColl).collectionVersion;
+}
+}  // namespace join_ordering
+
 std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& mca) {
     std::vector<CollectionTag> tags;
     mca.forEach([&](const CollectionPtr& collection) {
