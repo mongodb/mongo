@@ -1272,6 +1272,32 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesCommitDecisionOnTwoCommitRes
     coordinator->shutdown();
 }
 
+// Verifies that onCompletion() is ready as soon as all network responses have been delivered,
+// with no additional call to runReadyNetworkOperations() required. Tests that wait on
+// onCompletion() after responding to all prepare and commit commands depend on this guarantee.
+TEST_F(TransactionCoordinatorTest, CompletionReadyAfterFinalNetworkResponse) {
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
+    // One call per shard:
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+
+    // _runReadyNetworkOperations_inlock loops back after yielding to the executor, draining
+    // _canceledAlarms. onCompletion() must already be resolved here.
+    ASSERT_TRUE(coordinator->onCompletion().isReady());
+
+    coordinator->onCompletion().get();
+    coordinator->shutdown();
+}
+
 TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnAbortAndCommitResponses) {
     auto coordinator = std::make_shared<TransactionCoordinator>(
         operationContext(),
