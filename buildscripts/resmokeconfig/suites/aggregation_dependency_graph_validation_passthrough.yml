@@ -31,7 +31,6 @@ selector:
     # fall back to the classic engine which does a full foreign collection scan per local document,
     # making scannedObjects counts diverge from the SBE-optimized values this test asserts.
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
-    # TODO SERVER-127304
     - jstests/aggregation/sources/project/remove_redundant_projects.js
     # This test deliberately constructs pipelines at the 1000-stage limit; injecting
     # $_internalAssertDataAssumptions stages pushes them over the limit.
