@@ -1922,7 +1922,8 @@ export class ReplSetTest {
     }
 
     /**
-     *  Blocks until the set is initialized with a primary.
+     *  Blocks until the set is initialized with a primary, then waits for step-up writes
+     *  (primary-only services + query analysis writer) to complete.
      *  TODO SERVER-124472: Determine if initiateForDisagg needs additional functionality to
      *  match ASC ReplSetTest.initiate.
      */
@@ -1931,7 +1932,12 @@ export class ReplSetTest {
 
         // Blocks until there is a primary. We use a faster retry interval here since we expect the
         // primary to be ready very soon. We also turn the failpoint off once we have a primary.
-        this.getPrimary(this.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
+        const primary = this.getPrimary(this.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
+
+        // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
+        if (this._notX509Auth(primary) || primary.isTLS()) {
+            asCluster(this, primary, () => this.waitForStepUpWrites(primary));
+        }
 
         jsTest.log(
             "ReplSetTest initiateForDisagg took " +
