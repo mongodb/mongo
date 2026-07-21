@@ -25,8 +25,7 @@ value::MaterializedRow materializeCopyOfRow(std::vector<value::SlotAccessor*>& a
 
     size_t idx = 0;
     for (auto& accessor : accessors) {
-        auto view = accessor->getViewOfValue();
-        row.reset(idx++, value::TagValueOwned::fromRaw(value::copyValue(view.tag, view.value)));
+        row.reset(idx++, accessor->getViewOfValue().copy());
     }
     return row;
 }
@@ -40,8 +39,7 @@ value::MaterializedRow materializeViewOfRow(std::vector<value::SlotAccessor*>& a
 
     size_t idx = 0;
     for (auto& accessor : accessors) {
-        auto [tag, val] = accessor->getViewOfValue();
-        row.reset(idx++, false, tag, val);
+        row.reset(idx++, accessor->getViewOfValue());
     }
     return row;
 }

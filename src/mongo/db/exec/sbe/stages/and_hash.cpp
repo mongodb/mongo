@@ -180,8 +180,7 @@ PlanState AndHashStage::getNext() {
             // Copy keys in order to do the lookup.
             size_t idx = 0;
             for (auto& p : _inInnerKeyAccessors) {
-                auto [tag, val] = p->getViewOfValue();
-                _probeKey.reset(idx++, false, tag, val);
+                _probeKey.reset(idx++, p->getViewOfValue());
             }
 
             auto [low, hi] = _ht->equal_range(_probeKey);

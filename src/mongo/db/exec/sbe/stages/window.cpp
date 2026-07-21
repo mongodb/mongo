@@ -294,7 +294,7 @@ void WindowStage::clearAccessors(
     value::MaterializedRow& row) {
     for (size_t i = 0; i < accessors.size(); i++) {
         accessors[i]->setIndex(1);
-        row.reset(i, false, value::TypeTags::Nothing, 0);
+        row.reset(i, value::TagValueView::nothing());
     }
 }
 

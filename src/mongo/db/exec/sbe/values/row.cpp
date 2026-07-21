@@ -623,7 +623,7 @@ void RowBase<RowType>::deserializeForSorterIntoRow(BufReader& buf,
     }
     for (size_t idx = 0; idx < cnt; ++idx) {
         auto [tag, val] = deserializeValue(buf, settings.collator);
-        row.reset(idx, true, tag, val);
+        row.reset(idx, TagValueOwned(tag, val));
     }
 }
 

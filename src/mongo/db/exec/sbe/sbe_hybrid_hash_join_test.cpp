@@ -34,7 +34,9 @@ namespace {
  */
 value::MaterializedRow makeKeyRow(int64_t key) {
     value::MaterializedRow row(1);
-    row.reset(0, true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(key));
+    row.reset(0,
+              value::TagValueOwned::fromRaw(value::TypeTags::NumberInt64,
+                                            value::bitcastFrom<int64_t>(key)));
     return row;
 }
 
@@ -44,7 +46,7 @@ value::MaterializedRow makeKeyRow(int64_t key) {
 value::MaterializedRow makeProjectRow(std::string_view payload) {
     auto [tag, val] = value::makeNewString(payload);
     value::MaterializedRow row(1);
-    row.reset(0, true, tag, val);
+    row.reset(0, value::TagValueOwned::fromRaw(tag, val));
     return row;
 }
 
@@ -74,7 +76,7 @@ std::vector<int64_t> drainCursor(JoinCursor& cursor) {
 value::MaterializedRow makeStringKeyRow(std::string_view key) {
     auto [tag, val] = value::makeNewString(key);
     value::MaterializedRow row(1);
-    row.reset(0, true, tag, val);
+    row.reset(0, value::TagValueOwned::fromRaw(tag, val));
     return row;
 }
 
@@ -118,8 +120,12 @@ std::vector<MatchTuple> drainCursorWithProjects(JoinCursor& cursor) {
  */
 value::MaterializedRow makeCompositeKeyRow(int64_t key1, int64_t key2) {
     value::MaterializedRow row(2);
-    row.reset(0, true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(key1));
-    row.reset(1, true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(key2));
+    row.reset(0,
+              value::TagValueOwned::fromRaw(value::TypeTags::NumberInt64,
+                                            value::bitcastFrom<int64_t>(key1)));
+    row.reset(1,
+              value::TagValueOwned::fromRaw(value::TypeTags::NumberInt64,
+                                            value::bitcastFrom<int64_t>(key2)));
     return row;
 }
 
@@ -1309,12 +1315,12 @@ TEST_F(HybridHashJoinTestFixture, SaveRestoreWithBsonCrossSlotAliasing) {
     ASSERT_LT(subDocPtr, docPtr + BSONObj(docPtr).objsize());
 
     value::MaterializedRow probeProject(2);
-    probeProject.reset(0, true, docTag, docVal);  // slot 0: owns the full-document buffer
-    probeProject.reset(
-        1,
-        false,
-        value::TypeTags::bsonObject,
-        value::bitcastFrom<const char*>(subDocPtr));  // slot 1: non-owned, inside slot 0
+    // slot 0: owns the full-document buffer
+    probeProject.reset(0, value::TagValueOwned::fromRaw(docTag, docVal));
+    // slot 1: non-owned, inside slot 0
+    probeProject.reset(1,
+                       value::TagValueView{value::TypeTags::bsonObject,
+                                           value::bitcastFrom<const char*>(subDocPtr)});
 
     auto cursor = JoinCursor::empty();
     hhj->probe(probeKey, probeProject, cursor);
@@ -1332,8 +1338,9 @@ TEST_F(HybridHashJoinTestFixture, SaveRestoreWithBsonCrossSlotAliasing) {
         ASSERT_EQ(savedTag, value::TypeTags::bsonObject);
         const char* savedDocPtr = value::bitcastTo<const char*>(savedVal);
         const char* savedSubPtr = BSONObj(savedDocPtr)["subdoc"].embeddedObject().objdata();
-        probeProject.reset(
-            1, false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(savedSubPtr));
+        probeProject.reset(1,
+                           value::TagValueView{value::TypeTags::bsonObject,
+                                               value::bitcastFrom<const char*>(savedSubPtr)});
     }
 
     // Second save: probeProject[1] now aliases into _savedProbeProject[0]'s buffer.

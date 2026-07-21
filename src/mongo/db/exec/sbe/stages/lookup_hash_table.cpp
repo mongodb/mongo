@@ -345,7 +345,7 @@ std::pair<RecordId, key_string::TypeBits> LookupHashTable::serializeKeyForRecord
     value::TagValueView key) const {
     key_string::Builder kb{key_string::Version::kLatestVersion};
     value::FixedSizeRow<1 /*N*/> row{};
-    row.reset(0, false, key.tag, key.value);
+    row.reset(0, key);
     return encodeKeyString(kb, row);
 }
 

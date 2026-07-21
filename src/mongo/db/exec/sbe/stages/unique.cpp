@@ -90,8 +90,7 @@ PlanState UniqueStage::getNext() {
         value::MaterializedRow key{_inKeyAccessors.size()};
         size_t idx = 0;
         for (auto& accessor : _inKeyAccessors) {
-            auto [tag, val] = accessor->getViewOfValue();
-            key.reset(idx++, false, tag, val);
+            key.reset(idx++, accessor->getViewOfValue());
         }
 
         ++_specificStats.dupsTested;

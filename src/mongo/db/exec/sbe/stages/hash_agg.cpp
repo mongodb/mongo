@@ -239,8 +239,7 @@ void HashAggStage::open(bool reOpen) {
             // Copy keys in order to do the lookup.
             size_t idx = 0;
             for (auto& p : _inKeyAccessors) {
-                auto [tag, val] = p->getViewOfValue();
-                key.reset(idx++, false, tag, val);
+                key.reset(idx++, p->getViewOfValue());
             }
             _htIt = _ht->find(key);
             firstDoc = false;

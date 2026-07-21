@@ -307,10 +307,10 @@ public:
             auto [_, tagNothing, valNothing] = getValue(bufIdx++, bufferLen);
             tassert(6136200, "sbe tag must be 'Boolean'", tagNothing == TypeTags::Boolean);
             if (!bitcastTo<bool>(valNothing)) {
-                row.reset(rowIdx++, false, TypeTags::Nothing, 0);
+                row.reset(rowIdx++, TagValueView::nothing());
             } else {
                 auto [owned, tag, val] = getValue(bufIdx++, bufferLen);
-                row.reset(rowIdx++, owned, tag, val);
+                row.reset(rowIdx++, TagValueMaybeOwned::fromRaw(owned, tag, val));
             }
         }
     }

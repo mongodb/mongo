@@ -198,7 +198,7 @@ TEST(ValueSerializeForSorter, Serialize) {
     value::MaterializedRow originalRow{testData->size()};
     for (size_t i = 0; i < testData->size(); i++) {
         auto [tag, value] = testData->getAt(i);
-        originalRow.reset(i, false, tag, value);
+        originalRow.reset(i, value::TagValueView{tag, value});
     }
 
     BufBuilder builder;
@@ -217,7 +217,7 @@ protected:
         value::MaterializedRow sourceRow{inputData.size()};
         auto idx = 0;
         for (auto& [tag, val] : inputData) {
-            sourceRow.reset(idx++, false, tag, val);
+            sourceRow.reset(idx++, value::TagValueView{tag, val});
         }
 
         key_string::Builder kb{key_string::Version::kLatestVersion};

@@ -99,15 +99,13 @@ public:
         // Two-pass save: collect all copies into fresh rows before freeing any old saved buffers.
         value::MaterializedRow newSavedKey(_probeKey.size());
         for (size_t i = 0; i < _probeKey.size(); ++i) {
-            auto [tag, val] = _probeKey.getViewOfValue(i);
-            newSavedKey.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
+            newSavedKey.reset(i, _probeKey.getViewOfValue(i).copy());
         }
         _savedProbeKey = std::move(newSavedKey);
 
         value::MaterializedRow newSavedProject(_probeProject.size());
         for (size_t i = 0; i < _probeProject.size(); ++i) {
-            auto [tag, val] = _probeProject.getViewOfValue(i);
-            newSavedProject.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
+            newSavedProject.reset(i, _probeProject.getViewOfValue(i).copy());
         }
         _savedProbeProject = std::move(newSavedProject);
     }
@@ -119,12 +117,10 @@ public:
         // into these buffers via its outer accessor; releasing them would leave those views
         // dangling.
         for (size_t i = 0; i < _savedProbeKey.size(); ++i) {
-            auto [tag, val] = _savedProbeKey.getViewOfValue(i);
-            _probeKey.reset(i, false, tag, val);
+            _probeKey.reset(i, _savedProbeKey.getViewOfValue(i));
         }
         for (size_t i = 0; i < _savedProbeProject.size(); ++i) {
-            auto [tag, val] = _savedProbeProject.getViewOfValue(i);
-            _probeProject.reset(i, false, tag, val);
+            _probeProject.reset(i, _savedProbeProject.getViewOfValue(i));
         }
     }
 

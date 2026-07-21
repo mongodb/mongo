@@ -181,14 +181,12 @@ PlanState HashJoinStage::getNext() {
 
                     size_t idx = 0;
                     for (auto& p : _inOuterKeyAccessors) {
-                        auto [tag, val] = p->getViewOfValue();
-                        _probeKey.reset(idx++, false, tag, val);
+                        _probeKey.reset(idx++, p->getViewOfValue());
                     }
 
                     idx = 0;
                     for (auto& p : _inOuterProjectAccessors) {
-                        auto [tag, val] = p->getViewOfValue();
-                        _probeProject.reset(idx++, false, tag, val);
+                        _probeProject.reset(idx++, p->getViewOfValue());
                     }
 
                     _joinImpl->probe(_probeKey, _probeProject, _cursor);

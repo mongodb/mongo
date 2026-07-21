@@ -70,28 +70,19 @@ public:
         }
     }
 
-    // 'idx' is the index of the column to reset.
-    void reset(size_t idx, bool own, value::TypeTags tag, value::Value val) {
-        RowType& self = *static_cast<RowType*>(this);
-        if (self.owned()[idx]) {
-            value::releaseValue(self.tags()[idx], self.values()[idx]);
-            self.owned()[idx] = false;
-        }
-        self.values()[idx] = val;
-        self.tags()[idx] = tag;
-        self.owned()[idx] = own;
+    void reset(size_t idx, value::TagValueMaybeOwned tagValue) {
+        auto [owned, tag, val] = tagValue.releaseToRaw();
+        reset_raw(idx, owned, tag, val);
     }
 
-    void reset(size_t idx, value::TagValueMaybeOwned val) {
-        auto [owned, tag, value] = val.releaseToRaw();
-        reset(idx, owned, tag, value);
+    void reset(size_t idx, value::TagValueOwned tagValue) {
+        auto [tag, val] = tagValue.releaseToRaw();
+        reset_raw(idx, true /*own*/, tag, val);
     }
 
-    void reset(size_t idx, value::TagValueOwned val) {
-        auto [tag, value] = val.releaseToRaw();
-        reset(idx, true, tag, value);
+    void reset(size_t idx, value::TagValueView tagValue) {
+        reset_raw(idx, false /*own*/, tagValue.tag, tagValue.value);
     }
-
 
     // The following methods are used by the sorter only.
     struct SorterDeserializeSettings {
@@ -126,6 +117,22 @@ public:
         boost::optional<size_t> numPrefixValsToRead = boost::none);
     void serializeIntoKeyString(key_string::Builder& builder,
                                 const CollatorInterface* collator = nullptr) const;
+
+private:
+    // Raw primitive shared by the typed reset() overloads. Callers outside RowBase must use the
+    // typed overloads (reset(TagValueView/TagValueOwned/TagValueMaybeOwned)), which encode
+    // ownership in the type and eliminate the risk of a mismatch between the 'own' flag and the
+    // actual ownership of the value.
+    // 'idx' is the index of the column to reset.
+    void reset_raw(size_t idx, bool own, value::TypeTags tag, value::Value val) {
+        RowType& self = *static_cast<RowType*>(this);
+        if (self.owned()[idx]) {
+            value::releaseValue(self.tags()[idx], self.values()[idx]);
+        }
+        self.values()[idx] = val;
+        self.tags()[idx] = tag;
+        self.owned()[idx] = own;
+    }
 
 protected:
     void release() noexcept {

@@ -108,6 +108,27 @@ public:
         }
     }
 
+    void testResetView() {
+        RowType row(N);
+        for (size_t i = 0; i < row.size(); i++) {
+            // Own the string here; hand the row only a non-owning *view* of it.
+            auto owned = value::makeNewString(longStrings[i % longStringsSize]);
+            value::ValueGuard guard(owned);
+            // Ensure pointer comparisons are meaningful (i.e. we're not in the small-string inline
+            // representation).
+            ASSERT_GT(value::getStringLength(owned.first, owned.second),
+                      value::kSmallStringMaxLength);
+            row.reset(i, value::TagValueView{owned.first, owned.second});
+            auto copied = row.copyOrMoveValue(i);
+            ASSERT_NE(value::getRawStringView(owned.first, owned.second),
+                      value::getRawStringView(copied.tag(), copied.value()));
+            verifyValue(row, i, copyValue(owned));
+        }
+        // 'row' holds only views, so its destructor must NOT free the strings;
+        // the ValueGuards free each string exactly once (a wrongful own would also
+        // trip ASAN here as a double-free).
+    }
+
     void testResize() {
         RowType row(0);
         ASSERT_EQ(row.size(), 0);
@@ -139,6 +160,7 @@ public:
         testMove();
         testAssign();
         testCopyOrMoveValue();
+        testResetView();
 
         if (allowResize) {
             testResize();
@@ -155,7 +177,7 @@ private:
     }
 
     void setValue(RowType& row, int idx, bool owned, TypedValue p) {
-        row.reset(idx, owned, p.first, p.second);
+        row.reset(idx, value::TagValueMaybeOwned::fromRaw(owned, p.first, p.second));
     }
 
     void verifyValue(RowType& row, int idx, TypedValue p) {

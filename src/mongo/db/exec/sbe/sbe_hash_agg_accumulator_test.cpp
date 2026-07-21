@@ -284,7 +284,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(
@@ -448,7 +448,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(
@@ -696,7 +696,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(
@@ -764,7 +764,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollatorSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(
@@ -862,7 +862,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEnforcesCapSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (true) {
         spillAccessor().reset(
@@ -1033,7 +1033,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(
@@ -1129,7 +1129,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCapSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (true) {
         spillAccessor().reset(
@@ -1278,7 +1278,7 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(
@@ -1463,7 +1463,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(
@@ -1623,7 +1623,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
     value::MaterializedRow mergedAggregate(1);
     value::MaterializedSingleRowAccessor mergedAggregateAccessor(mergedAggregate, 0);
     auto [tagRecovered, valRecovered] = consumePartialAggregateFromMockSpillStorage();
-    mergedAggregate.reset(0, true, tagRecovered, valRecovered);
+    mergedAggregate.reset(0, value::TagValueOwned::fromRaw(tagRecovered, valRecovered));
 
     while (!isMockSpillStorageEmpty()) {
         spillAccessor().reset(

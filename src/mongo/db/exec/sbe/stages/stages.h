@@ -150,7 +150,7 @@ public:
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
             auto [tag, val] = value::getPoisonValue();
             for (size_t idx = 0; idx < row.size(); idx++) {
-                row.reset(idx, false, tag, val);
+                row.reset(idx, value::TagValueView{tag, val});
             }
 #endif
         }

@@ -369,7 +369,7 @@ public:
     }
 
     void reset_raw(bool owned, TypeTags tag, Value val) override {
-        _it->second.reset(_slot, owned, tag, val);
+        _it->second.reset(_slot, TagValueMaybeOwned::fromRaw(owned, tag, val));
     }
 
 private:
@@ -401,7 +401,7 @@ public:
     }
 
     void reset_raw(bool owned, TypeTags tag, Value val) override {
-        _container[_it].reset(_slot, owned, tag, val);
+        _container[_it].reset(_slot, TagValueMaybeOwned::fromRaw(owned, tag, val));
     }
 
 private:
@@ -431,7 +431,7 @@ public:
         return _row.copyOrMoveValue(_slot);
     }
     void reset_raw(bool owned, TypeTags tag, Value val) override {
-        _row.reset(_slot, owned, tag, val);
+        _row.reset(_slot, TagValueMaybeOwned::fromRaw(owned, tag, val));
     }
 
 private:

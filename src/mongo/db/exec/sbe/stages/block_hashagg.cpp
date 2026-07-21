@@ -342,7 +342,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
 
         for (size_t i = 0; i < extractedGbs.size(); ++i) {
             auto [idTag, idVal] = extractedGbs[i][blockIndex];
-            key->reset(i, false, idTag, idVal);
+            key->reset(i, value::TagValueView{idTag, idVal});
         }
 
         // Set '_htIt' to point to the entry for 'key' in '_ht'.
@@ -543,7 +543,7 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenize
         // Go over each mono block and produce the output manually.
         size_t idx = 0;
         for (auto* mb : monoGbBlocks) {
-            key.reset(idx++, false, mb->getTag(), mb->getValue());
+            key.reset(idx++, value::TagValueView{mb->getTag(), mb->getValue()});
         }
 
         out.keys.push_back(std::move(key));
@@ -600,13 +600,14 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenize
                 for (size_t keyIdx = 0; keyIdx < _gbBlocks.size(); ++keyIdx) {
                     if (isMonoBlock[keyIdx]) {
                         auto* monoBlock = monoGbBlocks[monoBlockIdx];
-                        key.reset(keyIdx, false, monoBlock->getTag(), monoBlock->getValue());
+                        key.reset(keyIdx,
+                                  value::TagValueView{monoBlock->getTag(), monoBlock->getValue()});
                         ++monoBlockIdx;
                     } else {
                         const size_t originalTokenId = _tokenInfos[nonMonoBlockIdx].idxs[i];
                         dassert(originalTokenId < _deblockedTokens[nonMonoBlockIdx].count());
                         auto [t, v] = _deblockedTokens[nonMonoBlockIdx][originalTokenId];
-                        key.reset(keyIdx, false, t, v);
+                        key.reset(keyIdx, value::TagValueView{t, v});
                         ++nonMonoBlockIdx;
                     }
                 }

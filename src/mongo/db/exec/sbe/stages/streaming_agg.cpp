@@ -153,8 +153,7 @@ void StreamingAggStage::open(bool reOpen) {
 void StreamingAggStage::readInKey() {
     size_t idx = 0;
     for (auto& accessor : _inKeyAccessors) {
-        auto [tag, val] = accessor->getViewOfValue();
-        _inOutKey.reset(idx++, false, tag, val);
+        _inOutKey.reset(idx++, accessor->getViewOfValue());
     }
 }
 

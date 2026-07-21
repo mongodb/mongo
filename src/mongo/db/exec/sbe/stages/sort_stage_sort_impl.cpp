@@ -85,8 +85,7 @@ public:
 
             size_t idx = 0;
             for (auto accessor : _inKeyAccessors) {
-                auto [tag, val] = accessor->getViewOfValue();
-                keys.reset(idx++, false, tag, val);
+                keys.reset(idx++, accessor->getViewOfValue());
             }
 
             // Do not allocate the values here, instead let the sorter decide, since the sorter may
@@ -95,8 +94,7 @@ public:
                 ValueRow vals{_inValueAccessors.size()};
                 size_t idx = 0;
                 for (auto accessor : _inValueAccessors) {
-                    auto [tag, val] = accessor->getViewOfValue();
-                    vals.reset(idx++, false, tag, val);
+                    vals.reset(idx++, accessor->getViewOfValue());
                 }
                 return vals;
             });
