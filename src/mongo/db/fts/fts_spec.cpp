@@ -202,6 +202,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
         // a frequently occuring term? or does it only show up once in
         // a long block of text?
 
+        tassert(12942700, "numTokens must be positive", numTokens > 0);
         double coeff = (0.5 * data.count / numTokens) + 0.5;
 
         // if term is identical to the raw form of the
