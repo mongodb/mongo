@@ -173,10 +173,13 @@ public:
                 const auto fcvSnapshot = (*fixedFcv).acquireFCVSnapshot();
                 // (Generic FCV reference): To run this command and ensure the consistency of
                 // the metadata we need to make sure we are on a stable state.
+                //
+                // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals
+                // via the isFcvTransitionInProgress() function.
                 uassert(ErrorCodes::CommandNotSupported,
                         "Resharding is not supported during FCV changes, please wait for the FCV "
                         "change to complete.",
-                        !fcvSnapshot.isUpgradingOrDowngrading());
+                        !isFcvTransitionInProgress(fixedFcv));
 
                 // We only want to use provenance in resharding if FCV is latest but it's still
                 // possible for a mongos on a higher fcv to send a reshard collection request to a
