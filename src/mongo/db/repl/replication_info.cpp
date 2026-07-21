@@ -260,9 +260,9 @@ public:
             result.append("userWriteBlockMode", state);
             result.append("userWriteBlockReason", reason);
             GlobalUserWriteBlockState::get(opCtx)->appendUserWriteBlockModeCounters(result);
-            result.append("replicaSetWriteBlock", replicaSetState);
+            result.append("replicaSetWritesBlock", replicaSetState);
             if (replicaSetReason) {
-                result.append("replicaSetWriteBlockReason", *replicaSetReason);
+                result.append("replicaSetWritesBlockReason", *replicaSetReason);
             }
             ReplicaSetWriteBlockState::get(opCtx)->appendReplicaSetWritesBlockCounters(result);
             ReplicaSetWriteBlockState::get(opCtx)->appendReplicaSetWriteBlockRejectionMetrics(

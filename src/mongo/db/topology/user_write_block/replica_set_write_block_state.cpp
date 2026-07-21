@@ -61,15 +61,15 @@ void ReplicaSetWriteBlockState::checkReplicaSetWritesAllowed(
     if (!writesAllowed) {
         switch (opType) {
             case ReplicaSetWriteBlockRejectedWriteOp::kInsert:
-                _replicaSetWriteBlockRejectedInserts.fetchAndAdd(1);
+                _replicaSetWritesBlockRejectedInserts.fetchAndAdd(1);
                 break;
             case ReplicaSetWriteBlockRejectedWriteOp::kUpdate:
-                _replicaSetWriteBlockRejectedUpdates.fetchAndAdd(1);
+                _replicaSetWritesBlockRejectedUpdates.fetchAndAdd(1);
                 break;
         }
         uasserted(
             ErrorCodes::ReplicaSetWritesBlocked,
-            fmt::format("Replica set write blocked, reason: {}", idl::serialize(info.reason)));
+            fmt::format("Replica set writes blocked, reason: {}", idl::serialize(info.reason)));
     }
 }
 
@@ -97,7 +97,9 @@ Status ReplicaSetWriteBlockState::checkIfConvertToCappedAllowedToStart(
         !nss.isOnInternalDb()) {
         return Status(
             ErrorCodes::ReplicaSetWritesBlocked,
-            fmt::format("convertToCapped blocked, reason: {}", idl::serialize(info.reason)));
+            fmt::format(
+                "convertToCapped blocked because replica set writes are blocked, reason: {}",
+                idl::serialize(info.reason)));
     }
     return Status::OK();
 }
@@ -117,7 +119,7 @@ void ReplicaSetWriteBlockState::checkReplicaSetDeletionsAllowed(OperationContext
         nss.isSystemDotProfile();
     if (!deletesAllowed) {
         const auto info = _writeBlockInfo.load();
-        _replicaSetWriteBlockRejectedDeletes.fetchAndAdd(1);
+        _replicaSetWritesBlockRejectedDeletes.fetchAndAdd(1);
         uasserted(
             ErrorCodes::ReplicaSetWritesBlocked,
             fmt::format("Replica set writes blocked, reason: {}", idl::serialize(info.reason)));
@@ -152,11 +154,11 @@ void ReplicaSetWriteBlockState::appendReplicaSetWriteBlockRejectionMetrics(
     BSONObjBuilder& bob) const {
     BSONObjBuilder sub(bob.subobjStart("replicaSetWritesBlockRejected"));
     sub.appendNumber("inserts",
-                     static_cast<long long>(_replicaSetWriteBlockRejectedInserts.load()));
+                     static_cast<long long>(_replicaSetWritesBlockRejectedInserts.load()));
     sub.appendNumber("updates",
-                     static_cast<long long>(_replicaSetWriteBlockRejectedUpdates.load()));
+                     static_cast<long long>(_replicaSetWritesBlockRejectedUpdates.load()));
     sub.appendNumber("deletes",
-                     static_cast<long long>(_replicaSetWriteBlockRejectedDeletes.load()));
+                     static_cast<long long>(_replicaSetWritesBlockRejectedDeletes.load()));
 }
 
 

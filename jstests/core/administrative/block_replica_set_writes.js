@@ -134,9 +134,9 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         // After both invocations complete, the block should be disabled (the second invocation ran last).
         const replStatus = assert.commandWorked(this.replicaSetPrimaryAdminDB.serverStatus()).repl;
         assert.eq(
-            replStatus.replicaSetWriteBlock,
+            replStatus.replicaSetWritesBlock,
             1,
-            "replicaSetWriteBlock metric should be 1 (Disabled) after the serialized disable completes",
+            "replicaSetWritesBlock metric should be 1 (Disabled) after the serialized disable completes",
         );
     });
 
@@ -784,12 +784,12 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             );
             // The build must fail because of write blocking. This surfaces in one of two ways: the
             // in-progress build is aborted with a "Write blocking" reason (IndexBuildAborted), or the
-            // build's setup write is rejected outright with "Replica set write blocked"
+            // build's setup write is rejected outright with "Replica set writes blocked"
             // (ReplicaSetWritesBlocked) when the build restarts after the block is already enabled
             // (e.g. when a concurrent FCV change interrupts the paused build).
             assert(
                 res.errmsg.includes("Write blocking") ||
-                    res.errmsg.includes("Replica set write blocked"),
+                    res.errmsg.includes("Replica set writes blocked"),
                 "Unexpected index build failure reason",
                 {res},
             );

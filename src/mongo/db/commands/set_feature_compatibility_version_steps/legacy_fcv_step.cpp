@@ -354,12 +354,12 @@ private:
     static void _uassertReplicaSetWritesNotBlocked(OperationContext* opCtx, bool isUpgrade) {
         uassert(ErrorCodes::ReplicaSetWritesBlocked,
                 isUpgrade
-                    ? "Cannot upgrade while replica set write blocking is enabled. Replica set "
-                      "write blocking must be disabled before upgrading. You probably reached disk "
-                      "full on some of your nodes. Please contact support."
-                    : "Cannot downgrade while replica set write blocking is enabled. Replica set "
-                      "write blocking must be disabled before downgrading. You probably reached "
-                      "disk full on some of your nodes. Please contact support.",
+                    ? "Cannot upgrade while replica set writes are blocked. Replica set writes "
+                      "must be unblocked before upgrading. You probably reached disk full on some "
+                      "of your nodes. Please contact support."
+                    : "Cannot downgrade while replica set writes are blocked. Replica set writes "
+                      "must be unblocked before downgrading. You probably reached disk full on "
+                      "some of your nodes. Please contact support.",
                 !ReplicaSetWriteBlockState::get(opCtx)->isReplicaSetWriteBlockingEnabled());
     }
 

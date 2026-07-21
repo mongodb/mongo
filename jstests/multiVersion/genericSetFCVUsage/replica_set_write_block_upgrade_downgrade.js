@@ -39,7 +39,7 @@ function runUpgrade(setFcvAdminDB) {
 function assertSetFcvBlocked(fcvResult) {
     assert.commandFailedWithCode(fcvResult, ErrorCodes.ReplicaSetWritesBlocked);
     assert(
-        fcvResult.errmsg.includes("replica set write blocking is enabled"),
+        fcvResult.errmsg.includes("replica set writes are blocked"),
         "Error message should mention the replica set write block",
         {fcvResult},
     );

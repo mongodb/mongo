@@ -132,14 +132,14 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         // Check replica set write block, reason, and command counter metrics when blockReplicaSetWrites is enabled.
         let replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
         assert.eq(
-            replStatus.replicaSetWriteBlock,
+            replStatus.replicaSetWritesBlock,
             2,
-            "replicaSetWriteBlock metric should be 2 (Enabled)",
+            "replicaSetWritesBlock metric should be 2 (Enabled)",
         );
         assert.eq(
-            replStatus.replicaSetWriteBlockReason,
+            replStatus.replicaSetWritesBlockReason,
             0,
-            "replicaSetWriteBlockReason metric should be 0 (InsufficientDiskSpace)",
+            "replicaSetWritesBlockReason metric should be 0 (InsufficientDiskSpace)",
         );
         assert.eq(
             replStatus.replicaSetWritesBlockCounters.InsufficientDiskSpace,
@@ -156,13 +156,13 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         // Check replica set write block, reason, and command counter when blockReplicaSetWrites is disabled.
         replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
         assert.eq(
-            replStatus.replicaSetWriteBlock,
+            replStatus.replicaSetWritesBlock,
             1,
-            "replicaSetWriteBlock metric should be 1 (Disabled)",
+            "replicaSetWritesBlock metric should be 1 (Disabled)",
         );
         assert(
-            !replStatus.hasOwnProperty("replicaSetWriteBlockReason"),
-            "replicaSetWriteBlockReason should be absent when replica set write block is disabled",
+            !replStatus.hasOwnProperty("replicaSetWritesBlockReason"),
+            "replicaSetWritesBlockReason should be absent when replica set write block is disabled",
         );
         assert.eq(
             replStatus.replicaSetWritesBlockCounters.InsufficientDiskSpace,
