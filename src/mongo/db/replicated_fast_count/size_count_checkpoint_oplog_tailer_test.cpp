@@ -204,9 +204,18 @@ TEST_F(OplogTailerTest, RetriesScanOnWriteConflict) {
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
 }
 
+TEST_F(OplogTailerTest, LastBufferedRidNotFound) {
+    unittest::ServerParameterGuard featureFlag("featureFlagSizeBasedOplogTruncationForDisagg",
+                                               false);
+    SizeCountCheckpointBuffer buffer(oplogUuid(), RecordId(1));
+    bufferNewOplogEntries(_opCtx, buffer);
+}
+
 using OplogTailerDeathTest = OplogTailerTest;
 
 DEATH_TEST_F(OplogTailerDeathTest, LastBufferedRidNotFound, "12101812") {
+    unittest::ServerParameterGuard featureFlag("featureFlagSizeBasedOplogTruncationForDisagg",
+                                               true);
     SizeCountCheckpointBuffer buffer(oplogUuid(), RecordId(1));
     bufferNewOplogEntries(_opCtx, buffer);
 }

@@ -41,20 +41,35 @@ boost::optional<OplogScanResult> SizeCountCheckpointBuffer::checkoutForFlush() {
 
 void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
     std::lock_guard lk(_mutex);
+    boost::optional<Record> record;
     // The boost::none state means we have not buffered any oplog entries yet.
     if (_lastBufferedRid.has_value()) {
-        tassert(12101812,
+        // Size-based oplog truncation should never truncate the last buffered record ID.
+        // Time-based oplog truncation can truncate the last buffered record ID, so we relax this
+        // assertion until SERVER-131791.
+        // TODO(SERVER-131842): Assert this unconditionally.
+        if (gFeatureFlagSizeBasedOplogTruncationForDisagg.isEnabled()) {
+            tassert(
+                12101812,
                 str::stream() << "Unable to find oplog start point for next size count checkpoint"
                               << ", lastBufferedRid: "
                               << _lastBufferedRid.value().toStringHumanReadable(),
                 cursor.seekExact(_lastBufferedRid.value()));
+            record = cursor.next();
+        } else {
+            record = cursor.seek(_lastBufferedRid.value(),
+                                 SeekableRecordCursor::BoundInclusion::kExclude);
+        }
+    } else {
+        record = cursor.next();
     }
 
     // We advance lastBufferedRid on each iteration so that if cursor.next() throws a
     // WriteConflictException, the caller can resume scanning after the last consumed record.
-    while (const auto rec = cursor.next()) {
-        _pending->consumeRecord(*rec);
-        _lastBufferedRid = rec->id;
+    while (record) {
+        _pending->consumeRecord(*record);
+        _lastBufferedRid = record->id;
+        record = cursor.next();
     }
 }
 
