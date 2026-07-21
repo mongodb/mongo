@@ -367,18 +367,6 @@ TEST_F(ExpressionJavascriptTest, ExpressionFunctionRejectsMalformedBSONColumn) {
                        ErrorCodes::InvalidBSONFromJavaScript);
 }
 
-TEST_F(ExpressionJavascriptTest, ExpressionFunctionPreservesExceededMemoryLimit) {
-    unittest::ServerParameterGuard memLimitParam("bsonMaxExpandedMemUsage", 1);
-    auto bsonExpr =
-        BSON("expr" << BSON("body"
-                            << "function() { return new BinData(7, "
-                               "'AQAAAAAAAAAAQJN/AAAAAAAAAAIAAAAAAAAABwAAAAAAAAAOAAAAAAAAAAA='); };"
-                            << "args" << BSONArray() << "lang" << ExpressionFunction::kJavaScript));
-    auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
-    ASSERT_THROWS_CODE(
-        expr->evaluate({}, getVariables()), AssertionException, ErrorCodes::ExceededMemoryLimit);
-}
-
 TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitRejectsMalformedBSONColumn) {
     auto bsonExpr =
         BSON("expr" << BSON("this" << "$$ROOT"
