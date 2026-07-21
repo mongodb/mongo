@@ -505,16 +505,34 @@ ElementRep ElementRep::makeDefaultRep() {
 // Returns the offset of 'elt' within 'object' as a uint32_t. The element must be part
 // of the object or the behavior is undefined.
 uint32_t getElementOffset(const BSONObj& object, const BSONElement& elt) {
-    invariant(!elt.eoo());
-    const char* const objRaw = object.objdata();
-    const char* const eltRaw = elt.rawdata();
-    invariant(eltRaw < objRaw + object.objsize());
-    const ptrdiff_t offset = eltRaw - objRaw;
-    // BSON documents express their size as an int32_t so we should always be able to
-    // express the offset as a uint32_t.
-    invariant(offset > 0);
-    invariant(offset <= std::numeric_limits<int32_t>::max());
-    invariant(offset + elt.size() <= object.objsize());
+    // NOTE: Using <=> rather than <= because spaceship correctly handles mixed sign compares.
+    //       This doesn't really matter since max() should be positive, but avoids warnings.
+    static_assert((std::numeric_limits<decltype(object.objsize())>::max() <=>
+                   std::numeric_limits<uint32_t>::max()) <= 0);
+    static_assert((std::numeric_limits<decltype(elt.size())>::max() <=>
+                   std::numeric_limits<uint32_t>::max()) <= 0);
+
+    // Check the validity of 'object' and 'elt' while carefully avoiding undefined behavior. Both
+    // the object size and element size are read from the contents of the object and element
+    // (respectively) and can take on any int32_t value, including negative values. This check
+    // requires that the object's and element's data pointers both belong to the same memory
+    // allocation to be properly defined.
+    //
+    // Ensure that 0 < element size, that the element pointer is bounded on the left by the
+    // object pointer, and that the end of the element is bounded on the right by the end of the
+    // object (according to the element's and object's sizes). Writing 'offset + elementSize <=
+    // objsize' in ptrdiff_t subsumes the size check and avoids signed overflow. When the element
+    // and object size are both 32-bit, this invariant also guarantees that the offset
+    // (elt.rawdata() - object.objdata()) is within the bounds of a uint32_t.
+    //
+    // Because this function is on the hot path of some important workloads, we group all checks
+    // into a single invariant call. The offset and element size are hoisted out of the return
+    // statement.
+    const auto offset = elt.rawdata() - object.objdata();
+    const int elementSize = elt.size();
+    invariant(!elt.eoo() && elementSize > 0 && offset > 0 &&
+              offset + elementSize <= object.objsize());
+
     return static_cast<uint32_t>(offset);
 }
 
