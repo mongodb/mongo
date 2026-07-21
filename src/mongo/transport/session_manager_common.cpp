@@ -460,7 +460,8 @@ SessionManagerCommon::SessionStats SessionManagerCommon::getSessionStats() const
 
 void SessionManagerCommon::onClientConnect(Client* client) {
     auto session = client->session();
-    if (session && session->isLoadBalancerPeer()) {
+    // isLoadBalancerPeer can only be set here if the clientIsLoadBalancedPeer failpoint is enabled.
+    if (MONGO_unlikely(session && session->isLoadBalancerPeer())) {
         _loadBalancedSessions.increment();
     }
     if (session && session->isConnectedToPriorityPort()) {
