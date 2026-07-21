@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop_bson_helpers.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_settings.h"
@@ -1111,6 +1112,17 @@ void CurOp::reportState(BSONObjBuilder* builder,
 
         curop_bson_helpers::appendObjectTruncatingAsNecessary(
             "command", redactedCommandBuilder.done(), maxQuerySize, *builder);
+    } else if (_command) {
+        // Apply the command's own field-level redaction (the same the slow-query log uses) so this
+        // diagnostic output stays consistent with the log.
+        mutablebson::Document cmdToLog(obj, mutablebson::Document::kInPlaceDisabled);
+        _command->snipForLogging(&cmdToLog);
+        curop_bson_helpers::appendObjectTruncatingAsNecessary(
+            "command", cmdToLog.getObject(), maxQuerySize, *builder);
+    } else if (isCommand()) {
+        // No resolved Command* for this command; report it as "unrecognized" rather than echoing
+        // the request, consistent with the slow-query log.
+        builder->append("command", "unrecognized");
     } else {
         curop_bson_helpers::appendObjectTruncatingAsNecessary(
             "command", obj, maxQuerySize, *builder);
