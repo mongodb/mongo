@@ -35,11 +35,14 @@ function assertSetQuerySettingsByQueryValidationFailure(qsutils, queryInstance) 
     assert.commandFailedWithCode(res, [1064380]);
 }
 
-function assertQuerySettingsRejectFlagIsNotApplied(qsutils, queryInstance) {
+// Verifies that reject query settings applied to 'queryInstanceForSettings' do not affect
+// 'queryToRun'. This is used to confirm that rawData=true queries have a distinct query shape hash
+// and are therefore unaffected by settings applied to the base (rawData absent) shape.
+function assertQuerySettingsRejectFlagIsNotApplied(qsutils, queryInstanceForSettings, queryToRun) {
     const db = qsutils._db;
-    const queryShapeHash = qsutils.getQueryShapeHashFromExplain(queryInstance);
+    const queryShapeHash = qsutils.getQueryShapeHashFromExplain(queryInstanceForSettings);
     qsutils.withQuerySettings(queryShapeHash, {reject: true}, () => {
-        const cmdObj = qsutils.withoutDollarDB(queryInstance);
+        const cmdObj = qsutils.withoutDollarDB(queryToRun);
         assert.commandWorked(db.runCommand(cmdObj));
     });
 }
@@ -83,18 +86,21 @@ describe("setQuerySettings commands against", function () {
             ...this.findQueryInstance,
             ...rawDataOpt(true),
         });
-        // TODO SERVER-112940: Enable this test after the find command is updated to include the rawData parameter in its query shape hash calculation.
-        // assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, {...this.findQueryInstance, ...rawDataOpt(true)});
+        // Query settings applied to the base shape (rawData absent) must not affect rawData=true
+        // queries, since rawData=true produces a distinct query shape hash.
+        assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, this.findQueryInstance, {
+            ...this.findQueryInstance,
+            ...rawDataOpt(true),
+        });
     });
 
-    // TODO SERVER-112940: Enable this test after the find command is updated to include the rawData parameter in the query shape hash calculation.
-    // it("find commands with different rawData values should have different query shape hashes", function () {
-    //     assertQueriesHaveDifferetQueryShapeHashes(
-    //         this.qsutils,
-    //         {...this.findQueryInstance, ...rawDataOpt(false)},
-    //         {...this.findQueryInstance, ...rawDataOpt(true)},
-    //     );
-    // });
+    it("find commands with different rawData values should have different query shape hashes", function () {
+        assertQueriesHaveDifferetQueryShapeHashes(
+            this.qsutils,
+            {...this.findQueryInstance, ...rawDataOpt(false)},
+            {...this.findQueryInstance, ...rawDataOpt(true)},
+        );
+    });
 
     it("aggregate commands with rawData=false should apply query settings", function () {
         assertQuerySettingsRejectFlagIsSuccesfullyApplied(this.qsutils, {
@@ -108,18 +114,21 @@ describe("setQuerySettings commands against", function () {
             ...this.aggQueryInstance,
             ...rawDataOpt(true),
         });
-        // TODO SERVER-112940: Enable this test after the aggregate command is updated to include the rawData parameter in its query shape hash calculation.
-        // assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, {...this.aggQueryInstance, ...rawDataOpt(true)});
+        // Query settings applied to the base shape (rawData absent) must not affect rawData=true
+        // queries, since rawData=true produces a distinct query shape hash.
+        assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, this.aggQueryInstance, {
+            ...this.aggQueryInstance,
+            ...rawDataOpt(true),
+        });
     });
 
-    // TODO SERVER-112940: Enable this test after the aggregate command is updated to include the rawData parameter in the query shape hash computation.
-    // it("aggregate commands with different rawData values should have different query shape hashes", function () {
-    //     assertQueriesHaveDifferetQueryShapeHashes(
-    //         this.qsutils,
-    //         {...this.aggQueryInstance, ...rawDataOpt(false)},
-    //         {...this.aggQueryInstance, ...rawDataOpt(true)},
-    //     );
-    // });
+    it("aggregate commands with different rawData values should have different query shape hashes", function () {
+        assertQueriesHaveDifferetQueryShapeHashes(
+            this.qsutils,
+            {...this.aggQueryInstance, ...rawDataOpt(false)},
+            {...this.aggQueryInstance, ...rawDataOpt(true)},
+        );
+    });
 
     it("distinct commands with rawData=false should apply query settings", function () {
         assertQuerySettingsRejectFlagIsSuccesfullyApplied(this.qsutils, {
@@ -133,16 +142,19 @@ describe("setQuerySettings commands against", function () {
             ...this.distinctQueryInstance,
             ...rawDataOpt(true),
         });
-        // TODO SERVER-112940: Enable this test after the distinct command is updated to include the rawData parameter in its query shape hash calculation.
-        // assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, {...this.distinctQueryInstance, ...rawDataOpt(true)});
+        // Query settings applied to the base shape (rawData absent) must not affect rawData=true
+        // queries, since rawData=true produces a distinct query shape hash.
+        assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, this.distinctQueryInstance, {
+            ...this.distinctQueryInstance,
+            ...rawDataOpt(true),
+        });
     });
 
-    // TODO SERVER-112940: Enable this test after the distinct command is updated to include the rawData parameter in its query shape hash calculation.
-    // it("distinct commands with different rawData values should have different query shape hashes", function () {
-    //     assertQueriesHaveDifferetQueryShapeHashes(
-    //         this.qsutils,
-    //         {...this.distinctQueryInstance, ...rawDataOpt(false)},
-    //         {...this.distinctQueryInstance, ...rawDataOpt(true)},
-    //     );
-    // });
+    it("distinct commands with different rawData values should have different query shape hashes", function () {
+        assertQueriesHaveDifferetQueryShapeHashes(
+            this.qsutils,
+            {...this.distinctQueryInstance, ...rawDataOpt(false)},
+            {...this.distinctQueryInstance, ...rawDataOpt(true)},
+        );
+    });
 });

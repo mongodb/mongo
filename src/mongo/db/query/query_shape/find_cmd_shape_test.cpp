@@ -15,7 +15,6 @@ namespace mongo::query_shape {
 
 namespace {
 /**
- * TODO this was stolen from another test. Time for a library?
  * Simplistic redaction strategy for testing which appends the field name to the prefix "REDACT_".
  */
 std::string applyHmacForTest(std::string_view sd) {
@@ -33,6 +32,7 @@ struct RequestOptions {
     OptionalBool tailable = {};
     OptionalBool awaitData = {};
     OptionalBool mirrored = {};
+    OptionalBool rawData = {};
     OptionalBool limit = {};
     OptionalBool skip = {};
 };
@@ -90,10 +90,11 @@ public:
         fcr->setSingleBatch(requestOptions.singleBatch);
         fcr->setAllowDiskUse(requestOptions.allowDiskUse);
         fcr->setReturnKey(requestOptions.returnKey);
-        fcr->setAllowDiskUse(requestOptions.showRecordId);
+        fcr->setShowRecordId(requestOptions.showRecordId);
         fcr->setTailable(requestOptions.tailable);
         fcr->setAwaitData(requestOptions.awaitData);
         fcr->setMirrored(requestOptions.mirrored);
+        fcr->setRawData(requestOptions.rawData);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
         return std::make_unique<FindCmdShapeComponents>(*parsedFind, _expCtx);
     }
@@ -165,12 +166,18 @@ TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToTrue) {
     fcr->setAwaitData(true);
     fcr->setMirrored(true);
     fcr->setOplogReplay(true);
+    fcr->setRawData(true);
     fcr->setLimit(1);
     fcr->setSkip(1);
     auto&& parsedRequest =
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
-    ASSERT_EQUALS(0x2FFFF, getShapeComponents(*cmdShape).optionalArgumentsEncoding());
+    // optionalArgumentsEncoding() uses 18 bits: 8 flags × 2 bits at positions 2-17 (the loop
+    // shifts each flag left after ORing, so the first flag singleBatch lands at bits 16-17 and
+    // the last flag oplogReplay at bits 2-3), plus limit at bit 1 and skip at bit 0.
+    // rawData is NOT part of this value; it is encoded separately in sha256Hash.
+    ASSERT_EQUALS((0b1011'1111'1111'1111 << 2) | 0b11,
+                  getShapeComponents(*cmdShape).optionalArgumentsEncoding());
 }
 
 TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
@@ -183,10 +190,88 @@ TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
     fcr->setAwaitData(false);
     fcr->setMirrored(false);
     fcr->setOplogReplay(false);
+    fcr->setRawData(false);
     auto&& parsedRequest =
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
-    ASSERT_EQUALS(0x2AAA8, getShapeComponents(*cmdShape).optionalArgumentsEncoding());
+    // 8 flags × 0b10 (false) = 16 bits, shifted left 2 for limit/skip = 18 bits. No skip/limit.
+    ASSERT_EQUALS(0b1010101010101010 << 2,
+                  getShapeComponents(*cmdShape).optionalArgumentsEncoding());
+}
+
+TEST_F(FindCmdShapeTest, RawDataTrueAppearsInShape) {
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setRawData(true);
+    auto&& parsedRequest =
+        uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
+
+    ASSERT_TRUE(cmdShape->rawData);
+
+    auto shapeBson =
+        cmdShape->toBson(_expCtx->getOperationContext(),
+                         SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                         SerializationContext::stateDefault());
+    ASSERT_TRUE(shapeBson.hasField(FindCommandRequest::kRawDataFieldName));
+    ASSERT_TRUE(shapeBson[FindCommandRequest::kRawDataFieldName].boolean());
+}
+
+TEST_F(FindCmdShapeTest, RawDataAbsentOrFalseNotInShape) {
+    // rawData=false is normalized to absent: it does not change the query shape.
+    for (auto rawDataVal : {boost::optional<bool>{}, boost::optional<bool>{false}}) {
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        if (rawDataVal.has_value()) {
+            fcr->setRawData(*rawDataVal);
+        }
+        auto&& parsedRequest =
+            uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+        auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
+
+        ASSERT_FALSE(cmdShape->rawData);
+
+        auto shapeBson =
+            cmdShape->toBson(_expCtx->getOperationContext(),
+                             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                             SerializationContext::stateDefault());
+        ASSERT_FALSE(shapeBson.hasField(FindCommandRequest::kRawDataFieldName));
+    }
+}
+
+TEST_F(FindCmdShapeTest, RawDataDifferentiatesQueryShape) {
+    auto makeShape = [&](boost::optional<bool> rawData) {
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(BSON("x" << 1));
+        if (rawData.has_value()) {
+            fcr->setRawData(*rawData);
+        }
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+        return std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+    };
+
+    auto shapeNoRawData = makeShape(boost::none);
+    auto shapeRawDataTrue = makeShape(true);
+    auto shapeRawDataFalse = makeShape(false);
+
+    // rawData=absent and rawData=false should produce the same hash (false does not change shape).
+    // rawData=true should be distinct from both.
+    auto hashNone = shapeNoRawData->sha256Hash(nullptr, SerializationContext{});
+    auto hashTrue = shapeRawDataTrue->sha256Hash(nullptr, SerializationContext{});
+    auto hashFalse = shapeRawDataFalse->sha256Hash(nullptr, SerializationContext{});
+
+    ASSERT_NE(hashNone.toHexString(), hashTrue.toHexString());
+    ASSERT_EQ(hashNone.toHexString(), hashFalse.toHexString());
+    ASSERT_NE(hashTrue.toHexString(), hashFalse.toHexString());
+}
+
+TEST_F(FindCmdShapeTest, RawDataPreservedInToFindCommandRequest) {
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setRawData(true);
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto cmdShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+
+    auto roundTripped = cmdShape->toFindCommandRequest();
+    ASSERT_TRUE(roundTripped->getRawData().has_value());
+    ASSERT_TRUE(bool(roundTripped->getRawData()));
 }
 
 

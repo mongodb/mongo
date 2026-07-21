@@ -23,8 +23,13 @@ size_t CountCmdShapeComponents::size() const {
     return sizeof(CountCmdShapeComponents) + representativeQuery.objsize();
 }
 
-CountCmdShape::CountCmdShape(const ParsedFindCommand& find, const bool hasLimit, const bool hasSkip)
-    : Shape(find.findCommandRequest->getNamespaceOrUUID(), find.findCommandRequest->getCollation()),
+CountCmdShape::CountCmdShape(const ParsedFindCommand& find,
+                             const bool hasLimit,
+                             const bool hasSkip,
+                             const bool rawData)
+    : Shape(find.findCommandRequest->getNamespaceOrUUID(),
+            find.findCommandRequest->getCollation(),
+            rawData),
       components(find, hasLimit, hasSkip) {}
 
 const CmdSpecificShapeComponents& CountCmdShape::specificComponents() const {
@@ -80,9 +85,15 @@ QueryShapeHash CountCmdShape::sha256Hash(OperationContext*, const SerializationC
 
     // 16-bit command options word. Use 0th bit as an indicator whether the command specification
     // includes a namespace or a UUID of a collection. The remaining bits are reserved for encoding
-    // command options in the future.
-    const std::uint16_t commandOptions = nssOrUUID.isNamespaceString() ? 0 : 1;
-    countCommandShapeBuffer.appendNum(static_cast<short>(commandOptions));
+    // command-specific options in the future.
+    countCommandShapeBuffer.appendNum(static_cast<short>(nssOrUUID.isNamespaceString() ? 0 : 1));
+
+    // Common command options (e.g. rawData) are appended as a separate word, and only when one of
+    // them is set, so that commands without any common options keep their historical hashes. See
+    // Shape::commonOptionsWord() for the bit layout.
+    if (const auto commonOptions = commonOptionsWord()) {
+        countCommandShapeBuffer.appendNum(static_cast<short>(commonOptions));
+    }
 
     auto nssDataRange = nssOrUUID.asDataRange();
     countCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());

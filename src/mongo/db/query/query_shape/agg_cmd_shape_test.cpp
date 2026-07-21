@@ -15,7 +15,6 @@
 
 using namespace std::literals::string_view_literals;
 
-using namespace std::literals::string_view_literals;
 namespace mongo::query_shape {
 
 namespace {
@@ -53,10 +52,14 @@ public:
     std::unique_ptr<AggCmdShape> makeShapeFromPipeline(
         std::vector<std::string_view> stagesJson,
         boost::optional<std::string_view> letJson = boost::none,
-        boost::optional<std::string_view> collationJson = boost::none) {
+        boost::optional<std::string_view> collationJson = boost::none,
+        boost::optional<bool> rawData = boost::none) {
 
         auto aggRequest = makeAggregateCommandRequest(
             std::move(stagesJson), std::move(letJson), std::move(collationJson));
+        if (rawData.has_value()) {
+            aggRequest->setRawData(*rawData);
+        }
 
         auto parsedPipeline = pipeline_factory::makePipeline(
             aggRequest->getPipeline(), _expCtx, pipeline_factory::kOptionsMinimal);
@@ -70,6 +73,9 @@ public:
     std::unique_ptr<AggCmdShapeComponents> makeShapeComponentsFromPipeline(
         std::vector<std::string_view> stagesJson, OptionalBool allowDiskUse = {}) {
         auto aggRequest = makeAggregateCommandRequest(std::move(stagesJson));
+        if (allowDiskUse.has_value()) {
+            aggRequest->setAllowDiskUse(bool(allowDiskUse));
+        }
 
         auto parsedPipeline = pipeline_factory::makePipeline(
             aggRequest->getPipeline(), _expCtx, pipeline_factory::kOptionsMinimal);
@@ -266,5 +272,47 @@ TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeWithAndWithoutCollation) {
         {R"({$match: {x: 3}})"sv, R"({$limit: 2})"sv}, boost::none, R"({locale: "en_US"})"sv);
     ASSERT_LT(shapeWithoutCollation->size(), shapeWithCollation->size());
 }
+
+TEST_F(AggCmdShapeTest, RawDataTrueAppearsInShape) {
+    auto shape = makeShapeFromPipeline({R"({$match: {x: 1}})"}, {}, {}, true);
+
+    auto shapeBson = shape->toBson(_operationContext.get(),
+                                   SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                                   SerializationContext::stateDefault());
+    ASSERT_TRUE(shapeBson.hasField(AggregateCommandRequest::kRawDataFieldName));
+    ASSERT_TRUE(shapeBson[AggregateCommandRequest::kRawDataFieldName].boolean());
+}
+
+TEST_F(AggCmdShapeTest, RawDataAbsentOrFalseNotInShape) {
+    // rawData=false is normalized to absent: it does not change the query shape.
+    for (auto rawDataVal : {boost::optional<bool>{}, boost::optional<bool>{false}}) {
+        auto shape = makeShapeFromPipeline({R"({$match: {x: 1}})"}, {}, {}, rawDataVal);
+
+        ASSERT_FALSE(shape->rawData);
+
+        auto shapeBson =
+            shape->toBson(_operationContext.get(),
+                          SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                          SerializationContext::stateDefault());
+        ASSERT_FALSE(shapeBson.hasField(AggregateCommandRequest::kRawDataFieldName));
+    }
+}
+
+TEST_F(AggCmdShapeTest, RawDataDifferentiatesQueryShape) {
+    auto shapeNoRawData = makeShapeFromPipeline({R"({$match: {x: 1}})"});
+    auto shapeRawDataTrue = makeShapeFromPipeline({R"({$match: {x: 1}})"}, {}, {}, true);
+    auto shapeRawDataFalse = makeShapeFromPipeline({R"({$match: {x: 1}})"}, {}, {}, false);
+
+    auto hashNone = shapeNoRawData->sha256Hash(_operationContext.get(), SerializationContext{});
+    auto hashTrue = shapeRawDataTrue->sha256Hash(_operationContext.get(), SerializationContext{});
+    auto hashFalse = shapeRawDataFalse->sha256Hash(_operationContext.get(), SerializationContext{});
+
+    // rawData=absent and rawData=false should produce the same hash (false does not change shape).
+    // rawData=true should be distinct from both.
+    ASSERT_NE(hashNone.toHexString(), hashTrue.toHexString());
+    ASSERT_EQ(hashNone.toHexString(), hashFalse.toHexString());
+    ASSERT_NE(hashTrue.toHexString(), hashFalse.toHexString());
+}
+
 }  // namespace
 }  // namespace mongo::query_shape

@@ -29,7 +29,8 @@ const CmdSpecificShapeComponents& DistinctCmdShape::specificComponents() const {
 DistinctCmdShape::DistinctCmdShape(const ParsedDistinctCommand& distinct,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Shape(distinct.distinctCommandRequest->getNamespaceOrUUID(),
-            distinct.distinctCommandRequest->getCollation().get_value_or(BSONObj())),
+            distinct.distinctCommandRequest->getCollation().get_value_or(BSONObj()),
+            distinct.distinctCommandRequest->getRawData().value_or(false)),
       components(distinct, expCtx) {}
 
 void DistinctCmdShape::appendCmdSpecificShapeComponents(
@@ -70,9 +71,15 @@ QueryShapeHash DistinctCmdShape::sha256Hash(OperationContext*, const Serializati
 
     // 16-bit command options word. Use 0th bit as an indicator whether the command specification
     // includes a namespace or a UUID of a collection. The remaining bits are reserved for encoding
-    // command options in the future.
-    const std::uint16_t commandOptions = nssOrUUID.isNamespaceString() ? 0 : 1;
-    distinctCommandShapeBuffer.appendNum(static_cast<short>(commandOptions));
+    // command-specific options in the future.
+    distinctCommandShapeBuffer.appendNum(static_cast<short>(nssOrUUID.isNamespaceString() ? 0 : 1));
+
+    // Common command options (e.g. rawData) are appended as a separate word, and only when one of
+    // them is set, so that commands without any common options keep their historical hashes. See
+    // Shape::commonOptionsWord() for the bit layout.
+    if (const auto commonOptions = commonOptionsWord()) {
+        distinctCommandShapeBuffer.appendNum(static_cast<short>(commonOptions));
+    }
     auto nssDataRange = nssOrUUID.asDataRange();
     distinctCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
 

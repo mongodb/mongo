@@ -207,6 +207,8 @@ std::unique_ptr<FindCommandRequest> FindCmdShape::toFindCommandRequest() const {
         fcr->setMirrored(bool(_components.mirrored));
     if (_components.oplogReplay.has_value())
         fcr->setOplogReplay(bool(_components.oplogReplay));
+    if (rawData)
+        fcr->setRawData(rawData);
 
     // Common shape components.
     if (_components.let.hasLet)
@@ -221,7 +223,8 @@ std::unique_ptr<FindCommandRequest> FindCmdShape::toFindCommandRequest() const {
 FindCmdShape::FindCmdShape(const ParsedFindCommand& findRequest,
                            const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Shape(findRequest.findCommandRequest->getNamespaceOrUUID(),
-            findRequest.findCommandRequest->getCollation()),
+            findRequest.findCommandRequest->getCollation(),
+            findRequest.findCommandRequest->getRawData().value_or(false)),
       _components(findRequest, expCtx) {}
 
 void FindCmdShape::appendCmdSpecificShapeComponents(
@@ -259,6 +262,13 @@ QueryShapeHash FindCmdShape::sha256Hash(OperationContext*, const SerializationCo
     // whether the command specification includes a namespace or a UUID of a collection.
     findCommandShapeBuffer.appendNum(_components.optionalArgumentsEncoding() << 1 |
                                      (nssOrUUID.isNamespaceString() ? 1 : 0));
+
+    // Common command options (e.g. rawData) are appended as a separate word, and only when one of
+    // them is set, so that commands without any common options keep their historical hashes. See
+    // Shape::commonOptionsWord() for the bit layout.
+    if (const auto commonOptions = commonOptionsWord()) {
+        findCommandShapeBuffer.appendNum(static_cast<short>(commonOptions));
+    }
     auto nssDataRange = nssOrUUID.asDataRange();
     findCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
     findCommandShapeBuffer.appendBuf(_components.min.objdata(), _components.min.objsize());
