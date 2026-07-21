@@ -12,7 +12,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
-#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
@@ -23,11 +22,13 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/list_indexes_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -367,9 +368,13 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
         // This spawns a new thread and returns immediately once the index build has been
         // registered with the IndexBuildsCoordinator.
         try {
-            auto indexBuildMethod = (index_builds::primary_driven::enabled(opCtx.get())
-                                         ? IndexBuildMethodEnum::kPrimaryDriven
-                                         : IndexBuildMethodEnum::kHybrid);
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            auto indexBuildMethod =
+                ((fcvSnapshot.isVersionInitialized() &&
+                  mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                      VersionContext::getDecoration(opCtx.get()), fcvSnapshot))
+                     ? IndexBuildMethodEnum::kPrimaryDriven
+                     : IndexBuildMethodEnum::kHybrid);
 
             IndexBuildsCoordinator::get(opCtx.get())
                 ->applyStartIndexBuild(opCtx.get(),

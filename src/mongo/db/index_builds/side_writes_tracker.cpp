@@ -14,7 +14,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/index_build_interceptor_gen.h"
-#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/side_writes_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -25,6 +24,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_unit.h"
@@ -86,7 +86,11 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
     std::vector<RecordId> rids;
     rs.reserveRecordIds(opCtx, *shard_role_details::getRecoveryUnit(opCtx), &rids, toInsert.size());
 
-    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(opCtx);
+    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
 
     LOGV2_DEBUG(20691,
                 2,
@@ -94,7 +98,7 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                 "numRecords"_attr = toInsert.size(),
                 "index"_attr = indexCatalogEntry->descriptor()->indexName());
 
-    if (primaryDrivenIndexBuildEnabled) {
+    if (primaryDrivenFeatureFlagEnabled) {
         invariant(rs.keyFormat() == KeyFormat::Long);
         IntegerKeyedContainer& container =
             std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
@@ -241,8 +245,6 @@ Status SideWritesTracker::drainWritesIntoIndex(
     invariant(kBatchMaxMB <= std::numeric_limits<int32_t>::max() / kMB);
     const int32_t kBatchMaxBytes = kBatchMaxMB * kMB;
 
-    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(opCtx);
-
     // In a single WriteUnitOfWork, scan the side table up to the batch or memory limit, apply
     // the keys to the index, and delete the side table records. Returns true if the cursor has
     // reached the end of the table, false if there are more records, and an error Status
@@ -259,7 +261,14 @@ Status SideWritesTracker::drainWritesIntoIndex(
         // concern. And thus will observe data that can be rolled back via replication.
         shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
 
-        WriteUnitOfWork wuow(opCtx);
+        // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+        auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot);
+        WriteUnitOfWork wuow(opCtx,
+                             primaryDrivenFeatureFlagEnabled ? WriteUnitOfWork::kGroupForTransaction
+                                                             : WriteUnitOfWork::kDontGroup);
 
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
@@ -326,7 +335,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         // Delete documents from the side table as soon as they have been inserted into the
         // index. This ensures that no key is ever inserted twice and no keys are skipped.
         for (const auto& recordId : recordsAddedToIndex) {
-            if (primaryDrivenIndexBuildEnabled) {
+            if (primaryDrivenFeatureFlagEnabled) {
                 IntegerKeyedContainer& container =
                     std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer())
                         .get();

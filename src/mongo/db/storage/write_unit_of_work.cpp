@@ -9,6 +9,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 
 #include <ostream>
@@ -19,13 +21,10 @@
 namespace mongo {
 namespace {
 
-const auto getOplogGroupingPolicy =
-    ServiceContext::declareDecoration<std::unique_ptr<OplogGroupingPolicy>>();
-
 /**
  * Returns the grouping type to be used, converting kDontGroup to a batched mode for a top-level
- * WriteUnitOfWork if the operation is not a multi-document transaction and oplog entry grouping is
- * enabled. The chosen mode depends on whether the write is retryable:
+ * WriteUnitOfWork if the operation is not a multi-document transaction and primary-driven index
+ * builds are enabled. The chosen mode depends on whether the write is retryable:
  *   - retryable write -> kGroupForAtomicWrite (single retryable statement, applied atomically).
  *   - otherwise       -> kGroupForTransaction (atomic batched write without session info).
  *
@@ -41,7 +40,12 @@ WriteUnitOfWork::OplogEntryGroupType getGroupType(OperationContext* opCtx,
         return groupType;
     }
 
-    if (!OplogGroupingPolicy::get(opCtx->getServiceContext()).shouldGroupOplogEntries(opCtx)) {
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool pdibEnabled = fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
+
+    if (!pdibEnabled) {
         return groupType;
     }
 
@@ -52,19 +56,6 @@ WriteUnitOfWork::OplogEntryGroupType getGroupType(OperationContext* opCtx,
 }
 
 }  // namespace
-
-OplogGroupingPolicy& OplogGroupingPolicy::get(ServiceContext* svc) {
-    auto& policy = getOplogGroupingPolicy(svc);
-    if (policy) {
-        return *policy;
-    }
-    static OplogGroupingPolicy defaultPolicy;
-    return defaultPolicy;
-}
-
-void OplogGroupingPolicy::set(ServiceContext* svc, std::unique_ptr<OplogGroupingPolicy> policy) {
-    getOplogGroupingPolicy(svc) = std::move(policy);
-}
 
 WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupOplogEntries)
     : _opCtx(opCtx),

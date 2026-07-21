@@ -20,7 +20,6 @@
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
-#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/multi_key_path_tracker.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_unit.h"
@@ -792,7 +792,11 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     const KeyStringSet keySet{keyString};
 
-    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(opCtx);
+    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
     if (opType == IndexBuildInterceptor::Op::kInsert) {
         int64_t numInserted;
         auto status = insertKeysAndUpdateMultikeyPaths(
@@ -807,8 +811,8 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
             std::move(onDuplicateKey),
             &numInserted,
             IncludeDuplicateRecordId::kOff,
-            primaryDrivenIndexBuildEnabled ? ContainerWriteBehavior::kReplicate
-                                           : ContainerWriteBehavior::kDoNotReplicate);
+            primaryDrivenFeatureFlagEnabled ? ContainerWriteBehavior::kReplicate
+                                            : ContainerWriteBehavior::kDoNotReplicate);
         if (!status.isOK()) {
             return status;
         }
@@ -826,8 +830,8 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                        {keySet.begin(), keySet.end()},
                        options,
                        &numDeleted,
-                       primaryDrivenIndexBuildEnabled ? ContainerWriteBehavior::kReplicate
-                                                      : ContainerWriteBehavior::kDoNotReplicate);
+                       primaryDrivenFeatureFlagEnabled ? ContainerWriteBehavior::kReplicate
+                                                       : ContainerWriteBehavior::kDoNotReplicate);
         if (!s.isOK()) {
             return s;
         }

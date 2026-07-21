@@ -324,7 +324,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/metadata_consistency_validation:metadata_consistency_types_idl",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/index_builds:multi_index_block",
-        "//src/mongo/db/index_builds/primary_driven:enabled",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:batched_write_context",
         "//src/mongo/db/op_observer:op_observer_impl",

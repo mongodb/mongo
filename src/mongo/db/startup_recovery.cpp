@@ -19,7 +19,6 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/multi_index_block.h"
-#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/primary_driven/registry.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/rebuild_indexes.h"
@@ -552,7 +551,10 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
         return;
     }
 
-    if (index_builds::primary_driven::enabled(opCtx)) {
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot)) {
         for (auto&& [buildUUID, entry] : reconcileResult.indexBuildsToRestart) {
             std::vector<IndexBuildInfo> builds;
             builds.reserve(entry.indexSpecsAndIdents.size());

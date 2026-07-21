@@ -11,23 +11,6 @@
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
-class ServiceContext;
-
-/**
- * Determines whether a WriteUnitOfWork should group its oplog entries into a single commit
- * timestamp. Registered per ServiceContext to avoid a dependency cycle between this library and
- * higher-level code that makes the actual determination.
- */
-class [[MONGO_MOD_OPEN]] OplogGroupingPolicy {
-public:
-    virtual ~OplogGroupingPolicy() = default;
-    virtual bool shouldGroupOplogEntries(OperationContext* opCtx) const {
-        return false;
-    }
-
-    static OplogGroupingPolicy& get(ServiceContext* svc);
-    static void set(ServiceContext* svc, std::unique_ptr<OplogGroupingPolicy> policy);
-};
 
 /**
  * The WriteUnitOfWork is an RAII type that begins a storage engine write unit of work on both the

@@ -44,6 +44,10 @@ bool shouldReplicateRangeTruncates(const rss::PersistenceProvider&, const Versio
  */
 bool shouldSetIsTimeseriesField(const VersionContext& vCtx);
 
+/**
+ * Returns true if gFeatureFlagPrimaryDrivenIndexBuilds is enabled.
+ */
+bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx);
 
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,

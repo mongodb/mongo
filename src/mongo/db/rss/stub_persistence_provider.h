@@ -48,7 +48,9 @@ public:
     }
 
     bool mustUsePrimaryDrivenIndexBuilds() const override {
-        return false;
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::mustUsePrimaryDrivenIndexBuilds() method not implemented");
     }
 
     bool mustUseContainerWrites() const override {
