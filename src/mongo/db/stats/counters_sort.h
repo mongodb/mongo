@@ -42,8 +42,8 @@ extern SortCounters sortCounters;
 class FileSpillingMetrics {
 public:
     // Current on-disk size of temporary spill files on the local dbpath.
-    Atomic64Metric& fileSpilledStorageSize =
-        *MetricBuilder<Atomic64Metric>{"query.spilling.fileSpilledStorageSize"};
+    Counter64& fileSpilledStorageSize =
+        *MetricBuilder<Counter64>{"query.spilling.fileSpilledStorageSize"};
 };
 extern FileSpillingMetrics fileSpillingMetrics;
 
