@@ -56,3 +56,13 @@ multiversion_setup(
     name = "last-lts",
     version = "last-lts",
 )
+
+multiversion_setup(
+    name = "last-patch",
+    target_compatible_with = select(
+        {
+            "//conditions:default": ["@platforms//:incompatible"],  # last-patch download requires additional configuration, SERVER-131473
+        },
+    ),
+    version = "last-patch",
+)

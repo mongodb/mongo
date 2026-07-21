@@ -13,6 +13,7 @@
 # python buildscripts/resmoke.py run --suites=core
 
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
 
 resmoke_suite_test(
     name = "aggregation_dependency_graph_validation_passthrough",
@@ -247,6 +248,290 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "jscore",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "json_schema",
+    config = "//buildscripts/resmokeconfig:suites/json_schema.yml",
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_classic",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_classic.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_sharding",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_sharding.yml",
+    shard_count = 2,
+    tags = [
+        "blocked_in_join_opt_variant",
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_tester_self_test",
+    config = "//buildscripts/resmokeconfig:suites/query_tester_self_test.yml",
+    data = [
+        "//src/mongo/db/query/query_tester/tests/selfTests/testlib:all_python_files",
+    ],
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Resolution of the `testlib` module fails: "ModuleNotFoundError: No module named 'testlib'"
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_cbr_automatic_cost_choice",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_cbr_automatic_cost_choice.yml",
+    tags = [
+        "blocked_in_query_alias",
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_cbr_automatic_no_multiplanning_results",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_cbr_automatic_no_multiplanning_results.yml",
+    tags = [
+        "blocked_in_query_alias",
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_expression_optimization_fuzzer_tests",
+    extra_args = [
+        "--diffTestingMode",
+        "optimization",
+    ],
+    npm_command = "agg-expr-fuzzer",
+    num_generated_files = 400,
+    target_compatible_with = select(
+        {
+            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
+        },
+    ),
+)
+
+resmoke_suite_test(
+    name = "aggregation_expression_optimization_fuzzer",
+    srcs = [":aggregation_expression_optimization_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    tags = [
+        "aggfuzzer",
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",
+        "random_name",
+        "require_npm",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_optimization_fuzzer_tests",
+    extra_args = [
+        "--diffTestingMode",
+        "optimization",
+        "--numPipelines=3000",
+    ],
+    npm_command = "agg-fuzzer",
+    num_generated_files = 400,
+    target_compatible_with = select(
+        {
+            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
+        },
+    ),
+)
+
+resmoke_suite_test(
+    name = "aggregation_optimization_fuzzer",
+    srcs = [":aggregation_optimization_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    tags = [
+        "aggfuzzer",
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",
+        "optimization",
+        "random_name",
+        "require_npm",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_1",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_2",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_3",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_4",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_manual_test",
+    config = "//buildscripts/resmokeconfig:suites/query_tester_manual_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Tests fail with "Permission denied": Failed to open file
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # The query_tester test kind treats each directory under manual_tests/ as a
+    # single test case. srcs auto-derive to those directories; directory
+    # granularity writes each as a test while still tracking its multiple files as inputs.
+    test_root_granularity = "directory",
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_explain_v3_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/core_explain_v3_passthrough.yml",
+    shard_count = 4,
+    tags = [
+        "blocked_in_query_alias",
+        "ci-default",
     ],
     deps = [
         "//src/mongo/db:mongod",

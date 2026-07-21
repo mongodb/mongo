@@ -721,3 +721,108 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "concurrency_sharded_with_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_with_config_shard.yml",
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "cluster_scalability_only",
+        "common",
+        "concurrency",
+        "read_concern_maj",
+        "resources:cpu:2",
+        "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_with_balancer_and_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_with_balancer_and_config_shard.yml",
+    shard_count = 33,
+    tags = [
+        "ci-release-critical",
+        "cluster_scalability_only",
+        "common",
+        "concurrency",
+        "read_concern_maj",
+        "resources:cpu:2",
+        "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fcv_upgrade_downgrade_sharded_collections_jscore_passthrough",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/fcv_upgrade_downgrade_sharded_collections_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "requires_replicated_fast_count_recovery",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_retryable_writes",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_retryable_writes.yml",
+    shard_count = 44,
+    tags = [
+        "ci-default",
+        "jscore",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fcv_upgrade_downgrade_sharding_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/fcv_upgrade_downgrade_sharding_jscore_passthrough.yml",
+    shard_count = 49,
+    tags = [
+        "ci-default",
+        "requires_replicated_fast_count_recovery",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

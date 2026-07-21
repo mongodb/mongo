@@ -40,6 +40,9 @@ RESMOKE_FUNCS = frozenset(
 BAZEL_TAG_PREFIX = "bazel:"
 BAZEL_NONE = "none"  # the value after the prefix, i.e. the full tag is 'bazel:none'
 
+# Evergreen tags that mark a task as running in the commit-queue / required variants.
+CRITICAL_EVERGREEN_TAGS = frozenset({"default", "release_critical"})
+
 TAG_EQUIVALENCES = {
     "default": "ci-default",
     "release_critical": "ci-release-critical",
@@ -141,8 +144,35 @@ class Violation:
 
 class TagRule(ABC):
     @abstractmethod
-    def check(self, task: EvergreenTask, target: BazelTarget) -> list[Violation]:
-        pass
+    def check(self, task: EvergreenTask, target: BazelTarget | None = None) -> list[Violation]:
+        """Return violations for a task.
+
+        Rules in TAG_RULES compare a task against a resolved Bazel `target`. Rules in TASK_RULES
+        inspect the task's own 'bazel:*' labels and are called once per task with `target=None`.
+        """
+
+
+class CriticalTasksMustMapToTarget(TagRule):
+    """A task tagged 'default' or 'release_critical' must map to a resmoke_suite_test target
+    (e.g. 'bazel://jstests/suites/foo:bar').
+    """
+
+    @staticmethod
+    def applies(task: EvergreenTask) -> bool:
+        """Whether the task is critical yet opts out of Bazel coverage with 'bazel:none'."""
+        return bool(task.tags & CRITICAL_EVERGREEN_TAGS) and task.labels == {BAZEL_NONE}
+
+    def check(self, task: EvergreenTask, target: BazelTarget | None = None) -> list[Violation]:
+        if not self.applies(task):
+            return []
+        critical = sorted(task.tags & CRITICAL_EVERGREEN_TAGS)
+        return [
+            Violation(
+                f"{task.ref}: task '{task.name}' is tagged {critical} but maps to 'bazel:none'; "
+                "default/release_critical tasks must map to a real resmoke_suite_test target "
+                "(bazel://pkg:target)"
+            )
+        ]
 
 
 class EvergreenTagsMustBeOnTarget(TagRule):
@@ -179,10 +209,14 @@ class TargetTagsMustBeOnEvergreen(TagRule):
         ]
 
 
+# Rules that compare a task against a resolved Bazel target.
 TAG_RULES: tuple[TagRule, ...] = (
     EvergreenTagsMustBeOnTarget(),
     TargetTagsMustBeOnEvergreen(),
 )
+
+# Rules that inspect a task's own 'bazel:*' labels (no target needed), run once per task.
+TASK_RULES: tuple[TagRule, ...] = (CriticalTasksMustMapToTarget(),)
 
 
 class TaskResult:
@@ -192,6 +226,7 @@ class TaskResult:
         self.task = task
         self.violations: list[str] = []
         self.needs_bazel_tag = False
+        self.needs_real_target = False  # critical task that maps to 'bazel:none'
         self.evergreen_tags_to_add: set[str] = set()
         self.target_tags_to_add: dict[str, set[str]] = {}
 
@@ -206,6 +241,12 @@ def check_task(task: dict, source: Path, label_to_tags: dict[str, set[str]]) -> 
         result.violations.append(f"{evg.ref}: task '{evg.name}' has no 'bazel:*' tag")
         result.needs_bazel_tag = True
         return result
+
+    # Task-level rules: inspect the task's own labels (e.g. 'bazel:none' coverage requirements).
+    for rule in TASK_RULES:
+        for violation in rule.check(evg):
+            result.violations.append(violation.message)
+    result.needs_real_target = CriticalTasksMustMapToTarget.applies(evg)
 
     # Precondition: bazel:none must be used alone.
     if BAZEL_NONE in evg.labels:
@@ -565,21 +606,33 @@ def main() -> int:
     violations = [v for r in results for v in r.violations]
 
     missing_tag = [r.task for r in results if r.needs_bazel_tag]
+    needs_real_target = [r.task for r in results if r.needs_real_target]
 
     def print_missing_tag_snippets() -> None:
-        print(
-            f"\n{len(missing_tag)} task(s) are missing a 'bazel:*' tag (not auto-fixable). Create "
-            "the suite target (snippet below) and tag the task, or add 'bazel:none':\n"
-        )
-        for task in missing_tag:
-            print(f"# --- {task.name} ---")
-            print(resmoke_suite_test_snippet(task))
-            print()
+        if missing_tag:
+            print(
+                f"\n{len(missing_tag)} task(s) are missing a 'bazel:*' tag (not auto-fixable). "
+                "Create the suite target (snippet below) and tag the task, or add 'bazel:none':\n"
+            )
+            for task in missing_tag:
+                print(f"# --- {task.name} ---")
+                print(resmoke_suite_test_snippet(task))
+                print()
+        if needs_real_target:
+            print(
+                f"\n{len(needs_real_target)} default/release_critical task(s) map to 'bazel:none' "
+                "but must map to a real target (not auto-fixable). Create the suite target (snippet "
+                "below) and tag the task with its 'bazel://...' label:\n"
+            )
+            for task in needs_real_target:
+                print(f"# --- {task.name} ---")
+                print(resmoke_suite_test_snippet(task))
+                print()
 
     if not args.fix:
         for v in violations:
             print(f"  {v}")
-        if missing_tag:
+        if missing_tag or needs_real_target:
             print_missing_tag_snippets()
         if violations:
             print(
@@ -618,7 +671,11 @@ def main() -> int:
 
     # Report everything --fix could not resolve. Unknown-target and bazel:none-mixing violations
     # need a hand edit; without printing them here, --fix would exit non-zero with no explanation.
-    not_auto_fixable = [v for v in violations if "references unknown" in v or "mixes" in v]
+    not_auto_fixable = [
+        v
+        for v in violations
+        if "references unknown" in v or "mixes" in v or "must map to a real" in v
+    ]
     if manual:
         print(f"\n{len(manual)} Bazel target tag issue(s) require manual fixing:")
         for m in manual:
@@ -627,11 +684,11 @@ def main() -> int:
         print(f"\n{len(not_auto_fixable)} issue(s) require manual fixing:")
         for v in not_auto_fixable:
             print(f"  {v}")
-    if missing_tag:
+    if missing_tag or needs_real_target:
         print_missing_tag_snippets()
 
     # The run fails if anything remains unresolved after fixing.
-    return 1 if (manual or not_auto_fixable or missing_tag) else 0
+    return 1 if (manual or not_auto_fixable or missing_tag or needs_real_target) else 0
 
 
 if __name__ == "__main__":

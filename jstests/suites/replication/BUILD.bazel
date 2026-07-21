@@ -14,6 +14,7 @@
 
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
+load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
 
 resmoke_suite_test(
     name = "causally_consistent_read_concern_snapshot_passthrough",
@@ -1059,6 +1060,252 @@ resmoke_suite_test(
         "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "bulk_write_multi_op_causally_consistent_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/bulk_write_multi_op_causally_consistent_jscore_passthrough.yml",
+    shard_count = 5,
+    tags = [
+        "bulk_write",
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # During fixture setup, "WiredTiger error message": /tmp/rtt7nlqa/job1/resmoke/node0/index-8cd4e295-f7a6-4d3d-8e18-9d4e568b569f.wt handle-open "No such file or directory"
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "magic_restore_replica_sets_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/magic_restore_replica_sets_jscore_passthrough.yml",
+    shard_count = 5,
+    tags = [
+        "ci-default",
+        "magic_restore",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "magic_restore_sharding_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/magic_restore_sharding_jscore_passthrough.yml",
+    shard_count = 7,
+    tags = [
+        "ci-default",
+        "magic_restore",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "magic_restore_sharded_collections_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/magic_restore_sharded_collections_jscore_passthrough.yml",
+    shard_count = 10,
+    tags = [
+        "ci-default",
+        "magic_restore",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_local_read_write_multi_stmt_txn",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_local_read_write_multi_stmt_txn.yml",
+    shard_count = 30,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary.yml",
+    shard_count = 40,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "kill_terminate",
+        "requires_replicated_fast_count_recovery",
+        "resources:cpu:2",
+        "sharded",
+        "stepdowns",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "feature_flag_multiversion",
+    config = "//buildscripts/resmokeconfig:suites/feature_flag_multiversion.yml",
+    tags = [
+        "ci-default",
+        "multiversion",
+        "no_multiversion_generate_tasks",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multiversion",
+    config = "//buildscripts/resmokeconfig:suites/multiversion.yml",
+    multiversion_deps = [
+        "//bazel/resmoke/multiversion:last-continuous",
+        "//bazel/resmoke/multiversion:last-lts",
+    ],
+    shard_count = 9,
+    tags = [
+        "ci-default",
+        "future_git_tag_incompatible",
+        "incompatible_with_bazel_remote_test",  # Suite has many unique test failures when run with sandboxed, remote execution
+        "multiversion",
+        "no_multiversion_generate_tasks",
+        "requires_replicated_fast_count_recovery",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_auth",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_auth.yml",
+    shard_count = 15,
+    tags = [
+        "auth",
+        "ci-release-critical",
+        "common",
+        "replica_sets",
+        "san",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "initial_sync_fuzzer_sanity_patch_tests",
+    npm_command = "initsync-fuzzer",
+    num_generated_files = 2,
+    target_compatible_with = select(
+        {
+            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
+        },
+    ),
+)
+
+resmoke_suite_test(
+    name = "initial_sync_fuzzer_sanity_patch",
+    srcs = [":initial_sync_fuzzer_sanity_patch_tests"],
+    config = "//buildscripts/resmokeconfig:suites/initial_sync_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",
+        "random_name",
+        "require_npm",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+[
+    resmoke_suite_test(
+        name = suite_name,
+        config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/{}.yml".format(suite_name),
+        data = [
+            "//jstests/libs/config_files:set_replsetname.json",
+        ],
+        multiversion_deps = [
+            "//bazel/resmoke/multiversion:{}".format(multiversion),
+        ],
+        resmoke_args = [
+            "--runNoFeatureFlagTests",
+        ],
+        shard_count = 23,
+        tags = [
+            "ci-default",
+            "future_git_tag_incompatible",
+            "multiversion",
+            "random_multiversion_ds",
+            "resources:cpu:2",
+        ],
+        deps = [
+            "//src/mongo/db:mongod",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+            "//src/mongo/tools/mongobridge_tool:mongobridge",
+        ],
+    )
+    for suite_name, multiversion in {
+        "replica_sets_last_lts": "last-lts",
+        "replica_sets_last_continuous": "last-continuous",
+    }.items()
+]
+
+jstestfuzz_generate(
+    name = "rollback_fuzzer_sanity_patch_tests",
+    npm_command = "rollback-fuzzer",
+    num_generated_files = 2,
+    target_compatible_with = select(
+        {
+            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
+        },
+    ),
+)
+
+resmoke_suite_test(
+    name = "rollback_fuzzer_sanity_patch",
+    srcs = [":rollback_fuzzer_sanity_patch_tests"],
+    config = "//buildscripts/resmokeconfig:suites/rollback_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",
+        "random_name",
+        "require_npm",
+        "rollbackfuzzer",
+    ],
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",

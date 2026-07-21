@@ -284,7 +284,7 @@ def query_targets_to_burn_in(
         for test in tests_changed:
             if test in exclusions["selector"].get(test_kind, {}).get("exclude_tests", []):
                 continue
-            if not _test_matches_roots(test, config["selector"].get("roots", [])):
+            if not _test_matches_roots(test, (config.get("selector") or {}).get("roots") or []):
                 continue
 
             burn_in_target = (

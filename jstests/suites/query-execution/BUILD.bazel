@@ -1623,3 +1623,325 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "concurrency_replication_high_yielding",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_replication_high_yielding.yml",
+    shard_count = 23,
+    tags = [
+        "ci-default",
+        "common",
+        "concurrency",
+        "repl",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_sharded_collections_pqs_fallback",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_sharded_collections_pqs_fallback.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Timeouts of accurate_percentiles_continuous.js, accurate_percentiles_discrete.js after 16 minutes.
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_jscore_pqs_fallback",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_pqs_fallback.yml",
+    shard_count = 16,
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Timeout of express_pbt.js after 16 minutes
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_pqs_fallback",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_pqs_fallback.yml",
+    shard_count = 38,
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # express_pbt.js times out after 16 minutes
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_pqs_fallback",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_pqs_fallback.yml",
+    shard_count = 41,
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # express_pbt.js times out after 16 minutes
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_batch_size_1_watch_collection",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_watch_collection.yml",
+    shard_count = 2,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_blockprocessing_fuzzer_tests",
+    extra_args = [
+        "--diffTestingMode",
+        "blockprocessing",
+        "--numPipelines=750",
+    ],
+    npm_command = "agg-fuzzer",
+    num_generated_files = 1400,
+    target_compatible_with = select(
+        {
+            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
+        },
+    ),
+)
+
+resmoke_suite_test(
+    name = "aggregation_blockprocessing_fuzzer",
+    srcs = [":aggregation_blockprocessing_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    tags = [
+        "aggfuzzer",
+        "blockprocessing",
+        "ci-release-critical",
+        "common",
+        "incompatible_with_bazel_remote_test",
+        "no_debug_mode",
+        "random_name",
+        "require_npm",
+        "timeseries",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_wildcard_fuzzer_tests",
+    extra_args = [
+        "--diffTestingMode",
+        "wildcard",
+    ],
+    npm_command = "agg-fuzzer",
+    num_generated_files = 400,
+    target_compatible_with = select(
+        {
+            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
+        },
+    ),
+)
+
+resmoke_suite_test(
+    name = "aggregation_wildcard_fuzzer",
+    srcs = [":aggregation_wildcard_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    tags = [
+        "aggfuzzer",
+        "ci-release-critical",
+        "common",
+        "incompatible_with_bazel_remote_test",
+        "random_name",
+        "require_npm",
+        "wildcard",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_compute_mode",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_compute_mode.yml",
+    tags = [
+        "ci-default",
+        "compute_mode",
+        "concurrency",
+        "no_passthrough",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_query_shape_hash_stability_generated_test_1",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_query_shape_hash_stability_generated_test_2",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_query_shape_hash_stability_generated_test_3",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_query_shape_hash_stability_generated_test_4",
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_clustered_collections",
+    config = "//buildscripts/resmokeconfig:suites/sharding_clustered_collections.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "clustered_collections",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
