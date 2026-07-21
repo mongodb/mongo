@@ -106,6 +106,8 @@ export var ReshardingTest = class {
         /** @private */
         this._tempNs = undefined;
         /** @private */
+        this._sourceCollOptions = {};
+        /** @private */
         this._primaryShardName = undefined;
         /** @private */
         this._underlyingSourceNs = undefined;
@@ -356,6 +358,7 @@ export var ReshardingTest = class {
 
         this._primaryShardName = primaryShardName;
 
+        this._sourceCollOptions = Object.assign({}, collOptions);
         const tempCollNamePrefix = this._setupTimeseriesState(sourceDB, collName, collOptions);
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
         this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
@@ -411,6 +414,7 @@ export var ReshardingTest = class {
             shardCollOptions,
         );
 
+        this._sourceCollOptions = Object.assign({}, shardCollOptions);
         const tempCollNamePrefix = this._setupTimeseriesState(
             sourceDB,
             sourceCollection.getName(),
@@ -502,6 +506,23 @@ export var ReshardingTest = class {
         }
 
         this._newShardKey = Object.assign({}, newShardKeyPattern);
+
+        // Resharding replaces the collection with a new UUID, so the temporary resharding namespace
+        // (system.resharding.<sourceUUID>) differs for each operation. Refresh the cached source
+        // UUID and temp namespace here so a fixture that reshards more than once checks consistency
+        // against the current operation's temporary collection rather than a stale one. For the
+        // common single-reshard case this recomputes the same values captured at creation time.
+        {
+            const [dbName, collName] = getDBNameAndCollNameFromFullNamespace(this._ns);
+            const sourceDB = this._st.s.getDB(dbName);
+            const tempCollNamePrefix = this._setupTimeseriesState(
+                sourceDB,
+                collName,
+                this._sourceCollOptions,
+            );
+            const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
+            this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
+        }
 
         if (toShard === undefined) {
             newChunks = newChunks.map((chunk) => ({
