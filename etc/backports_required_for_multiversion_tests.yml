@@ -21,6 +21,8 @@
 #
 last-patch:
   all:
+    - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
+      ticket: SERVER-130139
     - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
@@ -48,6 +50,8 @@ last-continuous:
       ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/subtype.js
       ticket: SERVER-129103
+    - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
+      ticket: SERVER-130139
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
       ticket: SERVER-121533
     - test_file: jstests/core/administrative/filemd5.js
@@ -195,6 +199,8 @@ last-lts:
       ticket: SERVER-90485
     - test_file: jstests/aggregation/variables/subpipeline_system_variables.js
       ticket: SERVER-114384
+    - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
+      ticket: SERVER-130139
     - test_file: jstests/auth/commands_builtin_roles_replset.js
       ticket: SERVER-92411
     - test_file: jstests/auth/curop_auth_info.js
