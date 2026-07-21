@@ -58,6 +58,7 @@ selector:
   exclude_with_any_tags:
     - assumes_write_concern_unchanged
     - assumes_against_mongod_not_mongos
+    - backport_required_multiversion
     - multiversion_incompatible
     - requires_2_or_more_shards
     - requires_sharding

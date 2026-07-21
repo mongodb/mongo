@@ -152,7 +152,7 @@ std::vector<double> parseP(ExpressionContext* const expCtx,
             uasserted(7750302, str::stream() << msg << pVal.toString());
         }
         double p = pVal.coerceToDouble();
-        if (p < 0 || p > 1) {
+        if (!std::isfinite(p) || p < 0 || p > 1) {
             uasserted(7750303, str::stream() << msg << p);
         }
         ps.push_back(p);
