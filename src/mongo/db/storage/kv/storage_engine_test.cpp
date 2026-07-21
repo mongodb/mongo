@@ -42,6 +42,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
@@ -911,6 +912,47 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     // There are no two-phase builds to resume or restart.
     EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
     EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
+}
+
+TEST_F(StorageEngineTest, ReconcileUnfinishedIndexRetriesWriteConflicts) {
+    auto opCtx = cc().makeOperationContext();
+
+    Lock::GlobalLock lk(&*opCtx, MODE_X);
+
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("a_1");
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+
+    // Start a single-phase (i.e. no build UUID) index.
+    const boost::optional<UUID> buildUUID = boost::none;
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, buildUUID));
+        wuow.commit();
+    }
+
+    const auto indexIdent =
+        _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), collInfo.catalogId, indexName);
+
+    // Dropping the unfinished index writes to the catalog. Reconcile must retry that write on
+    // consecutive write conflicts rather than let the exception escape and take down startup.
+    auto fp = globalFailPointRegistry().find("WTWriteConflictException");
+    ASSERT(fp);
+    fp->setMode(FailPoint::nTimes, 2);
+    ON_BLOCK_EXIT([&] { fp->setMode(FailPoint::off); });
+
+    auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
+
+    ASSERT(!identExists(opCtx.get(), indexIdent));
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
+
+    // The retried catalog write must have persisted the metadata without the dropped index.
+    auto md = durable_catalog::getParsedCatalogEntry(
+                  opCtx.get(), collInfo.catalogId, _storageEngine->getMDBCatalog())
+                  ->metadata;
+    ASSERT_EQ(-1, md->findIndexOffset(indexName));
 }
 
 TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {

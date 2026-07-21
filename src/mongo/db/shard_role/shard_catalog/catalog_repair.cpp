@@ -4,6 +4,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_repair.h"
 
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -316,12 +317,14 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                                     << md->nss.toStringForErrorMsg() << " Index: " << indexName);
         }
         if (indexesToDrop.size() > 0) {
-            WriteUnitOfWork wuow(opCtx);
-            CollectionWriter writer{opCtx, entry.nss};
-            auto collection = writer.getWritableCollection(opCtx);
-            invariant(collection->getCatalogId() == entry.catalogId);
-            collection->replaceMetadata(opCtx, std::move(md));
-            wuow.commit();
+            writeConflictRetry(opCtx, "dropUnfinishedIndexes", entry.nss, [&] {
+                WriteUnitOfWork wuow(opCtx);
+                CollectionWriter writer{opCtx, entry.nss};
+                auto collection = writer.getWritableCollection(opCtx);
+                invariant(collection->getCatalogId() == entry.catalogId);
+                collection->replaceMetadata(opCtx, md);
+                wuow.commit();
+            });
         }
     }
 
