@@ -365,6 +365,57 @@ TEST(PipelineResolverTest, DoesNotInfiniteLoopOnMutualGraphLookupViewCycle) {
     ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$graphLookup"sv);
 }
 
+TEST(PipelineResolverTest, MongotLedPipelineOnViewBindsUnionWithSubpipelineView) {
+    const NamespaceString kViewNss =
+        NamespaceString::createNamespaceString_forTest("test", "searchView");
+    const NamespaceString kViewBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "searchBacking");
+
+    // Insert the top-level view entry the way maybeApplyViewPipeline does for view aggregations.
+    BSONObj viewMatchStage = BSON("$match" << BSON("v" << 1));
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    ResolvedNamespace rnView(kViewNss, kViewBackingNss, {viewMatchStage}, BSONObj{}, opts);
+    ResolvedNamespaceMap nsMap;
+    PipelineResolver::insertTopLevelViewEntry(nsMap, kViewNss, std::move(rnView));
+
+    // Model the shape hybrid search desugars to on a view: a mongot stage first, followed by a
+    // $unionWith wrapping another input pipeline that targets the same view.
+    BSONObj searchStage = BSON(
+        "$search" << BSON("index" << "idx" << "text" << BSON("query" << "q" << "path" << "m")));
+    BSONObj unionStage = BSON(
+        "$unionWith" << BSON("coll" << "searchView"
+                                    << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("i" << 1)))));
+    LiteParsedPipeline userLpp(
+        kViewNss, std::vector<BSONObj>{searchStage, unionStage}, true, LiteParserOptions{});
+
+    bool result =
+        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(&userLpp, kViewNss, nsMap);
+    ASSERT_TRUE(result);
+
+    // Mongot-led pipelines are bind-only at the top level: the view pipeline must NOT be
+    // prepended (mongot applies the view itself).
+    ASSERT_EQ(userLpp.getStages().size(), 2U);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$search"sv);
+    ASSERT_EQ(userLpp.getStages()[1]->getParseTimeName(), "$unionWith"sv);
+
+    // The $unionWith must be marked view-resolved so DocumentSource construction keeps the
+    // parsed stage params instead of reparsing the sub-pipeline from BSON (which drops AST-only
+    // extension stage specs).
+    auto resolvedBackingNss = userLpp.getStages()[1]->getResolvedBackingNss();
+    ASSERT_TRUE(resolvedBackingNss.isInvolvedNamespaceAView());
+    ASSERT_EQ(resolvedBackingNss.getNamespace(), kViewNss);
+
+    // The recursion must also have handled the view inside the sub-pipeline: the sub-pipeline is
+    // not mongot-led, so the view's $match gets stitched in front of the user's $match.
+    auto* subs = userLpp.getStages()[1]->getMutableSubPipelines();
+    ASSERT_EQ(subs->size(), 1U);
+    const auto& innerStages = subs->front()->getStages();
+    ASSERT_EQ(innerStages.size(), 2U);
+    ASSERT_EQ(innerStages[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(innerStages[1]->getParseTimeName(), "$match"sv);
+}
+
 TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
     // Build a ResolvedNamespace representing a view backed by kBackingNss.
     BSONObj viewStage = BSON("$match" << BSON("v" << 1));
