@@ -36,10 +36,11 @@ public:
                               << typeName(value.getType()),
                 value.isArray());
 
+        auto* opCtx = _expCtx->getOperationContext();
         for (const auto& val : value.getArray()) {
             _values.emplace(SimpleMemoryUsageToken{val.getApproximateSize(), &_memUsageTracker},
                             val);
-            _memUsageTracker.assertWithinMemoryLimit(_expCtx->getOperationContext(), kName);
+            _memUsageTracker.assertWithinMemoryLimit(opCtx, kName);
         }
     }
 

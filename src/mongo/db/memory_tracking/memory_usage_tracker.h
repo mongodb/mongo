@@ -76,7 +76,12 @@ public:
      */
     void assertWithinMemoryLimit(OperationContext* opCtx,
                                  std::string_view name,
-                                 std::string_view stageName = {}) const;
+                                 std::string_view stageName = {}) const {
+        if (MONGO_likely(withinMemoryLimit(opCtx))) {
+            return;
+        }
+        uassertedMemoryLimitExceeded(opCtx, name, stageName);
+    }
 
     /**
      * Checks that the caller can spill to disk if necessary.
@@ -123,6 +128,15 @@ private:
      * in-use total) when 'report' is true.
      */
     void addInternal(int64_t diff, bool report);
+
+    /**
+     * Called after the memory limit has already been checked to assert that the current usage
+     * exceeds the limit, including a name, stageName (optional), current usage, and limit in
+     * the error message.
+     */
+    void uassertedMemoryLimitExceeded(OperationContext* opCtx,
+                                      std::string_view name,
+                                      std::string_view stageName) const;
 
     SimpleMemoryUsageTracker* _base = nullptr;
 
