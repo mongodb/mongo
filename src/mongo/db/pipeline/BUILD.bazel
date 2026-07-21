@@ -1519,6 +1519,7 @@ mongo_cc_unit_test(
         "lite_parsed_rank_fusion_test.cpp",
         "lite_parsed_score_fusion_desugarer_test.cpp",
         "lite_parsed_score_fusion_test.cpp",
+        "match_processor_test.cpp",
         "serverless_aggregation_context_fixture.cpp",
         "sort_rules_test.cpp",
         "//src/mongo/db/pipeline:document_source_coll_stats_test.cpp",

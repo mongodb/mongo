@@ -7,6 +7,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
@@ -210,6 +211,69 @@ TEST_F(MatchProcessorTest, FastPathAgreesWithSlowPath) {
         ASSERT_EQ(fastResult, slowResult)
             << "fast/slow path disagree; predicate=" << c.predicate << " doc=" << c.doc;
     }
+}
+
+// --- BSONMatchableDocument::reset tests ---
+// SERVER-131797: MatchProcessor reuses a BSONMatchableDocument across process() calls. These
+// tests verify the reset semantics that the reuse relies on.
+
+TEST(MatchableDocumentTest, ResetRebindsToNewBsonObj) {
+    BSONMatchableDocument doc(BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(doc.toBSON(), BSON("a" << 1));
+    doc.reset(BSON("b" << 2));
+    ASSERT_BSONOBJ_EQ(doc.toBSON(), BSON("b" << 2));
+}
+
+TEST(MatchableDocumentTest, ResetMoveRebindsToNewBsonObj) {
+    BSONMatchableDocument doc(BSON("a" << 1));
+    BSONObj moved = BSON("c" << 3).getOwned();
+    doc.reset(std::move(moved));
+    ASSERT_BSONOBJ_EQ(doc.toBSON(), BSON("c" << 3));
+}
+
+TEST(MatchableDocumentTest, ResetManyTimesReflectsLatestBsonObj) {
+    BSONMatchableDocument doc(BSONObj{});
+    for (int i = 0; i < 100; i++) {
+        doc.reset(BSON("x" << i));
+        ASSERT_EQUALS(i, doc.toBSON().firstElement().numberInt());
+    }
+}
+
+// --- Reuse staleness tests ---
+// SERVER-131797: The reused BSONMatchableDocument must not go stale across repeated process()
+// calls with varying document shapes.
+
+TEST_F(MatchProcessorTest, ProcessRepeatedCallsSameShapeDoesNotGoStale) {
+    auto processor = makeProcessor(_expCtx, fromjson("{array: 5}"));
+    for (int i = 0; i < 1000; i++) {
+        ASSERT_TRUE(processor.process(trivialDoc(fromjson("{array: 5}"))));
+        ASSERT_FALSE(processor.process(trivialDoc(fromjson("{array: 6}"))));
+    }
+}
+
+TEST_F(MatchProcessorTest, ProcessVaryingDocShapesDoesNotGoStale) {
+    auto processor = makeProcessor(_expCtx, fromjson("{array: 5}"));
+
+    ASSERT_FALSE(processor.process(trivialDoc(fromjson("{}"))));
+    ASSERT_TRUE(processor.process(trivialDoc(fromjson("{array: 5}"))));
+    ASSERT_TRUE(processor.process(trivialDoc(fromjson("{array: [1, 2, 5, 6]}"))));
+    ASSERT_FALSE(processor.process(trivialDoc(fromjson("{array: [1, 2, 6]}"))));
+    ASSERT_FALSE(processor.process(trivialDoc(fromjson("{array: 6}"))));
+    ASSERT_TRUE(processor.process(trivialDoc(fromjson("{array: 5, other: 999}"))));
+    ASSERT_FALSE(processor.process(trivialDoc(fromjson("{other: 999}"))));
+    ASSERT_FALSE(processor.process(trivialDoc(fromjson("{nested: {array: 5}}"))));
+    ASSERT_TRUE(processor.process(trivialDoc(fromjson("{array: 5}"))));
+}
+
+TEST_F(MatchProcessorTest, ProcessLongerThanShorterDocDoesNotGoStale) {
+    auto processor = makeProcessor(_expCtx, fromjson("{x: 1}"));
+    ASSERT_TRUE(processor.process(trivialDoc(
+        fromjson("{a: {b: {c: {d: {e: 1}}}}, x: 1, longField: 'aaaaaaaaaaaaaaaaaaaa'}"))));
+    ASSERT_FALSE(processor.process(trivialDoc(fromjson("{x: 2}"))));
+    ASSERT_TRUE(processor.process(trivialDoc(fromjson("{x: 1}"))));
+    ASSERT_FALSE(processor.process(trivialDoc(fromjson("{}"))));
+    ASSERT_TRUE(processor.process(trivialDoc(
+        fromjson("{a: {b: {c: {d: {e: 1}}}}, x: 1, longField: 'aaaaaaaaaaaaaaaaaaaa'}"))));
 }
 
 }  // namespace

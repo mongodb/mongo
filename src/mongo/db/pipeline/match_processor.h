@@ -5,6 +5,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/util/modules.h"
 
@@ -28,6 +29,9 @@ public:
     // the MatchExpression. The optional 'ctx' parameter carries evaluation state (see
     // EvaluationContext); when it holds a memory tracker, memory usage observed while evaluating
     // any $expr sub-expressions within the match expression is accumulated against it.
+    //
+    // Not thread-safe: callers must ensure no concurrent calls to process() on the same
+    // instance.
     bool process(const Document& input, const EvaluationContext& ctx = {}) const;
 
     std::unique_ptr<MatchExpression>& getExpression() {
@@ -65,6 +69,9 @@ private:
     // Store the BSONObj that backs this '_expression' so that it doesn't get disposed before the
     // match expression does.
     BSONObj _predicate;
+
+    // Reused across process() calls to avoid per-document BSONMatchableDocument ctor and dtor.
+    mutable BSONMatchableDocument _matchableDoc{BSONObj{}};
 };
 
 }  // namespace mongo
