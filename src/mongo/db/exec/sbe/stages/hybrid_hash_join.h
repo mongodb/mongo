@@ -206,10 +206,12 @@ class HybridHashJoin {
 public:
     HybridHashJoin(int64_t memLimit,
                    CollatorInterface* collator,
+                   bool allowDiskUse,
                    boost::optional<size_t> estimatedBuildCardinality,
                    HashJoinStats& stats)
         : _memLimit(memLimit),
           _collator(collator),
+          _allowDiskUse(allowDiskUse),
           _estimatedBuildCardinality(estimatedBuildCardinality),
           _stats(stats) {
         const HashedKeyHasher hasher{_collator};
@@ -284,6 +286,8 @@ private:
     int64_t _memLimit;
 
     CollatorInterface* _collator;
+
+    const bool _allowDiskUse;
 
     // In-memory hash table for the build side (used in both pure and hybrid modes).
     boost::optional<HHJTableType> _ht;

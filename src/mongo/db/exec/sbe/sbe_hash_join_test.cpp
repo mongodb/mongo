@@ -5,6 +5,7 @@
  * This file contains tests for sbe::HashJoinStage.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -16,6 +17,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -157,7 +159,8 @@ std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeHashJoinStage(
     value::SlotVector outerProjectSlots,
     value::SlotVector innerCondSlots,
     value::SlotVector innerProjectSlots,
-    boost::optional<value::SlotId> collatorSlot = boost::none) {
+    boost::optional<value::SlotId> collatorSlot = boost::none,
+    bool allowDiskUse = true) {
 
     // Output slots are the condition and project slots from both sides
     value::SlotVector outputSlots;
@@ -173,6 +176,7 @@ std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeHashJoinStage(
                                               innerCondSlots,
                                               innerProjectSlots,
                                               collatorSlot,
+                                              allowDiskUse,
                                               nullptr /* yieldPolicy */,
                                               kEmptyPlanNodeId,
                                               boost::none);
@@ -228,6 +232,50 @@ TEST_F(HashJoinStageTest, BasicHashJoin) {
 
     assertResultsMatch(
         resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
+}
+
+TEST_F(HashJoinStageTest, SpillThrowsWhenDiskUseNotAllowed) {
+    // Force the hash table to spill by setting a tiny memory limit.
+    unittest::ServerParameterGuard maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill",
+        static_cast<long long>(16));
+
+    auto ctx = makeCompileCtx();
+
+    // Build enough inner rows that the hash table exceeds the tiny memory limit.
+    BSONArrayBuilder innerBuilder;
+    for (int i = 0; i < 50; ++i) {
+        innerBuilder.append(BSON_ARRAY(i << ("big_string_" + std::to_string(i))));
+    }
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(innerBuilder.arr()));
+    value::TagValueOwned outerArr =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(BSON_ARRAY(1 << "x"))));
+
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
+
+    // Construct the join with allowDiskUse = false.
+    auto [outputSlots, hashJoinStage] = makeHashJoinStage(this,
+                                                          std::move(outerStage),
+                                                          std::move(innerStage),
+                                                          makeSV(outerSlots[0]),
+                                                          makeSV(outerSlots[1]),
+                                                          makeSV(innerSlots[0]),
+                                                          makeSV(innerSlots[1]),
+                                                          boost::none /* collatorSlot */,
+                                                          false /* allowDiskUse */);
+
+    // The stage must throw QueryExceededMemoryLimitNoDiskUseAllowed when it tries to spill during
+    // the build phase, instead of spilling.
+    ASSERT_THROWS_CODE(
+        [&] {
+            auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
+            getAllResultsMulti(hashJoinStage.get(), resultAccessors);
+        }(),
+        DBException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 TEST_F(HashJoinStageTest, HashJoinEmptyOuter) {
@@ -742,6 +790,7 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
                                          makeSV(innerCondSlot),
                                          makeSV(innerProjSlot),
                                          boost::optional<value::SlotId>{useCollator, collatorSlot},
+                                         true /* allowDiskUse */,
                                          nullptr /* yieldPolicy */,
                                          kEmptyPlanNodeId,
                                          boost::none);

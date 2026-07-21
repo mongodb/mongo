@@ -148,6 +148,7 @@ TEST_F(PlanSizeTest, HashJoin) {
                                       mockSV(),
                                       makeSV(),
                                       generateSlotId(),
+                                      true /* allowDiskUse */,
                                       nullptr /* yieldPolicy */,
                                       kEmptyPlanNodeId,
                                       boost::none);

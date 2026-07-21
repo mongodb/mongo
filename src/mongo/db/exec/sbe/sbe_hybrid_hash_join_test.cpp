@@ -5,6 +5,7 @@
  * This file contains tests for sbe::HybridHashJoin.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -131,9 +132,11 @@ protected:
     static constexpr uint64_t kDefaultMemLimit = 256;
     HashJoinStats stats;
 
-    std::unique_ptr<HybridHashJoin> makeHHJ(CollatorInterface* collator = nullptr) {
+    std::unique_ptr<HybridHashJoin> makeHHJ(CollatorInterface* collator = nullptr,
+                                            bool allowDiskUse = true) {
         stats = {};
-        return std::make_unique<HybridHashJoin>(kDefaultMemLimit, collator, boost::none, stats);
+        return std::make_unique<HybridHashJoin>(
+            kDefaultMemLimit, collator, allowDiskUse, boost::none, stats);
     }
 };
 
@@ -355,6 +358,26 @@ TEST_F(HybridHashJoinTestFixture, SpillTriggersOnMemoryLimit) {
     ASSERT_GT(stats.spillingStats.getSpilledRecords(), 0u);
     ASSERT_GT(stats.spillingStats.getSpilledDataStorageSize(), 0u);
     ASSERT_GT(stats.numPartitionsSpilled, 0);
+}
+
+TEST_F(HybridHashJoinTestFixture, SpillThrowsWhenDiskUseNotAllowed) {
+    auto hhj = makeHHJ(nullptr /* collator */, false /* allowDiskUse */);
+
+    // Inserting enough rows to exceed the tiny memory limit must throw
+    // QueryExceededMemoryLimitNoDiskUseAllowed instead of partitioning and spilling, because disk
+    // use is not allowed.
+    ASSERT_THROWS_CODE(
+        [&] {
+            for (int i = 0; i < 50; ++i) {
+                auto payload = "payload_" + std::to_string(i);
+                hhj->addBuild(makeKeyRow(i), makeProjectRow(payload));
+            }
+        }(),
+        DBException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+
+    // No spilling should have occurred.
+    ASSERT_FALSE(stats.usedDisk);
 }
 
 TEST_F(HybridHashJoinTestFixture, SpilledPartitionsProcessedCorrectly) {

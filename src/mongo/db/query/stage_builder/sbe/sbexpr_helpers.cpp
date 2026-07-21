@@ -1179,6 +1179,7 @@ SbStage SbBuilder::makeHashJoin(SbStage outerStage,
                                           lower(innerCondSlots),
                                           lower(innerProjectSlots),
                                           collatorSlot,
+                                          _state.allowDiskUse,
                                           _state.yieldPolicy,
                                           _nodeId,
                                           estimatedBuildCardinality);

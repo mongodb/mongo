@@ -24,6 +24,7 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector innerKey,
                              value::SlotVector innerProjects,
                              boost::optional<value::SlotId> collatorSlot,
+                             bool allowDiskUse,
                              PlanYieldPolicySBE* yieldPolicy,
                              PlanNodeId planNodeId,
                              boost::optional<size_t> estimatedBuildCardinality,
@@ -34,6 +35,7 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
       _innerKey(std::move(innerKey)),
       _innerProjects(std::move(innerProjects)),
       _collatorSlot(collatorSlot),
+      _allowDiskUse(allowDiskUse),
       _estimatedBuildCardinality(estimatedBuildCardinality),
       _probeKey(_outerKey.size()),
       _probeProject(_outerProjects.size()) {
@@ -53,8 +55,10 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
                                            _innerKey,
                                            _innerProjects,
                                            _collatorSlot,
+                                           _allowDiskUse,
                                            _yieldPolicy,
                                            _commonStats.nodeId,
+                                           _estimatedBuildCardinality,
                                            participateInTrialRunTracking());
 }
 
@@ -109,6 +113,7 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
         loadMemoryLimit(StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill)
             .get(_opCtx),
         collator,
+        _allowDiskUse,
         _estimatedBuildCardinality,
         _stats);
 }

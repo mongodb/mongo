@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/sbe/stages/hybrid_hash_join.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 #include "mongo/db/stats/counters.h"
@@ -563,6 +564,11 @@ void HybridHashJoin::addBuild(value::MaterializedRow key, value::MaterializedRow
  * the largest partitions until memory usage is under the limit.
  */
 void HybridHashJoin::enablePartitioning() {
+    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+            "Exceeded memory limit for $lookup, but didn't allow external spilling; pass "
+            "allowDiskUse:true to opt in",
+            _allowDiskUse);
+
     // Initialize the partition buffers and metadata and bloom filter
     _partitionBuffers.resize(kNumPartitions);
     _partitionMemUsage.resize(kNumPartitions, 0);
@@ -826,8 +832,8 @@ boost::optional<JoinCursor> HybridHashJoin::nextSpilledJoinCursor() {
         // to further subdivide the data. The higher level uses different hash bits to ensure
         // progress
 
-        std::unique_ptr<HybridHashJoin> join =
-            std::make_unique<HybridHashJoin>(_memLimit, _collator, boost::none, _stats);
+        std::unique_ptr<HybridHashJoin> join = std::make_unique<HybridHashJoin>(
+            _memLimit, _collator, _allowDiskUse, boost::none, _stats);
         join->_recursionLevel = _recursionLevel + 1;
         join->_fileStats = _fileStats;
         _stats.recursionDepthMax = std::max(_stats.recursionDepthMax, 1 + _recursionLevel);
