@@ -159,16 +159,39 @@ boost::optional<BSONObj> rightmostGlobalMaxShardKey(OperationContext* opCtx,
 }
 
 /**
- * Returns true iff a document whose shard key is the global maximum (every shard-key field is
- * MaxKey) exists locally within 'range'. The global-max key sorts to the very top of the keyspace,
- * so a single backward scan of the range that returns it answers the question. Throws IndexNotFound
- * when no shard-key-prefixed index is available to run the scan.
+ * Returns true iff the first 'numFields' fields of 'shardKeyValue' exist and are all MaxKey.
  */
-bool hasGlobalMaxDocInRange(OperationContext* opCtx,
-                            const DatabaseName& dbName,
-                            const UUID& collUuid,
-                            const ShardKeyPattern& shardKeyPattern,
-                            const ChunkRange& range) {
+bool isMaxKeyOnLeadingFields(const BSONObj& shardKeyValue, int numFields) {
+    int seen = 0;
+    for (auto&& elem : shardKeyValue) {
+        if (seen >= numFields) {
+            break;
+        }
+        if (elem.type() != BSONType::maxKey) {
+            return false;
+        }
+        ++seen;
+    }
+    return seen == numFields;
+}
+
+/**
+ * Returns true iff 'range' contains a document whose shard key is MaxKey on its leading
+ * range.max.nFields() fields.
+ *
+ * The task's range.max sets how many leading fields must be MaxKey: a single-field bound
+ * {a: MaxKey} matches on the leading field alone, while a full-width bound {a: MaxKey, b: MaxKey}
+ * matches on both. This is a plain existence check with no ownership filtering: a matching document
+ * is the maximum possible shard key over those fields, so if one exists it is the rightmost
+ * document in the range, and a single backward scan that returns the rightmost document answers it.
+ *
+ * Throws IndexNotFound when no shard-key-prefixed index is available to run the scan.
+ */
+bool hasLeadingMaxKeyDocInRange(OperationContext* opCtx,
+                                const DatabaseName& dbName,
+                                const UUID& collUuid,
+                                const ShardKeyPattern& shardKeyPattern,
+                                const ChunkRange& range) {
     const auto acquisition = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
@@ -200,7 +223,7 @@ bool hasGlobalMaxDocInRange(OperationContext* opCtx,
         shardKeyPattern,
         Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMin(), false)),
         Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMax(), true)));
-    return shardKey && isGlobalMaxShardKey(*shardKey);
+    return shardKey && isMaxKeyOnLeadingFields(*shardKey, range.getMax().nFields());
 }
 
 /**
@@ -609,7 +632,7 @@ bool shouldSkipRangeDeletionForMaxKeyOrphans(OperationContext* opCtx,
     if (!skPattern.getKeyPattern().isGlobalMax(range.getMax())) {
         return false;
     }
-    return hasGlobalMaxDocInRange(opCtx, dbName, collUuid, skPattern, range);
+    return hasLeadingMaxKeyDocInRange(opCtx, dbName, collUuid, skPattern, range);
 }
 
 namespace {
