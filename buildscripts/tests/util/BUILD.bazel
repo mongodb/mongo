@@ -2,6 +2,26 @@ load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_test")
 
 py_test(
+    name = "test_download_utils",
+    srcs = [
+        "__init__.py",
+        "test_download_utils.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "botocore",
+            group = "aws",
+        ),
+    ],
+)
+
+py_test(
     name = "test_fileops",
     srcs = [
         "__init__.py",
