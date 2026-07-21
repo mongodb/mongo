@@ -86,6 +86,9 @@ selector:
     # Uses mongod generated UUID which is different between the clusters
     - jstests/core/query/parsing/collection_uuid_write_commands.js
 
+    # The test sets stmtIds manually.
+    - jstests/core/query/parsing/write_command_duplicate_stmt_ids_validation.js
+
     # update with $ modifiers can sometimes change field ordering
     - jstests/core/query/update/update_multi5.js
     - jstests/core/query/update/upsert_and.js
