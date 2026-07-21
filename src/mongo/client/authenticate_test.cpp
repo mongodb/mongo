@@ -9,6 +9,7 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/auth_mechanism.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/user.h"
@@ -257,6 +258,22 @@ TEST_F(SpeculativeInternalAuthTest, SpeculateInternalAuthScramRequestsSkipEmptyE
     auto specAuth = getSpeculativeAuthenticate(helloRequestBuilder.obj());
     assertSaslStartSkipsEmptyExchange(specAuth, auth::kMechanismScramSha256);
     ASSERT_EQ(specAuth["db"].str(), "local") << specAuth;
+}
+
+TEST_F(SpeculativeInternalAuthTest, GetInternalAuthParamsRejectsPlain) {
+    auth::setInternalAuthKeys({"hunter2"});
+
+    // PLAIN would leak the raw keyfile as a cleartext credential; it must never be used for
+    // internal authentication.
+    ASSERT_FALSE(auth::getInternalAuthParams(0, auth::kMechanismSaslPlain));
+}
+
+TEST_F(SpeculativeInternalAuthTest, GetInternalAuthParamsAllowsScram) {
+    auth::setInternalAuthKeys({"hunter2"});
+
+    auto cred = auth::getInternalAuthParams(0, auth::kMechanismScramSha256);
+    ASSERT_TRUE(cred);
+    ASSERT_TRUE(cred->mechanism == auth::AuthMechanism::kScramSha256);
 }
 
 }  // namespace

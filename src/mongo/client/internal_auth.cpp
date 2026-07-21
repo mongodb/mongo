@@ -78,6 +78,12 @@ boost::optional<Credential> getInternalAuthParams(size_t idx, std::string_view m
     if (!swMech.isOK())
         return boost::none;
 
+    // Defence in depth: PLAIN must never be used for internal authentication, as it would send the
+    // raw keyfile as a cleartext credential. This mirrors the speculative-auth guard in
+    // authenticate.cpp and backstops the mechanism allowlist applied during connection setup.
+    if (swMech.getValue() == AuthMechanism::kSaslPlain)
+        return boost::none;
+
     auto password = internalAuthKeys.at(idx);
     auto systemUser = internalSecurity.getUser();
     if (swMech.getValue() == AuthMechanism::kScramSha1) {
