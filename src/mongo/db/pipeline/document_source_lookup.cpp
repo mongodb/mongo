@@ -39,12 +39,10 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
-#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
-#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
@@ -106,6 +104,11 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
             isConfigSvrSupportedCollection || allowGenericForeignDbLookup);
     return nss;
 }
+
+// The mongot_lookup_prefix helpers (isSourceStage / isSupportStage / prefixEndIdx / extractPrefix)
+// live in search_helper_bson_obj.h so this search-specific logic stays with the other BSON-level
+// mongot helpers rather than in the generic $lookup code. This alias keeps the call sites terse.
+using namespace search_helper_bson_obj::mongot_lookup_prefix;
 
 namespace {
 
@@ -277,12 +280,37 @@ std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     // When we first create a $lookup stage, the input 'pipeline' is unparsed, so we
     // check for the $documents stage itself.
     if (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
-        pipeline[0].hasField("$search"sv) ||
         pipeline[0].hasField(DocumentSourceQueue::kStageName)) {
         return {pipeline[0]};
     }
-    return {};
+    // For mongot subpipelines the join $match must be placed after the entire mongot prefix (the
+    // search source stage plus any idLookup / storedSource $replaceRoot support stages), not just
+    // after the first stage. Returning the full prefix here keeps the mongot source stage first and
+    // ensures the equality $match runs after view transforms / storedSource promotion.
+    return extractPrefix(pipeline);
 }
+
+namespace {
+// True if 'pipeline' should be treated as a mongot search subpipeline for the purposes of $lookup
+// view handling. This covers three shapes:
+//   - a legacy mongot pipeline ($search / $searchMeta / $vectorSearch first),
+//   - an extension mongot pipeline (the extension desugar of those), and
+//   - an already-desugared mongot pipeline whose first stage is a mongot source stage (DRM /
+//     $_extension* / $_internalSearchMongotRemote).
+// Recognizing the extension/desugared cases (not just isMongotPipeline) is required so $lookup
+// still treats the foreign namespace as a mongot-indexed view: otherwise the view pipeline is
+// prepended and the mongot stage is no longer first, yielding empty join results (or error 40602
+// because the mongot stage must lead the subpipeline).
+bool isMongotLookupSubpipeline(const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
+                               const std::vector<BSONObj>& pipeline) {
+    if (pipeline.empty()) {
+        return false;
+    }
+    return search_helper_bson_obj::isMongotPipeline(ifrContext, pipeline) ||
+        search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, pipeline) ||
+        isSourceStage(pipeline[0]);
+}
+}  // namespace
 
 // Process and copy the given `pipeline` to the `_sharedState->resolvedPipeline` attribute and
 // compute where the $match stage is going to be placed, indicated through the
@@ -293,16 +321,15 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     boost::optional<std::pair<std::string, std::string>> localForeignFields,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // When fromNs represents a view, we have to decipher if the view is mongot-indexed or not.
-    // Currently, if the pipeline to be run on the joined collection is a
-    // mongot pipeline (it starts with $search, $searchMeta, or $vectorSearch), $lookup assumes
-    // the view is mongot-indexed.
+    // Currently, if the pipeline to be run on the joined collection is a mongot pipeline (it starts
+    // with $search, $searchMeta, or $vectorSearch -- or the extension desugar of those), $lookup
+    // assumes the view is mongot-indexed.
     //
     // Skip validation/view application when we know that the router already processed the view.
     const bool pipelineIsAlreadyDesugared = !pipeline.empty() &&
         pipeline[0].hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName);
 
-    if (_fromNsIsAView &&
-        search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline) &&
+    if (_fromNsIsAView && isMongotLookupSubpipeline(expCtx->getIfrContext(), pipeline) &&
         !pipelineIsAlreadyDesugared) {
         // The user pipeline is a mongot pipeline so we assume the view is a mongot-indexed view. As
         // such, we overwrite the view pipeline. This is because in the case of mongot queries on
@@ -310,7 +337,12 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
         _fromExpCtx->setView(boost::make_optional(
             ResolvedNamespace::makeForView(fromNs, _resolvedNs, _sharedState->resolvedPipeline)));
         _sharedState->resolvedPipeline = pipeline;
-        _fieldMatchPipelineIdx = 1;
+        // The join $match belongs immediately after the mongot prefix. For an unparsed pipeline
+        // (a single $search/$searchMeta/$vectorSearch stage) the prefix is one stage, so index 1.
+        // If the pipeline already arrived desugared (e.g. DRM + idLookup, or a storedSource
+        // $replaceRoot), the prefix spans multiple stages and the $match must go after all of them.
+        const size_t prefixLen = prefixEndIdx(pipeline);
+        _fieldMatchPipelineIdx = prefixLen == 0 ? 1 : prefixLen;
         if (localForeignFields != boost::none) {
             std::tie(_localField, _foreignField) = *localForeignFields;
         }
@@ -453,14 +485,25 @@ void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
         return;
     auto& resolvedPipeline = lookupStage->_sharedState->resolvedPipeline;
     auto oldIdx = *lookupStage->_fieldMatchPipelineIdx;
+    const auto oldSize = resolvedPipeline.size();
     tassert(12761200,
-            "Expected empty $match placeholder at old _fieldMatchPipelineIdx",
-            oldIdx < resolvedPipeline.size() && resolvedPipeline[oldIdx].hasField("$match") &&
+            str::stream() << "expected empty $match placeholder at old _fieldMatchPipelineIdx "
+                          << oldIdx << " in resolvedPipeline of size " << oldSize,
+            oldIdx < oldSize && resolvedPipeline[oldIdx].hasField("$match") &&
                 resolvedPipeline[oldIdx]["$match"].Obj().isEmpty());
+    // 'newIdx' is an index into the placeholder-containing pipeline and may equal 'oldSize' when
+    // the mongot prefix is the entire subpipeline and the $match must be appended at the end.
     tassert(12761201,
-            "internalFieldMatchPipelineIdx out of range of resolvedPipeline",
-            newIdx <= resolvedPipeline.size() - 1);
+            str::stream() << "internalFieldMatchPipelineIdx " << newIdx
+                          << " out of range of resolvedPipeline of size " << oldSize,
+            newIdx <= oldSize);
     resolvedPipeline.erase(resolvedPipeline.begin() + oldIdx);
+    // Erasing the old placeholder shifts every later element left by one, so a target index past
+    // the old position must be decremented to land in the right place (this also maps an
+    // append-at-end 'newIdx' == oldSize to the new last position).
+    if (newIdx > oldIdx) {
+        --newIdx;
+    }
     resolvedPipeline.insert(resolvedPipeline.begin() + newIdx, BSON("$match" << BSONObj()));
     lookupStage->_fieldMatchPipelineIdx = newIdx;
 }
@@ -469,24 +512,37 @@ namespace {
 // TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
 // parsing/desugaring/resolution.
 // Computes where the localField/foreignField equality $match placeholder must live in a mongot
-// $lookup subpipeline on the shard. The placeholder must sit immediately after the mongot search
-// prefix.
+// $lookup subpipeline on the shard. The placeholder must sit immediately after the full mongot
+// prefix (the search source stage plus any idLookup / storedSource $replaceRoot support stages).
+//
+// 'resolvedPipeline' may already contain the empty $match placeholder (inserted during
+// construction at the pre-relocation index, which can fall inside the mongot prefix). Skip that
+// placeholder while scanning so it does not truncate the prefix. Returns the target insert index,
+// which may equal resolvedPipeline.size() to append at the end.
 size_t computeDesugaredMongotFieldMatchIdx(const std::vector<BSONObj>& resolvedPipeline) {
-    static constexpr std::array kPrefixStageNames = {
-        DocumentSourceInternalSearchIdLookUp::kStageName,
-        DocumentSourceInternalSearchMongotRemote::kStageName,
-        DocumentSourceSearch::kStageName,
-        DocumentSourceSearchMeta::kStageName,
-        DocumentSourceVectorSearch::kStageName,
-    };
-    for (std::string_view stageName : kPrefixStageNames) {
-        for (size_t i = 0; i < resolvedPipeline.size(); ++i) {
-            if (resolvedPipeline[i].hasField(stageName)) {
-                return i + 1;
-            }
+    boost::optional<size_t> lastPrefixIdx;
+    for (size_t i = 0; i < resolvedPipeline.size(); ++i) {
+        const auto& stage = resolvedPipeline[i];
+        // Skip an already-inserted empty $match placeholder. This relies on the injected
+        // placeholder being the only empty {$match: {}} in a desugared mongot subpipeline: mongot
+        // desugaring never emits one, and a user-authored empty $match is semantically inert, so
+        // treating any empty $match as the placeholder does not change results here.
+        if (stage.hasField("$match") && stage.getObjectField("$match").isEmpty()) {
+            continue;
+        }
+        if (isSourceStage(stage) || isSupportStage(stage)) {
+            lastPrefixIdx = i;
+            continue;
+        }
+        // First non-prefix, non-placeholder stage after the prefix ends the scan.
+        if (lastPrefixIdx) {
+            break;
         }
     }
-    return resolvedPipeline.size() - 1;
+    if (!lastPrefixIdx) {
+        return resolvedPipeline.empty() ? 0 : resolvedPipeline.size() - 1;
+    }
+    return *lastPrefixIdx + 1;
 }
 
 // TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
@@ -499,7 +555,9 @@ size_t computeHybridSearchFieldMatchIdx(const std::vector<BSONObj>& resolvedPipe
             return i;
         }
     }
-    return resolvedPipeline.size() - 1;
+    // Guard the empty case so size() - 1 does not wrap to a huge index (matches the mongot sibling
+    // above). Not reachable today since a hybrid subpipeline is never empty here.
+    return resolvedPipeline.empty() ? 0 : resolvedPipeline.size() - 1;
 }
 }  // namespace
 

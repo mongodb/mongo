@@ -9,6 +9,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
@@ -20,6 +21,10 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/explain_options.h"
@@ -891,6 +896,151 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineS
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+// Tests for the mongot_lookup_prefix helpers, which determine where the localField/foreignField
+// equality $match must be placed within a mongot $lookup subpipeline.
+
+// These exercise free functions over BSONObj and need no fixture, so use a plain TEST suite.
+TEST(MongotLookupPrefixTest, IsSourceStage) {
+    using namespace search_helper_bson_obj::mongot_lookup_prefix;
+
+    // User-facing mongot source stages.
+    ASSERT_TRUE(isSourceStage(BSON("$search" << BSON("term" << "x"))));
+    ASSERT_TRUE(isSourceStage(BSON("$searchMeta" << BSON("term" << "x"))));
+    ASSERT_TRUE(isSourceStage(BSON("$vectorSearch" << BSON("queryVector" << BSON_ARRAY(1 << 2)))));
+
+    // Legacy desugared mongot source stage.
+    ASSERT_TRUE(isSourceStage(BSON(DocumentSourceInternalSearchMongotRemote::kStageName
+                                   << BSON("mongotQuery" << BSON("term" << "asdf")))));
+
+    // Extension desugared mongot source stages.
+    ASSERT_TRUE(isSourceStage(BSON(DocumentSourceInternalDocumentResultsAndMetadata::kStageName
+                                   << BSON("source" << "$_extensionSearch"))));
+    ASSERT_TRUE(
+        isSourceStage(BSON(search_helpers::kExtensionSearchStageName << BSON("term" << "asdf"))));
+    ASSERT_TRUE(isSourceStage(
+        BSON(search_helpers::kExtensionSearchMetaStageName << BSON("term" << "asdf"))));
+    ASSERT_TRUE(isSourceStage(BSON(search_helpers::kExtensionVectorSearchStageName
+                                   << BSON("queryVector" << BSON_ARRAY(1 << 2)))));
+
+    // Non-source stages must not match, including a non-storedSource $replaceRoot.
+    ASSERT_FALSE(isSourceStage(BSON("$match" << BSON("x" << 1))));
+    ASSERT_FALSE(isSourceStage(BSON("$project" << BSON("x" << 1))));
+    ASSERT_FALSE(
+        isSourceStage(BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj())));
+    ASSERT_FALSE(isSourceStage(fromjson("{$replaceRoot: {newRoot: '$x'}}")));
+}
+
+TEST(MongotLookupPrefixTest, IsSupportStage) {
+    using namespace search_helper_bson_obj::mongot_lookup_prefix;
+
+    // idLookup.
+    ASSERT_TRUE(isSupportStage(
+        BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSON("limit" << 100))));
+
+    // The storedSource $replaceRoot in both the legacy and extension desugared shapes.
+    ASSERT_TRUE(isSupportStage(
+        fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$ROOT']}}}")));
+    ASSERT_TRUE(isSupportStage(fromjson("{$replaceRoot: {newRoot: '$storedSource'}}")));
+
+    // Non-support stages must not match.
+    ASSERT_FALSE(isSupportStage(BSON("$match" << BSON("x" << 1))));
+    ASSERT_FALSE(isSupportStage(BSON("$search" << BSON("term" << "x"))));
+    // A generic $replaceRoot must not match.
+    ASSERT_FALSE(isSupportStage(fromjson("{$replaceRoot: {newRoot: '$x'}}")));
+    // Each part of the legacy $ifNull shape must match: a wrong first arg, a wrong second arg, and
+    // an $ifNull with the wrong arg count are all rejected.
+    ASSERT_FALSE(
+        isSupportStage(fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$other', '$$ROOT']}}}")));
+    ASSERT_FALSE(isSupportStage(
+        fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$NOW']}}}")));
+    ASSERT_FALSE(isSupportStage(
+        fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$ROOT', 1]}}}")));
+}
+
+TEST(MongotLookupPrefixTest, ExtractPrefix) {
+    using namespace search_helper_bson_obj::mongot_lookup_prefix;
+
+    // Empty and non-mongot pipelines have no prefix. prefixEndIdx agrees.
+    ASSERT_TRUE(extractPrefix({}).empty());
+    ASSERT_EQ(prefixEndIdx({}), 0U);
+    ASSERT_TRUE(extractPrefix({BSON("$match" << BSON("x" << 1))}).empty());
+    ASSERT_EQ(prefixEndIdx({BSON("$match" << BSON("x" << 1))}), 0U);
+    // idLookup without a leading source stage is not a valid prefix start.
+    ASSERT_TRUE(extractPrefix({BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj())})
+                    .empty());
+
+    // A lone $search is a one-stage prefix; trailing non-support stages are excluded.
+    const auto search = BSON("$search" << BSON("term" << "x"));
+    {
+        auto prefix = extractPrefix({search});
+        ASSERT_EQ(prefix.size(), 1U);
+        ASSERT_BSONOBJ_EQ(prefix[0], search);
+    }
+    {
+        auto prefix = extractPrefix({search, BSON("$match" << BSON("x" << 1))});
+        ASSERT_EQ(prefix.size(), 1U);
+        ASSERT_BSONOBJ_EQ(prefix[0], search);
+    }
+
+    // Bug 1: desugared source + idLookup. Old extractSourceStage returned {} here, pushing the
+    // $match before the source stage. The full prefix is both stages, in order.
+    {
+        const auto mongotRemote = BSON(DocumentSourceInternalSearchMongotRemote::kStageName
+                                       << BSON("mongotQuery" << BSON("term" << "asdf")));
+        const auto idLookup = BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj());
+        auto prefix = extractPrefix({mongotRemote, idLookup});
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], mongotRemote);
+        ASSERT_BSONOBJ_EQ(prefix[1], idLookup);
+    }
+
+    // Bug 1 (extension): the extension-desugared DRM + idLookup (the non-storedSource extension
+    // $search/$vectorSearch shape). Both stages form the prefix.
+    {
+        const auto drm = BSON(DocumentSourceInternalDocumentResultsAndMetadata::kStageName << BSON(
+                                  "source" << BSON("$_extensionSearch" << BSON("term" << "asdf"))));
+        const auto idLookup = BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj());
+        auto prefix = extractPrefix({drm, idLookup});
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], drm);
+        ASSERT_BSONOBJ_EQ(prefix[1], idLookup);
+    }
+
+    // Bug 2 (legacy): storedSource source + $ifNull $replaceRoot. The $match must go after the
+    // $replaceRoot so the join runs on the promoted (un-nested) fields. The prefix is the whole
+    // pipeline.
+    {
+        const auto mongotRemote = BSON(DocumentSourceInternalSearchMongotRemote::kStageName
+                                       << BSON("mongotQuery" << BSON("term" << "asdf")));
+        const auto replaceRoot =
+            fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$ROOT']}}}");
+        auto prefix = extractPrefix({mongotRemote, replaceRoot});
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], mongotRemote);
+        ASSERT_BSONOBJ_EQ(prefix[1], replaceRoot);
+    }
+
+    // Bug 2 (extension): the extension-desugared DRM + {newRoot: "$storedSource"} $replaceRoot,
+    // followed by user stages. The prefix must span both mongot stages so the join $match lands
+    // after storedSource promotion (this is the exact shape that produced empty results on the
+    // shard for lookup_match.js). Trailing user stages are excluded.
+    {
+        const auto drm =
+            BSON(DocumentSourceInternalDocumentResultsAndMetadata::kStageName << BSON(
+                     "source" << BSON("$_extensionSearch" << BSON("returnStoredSource" << true))));
+        const auto replaceRoot = fromjson("{$replaceRoot: {newRoot: '$storedSource'}}");
+        std::vector<BSONObj> storedSourceExtension = {drm,
+                                                      replaceRoot,
+                                                      fromjson("{$project: {_id: false}}"),
+                                                      fromjson("{$set: {x: {$add: [1, '$x']}}}")};
+        auto prefix = extractPrefix(storedSourceExtension);
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_EQ(prefixEndIdx(storedSourceExtension), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], drm);
+        ASSERT_BSONOBJ_EQ(prefix[1], replaceRoot);
+    }
 }
 
 // $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
