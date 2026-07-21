@@ -21,7 +21,6 @@
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
@@ -145,15 +144,9 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
 }
 
 bool canBatchedWritesCommit(OperationContext* opCtx) {
-    auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
-    auto mustUsePrimaryDrivenIndexBuilds =
-        rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds();
-
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
-    bool batchedWritesExist = batchedWriteContext.writesAreBatched() &&
+    return batchedWriteContext.writesAreBatched() &&
         !batchedWriteContext.getBatchedOperations(opCtx)->isEmpty();
-
-    return batchedWritesExist && mustUsePrimaryDrivenIndexBuilds;
 }
 
 void ReshardingOplogApplicationRules::_applyInsertOrUpdate(OperationContext* opCtx,
