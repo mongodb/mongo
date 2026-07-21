@@ -9,7 +9,7 @@
  *
  * Hash join is disabled for the duration of the test so that DILJ is deterministically selected for the sparse index.
  *
- * @tags: [featureFlagSbeFull]
+ * @tags: [requires_sbe]
  */
 import {
     JoinAlgorithm,

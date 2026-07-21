@@ -43,6 +43,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/max_estimated_scan_bytes_metrics.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -799,6 +800,26 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     }
 }
 
+// Returns true if 'index' is a wildcard index whose projection covers 'foreignField'.
+bool wildcardIndexProjectionCoversField(const IndexEntry& index, const std::string& foreignField) {
+    auto* wildcardProjection = index.indexPathProjection;
+    tassert(
+        6408201, "wildcardProjection must be non-null for Wildcard Indexes", wildcardProjection);
+    return projection_executor_utils::applyProjectionToOneField(wildcardProjection->exec(),
+                                                                foreignField);
+}
+
+// Returns true if 'index' is a single-path, non-partial wildcard index covering 'foreignField'.
+// Compound and partial wildcard indexes are excluded: DILJ's runtime guards don't account for
+// documents a partial filter would exclude, and compound wildcard indexes aren't supported here.
+bool isSinglePathWildcardIndexCoveringField(const IndexEntry& index,
+                                            const std::string& foreignField) {
+    if (index.type != INDEX_WILDCARD || index.keyPattern.nFields() != 1 || index.filterExpr) {
+        return false;
+    }
+    return wildcardIndexProjectionCoversField(index, foreignField);
+}
+
 // Returns true if the partial filter expression of 'index' (if any) is compatible with using the
 // index for the right side of a $lookup pushed into SBE. At runtime the Dynamic Indexed Loop Join
 // decides per local key whether the index covers it by evaluating the filter against the foreign
@@ -846,15 +867,17 @@ bool isPartialFilterCompatibleWithLookupPushdown(boost::intrusive_ptr<Expression
 }
 
 // Determines whether 'index' is eligible for executing the right side of a pushed down $lookup over
-// 'foreignField'. If this function returns true, i.e. the index is eligible, the collation of the
-// index should also be checked using 'isIndexCollationCompatible'. An eligible index that is
-// non-sparse, has a compatible collation, and has no partial filter can be used in INLJ in SBE. An
-// eligible index that is sparse, has an incompatible collation, and/or has a compatible partial
-// filter must instead use DILJ, which decides at run time (per local key) whether the index can be
-// used or a collection scan is required.
+// 'foreignField'. If eligible, the collation should also be checked with
+// 'isIndexCollationCompatible': a collation-compatible index with no partial filter can use INLJ
+// in SBE, while a sparse, collation-incompatible, and/or (compatibly) partial-filtered index must
+// use DILJ. Wildcard indexes are always sparse, so an eligible wildcard index always routes to
+// DILJ.
 bool isIndexEligibleForRightSideOfLookupPushdown(boost::intrusive_ptr<ExpressionContext> expCtx,
                                                  const IndexEntry& index,
                                                  const std::string& foreignField) {
+    if (index.type == INDEX_WILDCARD) {
+        return isSinglePathWildcardIndexCoveringField(index, foreignField);
+    }
     return (index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
         index.keyPattern.firstElement().fieldName() == foreignField &&
         isPartialFilterCompatibleWithLookupPushdown(expCtx, index, foreignField);
@@ -862,29 +885,28 @@ bool isIndexEligibleForRightSideOfLookupPushdown(boost::intrusive_ptr<Expression
 
 // Returns true if 'index' can be used for the right side of a $lookup in the classic engine but
 // not in SBE. This applies to:
+//   - Compound or partial wildcard indexes covering the foreign field: classic can leverage these
+//     but SBE cannot. A single-path, non-partial wildcard index is handled by
+//     'isIndexEligibleForRightSideOfLookupPushdown' instead.
 //   - Partial B-tree/hashed indexes on the foreign field whose filter references a field other
 //     than the foreign field: SBE's DILJ can only evaluate a partial filter that depends solely on
 //     the foreign-field value, so these are handled by classic.
-//   - Wildcard indexes that cover the foreign field: classic can leverage them but SBE cannot.
-//     TODO SERVER-130024: extend SBE to support wildcard indexes for $lookup pushdown.
 bool isIndexEligibleForRightSideOfLookupOnlyInClassic(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const IndexEntry& index,
     const std::string& foreignField) {
-    if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
-        index.keyPattern.firstElement().fieldName() == foreignField && index.filterExpr &&
-        !isPartialFilterCompatibleWithLookupPushdown(expCtx, index, foreignField)) {
-        return true;
-    }
     if (index.type == INDEX_WILDCARD) {
-        auto* wildcardProjection = index.indexPathProjection;
-        tassert(6408201,
-                "wildcardProjection must be non-null for Wildcard Indexes",
-                wildcardProjection);
-        return projection_executor_utils::applyProjectionToOneField(wildcardProjection->exec(),
-                                                                    foreignField);
+        if (!wildcardIndexProjectionCoversField(index, foreignField)) {
+            return false;
+        }
+        // Single-path, non-partial wildcard indexes are handled by
+        // 'isIndexEligibleForRightSideOfLookupPushdown' instead; compound or partial ones stay
+        // classic-only.
+        return index.keyPattern.nFields() != 1 || index.filterExpr;
     }
-    return false;
+    return (index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
+        index.keyPattern.firstElement().fieldName() == foreignField && index.filterExpr &&
+        !isPartialFilterCompatibleWithLookupPushdown(expCtx, index, foreignField);
 }
 
 // Determines whether 'index' has collation compatible with the collation used for the local
@@ -969,17 +991,20 @@ void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlanner
     }
 }
 
-// Checks if there is an index that can be used if the $lookup is pushed to SBE. It returns a tuple
-// {boost::optional<IndexEntry>, bool}. The left side contains an eligible index or boost::none if
-// no such index exists. The right side is a flag denoting whether the eligible index has a
-// compatible collation. An non-sparse eligible index with a compatible collation and no partial
-// filter can be used in the INLJ strategy, while an eligible index that is sparse and/or has a
-// partial filter and/or has an incompatible collation must use the DILJ strategy instead.
+// Checks if there is an index that can be used if the $lookup is pushed to SBE. Returns a tuple of
+// an eligible index (or boost::none if none exists) and whether it's collation-compatible with the
+// query. A non-sparse, collation-compatible index with no partial filter uses INLJ; otherwise DILJ
+// is used. Wildcard indexes are always sparse-like, so an eligible wildcard index always uses DILJ.
 std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideOfLookupPushdown(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const std::string& foreignField,
     std::vector<IndexEntry> indexes,
     const CollatorInterface* collator) {
+    // Wildcard indexes omit documents missing the indexed path just like a sparse index, even
+    // though their catalog 'sparse' flag isn't set until expanded for a specific field below.
+    auto isEffectivelySparse = [](const IndexEntry& index) {
+        return index.sparse || index.type == INDEX_WILDCARD;
+    };
     std::sort(indexes.begin(), indexes.end(), [&](const IndexEntry& left, const IndexEntry& right) {
         if (!CollatorInterface::collatorsMatch(left.collator, right.collator)) {
             if (CollatorInterface::collatorsMatch(left.collator, collator)) {
@@ -999,11 +1024,10 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
             return !leftPartial;
         }
 
-        // Prefer a non-sparse index over a sparse one: a non-sparse index can use the faster INLJ,
-        // whereas a sparse index is constrained to DILJ. This preserves INLJ when a
-        // non-sparse index on the foreign field is also available.
-        if (left.sparse != right.sparse) {
-            return !left.sparse;
+        // Prefer a non-sparse index over a sparse (or sparse-like, i.e. wildcard) one, since it
+        // can use the faster INLJ instead of DILJ.
+        if (isEffectivelySparse(left) != isEffectivelySparse(right)) {
+            return !isEffectivelySparse(left);
         }
         const auto nFieldsLeft = left.keyPattern.nFields();
         const auto nFieldsRight = right.keyPattern.nFields();
@@ -1019,9 +1043,22 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
     });
     // Indexes with compatible collation are at the front.
     for (const auto& index : indexes) {
-        if (isIndexEligibleForRightSideOfLookupPushdown(expCtx, index, foreignField)) {
-            return {index, isIndexCollationCompatible(index, collator)};
+        if (!isIndexEligibleForRightSideOfLookupPushdown(expCtx, index, foreignField)) {
+            continue;
         }
+        if (index.type == INDEX_WILDCARD) {
+            // The raw wildcard IndexEntry's keyPattern is a placeholder (e.g. {"$**": 1}); expand
+            // it into a concrete {foreignField: 1} entry so downstream code can treat it like any
+            // other eligible index.
+            std::vector<IndexEntry> expanded;
+            wildcard_planning::expandWildcardIndexEntry(index, {foreignField}, &expanded);
+            if (expanded.empty()) {
+                // The wildcard index cannot answer 'foreignField'; try the next candidate.
+                continue;
+            }
+            return {expanded[0], isIndexCollationCompatible(expanded[0], collator)};
+        }
+        return {index, isIndexCollationCompatible(index, collator)};
     }
 
     return {boost::none, false};

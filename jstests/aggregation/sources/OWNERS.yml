@@ -31,6 +31,9 @@ filters:
   - "lookup_equijoin_semantics_sparse.js":
     approvers:
       - 10gen/query-execution
+  - "lookup_equijoin_semantics_wildcard.js":
+    approvers:
+      - 10gen/query-execution
   - "lookup_equijoin_semantics_lib.js":
     approvers:
       - 10gen/query-execution

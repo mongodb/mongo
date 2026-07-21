@@ -442,15 +442,20 @@ function setLookupPushdownDisabled(value) {
 })();
 
 (function testWildcardIndex() {
-    // A compatible wildcard index on the foreign collection that matches the foreignField. In this case, it
-    // should not be pushed to SBE.
+    // A compatible, sparse-like wildcard index on the foreignField is pushed to SBE: hash join by
+    // default, or DILJ when hash join is unavailable.
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({"$**": 1}, {name: "wcidx"}));
+    const wildcardPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, wildcardPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        wildcardPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
     // A wildcard index on the foreign collection that excludes the foreignField. In this case, it
@@ -481,19 +486,31 @@ function setLookupPushdownDisabled(value) {
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
-    // A compatible wildcard index with no other SBE compatible indexes should use classic.
+    // A compatible scoped wildcard index ("b.$**") covers its own root field "b" and is pushed to
+    // SBE the same way a full wildcard index is.
+    const scopedWildcardOnBPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, scopedWildcardOnBPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        scopedWildcardOnBPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
+    // The same scoped wildcard index also covers sub-paths under "b".
+    const scopedWildcardOnBDotCPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b.c", as: "out"}},
+    ];
+    runTest(coll, scopedWildcardOnBDotCPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b.c", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        scopedWildcardOnBDotCPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
     // A compatible index with incompatible collations should use HJ
@@ -504,15 +521,22 @@ function setLookupPushdownDisabled(value) {
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
+    // A wildcard index with an inclusion projection that covers the foreignField is pushed to SBE
+    // the same way a full wildcard index is.
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(
         foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1}}),
     );
+    const inclusionWildcardPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, inclusionWildcardPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        inclusionWildcardPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
     // A compatible wildcard index with a compatible regular index over the foreignField. We should
@@ -526,18 +550,22 @@ function setLookupPushdownDisabled(value) {
     );
     assert.commandWorked(foreignColl.dropIndexes());
 
-    // The index can be used in classic so lookup is not pushed but classic does not use it at the end.
+    // A wildcard index covering the foreignField is pushed to SBE regardless of an earlier $match
+    // on an unrelated field.
     assert.commandWorked(
         foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1, c: 1}}),
     );
+    const matchThenLookupPipeline = [
+        {$match: {"c.d": 1}},
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, matchThenLookupPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [
-            {$match: {"c.d": 1}},
-            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
-        ],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        matchThenLookupPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
         null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
     assert.commandWorked(foreignColl.deleteOne(mkDoc));
     assert.commandWorked(foreignColl.dropIndexes());

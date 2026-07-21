@@ -68,6 +68,7 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_sparse.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_wildcard.js
     - jstests/aggregation/explain/explain_limit.js
     - jstests/aggregation/sources/densify/generated_limit.js
     - jstests/aggregation/sources/unionWith/unionWith.js

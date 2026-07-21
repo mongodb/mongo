@@ -4,6 +4,9 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/index_path_projection.h"
+#include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -27,6 +30,23 @@
 
 namespace {
 using namespace mongo;
+
+/**
+ * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
+ */
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp, WildcardProjection* wcProjection = nullptr) {
+    return {kp,
+            IndexNames::nameToType(IndexNames::findPluginName(kp)),
+            IndexConfig::kLatestIndexVersion,
+            false,
+            {},
+            {},
+            false,
+            false,
+            CoreIndexInfo::Identifier("test_foo"),
+            {},
+            wcProjection};
+}
 
 class QueryPlannerPipelinePushdownTest : public QueryPlannerTest {
 protected:
@@ -195,6 +215,51 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookups) {
             "strategy: 'NestedLoopJoin', node: {cscan: {dir:1, filter: {x:1}}}}}}}",
         solution->root()))
         << solution->root()->toString();
+}
+
+TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleLookupUsingWildcardIndex) {
+    // A single-path wildcard index covering the foreign field routes $lookup to SBE's dynamic
+    // indexed loop join. The resulting index scan's key pattern must have the '$_path' component
+    // inserted ahead of the foreign field, since that's the real on-disk key shape of a wildcard
+    // index (see extendWithAggPipeline()).
+    auto wcProjection = WildcardKeyGenerator::createProjectionExecutor(BSON("$**" << 1), BSONObj());
+    secondaryCollMap[kSecondaryNamespace].indexes.push_back(
+        buildSimpleIndexEntry(BSON("$**" << 1), &wcProjection));
+
+    const std::vector<BSONObj> rawPipeline = {
+        fromjson("{$lookup: {from: '" + std::string{kSecondaryNamespace.coll()} +
+                 "', localField: 'x', foreignField: 'y', as: 'out'}}"),
+    };
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    runQueryWithPipeline(fromjson("{x: 1}"), makeInnerPipelineStages(*pipeline.get()));
+
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    ASSERT(!cq->cqPipeline().empty());
+    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
+
+    // The eq_lookup matcher's 'node' field only checks the local-side plan (children[0]); it has
+    // no support for inspecting the foreign-side index scan, so we check that part directly.
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
+        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString_forTest() +
+            "', joinFieldLocal: 'x', joinFieldForeign: 'y', joinField: 'out', "
+            "strategy: 'DynamicIndexedLoopJoin', node: "
+            "{cscan: {dir:1, filter: {x:1}}}}}",
+        solution->root()))
+        << solution->root()->toString();
+
+    auto* eqLookupNode = static_cast<EqLookupNode*>(solution->root());
+    ASSERT_EQUALS(eqLookupNode->children[1]->getType(), STAGE_FETCH);
+    auto* fetchNode = static_cast<FetchNode*>(eqLookupNode->children[1].get());
+    ASSERT_EQUALS(fetchNode->children[0]->getType(), STAGE_IXSCAN);
+    auto* ixScanNode = static_cast<IndexScanNode*>(fetchNode->children[0].get());
+
+    // The real on-disk shape of a wildcard index key is {$_path: 1, <field>: 1}, not just
+    // {<field>: 1}, so '$_path' must be inserted ahead of the foreign field.
+    ASSERT_BSONOBJ_EQ(ixScanNode->index.keyPattern, fromjson("{'$_path': 1, y: 1}"));
+    ASSERT_EQUALS(ixScanNode->index.multikeyPaths.size(), 2U);
+    ASSERT_TRUE(ixScanNode->index.multikey);
+    ASSERT_TRUE(ixScanNode->shouldDedup);
 }
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookupsAndTwoGroups) {

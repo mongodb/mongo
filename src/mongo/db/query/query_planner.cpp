@@ -2041,13 +2041,44 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                 strategy == EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin) {
                 auto ixScan =
                     std::make_unique<IndexScanNode>(lookupStage->getFromNs(), std::move(*idxEntry));
+                if (ixScan->index.type == IndexType::INDEX_WILDCARD) {
+                    // The expanded wildcard IndexEntry's keyPattern is the logical
+                    // {foreignField: 1}, but on-disk keys are {$_path: 1, foreignField: 1}.
+                    // Insert '$_path' so the key pattern (and the 'iets' below) match reality.
+                    BSONObjBuilder newKeyPattern;
+                    size_t idx = 0;
+                    for (auto&& elem : ixScan->index.keyPattern) {
+                        if (idx == ixScan->index.wildcardFieldPos) {
+                            newKeyPattern.append("$_path", 1);
+                        }
+                        newKeyPattern.append(elem);
+                        idx++;
+                    }
+                    ixScan->index.keyPattern = newKeyPattern.obj();
+                    // 'multikeyPaths' must stay the same size as 'keyPattern'.
+                    ixScan->index.multikeyPaths.insert(ixScan->index.multikeyPaths.begin() +
+                                                           ixScan->index.wildcardFieldPos,
+                                                       MultikeyComponents{});
+                    ixScan->index.wildcardFieldPos++;
+                    // 'multikey' on an expanded wildcard entry can't be trusted, and dedup is
+                    // needed across the searched local keys, so force both.
+                    ixScan->index.multikey = true;
+                    ixScan->shouldDedup = true;
+                }
                 BSONObjIterator it(ixScan->index.keyPattern);
-                // For each field in the key add an entry to the interval evaluation tree using a
-                // new input parameter (when the index field is the foreign field) or a full range
-                // otherwise.
+                // For each key field, add an IET entry: a constant point interval for '$_path', a
+                // new input parameter for the foreign field, or a full range otherwise.
                 while (it.more()) {
                     BSONElement kpElt = it.next();
-                    if (lookupStage->getForeignField()->fullPath() == kpElt.fieldNameStringData()) {
+                    if (kpElt.fieldNameStringData() == "$_path"sv) {
+                        OrderedIntervalList oil("$_path");
+                        oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(
+                            lookupStage->getForeignField()->fullPath()));
+                        ixScan->iets.push_back(
+                            interval_evaluation_tree::IET::make<
+                                interval_evaluation_tree::ConstNode>(std::move(oil)));
+                    } else if (lookupStage->getForeignField()->fullPath() ==
+                               kpElt.fieldNameStringData()) {
                         ixScan->iets.push_back(
                             interval_evaluation_tree::IET::make<interval_evaluation_tree::EvalNode>(
                                 nextInternalParam++, MatchExpression::EQ));

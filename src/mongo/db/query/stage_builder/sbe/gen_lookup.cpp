@@ -1009,6 +1009,19 @@ SbStage buildIndexJoinLookupForeignSideStage(
                 break;
             }
         }
+    } else if (index.type == INDEX_WILDCARD && state.getCollatorSlot()) {
+        // Unlike the hashed-index case above, there's no ternary here: this whole branch is
+        // skipped when there's no collator (a wildcard lookup may run with no collation at all),
+        // so reaching this line already means a collator exists.
+        //
+        // The '$_path' component of a wildcard key is always uncollated, so collate only the
+        // value here; 'makeNewKeyStringCall' below skips the collator when building the key.
+        auto [outStage, outSlots] = b.makeProject(std::move(valueGeneratorStage),
+                                                  b.makeFunction(sbe::EFn::kCollComparisonKey,
+                                                                 valueForIndexBound,
+                                                                 SbSlot{*state.getCollatorSlot()}));
+        valueGeneratorStage = std::move(outStage);
+        valueForIndexBound = outSlots[0];
     }
 
     std::vector<std::string> indexFieldNames;
@@ -1060,8 +1073,10 @@ SbStage buildIndexJoinLookupForeignSideStage(
         }
         args.push_back(b.makeInt64Constant(static_cast<int64_t>(discriminator)));
 
+        // Wildcard keys skip the collator here: the value was already collated above, and
+        // '$_path' must stay uncollated.
         sbe::EFn functionName = sbe::EFn::kKs;
-        if (state.getCollatorSlot()) {
+        if (state.getCollatorSlot() && index.type != INDEX_WILDCARD) {
             functionName = sbe::EFn::kCollKs;
             args.emplace_back(SbSlot{*state.getCollatorSlot()});
         }
@@ -1257,6 +1272,7 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     const IndexBoundsEvaluationInfo& indexBoundsEvaluationInfo,
     bool collationCompatibleForDilj,
     bool indexIsSparse,
+    bool indexIsWildcard,
     const MatchExpression* partialFilterExpr,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
@@ -1295,12 +1311,14 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     //   - Sparse index: a null or missing local key (both encoded as 'null' in the local key set
     //     by buildKeySetForLocal) must use the scan, since a sparse index omits foreign documents
     //     that are missing the field.
+    //   - Wildcard index: array/object local keys must use the scan, since a wildcard index
+    //     stores one key per sub-field rather than one key for the whole value.
     //   - Partial index: the index only contains foreign docs satisfying its filter, so the index
     //     branch is safe for a local key only if that key satisfies the filter (handled separately
     //     below, since it requires evaluating the filter rather than a type check).
-    // The collation/sparse checks are folded into a single type mask: 'traverseF' returns true if
-    // any key in the set matches the mask, so the guard is the negation, "no local key matches the
-    // disallowed types".
+    // The collation/sparse/wildcard checks are folded into a single type mask: 'traverseF' returns
+    // true if any key in the set matches the mask, so the guard is the negation, "no local key
+    // matches the disallowed types".
     SbExpr::Vector gateConditions;
     // Single local key materialized for the partial filter condition (see below).
     boost::optional<SbSlot> localKeySlot;
@@ -1324,6 +1342,9 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     }
     if (indexIsSparse) {
         typeMask |= getBSONTypeMask(BSONType::null);
+    }
+    if (indexIsWildcard) {
+        typeMask |= getBSONTypeMask(BSONType::array) | getBSONTypeMask(BSONType::object);
     }
     if (typeMask) {
         gateConditions.push_back(makeNoLocalKeyMatchesGuard(typeMask));
@@ -1373,9 +1394,10 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
         }
     }
 
-    // DILJ is only chosen when at least one reason (incompatible collation, sparse, or partial)
-    // holds. If none produced a gate condition, default to always taking the index branch. When
-    // multiple apply they are AND-ed: the index branch is safe only if every reason permits it.
+    // DILJ is only chosen when at least one reason (incompatible collation, sparse, wildcard, or
+    // partial) holds. If none produced a gate condition, default to always taking the index
+    // branch. When multiple apply they are AND-ed: the index branch is safe only if every reason
+    // permits it.
     auto filter = gateConditions.empty()
         ? b.makeBoolConstant(true)
         : (gateConditions.size() == 1
@@ -1725,6 +1747,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
                         indexInfo,
                         eqLookupNode->collationCompatibleForDilj,
                         indexScan->index.sparse,
+                        indexScan->index.type == IndexType::INDEX_WILDCARD,
                         indexScan->index.filterExpr,
                         eqLookupNode->nodeId(),
                         eqLookupNode->unwindSpec,

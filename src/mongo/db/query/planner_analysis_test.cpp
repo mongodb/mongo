@@ -6,6 +6,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
@@ -65,13 +66,38 @@ TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
         WildcardKeyGenerator::createProjectionExecutor(keyPattern, BSON("b" << 0));
     auto incompatibleWcIndex = buildSimpleIndexEntry(keyPattern, &wcProjectionExclude);
 
+    BSONObj compoundKeyPattern = BSON("a" << 1 << "$**" << 1);
+    auto compoundWcProjection =
+        WildcardKeyGenerator::createProjectionExecutor(compoundKeyPattern, BSONObj());
+    auto compoundWcIndex = buildSimpleIndexEntry(compoundKeyPattern, &compoundWcProjection);
+
+    // A partial single-path wildcard index covering the foreign field is still classic-only:
+    // DILJ's runtime guards don't account for documents excluded by a partial filter.
+    AlwaysTrueMatchExpression partialFilterExpr;
+    auto partialWcIndex = buildSimpleIndexEntry(keyPattern, &wcProjection);
+    partialWcIndex.filterExpr = &partialFilterExpr;
+
     auto sbeIndex = buildSimpleIndexEntry(BSON("b" << 1));
 
     // There are no indexes.
     ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
         expCtx, foreignField, indexList));
-    // A single index that is wildcard index that can be used only in classic.
+    // A single-path wildcard index covering the foreign field can now be used in SBE via the
+    // dynamic indexed loop join, so it must NOT force the $lookup into the classic engine.
     indexList.push_back(compatibleWcIndex);
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
+
+    // A compound wildcard index covering the foreign field is still classic-only: SBE only
+    // supports single-path wildcard indexes for $lookup pushdown.
+    indexList.clear();
+    indexList.push_back(compoundWcIndex);
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
+
+    // A partial wildcard index covering the foreign field is also classic-only.
+    indexList.clear();
+    indexList.push_back(partialWcIndex);
     ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
         expCtx, foreignField, indexList));
 
@@ -87,9 +113,10 @@ TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
     ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
         expCtx, foreignField, indexList));
 
-    // A wildcard index that can be used in classic and a second index that can be used in SBE.
+    // A compound wildcard index that can only be used in classic, plus a second index that can be
+    // used in SBE.
     indexList.clear();
-    indexList.push_back(compatibleWcIndex);
+    indexList.push_back(compoundWcIndex);
     indexList.push_back(sbeIndex);
     ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
         expCtx, foreignField, indexList));
