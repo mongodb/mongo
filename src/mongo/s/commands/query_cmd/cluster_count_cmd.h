@@ -505,7 +505,8 @@ public:
                         return shape_helpers::tryMakeShape<query_shape::CountCmdShape>(
                             *parsedFind,
                             countRequestForShard.getLimit().has_value(),
-                            countRequestForShard.getSkip().has_value());
+                            countRequestForShard.getSkip().has_value(),
+                            countRequestForShard.getRawData().value_or(false));
                     }};
 
                     CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {

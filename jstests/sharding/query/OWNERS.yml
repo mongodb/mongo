@@ -30,6 +30,9 @@ filters:
   - "sharded_profile.js":
     approvers:
       - 10gen/query-integration-observability
+  - "count_explain_raw_data_query_shape.js":
+    approvers:
+      - 10gen/query-integration-observability
   - "authwhere.js":
     approvers:
       - 10gen/query-integration-features
