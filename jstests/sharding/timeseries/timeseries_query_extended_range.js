@@ -10,8 +10,12 @@
  * ]
  */
 
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {
+    getTimeseriesCollForDDLOps,
+    isViewlessTimeseriesOnlySuite,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getAggPlanStages, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -434,5 +438,108 @@ let testCases = [
 for (let tc of testCases) {
     runTimeSeriesExtendedRangeTest(st, tc);
 }
+
+// Verifies fixed-bucket optimizations are gated per-shard, not by the router: for the same
+// aligned, otherwise-prunable predicate, a shard with extended-range data must keep its event
+// filter and skip the _id predicate optimization, while a shard without it gets both.
+(function testFixedBucketEventFilterRespectsPerShardExtendedRange() {
+    const db = st.getDB(dbName);
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingOptimizations")) {
+        return;
+    }
+
+    if (!isViewlessTimeseriesOnlySuite(db)) {
+        // Fixed bucketing relies on catalog state that only exists for viewless timeseries
+        // collections. In suites that may still create legacy "viewful" collections (e.g.
+        // sharding_legacy_timeseries_no_rawdata_gen, or FCV upgrade/downgrade suites where
+        // viewful collections are still the default), this test isn't guaranteed to observe
+        // 'fixedBuckets: true' in explain output.
+        jsTest.log.info(
+            "Skipping testFixedBucketEventFilterRespectsPerShardExtendedRange because the suite " +
+                "may use legacy viewful timeseries collections",
+        );
+        return;
+    }
+
+    const fbCollName = "fixedBucketColl";
+    const fbFullCollName = `${dbName}.${fbCollName}`;
+    const metaFieldName = "meta";
+
+    assert.commandWorked(
+        db.adminCommand({
+            shardCollection: fbFullCollName,
+            key: {[metaFieldName]: 1},
+            timeseries: {
+                timeField: timeFieldName,
+                metaField: metaFieldName,
+                bucketMaxSpanSeconds: 3600,
+                bucketRoundingSeconds: 3600,
+            },
+        }),
+    );
+    const fbColl = db.getCollection(fbCollName);
+    const fbBucketsCollName = getTimeseriesCollForDDLOps(db, fbCollName);
+
+    // Split into two chunks at a boundary between the meta value used for extended-range
+    // (pre-1970) data and the one used for standard-range data.
+    assert.commandWorked(st.splitAt(`${dbName}.${fbBucketsCollName}`, {[metaFieldName]: 1}));
+
+    // Insert before moving chunks so both inserts land deterministically on the primary shard;
+    // the subsequent moveChunk then migrates the upper chunk's data along with it.
+    assert.commandWorked(
+        fbColl.insert([
+            // Extended-range data; stays on the primary shard (shard0).
+            {[timeFieldName]: ISODate("1965-01-01T00:00:00Z"), [metaFieldName]: 0},
+            {[timeFieldName]: ISODate("1965-01-01T01:00:00Z"), [metaFieldName]: 0},
+            // Standard-range data; its chunk moves to shard1 below.
+            {[timeFieldName]: ISODate("2020-01-01T00:00:00Z"), [metaFieldName]: 1},
+            {[timeFieldName]: ISODate("2020-01-01T01:00:00Z"), [metaFieldName]: 1},
+        ]),
+    );
+
+    // Move the upper chunk (and its data) off of the primary shard.
+    assert.commandWorked(
+        st.moveChunk(`${dbName}.${fbBucketsCollName}`, {[metaFieldName]: 1}, st.shard1.shardName),
+    );
+
+    // Aligned to the hour bucket boundary, so the event filter is prunable wherever there's no
+    // extended-range data.
+    const pipeline = [{$match: {[timeFieldName]: {$lt: ISODate("2020-01-01T01:00:00Z")}}}];
+
+    const explain = fbColl.explain().aggregate(pipeline);
+    const explainShards = explain.shards;
+    assert.eq(Object.keys(explainShards).length, 2, {explain});
+    for (let shard in explainShards) {
+        // shard0 has extended-range data, so its event filter must not be pruned and it must not
+        // get an _id predicate; the other shard has none, so both optimizations should apply.
+        const hasExtendedRangeData = shard === st.shard0.shardName;
+
+        const unpackStages = getAggPlanStages(explainShards[shard], "$_internalUnpackBucket");
+        assert.eq(unpackStages.length, 1, {explain});
+        const unpackStage = unpackStages[0]["$_internalUnpackBucket"];
+        assert.eq(unpackStage.hasOwnProperty("eventFilter"), hasExtendedRangeData, {
+            shard,
+            unpackStage,
+        });
+
+        const parsedQuery = getQueryPlanner(explainShards[shard]).parsedQuery;
+        const preds = parsedQuery["$and"] || [parsedQuery];
+        const idPreds = preds.filter((pred) => pred.hasOwnProperty("_id"));
+        assert.eq(idPreds.length, hasExtendedRangeData ? 0 : 1, {shard, parsedQuery});
+    }
+
+    const results = fbColl.aggregate(pipeline).toArray();
+    assert.sameMembers(
+        [
+            ISODate("1965-01-01T00:00:00Z"),
+            ISODate("1965-01-01T01:00:00Z"),
+            ISODate("2020-01-01T00:00:00Z"),
+        ],
+        results.map((d) => d[timeFieldName]),
+        {results},
+    );
+
+    fbColl.drop();
+})();
 
 st.stop();

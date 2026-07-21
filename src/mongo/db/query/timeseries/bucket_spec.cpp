@@ -442,9 +442,7 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
             // to the buckets before unpacking. So we can use default values
             // for the rest of the arguments.
         };
-        // TODO SERVER-131496: this leaves 'usesExtendedRange' defaulted to false, so the bucket
-        // predicate generator selection below ignores extended-range data on the write path. It
-        // should be set from expCtx->getRequiresTimeseriesExtendedRangeSupport().
+        bucketSpec.setUsesExtendedRange(expCtx->getRequiresTimeseriesExtendedRangeSupport());
         auto bucketPredicate =
             createPredicatesOnBucketLevelField(residualPred.get(),
                                                bucketSpec,

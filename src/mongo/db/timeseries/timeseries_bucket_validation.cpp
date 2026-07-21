@@ -541,8 +541,12 @@ void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
                             const BSONObj& controlMin,
                             const BSONObj& controlMax,
                             bool criticalValidationOnly) {
-    const bool fixedBucketingEnabled = canUseFixedBucketOptimizations(timeseriesOptions);
     auto minTimestamp = controlMin[timeseriesOptions.getTimeField()].Date();
+    // Only 'minTimestamp' needs to be checked for extended range here: the sole check gated by
+    // 'fixedBucketingEnabled' below just validates that 'control.min' is aligned to the fixed
+    // bucket boundary.
+    const bool fixedBucketingEnabled = canUseFixedBucketOptimizations(
+        timeseriesOptions, timeseries::dateOutsideStandardRange(minTimestamp));
     auto maxTimestamp = controlMax[timeseriesOptions.getTimeField()].Date();
     auto bucketMaxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
     if (maxTimestamp - minTimestamp >= Seconds(*bucketMaxSpanSeconds) && !criticalValidationOnly) {

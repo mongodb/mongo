@@ -8,7 +8,7 @@
  *     uses_explain,
  *     # We need a timeseries collection.
  *     requires_timeseries,
- *     requires_fcv_71,
+ *     requires_fcv_90,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
  *     # Refusing to run a test that issues an aggregation command with explain because it may
@@ -23,7 +23,6 @@
  * ]
  */
 
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 (function () {
@@ -129,20 +128,8 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
 
     ///
     // These tests will validate the group stage is rewritten when the '_id' field has a $dateTrunc
-    // expression. Some rewrites can only be performed if we are on mongod, since the
-    // `requiresTimeseriesExtendedRangeSupport` flag may not be accurate on mongos.
+    // expression.
     ///
-    const isMongos = FixtureHelpers.isMongos(db);
-    // Detect if jstests/libs/override_methods/implicitly_shard_accessed_collections.js is in
-    // use
-    const useImplicitSharding = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
-    // TODO (SERVER-94666) revisit conditions in which query-level rewrites can be applied, specifically
-    // for untracked collections
-    const isCollectionUntracked =
-        !isMongos ||
-        (isMongos &&
-            !TestData.implicitlyTrackUnshardedCollectionOnCreation &&
-            !useImplicitSharding);
 
     const groupByDateTrunc_ExpectRewrite = [
         // Validate the rewrite occurs with a simple case, where the bucket boundary and 'unit' are the
@@ -212,7 +199,7 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
                     accmax: 7,
                 },
             ],
-            rewriteExpected: isCollectionUntracked,
+            rewriteExpected: true,
         },
 
         // Validate the rewrite occurs with a timezone with the same hourly boundaries, and
@@ -236,7 +223,7 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
                 {_id: {"m": "MDB", t: ISODate("2022-09-29T16:00:00Z")}, accmin: 1, accmax: 6},
                 {_id: {"m": "MDB", t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7},
             ],
-            rewriteExpected: isCollectionUntracked,
+            rewriteExpected: true,
         },
 
         // The 'unit' field in $dateTrunc is larger than 'week', but 'bucketMaxSpanSeconds' is less than
@@ -398,6 +385,39 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
             checkRewrite({pipeline: testCase.pipeline, rewriteExpected: false});
             checkResults(testCase);
         });
+    })();
+
+    // Validate the rewrite does not apply when the collection has extended-range measurements
+    // (timestamps outside [1970-01-01, 2038-01-19]), even though the $dateTrunc expression aligns
+    // with the bucket boundaries. Extended-range buckets can be clamped so that 'control.min' does
+    // not equal the true rounded minimum, so bucket-level fields can't safely stand in for the
+    // unpacked measurements.
+    (function testExtendedRangeData_NoRewrite() {
+        setUpSmallCollection({
+            roundingParam: 3600,
+            startingTime: ISODate("2022-09-30T15:00:00.000Z"),
+        });
+        const extendedRangeDocs = [
+            {
+                [timeField]: ISODate("1969-01-01T00:00:00Z"),
+                [metaField]: "MDB",
+                [measurementField]: 42,
+            },
+        ];
+        assert.commandWorked(coll.insertMany(extendedRangeDocs));
+        assert.commandWorked(collNonTs.insertMany(extendedRangeDocs));
+
+        const pipeline = [
+            {
+                $group: {
+                    _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "hour"}}},
+                    accmin: {$min: `$${measurementField}`},
+                    accmax: {$max: `$${measurementField}`},
+                },
+            },
+        ];
+        checkRewrite({pipeline, rewriteExpected: false});
+        checkResults({pipeline});
     })();
 
     (function testCollMod() {

@@ -150,6 +150,10 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
             "Timeseries collections must have timeseries options",
             timeseriesFields.has_value());
 
+    // TypeCollectionTimeseriesFields carries no usesExtendedRange info, so the router cannot know
+    // whether it's safe to apply fixed-bucket optimizations; omitting the argument conservatively
+    // disables them. Shards set fixedBuckets correctly via
+    // populateUnpackBucketStagesFromCollection.
     return TimeseriesTranslationParams{
         timeseriesFields->getTimeseriesOptions(),
         !timeseriesFields->getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true),
@@ -176,7 +180,8 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
     return TimeseriesTranslationParams{
         collPtr->getTimeseriesOptions().get(),
         !collPtr->getTimeseriesMixedSchemaBucketsState().mustConsiderMixedSchemaBucketsInReads(),
-        canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions())};
+        canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions(),
+                                       collPtr->getRequiresTimeseriesExtendedRangeSupport())};
 }
 
 template <class T>
@@ -252,8 +257,9 @@ void populateUnpackBucketStagesFromCollection(Pipeline& pipeline, const Collecti
             }
 
             if (!unpack->fixedBuckets()) {
-                unpack->setFixedBuckets(
-                    canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions()));
+                unpack->setFixedBuckets(canUseFixedBucketOptimizations(
+                    *collPtr->getTimeseriesOptions(),
+                    collPtr->getRequiresTimeseriesExtendedRangeSupport()));
             }
 
             if (!unpack->usesExtendedRange()) {

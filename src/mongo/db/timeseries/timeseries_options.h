@@ -12,6 +12,8 @@
 
 #include <utility>
 
+#include <boost/optional.hpp>
+
 [[MONGO_MOD_PUBLIC]];
 
 namespace mongo::timeseries {
@@ -20,9 +22,13 @@ namespace mongo::timeseries {
  * Evaluates whether fixed-bucket query optimizations can be used.
  *
  * Returns true if fixed-bucket query optimizations are enabled (via
- * featureFlagFixedBucketingOptimizations) and applicable to the specified timeseries options.
+ * featureFlagFixedBucketingOptimizations), applicable to the specified timeseries options, and the
+ * caller has confirmed there is no extended-range data to worry about. 'hasExtendedRangeData' is
+ * boost::none when the caller cannot determine this (e.g. on the router, which lacks per-shard
+ * extended-range information) and the optimizations must conservatively be disabled.
  */
-bool canUseFixedBucketOptimizations(const TimeseriesOptions& options);
+bool canUseFixedBucketOptimizations(const TimeseriesOptions& options,
+                                    boost::optional<bool> hasExtendedRangeData = boost::none);
 
 /**
  * Evaluates whether the transition of timeseries granularities is valid (returning Status::OK if

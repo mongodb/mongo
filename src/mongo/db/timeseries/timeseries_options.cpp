@@ -110,10 +110,12 @@ Status checkBucketingParameters(TimeseriesOptions& timeseriesOptions,
 
 }  // namespace
 
-bool canUseFixedBucketOptimizations(const TimeseriesOptions& options) {
+bool canUseFixedBucketOptimizations(const TimeseriesOptions& options,
+                                    boost::optional<bool> hasExtendedRangeData) {
     return feature_flags::gFixedBucketingOptimizations.isEnabled() &&
         options.getFixedBucketing().value_or(false) &&
-        options.getBucketMaxSpanSeconds() == options.getBucketRoundingSeconds();
+        options.getBucketMaxSpanSeconds() == options.getBucketRoundingSeconds() &&
+        hasExtendedRangeData.has_value() && !hasExtendedRangeData.value();
 }
 
 Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& currentOptions,

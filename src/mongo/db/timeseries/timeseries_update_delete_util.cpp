@@ -295,13 +295,17 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
         : std::unique_ptr<MatchExpression>{};
 
     // Translate the time field predicate into a predicate on the bucket-level time field.
+    // The router has no visibility into shard-local bucket data, so we must conservatively
+    // assume extended-range data may be present to avoid an unsafe optimization.
+    BucketSpec routingBucketSpec{
+        std::string{tsOptions.getTimeField()},
+        metaField.map([](std::string_view s) { return std::string{s}; }),
+    };
+    routingBucketSpec.setUsesExtendedRange(true);
     std::unique_ptr<MatchExpression> timeBucketPred = timeOnlyPred
         ? BucketSpec::createPredicatesOnBucketLevelField(
               timeOnlyPred.get(),
-              BucketSpec{
-                  std::string{tsOptions.getTimeField()},
-                  metaField.map([](std::string_view s) { return std::string{s}; }),
-              },
+              routingBucketSpec,
               *tsOptions.getBucketMaxSpanSeconds(),
               expCtx,
               false /*haveComputedMetaField*/,
@@ -330,7 +334,8 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
     const BSONObj& writeQuery) {
-    const bool fixedBuckets = canUseFixedBucketOptimizations(tsOptions);
+    const bool fixedBuckets = canUseFixedBucketOptimizations(
+        tsOptions, expCtx->getRequiresTimeseriesExtendedRangeSupport());
     auto [metaOnlyExpr, bucketMetricExpr, residualExpr] =
         BucketSpec::getPushdownPredicates(expCtx,
                                           tsOptions,

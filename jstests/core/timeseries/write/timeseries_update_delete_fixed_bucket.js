@@ -6,6 +6,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   requires_fcv_90,
  *   featureFlagTimeseriesUpdatesSupport,
  *   featureFlagFixedBucketingOptimizations,
  *  # TODO SERVER-76583: Remove following two tags.
@@ -222,6 +223,53 @@ import {
         });
     })();
 
+    // Confirms the fixed-bucket write-path optimization is disabled for the whole collection once
+    // any extended-range measurement is present, even though the target bucket for this update is
+    // itself a normal, non-extended-range bucket. Omits the '_id' bound used in the equivalent
+    // aligned-predicate tests above, since that bound is unsafe once extended-range data is
+    // present (an ObjectId's embedded timestamp can't represent dates outside the standard range).
+    (function testUpdateOne_ExtendedRangeData() {
+        const extendedRangeDoc = {
+            [timeFieldName]: ISODate("1965-01-01T00:00:00Z"),
+            [metaFieldName]: 2,
+            _id: 10,
+            a: 1,
+        };
+        testFindOneAndUpdate({
+            initialDocList: [
+                extendedRangeDoc,
+                doc_b_start_time,
+                doc_a_late_time,
+                doc_a_latest_time,
+            ],
+            cmd: {
+                filter: {[timeFieldName]: {$gte: times[3]}},
+                update: {$set: {a: 10}},
+            },
+            res: {
+                resultDocList: [
+                    extendedRangeDoc,
+                    doc_b_start_time,
+                    doc_a_late_time,
+                    {...doc_a_latest_time, a: 10},
+                ],
+                returnDoc: doc_a_latest_time,
+                bucketFilter: makeBucketFilter({
+                    $and: [
+                        {"control.max.time": {$_internalExprGte: times[3]}},
+                        {"control.min.time": {$_internalExprGte: startingTime}},
+                    ],
+                }),
+                // The optimization must not drop this: it stays equal to the original predicate.
+                residualFilter: {[timeFieldName]: {$gte: times[3]}},
+                nBucketsUnpacked: 1,
+                nMatched: 1,
+                nModified: 1,
+            },
+            timeseriesOptions: tsOptions,
+        });
+    })();
+
     /**
      * The following tests confirm that the predicates generated from the fixed bucket rewrites
      * return the expected results for delete commands.
@@ -324,6 +372,49 @@ import {
                     ],
                 }),
                 residualFilter: {},
+                nBucketsUnpacked: 1,
+                nReturned: 1,
+            },
+            timeseriesOptions: tsOptions,
+        });
+    })();
+
+    // Confirms the fixed-bucket write-path optimization is not applied when the collection
+    // contains extended-range data (timestamps outside the standard [1970-01-01, 2038-01-19]
+    // range), mirroring the read-path coverage in bucket_unpacking_with_match_fixed_buckets.js
+    // and bucket_unpacking_group_reorder_fixed_buckets.js. canUseFixedBucketOptimizations() must
+    // return false for the whole collection once any extended-range measurement is present, even
+    // though the target bucket for this delete is otherwise a normal, non-extended-range bucket.
+    // Uses the same '$gte times[3]' predicate as testFindOneAndRemove_NoFilter above, which is
+    // bucket-boundary-aligned and would have its residualFilter dropped if fixedBuckets were
+    // (incorrectly) applied. As with the update case above, there's no '_id' bound either, since
+    // that predicate is unsafe once extended-range data is present.
+    (function testDeleteOne_ExtendedRangeData() {
+        const extendedRangeDoc = {
+            [timeFieldName]: ISODate("1965-01-01T00:00:00Z"),
+            [metaFieldName]: 2,
+            _id: 10,
+            a: 1,
+        };
+        testFindOneAndRemove({
+            initialDocList: [
+                extendedRangeDoc,
+                doc_b_start_time,
+                doc_a_late_time,
+                doc_a_latest_time,
+            ],
+            cmd: {filter: {[timeFieldName]: {$gte: times[3]}}},
+            res: {
+                expectedDocList: [extendedRangeDoc, doc_b_start_time, doc_a_late_time],
+                nDeleted: 1,
+                bucketFilter: makeBucketFilter({
+                    $and: [
+                        {"control.max.time": {$_internalExprGte: times[3]}},
+                        {"control.min.time": {$_internalExprGte: startingTime}},
+                    ],
+                }),
+                // The optimization must not drop this: it stays equal to the original predicate.
+                residualFilter: {[timeFieldName]: {$gte: times[3]}},
                 nBucketsUnpacked: 1,
                 nReturned: 1,
             },

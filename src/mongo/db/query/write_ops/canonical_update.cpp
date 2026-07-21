@@ -72,6 +72,9 @@ TranslatedTimeseriesUpdate maybeTranslateTimeseriesUpdate(
             "Cannot perform an updateOne or a findAndModify with a query and sort on a time-series "
             "collection.",
             request.isMulti() || request.getSort().isEmpty());
+    if (collection && collection->getRequiresTimeseriesExtendedRangeSupport()) {
+        expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+    }
 
     // If we're updating documents in a time-series collection, splits the match expression into a
     // bucket-level match expression and a residual expression so that we can push down the

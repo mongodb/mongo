@@ -6,7 +6,7 @@
  *     uses_explain,
  *     # We need a timeseries collection.
  *     requires_timeseries,
- *     requires_fcv_71,
+ *     requires_fcv_90,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
  *     # Refusing to run a test that issues an aggregation command with explain because it may
@@ -14,6 +14,11 @@
  *     does_not_support_stepdowns,
  *     featureFlagFixedBucketingOptimizations,
  *     requires_getmore,
+ *     # checkExplain() asserts there is exactly one $_internalUnpackBucket stage, but
+ *     # getAggPlanStages() returns one match per shard for a sharded explain. If the balancer
+ *     # moves this collection's chunks across shards mid-test, the assertion can see more than
+ *     # one stage even though each shard's plan is individually correct.
+ *     assumes_balancer_off,
  * ]
  */
 
@@ -405,5 +410,48 @@ function generateRandomTimestamp() {
     checkRandomTestResult(
         [{$match: {[timeField]: {$gte: generateRandomTimestamp()}}}],
         false /* shouldCheckExplain */,
+    );
+})();
+
+// Verify event filter is absent for an aligned $lt predicate on a fixed-bucket collection.
+// This exercises the shard-side prune pass: after the router processes the pipeline with
+// fixedBuckets=false (setting an eventFilter), the shard sets fixedBuckets=true and should
+// prune the now-redundant eventFilter.
+(function testAlignedLtPredicateRemovesEventFilter() {
+    coll.drop();
+    // Set bucketMaxSpanSeconds == bucketRoundingSeconds to satisfy canUseFixedBucketOptimizations.
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {
+                timeField,
+                metaField,
+                bucketMaxSpanSeconds: 3600,
+                bucketRoundingSeconds: 3600,
+            },
+        }),
+    );
+
+    // Insert documents spanning two bucket boundaries (each bucket is 1 hour).
+    assert.commandWorked(
+        coll.insertMany([
+            {[timeField]: ISODate("2024-01-01T08:00:00Z"), [metaField]: "a", x: 1},
+            {[timeField]: ISODate("2024-01-01T08:30:00Z"), [metaField]: "a", x: 2},
+            {[timeField]: ISODate("2024-01-01T09:00:00Z"), [metaField]: "a", x: 3},
+            {[timeField]: ISODate("2024-01-01T09:30:00Z"), [metaField]: "a", x: 4},
+        ]),
+    );
+
+    // Predicate aligned to the hour boundary: $lt 09:00 covers the [08:00, 09:00) bucket exactly.
+    const pipeline = [{$match: {[timeField]: {$lt: ISODate("2024-01-01T09:00:00Z")}}}];
+
+    // Verify no eventFilter or wholeBucketFilter in the explain (null = absent).
+    checkExplain(pipeline, null, null, true, true);
+
+    // Verify correct results: only x:1 and x:2 are before 09:00.
+    const results = coll.aggregate(pipeline).toArray();
+    assert.sameMembers(
+        results.map((d) => d.x),
+        [1, 2],
+        {results},
     );
 })();

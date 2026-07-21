@@ -1791,6 +1791,34 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
         }
     }
 
+    // Shard-side event filter pruning for fixed buckets.
+    // A pipeline that arrived from the router with fixedBuckets=false will have its post-unpack
+    // $match already processed: a loose $match inserted before us, and _eventFilter set inside us.
+    // After populateUnpackBucketStagesFromCollection sets fixedBuckets=true, we check here whether
+    // the event filter is made redundant by the fixed-bucket alignment guarantee. Safety checks:
+    //   1. fixedBuckets=true and !usesExtendedRange (no clamping near Date_t::min()).
+    //   2. _eventFilter is present.
+    //   3. A $match stage immediately precedes us (belt-and-suspenders: confirms the bucket-level
+    //      filter actually exists before we drop per-event evaluation).
+    //   4. createPredicatesOnBucketLevelField returns rewriteProvidesExactMatchPredicate=true
+    //      (the predicate is aligned to bucket boundaries, so the bucket filter is tight).
+    if (_fixedBuckets && !usesExtendedRange() && _sharedState->_eventFilter &&
+        itr != container->begin() &&
+        dynamic_cast<const DocumentSourceMatch*>(std::prev(itr)->get())) {
+        auto predicates = createPredicatesOnBucketLevelField(_sharedState->_eventFilter.get());
+        if (predicates.rewriteProvidesExactMatchPredicate) {
+            _sharedState->_eventFilter.reset();
+            _eventFilterBson = {};
+            _eventFilterDeps = DepsTracker{};
+            // The router (which didn't yet know fixedBuckets=true) may have already computed a
+            // wholeBucketFilter alongside the now-redundant event filter. As elsewhere in this
+            // file: if the event filter is dropped, a wholeBucketFilter is no longer needed.
+            _sharedState->_wholeBucketFilter.reset();
+            _wholeBucketFilterBson = {};
+            return itr;
+        }
+    }
+
     if (std::next(itr) == container->end()) {
         return container->end();
     }

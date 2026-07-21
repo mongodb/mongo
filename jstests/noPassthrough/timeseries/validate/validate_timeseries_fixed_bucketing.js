@@ -17,7 +17,11 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
-const conn = MongoRunner.runMongod();
+// Raw bucket inserts deliberately construct misaligned buckets to be caught by validate() later.
+// timeseriesLessStrictBucketValidator relaxes the write-path document validator (which otherwise
+// enforces the same fixed-bucketing rounding invariant) so those inserts succeed; it does not
+// affect the validate() command itself.
+const conn = MongoRunner.runMongod({setParameter: {timeseriesLessStrictBucketValidator: true}});
 const db = conn.getDB(jsTestName());
 
 // TODO(SERVER-127534): Remove once featureFlagFixedBucketingCatalog is on by default.
