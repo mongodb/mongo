@@ -273,6 +273,9 @@ export function getTimeSeriesIndexModel({allowPartialIndexes = false, allowColla
 }
 
 export function getIndexesModel({isTS = false, minNumIndexes = 0, maxNumIndexes = 15} = {}) {
+    // Index model needs to change if we're in a time-series passthrough, since TS collections
+    // and regular collections don't support the same index types.
+    isTS = TestData.isTimeseriesTestSuite || isTS;
     const indexModel = isTS ? getTimeSeriesIndexModel() : getIndexModel();
     return fc.array(indexModel, {minLength: minNumIndexes, maxLength: maxNumIndexes, size: "+2"});
 }

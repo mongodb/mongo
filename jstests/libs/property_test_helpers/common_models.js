@@ -11,6 +11,7 @@ import {
     getTrySbeRestrictedPushdownEligibleAggPipelineArb,
     getTrySbeEnginePushdownEligibleAggPipelineArb,
     getSbeFullPushdownEligibleAggPipelineArb,
+    getSortArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 import {
     simpleProjectArb,
@@ -25,6 +26,7 @@ import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.j
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
+import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 
 export function createStabilityWorkload(numQueriesPerRun) {
     // TODO SERVER-108077: when this ticket is complete, remove filters and allow ORs.
@@ -223,4 +225,21 @@ export function topLevelOrAggModel({is83orAbove = true} = {}) {
         });
 
     return aggModel;
+}
+
+// Creates a model where all stages are eligible to be pushed to the find layer.
+export function findLayerOnlyPipeline({is83orAbove = true} = {}) {
+    const matchModel = getMatchArb().filter(
+        // Older versions suffer from SERVER-101007
+        // TODO SERVER-114269 remove this check.
+        (match) => is83orAbove || !JSON.stringify(match).includes('"$elemMatch"'),
+    );
+    // Limit/skip are not included so results are deterministic.
+    const findLayerStageArb = oneof(
+        simpleProjectArb,
+        multipleFieldProjectArb,
+        matchModel,
+        getSortArb(),
+    );
+    return fc.array(findLayerStageArb, {minLength: 0, maxLength: 4});
 }
