@@ -49,6 +49,12 @@ structs:
                     write for it"
                 optional: true
                 type: bool
+            term:
+                description:
+                    "Replication term observed for the participant when the sub-router
+                    contacted it."
+                optional: true
+                type: long
 
     TxnResponseMetadata:
         description:
@@ -66,7 +72,6 @@ structs:
                 description: "Additional participants in the transaction"
                 optional: true
                 type: array<AdditionalParticipantInfo>
-
     TxnRecoveryToken:
         description: "Contains info for retrying the commit of a sharded transaction"
         fields:
