@@ -872,19 +872,18 @@ DEATH_TEST(CountNDVMultiKeyDeathTest, ThrowsOnParallelArrays, "Parallel arrays a
     countNDVMultiKey({{.path = "a"}, {.path = "b"}}, {fromjson("{a: [1, 2], b: [3, 4]}")});
 }
 
-// TODO SERVER-129532: Move to a passing non-death test.
-DEATH_TEST(CountNDVDeathTest,
-           DottedPathSharingPrefixWithArrayField,
-           "Parallel arrays are not supported") {
-    // Regression for SERVER-129532: index {a:1, "a.b":-1} with document
-    // {a:[{b:0},{b:0},1]}. Today this is (incorrectly) treated as a parallel-array case and
-    // triggers "Parallel arrays are not supported"; once SERVER-129532 is fixed this should become
-    // a regular (non-death) test that validates the produced key counts.
-    auto r =
-        countNDVMultiKey({{.path = "a"}, {.path = "a.b"}}, {fromjson("{a: [{b: 0}, {b: 0}, 1]}")});
-    // The compound key produces ({b:0},0), ({b:0},0), ({b:0},null) -- three keys, two unique.
+TEST(CountNDVMultiKey, DottedPathSharingPrefixWithArrayField) {
+    // Regression for SERVER-129532: index {a:1, "a.b":-1} with document {a:[{b:0},{b:0},1]}.
+    // A dotted path ("a.b") sharing an array-valued prefix ("a") is no longer treated as a
+    // parallel-array case; both fields resolve against the same outer array, and each element is
+    // visited once (scalar elements yield null for the remaining "b" sub-path).
+    const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a"}, {.path = "a.b"}};
+    const std::vector<BSONObj> docs = {fromjson("{a: [{b: 0}, {b: 0}, 1]}")};
+    auto r = countNDVMultiKey(fields, docs);
+    // The compound key produces ({b:0},0), ({b:0},0), (1,null) -- three keys, two unique.
     ASSERT_EQ(3, r.totalSampleKeys);
     ASSERT_EQ(2, r.sampleUniqueKeys);
+    ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
 }
 
 TEST(CountUniqueDocuments, AllUnique) {
@@ -1057,60 +1056,142 @@ TEST(MatchesIntervalOIL, PointIntervalExclusive) {
     ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));
 }
 
-// TODO SERVER-129532: Re-enable this test.
-DEATH_TEST(CountNDVDeathTest, DottedPathSharingArrayPrefix, "Parallel arrays are not supported") {
+TEST(CountNDVMultiKey, DottedPathSharingArrayPrefix) {
     // Regression for SERVER-129532: index {a:1, "a.b":-1} with documents where
     // "a.b" shares the array-valued prefix "a". Both countNDVMultiKey and BtreeKeyGenerator
     // must produce the same count of unique compound keys.
     const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a"}, {.path = "a.b"}};
 
     // a is an array of subdocs lacking a subfield "b"; original bug trigger.
-    countNDVMultiKey(fields, {fromjson("{a: [{x: 0}, {y: 0}, 1]}")});
-
-    // Additional cases to add once SERVER-129532 is fixed:
+    // Keys: ({x:0},null), ({y:0},null), (1,null) -- three keys, all unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [{x: 0}, {y: 0}, 1]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(3, r.totalSampleKeys);
+        ASSERT_EQ(3, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
     // a is an array of subdocs with distinct "b" subfields.
-    // countNDVMultiKey(fields, {fromjson("{a: [{b: 1}, {b: 2}]}")});
+    // Keys: ({b:1},1), ({b:2},2) -- two unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [{b: 1}, {b: 2}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
     // a is an array of subdocs with duplicate "b" subfields.
-    // countNDVMultiKey(fields, {fromjson("{a: [{b: 1}, {b: 1}]}")});
+    // Keys: ({b:1},1), ({b:1},1) -- one unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [{b: 1}, {b: 1}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(1, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
     // Multiple documents.
-    // countNDVMultiKey(fields, {fromjson("{a: [{b: 1}]}") , fromjson("{a: [{b: 2}]}")});
+    // Keys: ({b:1},1), ({b:2},2) -- two unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [{b: 1}]}"), fromjson("{a: [{b: 2}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
 }
 
-// TODO SERVER-129532: Move to a passing non-death test.
-DEATH_TEST(CountNDVDeathTest, UnevenNestedArrays, "Parallel arrays are not supported") {
+TEST(CountNDVMultiKey, UnevenNestedArrays) {
     // Mirrors BtreeKeyGeneratorTest::GetKeysUnevenNestedArrays:
     // index {a:1, "a.b":1} with document {a:[1, {b:[2,3,4]}]}.
     // BtreeKeyGenerator produces (1,null), ({b:[2,3,4]},2), ({b:[2,3,4]},3), ({b:[2,3,4]},4).
     const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a"}, {.path = "a.b"}};
 
-    countNDVMultiKey(fields, {fromjson("{a: [1, {b: [2, 3, 4]}]}")});
-
-    // countNDVMultiKey(fields, {fromjson("{a: [1, {b: [2, 3, 4]}]}")});
-    // // Single subdoc with array subfield.
-    // countNDVMultiKey(fields, {fromjson("{a: [{b: [10, 20]}]}")});
-    // // Multiple docs.
-    // countNDVMultiKey(fields,
-    //                     {fromjson("{a: [1, {b: [2, 3]}]}"), fromjson("{a: [{b: [3, 4]}]}")});
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [1, {b: [2, 3, 4]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(4, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Single subdoc with array subfield.
+    // Keys: ({b:[10,20]},10), ({b:[10,20]},20) -- two unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [{b: [10, 20]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    // Multiple docs.
+    // Keys: (1,null), ({b:[2,3]},2), ({b:[2,3]},3), ({b:[3,4]},3), ({b:[3,4]},4) -- five unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a: [1, {b: [2, 3]}]}"),
+                                           fromjson("{a: [{b: [3, 4]}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(5, r.totalSampleKeys);
+        ASSERT_EQ(5, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
 }
 
-// TODO SERVER-129532: Move to a passing non-death test.
-DEATH_TEST(CountNDVDeathTest,
-           AlternateMissingCompoundDottedPath,
-           "Parallel arrays are not supported") {
+TEST(CountNDVMultiKey, AlternateMissingCompoundDottedPath) {
     // Mirrors BtreeKeyGeneratorTest::GetKeysAlternateMissing:
     // Compound nested-field index where different array elements have different subfields
     // present, producing alternating null keys across the two indexed fields.
     // Both fields share the 'a' prefix array so this is not a parallel-array case.
     const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}, {.path = "a.c"}};
 
-    countNDVMultiKey(fields, {fromjson("{a:[{b:1},{c:2}]}")});
-
-    // Keys: (1, null) and (null, 2).
-    // countNDVMultiKey(fields, {fromjson("{a:[{b:1},{c:2}]}")});
+    // Keys: (1, null) and (null, 2) -- two unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:1},{c:2}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
     // Multiple docs.
-    // countNDVMultiKey(fields, {fromjson("{a:[{b:1},{c:2}]}"), fromjson("{a:[{b:3},{c:4}]}")});
+    // Keys: (1,null), (null,2), (3,null), (null,4) -- four unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:1},{c:2}]}"),
+                                           fromjson("{a:[{b:3},{c:4}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(4, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
     // Some elements have both fields.
-    // countNDVMultiKey(fields, {fromjson("{a:[{b:1,c:2},{c:3}]}")});
+    // Keys: (1,2), (null,3) -- two unique.
+    {
+        const std::vector<BSONObj> docs = {fromjson("{a:[{b:1,c:2},{c:3}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+}
+
+TEST(CountNDVMultiKey, DeeplyNestedSharedArrayPrefix) {
+    {
+        const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}, {.path = "a.b.c"}};
+        const std::vector<BSONObj> docs = {fromjson("{a: [{b: {c: [1, 2]}}, {b: {c: [1, 2]}}]}")};
+        auto r = countNDVMultiKey(fields, docs);
+
+        // 4 total keys: 1 for each of the 4 elements in the a.b.c arrays. Only two of them are
+        // unique.
+        ASSERT_EQ(4, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
+    {
+        const std::vector<FieldPathAndEqSemantics> fields = {{.path = "a.b"}, {.path = "a.b.c"}};
+        const std::vector<BSONObj> docs = {fromjson("{a: {b: [{c: 1}, {c: 2}]}}")};
+        auto r = countNDVMultiKey(fields, docs);
+
+        // 2 total keys: 1 for each element of the 'a.b' array. Both of them are unique.
+        ASSERT_EQ(2, r.totalSampleKeys);
+        ASSERT_EQ(2, r.sampleUniqueKeys);
+        ASSERT_EQ(r.sampleUniqueKeys, countUniqueKeysBtree(fields, docs));
+    }
 }
 
 }  // namespace mongo::ce
