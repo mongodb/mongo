@@ -10,6 +10,12 @@
 #include <string_view>
 
 namespace mongo {
+namespace {
+// Upper bound on the document size (in bytes) for which the 'match against the whole trivially
+// convertible document' fast path (see MatchProcessor::process) is used. Bounds the cost of the
+// matcher's linear field scan over fields the predicate does not need.
+constexpr int kWholeDocumentMatchMaxSizeBytes = 16 * 1024;
+}  // namespace
 
 MatchProcessor::MatchProcessor(std::unique_ptr<MatchExpression> expr,
                                DepsTracker dependencies,
@@ -29,6 +35,16 @@ bool MatchProcessor::process(const Document& input, const EvaluationContext& ctx
     BSONObj toMatch = [&]() {
         if (_dependencies.needWholeDocument) {
             return input.toBson<BSONObj::LargeSizeTrait>();
+        }
+        // Fast path: if the document is already backed by owned BSON (e.g. a document materialized
+        // by a SequentialDocumentCache), matching against the whole document avoids rebuilding a
+        // projected BSON. This is a win when the same document is matched repeatedly (a nested-loop
+        // $lookup re-scanning its cached prefix). Correctness is unchanged -- the matcher only
+        // reads the paths it needs -- and the size gate bounds the extra field-scan cost for wide
+        // docs.
+        if (auto whole = input.toBsonIfTriviallyConvertible();
+            whole && whole->objsize() <= kWholeDocumentMatchMaxSizeBytes) {
+            return std::move(*whole);
         }
         if (_dependenciesHaveUniqueFirstFields) {
             // Use optimized function that does not check whether we have already seen a specific
