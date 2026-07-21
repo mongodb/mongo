@@ -188,7 +188,7 @@ executor:
         TestData.preOverrideRunCommand = Mongo.prototype.runCommand;
         TestData.doNotOverrideReadPreference = true;
         await import("jstests/libs/override_methods/enable_sessions.js");
-        await import('jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js');
+        await import('jstests/libs/override_methods/query/multiple_crud_ops_as_bulk_write.js');
         await import('jstests/libs/override_methods/enable_causal_consistency.js');
   hooks:
     # The CheckReplDBHash hook waits until all operations have replicated to and have been applied

@@ -118,6 +118,8 @@ function isOperationPartOfStableAPI(commandName, commandObj) {
     }
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_api_strict.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/query/set_api_strict.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithApiStrict);

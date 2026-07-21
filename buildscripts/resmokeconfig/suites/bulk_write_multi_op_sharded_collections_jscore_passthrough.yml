@@ -210,7 +210,7 @@ executor:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
         TestData.preOverrideRunCommand = Mongo.prototype.runCommand;
         await import("jstests/libs/override_methods/enable_sessions.js");
-        await import('jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js');
+        await import('jstests/libs/override_methods/query/multiple_crud_ops_as_bulk_write.js');
   hooks:
     - class: CheckReplDBHash
     - class: ValidateCollections

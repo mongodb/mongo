@@ -20,7 +20,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
-        await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+        await import("jstests/libs/override_methods/query/query_shape_hash_stability.js");
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false

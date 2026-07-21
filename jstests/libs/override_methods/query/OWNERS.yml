@@ -6,3 +6,52 @@ filters:
   - "implicit_explain_v3_verbosity.js":
     approvers:
       - 10gen/query-optimization
+  - "*golden_overrides.js":
+    approvers:
+      - 10gen/query-optimization
+  - "*changestream*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "*query_settings*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "implicit_wildcard_indexes.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "implicitly_wrap_pipelines_in_facets.js":
+    approvers:
+      - 10gen/query-execution-classic
+  - "*bulk_write.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "implicit_timeseries_collections.js":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "query_shape_hash_stability.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-observability
+  - "rerun_queries.js":
+    approvers:
+      - 10gen/query-optimization
+  - "set_api*":
+    approvers:
+      - 10gen/query-optimization
+  - "implicit_identity_views.js":
+    approvers:
+      - 10gen/query-optimization
+  - "implicit_change_stream_v1.js":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "implicit_change_stream_v2_ignore_removed_shards.js":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "implicit_persistent_samples.js":
+    approvers:
+      - 10gen/query-optimization
+  - "implicit_histograms.js":
+    approvers:
+      - 10gen/query-optimization
+  - "require_change_stream_test_fixture.js":
+    approvers:
+      - 10gen/query-execution

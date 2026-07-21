@@ -1,36 +1,5 @@
 version: 1.0.0
 filters:
-  - "*golden_overrides.js":
-    approvers:
-      - 10gen/query-optimization
-  - "*changestream*":
-    approvers:
-      - 10gen/query-execution-change-streams
-  - "*query_settings*":
-    approvers:
-      - 10gen/query-execution-query-settings
-  - "implicit_wildcard_indexes.js":
-    approvers:
-      - 10gen/query-execution-write-exec
-  - "implicitly_wrap_pipelines_in_facets.js":
-    approvers:
-      - 10gen/query-execution-classic
-  - "*bulk_write.js":
-    approvers:
-      - 10gen/query-execution-write-exec
-  - "implicit_timeseries_collections.js":
-    approvers:
-      - 10gen/query-integration-timeseries
-  - "query_shape_hash_stability.js":
-    approvers:
-      - 10gen/query-execution-query-settings
-      - 10gen/query-integration-observability
-  - "rerun_queries.js":
-    approvers:
-      - 10gen/query-optimization
-  - "set_api*":
-    approvers:
-      - 10gen/query-optimization
   - "send_command_to_initial_sync_node*":
     approvers:
       - 10gen/server-initial-sync
@@ -51,21 +20,12 @@ filters:
   - "implicitly_retry_on_shard_transition_errors.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
-  - "implicit_identity_views.js":
-    approvers:
-      - 10gen/query-optimization
-  - "implicitly_retry_on_conflicting_operation_during_fuzztest.js":
-    approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology
   - "validate_collections_on_shutdown.js":
     approvers:
       - 10gen/server-validate
-  - "implicit_change_stream_v1.js":
+  - "implicitly_retry_on_conflicting_operation_during_fuzztest.js":
     approvers:
-      - 10gen/query-execution-change-streams
-  - "implicit_change_stream_v2_ignore_removed_shards.js":
-    approvers:
-      - 10gen/query-execution-change-streams
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "implicitly_retry_on_config_stepdowns.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
@@ -76,9 +36,6 @@ filters:
   - "pin_fcv_to_last_continuous.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
-  - "implicit_persistent_samples.js":
-    approvers:
-      - 10gen/query-optimization
   - "implicitly_retry_on_migration_in_progress.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

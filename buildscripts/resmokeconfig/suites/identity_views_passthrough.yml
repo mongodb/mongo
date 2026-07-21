@@ -52,7 +52,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: await import("jstests/libs/override_methods/implicit_identity_views.js");
+      eval: await import("jstests/libs/override_methods/query/implicit_identity_views.js");
   hooks:
     - class: ValidateCollections
     - class: CleanEveryN

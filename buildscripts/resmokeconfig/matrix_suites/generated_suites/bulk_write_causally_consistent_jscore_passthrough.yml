@@ -18,7 +18,7 @@ executor:
   config:
     shell_options:
       eval:
-        globalThis.testingReplication = true;; await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');;
+        globalThis.testingReplication = true;; await import('jstests/libs/override_methods/query/single_crud_op_as_bulk_write.js');;
         await import('jstests/libs/override_methods/enable_causal_consistency.js');
   fixture:
     class: ReplicaSetFixture

@@ -26,7 +26,7 @@ executor:
   config:
     shell_options:
       eval:
-        'globalThis.testingReplication = true;; await import("jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+        'globalThis.testingReplication = true;; await import("jstests/libs/override_methods/query/make_index_filters_into_query_settings.js");
         db.adminCommand({configureFailPoint: ''querySettingsPlanCacheInvalidation'',
         mode: ''alwaysOn''});'
       global_vars:

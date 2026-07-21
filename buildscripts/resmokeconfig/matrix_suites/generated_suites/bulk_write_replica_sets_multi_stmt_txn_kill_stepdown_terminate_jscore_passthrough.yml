@@ -20,7 +20,7 @@ executor:
         await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
         await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
         await import('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');;
-        await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+        await import('jstests/libs/override_methods/query/single_crud_op_as_bulk_write.js');
       global_vars:
         TestData:
           logRetryAttempts: true

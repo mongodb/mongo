@@ -16,7 +16,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
-        await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+        await import('jstests/libs/override_methods/query/single_crud_op_as_bulk_write.js');
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false

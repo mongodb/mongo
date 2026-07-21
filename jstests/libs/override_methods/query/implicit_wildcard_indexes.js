@@ -181,6 +181,6 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_wildcard_indexes.js",
+    "jstests/libs/override_methods/query/implicit_wildcard_indexes.js",
 );
 OverrideHelpers.overrideRunCommand(runCommandOverride);

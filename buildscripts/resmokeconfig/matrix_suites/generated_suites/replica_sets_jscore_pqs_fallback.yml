@@ -21,7 +21,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/query/implicit_query_settings_fallback.js");
   fixture:
     class: ReplicaSetFixture
     mongod_options:

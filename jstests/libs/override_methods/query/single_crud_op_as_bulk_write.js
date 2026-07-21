@@ -95,6 +95,6 @@ function runCommandSingleOpBulkWriteOverride(
 TestData.runningWithBulkWriteOverride = true; // See update_metrics.js.
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/single_crud_op_as_bulk_write.js",
+    "jstests/libs/override_methods/query/single_crud_op_as_bulk_write.js",
 );
 OverrideHelpers.overrideRunCommand(runCommandSingleOpBulkWriteOverride);

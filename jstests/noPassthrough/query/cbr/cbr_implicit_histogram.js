@@ -3,7 +3,7 @@
  * histograms for indexed fields.
  */
 
-import {runCommandOverride} from "jstests/libs/override_methods/implicit_histograms.js";
+import {runCommandOverride} from "jstests/libs/override_methods/query/implicit_histograms.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const conn = MongoRunner.runMongod({

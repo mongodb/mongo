@@ -6,7 +6,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Override all commands to explicitly set 'apiVersion'.
-import("jstests/libs/override_methods/set_api_version.js");
+import("jstests/libs/override_methods/query/set_api_version.js");
 
 const dbName = "prepare_txn_with_api";
 const collName = "test";

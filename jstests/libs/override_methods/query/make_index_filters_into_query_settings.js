@@ -176,5 +176,5 @@ OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/make_index_filters_into_query_settings.js",
+    "jstests/libs/override_methods/query/make_index_filters_into_query_settings.js",
 );

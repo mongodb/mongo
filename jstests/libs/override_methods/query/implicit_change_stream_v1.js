@@ -38,6 +38,6 @@ function runChangeStreamWithV1Version(conn, _dbName, _commandName, commandObj, f
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_change_stream_v1.js",
+    "jstests/libs/override_methods/query/implicit_change_stream_v1.js",
 );
 OverrideHelpers.overrideRunCommand(runChangeStreamWithV1Version);

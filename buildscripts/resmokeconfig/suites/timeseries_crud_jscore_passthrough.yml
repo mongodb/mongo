@@ -39,7 +39,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/implicit_timeseries_collections.js");
+      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/query/implicit_timeseries_collections.js");
       global_vars:
         TestData:
           isTimeseriesTestSuite: true

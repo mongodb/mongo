@@ -18,7 +18,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
-        await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+        await import("jstests/libs/override_methods/query/implicit_query_settings_fallback.js");
   fixture:
     class: ReplicaSetFixture
     mongod_options:

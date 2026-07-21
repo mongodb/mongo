@@ -206,5 +206,5 @@ OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/query_shape_hash_stability.js",
+    "jstests/libs/override_methods/query/query_shape_hash_stability.js",
 );

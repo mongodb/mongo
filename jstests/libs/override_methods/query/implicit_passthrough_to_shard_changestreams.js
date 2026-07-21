@@ -51,7 +51,7 @@ function runCommandWithPassthroughToShard(
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js",
+    "jstests/libs/override_methods/query/implicit_passthrough_to_shard_changestreams.js",
 );
 
 OverrideHelpers.overrideRunCommand(runCommandWithPassthroughToShard);

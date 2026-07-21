@@ -140,5 +140,5 @@ OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_query_settings_fallback.js",
+    "jstests/libs/override_methods/query/implicit_query_settings_fallback.js",
 );

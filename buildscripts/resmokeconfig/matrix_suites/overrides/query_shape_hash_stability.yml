@@ -1,7 +1,7 @@
 - name: eval_query_shape_hash_stability
   value:
     eval: >-
-      await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+      await import("jstests/libs/override_methods/query/query_shape_hash_stability.js");
 
 - name: fuzzer_selector
   value:

@@ -49,7 +49,7 @@ export async function runDeleteCmdsOnRepeat(host, dbName, collName, targetNumPer
     );
 
     if (TestData.runningWithBulkWriteOverride) {
-        await import("jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
+        await import("jstests/libs/override_methods/query/single_crud_op_as_bulk_write.js");
     }
 
     const conn = new Mongo(host);

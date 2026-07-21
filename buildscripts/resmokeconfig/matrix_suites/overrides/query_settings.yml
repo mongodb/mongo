@@ -147,18 +147,18 @@
 - name: eval_cursor_hints_to_query_settings
   value:
     eval: >-
-      await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+      await import("jstests/libs/override_methods/query/make_cursor_hints_into_query_settings.js");
 
 - name: eval_index_filters_to_query_settings
   value:
     eval: >-
-      await import("jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+      await import("jstests/libs/override_methods/query/make_index_filters_into_query_settings.js");
       db.adminCommand({configureFailPoint: 'querySettingsPlanCacheInvalidation', mode: 'alwaysOn'});
 
 - name: eval_implicit_query_settings_fallback
   value:
     eval: >-
-      await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+      await import("jstests/libs/override_methods/query/implicit_query_settings_fallback.js");
 
 - name: sharding_temporarily_enforce_1_mongos
   value:

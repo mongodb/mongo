@@ -21,7 +21,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/query/make_cursor_hints_into_query_settings.js");
       global_vars:
         TestData:
           isHintsToQuerySettingsSuite: true

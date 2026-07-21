@@ -38,6 +38,6 @@ function runChangeStreamWithIgnoreRemovedShards(
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_change_stream_v2_ignore_removed_shards.js",
+    "jstests/libs/override_methods/query/implicit_change_stream_v2_ignore_removed_shards.js",
 );
 OverrideHelpers.overrideRunCommand(runChangeStreamWithIgnoreRemovedShards);

@@ -1,6 +1,6 @@
 - name: single_op_override
   value:
-    eval: await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+    eval: await import('jstests/libs/override_methods/query/single_crud_op_as_bulk_write.js');
 
 - name: causal_consistency
   value:

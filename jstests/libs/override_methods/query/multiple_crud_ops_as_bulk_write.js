@@ -281,6 +281,6 @@ function runCommandMultiOpBulkWriteOverride(
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js",
+    "jstests/libs/override_methods/query/multiple_crud_ops_as_bulk_write.js",
 );
 OverrideHelpers.overrideRunCommand(runCommandMultiOpBulkWriteOverride);

@@ -24,6 +24,8 @@ function runCommandWithApiVersion(conn, dbName, commandName, commandObj, func, m
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_api_version.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/query/set_api_version.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithApiVersion);

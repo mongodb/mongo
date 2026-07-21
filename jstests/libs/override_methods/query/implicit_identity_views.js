@@ -115,5 +115,5 @@ Mongo.prototype.runCommand = function (dbName, cmdObj, options) {
 
 // Always apply the override if a test spawns a parallel shell.
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_identity_views.js",
+    "jstests/libs/override_methods/query/implicit_identity_views.js",
 );
