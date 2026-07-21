@@ -129,8 +129,8 @@ run_build_and_test() {
     if [[ "${resmoke_disable_rbe}" == "true" ]]; then
         # Local exec runs a full suite serially on a single host, extend the
         # bazel-level timeout well beyond the remote-exec default so the run can finish.
-        build_timeout_seconds=14400
-        export build_timeout_seconds
+        test_timeout_seconds=14400
+        export test_timeout_seconds
     fi
 
     # Build the test targets before running them, retrying genuine build failures. `bazel
@@ -162,6 +162,9 @@ run_build_and_test() {
     fi
 
     export RETRY_ON_FAIL=0
+    # Set the timeout for the test phase independently from the build phase above:
+    build_timeout_seconds="${test_timeout_seconds:-${build_timeout_seconds:-}}"
+    export build_timeout_seconds
     bazel_evergreen_shutils::retry_bazel_cmd $test_attempts "$BAZEL_BINARY" \
         test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets}
     RET=$?

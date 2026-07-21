@@ -35,6 +35,17 @@ else
     echo "common --define GIT_COMMIT_HASH=${GIT_REV}" >>.bazelrc.git
 fi
 
+# Size the Bazel server JVM heap if bazel_jvm_heap_ram_ratio is set.
+# Linux only; /proc/meminfo is unavailable on Windows/macOS. This is useful for
+# invocations running a massive number of remote actions.
+if [[ -n "${bazel_jvm_heap_ram_ratio:-}" ]] && [[ -r /proc/meminfo ]]; then
+    mem_kb=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+    if [[ -n "${mem_kb}" ]]; then
+        xmx_mb=$(awk -v kb="${mem_kb}" -v r="${bazel_jvm_heap_ram_ratio}" 'BEGIN {printf "%d", kb / 1024 * r}')
+        echo "startup --host_jvm_args=-Xmx${xmx_mb}m" >>.bazelrc.evergreen
+    fi
+fi
+
 if [[ "${requester}" == "commit" ]]; then
     mongo_version=$(awk -F'MONGO_VERSION=' '/MONGO_VERSION=/ { split($2, version, /[[:space:]]/); print version[1]; exit }' .bazelrc.target_mongo_version)
     if [[ -z "${mongo_version}" ]]; then
