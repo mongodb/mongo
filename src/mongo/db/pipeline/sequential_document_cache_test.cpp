@@ -3,11 +3,14 @@
 
 #include "mongo/db/pipeline/sequential_document_cache.h"
 
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <vector>
 
 
 namespace mongo {
@@ -147,6 +150,71 @@ DEATH_TEST(SequentialDocumentCacheTestDeathTest,
     cache.abandon();
 
     cache.getNext();
+}
+
+// --- BSON materialization on freeze() ---
+
+// freeze() materializes modified (non-trivially-convertible) documents into owned BSON so that
+// downstream consumers can match against the whole document instead of re-serializing a projection.
+// The served document must preserve its content and be trivially convertible afterward.
+TEST(SequentialDocumentCacheTest, MaterializesModifiedDocumentsOnFreeze) {
+    SequentialDocumentCache cache(kCacheSizeBytes);
+
+    MutableDocument md(DOC("_id" << 0));
+    md.setField("computed", Value(42));
+    Document modified = md.freeze();
+    // Precondition: a mutated document is not trivially convertible.
+    ASSERT_FALSE(modified.toBsonIfTriviallyConvertible().has_value());
+    cache.add(modified);
+
+    cache.freeze();
+
+    auto served = cache.getNext();
+    ASSERT_TRUE(served.has_value());
+    // Content is preserved ...
+    ASSERT_DOCUMENT_EQ(*served, DOC("_id" << 0 << "computed" << 42));
+    // ... and the served document has been materialized into owned BSON.
+    ASSERT_TRUE(served->toBsonIfTriviallyConvertible().has_value());
+}
+
+// Values, types, nesting and array contents survive materialization unchanged.
+TEST(SequentialDocumentCacheTest, PreservesModifiedDocumentValuesAndTypesOnFreeze) {
+    SequentialDocumentCache cache(kCacheSizeBytes);
+
+    MutableDocument md(Document(fromjson("{_id: 0}")));
+    md.setField("s", Value("str"sv));
+    md.setField("arr", Value(std::vector<Value>{Value(1), Value(2)}));
+    md.setField("nested", Value(Document(fromjson("{a: 1}"))));
+    md.setField("d", Value(3.5));
+    cache.add(md.freeze());
+
+    cache.freeze();
+
+    auto served = cache.getNext();
+    ASSERT_TRUE(served.has_value());
+    ASSERT_DOCUMENT_EQ(
+        *served, Document(fromjson("{_id: 0, s: 'str', arr: [1, 2], nested: {a: 1}, d: 3.5}")));
+    ASSERT_TRUE(served->toBsonIfTriviallyConvertible().has_value());
+}
+
+// Documents carrying metadata are left as-is by materialization (which would otherwise strip
+// metadata via toBson()), so their metadata survives freeze().
+TEST(SequentialDocumentCacheTest, PreservesDocumentMetadataOnFreeze) {
+    SequentialDocumentCache cache(kCacheSizeBytes);
+
+    MutableDocument md(DOC("_id" << 0));
+    md.metadata().setSearchScore(1.5);
+    Document withMeta = md.freeze();
+    ASSERT_TRUE(withMeta.metadata().hasSearchScore());
+    cache.add(withMeta);
+
+    cache.freeze();
+
+    auto served = cache.getNext();
+    ASSERT_TRUE(served.has_value());
+    ASSERT_DOCUMENT_EQ(*served, DOC("_id" << 0));
+    ASSERT_TRUE(served->metadata().hasSearchScore());
+    ASSERT_EQ(served->metadata().getSearchScore(), 1.5);
 }
 
 }  // namespace

@@ -1581,6 +1581,7 @@ mongo_cc_unit_test(
         "granularity_rounder_preferred_numbers_test.cpp",
         "lite_parsed_desugarer_test.cpp",
         "lookup_set_cache_test.cpp",
+        "match_processor_test.cpp",
         "partition_key_comparator_test.cpp",
         "pipeline_factory_test.cpp",
         "pipeline_metadata_tree_test.cpp",

@@ -32,6 +32,17 @@ void SequentialDocumentCache::freeze() {
     _status = CacheStatus::kServing;
     _cache.shrink_to_fit();
 
+    // Materialize each cached document into owned BSON once, now that the cache is read-only.
+    // Downstream consumers that read the same documents repeatedly (e.g. a nested-loop $lookup
+    // re-matching the cached prefix for every input document) can then match against the
+    // already-BSON-backed document instead of re-serializing a projection on every pass. Documents
+    // carrying metadata are left as-is so no metadata is dropped.
+    for (auto& doc : _cache) {
+        if (!doc.metadata() && !doc.isTriviallyConvertible()) {
+            doc = Document(doc.toBson());
+        }
+    }
+
     _cacheIter = _cache.begin();
 }
 
