@@ -6,6 +6,7 @@
 //   assumes_balancer_off,
 //   # If a rollback is triggered during a stepdown, the change stream cursor can become invalid.
 //   does_not_support_stepdowns,
+//   requires_fcv_90,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
