@@ -1,3 +1,5 @@
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
+
 export var MetadataConsistencyChecker = (function () {
     const run = (mongos, ignoreInconsistenciesTempWorkaround = false) => {
         const adminDB = mongos.getDB("admin");
@@ -41,6 +43,21 @@ export var MetadataConsistencyChecker = (function () {
             if (e.code === ErrorCodes.FailedToSatisfyReadPreference) {
                 // Metadata consistency check can fail with FailedToSatisfyReadPreference error
                 // response when the primary of the shard is permanently down.
+                return true;
+            }
+
+            // TODO SERVER-131773 Evaluate whether this error suppression should be kept.
+            if (
+                e.code === ErrorCodes.ShardingStateNotInitialized &&
+                PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                    adminDB,
+                    "supportsLocalCollections",
+                    false,
+                )
+            ) {
+                // Metadata consistency check can fail with ShardingStateNotInitialized when it
+                // targets a shard node that has just restarted (e.g. in kill_primary suites) and
+                // has not yet re-initialized. Treat this as a transient error.
                 return true;
             }
 
