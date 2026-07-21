@@ -40,4 +40,6 @@ executor:
             # release_critical task. Disable validation so jstests/noPassthrough/extensions/* can load
             # their test-signed extensions.
             featureFlagExtensionsApiSignatureValidation: false
+          setParametersMongos:
+            featureFlagExtensionsApiSignatureValidation: false
       nodb: ""

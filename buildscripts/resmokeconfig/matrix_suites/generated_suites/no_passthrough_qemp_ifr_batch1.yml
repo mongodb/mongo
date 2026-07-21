@@ -41,6 +41,8 @@ executor:
             featureFlagSbeEqLookupUnwindNestedLoopJoin: false
             featureFlagSbeNonLeadingMatch: true
             featureFlagSbeTransformStages: true
+          setParametersMongos:
+            featureFlagExtensionsApiSignatureValidation: false
       nodb: ""
 matrix_suite: true
 selector:

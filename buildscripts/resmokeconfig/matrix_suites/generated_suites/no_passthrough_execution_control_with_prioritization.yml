@@ -32,6 +32,8 @@ executor:
           setParameters:
             executionControlDeprioritizationGate: true
             featureFlagExtensionsApiSignatureValidation: false
+          setParametersMongos:
+            featureFlagExtensionsApiSignatureValidation: false
       nodb: ""
 matrix_suite: true
 selector:

@@ -44,6 +44,7 @@ executor:
             featureFlagResumablePrimaryDrivenIndexBuilds: true
           setParametersMongos:
             featureFlagContainerWrites: true
+            featureFlagExtensionsApiSignatureValidation: false
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
             featureFlagResumablePrimaryDrivenIndexBuilds: true
