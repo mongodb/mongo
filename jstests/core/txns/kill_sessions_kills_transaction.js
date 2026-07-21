@@ -7,6 +7,9 @@
 //   uses_parallel_shell
 // ]
 
+// TODO: SERVER-60746 enable multi-router once {killSessions: ..} is supported on multi-router.
+TestData.pinToSingleMongos = true;
+
 const dbName = "test";
 const collName = "kill_sessions_kills_transaction";
 const testDB = db.getSiblingDB(dbName);
