@@ -214,6 +214,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:graph_lookup_mock_mongo_interface",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interfaces",
         "//src/mongo/db/pipeline/spilling:spilling_test_utils",
+        "//src/mongo/db/query:await_data_state",
         "//src/mongo/db/query:query_planner_test_lib",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_factory_mock",

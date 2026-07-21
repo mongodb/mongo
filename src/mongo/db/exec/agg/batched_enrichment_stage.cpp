@@ -4,6 +4,7 @@
 #include "mongo/db/exec/agg/batched_enrichment_stage.h"
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/query/await_data_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
@@ -120,6 +121,16 @@ void BatchedEnrichmentStage::fillBatch() {
 
         trackPush(upstream->getDocument());
         _inputBuffer.push_back(std::move(*upstream));
+
+        // Don't accumulate a batch while awaiting inserts. On a tailable awaitData change stream
+        // the leaf oplog executor blocks on the insert notifier (rather than returning EOF) while
+        // 'shouldWaitForInserts' is set, so continuing to fill would make a getMore wait for a full
+        // 'maxInputEvents' batch or the awaitData deadline. Stop after the first buffered event, as
+        // CursorStage does one stage lower; getMore clears the flag once it is delivered and the
+        // follow-up getNextBatch batches normally. Non-awaitData ops never set the flag (no-op).
+        if (awaitDataState(getContext()->getOperationContext()).shouldWaitForInserts) {
+            break;
+        }
     }
 
     _phase = Phase::kEnrich;
