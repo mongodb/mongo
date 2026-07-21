@@ -42,12 +42,12 @@ last-patch:
   suites: null
 last-continuous:
   all:
-    - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
-      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/const_literal_bindata_restricted_subtypes.js
+      ticket: SERVER-130168
     - test_file: jstests/aggregation/expressions/convert_bindata.js
       ticket: SERVER-129103
-    - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
-      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/convert_bindata_restricted_subtypes.js
+      ticket: SERVER-130168
     - test_file: jstests/aggregation/expressions/subtype.js
       ticket: SERVER-129103
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
@@ -161,12 +161,12 @@ last-lts:
       ticket: SERVER-92668
     - test_file: jstests/aggregation/bugs/server94212.js
       ticket: SERVER-94212
-    - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
-      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/const_literal_bindata_restricted_subtypes.js
+      ticket: SERVER-130168
     - test_file: jstests/aggregation/expressions/convert_bindata.js
       ticket: SERVER-129103
-    - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
-      ticket: SERVER-129103
+    - test_file: jstests/aggregation/expressions/convert_bindata_restricted_subtypes.js
+      ticket: SERVER-130168
     - test_file: jstests/aggregation/expressions/null_chars_string_input.js
       ticket: SERVER-95687
     - test_file: jstests/aggregation/expressions/reduce_overflow.js

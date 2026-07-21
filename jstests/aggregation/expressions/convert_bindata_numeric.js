@@ -105,10 +105,10 @@ const conversionTestDocs = [
     {
         _id: 10,
         input: 813245678.98,
-        target: {type: "binData", subtype: 3},
+        target: {type: "binData", subtype: 0},
         byteOrder: "big",
         // Hex: "0x41C83C92777D70A4", 8 byte double
-        expected: BinData(3, "Qcg8knd9cKQ="),
+        expected: BinData(0, "Qcg8knd9cKQ="),
     },
     // Test conversions from BinData to double
     {
