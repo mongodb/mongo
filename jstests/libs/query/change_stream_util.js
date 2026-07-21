@@ -815,10 +815,12 @@ export function ChangeStreamTest(_db, options) {
 
     /**
      * Returns the document to be used for the value of a $changeStream stage, given a watchMode
-     * of type ChangeStreamWatchMode and optional resumeAfter value.
+     * of type ChangeStreamWatchMode and optional resumeAfter value. Any 'extraOptions' (e.g.
+     * {fullDocument: "updateLookup"}) are merged in; the watchMode-derived and resumeAfter fields
+     * take precedence over them.
      */
-    self.getChangeStreamStage = function (watchMode, resumeAfter) {
-        const changeStreamDoc = {};
+    self.getChangeStreamStage = function (watchMode, resumeAfter, extraOptions = {}) {
+        const changeStreamDoc = {...extraOptions};
         if (resumeAfter) {
             changeStreamDoc.resumeAfter = resumeAfter;
         }
@@ -831,11 +833,12 @@ export function ChangeStreamTest(_db, options) {
 
     /**
      * Create a change stream of the given watch mode (see ChangeStreamWatchMode) on the given
-     * collection. Will resume from a given point if resumeAfter is specified.
+     * collection. Will resume from a given point if resumeAfter is specified. Any 'options' are
+     * merged into the $changeStream stage (e.g. {fullDocument: "updateLookup"}).
      */
-    self.getChangeStream = function ({watchMode, coll, resumeAfter}) {
+    self.getChangeStream = function ({watchMode, coll, resumeAfter, options = {}}) {
         return self.startWatchingChanges({
-            pipeline: [{$changeStream: self.getChangeStreamStage(watchMode, resumeAfter)}],
+            pipeline: [{$changeStream: self.getChangeStreamStage(watchMode, resumeAfter, options)}],
             collection: watchMode == ChangeStreamWatchMode.kCollection ? coll : 1,
             // Use a batch size of 0 to prevent any notifications from being returned in the first
             // batch. These would be ignored by ChangeStreamTest.getOneChange().

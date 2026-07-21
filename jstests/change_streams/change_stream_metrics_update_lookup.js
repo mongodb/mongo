@@ -105,5 +105,9 @@ describe("change stream updateLookup single-document-lookup metrics", function (
 
         // Two update events → exactly 2 post-image lookups total.
         assert.eq(lookup.found + lookup.notFound + lookup.notHandled, 2, {lookup});
+
+        // Both lookups (found + notFound) recorded a latency observation. 'latencyMicros' is a
+        // histogram; 'totalCount' is its number of recorded observations.
+        assert.gt(lookup.latencyMicros.totalCount, 0, {lookup});
     });
 });
