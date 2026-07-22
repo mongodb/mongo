@@ -176,21 +176,19 @@ private:
                        AsyncWorkScheduler* parent,
                        WithLock withParentLock);
 
-    // A targeted host and the shard object used to target it. The shard object is passed through
-    // resolved so the caller can avoid a potentially blocking "ShardRegistry::getShard" call.
-    struct HostAndShard {
-        HostAndPort hostTargeted;
-        std::shared_ptr<Shard> shard;
-    };
-
     /**
-     * Finds the host and port for a shard id, returning it and the shard object used for targeting.
+     * Schedules 'commandObj' on an already-resolved host, storing the resulting
+     * TaskExecutor::CallbackHandle in '_activeHandles' so shutdown() can cancel it, and returns a
+     * future for the response. Must be called from within scheduleRemoteCommand's scheduleWork
+     * task, whose CallbackHandle is still in '_activeHandles'; that keeps join() from destroying
+     * the scheduler while the response callbacks scheduled here (which capture a raw 'this') are
+     * still pending.
      */
-    Future<HostAndShard> _targetHostAsync(
-        const ShardId& shardId,
-        const ReadPreferenceSetting& readPref,
-        OperationContextFn operationContextFn = [](OperationContext*) {},
-        BSONObj commandObj = BSONObj());
+    Future<executor::TaskExecutor::ResponseStatus> _sendCommandToResolvedHost(
+        HostAndPort host,
+        std::shared_ptr<Shard> shard,
+        BSONObj commandObj,
+        const ReadPreferenceSetting& readPref);
 
     /**
      * Returns true when all the registered child schedulers, op contexts and handles have joined.

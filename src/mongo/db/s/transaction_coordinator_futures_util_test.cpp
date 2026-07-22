@@ -21,8 +21,10 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/str.h"
 
@@ -633,6 +635,48 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownAllowedFromScheduleWorkAtCallback) {
     });
 
     future.get();
+}
+
+// Regression test: the scheduler must stay alive while a scheduleRemoteCommand continuation that
+// captured a raw 'this' is still pending. The failpoint parks a worker after targeting but before
+// the command handle is registered, so join() must block until the command completes. Without the
+// fix join() returns in that window and the scheduler is freed under the continuation, which ASAN
+// catches as a use-after-free.
+TEST_F(AsyncWorkSchedulerTest, SchedulerStaysAliveUntilRemoteCommandCompletes) {
+    auto async = std::make_unique<AsyncWorkScheduler>(getServiceContext());
+
+    auto* fp = globalFailPointRegistry().find(
+        "hangTransactionCoordinatorAsyncWorkSchedulerBeforeSchedulingRemoteCommand");
+    ASSERT(fp);
+    // Enable via a scope block so the failpoint is always disabled on exit, even if the test
+    // aborts.
+    FailPointEnableBlock fpBlock(fp);
+
+    auto future = async->scheduleRemoteCommand(
+        kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
+
+    // Tears the scheduler down as soon as it looks idle. join() must block until the command
+    // completes; before the fix it returned early and freed the scheduler under the continuation.
+    stdx::thread owner([&] {
+        async->join();
+        async.reset();
+    });
+
+    // Wait until the worker is parked: targeting done, command handle not yet registered.
+    fp->waitForTimesEntered(fpBlock.initialTimesEntered() + 1);
+
+    // Release the worker so the command can be sent, then service it.
+    fp->setMode(FailPoint::off);
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_BSONOBJ_EQ(BSON("TestCommand" << 1), request.cmdObj);
+        return BSON("ok" << 1);
+    });
+
+    // join() returns (and reset() runs) only after the command completed; no use-after-free.
+    owner.join();
+
+    ASSERT(future.isReady());
+    ASSERT_OK(future.getNoThrow().getStatus());
 }
 
 TEST_F(AsyncWorkSchedulerTest, DestroyingSchedulerCapturedInFutureCallback) {
