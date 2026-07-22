@@ -236,7 +236,7 @@ TEST(TimeseriesOptionsTest, CanUseFixedBucketOptimizations) {
     const auto optionsValuesNotEqual =
         createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(1633, 77);
 
-    // Flag off: always returns false regardless of options.
+    // With feature flag off, always returns false regardless of options.
     {
         unittest::ServerParameterGuard flagController("featureFlagFixedBucketingOptimizations",
                                                       false);
@@ -254,10 +254,8 @@ TEST(TimeseriesOptionsTest, CanUseFixedBucketOptimizations) {
         }
     }
 
-    // Flag on, no extended range data: result depends on fixedBucketing field and
-    // maxSpan == rounding.
-    unittest::ServerParameterGuard flagController("featureFlagFixedBucketingOptimizations", true);
-
+    // With feature flag on (the default), no extended range data: result depends on fixedBucketing
+    // field and maxSpan == rounding.
     EXPECT_TRUE(
         timeseries::canUseFixedBucketOptimizations(withFixedBucketing(optionsEqualAndNone), false))
         << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
@@ -305,8 +303,6 @@ TEST(TimeseriesOptionsTest, CanUseFixedBucketOptimizations) {
 }
 
 TEST(TimeseriesOptionsTest, CanUseFixedBucketOptimizationsRequiresKnownExtendedRangeState) {
-    unittest::ServerParameterGuard flagController("featureFlagFixedBucketingOptimizations", true);
-
     auto options = createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(3600, 3600);
     options.setFixedBucketing(true);
 

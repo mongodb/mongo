@@ -541,7 +541,7 @@ feature_flags:
     featureFlagFixedBucketingOptimizations:
         description: "Enable query optimizations relying on the fixed bucketing property of time-series collections."
         cpp_varname: gFixedBucketingOptimizations
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagChangeStreamOptimizedUpdateLookup:

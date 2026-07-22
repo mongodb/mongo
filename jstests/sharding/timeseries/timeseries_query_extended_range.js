@@ -6,7 +6,7 @@
  * @tags: [
  *   # This test moves chunks around itself.
  *   assumes_balancer_off,
- *   requires_fcv_80,
+ *   requires_fcv_90,
  * ]
  */
 
@@ -14,7 +14,6 @@ import {
     getTimeseriesCollForDDLOps,
     isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -444,9 +443,6 @@ for (let tc of testCases) {
 // filter and skip the _id predicate optimization, while a shard without it gets both.
 (function testFixedBucketEventFilterRespectsPerShardExtendedRange() {
     const db = st.getDB(dbName);
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingOptimizations")) {
-        return;
-    }
 
     if (!isViewlessTimeseriesOnlySuite(db)) {
         // Fixed bucketing relies on catalog state that only exists for viewless timeseries

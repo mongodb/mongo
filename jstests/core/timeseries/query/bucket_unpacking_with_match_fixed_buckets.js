@@ -12,7 +12,6 @@
  *     # Refusing to run a test that issues an aggregation command with explain because it may
  *     # return incomplete results if interrupted by a stepdown.
  *     does_not_support_stepdowns,
- *     featureFlagFixedBucketingOptimizations,
  *     requires_getmore,
  *     # checkExplain() asserts there is exactly one $_internalUnpackBucket stage, but
  *     # getAggPlanStages() returns one match per shard for a sharded explain. If the balancer
