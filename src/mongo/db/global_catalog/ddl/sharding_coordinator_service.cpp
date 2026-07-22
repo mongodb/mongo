@@ -36,8 +36,10 @@
 #include "mongo/db/global_catalog/ddl/timeseries_upgrade_downgrade_coordinator.h"
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/move_range_coordinator.h"
+#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/resharding/reshard_collection_coordinator.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -159,11 +161,13 @@ std::shared_ptr<ShardingCoordinator> constructShardingCoordinatorInstance(
 }
 
 
-size_t countCoordinatorDocs(OperationContext* opCtx, const NamespaceString& nss) {
+size_t countCoordinatorDocs(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            BSONObj filter = {}) {
     constexpr auto kNumCoordLabel = "numCoordinators"sv;
     static const auto countStage = BSON("$count" << kNumCoordLabel);
 
-    AggregateCommandRequest aggRequest{nss, {countStage}};
+    AggregateCommandRequest aggRequest{nss, {BSON("$match" << filter), countStage}};
 
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOKWithContext(
@@ -293,19 +297,11 @@ void ShardingCoordinatorService::waitForOngoingCoordinatorsToFinish(
 }
 
 void ShardingCoordinatorService::_onServiceInitialization() {
-    {
-        std::lock_guard lg(_mutex);
-        invariant(_state == State::kPaused);
-        invariant(_numCoordinatorsToWait == 0);
-        invariant(_numActiveCoordinatorsPerTypeAndOfcv.empty());
-        _state = State::kRecovering;
-    }
-
-    // TODO SERVER-130762: This this being called from here mostly because it was convenient, but
-    // we should reconsider if there is a better way to handle this. Specifically, this is not in
-    // migration_util.cpp because it would cause a dependency cycle between sharding_runtime_d and
-    // sharding_ddl_coordinators_d.
-    _moveRangeRecoveryNotifier(getGlobalServiceContext());
+    std::lock_guard lg(_mutex);
+    invariant(_state == State::kPaused);
+    invariant(_numCoordinatorsToWait == 0);
+    invariant(_numActiveCoordinatorsPerTypeAndOfcv.empty());
+    _state = State::kRecovering;
 }
 
 void ShardingCoordinatorService::_onServiceTermination() {
@@ -362,11 +358,16 @@ bool ShardingCoordinatorService::areAllCoordinatorsOfTypeFinished(
 
 ExecutorFuture<void> ShardingCoordinatorService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    const auto term = repl::ReplicationCoordinator::get(cc().getServiceContext())->getTerm();
     return ExecutorFuture<void>(**executor)
-        .then([this, stateDocNss = getStateDocumentsNS()] {
+        .then([this, stateDocNss = getStateDocumentsNS(), token, term] {
             AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
             auto opCtx = cc().makeOperationContext();
             const auto numCoordinators = countCoordinatorDocs(opCtx.get(), stateDocNss);
+            const auto numMoveRangeCoordinators = countCoordinatorDocs(
+                opCtx.get(),
+                stateDocNss,
+                BSON("_id.operationType" << idl::serialize(CoordinatorTypeEnum::kMoveRange)));
             if (numCoordinators > 0) {
                 LOGV2(5622500,
                       "Found Sharding Coordinators to rebuild",
@@ -389,6 +390,11 @@ ExecutorFuture<void> ShardingCoordinatorService::_rebuildService(
                         _transitionToRecovered(lg, opCtx.get());
                     }
                 }
+            }
+
+            if (numMoveRangeCoordinators == 0 && !token.isCanceled()) {
+                RangeDeleterService::get(opCtx.get())
+                    ->notifyRecoveryJobComplete(term, RecoveryJob::kMoveRangeCoordinator);
             }
         })
         .onError([this](const Status& status) {

@@ -6,6 +6,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/observable_mutex_registry.h"
 
+#include <algorithm>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
@@ -31,7 +32,7 @@ RangeDeletionRecoveryTracker::RangeDeletionRecoveryTracker() {
     ObservableMutexRegistry::get().add("rangeDeletionRecoveryTrackerMutex", _mutex);
 }
 
-void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {
+void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term, RecoveryJob job) {
     std::lock_guard guard(_mutex);
     auto state = getStateForTerm(guard, term);
     if (!state) {
@@ -40,23 +41,18 @@ void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {
     tassert(11420101,
             "Recovery job already completed",
             !state->recoveryCompletePromise.getFuture().isReady());
-    auto& count = state->remainingJobCount;
-    count = count.value_or(0) + 1;
+    tassert(11420102, "Recovery job already registered", state->recoveryJobs.insert(job).second);
 }
 
-void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term) {
+void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term, RecoveryJob job) {
     std::lock_guard guard(_mutex);
     auto state = getStateForTerm(guard, term);
     if (!state) {
         return;
     }
-    auto& [count, promise] = *state;
-    if (!isRemainingJobCountValid(count)) {
-        return;
-    }
-    (*count)--;
-    if (*count == 0) {
-        ensurePromiseSet(promise, Outcome::kComplete);
+
+    if (state->recoveryJobs.erase(job) && state->recoveryJobs.empty()) {
+        ensurePromiseSet(state->recoveryCompletePromise, Outcome::kComplete);
     }
 }
 
@@ -99,17 +95,6 @@ RangeDeletionRecoveryTracker::TermState* RangeDeletionRecoveryTracker::getStateF
 
 bool RangeDeletionRecoveryTracker::isTermTooOld(WithLock, Term term) {
     return _highestEndedTerm.has_value() && *_highestEndedTerm >= term;
-}
-
-bool RangeDeletionRecoveryTracker::isRemainingJobCountValid(const boost::optional<int8_t>& count) {
-    try {
-        tassert(1079600,
-                "More jobs notified as complete than registered as started",
-                count.has_value() && *count > 0);
-        return true;
-    } catch (const AssertionException&) {
-        return false;
-    }
 }
 
 void RangeDeletionRecoveryTracker::cleanUpOldTerms(WithLock) {

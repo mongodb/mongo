@@ -148,11 +148,11 @@ void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term) {
     // Register a recovery job for migrationutil::resumeMigrationCoordinationsOnStepUp(), which
     // recovers all standalone MigrationCoordinators as a single batch and calls
     // notifyRecoveryJobComplete once when the entire batch finishes.
-    RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
+    RangeDeleterService::get(opCtx)->registerRecoveryJob(term, RecoveryJob::kLegacyMigration);
 
-    // Register a second recovery job on behalf of MoveRangeCoordinator recovery, resolved later
-    // from ShardingCoordinatorService::_onServiceInitialization().
-    RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
+    // Register one recovery job for the MoveRangeCoordinator recovered from disk. If there is no
+    // such coordinator, ShardingCoordinatorService resolves this job during its rebuild.
+    RangeDeleterService::get(opCtx)->registerRecoveryJob(term, RecoveryJob::kMoveRangeCoordinator);
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
@@ -403,7 +403,8 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long ter
         return whenAll(std::move(futures)).ignoreValue().thenRunOn(executor);
     }()
         .onCompletion([term](const auto&) {
-            RangeDeleterService::get(getGlobalServiceContext())->notifyRecoveryJobComplete(term);
+            RangeDeleterService::get(getGlobalServiceContext())
+                ->notifyRecoveryJobComplete(term, RecoveryJob::kLegacyMigration);
             LOGV2_DEBUG(11420100,
                         2,
                         "Finished all migration coordinator step-up recovery tasks",

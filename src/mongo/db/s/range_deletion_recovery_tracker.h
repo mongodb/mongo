@@ -8,11 +8,21 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
+#include <set>
+
 namespace mongo {
+
+enum class [[MONGO_MOD_PUBLIC]] RecoveryJob {
+    kRangeDeleter,
+    kLegacyMigration,
+    kMoveRangeCoordinator,
+};
 
 class RangeDeletionRecoveryTracker {
 public:
     using Term = long long;
+
+
     // Indicates whether all recovery jobs completed before the term ended.
     enum class Outcome {
         kComplete,    // All recovery jobs completed before the term ended.
@@ -36,8 +46,8 @@ public:
     RangeDeletionRecoveryTracker();
 
     [[nodiscard]] std::unique_ptr<ActiveTerm> notifyStartOfTerm(Term term);
-    void registerRecoveryJob(Term term);
-    void notifyRecoveryJobComplete(Term term);
+    void registerRecoveryJob(Term term, RecoveryJob job);
+    void notifyRecoveryJobComplete(Term term, RecoveryJob job);
     SharedSemiFuture<Outcome> getRecoveryFuture(Term term);
     size_t getTrackedTermsCount() const;
 
@@ -47,14 +57,13 @@ private:
     boost::optional<Term> _highestEndedTerm;
 
     struct TermState {
-        boost::optional<int8_t> remainingJobCount;
+        std::set<RecoveryJob> recoveryJobs;
         SharedPromise<Outcome> recoveryCompletePromise;
     };
     std::map<Term, TermState> _termStates;
 
     TermState* getStateForTerm(WithLock, Term term);
     bool isTermTooOld(WithLock, Term term);
-    bool isRemainingJobCountValid(const boost::optional<int8_t>& count);
     void notifyEndOfTerm(Term term);
     void cleanUpOldTerms(WithLock);
     void ensurePromiseSet(SharedPromise<Outcome>& promise, Outcome outcome);

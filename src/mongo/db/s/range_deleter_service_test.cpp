@@ -948,7 +948,7 @@ TEST_F(RangeDeleterServiceTest, ServiceUpFutureFulfilledOnStepdown) {
     rds->onStepDown();
     const auto term = kStartingTerm + 1;
     rds->onStepUpBegin(opCtx, term);
-    rds->registerRecoveryJob(term);
+    rds->registerRecoveryJob(term, RecoveryJob::kLegacyMigration);
     rds->onStepUpComplete(opCtx, term);
 
     auto future = rds->getServiceUpFuture();
@@ -978,7 +978,7 @@ TEST_F(RangeDeleterServiceTest, TermInitializationReadyBeforeServiceUp) {
     rds->onStepDown();
     const auto term = kStartingTerm + 1;
     rds->onStepUpBegin(opCtx, term);
-    rds->registerRecoveryJob(term);
+    rds->registerRecoveryJob(term, RecoveryJob::kLegacyMigration);
     rds->onStepUpComplete(opCtx, term);
 
     auto termInitFuture = rds->getTermInitializationFuture();
@@ -987,7 +987,7 @@ TEST_F(RangeDeleterServiceTest, TermInitializationReadyBeforeServiceUp) {
     ASSERT_OK(termInitFuture.getNoThrow(opCtx));
     ASSERT(!serviceUpFuture.isReady());
 
-    rds->notifyRecoveryJobComplete(term);
+    rds->notifyRecoveryJobComplete(term, RecoveryJob::kLegacyMigration);
 
     ASSERT_OK(serviceUpFuture.getNoThrow(opCtx));
 }
@@ -997,7 +997,7 @@ TEST_F(RangeDeleterServiceTest, RegisterTaskSucceedsDuringRecoveryPhase) {
     rds->onStepDown();
     const auto term = kStartingTerm + 1;
     rds->onStepUpBegin(opCtx, term);
-    rds->registerRecoveryJob(term);
+    rds->registerRecoveryJob(term, RecoveryJob::kLegacyMigration);
     rds->onStepUpComplete(opCtx, term);
 
     ASSERT_OK(rds->getTermInitializationFuture().getNoThrow());
@@ -1007,7 +1007,7 @@ TEST_F(RangeDeleterServiceTest, RegisterTaskSucceedsDuringRecoveryPhase) {
     auto ignore = rds->registerTask(
         task, SemiFuture<void>::makeReady(), RangeDeleterService::TaskPending::kPending);
 
-    rds->notifyRecoveryJobComplete(term);
+    rds->notifyRecoveryJobComplete(term, RecoveryJob::kLegacyMigration);
     ASSERT_OK(rds->getServiceUpFuture().getNoThrow(opCtx));
 
     ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));

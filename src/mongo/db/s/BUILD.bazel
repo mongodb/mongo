@@ -743,7 +743,6 @@ mongo_cc_library(
     srcs = [
         "move_range_coordinator.cpp",
         "move_range_coordinator_document_gen",
-        "notify_range_deleter_after_move_range_recovery.cpp",
         "//src/mongo/db:cleanup_structured_encryption_data_coordinator.cpp",
         "//src/mongo/db:cleanup_structured_encryption_data_coordinator_gen",
         "//src/mongo/db:compact_structured_encryption_data_coordinator.cpp",

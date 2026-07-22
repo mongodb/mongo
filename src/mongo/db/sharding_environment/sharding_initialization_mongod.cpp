@@ -756,7 +756,8 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
             // meaningfully. Still resolve the legacy migration recovery job registered in
             // onStepUpBegin, so it doesn't block RangeDeleterService recovery for the rest of the
             // term.
-            RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(term);
+            RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(
+                term, RecoveryJob::kLegacyMigration);
         }
 
         // The code above will only be executed after a stepdown happens, however the code below

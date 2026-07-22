@@ -50,9 +50,7 @@ public:
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<ShardingCoordinatorService>(
-            serviceContext,
-            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>(),
-            [](ServiceContext*) {});
+            serviceContext, std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>());
     }
 
     void setUp() override {
