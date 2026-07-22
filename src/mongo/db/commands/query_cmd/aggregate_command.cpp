@@ -266,8 +266,7 @@ public:
                                          _privileges,
                                          verbosity,
                                          reply,
-                                         _usedExternalDataSources,
-                                         _ifrContext));
+                                         _usedExternalDataSources));
 
             // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
             // set.
@@ -304,8 +303,7 @@ public:
                                          _privileges,
                                          verbosity,
                                          reply,
-                                         _usedExternalDataSources,
-                                         _ifrContext));
+                                         _usedExternalDataSources));
         }
 
         bool canRetryOnStaleShardMetadataError(const OpMsgRequest& /* unused */) const override {

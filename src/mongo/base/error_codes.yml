@@ -1140,12 +1140,10 @@ error_codes:
       name: StreamProcessorPrivateNetworkingError,
       categories: [StreamProcessorRetryableError],
     }
-  - {
-      code: 479,
-      name: IFRFlagRetry,
-      categories: [RetriableError],
-      extra: IFRFlagRetryInfo,
-    }
+  # Not tagged RetriableError: IFRFlagRetry is retryable only by the query-layer handlers, which
+  # disable the offending feature flag before re-running. It must never be retried verbatim (with the
+  # same command) at the network layer, so it deliberately carries no RetriableError category.
+  - {code: 479, name: IFRFlagRetry, extra: IFRFlagRetryInfo}
   # TODO SERVER-131201: make UnrecognizedIFRFlagInfo non-optional once all wire-compatible versions
   # send it (extraIsOptional avoids transforming the error on a newer receiver during the
   # multiversion window when a peer emits UnrecognizedIFRFlag without the extra info).

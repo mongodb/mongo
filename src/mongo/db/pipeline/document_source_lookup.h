@@ -172,7 +172,9 @@ public:
                          boost::optional<std::pair<std::string, std::string>> localForeignFields,
                          boost::optional<BSONObj> unwindSpec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                         bool containsUserSpecifiedPipeline = true);
+                         bool containsUserSpecifiedPipeline = true,
+                         FirstStageViewApplicationPolicy subpipelineViewPolicy =
+                             FirstStageViewApplicationPolicy::kDefaultPrepend);
 
     static std::unique_ptr<Pipeline> parsePipelineFromStageParamsWithMaybeViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
@@ -185,7 +187,9 @@ public:
         NamespaceString fromNs,
         std::vector<BSONObj> pipeline,
         boost::optional<std::pair<std::string, std::string>> localForeignFields,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        FirstStageViewApplicationPolicy subpipelineViewPolicy =
+            FirstStageViewApplicationPolicy::kDefaultPrepend);
 
     /**
      * Builds the BSONObj used to query the foreign collection and wraps it in a $match.

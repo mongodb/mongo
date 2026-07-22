@@ -15,6 +15,7 @@
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/logv2/log.h"
 
 #include <string_view>
@@ -92,11 +93,13 @@ std::function<void(LiteParsedPipeline&)> makeLookupViewBinder(
     const boost::intrusive_ptr<ExpressionContext>& fromExpCtx) {
     return [fromExpCtx](LiteParsedPipeline& liteParsedPipeline) {
         const auto& resolvedNamespaces = fromExpCtx->getResolvedNamespaces();
-        auto it = resolvedNamespaces.find(fromExpCtx->getUserNss());
+        const auto& userNss = fromExpCtx->getUserNss();
+        auto it = resolvedNamespaces.find(userNss);
         if (it == resolvedNamespaces.end() || !it->second.isInvolvedNamespaceAView()) {
             return;
         }
-        liteParsedPipeline.bindResolvedNamespaceToStages(it->second, resolvedNamespaces);
+        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+            &liteParsedPipeline, userNss, resolvedNamespaces, /*bindOnly*/ true);
     };
 }
 }  // namespace

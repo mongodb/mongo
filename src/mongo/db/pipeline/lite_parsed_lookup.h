@@ -42,7 +42,9 @@ public:
                       boost::optional<StageParamsPipeline> subpipelineStageParams = boost::none,
                       boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
                       bool internalFromIsAView = false,
-                      bool noUserPipeline = false)
+                      bool noUserPipeline = false,
+                      FirstStageViewApplicationPolicy subpipelineViewPolicy =
+                          FirstStageViewApplicationPolicy::kDefaultPrepend)
         : DefaultStageParams(ownedBsonObj.firstElement()),
           fromNss(std::move(fromNss)),
           as(std::move(as)),
@@ -57,6 +59,7 @@ public:
           internalFieldMatchPipelineIdx(std::move(internalFieldMatchPipelineIdx)),
           internalFromIsAView(internalFromIsAView),
           noUserPipeline(noUserPipeline),
+          subpipelineViewPolicy(subpipelineViewPolicy),
           _ownedOriginalBson(std::move(ownedBsonObj)) {}
 
     static const Id& id;
@@ -94,6 +97,14 @@ public:
     // True when the $lookup had no `pipeline:` field. Lets createFromStageParams keep _userPipeline
     // = boost::none instead of [], even after a view subpipeline is materialized.
     bool noUserPipeline = false;
+
+    // The subpipeline's first (desugared) stage's view-application policy. kDefaultPrepend (the
+    // default) means the stage is view-agnostic, so when 'fromNss' is a view the resolved view
+    // pipeline is prepended ahead of the user subpipeline as usual. kDoNothing means the stage
+    // applies the view itself (e.g. an extension search stage), so the view pipeline must not be
+    // prepended to the resolved pipeline.
+    FirstStageViewApplicationPolicy subpipelineViewPolicy =
+        FirstStageViewApplicationPolicy::kDefaultPrepend;
 
 private:
     // Owns the BSON buffer that DefaultStageParams::_originalSpec points into.

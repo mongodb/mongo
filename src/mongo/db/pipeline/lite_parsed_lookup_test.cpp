@@ -118,6 +118,18 @@ TEST_F(LiteParsedLookUpTest, StageParamsForwardsIsHybridSearchFlag) {
     ASSERT_TRUE(typed->isHybridSearch);
 }
 
+TEST_F(LiteParsedLookUpTest, StageParamsForwardsSubpipelineViewPolicy) {
+    // An ordinary subpipeline first stage defaults to kDefaultPrepend.
+    auto* typed =
+        parseAndGetParams(R"({$lookup: {from: "foreign", as: "a", pipeline: [{$match: {}}]}})");
+    ASSERT(typed->subpipelineViewPolicy == FirstStageViewApplicationPolicy::kDefaultPrepend);
+
+    // A first stage that applies the view itself forwards kDoNothing.
+    typed = parseAndGetParams(
+        R"({$lookup: {from: "foreign", as: "a", pipeline: [{$_internalSearchIdLookup: {}}]}})");
+    ASSERT(typed->subpipelineViewPolicy == FirstStageViewApplicationPolicy::kDoNothing);
+}
+
 TEST_F(LiteParsedLookUpTest, StageParamsCarriesLetVarsAndUnwindSpec) {
     auto* typed = parseAndGetParams(R"({
         $lookup: {

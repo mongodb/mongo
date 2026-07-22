@@ -6,7 +6,6 @@ description: >-
 excludes:
   - "with_mongot_extension.exclude_incompatible_tests"
   - "with_mongot_extension.exclude_search_extension_incompatible"
-  - "with_mongot_extension.exclude_extensions_inside_hybrid_search_disabled_incompatible"
 overrides:
   - "with_mongot_extension.load_extension"
   - "with_mongot_extension.extension_flags_hybridSearch_disabled"

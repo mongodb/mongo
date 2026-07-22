@@ -11,6 +11,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_graph_lookup_gen.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -317,6 +318,9 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     const auto resolvedNamespace = getExpCtx()->hasResolvedNamespace(getFromNs())
         ? getExpCtx()->getResolvedNamespace(getFromNs())
         : ResolvedNamespace{getFromNs(), std::vector<BSONObj>{}};
+
+    hybrid_scoring_util::assertForeignSearchViewIsNotTimeseries(getFromNs(), getExpCtx());
+
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
         getExpCtx(), resolvedNamespace.getResolvedNamespace(), resolvedNamespace.getCollUUID());
     _fromExpCtx->setInLookup(true);

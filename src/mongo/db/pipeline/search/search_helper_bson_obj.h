@@ -273,6 +273,19 @@ inline std::vector<BSONObj> extractPrefix(const std::vector<BSONObj>& pipeline) 
 }
 }  // namespace mongot_lookup_prefix
 
+/**
+ * Returns true if 'pipeline' begins with a mongot search stage in any of its forms: a user-facing
+ * $search/$searchMeta/$vectorSearch (legacy or extension), or an already-desugared mongot source
+ * stage.
+ */
+inline bool startsWithMongotStage(
+    const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
+    const std::vector<BSONObj>& pipeline) {
+    return isMongotPipeline(ifrContext, pipeline) ||
+        isExtensionMongotPipeline(ifrContext, pipeline) ||
+        (!pipeline.empty() && mongot_lookup_prefix::isSourceStage(pipeline[0]));
+}
+
 }  // namespace search_helper_bson_obj
 
 

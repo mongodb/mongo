@@ -447,5 +447,60 @@ TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
     ASSERT_EQ(entry.getResolvedNamespace(), resolvedView.getResolvedNamespace());
 }
 
+TEST(PipelineResolverTest, BindOnlyDoesNotInfiniteLoopOnMutualLookupViewCycle) {
+    // Same mutual-view cycle shape as DoesNotInfiniteLoopOnMutualGraphLookupViewCycle, but driven
+    // through the bindOnly=true path used by the $lookup execution-time binder. bindOnly toggles
+    // bind-vs-prepend at each level, but the inProgress/taggedViewNss cycle guard in
+    // resolveSubpipelinesInRange runs identically — this test proves the cycle is still detected.
+    //
+    // viewB has pipeline [{$lookup: {from: "viewE", ...}}]
+    // viewE has pipeline [{$lookup: {from: "viewB", ...}}]
+    // Both back the same base collection. Each bare-foreign $lookup materializes the target view's
+    // pipeline (tagged with the view NSS), so the recursion would loop forever without the guard.
+    const NamespaceString kViewBNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewB");
+    const NamespaceString kViewENss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewE");
+    const NamespaceString kBaseColl =
+        NamespaceString::createNamespaceString_forTest("testdb", "fsmcoll0");
+
+    auto makeLookupStage = [](std::string_view fromColl) {
+        return BSON("$lookup" << BSON("from" << fromColl << "localField"
+                                             << "a"
+                                             << "foreignField"
+                                             << "b"
+                                             << "as"
+                                             << "result"));
+    };
+
+    // viewB: {viewOn: "fsmcoll0", pipeline: [{$lookup: {from: "viewE", ...}}]}
+    std::vector<BSONObj> viewBPipeline{makeLookupStage("viewE")};
+    // viewE: {viewOn: "fsmcoll0", pipeline: [{$lookup: {from: "viewB", ...}}]}
+    std::vector<BSONObj> viewEPipeline{makeLookupStage("viewB")};
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(kViewBNss,
+                  ResolvedNamespace(kViewBNss, kBaseColl, viewBPipeline, BSONObj{}, opts));
+    nsMap.emplace(kViewENss,
+                  ResolvedNamespace(kViewENss, kBaseColl, viewEPipeline, BSONObj{}, opts));
+
+    // User queries the base collection with a bare $lookup against viewB (no user subpipeline).
+    LiteParsedPipeline userLpp(
+        kBaseColl, std::vector<BSONObj>{makeLookupStage("viewB")}, true, LiteParserOptions{});
+
+    // This must complete without hanging or crashing (stack overflow) even though viewB <-> viewE
+    // form a mutual cycle.
+    PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+        &userLpp, kBaseColl, nsMap, /*bindOnly*/ true);
+
+    // bindOnly never prepends the view pipeline: the top-level user $lookup is the only stage.
+    ASSERT_EQ(userLpp.getStages().size(), 1U);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$lookup"sv);
+}
+
 }  // namespace
 }  // namespace mongo

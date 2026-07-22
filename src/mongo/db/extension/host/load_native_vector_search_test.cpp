@@ -176,6 +176,26 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithoutFilter) {
                           });
 }
 
+// An expanded extension stage (LiteParsedExpanded) must report the timeseries ban,
+// matching its LiteParsedExpandable sibling and the full-parsed DocumentSourceExtensionOptimizable.
+// Otherwise the ban is silently skipped when the stage is validated in its desugared form.
+TEST_F(LoadNativeVectorSearchTest, ExpandedExtensionStageCannotRunOnTimeseries) {
+    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);
+    auto liteParsed = LiteParsedDocumentSource::parse(nss, spec);
+    auto* lpExpandable =
+        dynamic_cast<DocumentSourceExtensionOptimizable::LiteParsedExpandable*>(liteParsed.get());
+    ASSERT_TRUE(lpExpandable);
+
+    // The first expanded stage ($vectorSearchMetrics) is the extension AST-node stage, represented
+    // by a LiteParsedExpanded.
+    const auto& expanded = lpExpandable->getExpandedPipeline();
+    ASSERT_FALSE(expanded.empty());
+    auto* lpExpanded = dynamic_cast<DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
+        expanded.front().get());
+    ASSERT_TRUE(lpExpanded);
+    ASSERT_FALSE(lpExpanded->constraints().canRunOnTimeseries);
+}
+
 TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
     auto spec = makeNativeVectorSearchSpec(/*filter*/ true);
     auto stages = desugarAndSerialize(expCtx, spec);
