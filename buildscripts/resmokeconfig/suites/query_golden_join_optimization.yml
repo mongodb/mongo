@@ -27,8 +27,6 @@ executor:
         # Keep these parameters in sync with the Join Optimization variant to make local testing easier.
         internalEnableJoinOptimization: true
         featureFlagCostBasedRanker: true
-        internalQueryPlanRanker: "costBased"
-        internalQueryCBRCEMode: "samplingCE"
         featureFlagPathArrayness: true
         featureFlagPersistentStats: true
         internalQuerySamplingByStrides: true

@@ -831,9 +831,9 @@
     "winningPlan": [
 "COLLSCAN: plan_stability_tpch_fuzzed.part {'p_type':{'$regex':'^STANDARD'}} ",
 "$lookup partsupp ps_partkey_1",
-"$lookup lineitem l_partkey_1"],
-    "keys" :    289441,
-    "docs" :    309441,
+"$lookup lineitem l_partkey_1_l_suppkey_1"],
+    "keys" :     13385,
+    "docs" :     33385,
     "rows" :        39,
     "csum" : "62515fc5699c3f0f"},
 
@@ -1391,9 +1391,9 @@
 "  -> [partsupp] COLLSCAN: plan_stability_tpch_fuzzed.partsupp {'$and':[{'$or':[{'ps_availqty':{'$lte':9607}},{'ps_availqty':{'$gt':5937}}]},{'ps_availqty':{'$lt':9935}},{'ps_comment':{'$regex':'^i'}}]} ",
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part ",
 "$match",
-"$lookup lineitem l_partkey_1"],
-    "keys" :     77237,
-    "docs" :    177237,
+"$lookup lineitem l_partkey_1_l_suppkey_1"],
+    "keys" :        86,
+    "docs" :    100086,
     "rows" :        32,
     "csum" : "cfdcd1c75de85b84"},
 
@@ -5462,7 +5462,7 @@
     "csum" : "ca7f0bfcb0e88d85"}
 
 ],
-">>>totals": {"commands": 221, "keys":   2408018, "docs":  10693739, "rows":     40893}
+">>>totals": {"commands": 221, "keys":   2054811, "docs":  10340532, "rows":     40893}
 }
 
 
