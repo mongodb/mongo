@@ -306,6 +306,26 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
 }
 
 // static
+Status WiredTigerUtil::checkConfigStringBannedKeys(StringData config) {
+    WiredTigerConfigParser parser(config);
+    WT_CONFIG_ITEM importEnabled;
+    if (parser.get("import.enabled", &importEnabled) == 0 && importEnabled.val != 0) {
+        return {ErrorCodes::BadValue,
+                "Enabling the WiredTiger 'import' option is not allowed in a configString"};
+    }
+
+    // Collections and indexes are always created as type=file objects and mongod never sets
+    // 'source' itself, so the only value that should ever appear here is empty.
+    WT_CONFIG_ITEM source;
+    if (parser.get("source", &source) == 0 && source.len != 0) {
+        return {ErrorCodes::BadValue,
+                "The WiredTiger 'source' option is not allowed in a configString"};
+    }
+
+    return Status::OK();
+}
+
+// static
 Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) {
     invariant(configElem.fieldNameStringData() == WiredTigerUtil::kConfigStringField);
 
@@ -352,6 +372,10 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
           std::string_view(typeItem.str, typeItem.len) == "file")) {
         return {ErrorCodes::IllegalOperation,
                 "Configuration of the WiredTiger 'type' option is not supported."};
+    }
+
+    if (auto bannedKeyStatus = checkConfigStringBannedKeys(config); !bannedKeyStatus.isOK()) {
+        return bannedKeyStatus;
     }
 
     return Status::OK();

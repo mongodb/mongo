@@ -84,6 +84,7 @@ public:
                                                     const boost::optional<TenantId>&);
     static Status validateWiredTigerLiveRestoreReadSizeMB(int);
     static Status validateStatisticsSetting(const std::string&);
+    static Status validateWiredTigerConfigString(const std::string&);
 
     /**
      * Returns current history file size limit in MB.

@@ -35,6 +35,7 @@
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -170,6 +171,10 @@ Status WiredTigerGlobalOptions::validateStatisticsSetting(const std::string& set
     }
 
     return Status::OK();
+}
+
+Status WiredTigerGlobalOptions::validateWiredTigerConfigString(const std::string& config) {
+    return WiredTigerUtil::checkConfigStringBannedKeys(config);
 }
 
 template <typename T>
