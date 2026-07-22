@@ -38,6 +38,13 @@ namespace {
 const auto getMaintainerThread =
     ServiceContext::declareDecoration<std::unique_ptr<OplogCapMaintainerThread>>();
 
+// Serializes start/stop transitions so two callers can never interleave.
+const auto getMaintainerThreadMutex = ServiceContext::declareDecoration<std::mutex>();
+
+// Number of OplogCapMaintainerThreads currently executing run() for a given ServiceContext. Used
+// to confirm we only ever have one running thread per ServiceContext.
+const auto getActiveThreadCount = ServiceContext::declareDecoration<Atomic<int>>();
+
 // Cumulative amount of time spent truncating the oplog.
 Atomic<int64_t> totalTimeTruncating;
 
@@ -140,13 +147,28 @@ void startOplogCapMaintainerThread(ServiceContext* serviceContext,
         return;
     }
 
-    std::unique_ptr<OplogCapMaintainerThread> maintainerThread =
-        std::make_unique<OplogCapMaintainerThread>();
-    OplogCapMaintainerThread::set(serviceContext, std::move(maintainerThread));
+    // Serialize against a concurrent start/stop so we can't race on the decoration slot.
+    std::lock_guard<std::mutex> lk(getMaintainerThreadMutex(serviceContext));
+
+    // Overlapping storage-lifecycle events can each reach start without a matching stop of the
+    // currently running instance. Tear it down here if it is running.
+    if (auto* existing = OplogCapMaintainerThread::get(serviceContext);
+        existing && existing->running()) {
+        LOGV2_WARNING(
+            13139400,
+            "Found a running OplogCapMaintainerThread when starting a new one; shutting "
+            "the existing one down before restarting. This is unexpected and may indicate "
+            "an unbalanced start/stop of the oplog cap maintainer thread.");
+        existing->shutdown(Status(ErrorCodes::InterruptedDueToStorageChange,
+                                  "Restarting the OplogCapMaintainerThread"));
+    }
+
+    OplogCapMaintainerThread::set(serviceContext, std::make_unique<OplogCapMaintainerThread>());
     OplogCapMaintainerThread::get(serviceContext)->go();
 }
 
 void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& reason) {
+    std::lock_guard<std::mutex> lk(getMaintainerThreadMutex(serviceContext));
     if (OplogCapMaintainerThread* maintainerThread = OplogCapMaintainerThread::get(serviceContext);
         maintainerThread) {
         maintainerThread->shutdown(reason);
@@ -262,6 +284,15 @@ RecordId OplogCapMaintainerThread::_reclaimOplog(OperationContext* opCtx,
 
 void OplogCapMaintainerThread::run() {
     LOGV2(5295000, "Oplog cap maintainer thread started", "threadName"_attr = name());
+
+    // There must only ever be one maintainer thread running per ServiceContext. This guard catches
+    // a thread that was started without being registered. dassert so it fails loudly in debug
+    // builds without adding a production crash path.
+    auto& activeThreadCount = getActiveThreadCount(getGlobalServiceContext());
+    dassert(activeThreadCount.fetchAndAdd(1) == 0,
+            "More than one OplogCapMaintainerThread is running");
+    ON_BLOCK_EXIT([&] { activeThreadCount.fetchAndSubtract(1); });
+
     ThreadClient tc(name(),
                     getGlobalServiceContext()->getService(),
                     Client::noSession(),
