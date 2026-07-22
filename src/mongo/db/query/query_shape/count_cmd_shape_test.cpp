@@ -371,5 +371,62 @@ TEST_F(CountCmdShapeTest, DifferentShapeComponentsSizes) {
     ASSERT_LT(smallFindCmdComponent->size(), largeFindCmdComponent->size());
 }
 
+// -------------------------------------------------------------------------
+// rawData tests
+// -------------------------------------------------------------------------
+
+TEST_F(CountCmdShapeTest, RawDataTrueAppearsInShape) {
+    const auto ccr = std::make_unique<CountCommandRequest>(testNss);
+    ccr->setRawData(true);
+    const auto parsedRequest = uassertStatusOK(
+        parsed_find_command::parseFromCount(expCtx, *ccr, extensionsCallback, testNss));
+    auto shape = std::make_unique<CountCmdShape>(
+        *parsedRequest, false, false, ccr->getRawData().value_or(false));
+    const auto shapeBson =
+        shape->toBson(expCtx->getOperationContext(), representativeShapeOptions, {});
+    ASSERT_TRUE(shapeBson.hasField(CountCommandRequest::kRawDataFieldName));
+    ASSERT_TRUE(shapeBson[CountCommandRequest::kRawDataFieldName].boolean());
+}
+
+TEST_F(CountCmdShapeTest, RawDataAbsentOrFalseNotInShape) {
+    for (auto rawDataVal : {boost::optional<bool>{}, boost::optional<bool>{false}}) {
+        const auto ccr = std::make_unique<CountCommandRequest>(testNss);
+        if (rawDataVal.has_value()) {
+            ccr->setRawData(*rawDataVal);
+        }
+        const auto parsedRequest = uassertStatusOK(
+            parsed_find_command::parseFromCount(expCtx, *ccr, extensionsCallback, testNss));
+        auto shape = std::make_unique<CountCmdShape>(
+            *parsedRequest, false, false, ccr->getRawData().value_or(false));
+        ASSERT_FALSE(shape->rawData);
+        const auto shapeBson =
+            shape->toBson(expCtx->getOperationContext(), representativeShapeOptions, {});
+        ASSERT_FALSE(shapeBson.hasField(CountCommandRequest::kRawDataFieldName));
+    }
+}
+
+TEST_F(CountCmdShapeTest, RawDataDifferentiatesQueryShape) {
+    auto makeShape = [&](boost::optional<bool> rawDataVal) {
+        const auto ccr = std::make_unique<CountCommandRequest>(testNss);
+        ccr->setQuery(BSON("x" << 1));
+        if (rawDataVal.has_value()) {
+            ccr->setRawData(*rawDataVal);
+        }
+        const auto parsedRequest = uassertStatusOK(
+            parsed_find_command::parseFromCount(expCtx, *ccr, extensionsCallback, testNss));
+        return std::make_unique<CountCmdShape>(
+            *parsedRequest, false, false, rawDataVal.value_or(false));
+    };
+
+    auto hashNone = makeShape(boost::none)->sha256Hash(expCtx->getOperationContext(), {});
+    auto hashTrue = makeShape(true)->sha256Hash(expCtx->getOperationContext(), {});
+    auto hashFalse = makeShape(false)->sha256Hash(expCtx->getOperationContext(), {});
+
+    ASSERT_NE(hashNone.toHexString(), hashTrue.toHexString());
+    // rawData=false is normalized to absent — same hash as no rawData.
+    ASSERT_EQ(hashNone.toHexString(), hashFalse.toHexString());
+    ASSERT_NE(hashTrue.toHexString(), hashFalse.toHexString());
+}
+
 }  // namespace
 }  // namespace mongo::query_shape

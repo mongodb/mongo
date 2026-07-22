@@ -33,8 +33,8 @@ void appendCmdNs(BSONObjBuilder& bob,
 }
 }  // namespace
 
-Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_)
-    : nssOrUUID(std::move(nssOrUUID_)), collation(std::move(collation_)) {
+Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_, bool rawData_)
+    : nssOrUUID(std::move(nssOrUUID_)), collation(std::move(collation_)), rawData(rawData_) {
     if (MONGO_unlikely(queryShapeCreationException.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "Failure creating query shape");
     }
@@ -52,6 +52,12 @@ BSONObj Shape::toBson(OperationContext* opCtx,
         bob.append(FindCommandRequest::kCollationFieldName, collation);
     }
     appendCmdSpecificShapeComponents(bob, opCtx, opts);
+
+    // Only add 'rawData' to the QueryShape when the value is true. We use find command's rawData
+    // field name definition, but it should be the same for all requests.
+    if (rawData) {
+        bob.append(FindCommandRequest::kRawDataFieldName, true);
+    }
     return bob.obj();
 }
 

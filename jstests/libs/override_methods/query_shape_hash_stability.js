@@ -136,11 +136,13 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
         );
     })();
 
-    // TODO SERVER-103551 remove this once query shape hash calculation for legacy timeseries
-    // collection is fixed
+    // Known limitation: the query shape hash for 'rawData' operations targeting legacy timeseries
+    // collections is unstable across nodes. The shape is computed over the namespace the node
+    // resolves the query to, which depends on the routing info available: a mongos that tracks the
+    // collection resolves it to 'system.buckets.*', while other nodes report the original
+    // namespace (SERVER-103069). Note: non-timeseries 'rawData' commands are already covered by
+    // these passthroughs; only the legacy 'system.buckets.*' case is skipped here.
     if (isRawOperationOnLegacyTimeseries) {
-        // Operations that specify `rawData` targeting legacy timeseries collection will not produce
-        // a query shape hash on the shards of a sharded cluster (SERVER-103069)
         return;
     }
 

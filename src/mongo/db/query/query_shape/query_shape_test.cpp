@@ -741,8 +741,8 @@ TEST_F(UniversalShapeTest, SizeOfShape) {
 
     ASSERT_EQ(innerComponents->size(), shape->specificComponents().size());
     ASSERT_EQ(shape->size(),
-              sizeof(NamespaceStringOrUUID) + sizeof(BSONObj) + sizeof(void*) /*vtable ptr*/ +
-                  shape->specificComponents().size() + static_cast<size_t>(collation.objsize()));
+              sizeof(Shape) + shape->specificComponents().size() +
+                  static_cast<size_t>(collation.objsize()));
 }
 
 TEST_F(UniversalShapeTest, SizeOfShapeWithExtraSize) {

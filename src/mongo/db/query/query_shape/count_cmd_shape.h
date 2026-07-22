@@ -33,7 +33,10 @@ struct CountCmdShapeComponents : public CmdSpecificShapeComponents {
 
 class CountCmdShape final : public Shape {
 public:
-    CountCmdShape(const ParsedFindCommand& find, bool hasLimit, bool hasSkip);
+    CountCmdShape(const ParsedFindCommand& find,
+                  bool hasLimit,
+                  bool hasSkip,
+                  bool rawData = false);  // rawData is stored in Shape base class
 
     const CmdSpecificShapeComponents& specificComponents() const final;
 

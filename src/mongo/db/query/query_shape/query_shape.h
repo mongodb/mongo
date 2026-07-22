@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -118,6 +119,8 @@ public:
         h = H::combine(std::move(h), shape.nssOrUUID, shape.specificComponents());
         if (!shape.collation.isEmpty())
             h = H::combine(std::move(h), simpleHash(shape.collation));
+        if (shape.rawData)
+            h = H::combine(std::move(h), shape.rawData);
         return h;
     }
 
@@ -127,8 +130,26 @@ public:
     // Never shapified. If it's empty, leave it off.
     BSONObj collation;
 
+    // Common command option folded into the shape when true. It MUST be sourced from the command
+    // request (and not from the operation context), so that query shapes built inside the
+    // setQuerySettings command still set rawData when the represented query has it. The
+    // setQuerySettings command runs on its own operation context, which does not carry the
+    // represented query's rawData, so an opCtx lookup would omit it and the shape would never match
+    // the executed query.
+    bool rawData;
+
 protected:
-    Shape(NamespaceStringOrUUID, BSONObj collation_);
+    Shape(NamespaceStringOrUUID, BSONObj collation_, bool rawData_ = false);
+
+    /**
+     * Encodes boolean options common to every command shape (bit 0: rawData; a new flag claims the
+     * next free bit and 0 must mean "absent/false"). Sub-classes implementing sha256Hash() append
+     * this word to their hash buffer only when it is non-zero, so commands without any common
+     * options keep their pre-existing hashes.
+     */
+    std::uint16_t commonOptionsWord() const {
+        return rawData ? 1u : 0u;
+    }
 
     /**
      * Along with the hash implementation, this is the main way that shapes are 'shapified' -

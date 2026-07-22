@@ -253,9 +253,13 @@ public:
                 parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, ns));
 
             // Compute QueryShapeHash and record it in CurOp.
+            const bool rawDataForShape = request().getRawData().value_or(false);
             query_shape::DeferredQueryShape deferredShape{[&]() {
                 return shape_helpers::tryMakeShape<query_shape::CountCmdShape>(
-                    *parsedFind, request().getLimit().has_value(), request().getSkip().has_value());
+                    *parsedFind,
+                    request().getLimit().has_value(),
+                    request().getSkip().has_value(),
+                    rawDataForShape);
             }};
 
             CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
@@ -501,9 +505,13 @@ public:
                                           const ParsedFindCommand& parsedFind,
                                           const NamespaceString& ns) {
             // Compute QueryShapeHash and record it in CurOp.
+            const bool rawDataForShape = req.getRawData().value_or(false);
             query_shape::DeferredQueryShape deferredShape{[&]() {
                 return shape_helpers::tryMakeShape<query_shape::CountCmdShape>(
-                    parsedFind, req.getLimit().has_value(), req.getSkip().has_value());
+                    parsedFind,
+                    req.getLimit().has_value(),
+                    req.getSkip().has_value(),
+                    rawDataForShape);
             }};
             boost::optional<query_shape::QueryShapeHash> queryShapeHash =
                 CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
