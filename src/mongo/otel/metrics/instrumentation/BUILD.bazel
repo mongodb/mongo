@@ -203,6 +203,7 @@ mongo_cc_library(
     hdrs = ["wiredtiger_metrics.h"],
     deps = [
         "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/execution_control:ticketing_system",
         "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/storage/kv:kv_engine",
         "//src/mongo/otel/metrics:otel_metrics_service",

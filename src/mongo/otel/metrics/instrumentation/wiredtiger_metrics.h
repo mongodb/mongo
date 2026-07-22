@@ -64,9 +64,22 @@ struct WiredTigerStatsSnapshot {
 };
 
 /**
+ * Point-in-time sample of a curated set of TicketingSystem connection statistics
+ */
+struct TicketingSystemStatsSnapshot {
+    int64_t readAvailable{0};
+    int64_t writeAvailable{0};
+};
+
+/**
  * Parse the raw BSON connection statistics from WiredTiger into a snapshot
  */
 [[MONGO_MOD_PUBLIC]] WiredTigerStatsSnapshot parseWiredTigerStats(const BSONObj& stats);
+
+/**
+ * Parse the raw BSON connection statistics from the TicketingSystem into a snapshot
+ */
+[[MONGO_MOD_PUBLIC]] TicketingSystemStatsSnapshot parseTicketingSystemStats(const BSONObj& stats);
 
 /**
  * Owns the OpenTelemetry instruments for WiredTiger metrics
@@ -76,9 +89,26 @@ public:
     WiredTigerMetrics();
     ~WiredTigerMetrics();
 
-    void update(const WiredTigerStatsSnapshot& snap);
-    void recordCollectError();
-    void recordEngineNotReadyError();
+    /**
+     * Update metrics tracking WiredTiger storage stats
+     */
+    void updateWiredTiger(const WiredTigerStatsSnapshot& snap);
+
+    /**
+     * Update metrics tracking ticketing system stats
+     */
+    void updateTicketingSystem(const TicketingSystemStatsSnapshot& snap);
+
+    /**
+     * Update metrics tracking WiredTiger errors
+     */
+    void recordWTCollectError();
+    void recordWTEngineNotReadyError();
+
+    /**
+     * Update metrics tracking TicketingSystem errors
+     */
+    void recordTSCollectError();
 
 private:
     class Impl;

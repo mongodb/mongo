@@ -189,6 +189,8 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.wiredTiger.collectErrors");
     static constexpr MetricName kWiredTigerEngineNotReadyErrors =
         MetricNameMaker::make("mongodb.serverStatus.wiredTiger.engineNotReadyErrors");
+    static constexpr MetricName kTicketingSystemCollectErrors =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.ticketingSystem.collectErrors");
 
     // Ingress Request Rate Limiter (Admission Control) Metrics. These mirror the fields that
     // RateLimiter::appendStats() historically reported under

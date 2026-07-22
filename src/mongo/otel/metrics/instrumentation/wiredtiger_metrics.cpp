@@ -31,6 +31,8 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log_severity_suppressor.h"
@@ -55,6 +57,7 @@ namespace mongo {
 
 namespace {
 
+using admission::execution_control::TicketingSystem;
 using otel::metrics::Counter;
 using otel::metrics::Gauge;
 using otel::metrics::MetricNames;
@@ -136,6 +139,14 @@ public:
               MetricNames::kTransactionCheckpointMostRecentTime,
               "Most recent transaction checkpoint time",
               MetricUnit::kMilliseconds)),
+          _concurrentTransactionsReadAvailable(MetricsService::instance().createInt64Gauge(
+              MetricNames::kConcurrentTransactionsReadAvailable,
+              "Amount of concurrent read transactions available",
+              MetricUnit::kCount)),
+          _concurrentTransactionsWriteAvailable(MetricsService::instance().createInt64Gauge(
+              MetricNames::kConcurrentTransactionsWriteAvailable,
+              "Amount of concurrent write transactions available",
+              MetricUnit::kCount)),
           _collectErrors(MetricsService::instance().createInt64Counter(
               MetricNames::kWiredTigerCollectErrors,
               "Number of times WiredTiger stats reading failed during collection",
@@ -143,9 +154,13 @@ public:
           _engineNotReadyErrors(MetricsService::instance().createInt64Counter(
               MetricNames::kWiredTigerEngineNotReadyErrors,
               "Number of times the WiredTiger storage engine was not ready in time for collection",
+              MetricUnit::kCount)),
+          _ticketingSystemCollectErrors(MetricsService::instance().createInt64Counter(
+              MetricNames::kTicketingSystemCollectErrors,
+              "Number of times reading the ticketing system's stats failed during collection",
               MetricUnit::kCount)) {}
 
-    void update(const WiredTigerStatsSnapshot& snap) {
+    void updateWiredTiger(const WiredTigerStatsSnapshot& snap) {
         // Add the difference since the previous snapshot to counter metrics.
         // Counters should never decrease, so negative deltas (e.g., resets) are ignored.
         auto addDelta = [](Counter<int64_t>& counter, int64_t& prev, int64_t current) {
@@ -187,12 +202,21 @@ public:
             snap.transactionCheckpointMostRecentTimeMsecs);
     }
 
-    void recordCollectError() {
+    void updateTicketingSystem(const TicketingSystemStatsSnapshot& snap) {
+        _concurrentTransactionsReadAvailable.set(snap.readAvailable);
+        _concurrentTransactionsWriteAvailable.set(snap.writeAvailable);
+    }
+
+    void recordWTCollectError() {
         _collectErrors.add(1);
     }
 
-    void recordEngineNotReadyError() {
+    void recordWTEngineNotReadyError() {
         _engineNotReadyErrors.add(1);
+    }
+
+    void recordTSCollectError() {
+        _ticketingSystemCollectErrors.add(1);
     }
 
 private:
@@ -214,10 +238,13 @@ private:
     Gauge<int64_t>& _maximumBytesConfigured;
     Gauge<int64_t>& _connectionDataHandlesCurrentlyActive;
     Gauge<int64_t>& _transactionCheckpointMostRecentTimeMsecs;
+    Gauge<int64_t>& _concurrentTransactionsReadAvailable;
+    Gauge<int64_t>& _concurrentTransactionsWriteAvailable;
 
     // Error-handling metrics
     Counter<int64_t>& _collectErrors;
     Counter<int64_t>& _engineNotReadyErrors;
+    Counter<int64_t>& _ticketingSystemCollectErrors;
 
     // Previous snapshot, used to compute deltas for the monotonic counters.
     WiredTigerStatsSnapshot _prev;
@@ -226,16 +253,24 @@ private:
 WiredTigerMetrics::WiredTigerMetrics() : _impl(std::make_unique<Impl>()) {}
 WiredTigerMetrics::~WiredTigerMetrics() = default;
 
-void WiredTigerMetrics::update(const WiredTigerStatsSnapshot& snap) {
-    _impl->update(snap);
+void WiredTigerMetrics::updateWiredTiger(const WiredTigerStatsSnapshot& snap) {
+    _impl->updateWiredTiger(snap);
 }
 
-void WiredTigerMetrics::recordCollectError() {
-    _impl->recordCollectError();
+void WiredTigerMetrics::updateTicketingSystem(const TicketingSystemStatsSnapshot& snap) {
+    _impl->updateTicketingSystem(snap);
 }
 
-void WiredTigerMetrics::recordEngineNotReadyError() {
-    _impl->recordEngineNotReadyError();
+void WiredTigerMetrics::recordWTCollectError() {
+    _impl->recordWTCollectError();
+}
+
+void WiredTigerMetrics::recordWTEngineNotReadyError() {
+    _impl->recordWTEngineNotReadyError();
+}
+
+void WiredTigerMetrics::recordTSCollectError() {
+    _impl->recordTSCollectError();
 }
 
 WiredTigerStatsSnapshot parseWiredTigerStats(const BSONObj& stats) {
@@ -280,23 +315,55 @@ void runWiredTigerCollectionCycle(WiredTigerMetrics& metrics, ServiceContext* sv
     auto rlk = svc->getStorageChangeMutex().readLock();
     auto* se = svc->getStorageEngine();
     if (!se) {
-        metrics.recordEngineNotReadyError();
+        metrics.recordWTEngineNotReadyError();
         return;
     }
 
     auto* engine = se->getEngine();
     if (!engine) {
-        metrics.recordEngineNotReadyError();
+        metrics.recordWTEngineNotReadyError();
         return;
     }
 
     auto stats = engine->collectStorageStats();
     if (!stats) {
-        metrics.recordCollectError();
+        metrics.recordWTCollectError();
         return;
     }
 
-    metrics.update(parseWiredTigerStats(*stats));
+    auto snap = parseWiredTigerStats(*stats);
+    metrics.updateWiredTiger(snap);
+}
+
+TicketingSystemStatsSnapshot parseTicketingSystemStats(const BSONObj& stats) {
+    TicketingSystemStatsSnapshot snap;
+
+    auto readStats = stats.getObjectField("read");
+    snap.readAvailable = readStats["available"].safeNumberInt();
+    auto writeStats = stats.getObjectField("write");
+    snap.writeAvailable = writeStats["available"].safeNumberInt();
+
+    return snap;
+}
+
+void runTicketingSystemCollectionCycle(WiredTigerMetrics& metrics, ServiceContext* svc) {
+    auto* ts = TicketingSystem::get(svc);
+    if (!ts) {
+        metrics.recordTSCollectError();
+        return;
+    }
+
+    BSONObjBuilder statBuilder;
+    ts->appendStats(statBuilder);
+
+    auto stats = statBuilder.obj();
+    auto snap = parseTicketingSystemStats(stats);
+    metrics.updateTicketingSystem(snap);
+}
+
+void runCollectionCycle(WiredTigerMetrics& metrics, ServiceContext* svc) {
+    runWiredTigerCollectionCycle(metrics, svc);
+    runTicketingSystemCollectionCycle(metrics, svc);
 }
 
 void installWiredTigerOtelMetrics(ServiceContext* svcCtx) {
@@ -304,7 +371,7 @@ void installWiredTigerOtelMetrics(ServiceContext* svcCtx) {
     state.metrics = std::make_unique<WiredTigerMetrics>();
     state.job = svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
         "WiredTigerOtelMetrics",
-        [&state, svcCtx](Client*) { runWiredTigerCollectionCycle(*state.metrics, svcCtx); },
+        [&state, svcCtx](Client*) { runCollectionCycle(*state.metrics, svcCtx); },
         Seconds(1),
         false /*isKillableByStepdown*/});
     state.job.start();

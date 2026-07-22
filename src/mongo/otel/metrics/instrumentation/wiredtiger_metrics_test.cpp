@@ -99,13 +99,13 @@ inline const auto kCounterFields = std::to_array<CounterField>({
 });
 
 // Maps each field of the snapshot to the gauge it hydrates.
-struct GaugeField {
+struct WTGaugeField {
     std::string_view name;
     int64_t WiredTigerStatsSnapshot::* field;
     MetricName metric;
 };
 
-inline const auto kGaugeFields = std::to_array<GaugeField>({
+inline const auto kWiredTigerGaugeFields = std::to_array<WTGaugeField>({
     {"evictionEmptyScore"sv,
      &WiredTigerStatsSnapshot::evictionEmptyScore,
      MetricNames::kEvictionEmptyScore},
@@ -162,7 +162,7 @@ TEST_F(WiredTigerOtelMetricsTest, CountableWTMetrics) {
             WiredTigerStatsSnapshot snap;
             for (const auto& f : kCounterFields)
                 snap.*f.field = reading;
-            metrics.update(snap);
+            metrics.updateWiredTiger(snap);
         }
 
         for (size_t i = 0; i < kCounterFields.size(); ++i) {
@@ -191,12 +191,12 @@ TEST_F(WiredTigerOtelMetricsTest, PointInTimeWTMetrics) {
         SCOPED_TRACE(fmt::format("name={}", tc.name));
         for (int64_t reading : tc.readings) {
             WiredTigerStatsSnapshot snap;
-            for (const auto& f : kGaugeFields)
+            for (const auto& f : kWiredTigerGaugeFields)
                 snap.*f.field = reading;
-            _metrics.update(snap);
+            _metrics.updateWiredTiger(snap);
         }
 
-        for (const auto& f : kGaugeFields) {
+        for (const auto& f : kWiredTigerGaugeFields) {
             SCOPED_TRACE(fmt::format("field={}", f.name));
             EXPECT_EQ(tc.expected, _capturer.readInt64Gauge(f.metric));
         }
@@ -250,6 +250,60 @@ TEST(WiredTigerParseStatsTest, MissingFieldsDefaultToZero) {
     ASSERT_EQ(snap.maximumBytesConfigured, 0);
     ASSERT_EQ(snap.transactionCheckpointMostRecentTimeMsecs, 0);
     ASSERT_EQ(snap.connectionDataHandlesCurrentlyActive, 0);
+}
+
+TEST(TicketingSystemParseStatsTest, ParsesAllKeys) {
+    BSONObj stats = BSON("read" << BSON("available" << 20) << "write" << BSON("available" << 40));
+
+    TicketingSystemStatsSnapshot snap = parseTicketingSystemStats(stats);
+
+    ASSERT_EQ(snap.readAvailable, 20);
+    ASSERT_EQ(snap.writeAvailable, 40);
+}
+
+struct TSGaugeField {
+    std::string_view name;
+    int64_t TicketingSystemStatsSnapshot::* field;
+    MetricName metric;
+};
+
+inline const auto kTicketingSystemGaugeFields = std::to_array<TSGaugeField>({
+    {"readAvailable"sv,
+     &TicketingSystemStatsSnapshot::readAvailable,
+     MetricNames::kConcurrentTransactionsReadAvailable},
+    {"writeAvailable"sv,
+     &TicketingSystemStatsSnapshot::writeAvailable,
+     MetricNames::kConcurrentTransactionsWriteAvailable},
+});
+
+TEST_F(WiredTigerOtelMetricsTest, PointInTimeTSMetrics) {
+    struct Case {
+        std::string_view name;
+        std::vector<int64_t> readings;
+        int64_t expected;
+    };
+
+    const auto cases = std::to_array<Case>({
+        {"single_reading"sv, {1000}, 1000},
+        {"latest_reading_wins"sv, {1000, 1500}, 1500},
+        {"decrease_is_reflected"sv, {5000, 1000}, 1000},
+        {"zero"sv, {0}, 0},
+    });
+
+    for (const auto& tc : cases) {
+        SCOPED_TRACE(fmt::format("name={}", tc.name));
+        for (int64_t reading : tc.readings) {
+            TicketingSystemStatsSnapshot snap;
+            for (const auto& f : kTicketingSystemGaugeFields)
+                snap.*f.field = reading;
+            _metrics.updateTicketingSystem(snap);
+        }
+
+        for (const auto& f : kTicketingSystemGaugeFields) {
+            SCOPED_TRACE(fmt::format("field={}", f.name));
+            EXPECT_EQ(tc.expected, _capturer.readInt64Gauge(f.metric));
+        }
+    }
 }
 
 }  // namespace
