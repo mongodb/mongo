@@ -141,8 +141,13 @@ functions:
               EXTRA_ARGS="--download-url https://mongodbtoolchain.build.10gen.cc/toolchain/rhel80-zseries/x86_64/mongodbtoolchain-${MDB_TOOLCHAIN_REV}.tar.gz"
           fi
 
+          # The pinned toolchain tarball sources a script that it does not contain.
+          # pipefail preserves the installer's real exit status.
+          # FIXME-WT-18153: Remove this filter once the toolchain has been fixed.
+          set -o pipefail
           curl -fsSL https://s3.amazonaws.com/mongodbtoolchain.build.10gen.cc/installer.sh \
-              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" $EXTRA_ARGS
+              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" $EXTRA_ARGS 2>&1 \
+              | sed -E '/scripts\/installer\.sh: No such file or directory/d; /return: can only .return. from a function or sourced script/d'
 
   # Since Bazel (currently used in SCons) uses EngFlow's remote execution system instead of icecream,
   # additional credentials need to be setup to maintain efficient compilation speed.
@@ -2495,16 +2500,6 @@ tasks:
             set -o verbose
 
             ./smoke_lazyfs.sh
-
-  - name: csuite-schema-disagg-abort
-    tags: ["pull_request"]
-    depends_on: *s-all-dep
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: test/csuite/schema_disagg_abort
 
   - name: csuite-wt12015-backup-corruption-test
     tags: ["pull_request"]

@@ -759,6 +759,7 @@ err:
          */
         txn->flags = 0;
         txn->time_point.flags = 0;
+        txn->operation_timeout_us = 0;
     }
     return (ret);
 }
@@ -2381,15 +2382,15 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     WT_CONNECTION_STATS **stats;
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t checkpoint_timestamp, checkpoint_pinned_ts_lag;
-    wt_timestamp_t durable_timestamp;
+    wt_timestamp_t durable_timestamp, durable_oldest_lag;
     wt_timestamp_t oldest_active_read_timestamp, oldest_reader_lag;
-    wt_timestamp_t oldest_timestamp;
+    wt_timestamp_t oldest_timestamp, pinned_ts_lag;
     wt_timestamp_t pinned_timestamp;
     uint64_t checkpoint_pinned;
 
     conn = S2C(session);
     checkpoint_pinned = WT_TXN_NONE;
-    checkpoint_pinned_ts_lag = oldest_reader_lag = WT_TS_NONE;
+    checkpoint_pinned_ts_lag = durable_oldest_lag = oldest_reader_lag = pinned_ts_lag = WT_TS_NONE;
     checkpoint_timestamp = WT_TS_NONE;
     txn_global = &conn->txn_global;
     stats = conn->stats;
@@ -2412,8 +2413,9 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
         pinned_timestamp = checkpoint_timestamp;
 
     /* Represents the lag of the pinned timestamp with respect to the oldest timestamp.*/
-    WT_STATP_CONN_SET(
-      session, stats, txn_pinned_timestamp_lag, oldest_timestamp - pinned_timestamp);
+    if (oldest_timestamp > pinned_timestamp)
+        pinned_ts_lag = oldest_timestamp - pinned_timestamp;
+    WT_STATP_CONN_SET(session, stats, txn_pinned_timestamp_lag, pinned_ts_lag);
 
     /* Represents the lag of the checkpoint timestamp with respect to the oldest timestamp.*/
     if (checkpoint_timestamp != WT_TS_NONE && checkpoint_timestamp < oldest_timestamp)
@@ -2422,8 +2424,10 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(
       session, stats, txn_pinned_timestamp_checkpoint_lag, checkpoint_pinned_ts_lag);
 
-    WT_STATP_CONN_SET(
-      session, stats, txn_pinned_timestamp_oldest, durable_timestamp - oldest_timestamp);
+    /* Represents how far the durable timestamp leads the oldest timestamp. */
+    if (durable_timestamp > oldest_timestamp)
+        durable_oldest_lag = durable_timestamp - oldest_timestamp;
+    WT_STATP_CONN_SET(session, stats, txn_pinned_timestamp_oldest, durable_oldest_lag);
 
     __wti_txn_get_pinned_timestamp(session, &oldest_active_read_timestamp, 0);
     if (oldest_active_read_timestamp != WT_TS_NONE &&

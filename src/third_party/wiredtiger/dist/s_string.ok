@@ -1363,6 +1363,7 @@ mongod
 mongodb
 mongodbtoolchain
 moreinit
+mpP
 mrs
 msecs
 msg
@@ -1506,6 +1507,7 @@ perf
 pfx
 pid
 pindexp
+pipefail
 plh
 pluggable
 pmem
@@ -1574,6 +1576,7 @@ queueable
 queueing
 queuer
 quiesce
+quiesced
 qup
 rN
 rS

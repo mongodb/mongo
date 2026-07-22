@@ -398,8 +398,9 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
      * backup or the checkpoint LSN. Otherwise we want the minimum of the last log file written to
      * disk and the checkpoint LSN.
      */
-    min_lognum = backup_file == 0 ? WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file) :
-                                    WT_MIN(log->ckpt_lsn.l.file, backup_file);
+    min_lognum = backup_file == 0 ?
+      WT_MIN(__wt_lsn_file(&log->ckpt_lsn), __wt_lsn_file(&log->sync_lsn)) :
+      WT_MIN(__wt_lsn_file(&log->ckpt_lsn), backup_file);
 
     __wt_readlock(session, &conn->log_mgr.debug_log_retention_lock);
 
@@ -435,8 +436,8 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
           " sync file %" PRIu32 " backup_file %" PRIu32 " debug_log count%" PRIu32
           " old min %" PRIu32,
           (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / WT_THOUSAND, min_lognum,
-          log->ckpt_lsn.l.file, log->sync_lsn.l.file, backup_file, conn->debug.log_cnt,
-          log->min_fileid));
+          __wt_lsn_file(&log->ckpt_lsn), __wt_lsn_file(&log->sync_lsn), backup_file,
+          conn->debug.log_cnt, log->min_fileid));
         log->min_fileid = min_lognum;
     }
 
@@ -897,7 +898,7 @@ __log_wrlsn_server(void *arg)
             __wti_log_wrlsn(session, &yield);
         else
             WT_STAT_CONN_INCR(session, log_write_lsn_skip);
-        prev = log->alloc_lsn;
+        WT_ASSIGN_LSN(&prev, &log->alloc_lsn);
         did_work = (yield == 0);
 
         /*

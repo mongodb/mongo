@@ -364,7 +364,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
      * current one and advance the LSN. Signal the worker thread because we know the LSN has moved
      * into a later log file and there should be a log file ready to close.
      */
-    while (log->sync_lsn.l.file < min_lsn->l.file) {
+    while (__wt_lsn_file(&log->sync_lsn) < __wt_lsn_file(min_lsn)) {
         __wt_cond_signal(session, S2C(session)->log_mgr.file.cond);
         __wt_cond_wait(session, log->log_sync_cond, 10 * WT_THOUSAND, NULL);
     }

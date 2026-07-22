@@ -1007,7 +1007,9 @@ struct __wt_connection_stats {
     int64_t disagg_pick_up_file_meta_inserted;
     int64_t disagg_pick_up_checkpoint_time;
     int64_t disagg_role_leader;
+    int64_t disagg_step_down_in_progress;
     int64_t disagg_step_down_time;
+    int64_t disagg_step_up_in_progress;
     int64_t disagg_step_up_time;
     int64_t layered_curs_insert;
     int64_t layered_curs_modify;

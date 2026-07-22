@@ -593,7 +593,7 @@ create_database(const char *home, WT_CONNECTION **connp)
 
     /* Leader: seed an initial key before the create-time close checkpoint. */
     if (g.disagg_leader)
-        disagg_key_push_initial(conn);
+        disagg_key_push_initial(conn, true);
 
     *connp = conn;
 }

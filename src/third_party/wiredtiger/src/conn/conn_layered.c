@@ -263,11 +263,11 @@ __disagg_shared_metadata_queue_free(WT_SESSION_IMPL *session, WT_DISAGG_METADATA
 }
 
 /*
- * __shared_metadata_op_to_string --
+ * __wti_disagg_shared_metadata_op_to_string --
  *     Convert a metadata operation to string representation.
  */
-static inline const char *
-__shared_metadata_op_to_string(WT_SHARED_METADATA_OP op)
+const char *
+__wti_disagg_shared_metadata_op_to_string(WT_SHARED_METADATA_OP op)
 {
     switch (op) {
     case WT_SHARED_METADATA_NONE:
@@ -372,7 +372,7 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
       "Scheduled copying disaggregated metadata for table \"%s\" (stable URI \"%s\") with %s "
       "operation to shared "
       "metadata table at next checkpoint:",
-      table_name, stable_uri, __shared_metadata_op_to_string(metadata_op));
+      table_name, stable_uri, __wti_disagg_shared_metadata_op_to_string(metadata_op));
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  colgroup: %s",
       entry->colgroup_value == NULL ? "<none>" : entry->colgroup_value);
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  layered: %s",
@@ -449,11 +449,12 @@ __wti_disagg_shared_metadata_queue_prune(WT_SESSION_IMPL *session, wt_timestamp_
 /*
  * __wti_disagg_table_latest_create_remove --
  *     Return the latest CREATE or REMOVE operation for the given table name in the shared metadata
- *     queue. Returns WT_SHARED_METADATA_NONE as a sentinel when no CREATE or REMOVE entry is found.
- *     UPDATE entries are skipped because they do not affect whether the table exists.
+ *     queue and its schema epoch, or WT_SHARED_METADATA_NONE when no such entry is found. UPDATE
+ *     entries are skipped because they do not affect whether the table exists.
  */
 WT_SHARED_METADATA_OP
-__wti_disagg_table_latest_create_remove(WT_SESSION_IMPL *session, const char *table_name)
+__wti_disagg_table_latest_create_remove(
+  WT_SESSION_IMPL *session, const char *table_name, wt_timestamp_t *epochp)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DISAGG_METADATA_OP *entry;
@@ -461,12 +462,15 @@ __wti_disagg_table_latest_create_remove(WT_SESSION_IMPL *session, const char *ta
 
     conn = S2C(session);
     last_op = WT_SHARED_METADATA_NONE;
+    *epochp = WT_SCHEMA_EPOCH_NONE;
 
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
     TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q)
         if (entry->metadata_op != WT_SHARED_METADATA_UPDATE &&
-          strcmp(entry->table_name, table_name) == 0)
+          strcmp(entry->table_name, table_name) == 0) {
             last_op = entry->metadata_op;
+            *epochp = entry->schema_epoch;
+        }
     __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
 
     return (last_op);
@@ -519,7 +523,7 @@ __disagg_shared_metadata_op_helper(
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "%s disaggregated shared metadata: key=\"%s\" value=\"%s\"",
-      __shared_metadata_op_to_string(metadata_op), key, value);
+      __wti_disagg_shared_metadata_op_to_string(metadata_op), key, value);
 
 err:
     if (cursor != NULL)
@@ -688,7 +692,7 @@ __wt_disagg_shared_metadata_queue_process(
         if (entry->deferred) {
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Defer metadata operation %s for table \"%s\"",
-              __shared_metadata_op_to_string(entry->metadata_op), entry->table_name);
+              __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name);
             entry->deferred = false;
             continue;
         }
@@ -697,7 +701,7 @@ __wt_disagg_shared_metadata_queue_process(
         if (cur_schema_epoch != WT_SCHEMA_EPOCH_NONE && entry->schema_epoch > cur_schema_epoch) {
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Defer metadata operation %s for table \"%s\" with schema epoch %" PRIu64,
-              __shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
+              __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
               entry->schema_epoch);
             WT_STAT_CONN_INCR(session, checkpoint_disagg_metadata_unstable);
             continue;
@@ -791,7 +795,8 @@ __wt_disagg_shared_metadata_queue_publish(
         if (entry->schema_epoch == WT_SCHEMA_EPOCH_UNPUBLISHED) {
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Publishing metadata operation %s for table \"%s\" to schema epoch %" PRIu64,
-              __shared_metadata_op_to_string(entry->metadata_op), entry->table_name, schema_epoch);
+              __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
+              schema_epoch);
             entry->schema_epoch = schema_epoch;
         }
 
@@ -988,12 +993,14 @@ err:
 static int
 __disagg_step_up(WT_SESSION_IMPL *session)
 {
+    struct timespec tsp;
     WT_DECL_RET;
     WT_SESSION_IMPL *internal_session = NULL;
     uint64_t now;
 
     WT_CONNECTION_IMPL *conn = S2C(session);
     F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP);
+    WT_STAT_CONN_SET(session, disagg_step_up_in_progress, 1);
 
     /*
      * Some functionality in stepping up needs a session that can open data handles. The default
@@ -1010,6 +1017,10 @@ __disagg_step_up(WT_SESSION_IMPL *session)
 
     __wt_verbose_debug1(
       session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "Stepping up to the leader mode");
+
+    tsp.tv_sec = 1;
+    tsp.tv_nsec = 0;
+    __wt_timing_stress(session, WT_TIMING_STRESS_DISAGG_ROLE_TRANSITION, &tsp);
 
     /*
      * Step up to the leader mode. We need to do this first, because the rest of the operations
@@ -1053,6 +1064,7 @@ __disagg_step_up(WT_SESSION_IMPL *session)
 err:
     if (internal_session != NULL)
         WT_TRET(__wt_session_close_internal(internal_session));
+    WT_STAT_CONN_SET(session, disagg_step_up_in_progress, 0);
     F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP);
     return (ret);
 }
@@ -1117,15 +1129,21 @@ __disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
 static int
 __disagg_step_down(WT_SESSION_IMPL *session)
 {
+    struct timespec tsp;
     WT_DECL_RET;
     WT_SHARED_DSK_CACHE *shared_dsk_cache;
 
     WT_CONNECTION_IMPL *conn = S2C(session);
     F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
+    WT_STAT_CONN_SET(session, disagg_step_down_in_progress, 1);
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     __wt_verbose_debug1(
       session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "Stepping down to the follower mode");
+
+    tsp.tv_sec = 1;
+    tsp.tv_nsec = 0;
+    __wt_timing_stress(session, WT_TIMING_STRESS_DISAGG_ROLE_TRANSITION, &tsp);
 
     /*
      * Mark disaggregated btrees read-only before switching role to follower to prevent concurrent
@@ -1156,6 +1174,7 @@ __disagg_step_down(WT_SESSION_IMPL *session)
     __wt_atomic_store_uint64_relaxed(&conn->txn_global.step_down_timestamp, WT_TS_NONE);
 
 err:
+    WT_STAT_CONN_SET(session, disagg_step_down_in_progress, 0);
     F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
     return (ret);
 }
@@ -1201,6 +1220,20 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     picked_up = false;
 
     WT_CLEAR(complete_checkpoint_meta);
+
+    /*
+     * Parse strict_checkpoint_metadata first: a reconfigure call may contain both this setting and
+     * a checkpoint_meta to pick up, and the pickup below must already run with the new setting. The
+     * setting keeps its previous value unless the configuration string names it explicitly.
+     */
+    WT_ERR_NOTFOUND_OK(
+      __wt_config_gets(session, cfg, "disaggregated.strict_checkpoint_metadata", &cval), true);
+    if (ret == 0 && cval.len > 0) {
+        if (WT_CONFIG_LIT_MATCH("true", cval))
+            F_SET(&conn->disaggregated_storage, WT_DISAGG_STRICT_CHECKPOINT_METADATA);
+        else
+            F_CLR(&conn->disaggregated_storage, WT_DISAGG_STRICT_CHECKPOINT_METADATA);
+    }
 
     /* Reconfigure-only settings. */
     if (reconfig) {

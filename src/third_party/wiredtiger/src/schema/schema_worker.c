@@ -75,26 +75,50 @@ __schema_layered_stable_worker_verify(WT_SESSION_IMPL *session, const char *stab
   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
   int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags)
 {
+    WT_DECL_ITEM(ckpt_uri);
     WT_DECL_RET;
-    WT_CONNECTION_IMPL *conn = S2C(session);
+    const char *checkpoint_name = NULL;
+    bool leader;
+
     WT_ASSERT(session, stable_uri != NULL);
 
-    /* Verify the stable table of the layered table. */
-    WT_WITHOUT_DHANDLE(session,
-      ret = __wt_schema_worker(session, stable_uri, file_func, name_func, cfg, open_flags));
+    /* Sample the role once so the open and the error message below agree if it changes. */
+    leader = S2C(session)->layered_table_manager.leader;
 
-    /* On followers, it is possible not to have any stable table. This is a transient state. */
-    if (!conn->layered_table_manager.leader && ret == ENOENT) {
-        __wt_verbose_level(session, WT_VERB_VERIFY, WT_VERBOSE_DEBUG_2,
-          "Verify (layered): %s stable table not found on follower, it can be a transient state.",
-          stable_uri);
-        ret = 0;
+    if (leader) {
+        /* Verify the stable table of the layered table. */
+        WT_WITHOUT_DHANDLE(session,
+          ret = __wt_schema_worker(session, stable_uri, file_func, name_func, cfg, open_flags));
+    } else {
+        WT_ERR(__wt_scr_alloc(session, 0, &ckpt_uri));
+
+        /* A follower always verifies the stable tree at the last picked-up checkpoint. */
+        WT_ERR_NOTFOUND_OK(
+          __wt_meta_checkpoint_last_name(session, stable_uri, &checkpoint_name, NULL, NULL), true);
+
+        /* There is nothing to verify before the first checkpoint is picked up. */
+        if (ret == WT_NOTFOUND) {
+            ret = 0;
+            goto err;
+        }
+
+        /* Use a URI with a "/<checkpoint name> suffix. */
+        WT_ERR(__wt_buf_fmt(session, ckpt_uri, "%s/%s", stable_uri, checkpoint_name));
+
+        /*
+         * Verify the stable table of the layered table. The open returns EBUSY when a concurrent
+         * pickup supersedes the checkpoint; the caller treats EBUSY as transient.
+         */
+        WT_WITHOUT_DHANDLE(session,
+          ret = __wt_schema_worker(session, ckpt_uri->data, file_func, name_func, cfg, open_flags));
     }
 
+err:
+    __wt_scr_free(session, &ckpt_uri);
+    __wt_free(session, checkpoint_name);
     if (ret != 0 && ret != EBUSY)
-        WT_RET_MSG(
-          session, ret, "Verify (layered): %s stable table verification failed", stable_uri);
-
+        WT_RET_MSG(session, ret, "Verify (layered): %s stable table verification failed on the %s",
+          stable_uri, leader ? "leader" : "follower");
     return (ret);
 }
 

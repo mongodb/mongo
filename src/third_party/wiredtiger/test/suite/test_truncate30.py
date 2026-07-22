@@ -105,6 +105,11 @@ class test_truncate30(wttest.WiredTigerTestCase):
         # into level-2 internal page splits that create dsk==NULL pages
         # inheriting page_del children from the replayed truncation.
         # Without the fix: SIGSEGV. With the fix: recovery completes cleanly.
+        #
+        # The WAL is copied while it may be mid-write, so recovery can find a torn
+        # final record and salvage/truncate the log. Those NOTICE messages are an
+        # expected outcome of the crash simulation, not a failure.
+        self.ignoreStdoutPattern('log record at position|corrupted at position|salvage: log file')
         simulate_crash_restart(self, '.', 'CRASH')
 
         # ---- Phase 4: verify integrity ----

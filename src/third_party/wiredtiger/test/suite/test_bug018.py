@@ -105,6 +105,7 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
                 pass
 
         # Expect an error and messages, so turn off stderr checking.
+        self.ignoreStdoutPatternIfExists('log_slot_destroy: failed to write slot')
         with self.expectedStderrPattern(''):
             try:
                 self.close_conn()

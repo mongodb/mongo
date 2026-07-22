@@ -24,8 +24,8 @@ static int __inmem_row_leaf_entries(WT_SESSION_IMPL *, const WT_PAGE_HEADER *, u
  *     older duplicates are discarded.
  */
 static int
-__page_find_min_delta_int(WT_SESSION_IMPL *session, WTI_DELTA_INT_MERGE_STATE s[], int32_t *min_d,
-  int32_t delta_count, WT_PAGE_HEADER *base_page_header)
+__page_find_min_delta_int(
+  WT_SESSION_IMPL *session, WTI_DELTA_INT_MERGE_STATE s[], int32_t *min_d, int32_t delta_count)
 {
     WT_ITEM cur_key, min_key;
     int32_t j;
@@ -47,7 +47,7 @@ __page_find_min_delta_int(WT_SESSION_IMPL *session, WTI_DELTA_INT_MERGE_STATE s[
          * skip decoding and compare against the already-decoded key.
          */
         if (!s[i].unpacked)
-            WT_CELL_DELTA_INT_UNPACK(session, base_page_header, &s[i]);
+            WT_CELL_DELTA_INT_UNPACK(session, &s[i]);
 
         if (j == -1) {
             j = i;
@@ -529,6 +529,8 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     WT_RET(__wt_calloc_def(session, delta_size, &delta_state));
     for (size_t i = 0; i < delta_size; ++i) {
         WT_PAGE_HEADER *dhdr = (WT_PAGE_HEADER *)deltas[i].data;
+        delta_state[i].base_dsk = base_image_header;
+        delta_state[i].delta_dsk = dhdr;
         delta_state[i].cell = WT_PAGE_HEADER_BYTE(btree, dhdr);
         delta_state[i].entries = dhdr->u.entries;
         delta_state[i].unpacked = false;
@@ -593,8 +595,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     for (;;) {
         /* Find the minimum delta entry only when needed. */
         if (j == -1)
-            WT_ERR(__page_find_min_delta_int(
-              session, delta_state, &j, (int32_t)delta_size, base_image_header));
+            WT_ERR(__page_find_min_delta_int(session, delta_state, &j, (int32_t)delta_size));
 
         /* Check if both base and all deltas are exhausted. */
         if (base_state.entries == 0 && j == -1)

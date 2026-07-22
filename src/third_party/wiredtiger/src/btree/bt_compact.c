@@ -105,6 +105,7 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     WT_ADDR *addr;
     WT_CELL_UNPACK_ADDR unpack;
     WT_DECL_RET;
+    uint8_t *new_cookie;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
@@ -115,12 +116,15 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     addr = ref->addr;
     WT_ASSERT(session, addr != NULL);
 
+    new_cookie = NULL;
+    WT_ERR(__wt_strndup(session, copy->addr, copy->size, &new_cookie));
+
     if (__wt_off_page(ref->home, addr))
         __wti_ref_addr_safe_free(session, addr->block_cookie, addr->block_cookie_size);
     else {
         __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &unpack);
 
-        WT_RET(__wt_calloc_one(session, &addr));
+        WT_ERR(__wt_calloc_one(session, &addr));
         addr->ta.newest_start_durable_ts = unpack.ta.newest_start_durable_ts;
         addr->ta.newest_stop_durable_ts = unpack.ta.newest_stop_durable_ts;
         addr->ta.oldest_start_ts = unpack.ta.oldest_start_ts;
@@ -143,13 +147,14 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
         }
     }
 
-    WT_ERR(__wt_strndup(session, copy->addr, copy->size, &addr->block_cookie));
+    addr->block_cookie = new_cookie;
     addr->block_cookie_size = copy->size;
 
     ref->addr = addr;
     return (0);
 
 err:
+    __wt_free(session, new_cookie);
     if (addr != ref->addr)
         __wt_free(session, addr);
     return (ret);

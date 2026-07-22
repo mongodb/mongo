@@ -143,8 +143,14 @@ functions:
           fi
 
           echo "mongodbtoolchain $MDB_TOOLCHAIN_REV not installed, downloading..."
+
+          # The pinned toolchain tarball sources a script that it does not contain.
+          # pipefail preserves the installer's real exit status.
+          # FIXME-WT-18153: Remove this filter once the toolchain has been fixed.
+          set -o pipefail
           curl -fsSL https://s3.amazonaws.com/mongodbtoolchain.build.10gen.cc/installer.sh \
-              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV"
+              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" 2>&1 \
+              | sed -E '/scripts\/installer\.sh: No such file or directory/d; /return: can only .return. from a function or sourced script/d'
 
   "dump stacktraces": &dump_stacktraces
     command: shell.exec
@@ -656,6 +662,44 @@ variables:
               ./test_schema_disagg_abort -b "$build_dir" -s 64 -T 12 -t 300
             done
 
+  - &schema-disagg-abort-switch-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            build_dir=$(cd ../../../ && pwd)
+            for i in $(seq ${times|10}); do
+              echo "Iteration $i/${times|10}"
+              # Switch mode (-m) exercises a random role switch mid-workload before the crash.
+              ./test_schema_disagg_abort -b "$build_dir" -s 64 -T 12 -t 300 -m
+            done
+
+  - &schema-disagg-abort-smoke-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            # Lightweight smoke coverage: leader plus short switch-mode runs.
+            bash ./smoke.sh
+
   # Configure flags for builtins.
   - &configure_flags_with_builtins
     HAVE_BUILTIN_EXTENSION_LZ4: -DHAVE_BUILTIN_EXTENSION_LZ4=1
@@ -723,6 +767,14 @@ tasks:
 
   - <<: *schema-disagg-abort-test-disagg
     name: schema-disagg-abort-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-switch-test-disagg
+    name: schema-disagg-abort-switch-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-smoke-test-disagg
+    name: schema-disagg-abort-smoke-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
 
 #######################################

@@ -32,6 +32,7 @@
 # [END_TAGS]
 
 from helper import copy_wiredtiger_home
+from metadata_helper import checkpoint_extent_list_blocks
 import wttest
 from wtdataset import SimpleDataSet
 import os
@@ -72,12 +73,27 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         tablename=f"{self.test_name}.wt"
         self.assertEqual(os.path.exists(tablename), True)
 
-        # This code will overwrite part of the table with 'bad' data, corrupting the table in the process.
-        # The impact of this overwriting can depend on the number of bytes overwritten, depending on what the
-        # rest of the test does and expects.
-        with open(tablename, 'r+') as tablepointer:
-            tablepointer.seek(1024)
-            tablepointer.write(data_to_corrupt_with)
+        # Leave the checkpoint's extent-list blocks intact. Salvage cannot recover a corrupt extent
+        # list, and a later checkpoint that drops this one reads its extent lists: a failed read
+        # there is fatal (a WT_PANIC under the default corruption_abort), so corrupting one aborts
+        # the test whenever the file layout happens to place an extent-list block in the range below.
+        protect = sorted(checkpoint_extent_list_blocks(self.session, 'file:' + self.test_name + '.wt'))
+        start = 1024
+        data = bytes(data_to_corrupt_with, 'latin-1')
+        end = start + len(data)
+        with open(tablename, 'r+b') as f:
+            pos = start
+            for b_off, b_size in protect:
+                b_end = b_off + b_size
+                if b_end <= pos or b_off >= end:
+                    continue
+                if b_off > pos:
+                    f.seek(pos)
+                    f.write(data[pos - start:b_off - start])
+                pos = max(pos, b_end)
+            if pos < end:
+                f.seek(pos)
+                f.write(data[pos - start:])
 
     def corrupt_salvage_verify(self):
         # An exclusive handle operation can fail if there is dirty data in the cache, closing the

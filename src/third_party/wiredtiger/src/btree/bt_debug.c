@@ -1019,12 +1019,14 @@ __debug_disk_delta(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *base_dsk,
         WTI_DELTA_INT_MERGE_STATE state;
 
         WT_CLEAR(state);
+        state.base_dsk = base_dsk;
+        state.delta_dsk = delta_dsk;
         state.cell = WT_PAGE_HEADER_BYTE(S2BT(session), delta_dsk);
         state.entries = delta_dsk->u.entries;
 
         /* Each entry is a key cell plus a value cell, so the count decreases by two. */
         while (state.entries > 0) {
-            WT_CELL_DELTA_INT_UNPACK(session, base_dsk, &state);
+            WT_CELL_DELTA_INT_UNPACK(session, &state);
             WT_ERR(__debug_cell_delta_int(ds, &state.unpack));
             state.unpacked = false;
             state.entries -= 2;

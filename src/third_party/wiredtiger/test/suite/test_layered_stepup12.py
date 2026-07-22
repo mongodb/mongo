@@ -27,15 +27,17 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # test_layered_stepup12.py
-#   Verify that schema operations on layered tables are illegal during a role transition.
-#   Attempting to take a schema lock fires an assert when step-up or step-down is ongoing,
-#   aborting the process.
+#   Verify how schema operations on layered tables behave during a role transition, against both
+#   step-up (follower->leader) and step-down (leader->follower):
+#     - Schema ops that take only the schema lock (create, and drop with checkpoint_wait=false) can
+#       race the transition, so they hit the "ongoing role-transition" guard and abort the process.
+#     - Schema ops that take the checkpoint lock first (truncate, verify, and drop with
+#       checkpoint_wait=true) are serialized against the transition by that lock - it is held for
+#       the whole step up/down - so they never observe the transition and do not abort.
+#     - Opening a statistics cursor acquires the schema lock to open a data handle, but a handle
+#       open is not a schema operation, so it is allowed during a transition and must not abort.
 #
-#   Eight scenarios cover drop, create, truncate, and verify against both transitions:
-#     step_up   + drop/create/truncate/verify: schema op races follower->leader step-up
-#     step_down + drop/create/truncate/verify: schema op races leader->follower step-down
-#
-#   Each scenario runs in a subprocess so that the expected abort is caught as a
+#   Each scenario runs in a subprocess, so that the expected aborts are caught as a
 #   non-zero exit code without killing the test runner.
 #
 #   FIXME-WT-17880: Remove this test once we have asynchronous step-up/step-down.
@@ -58,11 +60,20 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
         ('step_down', dict(start_role='leader',   target_role='follower')),
     ]
     ops = [
-        ('drop_lock_wait',   dict(op='drop', lock_wait=True)),
-        ('drop_lock_nowait', dict(op='drop', lock_wait=False)),
-        ('create',    dict(op='create')),
-        ('truncate',  dict(op='truncate')),
-        ('verify',    dict(op='verify')),
+        ('drop_lock_wait',
+            dict(op='drop', checkpoint_wait=False, lock_wait=True,  expect_abort=True)),
+        ('drop_lock_nowait',
+            dict(op='drop', checkpoint_wait=False, lock_wait=False, expect_abort=True)),
+        ('create',
+            dict(op='create',                                       expect_abort=True)),
+        ('drop_checkpoint_wait',
+            dict(op='drop', checkpoint_wait=True,  lock_wait=True,  expect_abort=False)),
+        ('truncate',
+            dict(op='truncate',                                     expect_abort=False)),
+        ('verify',
+            dict(op='verify',                                       expect_abort=False)),
+        ('stat_cursor',
+            dict(op='stat_cursor',                                  expect_abort=False)),
     ]
     scenarios = make_scenarios(disagg_storages, transitions, ops)
 
@@ -82,6 +93,7 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
             self.home,
             'statistics=(all)'
             + self.extensionsConfig()
+            + ',timing_stress_for_test=[disagg_role_transition]'
             + f',disaggregated=(role={self.start_role},drain_threads=2)')
 
         session = conn.open_session('')
@@ -91,19 +103,29 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
             meta = self.disagg_get_complete_checkpoint_meta(conn)
             self.assertIsNotNone(meta, 'expected a complete checkpoint from the leader')
             conn.reconfigure(f'disaggregated=(checkpoint_meta="{meta}")')
-            session.open_cursor(self.uri).close()
+            # Leave the handle unopened for the stat-cursor case so that opening the statistics
+            # cursor during the transition triggers a first-time handle open.
+            if self.op != 'stat_cursor':
+                session.open_cursor(self.uri).close()
 
         # Start the role transition in a background thread.
         t = threading.Thread(
             target=lambda: conn.reconfigure(f'disaggregated=(role={self.target_role})'),
             daemon=True)
-        t.start()
 
-        # The assertion in WT_WITH_SCHEMA_LOCK must fire and abort the process.
+        transition_stat = wiredtiger.stat.conn.disagg_step_up_in_progress \
+            if self.target_role == 'leader' else wiredtiger.stat.conn.disagg_step_down_in_progress
+
+        # Wait until the role transition has begun before initiating the schema op.
+        t.start()
+        self.assertStatGreaterSoon(transition_stat, 0, session=session, timeout=10,
+            msg='role transition did not start')
+
         match self.op:
             case 'drop':
                 lw = 'true' if self.lock_wait else 'false'
-                session.drop(self.uri, f'force=true,checkpoint_wait=false,lock_wait={lw}')
+                cw = 'true' if self.checkpoint_wait else 'false'
+                session.drop(self.uri, f'force=true,checkpoint_wait={cw},lock_wait={lw}')
             case 'create':
                 session.create(self.new_uri,
                                 'key_format=i,value_format=S,block_manager=disagg,type=layered')
@@ -111,6 +133,9 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
                 session.truncate(self.uri, None, None, None)
             case 'verify':
                 session.verify(self.uri, None)
+            case 'stat_cursor':
+                session.open_cursor(
+                    'statistics:' + self.uri, None, 'statistics=(all)').close()
 
         t.join()
 
@@ -123,6 +148,11 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
         rc, _ = self.run_subprocess_function(
             'SUBPROCESS',
             'test_layered_stepup12.test_layered_stepup12.subprocess_race',
-            silent=True)
-        self.assertEqual(rc, -signal.SIGABRT,
-            f'expected process to abort (rc={-signal.SIGABRT}) but got rc={rc}')
+            silent=True,
+            scenario=self.scenario_name)
+        if self.expect_abort:
+            self.assertEqual(rc, -signal.SIGABRT,
+                f'expected process to abort (rc={-signal.SIGABRT}) but got rc={rc}')
+        else:
+            self.assertGreaterEqual(rc, 0,
+                f'expected no abort but process was killed by signal (rc={rc})')

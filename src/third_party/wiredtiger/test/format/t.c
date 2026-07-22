@@ -363,7 +363,7 @@ main(int argc, char *argv[])
         wts_open(g.home, &g.wts_conn, true);
         /* Follower: seed an initial key before the first step-up checkpoint. */
         if (!g.disagg_leader)
-            disagg_key_push_initial(g.wts_conn);
+            disagg_key_push_initial(g.wts_conn, false);
         timestamp_init();
     }
     wts_prepare_discover(g.wts_conn);

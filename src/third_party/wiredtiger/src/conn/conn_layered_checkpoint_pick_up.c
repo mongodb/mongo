@@ -454,8 +454,8 @@ err:
  *     Process the metadata entries stored in the shared metadata table for a new checkpoint.
  */
 static int
-__disagg_apply_checkpoint_meta(
-  WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta, bool is_startup)
+__disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta,
+  wt_timestamp_t ckpt_schema_epoch, bool is_startup)
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *md_cursors[WT_DISAGG_CURSOR_COUNT], *md_write_cursor,
@@ -463,7 +463,9 @@ __disagg_apply_checkpoint_meta(
     WT_DECL_ITEM(current_buf);
     WT_DECL_ITEM(metadata_uri_buf);
     WT_DECL_RET;
+    WT_SHARED_METADATA_OP latest_op;
     WT_TIMER apply_timer;
+    wt_timestamp_t latest_epoch;
     uint64_t apply_elapsed_ms;
     uint32_t existing_tables, new_tables, new_ingest;
     size_t current_len;
@@ -472,7 +474,7 @@ __disagg_apply_checkpoint_meta(
     const char *cfg[2], *metadata_checkpoint_name, *metadata_value;
     const char *md_keys[WT_DISAGG_CURSOR_COUNT], *sh_keys[WT_DISAGG_CURSOR_COUNT];
     const char *current;
-    bool md_has[WT_DISAGG_CURSOR_COUNT], sh_has[WT_DISAGG_CURSOR_COUNT];
+    bool md_has[WT_DISAGG_CURSOR_COUNT], sh_has[WT_DISAGG_CURSOR_COUNT], strict;
 
     for (i = 0; i < WT_DISAGG_CURSOR_COUNT; i++)
         md_cursors[i] = sh_cursors[i] = NULL;
@@ -481,6 +483,9 @@ __disagg_apply_checkpoint_meta(
     metadata_checkpoint_name = NULL;
     layered_ingest_uri = NULL;
     existing_tables = new_tables = new_ingest = 0;
+
+    /* Whether to check that the local and shared metadata contain the same layered tables. */
+    strict = F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_STRICT_CHECKPOINT_METADATA);
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
 
@@ -647,8 +652,17 @@ __disagg_apply_checkpoint_meta(
              * be a new layered table that we should pick up, but it could also mean that we have
              * already dropped the table locally and should not recreate it as a result.
              */
-            if (__wti_disagg_table_latest_create_remove(session, current) ==
-              WT_SHARED_METADATA_REMOVE)
+            latest_op = __wti_disagg_table_latest_create_remove(session, current, &latest_epoch);
+            if (strict &&
+              (latest_op != WT_SHARED_METADATA_REMOVE || latest_epoch <= ckpt_schema_epoch))
+                WT_ERR_PANIC(session, EINVAL,
+                  "strict checkpoint metadata validation failed: table \"%s\" is present in the "
+                  "shared metadata but not in the local metadata, and is not explained by a "
+                  "pending REMOVE with a schema epoch greater than the checkpoint's schema epoch "
+                  "%" PRIu64 "; latest queued operation: %s at schema epoch %" PRIu64,
+                  current, ckpt_schema_epoch, __wti_disagg_shared_metadata_op_to_string(latest_op),
+                  latest_epoch);
+            if (latest_op == WT_SHARED_METADATA_REMOVE)
                 continue;
 
             /*
@@ -702,6 +716,16 @@ __disagg_apply_checkpoint_meta(
              *
              * FIXME-WT-17746: Remove the local metadata entries for the dropped table.
              */
+            latest_op = __wti_disagg_table_latest_create_remove(session, current, &latest_epoch);
+            if (strict &&
+              (latest_op != WT_SHARED_METADATA_CREATE || latest_epoch <= ckpt_schema_epoch))
+                WT_ERR_PANIC(session, EINVAL,
+                  "strict checkpoint metadata validation failed: table \"%s\" is present in "
+                  "the local metadata but not in the shared metadata, and there is no pending "
+                  "CREATE with a schema epoch greater than the checkpoint's schema epoch "
+                  "%" PRIu64 "; latest queued operation: %s at schema epoch %" PRIu64,
+                  current, ckpt_schema_epoch, __wti_disagg_shared_metadata_op_to_string(latest_op),
+                  latest_epoch);
         } else {
             /*
              * Neither the local nor the shared metadata has a layered: entry for this table name.
@@ -980,8 +1004,8 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
      */
 
     /* Apply the metadata from the checkpoint. */
-    WT_WITH_SCHEMA_LOCK(
-      session, ret = __disagg_apply_checkpoint_meta(session, ckpt_meta, is_startup));
+    WT_WITH_SCHEMA_LOCK(session,
+      ret = __disagg_apply_checkpoint_meta(session, ckpt_meta, metadata.schema_epoch, is_startup));
     WT_ERR(ret);
 
     /*

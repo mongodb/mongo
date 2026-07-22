@@ -1765,6 +1765,8 @@ __wt_schema_create_internal(
      */
     WT_ASSERT(session, __wt_spin_locked(session, &S2C(session)->schema_lock));
 
+    WT_ASSERT_NO_SCHEMA_OP_DURING_ROLE_TRANSITION(session);
+
     WT_RET(__wti_schema_internal_session(session, &int_session));
     ret = __schema_create(int_session, uri, config, open_dhandle);
     WT_TRET(__wti_schema_session_release(session, int_session));

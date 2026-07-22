@@ -1052,7 +1052,7 @@ typedef int int_void;
      */
     int _modify(WT_MODIFY *list) {
         int count = (int)list[0].size;
-        return (self->modify(self, &list[1], count));
+        return ($self->modify($self, &list[1], count));
     }
 
 %pythoncode %{
@@ -1189,7 +1189,7 @@ typedef int int_void;
 
 %extend __wt_session {
     int _log_printf(const char *msg) {
-        return self->log_printf($self, "%s", msg);
+        return $self->log_printf($self, "%s", msg);
     }
 
     int _clear() {
@@ -1216,179 +1216,179 @@ typedef int int_void;
 %rename (method) cclass::CONCAT(_,method);
 %extend cclass {
     int CONCAT(_, method) cargs {
-        return (self->method cargs_call );
+        return ($self->method cargs_call );
      }
 };
 %enddef
 
 SIDESTEP_METHOD(__wt_page_log, pl_complete_checkpoint,
   (WT_SESSION *session, WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args),
-  (self, session, args))
+  ($self, session, args))
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_complete_checkpoint,
   (WT_SESSION *session, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args),
-  (self, session, args))
+  ($self, session, args))
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_last_lsn,
   (WT_SESSION *session, uint64_t *lsn),
-  (self, session, lsn))
+  ($self, session, lsn))
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_open_checkpoint,
   (WT_SESSION *session, uint64_t *checkpoint_id),
-  (self, session, checkpoint_id))
+  ($self, session, checkpoint_id))
 
 SIDESTEP_METHOD(__wt_page_log, pl_open_handle,
   (WT_SESSION *session, int table_id, WT_PAGE_LOG_HANDLE **handle),
-  (self, session, table_id, handle))
+  ($self, session, table_id, handle))
 
 SIDESTEP_METHOD(__wt_page_log, pl_set_last_materialized_lsn,
   (WT_SESSION *session, uint64_t lsn),
-  (self, session, lsn))
+  ($self, session, lsn))
 
 SIDESTEP_METHOD(__wt_page_log, pl_trim_table,
   (WT_SESSION *session, uint64_t table_id, uint64_t start_lsn, uint64_t *lsnp),
-  (self, session, table_id, start_lsn, lsnp))
+  ($self, session, table_id, start_lsn, lsnp))
 
 SIDESTEP_METHOD(__wt_page_log, terminate,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_key_provider, set_key,
   (WT_SESSION *session, const WT_CRYPT_KEYS *crypt),
-  (self, session, crypt))
+  ($self, session, crypt))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_put,
   (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_PUT_ARGS *put_args, const WT_ITEM *buf),
-  (self, session, page_id, checkpoint_id, put_args, buf))
+  ($self, session, page_id, checkpoint_id, put_args, buf))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_get,
   (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_GET_ARGS *get_args,
     WT_ITEM *results_array, u_int *results_count),
-  (self, session, page_id, checkpoint_id, get_args, results_array, results_count))
+  ($self, session, page_id, checkpoint_id, get_args, results_array, results_count))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_get_page_ids,
   (WT_SESSION *session, int checkpoint_lsn, WT_ITEM *item, size_t *size),
-  (self, session, checkpoint_lsn, item, size))
+  ($self, session, checkpoint_lsn, item, size))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_discard,
   (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_DISCARD_ARGS *discard_args),
-  (self, session, page_id, checkpoint_id, discard_args))
+  ($self, session, page_id, checkpoint_id, discard_args))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_close,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_storage_source, ss_customize_file_system,
   (WT_SESSION *session, const char *bucket_name,
     const char *auth_token, const char *config, WT_FILE_SYSTEM **file_systemp),
-  (self, session, bucket_name, auth_token, config, file_systemp))
+  ($self, session, bucket_name, auth_token, config, file_systemp))
 
 SIDESTEP_METHOD(__wt_storage_source, ss_flush,
   (WT_SESSION *session, WT_FILE_SYSTEM *file_system,
     const char *source, const char *object, const char *config),
-  (self, session, file_system, source, object, config))
+  ($self, session, file_system, source, object, config))
 
 SIDESTEP_METHOD(__wt_storage_source, ss_flush_finish,
   (WT_SESSION *session, WT_FILE_SYSTEM *file_system,
     const char *source, const char *object, const char *config),
-  (self, session, file_system, source, object, config))
+  ($self, session, file_system, source, object, config))
 
 SIDESTEP_METHOD(__wt_storage_source, terminate,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_system, fs_exist,
   (WT_SESSION *session, const char *name, bool *existp),
-  (self, session, name, existp))
+  ($self, session, name, existp))
 
 SIDESTEP_METHOD(__wt_file_system, fs_open_file,
   (WT_SESSION *session, const char *name, WT_FS_OPEN_FILE_TYPE file_type,
     uint32_t flags, WT_FILE_HANDLE **file_handlep),
-  (self, session, name, file_type, flags, file_handlep))
+  ($self, session, name, file_type, flags, file_handlep))
 
 SIDESTEP_METHOD(__wt_file_system, fs_remove,
   (WT_SESSION *session, const char *name, uint32_t flags),
-  (self, session, name, flags))
+  ($self, session, name, flags))
 
 SIDESTEP_METHOD(__wt_file_system, fs_rename,
   (WT_SESSION *session, const char *from, const char *to, uint32_t flags),
-  (self, session, from, to, flags))
+  ($self, session, from, to, flags))
 
 SIDESTEP_METHOD(__wt_file_system, fs_size,
   (WT_SESSION *session, const char *name, wt_off_t *sizep),
-  (self, session, name, sizep))
+  ($self, session, name, sizep))
 
 SIDESTEP_METHOD(__wt_file_system, terminate,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, close,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_advise,
   (WT_SESSION *session, wt_off_t offset, wt_off_t len, int advice),
-  (self, session, offset, len, advice))
+  ($self, session, offset, len, advice))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_extend,
   (WT_SESSION *session, wt_off_t offset),
-  (self, session, offset))
+  ($self, session, offset))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_extend_nolock,
   (WT_SESSION *session, wt_off_t offset),
-  (self, session, offset))
+  ($self, session, offset))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_lock,
   (WT_SESSION *session, bool lock),
-  (self, session, lock))
+  ($self, session, lock))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_map,
   (WT_SESSION *session, bool lock, void *mapped_regionp, size_t *lengthp, void *mapped_cookiep),
-  (self, session, mapped_regionp, lengthp, mapped_cookiep))
+  ($self, session, mapped_regionp, lengthp, mapped_cookiep))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_map_discard,
   (WT_SESSION *session, void *map, size_t length, void *mapped_cookie),
-  (self, session, map, length, mapped_cookie))
+  ($self, session, map, length, mapped_cookie))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_map_preload,
   (WT_SESSION *session, const void *map, size_t length, void *mapped_cookie),
-  (self, session, map, length, mapped_cookie))
+  ($self, session, map, length, mapped_cookie))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_unmap,
   (WT_SESSION *session, void *mapped_region, size_t length, void *mapped_cookie),
-  (self, session, mapped_region, length, mapped_cookie))
+  ($self, session, mapped_region, length, mapped_cookie))
 
    /*
 SIDESTEP_METHOD(__wt_file_handle, fh_read,
   (WT_SESSION *session, wt_off_t offset, size_t len, void *buf),
-  (self, session, offset, len, buf))
+  ($self, session, offset, len, buf))
    */
 
 SIDESTEP_METHOD(__wt_file_handle, fh_size,
   (WT_SESSION *session, wt_off_t *sizep),
-  (self, session, sizep))
+  ($self, session, sizep))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_sync,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_sync_nowait,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_truncate,
   (WT_SESSION *session, wt_off_t offset),
-  (self, session, offset))
+  ($self, session, offset))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_write,
   (WT_SESSION *session, unsigned long offset, size_t length, const void *buf),
-  (self, session, offset, length, buf))
+  ($self, session, offset, length, buf))
 
 %ignore __wt_file_handle::fh_read;
 %rename (fh_read) __wt_file_handle::_fh_read;
 %extend __wt_file_handle {
     int _fh_read(WT_SESSION *session, unsigned long offset, size_t length, void *buf) {
-        return (self->fh_read(self, session, offset, length, buf));
+        return ($self->fh_read($self, session, offset, length, buf));
     }
 };
 
@@ -1399,11 +1399,11 @@ SIDESTEP_METHOD(__wt_file_handle, fh_write,
 %extend __wt_file_system {
     int _fs_directory_list(WT_SESSION *session, const char *directory, const char *prefix,
       char ***dirlist, int *countp) {
-        return (self->fs_directory_list(self, session, directory, prefix, dirlist, countp));
+        return ($self->fs_directory_list($self, session, directory, prefix, dirlist, countp));
     }
     int _fs_directory_list_single(WT_SESSION *session, const char *directory, const char *prefix,
       char ***dirlist, int *countp) {
-        return (self->fs_directory_list_single(self, session, directory, prefix, dirlist, countp));
+        return ($self->fs_directory_list_single($self, session, directory, prefix, dirlist, countp));
     }
 };
 

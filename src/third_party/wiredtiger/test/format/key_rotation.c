@@ -92,7 +92,7 @@ disagg_key_push(
  *     for the leader and before step-up for the follower.
  */
 void
-disagg_key_push_initial(WT_CONNECTION *conn)
+disagg_key_push_initial(WT_CONNECTION *conn, bool advance_stable)
 {
     if (GV(DISAGG_KEY_PROVIDER) != DISAGG_KEY_PROVIDER_PUSH)
         return;
@@ -105,11 +105,16 @@ disagg_key_push_initial(WT_CONNECTION *conn)
     wt_timestamp_t push_ts;
     testutil_check(disagg_key_push(session, kp, g.stable_timestamp, &push_ts));
 
-    /* Advance stable to the pushed key so the checkpoint drains it. */
-    char ts_buf[WT_TS_HEX_STRING_SIZE + 24];
-    testutil_snprintf(ts_buf, sizeof(ts_buf), "stable_timestamp=%" PRIx64, (uint64_t)push_ts);
-    testutil_check(conn->set_timestamp(conn, ts_buf));
-    g.stable_timestamp = push_ts;
+    /*
+     * The leader seeds before its create-time close checkpoint, which must drain the key now, so it
+     * advances stable.
+     */
+    if (advance_stable) {
+        char ts_buf[WT_TS_HEX_STRING_SIZE + 24];
+        testutil_snprintf(ts_buf, sizeof(ts_buf), "stable_timestamp=%" PRIx64, (uint64_t)push_ts);
+        testutil_check(conn->set_timestamp(conn, ts_buf));
+        g.stable_timestamp = push_ts;
+    }
 
     testutil_check(session->close(session, NULL));
 }

@@ -155,6 +155,18 @@ connection_disaggregated_config_common = [
     Config('role', '', r'''
         whether the stable table in a layered data store should lead or follow''',
         choices=['leader', 'follower'], undoc=True),
+    Config('strict_checkpoint_metadata', '', r'''
+        validate at checkpoint pickup that the local and shared metadata contain the same
+        layered tables, panicking on any difference that is not explained by a pending
+        metadata update with a schema epoch greater than the schema epoch of the picked-up
+        checkpoint. At startup the mode must be off: the startup pickup populates an empty
+        node from the checkpoint. Turn it on after startup, provided table creates and drops
+        reach this node through replicated operations and publish() rather than through
+        pickup. After a step-down,
+        turn it off until the unpublished tables left behind (step-down discards their
+        pending metadata updates) have been dropped. Preserved across calls to reconfigure
+        that do not name it''',
+        choices=['false', 'true'], undoc=True),
 ]
 disaggregated_config_common = [
     Config('page_log', '', r'''
@@ -1032,7 +1044,8 @@ connection_runtime_config = [
         choices=[
         'aggressive_stash_free', 'aggressive_sweep', 'backup_rename', 'checkpoint_evict_page',
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'commit_transaction_slow',
-        'compact_slow', 'conn_close_stress_log_printf', 'evict_reposition',
+        'compact_slow', 'conn_close_stress_log_printf', 'disagg_role_transition',
+        'evict_reposition',
         'failpoint_disagg_checkpoint_queue_drain', 'failpoint_eviction_split',
         'failpoint_history_store_delete_key_from_ts',
         'failpoint_page_log_handle_put', 'failpoint_rec_before_wrapup', 'failpoint_rec_split_write',
