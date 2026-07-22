@@ -1,9 +1,10 @@
 """Unit tests for buildscripts/resmokelib/utils/history.py."""
 
+import json
 import sys
 import unittest
 
-from buildscripts.resmokelib.utils.history import HistoryDict, make_historic
+from buildscripts.resmokelib.utils.history import HistoryDict, make_historic, to_plain
 
 
 class TestHistory(unittest.TestCase):
@@ -250,6 +251,49 @@ History:
             notify_calls,
             "copy() must not call notify_subscriber_write() during construction",
         )
+
+    def test_to_plain_converts_nested_historic(self):
+        """to_plain() should recursively return plain, json-serializable python objects.
+
+        This mirrors the DisaggReplicaSetFixture case: a plain dict/list tree (built in
+        the fixture) that embeds a nested HistoryDict pulled from replset_config_options.
+        """
+        # 'settings' comes out of a HistoryDict config store; the rest is built plainly.
+        settings = make_historic({"electionTimeoutMillis": 86400000, "chainingAllowed": False})
+        config = {
+            "version": 1,
+            "members": [{"_id": 0, "priority": 1}, {"_id": 1, "priority": 1}],
+            "settings": settings,
+        }
+
+        # The embedded HistoryDict makes the whole structure not directly json-serializable.
+        self.assertRaises(TypeError, lambda: json.dumps(config))
+
+        plain = to_plain(config)
+
+        # The result is made of plain builtin types, with no serialization envelope.
+        self.assertIsInstance(plain, dict)
+        self.assertIsInstance(plain["settings"], dict)
+        self.assertNotIsInstance(plain["settings"], HistoryDict)
+        self.assertIsInstance(plain["members"], list)
+        self.assertIsInstance(plain["members"][0], dict)
+        self.assertEqual(
+            plain,
+            {
+                "version": 1,
+                "members": [{"_id": 0, "priority": 1}, {"_id": 1, "priority": 1}],
+                "settings": {"electionTimeoutMillis": 86400000, "chainingAllowed": False},
+            },
+        )
+
+        # It round-trips through json without error.
+        self.assertEqual(json.loads(json.dumps(plain)), plain)
+
+    def test_to_plain_passes_through_scalars(self):
+        self.assertEqual(to_plain(5), 5)
+        self.assertEqual(to_plain("foo"), "foo")
+        self.assertEqual(to_plain(None), None)
+        self.assertEqual(to_plain({"a": 1}), {"a": 1})
 
 
 if __name__ == "__main__":
