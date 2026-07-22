@@ -114,6 +114,32 @@ export function assertWriteCmdQueryStatsSingleExec(
 }
 
 /**
+ * Runs `testFn` (which issues a delete and asserts its exact query stats metrics) on a freshly reset
+ * collection + query stats store, retrying until it passes or `maxAttempts` is exhausted.
+ *
+ * Debug builds can hit spurious WriteConflictExceptions that re-run a delete's COLLSCAN, which
+ * nondeterministically inflates the recorded docsExamined above its true value.
+ */
+export function retryDeleteMetricTestOnWriteConflict(ctxFn, testFn, maxAttempts = 5) {
+    let lastError;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const {conn, coll} = ctxFn();
+        resetQueryStatsCollection(coll);
+        resetQueryStatsStore(conn, "1MB");
+        try {
+            testFn();
+            return;
+        } catch (e) {
+            lastError = e;
+        }
+    }
+    throw new Error(
+        `delete metric assertion never passed in ${maxAttempts} attempts (likely a real ` +
+            `regression, not transient write-conflict inflation): ${lastError}`,
+    );
+}
+
+/**
  * Standalone-mongod fixture for query stats tests, with write-command sampling on.
  */
 export function standaloneWriteCmdQueryStatsFixture(extraSetParameters = {}) {
