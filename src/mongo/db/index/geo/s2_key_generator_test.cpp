@@ -724,4 +724,43 @@ TEST_F(S2KeyGeneratorTest, StrictWindingPolygonInGeometryCollectionRejectsGracef
         DBException,
         ErrorCodes::GeoKeyExtractionFailed);
 }
+
+// Regression test for a null-pointer crash in BigSimplePolygon::GetCapBound(). In a v4 2dsphere
+// index, parseForS2Version() tries GeoJSON first, then falls back to legacy point parsing. When
+// GeoJSON parsing fails (because "coordinates" is a scalar rather than an array), _polygon is left
+// allocated with bigPolygon->_loop == nullptr. If legacy point parsing then succeeds (because the
+// object's first two fields are numeric), both _polygon and _point are set simultaneously.
+// projectInto() branches on _polygon != null and skips projecting _point, so _point->crs stays
+// FLAT. getS2Region() then skips _point (crs != SPHERE) and returns *_polygon->bigPolygon,
+// whose _loop is null — triggering a null dereference in GetCapBound().
+TEST_F(S2KeyGeneratorTest, V4IndexStrictWindingPolygonWithScalarCoordinatesAndLegacyPointFields) {
+    BSONObj keyPattern = fromjson("{loc: '2dsphere'}");
+    BSONObj infoObj = fromjson("{key: {loc: '2dsphere'}, '2dsphereIndexVersion': 4}");
+    S2IndexingParams params;
+    const CollatorInterface* collator = nullptr;
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
+
+    // The document has numeric first-two fields (triggers legacy point fallback in v4),
+    // type Polygon with strict-winding CRS, and a non-array "coordinates" field.
+    BSONObj doc = fromjson(
+        "{loc: {a: 1, b: 2, type: 'Polygon',"
+        " crs: {type: 'name', properties:"
+        "       {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}},"
+        " coordinates: 0}}");
+
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+    // GeoJSON parsing fails (coordinates is not an array), _polygon is reset, legacy point
+    // fallback succeeds on the numeric first-two fields {a:1, b:2} — one key generated.
+    index2dsphere::getS2Keys(allocator,
+                             doc,
+                             keyPattern,
+                             params,
+                             &keys,
+                             &multikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
+    ASSERT_EQUALS(1U, keys.size());
+}
 }  // namespace
