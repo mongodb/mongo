@@ -21,6 +21,8 @@
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/metrics_filtering_util.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -97,7 +99,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
+             BSONObjBuilder& inputResultBuilder) final {
         const auto service = opCtx->getServiceContext();
         const auto clock = service->getFastClockSource();
         const auto runStart = clock->now();
@@ -112,6 +114,18 @@ public:
 
         ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
             opCtx, AdmissionContext::Priority::kExempt);
+
+        // If filtering is required by the metrics policy, append the header and metrics fields to a
+        // temporary result builder and filter them at the end. Otherwise, append directly to the
+        // input result builder to avoid additional costs in the non-filtering case.
+        auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+        bool requireFiltering = metricsPolicyManager.requiresServerStatusFiltering(opCtx);
+
+        boost::optional<BSONObjBuilder> tmpResultBuilder;
+        if (requireFiltering) {
+            tmpResultBuilder.emplace();
+        }
+        BSONObjBuilder& result = requireFiltering ? *tmpResultBuilder : inputResultBuilder;
 
         // --- basic fields that are global
 
@@ -217,6 +231,15 @@ public:
             if (include_timing) {
                 result.append(kTimingSection, t);
             }
+        }
+
+        // If filtering is required, we appended the header and metrics fields in a temporary result
+        // builder. Now extract and append only the ones matching the allowlist to the input result
+        // builder.
+        if (requireFiltering) {
+            const auto& matcher = metricsPolicyManager.getServerStatusAllowlistMatcher();
+            metrics_filtering_util::appendPaths(
+                inputResultBuilder, tmpResultBuilder->obj(), matcher);
         }
 
         return true;
