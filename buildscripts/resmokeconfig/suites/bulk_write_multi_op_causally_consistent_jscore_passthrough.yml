@@ -23,6 +23,8 @@ selector:
   - jstests/core/failcommand_failpoint.js
   # This test adds unknown fields to insert/update/delete ops which we ignore
   - jstests/core/write/write_commands_reject_unknown_fields.js
+  # The test sets stmtIds manually.
+  - jstests/core/write/write_command_duplicate_stmt_ids_validation.js
   # Checks for op names which bulkWrite will not show up as
   - jstests/core/txns/transactions_profiling.js
   - jstests/core/txns/currentop_blocked_operations.js

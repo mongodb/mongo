@@ -81,6 +81,7 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRouter) {
                           << " operations. Statement ids: " << BSON("stmtIds" << *stmtIds)
                           << ". BulkWrite command: " << req.toBSON({}),
             stmtIds->size() == ops.size());
+        write_ops::validateStmtIds(*stmtIds);
     }
 
     // Validate the namespaces in nsInfo.

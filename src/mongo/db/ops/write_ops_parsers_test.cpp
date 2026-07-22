@@ -156,6 +156,58 @@ TEST(CommandWriteOpsParsers, ErrorOnStmtIdSpecifiedTwoWays) {
     }
 }
 
+TEST(CommandWriteOpsParsers, ErrorOnDuplicateStmtIdsArray) {
+    auto cmd = BSON("insert"
+                    << "bar"
+                    << "documents" << BSON_ARRAY(BSONObj() << BSONObj()) << "stmtIds"
+                    << BSON_ARRAY(5 << 5));
+    for (bool seq : {false, true}) {
+        auto request = toOpMsg("foo", cmd, seq);
+        ASSERT_THROWS_CODE(
+            InsertOp::parse(request), AssertionException, ErrorCodes::InvalidOptions);
+    }
+}
+
+TEST(ValidateStmtIds, ThrowsOnDuplicateNonNegativeStmtId) {
+    ASSERT_THROWS_CODE(
+        write_ops::validateStmtIds({3, 1, 3}), AssertionException, ErrorCodes::InvalidOptions);
+}
+
+TEST(ValidateStmtIds, AcceptsDistinctStmtIds) {
+    write_ops::validateStmtIds({0, 1, 2, 100});
+}
+
+TEST(ValidateStmtIds, AcceptsSingleUninitializedPlaceholder) {
+    write_ops::validateStmtIds({-1});
+}
+
+TEST(ValidateStmtIds, AcceptsRepeatedUninitializedPlaceholder) {
+    write_ops::validateStmtIds({-1, -1});
+}
+
+TEST(ValidateStmtIds, AcceptsUninitializedMixedWithAssigned) {
+    write_ops::validateStmtIds({0, -1, 1});
+}
+
+TEST(ValidateStmtIds, AcceptsUninitializedInAnyPosition) {
+    write_ops::validateStmtIds({-1, 0, -1, 1});
+}
+
+TEST(ValidateStmtIds, ThrowsOnDuplicateAssignedMixedWithPlaceholder) {
+    ASSERT_THROWS_CODE(
+        write_ops::validateStmtIds({-1, 5, 5}), AssertionException, ErrorCodes::InvalidOptions);
+}
+
+TEST(ValidateStmtIds, ThrowsOnNonSentinelNegativeStmtId) {
+    ASSERT_THROWS_CODE(
+        write_ops::validateStmtIds({-5}), AssertionException, ErrorCodes::InvalidOptions);
+}
+
+TEST(ValidateStmtIds, ThrowsOnRepeatedNonSentinelNegativeStmtId) {
+    ASSERT_THROWS_CODE(
+        write_ops::validateStmtIds({-5, -5}), AssertionException, ErrorCodes::InvalidOptions);
+}
+
 TEST(CommandWriteOpsParsers, GarbageFieldsInUpdateDoc) {
     auto cmd = BSON("update"
                     << "bar"

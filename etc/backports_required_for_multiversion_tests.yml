@@ -975,6 +975,10 @@ last-continuous:
     ticket: SERVER-128433
   - test_file: jstests/sharding/change_stream_update_lookup_sharded_insert_update.js
     ticket: SERVER-131202
+  - test_file: jstests/core/write/write_command_duplicate_stmt_ids_validation.js
+    ticket: SERVER-131326
+  - test_file: jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
+    ticket: SERVER-131326
   suites: null
 last-lts:
   all:
@@ -2012,4 +2016,8 @@ last-lts:
     ticket: SERVER-128433
   - test_file: jstests/sharding/change_stream_update_lookup_sharded_insert_update.js
     ticket: SERVER-131202
+  - test_file: jstests/core/write/write_command_duplicate_stmt_ids_validation.js
+    ticket: SERVER-131326
+  - test_file: jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
+    ticket: SERVER-131326
   suites: null

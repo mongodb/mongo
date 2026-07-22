@@ -29,6 +29,7 @@
 
 #include "mongo/db/ops/write_ops.h"
 
+#include <absl/container/flat_hash_set.h>
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -55,6 +56,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
@@ -116,6 +118,7 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
                                                << "stmtIds" << *stmtIds)
                               << ". Write command: " << op.toBSON({}),
                 !op.getWriteCommandRequestBase().getStmtId());
+        write_ops::validateStmtIds(*stmtIds);
     }
 }
 
@@ -236,6 +239,26 @@ int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, siz
     const auto& stmtId = writeCommandBase.getStmtId();
     const int32_t kFirstStmtId = stmtId ? *stmtId : 0;
     return kFirstStmtId + writePos;
+}
+
+void validateStmtIds(const std::vector<std::int32_t>& stmtIds) {
+    // Statement ids are not allowed to repeat.
+    absl::flat_hash_set<std::int32_t> seen;
+    seen.reserve(stmtIds.size());
+    for (auto stmtId : stmtIds) {
+        if (stmtId == kUninitializedStmtId) {
+            // This sentinel marks a write that is not retryable, so it may repeat.
+            continue;
+        }
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Statement id must be non-negative. Got " << stmtId,
+                stmtId >= 0);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Statement ids must be unique within a write command. Found "
+                                 "duplicate statement id "
+                              << stmtId,
+                seen.insert(stmtId).second);
+    }
 }
 
 int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants) {
