@@ -175,6 +175,28 @@ function defaultDocTemplate(i) {
     };
 }
 
+/**
+ * A document template for building the same three index types as `DEFAULT_INDEX_SPECS` (index[0]
+ * {a:1} unique, index[1] {"$**":1} on `b`, index[2] {c:1}) but with the per-field key sizes skewed
+ * so that only one of the three sorters spills to disk. With the default 3000-document count and a
+ * 3 MB (1 MB / index) budget:
+ *   a — padded to ~2 KB → ~6 MB of key data over 3000 docs, well past its 1 MB budget ⇒ SPILLS.
+ *   b — two short (prefix-only) array elements → ~tens of KB total ⇒ never spills.
+ *   c — one short array element → ~tens of KB total ⇒ never spills.
+ * This yields the mixed spilled/in-memory sorter state used by the mixed-spilling tests while
+ * preserving the field shapes the default index specs rely on (unique scalar `a`, multi-element
+ * array `b`, single-element `c`).
+ */
+export function mixedSpillingDocTemplate(i) {
+    const prefix = String(i).padStart(8, "0");
+    return {
+        _id: i,
+        a: prefix + "x".repeat(2000),
+        b: [prefix + "y", prefix + "z"],
+        c: [prefix],
+    };
+}
+
 function bulkInsert(coll, count, template, batchSize = 1000) {
     let i = 0;
     while (i < count) {
