@@ -278,6 +278,20 @@ sh_binary(
 )
 
 sh_binary(
+    name = "wt_dump_catalog",
+    srcs = ["wt_dump_catalog_main.sh"],
+    data = ["wt_functions.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "wt_dump_collection",
+    srcs = ["wt_dump_collection_main.sh"],
+    data = ["wt_functions.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
     name = "mount_drives",
     srcs = ["mount_drives.sh"],
 )

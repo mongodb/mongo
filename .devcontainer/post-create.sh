@@ -288,6 +288,15 @@ echo "Setting up fzf bindings..."
 echo 'eval "$(fzf --bash)"' >>"${HOME}/.bashrc"
 echo 'source <(fzf --zsh)' >>"${HOME}/.zshrc"
 
+# Setup useful data processing functions
+echo "Setting up WT collection dumping functions..."
+if ! grep -q "source \"${WORKSPACE_FOLDER}/buildscripts/wt_functions.sh\"" "${HOME}/.bashrc" 2>/dev/null; then
+    echo "source \"${WORKSPACE_FOLDER}/buildscripts/wt_functions.sh\"" >>"${HOME}/.bashrc"
+fi
+if ! grep -q "source \"${WORKSPACE_FOLDER}/buildscripts/wt_functions.sh\"" "${HOME}/.zshrc" 2>/dev/null; then
+    echo "source \"${WORKSPACE_FOLDER}/buildscripts/wt_functions.sh\"" >>"${HOME}/.zshrc"
+fi
+
 echo ""
 echo "MongoDB development container setup completed successfully!"
 echo "Info: All infrastructure and dependencies are now configured and up to date."

@@ -92,6 +92,16 @@ alias(
 )
 
 alias(
+    name = "wt_dump_catalog",
+    actual = "//buildscripts:wt_dump_catalog",
+)
+
+alias(
+    name = "wt_dump_collection",
+    actual = "//buildscripts:wt_dump_collection",
+)
+
+alias(
     name = "mongo-tidy-test",
     actual = "//src/mongo/tools/mongo_tidy_checks/tests:MongoTidyCheck_unittest",
 )

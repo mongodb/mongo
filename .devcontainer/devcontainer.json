@@ -40,7 +40,8 @@
     }
   ],
   "containerEnv": {
-    "HOME": "/home/${localEnv:USER}"
+    "HOME": "/home/${localEnv:USER}",
+    "WORKSPACE_FOLDER": "${containerWorkspaceFolder}"
   },
   "remoteUser": "${localEnv:USER}",
   "containerUser": "${localEnv:USER}",
