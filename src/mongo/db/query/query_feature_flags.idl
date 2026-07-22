@@ -559,9 +559,9 @@ feature_flags:
             $_internalSearchIdLookup local _id point lookups, falling back to the existing
             local-read aggregation path when Express declines."
         cpp_varname: gFeatureFlagSearchOptimizedIdLookup
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: release
 
     featureFlagIncludeMetricsObjectOption:
         description: "Use includeMetrics.queryStats field instead of deprecated includeQueryStatsMetrics when forwarding to shards."

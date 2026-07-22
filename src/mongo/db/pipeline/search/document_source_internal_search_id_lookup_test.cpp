@@ -484,6 +484,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, OptimizedPathPopulatesExplainExecS
 }
 
 TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldSkipResultsWhenIdNotFound) {
+    unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", false};
     expCtx->setUUID(UUID::gen());
 
     // Create documents for the collection - only _id = 0 exists.
@@ -510,6 +511,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldSkipResultsWhenIdNotFound) {
 }
 
 TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotRemoveMetadata) {
+    unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", false};
     expCtx->setUUID(UUID::gen());
 
     // Create documents for the collection.
@@ -551,6 +553,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotRemoveMetadata) {
 }
 
 TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldAllowStringOrObjectIdValues) {
+    unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", false};
     expCtx->setUUID(UUID::gen());
 
     // Create documents for the collection with string and document _ids.
@@ -1191,6 +1194,7 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
 // inner pipeline runs.
 
 TEST_F(InternalSearchIdLookupWithCatalogTest, SearchIntervalOpenAfterPerDocumentLookup) {
+    unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", false};
     expCtx->setUUID(UUID::gen());
     std::vector<BSONObj> docs{BSON("_id" << 0 << "x" << "a"), BSON("_id" << 1 << "x" << "b")};
     insertDocuments(kTestNss, docs);
@@ -1241,6 +1245,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, SearchIntervalExplicitlyOpenedForE
 }
 
 TEST_F(InternalSearchIdLookupWithCatalogTest, SearchIntervalOpenedAtLimitBasedEOF) {
+    unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", false};
     expCtx->setUUID(UUID::gen());
     std::vector<BSONObj> docs{BSON("_id" << 0 << "x" << "a"), BSON("_id" << 1 << "x" << "b")};
     insertDocuments(kTestNss, docs);
