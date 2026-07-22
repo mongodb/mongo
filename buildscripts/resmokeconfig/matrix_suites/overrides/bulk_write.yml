@@ -36,6 +36,9 @@
       # Checks for specific name in the command that was executed that we override.
       - jstests/core/query/explain/explain_includes_command.js
       - jstests/core/query/distinct/distinct_collator.js
+      # TODO(SERVER-93922): enable this test once bulkWrite trims
+      # the overhead it introduces in the command object.
+      - jstests/core/query/bson_size_limit_agg.js
 
 - name: single_op_txns_excluded_files
   value:
