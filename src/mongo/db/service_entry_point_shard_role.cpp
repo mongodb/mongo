@@ -2065,7 +2065,10 @@ void ExecCommandDatabase::_commandExec() {
             const bool waitedForInitialized = _awaitShardingInitializedIfNeeded(ex.toStatus());
 
             const bool errorMayBeRetried =
-                staleExceptionIsRetryable == shard_role_loop::CanRetry::YES || waitedForInitialized;
+                staleExceptionIsRetryable == shard_role_loop::CanRetry::YES ||
+                waitedForInitialized ||
+                // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+                ex.code() == ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition;
 
             if (errorMayBeRetried && canRetryCommand(ex.toStatus())) {
                 _resetLockerStateAfterShardingUpdate(opCtx);
@@ -2140,6 +2143,11 @@ bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
     if (execError == ErrorCodes::StaleDbVersion || execError == ErrorCodes::StaleConfig ||
         execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
         return _invocation->canRetryOnStaleShardMetadataError(_execContext.getRequest());
+    }
+
+    // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+    if (execError == ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition) {
+        return true;
     }
 
     return false;

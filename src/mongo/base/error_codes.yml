@@ -1329,5 +1329,12 @@ error_codes:
   # Any other extension logical error.
   - {code: 519, name: ExtensionError, categories: [ExtensionError]}
 
+  # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+  - {
+      code: 520,
+      name: DDLCoordinatorMustRetryDueToFCVTransition,
+      categories: [InternalOnly],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

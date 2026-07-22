@@ -35,6 +35,9 @@ filters:
   - "authoritative_metadata_historical_snapshot_read.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "authoritative_shard_retries_nonauthoritative_ddl_after_ddl_lock.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "authoritative_shards_setfcv_blocks_chunk_operations.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

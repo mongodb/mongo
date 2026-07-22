@@ -4,9 +4,12 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
+#include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
-#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #include <memory>
 
@@ -39,12 +42,27 @@ private:
     ShardingCoordinatorMetadata _metadata;
 };
 
-class ShardingDDLCoordinatorTest : public ShardServerTestFixture {
+class ShardingDDLCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
-    ShardingDDLCoordinatorTest() : ShardServerTestFixture(makeOptions()) {}
+    static inline const ShardHandle kTestShardHandle{ShardId("test-shard"), UUID::gen()};
+
+    ShardingDDLCoordinatorTest() : repl::PrimaryOnlyServiceMongoDTest(makeOptions()) {}
+
+    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
+        return std::make_unique<ShardingCoordinatorService>(
+            serviceContext,
+            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>(),
+            [](ServiceContext*) {});
+    }
 
     void setUp() override {
-        ShardServerTestFixture::setUp();
+        repl::PrimaryOnlyServiceMongoDTest::setUp();
+
+        ShardingState::get(getServiceContext())
+            ->setRecoveryCompleted({OID::gen(),
+                                    ClusterRole::ShardServer,
+                                    ConnectionString(HostAndPort("localhost", 27017)),
+                                    kTestShardHandle});
 
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _network = network.get();
@@ -58,12 +76,9 @@ public:
         _executor->startup();
 
         _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(_executor);
-        _service = std::make_unique<ShardingCoordinatorService>(
-            getServiceContext(),
-            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>(),
-            [](ServiceContext*) {});
 
-        DDLLockManager::get(getServiceContext())->setRecoverable(_service.get());
+        DDLLockManager::get(getServiceContext())
+            ->setRecoverable(static_cast<ShardingCoordinatorService*>(_service));
     }
 
     void tearDown() override {
@@ -71,14 +86,13 @@ public:
         _executor->join();
         _executor.reset();
 
-        ShardServerTestFixture::tearDown();
+        repl::PrimaryOnlyServiceMongoDTest::tearDown();
     }
 
 protected:
     executor::NetworkInterfaceMock* _network;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
-    std::unique_ptr<ShardingCoordinatorService> _service;
 
     class TestShardingDDLCoordinator
         : public NonRecoverableShardingDDLCoordinator<CoordinatorStateDocTest> {
@@ -158,7 +172,9 @@ TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
         coordinatorMetadata.setForwardableOpMetadata(ForwardableOperationMetadata{});
 
         auto coordinator = std::make_shared<TestShardingDDLCoordinator>(
-            _service.get(), coordinatorMetadata, std::set<NamespaceString>({additionalNss}));
+            static_cast<ShardingCoordinatorService*>(_service),
+            coordinatorMetadata,
+            std::set<NamespaceString>({additionalNss}));
         coordinator->fulfillPromises();
         CancellationSource cancellationSource;
 
@@ -210,6 +226,33 @@ TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
                                                     nss3.makeTimeseriesBucketsNamespace()}),
                          std::set<DatabaseName>({dbName1, dbName2}),
                          std::set<NamespaceString>({nss1, nss2, nss3}));
+}
+
+TEST_F(ShardingDDLCoordinatorTest, NonAuthoritativeDDLRetriesOnFCVTransition) {
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "foo");
+
+    // Create a non-authoritative DDL coordinator
+    unittest::ServerParameterGuard disableAuthDDL{"featureFlagAuthoritativeShardsDDL", false};
+    unittest::ServerParameterGuard disableAuthCRUD{"featureFlagAuthoritativeShardsCRUD", false};
+
+    ShardingCoordinatorMetadata coordinatorMetadata(
+        ShardingCoordinatorId(nss, CoordinatorTypeEnum::kDropCollection));
+    coordinatorMetadata.setForwardableOpMetadata(ForwardableOperationMetadata{});
+    coordinatorMetadata.setAuthoritativeMetadataAccessLevel(
+        AuthoritativeMetadataAccessLevelEnum::kNone);
+    coordinatorMetadata.setDatabaseVersion(DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+
+    auto coordinator = std::make_shared<TestShardingDDLCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service),
+        coordinatorMetadata,
+        std::set<NamespaceString>{});
+
+    // Run the coordinator with authoritative shards enabled and test it asks for a retry.
+    unittest::ServerParameterGuard enableAuthDDL{"featureFlagAuthoritativeShardsDDL", true};
+    auto future = static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+                      ->run(_scopedExecutor, CancellationToken::uncancelable());
+    ASSERT_THROWS_CODE(
+        future.get(), DBException, ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition);
 }
 
 }  // namespace mongo

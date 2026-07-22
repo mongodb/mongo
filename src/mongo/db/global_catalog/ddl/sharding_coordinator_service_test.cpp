@@ -182,6 +182,8 @@ protected:
         }
         metadata.setForwardableOpMetadata(fom);
         metadata.setDatabaseVersion(DatabaseVersion{UUID::gen(), Timestamp(1, 0)});
+        metadata.setAuthoritativeMetadataAccessLevel(
+            AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
         MigrationBlockingOperationCoordinatorDocument doc;
         doc.setShardingCoordinatorMetadata(metadata);
         return doc;

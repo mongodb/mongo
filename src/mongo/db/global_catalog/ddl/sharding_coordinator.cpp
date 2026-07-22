@@ -15,8 +15,10 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -45,6 +47,8 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningCoordinatorInstance);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRemovingCoordinatorDocument);
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+MONGO_FAIL_POINT_DEFINE(hangNonAuthoritativeDDLBeforeDDLLock);
 // Suspends any coordinator matching 'operationType' before it starts executing the handler for
 // 'phase'. The criteria can be further restricted by specifying an optional 'nss'.
 //  Following the full description of the expected schema for the failpoint 'data' section:
@@ -235,12 +239,35 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
         .then([this, executor, token, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
+
+            if (metadata().getAuthoritativeMetadataAccessLevel() ==
+                AuthoritativeMetadataAccessLevelEnum::kNone) {
+                hangNonAuthoritativeDDLBeforeDDLLock.pauseWhileSet();
+            }
+
             return _acquireLocksAsync(opCtx, executor, token);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             // Check preconditions again now that we have the locks.
             auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
+
+            // If this shard became authoritative between creating the coordinator and acquiring the
+            // DDL locks, an authoritative DDL on the same DB/collection may already have completed.
+            // Throw an error retried at the shard entry point, recreating the coordinator as
+            // authoritative. This check guards against the interleaving described in SERVER-131535.
+            // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+            if (_firstExecution &&
+                metadata().getAuthoritativeMetadataAccessLevel() ==
+                    AuthoritativeMetadataAccessLevelEnum::kNone) {
+                uassert(ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition,
+                        "DDL coordinator must transition to the authoritative model",
+                        sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                            kVersionContextIgnored_UNSAFE,
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ==
+                            AuthoritativeMetadataAccessLevelEnum::kNone);
+            }
+
             _checkCoordinatorPreconditions(opCtx, /*afterAcquiringLocks=*/true);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
