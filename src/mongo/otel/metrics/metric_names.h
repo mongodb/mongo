@@ -343,15 +343,15 @@ public:
     static constexpr MetricName kChangeStreamOptionCursorMaxTimeMS =
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.cursor.maxTimeMS");
     static constexpr MetricName kChangeStreamCursorDocsReturned =
-        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.docsReturned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.docsReturned");
     static constexpr MetricName kChangeStreamCursorBytesReturned =
-        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.bytesReturned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.bytesReturned");
     static constexpr MetricName kChangeStreamCursorBatchesReturned =
-        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.batchesReturned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.batchesReturned");
     static constexpr MetricName kChangeStreamCursorDocsExamined =
-        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.docsExamined");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.docsExamined");
     static constexpr MetricName kChangeStreamCursorBytesRead =
-        MetricNameMaker::make("serverStatus.metrics.changeStreams.cursor.bytesRead");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.bytesRead");
 
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildsActive =
