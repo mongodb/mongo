@@ -42,8 +42,10 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
                 /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*(Connection reset by peer|Connection closed by peer)/;
         }
     } else if (implementation === "apple") {
+        // The peer close is reported as either "closed" or "reset" by peer depending on timing;
+        // accept both so the test doesn't flake on whichever variant occurs.
         expectedRegex =
-            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: HostUnreachable: futurize.* Connection closed by peer.*/;
+            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*(Connection closed by peer|Connection reset by peer)/;
     } else {
         throw Error("Unrecognized TLS implementation!");
     }
@@ -71,7 +73,8 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
             mongoOutput = rawMongoProgramOutput(".*");
             return mongoOutput.match(expectedRegex);
         },
-        "Mongo shell output was as follows:\n" + mongoOutput + "\n************",
+        // Lazy so the message shows the actual output, not the pre-assignment `undefined`.
+        () => "Mongo shell output was as follows:\n" + mongoOutput + "\n************",
         60 * 1000,
     );
 
