@@ -357,6 +357,11 @@ public:
                     "Cannot specify delete without a real namespace",
                     !request().getNamespace().isCollectionlessAggregateNS());
             checkIsTimeseriesNamespace(request().getWriteCommandRequestBase());
+            // Deletes forward client-supplied runtime constants instead of regenerating them, so
+            // only reject external attempts to set 'userRoles'. Internal redispatch paths are
+            // exempt and may set runtime constants.
+            Variables::validateRuntimeConstantsArePermitted(
+                opCtx, _batchedRequest.getLegacyRuntimeConstants());
         }
 
     private:
