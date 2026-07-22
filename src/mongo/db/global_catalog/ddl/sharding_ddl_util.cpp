@@ -17,6 +17,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
@@ -34,6 +35,7 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/distinct_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
@@ -1168,6 +1170,50 @@ void commitChunkOperationsMetadataToShardCatalog(
         **executor, token, std::move(request));
 
     sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+}
+
+multiversion::FeatureCompatibilityVersion getShardFCV(OperationContext* opCtx,
+                                                      const ShardId& shardId) {
+    const auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+
+    FindCommandRequest findCommand(NamespaceString::kServerConfigurationNamespace);
+    findCommand.setFilter(BSON("_id" << multiversion::kParameterName));
+    findCommand.setLimit(1);
+    findCommand.setReadConcern(repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern));
+
+    const auto response = uassertStatusOK(
+        shard->runExhaustiveCursorCommand(opCtx,
+                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                          DatabaseName::kAdmin,
+                                          findCommand.toBSON(),
+                                          Milliseconds(-1)));
+
+    tassert(13154100,
+            fmt::format("Could not find the featureCompatibilityVersion document on shard {}",
+                        shardId.toString()),
+            !response.docs.empty());
+
+    return uassertStatusOK(FeatureCompatibilityVersionParser::parse(response.docs.front()));
+}
+
+void assertRecipientSupportsAuthoritativeMetadataForMovePrimary(
+    OperationContext* opCtx,
+    const ShardId& recipientShardId,
+    AuthoritativeMetadataAccessLevelEnum donorAccessLevel) {
+    if (donorAccessLevel < AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+        return;
+    }
+
+    const auto recipientFCV = getShardFCV(opCtx, recipientShardId);
+    uassert(
+        ErrorCodes::ConflictingOperationInProgress,
+        fmt::format(
+            "Cannot run movePrimary with authoritative metadata while recipient shard {} is not "
+            "authoritative-DDL-capable (recipient FCV is {}). Wait for "
+            "setFeatureCompatibilityVersion to complete on all shards.",
+            recipientShardId.toString(),
+            multiversion::toString(recipientFCV)),
+        feature_flags::gAuthoritativeShardsDDL.isEnabledOnVersion(recipientFCV));
 }
 
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(

@@ -28,6 +28,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 #include <memory>
 #include <vector>
@@ -532,6 +533,25 @@ generateMetadataForUnsplittableCollectionCreation(OperationContext* opCtx,
 [[MONGO_MOD_NEEDS_REPLACEMENT]] AuthoritativeMetadataAccessLevelEnum
 getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,
                                            const ServerGlobalParams::FCVSnapshot& snapshot);
+
+/**
+ * Reads the featureCompatibilityVersion document from the given shard's admin.system.version
+ * collection and returns the parsed FCV.
+ *
+ * TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+ */
+[[MONGO_MOD_PRIVATE]] multiversion::FeatureCompatibilityVersion getShardFCV(OperationContext* opCtx,
+                                                                            const ShardId& shardId);
+
+/**
+ * Rejects movePrimary when the donor operates in authoritative-write mode but the recipient
+ * shard's FCV does not enable authoritative DDL. This prevents stale authoritative shard-catalog
+ * entries during a mixed-FCV upgrade window.
+ */
+[[MONGO_MOD_PRIVATE]] void assertRecipientSupportsAuthoritativeMetadataForMovePrimary(
+    OperationContext* opCtx,
+    const ShardId& recipientShardId,
+    AuthoritativeMetadataAccessLevelEnum donorAccessLevel);
 
 /*
  * Provided a collection UUID, returns the ID of one of the shards that are currently owning its

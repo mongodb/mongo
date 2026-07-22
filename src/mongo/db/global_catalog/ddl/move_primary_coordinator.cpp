@@ -231,6 +231,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 logChange(opCtx, "start");
 
+                // TODO (SERVER-98118): Remove once 9.0 is last-lts.
+                sharding_ddl_util::assertRecipientSupportsAuthoritativeMetadataForMovePrimary(
+                    opCtx, _doc.getToShardId(), _doc.getAuthoritativeMetadataAccessLevel());
+
                 if (_doc.getAuthoritativeMetadataAccessLevel() ==
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                     cloneAuthoritativeDatabaseMetadata(opCtx);
