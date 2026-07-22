@@ -332,5 +332,19 @@ TEST_F(MechanismRegistryTest, internalAuth) {
                       getMechsFor(internalSajack));
 }
 
+TEST_F(MechanismRegistryTest, internalAuthMechRegisteredEvenWhenExcludedFromConfig) {
+    registry.setEnabledMechanisms({"BAR"});
+
+    registry.registerFactory<InternalAuthMechanismFactory>(
+        SASLServerMechanismRegistry::kValidateGlobalMechanisms);
+
+    ASSERT_OK(registry.getServerMechanism(InternalAuthPolicy::getName(), "test").getStatus());
+
+    registry.registerFactory<FooMechanismFactory<true>>(
+        SASLServerMechanismRegistry::kValidateGlobalMechanisms);
+    ASSERT_EQ(ErrorCodes::MechanismUnavailable,
+              registry.getServerMechanism(FooPolicy::getName(), "test").getStatus().code());
+}
+
 }  // namespace
 }  // namespace mongo
