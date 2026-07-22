@@ -143,6 +143,14 @@ function runScenario({failoverDuringLoad}) {
     const newColl = newPrimary.getDB(dbName).getCollection(collName);
     IndexBuildTest.assertIndexesSoon(newColl, 2, ["_id_", indexName]);
 
+    // The spanning insert must have survived the failover intact: a lost or torn document would still
+    // let the build complete over the survivors and pass the index check above.
+    assert.eq(
+        newColl.countDocuments({x: {$in: [1, 2]}}),
+        2,
+        "expected both documents from the multi-entry insert on the new primary",
+    );
+
     rst.stopSet();
 }
 
