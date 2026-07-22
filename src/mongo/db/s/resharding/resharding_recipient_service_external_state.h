@@ -102,7 +102,8 @@ public:
      */
     void ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
                                                          const CommonReshardingMetadata& metadata,
-                                                         Timestamp cloneTimestamp);
+                                                         Timestamp cloneTimestamp,
+                                                         const BSONObj& critSecReason);
 
     virtual std::unique_ptr<ReshardingDataReplicationInterface> makeDataReplication(
         OperationContext* opCtx,

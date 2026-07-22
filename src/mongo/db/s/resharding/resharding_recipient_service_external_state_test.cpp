@@ -263,7 +263,7 @@ protected:
     void verifyTempReshardingCollectionAndMetadata() {
         RecipientStateMachineExternalStateImpl externalState;
         externalState.ensureTempReshardingCollectionExistsWithIndexes(
-            operationContext(), kMetadata, kDefaultFetchTimestamp);
+            operationContext(), kMetadata, kDefaultFetchTimestamp, BSON("x" << 1));
 
         auto scopedCsr =
             CollectionShardingRuntime::acquireShared(operationContext(), kReshardingNss);

@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -40,7 +41,8 @@ using namespace std::literals::string_view_literals;
 void ReshardingRecipientService::RecipientStateMachineExternalState::
     ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
                                                     const CommonReshardingMetadata& metadata,
-                                                    Timestamp cloneTimestamp) {
+                                                    Timestamp cloneTimestamp,
+                                                    const BSONObj& critSecReason) {
     LOGV2_DEBUG(5002300,
                 1,
                 "Creating temporary resharding collection",
@@ -82,10 +84,13 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
         tassert(12776700,
                 "Expected to have primary shard id given",
                 metadata.getPrimaryShardId().has_value());
-        shard_catalog_commit_for_resharding::commitCreateCollection(
-            opCtx,
-            metadata.getTempReshardingNss(),
-            metadata.getPrimaryShardId() == ShardingState::get(opCtx)->shardId());
+        resharding::withCriticalSectionForTempCollection(
+            opCtx, metadata.getTempReshardingNss(), critSecReason, false, [&] {
+                shard_catalog_commit_for_resharding::commitCreateCollection(
+                    opCtx,
+                    metadata.getTempReshardingNss(),
+                    metadata.getPrimaryShardId() == ShardingState::get(opCtx)->shardId());
+            });
     } else {
         auto scopedCsr =
             CollectionShardingRuntime::acquireExclusive(opCtx, metadata.getTempReshardingNss());

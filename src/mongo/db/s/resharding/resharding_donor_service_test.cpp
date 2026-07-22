@@ -1239,12 +1239,14 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
 
     // This acquires the critical section required by resharding donor machine when it is in
     // kBlockingWrites.
+    const auto critSecReason =
+        BSON("command" << "resharding_donor"
+                       << "collection" << doc.getSourceNss().toString_forTest());
     ShardingRecoveryService::get(opCtx.get())
         ->acquireRecoverableCriticalSectionBlockWrites(
             opCtx.get(),
             doc.getSourceNss(),
-            BSON("command" << "resharding_donor"
-                           << "collection" << doc.getSourceNss().toString_forTest()),
+            critSecReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
             true /* clearShardCatalogCache */);
 

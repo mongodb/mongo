@@ -588,6 +588,19 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                 _critSecReason,
                                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                 *customAction);
+
+                        // If for any reason the operation got aborted while the critical section is
+                        // held and the release in resharding::withCriticalSectionForTempCollection
+                        // fails then we force a release of the critical section for the temp
+                        // collection here.
+                        ShardingRecoveryService::get(opCtx.get())
+                            ->releaseRecoverableCriticalSection(
+                                opCtx.get(),
+                                _metadata.getTempReshardingNss(),
+                                _critSecReason,
+                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                                *customAction,
+                                false /*throwIfReasonDiffers*/);
                     }
                 })
                 .then([this, executor, factory] {
@@ -916,7 +929,7 @@ void ReshardingRecipientService::RecipientStateMachine::
         auto opCtx = _makeOperationContext(factory);
 
         _externalState->ensureTempReshardingCollectionExistsWithIndexes(
-            opCtx.get(), _metadata, *_cloneTimestamp);
+            opCtx.get(), _metadata, *_cloneTimestamp, _critSecReason);
 
         if (!_metadata.getProvenance() ||
             _metadata.getProvenance() == ReshardingProvenanceEnum::kReshardCollection) {
@@ -1534,18 +1547,29 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
                 _critSecReason,
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
-        resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
+        const bool mustClearCollectionMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
+        resharding::withCriticalSectionForTempCollection(
+            opCtx.get(),
+            _metadata.getTempReshardingNss(),
+            _critSecReason,
+            mustClearCollectionMetadata,
+            [&] {
+                resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(),
+                                                                                  _metadata);
 
-        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
-            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-            shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
-                opCtx.get(),
-                _metadata.getTempReshardingNss(),
-                _metadata.getReshardingUUID(),
-                _metadata.getSourceNss(),
-                _metadata.getSourceUUID(),
-                _metadata.getPrimaryShardId() == ShardingState::get(opCtx.get())->shardId());
-        }
+                if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+                    ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _metadata.getReshardingUUID(),
+                        _metadata.getSourceNss(),
+                        _metadata.getSourceUUID(),
+                        _metadata.getPrimaryShardId() ==
+                            ShardingState::get(opCtx.get())->shardId());
+                }
+            });
     }
 }
 
@@ -1578,15 +1602,25 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
             indexBuildsCoordinator->awaitNoIndexBuildInProgressForCollection(
                 opCtx.get(), _metadata.getReshardingUUID());
         }
+        const bool mustClearCollectionMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
+        resharding::withCriticalSectionForTempCollection(
+            opCtx.get(),
+            _metadata.getTempReshardingNss(),
+            _critSecReason,
+            mustClearCollectionMetadata,
+            [&] {
+                resharding::data_copy::ensureCollectionDropped(
+                    opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
 
-        resharding::data_copy::ensureCollectionDropped(
-            opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
-
-        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
-            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-            shard_catalog_commit_for_resharding::commitDropCollection(
-                opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
-        }
+                if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+                    ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    shard_catalog_commit_for_resharding::commitDropCollection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _metadata.getReshardingUUID());
+                }
+            });
     }
 
     resharding::data_copy::deleteRecipientResumeData(opCtx.get(), _metadata.getReshardingUUID());
