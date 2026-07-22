@@ -113,4 +113,17 @@ void RecordIdRange::intersectRange(const boost::optional<RecordIdBound>& min,
     }
 }
 
+auto RecordIdRange::makeSeekParams(bool forward) const
+    -> boost::optional<std::tuple<const RecordId&, SeekableRecordCursor::BoundInclusion>> {
+    const auto& seekTarget = forward ? _min : _max;
+    if (seekTarget) {
+        bool seekTargetInclusive = forward ? _minInclusive : _maxInclusive;
+        auto inclusivity = seekTargetInclusive ? SeekableRecordCursor::BoundInclusion::kInclude
+                                               : SeekableRecordCursor::BoundInclusion::kExclude;
+        return std::make_tuple(std::cref(seekTarget->recordId()), inclusivity);
+    }
+
+    return boost::none;
+}
+
 }  // namespace mongo

@@ -214,12 +214,6 @@ private:
     // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
 
-    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
-    boost::optional<sbe::value::SlotId> _minRecordIdSlot;
-
-    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
-    boost::optional<sbe::value::SlotId> _maxRecordIdSlot;
-
     MetaDataAccessor _metadataAccessors;
 
     // NOTE: '_stash' stores documents as BSON. Currently, one of the '_stash' is usages is to store

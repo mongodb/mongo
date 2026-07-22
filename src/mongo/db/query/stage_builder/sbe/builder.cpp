@@ -308,9 +308,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
             cq, indexBoundsInfo, env.runtimeEnv, &indexBoundsEvaluationCache);
     }
 
-    if (preparingFromSbeCache && data->staticData->doClusteredCollectionScanSbe) {
-        input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
-    }
+    // Re-binding clustered collection scan bounds for cached SBE plans is no longer supported.
 
     prepareSearchQueryParameters(data, cq);
 }  // prepareSlotBasedExecutableTree

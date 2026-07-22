@@ -25,7 +25,6 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
@@ -513,65 +512,6 @@ void bindIndexBounds(
             indexBoundsInfo, std::move(intervals), std::move(bounds), runtimeEnvironment);
     }
 }
-
-void bindClusteredCollectionBounds(const CanonicalQuery& cq,
-                                   const sbe::PlanStage* root,
-                                   const stage_builder::PlanStageData* data,
-                                   sbe::RuntimeEnvironment* runtimeEnvironment) {
-    // Arguments needed to mimic the original build-time bounds setting from the current query.
-    auto clusteredBoundInfos = data->staticData->clusteredCollBoundsInfos;
-    const MatchExpression* conjunct = cq.getPrimaryMatchExpression();  // this is csn->filter
-    bool minAndMaxEmpty = cq.getFindCommandRequest().getMin().isEmpty() &&
-        cq.getFindCommandRequest().getMax().isEmpty();
-
-    // Caching OR queries with collection scans is restricted, since it is challenging to determine
-    // which match expressions from the input query require a clustered collection scan. Therefore,
-    // we cannot correctly calculate the correct bounds for the query using the cached plan.
-    tassert(6125900,
-            "OR queries with clustered collection scans are not supported by the SBE cache.",
-            cq.getPrimaryMatchExpression()->matchType() != MatchExpression::OR || !minAndMaxEmpty);
-
-    tassert(7228000,
-            "We only expect to cache plans with one clustered collection scan.",
-            1 == clusteredBoundInfos.size());
-
-    const CollatorInterface* queryCollator = cq.getCollator();  // current query's desired collator
-
-    for (const auto& clusteredBoundInfo : clusteredBoundInfos) {
-        // The outputs produced by the QueryPlannerAccess APIs below (passed by reference).
-        // Scan start/end bounds.
-        RecordIdRange recordRange;
-
-        // Cast the return value to void since we are not building a CollectionScanNode here so do
-        // not need to set it in its 'hasCompatibleCollation' member.
-        static_cast<void>(
-            QueryPlannerAccess::handleRIDRangeScan(conjunct,
-                                                   queryCollator,
-                                                   data->staticData->ccCollator.get(),
-                                                   data->staticData->clusterKeyFieldName,
-                                                   recordRange));
-        QueryPlannerAccess::handleRIDRangeMinMax(cq,
-                                                 data->staticData->direction,
-                                                 queryCollator,
-                                                 data->staticData->ccCollator.get(),
-                                                 recordRange);
-        // Bind the scan bounds to input slots.
-        const auto& minRecord = recordRange.getMin();
-        if (minRecord) {
-            boost::optional<sbe::value::SlotId> minRecordId = clusteredBoundInfo.minRecord;
-            tassert(7571500, "minRecordId slot missing", minRecordId.has_value());
-            auto [tag, val] = sbe::value::makeCopyRecordId(minRecord->recordId());
-            runtimeEnvironment->resetSlot(minRecordId.value(), tag, val, true);
-        }
-        const auto& maxRecord = recordRange.getMax();
-        if (maxRecord) {
-            boost::optional<sbe::value::SlotId> maxRecordId = clusteredBoundInfo.maxRecord;
-            tassert(7571501, "maxRecordId slot missing", maxRecordId.has_value());
-            auto [tag, val] = sbe::value::makeCopyRecordId(maxRecord->recordId());
-            runtimeEnvironment->resetSlot(maxRecordId.value(), tag, val, true);
-        }
-    }
-}  // bindClusteredCollectionBounds
 
 void bindLimitSkipInputSlots(const CanonicalQuery& cq,
                              const stage_builder::PlanStageData* data,

@@ -65,7 +65,6 @@ public:
                     bool participateInTrialRunTracking);
 
     std::unique_ptr<PlanStage> clone() const final;
-    PlanState getNext() final;
     inline void close() final {
         closeShared();
         _randomCursor.reset();
@@ -84,6 +83,15 @@ private:
     }
     inline RecordCursor* getActiveCursor() const {
         return _randomCursor.get();
+    }
+    void getNextHangFailPoint() {
+        // no-op
+    }
+    bool pastEnd() const {
+        return false;
+    }
+    boost::optional<Record> getNextInternal() {
+        return _randomCursor->next();
     }
     std::unique_ptr<RecordCursor> _randomCursor;
 };  // class RandomScanStage

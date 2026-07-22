@@ -84,9 +84,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    _minRecordIdSlot = env->getSlotIfExists("minRecordId"sv);
-    _maxRecordIdSlot = env->getSlotIfExists("maxRecordId"sv);
-
     if (_cq) {
         initializeAccessors(_metadataAccessors, _rootData.staticData->metadataSlots);
     }

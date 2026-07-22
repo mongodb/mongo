@@ -121,7 +121,6 @@ public:
     //   if !forward: [0, startIdx)
     SeekResult seek(const RecordId& rid, size_t startIdx, bool forward) const;
 
-
 private:
     struct EMPTY_TAG {};
 

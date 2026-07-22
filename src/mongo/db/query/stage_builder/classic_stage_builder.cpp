@@ -71,7 +71,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         switch (root->getType()) {
             case STAGE_COLLSCAN: {
                 const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
-                // TODO(SERVER-125912): Build a MultiRangeClusteredScan once QSN supports
+                // TODO(SERVER-127890): Build a MultiRangeClusteredScan once QSN supports
                 // RecordIdRangeList.
                 CollectionScanParams params;
                 params.tailable = csn->tailable;

@@ -45,7 +45,6 @@ public:
                      bool participateInTrialRunTracking);
 
     std::unique_ptr<PlanStage> clone() const final;
-    PlanState getNext() final;
     void inline prepare(CompileCtx& ctx) final {
         prepareShared(ctx);
     }
@@ -63,6 +62,13 @@ private:
     }
     inline RecordCursor* getActiveCursor() const {
         return _cursor.get();
+    }
+    void getNextHangFailPoint();
+    bool pastEnd() const {
+        return false;
+    }
+    boost::optional<Record> getNextInternal() {
+        return _cursor->next();
     }
 
     std::unique_ptr<SeekableRecordCursor> _cursor;

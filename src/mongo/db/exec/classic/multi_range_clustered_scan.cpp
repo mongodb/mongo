@@ -57,19 +57,6 @@ MultiRangeClusteredScan::MultiRangeClusteredScan(ExpressionContext* expCtx,
                 "rangeList"_attr = BSONArray(redact(params.rangeList.toBSONArray())));
 }
 
-static auto makeSeekParams(const RecordIdRange& range, bool forward)
-    -> boost::optional<std::pair<const RecordId&, SeekableRecordCursor::BoundInclusion>> {
-    const auto& seekTarget = forward ? range.getMin() : range.getMax();
-    if (seekTarget) {
-        bool seekTargetInclusive = forward ? range.isMinInclusive() : range.isMaxInclusive();
-        auto inclusivity = seekTargetInclusive ? SeekableRecordCursor::BoundInclusion::kInclude
-                                               : SeekableRecordCursor::BoundInclusion::kExclude;
-        return std::make_pair(std::cref(seekTarget->recordId()), inclusivity);
-    }
-
-    return boost::none;
-}
-
 PlanStage::StageState MultiRangeClusteredScan::doWork(WorkingSetID* out) {
     if (MONGO_unlikely(hangCollScanDoWork.shouldFail())) {
         hangCollScanDoWork.pauseWhileSet();
@@ -100,7 +87,7 @@ PlanStage::StageState MultiRangeClusteredScan::doWork(WorkingSetID* out) {
 
                 const auto outerBounds = _params.rangeList.outerBounds();
                 const auto seekParams =
-                    makeSeekParams(outerBounds, _params.direction == CollectionScanParams::FORWARD);
+                    outerBounds.makeSeekParams(_params.direction == CollectionScanParams::FORWARD);
                 if (seekParams) {
                     const auto [seekTarget, seekInclusive] = *seekParams;
                     record = _cursor->seek(seekTarget, seekInclusive);
@@ -111,7 +98,7 @@ PlanStage::StageState MultiRangeClusteredScan::doWork(WorkingSetID* out) {
                 // We previously determined that we need to seek to the start of the next range.
                 const auto& range = _params.rangeList.getRanges()[_currentRangeIdx];
                 const auto seekParams =
-                    makeSeekParams(range, _params.direction == CollectionScanParams::FORWARD);
+                    range.makeSeekParams(_params.direction == CollectionScanParams::FORWARD);
                 // By the invariant of RecordIdRangeList, only the outer bounds can be absent,
                 // so the beginning of the "next" range is always present.
                 tassert(99745620, "Expected seekParams", seekParams);

@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
@@ -79,6 +80,13 @@ public:
         return _maxInclusive;
     }
 
+    /**
+     * Makes seek params (a target RecordId + an inclusion) for this range.
+     * If forward: seek to the min. Otherwise, seek to the max.
+     * If the corresponding side is not bounded, returns boost::none.
+     */
+    auto makeSeekParams(bool forward) const
+        -> boost::optional<std::tuple<const RecordId&, SeekableRecordCursor::BoundInclusion>>;
 
 private:
     // If present, this parameter sets the start point of a forward scan or the end point of a

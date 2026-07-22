@@ -175,7 +175,7 @@ protected:
     };
 
     // Shared logic for getNext()
-    inline void handleEOF(const boost::optional<Record>& nextRecord) {
+    inline void handleEOF() {
         if (_state->recordIdSlot) {
             _recordIdAccessor.reset(
                 value::TagValueOwned::fromRaw(sbe::value::makeCopyRecordId(RecordId())));
@@ -281,6 +281,7 @@ protected:
     void doRestoreState() override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
+    PlanState getNext() final;
 
 private:
     /**
@@ -294,6 +295,11 @@ private:
     }
 };
 
+/**
+ * Scan stage for a clustered collection scan over a single contiguous RecordId range (or an
+ * unbounded scan with a known direction). Use MultiRangeClusteredScanStage for non-contiguous
+ * (multi-range) clustered scans.
+ */
 class ScanStage final : public ScanStageBaseImpl<ScanStage> {
     friend class ScanStageBaseImpl<ScanStage>;
 
@@ -333,7 +339,6 @@ public:
               bool includeScanEndRecordId);
 
     std::unique_ptr<PlanStage> clone() const final;
-    PlanState getNext() final;
     void prepare(CompileCtx& ctx) final;
     void close() final;
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
@@ -345,6 +350,11 @@ private:
         return _cursor.get();
     }
     void scanResetState(bool reOpen);
+    void getNextHangFailPoint();
+    bool pastEnd() const {
+        return _havePassedScanEndRecordId;
+    }
+    boost::optional<Record> getNextInternal();
 
     // Only for a clustered collection scan, this sets '_minRecordId' to the lower scan bound.
     void setMinRecordId();
@@ -353,6 +363,7 @@ private:
     void setMaxRecordId();
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
+
     // Only for clustered collection scans: must ScanStageBase::getNext() include the starting
     // bound?
     bool _includeScanStartRecordId = true;
@@ -366,17 +377,20 @@ private:
     // Only for clustered collection scans: have we crossed the scan end bound if there is one?
     bool _havePassedScanEndRecordId = false;
 
-    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
+    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
     boost::optional<value::SlotId> _maxRecordIdSlot;
     value::SlotAccessor* _minRecordIdAccessor{nullptr};
     RecordId _minRecordId;
 
-    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
+    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
     boost::optional<value::SlotId> _minRecordIdSlot;
     value::SlotAccessor* _maxRecordIdAccessor{nullptr};
     RecordId _maxRecordId;
-    // Only care about whether first call of getNext() if clustered scan because we need to seek
+    // Only care about whether first call of getNext() if clustered scan because we need to seek.
     bool _firstGetNext{false};
 };  // class ScanStage
+
+extern FailPoint hangScanGetNext;
+
 }  // namespace sbe
 }  // namespace mongo

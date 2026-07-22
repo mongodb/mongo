@@ -64,34 +64,6 @@ std::unique_ptr<PlanStage> RandomScanStage::clone() const {
         _state, _yieldPolicy, _commonStats.nodeId, participateInTrialRunTracking());
 }
 
-PlanState RandomScanStage::getNext() {
-    auto optTimer(getOptTimer(_opCtx));
-
-    handleInterruptAndSlotAccess();
-    boost::optional<Record> nextRecord;
-    nextRecord = _randomCursor->next();
-
-    if (!nextRecord) {
-        handleEOF(nextRecord);
-        return trackPlanState(PlanState::IS_EOF);
-    }
-
-    resetRecordId(nextRecord);
-    if (_state->recordIdSlot) {
-        _recordId = std::move(nextRecord->id);
-        _recordIdAccessor.reset(value::TagValueView{value::TypeTags::RecordId,
-                                                    value::bitcastFrom<RecordId*>(&_recordId)});
-    }
-
-    if (!_scanFieldAccessors.empty()) {
-        placeFieldsFromRecordInAccessors(*nextRecord, _state->scanFieldNames, _scanFieldAccessors);
-    }
-
-    ++_specificStats.numReads;
-    trackRead();
-    return trackPlanState(PlanState::ADVANCED);
-}
-
 std::unique_ptr<PlanStageStats> RandomScanStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->specific = std::make_unique<ScanStats>(_specificStats);
