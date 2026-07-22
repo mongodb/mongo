@@ -108,6 +108,9 @@ export class ReplSetTest {
         }
     }
 
+    // TODO(SERVER-113063): Remove this.
+    skipAwaitReplicationConfigVersionCheck = false;
+
     asCluster(conn, fn, keyFileParam = undefined) {
         return asCluster(this, conn, fn, keyFileParam);
     }
@@ -2430,13 +2433,20 @@ export class ReplSetTest {
             ConfigMismatch: "ConfigMismatch",
         });
 
+        /**
+         * @param {ReplSetTest} rst
+         * @param {number} index
+         * @param {number} secondaryCount
+         */
         function checkProgressSingleNode(rst, index, secondaryCount) {
             let secondary = secondariesToCheck[index];
             let secondaryName = secondary.host;
 
             // TODO(SERVER-113063): Remove this skip.
             const shouldSkipConfigVersionCheck =
-                typeof TestData !== "undefined" && TestData.skipAwaitReplicationConfigVersionCheck;
+                rst.skipAwaitReplicationConfigVersionCheck ||
+                (typeof TestData !== "undefined" &&
+                    TestData.skipAwaitReplicationConfigVersionCheck);
             if (!shouldSkipConfigVersionCheck) {
                 let secondaryConfigVersion = asCluster(
                     rst,
