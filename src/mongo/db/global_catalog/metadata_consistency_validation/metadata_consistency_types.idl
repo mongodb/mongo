@@ -625,7 +625,10 @@ structs:
                 type: safeBool
                 default: false
             # _checkSecondariesMode is an internal, test-only parameter. It has no effect with the
-            # test proctor disabled, hence the leading underscore.
+            # test proctor disabled, hence the leading underscore. If not set,
+            # checkMetadataConsistency will internally choose randomly between
+            # `checkAtPrimaryTimestamp` and `checkAtSecondaryTimestamp` (again, only when the
+            # testing proctor is enabled).
             # TODO (SERVER-131058): consider exposing it publicly and remove the underscore.
             _checkSecondariesMode:
                 description: "How metadata is checked on secondaries"

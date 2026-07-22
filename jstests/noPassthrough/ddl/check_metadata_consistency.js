@@ -16,9 +16,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
-// Configure initial sharding cluster with a single config node to avoid reports from secondaries.
-// TODO (SERVER-129689): check reports from secondary nodes.
-const st = new ShardingTest({config: [{}]});
+const st = new ShardingTest({});
 const mongos = st.s;
 const isAuthoritativeShardsCRUDEnabled = FeatureFlagUtil.isPresentAndEnabled(
     mongos,
@@ -32,6 +30,13 @@ const configDB = mongosSession.getDatabase("config");
 const dbName = "testCheckMetadataConsistencyDB";
 let dbCounter = 0;
 
+function checkMetadataConsistency(dbOrColl, options) {
+    if (!options || !options.hasOwnProperty("_checkSecondariesMode")) {
+        options = {...(options || {}), _checkSecondariesMode: "noSecondaryCheck"};
+    }
+    return dbOrColl.checkMetadataConsistency(options).toArray();
+}
+
 function getNewDb() {
     return mongos.getDB(dbName + dbCounter++);
 }
@@ -39,7 +44,7 @@ function getNewDb() {
 function assertNoInconsistencies() {
     const checkOptions = {"checkIndexes": 1};
 
-    let res = mongos.getDB("admin").checkMetadataConsistency(checkOptions).toArray();
+    let res = checkMetadataConsistency(mongos.getDB("admin"), checkOptions);
     assert.eq(
         0,
         res.length,
@@ -52,7 +57,7 @@ function assertNoInconsistencies() {
         }
 
         let db = mongos.getDB(dbName);
-        res = db.checkMetadataConsistency(checkOptions).toArray();
+        res = checkMetadataConsistency(db, checkOptions);
         assert.eq(
             0,
             res.length,
@@ -61,7 +66,7 @@ function assertNoInconsistencies() {
 
         db.getCollectionNames().forEach((collName) => {
             let coll = db.getCollection(collName);
-            res = coll.checkMetadataConsistency(checkOptions).toArray();
+            res = checkMetadataConsistency(coll, checkOptions);
             assert.eq(
                 0,
                 res.length,
@@ -180,7 +185,11 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     );
 
     // Check correct behaviour of cursor with DBCommandCursor
-    let res = db.runCommand({checkMetadataConsistency: 1, cursor: {batchSize: 1}});
+    let res = db.runCommand({
+        checkMetadataConsistency: 1,
+        _checkSecondariesMode: "noSecondaryCheck",
+        cursor: {batchSize: 1},
+    });
     assert.commandWorked(res);
 
     assert.eq(1, res.cursor.firstBatch.length);
@@ -193,7 +202,11 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assert(!cursor.hasNext());
 
     // Check correct behaviour of cursor with GetMore
-    res = db.runCommand({checkMetadataConsistency: 1, cursor: {batchSize: 3}});
+    res = db.runCommand({
+        checkMetadataConsistency: 1,
+        _checkSecondariesMode: "noSecondaryCheck",
+        cursor: {batchSize: 3},
+    });
     assert.commandWorked(res);
     assert.eq(3, res.cursor.firstBatch.length);
 
@@ -223,13 +236,13 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     );
 
     // Database level mode command
-    let inconsistencies = db.checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(db);
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("CollectionUUIDMismatch", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(1, inconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Collection level mode command
-    const collInconsistencies = db.coll.checkMetadataConsistency().toArray();
+    const collInconsistencies = checkMetadataConsistency(db.coll);
     assert.eq(1, collInconsistencies.length);
     assert.eq(
         "CollectionUUIDMismatch",
@@ -254,13 +267,13 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assert.commandWorked(st.shard1.getDB(db.getName()).coll.insert({_id: "foo"}));
 
     // Database level mode command
-    let inconsistencies = db.checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(db);
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("MisplacedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(1, inconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Collection level mode command
-    const collInconsistencies = db.coll.checkMetadataConsistency().toArray();
+    const collInconsistencies = checkMetadataConsistency(db.coll);
     assert.eq(1, collInconsistencies.length, tojson(inconsistencies));
     assert.eq("MisplacedCollection", collInconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(1, collInconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
@@ -279,13 +292,13 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assert.commandWorked(st.configRS.getPrimary().getDB(db.getName()).coll.insert({_id: "foo"}));
 
     // Database level mode command
-    let inconsistencies = db.checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(db);
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("MisplacedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(1, inconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Collection level mode command
-    const collInconsistencies = db.coll.checkMetadataConsistency().toArray();
+    const collInconsistencies = checkMetadataConsistency(db.coll);
     assert.eq(1, collInconsistencies.length, tojson(inconsistencies));
     assert.eq("MisplacedCollection", collInconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(1, collInconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
@@ -321,7 +334,7 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assert.commandWorked(st.s.getDB(db.getName()).coll.insert({skey: 10}));
 
     // Database level mode command
-    let inconsistencies = db.checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(db);
     assert.eq(2, inconsistencies.length, tojson(inconsistencies));
     assert.eq("MissingShardKeyIndex", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq("MissingShardKeyIndex", inconsistencies[1].type, tojson(inconsistencies[1]));
@@ -374,7 +387,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         assert.commandWorked(st.s.getDB(dbName).coll.insert({skey: 10}));
 
         // Check inconsistencies
-        let inconsistencies = db.checkMetadataConsistency(checkOptions).toArray();
+        let inconsistencies = checkMetadataConsistency(db, checkOptions);
         assert.eq(2, inconsistencies.length, tojson(inconsistencies));
         const incTypes = inconsistencies.map((inconsistency) => inconsistency.type);
         const correctIncTypes =
@@ -430,7 +443,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         );
         assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: "hashed"}));
 
-        let inc0 = db.checkMetadataConsistency(checkOptions).toArray();
+        let inc0 = checkMetadataConsistency(db, checkOptions);
         assert.eq(1, inc0.length, tojson(inc0));
         assert.eq("RangeDeletionMissingShardKeyIndex", inc0[0].type, tojson(inc0[0]));
 
@@ -449,7 +462,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         );
         assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: "hashed"}));
 
-        let inc1 = db.checkMetadataConsistency(checkOptions).toArray();
+        let inc1 = checkMetadataConsistency(db, checkOptions);
         assert.eq(1, inc1.length, tojson(inc1));
         assert.eq("RangeDeletionMissingShardKeyIndex", inc1[0].type, tojson(inc1[0]));
 
@@ -477,10 +490,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(coll.createIndex({key1: 1}, "index1"));
     assert.commandWorked(shard1Coll.dropIndex("index1"));
 
-    let inconsistencies = db.checkMetadataConsistency(checkOptions).toArray();
+    let inconsistencies = checkMetadataConsistency(db, checkOptions);
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("InconsistentIndex", inconsistencies[0].type, tojson(inconsistencies));
-    let collInconsistencies = coll.checkMetadataConsistency(checkOptions).toArray();
+    let collInconsistencies = checkMetadataConsistency(coll, checkOptions);
     assert.eq(sortDoc(inconsistencies), sortDoc(collInconsistencies));
 
     // Fix inconsistencies and assert none are left
@@ -493,10 +506,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
     assert.commandWorked(shard1Coll.createIndex({key1: 1}, {name: "index1", sparse: true}));
 
-    inconsistencies = db.checkMetadataConsistency(checkOptions).toArray();
+    inconsistencies = checkMetadataConsistency(db, checkOptions);
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("InconsistentIndex", inconsistencies[0].type, tojson(inconsistencies));
-    collInconsistencies = coll.checkMetadataConsistency(checkOptions).toArray();
+    collInconsistencies = checkMetadataConsistency(coll, checkOptions);
     assert.eq(sortDoc(inconsistencies), sortDoc(collInconsistencies));
 
     // Fix inconsistencies and assert none are left
@@ -531,7 +544,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Remove db1 so that coll1 became hidden
     assert.commandWorked(configDatabasesColl.deleteOne({_id: db1.getName()}));
 
-    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("HiddenShardedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(
@@ -543,7 +556,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Remove db2 so that coll2 also became hidden
     assert.commandWorked(configDatabasesColl.deleteOne({_id: db2.getName()}));
 
-    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(2, inconsistencies.length, tojson(inconsistencies));
     assert.eq("HiddenShardedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(
@@ -600,7 +613,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(configDB.tags.insert(entry));
 
     // Database level mode command
-    let inconsistencies = db.checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(db);
     // TODO (SERVER-98118): Leave a single assert.eq(4, inconsistencies.length) once v9.0 branches out
     assert.between(3, inconsistencies.length, 4, tojson(inconsistencies));
     assert(
@@ -621,7 +634,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Clean up the database to pass the hooks that detect inconsistencies
     assert.commandWorked(configDB.chunks.updateOne({_id: chunk._id}, {$set: {max: chunk.max}}));
     db.dropDatabase();
-    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
@@ -651,7 +664,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     st.restartShardRS(0);
 
     // Cluster level mode command
-    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.gte(inconsistencies.length, 2, tojson(inconsistencies));
     assert(
         inconsistencies.some((object) => object.type === "MissingRoutingTable"),
@@ -667,7 +680,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Clean up the database to pass the hooks that detect inconsistencies
     assert.commandWorked(configDB.chunks.insertMany(chunks));
     db.dropDatabase();
-    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
@@ -720,7 +733,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     // Cluster level mode command
-    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
 
     // Check that there are 3 inconsistencies: 2 MisplacedCollection and 1 CollectionUUIDMismatch
     assert.eq(3, inconsistencies.length, tojson(inconsistencies));
@@ -752,13 +765,13 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     mongos.getCollection(kNss).insert({_id: 2});
     assert.commandWorked(mongos.adminCommand({split: kNss, middle: {_id: 1}}));
 
-    let no_inconsistency = db.checkMetadataConsistency().toArray();
+    let no_inconsistency = checkMetadataConsistency(db);
     assert.eq(no_inconsistency.length, 0);
 
     // make the collection unsplittable
     assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
-    let inconsistencies_chunks = db.checkMetadataConsistency().toArray();
+    let inconsistencies_chunks = checkMetadataConsistency(db);
 
     // Direct edits to the `unsplittable` field on config.collections desync the global catalog
     // from the per-shard catalog: the same divergence is reported once from the in-memory shard
@@ -795,13 +808,13 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // create a splittable collection with a key != {_id:1}
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
 
-    let no_inconsistency = db.checkMetadataConsistency().toArray();
+    let no_inconsistency = checkMetadataConsistency(db);
     assert.eq(no_inconsistency.length, 0);
 
     // make the collection unsplittable and catch the inconsistency
     assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
-    let inconsistencies_key = db.checkMetadataConsistency().toArray();
+    let inconsistencies_key = checkMetadataConsistency(db);
     assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 2, inconsistencies_key.length);
     assert.contains(
         "TrackedUnshardedCollectionHasInvalidKey",
@@ -855,7 +868,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     let configTimeseries = Object.assign({}, localTimeseries);
     configTimeseries.granularity = "seconds";
 
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.eq(1, inconsistencies.length);
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {timeseriesFields: localTimeseries}},
@@ -903,7 +916,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         "simulateCatalogTopLevelMetadataInconsistency",
     );
 
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.eq(1, inconsistencies.length);
     assertCollectionAuxiliaryMetadataMismatch(inconsistencies, [
         {
@@ -968,7 +981,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         db.adminCommand({shardCollection: kNss, key: {x: 1}, collation: {locale: "simple"}}),
     );
 
-    const no_inconsistency = db.checkMetadataConsistency().toArray();
+    const no_inconsistency = checkMetadataConsistency(db);
     assert.eq(0, no_inconsistency.length);
 
     // Update the default collation on the sharding catalog only and catch the inconsistency.
@@ -976,7 +989,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         configDB.collections.update({_id: kNss}, {$unset: {defaultCollation: ""}}),
     );
 
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 2, inconsistencies.length);
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {defaultCollation: localCollation}},
@@ -1039,7 +1052,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     configDB.chunks.insert(chunkEntry);
 
     // Catch the inconsistency.
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.neq(0, inconsistencies.length);
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {capped: true}},
@@ -1084,7 +1097,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
     anotherShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
 
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.gte(inconsistencies.length, 2);
     assert(
         inconsistencies.some(
@@ -1146,7 +1159,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         .getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Catch the inconsistency.
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.neq(0, inconsistencies.length);
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {uuid: uuidOnPrimaryShard}},
@@ -1244,7 +1257,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         .getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Catch the inconsistency.
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.neq(0, inconsistencies.length);
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {uuid: uuidOnPrimaryShard}},
@@ -1288,7 +1301,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
 
     // Catch the inconsistency.
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.eq(1, inconsistencies.length);
     assert.eq("MissingLocalCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(primaryShard.shardName, inconsistencies[0].details.shard, tojson(inconsistencies[0]));
@@ -1340,7 +1353,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
 
     // Catch the inconsistency.
-    const inconsistencies = db.checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(db);
     assert.eq(1, inconsistencies.length);
     assert.eq("MissingLocalCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(primaryShard.shardName, inconsistencies[0].details.shard, tojson(inconsistencies[0]));
@@ -1390,7 +1403,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     st.rs0.getPrimary();
 
     // Cluster level mode command.
-    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
 
     // Check that there is a MisplacedCollection.
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
@@ -1425,7 +1438,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
             configDB.chunks.update({_id: chunk._id}, {$unset: {onCurrentShardSince: 1}}),
         );
 
-        let inconsistencies = db.checkMetadataConsistency().toArray();
+        let inconsistencies = checkMetadataConsistency(db);
         // Direct edits to config.chunks desync the global catalog from the per-shard catalog when
         // authoritative shard CRUD is active: the same onCurrentShardSince divergence is reported
         // once from the in-memory shard catalog and a second time from the durable shard catalog.
@@ -1488,7 +1501,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                 {$set: {"history.0.shard": st.shard1.shardName}},
             ),
         );
-        let inconsistencies = db.checkMetadataConsistency().toArray();
+        let inconsistencies = checkMetadataConsistency(db);
         assert.eq(1, inconsistencies.length, tojson(inconsistencies));
         const corruptedChunkHistory = inconsistencies.filter(
             (inc) => inc.type === "CorruptedChunkHistory",
@@ -1509,7 +1522,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Artificially corrupt chunk (empty history array)
     {
         assert.commandWorked(configDB.chunks.update({_id: chunk._id}, {$set: {history: []}}));
-        let inconsistencies = db.checkMetadataConsistency().toArray();
+        let inconsistencies = checkMetadataConsistency(db);
         assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 1, inconsistencies.length);
         const corruptedChunkHistory = inconsistencies.filter(
             (inc) => inc.type === "CorruptedChunkHistory",
@@ -1551,7 +1564,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     {
         assert.commandWorked(configDB.chunks.update({_id: chunk._id}, {$unset: {history: 1}}));
 
-        let inconsistencies = db.checkMetadataConsistency().toArray();
+        let inconsistencies = checkMetadataConsistency(db);
         assert.eq(isAuthoritativeShardsCRUDEnabled ? 3 : 1, inconsistencies.length);
         const corruptedChunkHistory = inconsistencies.filter(
             (inc) => inc.type === "CorruptedChunkHistory",
@@ -1636,7 +1649,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     // Test missing view
-    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq(
         "MalformedTimeseriesBucketsCollection",
@@ -1685,7 +1698,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
             }),
     );
 
-    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq(
         "MalformedTimeseriesBucketsCollection",
@@ -1733,7 +1746,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
             }),
     );
 
-    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq(
         "MalformedTimeseriesBucketsCollection",
@@ -1775,7 +1788,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     configureFailPoint(st.rs0.getPrimary(), "skipCreateTimeseriesBucketsWithoutOptionsCheck");
     assert.commandWorked(db.createCollection(bucketsCollName));
 
-    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq(
         "MalformedTimeseriesBucketsCollection",
@@ -1803,7 +1816,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
             }),
     );
 
-    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq(
         "MalformedTimeseriesBucketsCollection",
@@ -1890,7 +1903,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         assert.commandWorked(coll.insert({shardKey: i, extraField: "value_" + i}));
     }
 
-    let inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();
+    let inconsistencies = checkMetadataConsistency(db, {"checkIndexes": 1});
     assert.eq(
         0,
         inconsistencies.length,
@@ -1898,7 +1911,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     generateCollationInconsistency(primaryShardRS);
-    inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();
+    inconsistencies = checkMetadataConsistency(db, {"checkIndexes": 1});
     jsTest.log("Inconsistencies found: " + tojson(inconsistencies));
 
     assert.eq(
@@ -1914,7 +1927,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     generateCollationInconsistency(st.rs1);
-    inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();
+    inconsistencies = checkMetadataConsistency(db, {"checkIndexes": 1});
     jsTest.log("Inconsistencies found: " + tojson(inconsistencies));
 
     assert.eq(
@@ -1937,7 +1950,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
 
     assert.commandWorked(mongos.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
-    inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();
+    inconsistencies = checkMetadataConsistency(db, {"checkIndexes": 1});
     assert.eq(
         0,
         inconsistencies.length,
@@ -1969,7 +1982,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         assert.commandWorked(configDB.createCollection(collName));
     }
 
-    const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(collNames.length, inconsistencies.length, {inconsistencies});
     for (const inconsistency of inconsistencies) {
         assert.eq("LegacyShardCacheCollectionsPresent", inconsistency.type, {inconsistencies});
@@ -2009,7 +2022,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         assert.commandWorked(configDB.getCollection(collName).insert({foo: "bar"}));
     }
 
-    const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    const inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
     assert.eq(collNames.length, inconsistencies.length, {inconsistencies});
     for (const inconsistency of inconsistencies) {
         assert.eq("AuthoritativeShardCatalogCollectionsPresent", inconsistency.type, {
