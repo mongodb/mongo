@@ -188,7 +188,10 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         // Outside of a transaction, multiple endpoints currently imply no versioning, since we
         // can't retry half a regular multi-write.
         if (endpoints.size() > 1u && !inTransaction) {
-            endpoint.shardVersion->setPlacementVersionIgnored();
+            auto& shardVersion = endpoint.shardVersion;
+            tassert(11841904, "Expected shardVersion to be set", shardVersion.has_value());
+
+            shardVersion->setPlacementVersionIgnored();
         }
 
         const auto sampleId = targetedSampleId && targetedSampleId->isFor(endpoint)

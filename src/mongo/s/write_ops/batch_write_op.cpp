@@ -56,6 +56,9 @@ struct WriteErrorComp {
     }
 };
 
+using ShardVersionMap = absl::flat_hash_map<ShardId, boost::optional<ShardVersion>>;
+using DbVersionMap = absl::flat_hash_map<ShardId, boost::optional<DatabaseVersion>>;
+
 /**
  * Returns a new write concern that has the copy of every field from the original
  * document but with a w set to 1. This is intended for upgrading { w: 0 } write
@@ -79,40 +82,55 @@ BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern) {
 }
 
 /**
- * Helper to determine whether a shard is already targeted with a different shardVersion, which
- * necessitates a new batch. This happens when a batch write includes a multi target write and
- * a single target write.
+ * Helper to determine whether a shard is already targeted with a different shardVersion or a
+ * different dbVersion, which necessitates a new batch.
  */
-bool wasShardAlreadyTargetedWithDifferentShardVersion(
+bool wasShardAlreadyTargetedWithDifferentShardOrDbVersion(
     const NamespaceString& nss,
     const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-    const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
-    const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
-    auto endpointSetIt = nsEndpointMap.find(nss);
-    if (endpointSetIt == nsEndpointMap.end()) {
-        // We haven't targeted this namespace yet.
-        return false;
-    }
+    const absl::flat_hash_map<NamespaceString, ShardVersionMap>& shardVersionMaps,
+    const absl::flat_hash_map<DatabaseName, DbVersionMap>& dbVersionMaps) {
+    // Check if 'writes' contains any conflicting ShardVersions or DatabaseVersions. Note that
+    // 'dvVersionMaps' is keyed on the _database_ name rather than the collection name.
+    auto svMapIt = shardVersionMaps.find(nss);
+    auto dvMapIt = dbVersionMaps.find(nss.dbName());
+    auto* svMap = svMapIt != shardVersionMaps.end() ? &svMapIt->second : nullptr;
+    auto* dvMap = dvMapIt != dbVersionMaps.end() ? &dvMapIt->second : nullptr;
 
-    for (auto&& write : writes) {
-        if (endpointSetIt->second.find(&write->endpoint) == endpointSetIt->second.end()) {
-            // This is a new endpoint for this namespace.
-            auto shardIdSetIt = nsShardIdMap.find(nss);
-            invariant(shardIdSetIt != nsShardIdMap.end());
-            if (shardIdSetIt->second.find(write->endpoint.shardName) !=
-                shardIdSetIt->second.end()) {
-                // And because we have targeted this shardId for this namespace before, this implies
-                // a shard is already targeted under a different endpoint/shardVersion, necessitates
-                // a new batch.
+    for (const auto& write : writes) {
+        const auto& endpoint = write->endpoint;
+        const bool isSharded =
+            endpoint.shardVersion && *endpoint.shardVersion != ShardVersion::UNSHARDED();
+
+        if (svMap) {
+            auto it = svMap->find(endpoint.shardName);
+            if (it != svMap->end() && it->second != endpoint.shardVersion) {
+                // If a conflicting ShardVersion is found, return true.
                 LOGV2_DEBUG(9986802,
                             4,
                             "New batch required as this shard was already targeted with a "
                             "different shard version",
-                            "shard"_attr = write->endpoint.shardName);
+                            "shard"_attr = endpoint.shardName);
+                return true;
+            }
+        }
+
+        // If 'endpoint' targets an unsharded collection, check if we already have a dbVersion
+        // for 'nss.dbName()', and if so check if it matches 'endpoint.databaseVersion'.
+        if (!isSharded && dvMap) {
+            auto it = dvMap->find(endpoint.shardName);
+            if (it != dvMap->end() && it->second != endpoint.databaseVersion) {
+                // If a conflicting DatabaseVersion is found, return true.
+                LOGV2_DEBUG(11841900,
+                            4,
+                            "New batch required as this shard was already targeted with a "
+                            "different database version",
+                            "shard"_attr = endpoint.shardName);
                 return true;
             }
         }
     }
+
     return false;
 }
 
@@ -123,8 +141,8 @@ bool isNewBatchRequiredOrdered(
     const NamespaceString& nss,
     const std::vector<std::unique_ptr<TargetedWrite>>& writes,
     const TargetedBatchMap& batchMap,
-    const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
-    const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
+    const absl::flat_hash_map<NamespaceString, ShardVersionMap>& shardVersionMaps,
+    const absl::flat_hash_map<DatabaseName, DbVersionMap>& dbVersionMaps) {
     // If this write targets a different shard, it needs to go in a different batch.
     for (auto&& write : writes) {
         if (batchMap.find(write->endpoint.shardName) == batchMap.end()) {
@@ -138,17 +156,17 @@ bool isNewBatchRequiredOrdered(
 
     // If we already targeted this shard with a different shard version, then we also need a new
     // batch.
-    return wasShardAlreadyTargetedWithDifferentShardVersion(
-        nss, writes, nsShardIdMap, nsEndpointMap);
+    return wasShardAlreadyTargetedWithDifferentShardOrDbVersion(
+        nss, writes, shardVersionMaps, dbVersionMaps);
 }
 
 bool isNewBatchRequiredUnordered(
     const NamespaceString& nss,
     const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-    const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
-    const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
-    return wasShardAlreadyTargetedWithDifferentShardVersion(
-        nss, writes, nsShardIdMap, nsEndpointMap);
+    const absl::flat_hash_map<NamespaceString, ShardVersionMap>& shardVersionMaps,
+    const absl::flat_hash_map<DatabaseName, DbVersionMap>& dbVersionMaps) {
+    return wasShardAlreadyTargetedWithDifferentShardOrDbVersion(
+        nss, writes, shardVersionMaps, dbVersionMaps);
 }
 
 /**
@@ -331,8 +349,8 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
 
     bool isWriteWithoutShardKeyOrId = false;
 
-    std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>> nsEndpointMap;
-    std::map<NamespaceString, std::set<ShardId>> nsShardIdMap;
+    absl::flat_hash_map<NamespaceString, ShardVersionMap> shardVersionMaps;
+    absl::flat_hash_map<DatabaseName, DbVersionMap> dbVersionMaps;
 
     for (auto& writeOp : writeOps) {
         // Only target Ready op.
@@ -415,7 +433,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
         if (ordered && !batchMap.empty()) {
             dassert(batchMap.size() == 1u);
             if (isNewBatchRequiredOrdered(
-                    targeter.getNS(), writes, batchMap, nsShardIdMap, nsEndpointMap)) {
+                    targeter.getNS(), writes, batchMap, shardVersionMaps, dbVersionMaps)) {
                 writeOp.cancelWrites(nullptr);
                 break;
             }
@@ -433,7 +451,8 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
         // If writes are unordered and we already have targeted endpoints, make sure we don't target
         // the same shard with a different shardVersion.
         if (!ordered &&
-            isNewBatchRequiredUnordered(targeter.getNS(), writes, nsShardIdMap, nsEndpointMap)) {
+            isNewBatchRequiredUnordered(
+                targeter.getNS(), writes, shardVersionMaps, dbVersionMaps)) {
             writeOp.cancelWrites(nullptr);
             break;
         }
@@ -491,8 +510,18 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
                 batchIt = batchMap.emplace(shardId, std::move(newBatch)).first;
             }
 
-            nsEndpointMap[targeter.getNS()].insert(&write->endpoint);
-            nsShardIdMap[targeter.getNS()].insert(shardId);
+            // Record shardVersion in the appropriate SV map.
+            const auto& shardVersion = write->endpoint.shardVersion;
+            auto& svMap = shardVersionMaps[targeter.getNS()];
+            svMap.emplace(shardId, shardVersion);
+
+            // If 'write->endpoint' targets an unsharded collection, record dbVersion in the
+            // appropriate DV map.
+            const bool isSharded = shardVersion && *shardVersion != ShardVersion::UNSHARDED();
+            if (!isSharded) {
+                auto& dvMap = dbVersionMaps[targeter.getNS().dbName()];
+                dvMap.emplace(shardId, write->endpoint.databaseVersion);
+            }
 
             batchIt->second->addWrite(std::move(write), estWriteSizeBytes);
         }
