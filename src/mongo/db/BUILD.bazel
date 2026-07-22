@@ -3874,3 +3874,44 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
     ],
 )
+
+mongo_cc_library(
+    name = "metrics_filtering_util",
+    srcs = [
+        "metrics_filtering_util.cpp",
+    ],
+    hdrs = [
+        "metrics_filtering_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "metrics_filtering_util_test_helpers",
+    srcs = [
+        "metrics_filtering_util_test_helpers.cpp",
+    ],
+    hdrs = [
+        "metrics_filtering_util_test_helpers.h",
+    ],
+    deps = [
+        ":metrics_filtering_util",
+        "//src/mongo:base",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "metrics_filtering_util_test",
+    srcs = [
+        "metrics_filtering_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":metrics_filtering_util",
+        ":metrics_filtering_util_test_helpers",
+        "//src/mongo/unittest",
+    ],
+)

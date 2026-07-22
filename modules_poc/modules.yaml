@@ -652,6 +652,7 @@ observability.metrics:
     jira: Networking & Observability
     fully_marked: true
   files:
+    - src/mongo/db/metrics_*
     - src/mongo/otel/metrics/
 
 observability.ftdc:

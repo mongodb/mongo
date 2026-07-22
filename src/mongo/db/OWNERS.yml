@@ -380,3 +380,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
       - 10gen/query-execution
+  - "metrics_filtering_util*":
+    approvers:
+      - 10gen/server-networking-and-observability
