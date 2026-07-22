@@ -366,7 +366,7 @@ function verifyProcessedAsSecondaryOnEarlyError(rst, mirrorMode, dbName, collNam
     let param =
         mirrorMode == kGeneralMode
             ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-            : {targetedMirroring: {samplingRate: samplingRate}};
+            : {samplingRate: 0.0, targetedMirroring: {samplingRate: samplingRate}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 
     for (const secondary of rst.getSecondaries()) {
@@ -422,7 +422,7 @@ function verifyErroredDuringSend(rst, mirrorMode, dbName, collName, tag) {
     let param =
         mirrorMode == kGeneralMode
             ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-            : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
+            : {samplingRate: 0.0, targetedMirroring: {samplingRate: samplingRate, tag: tag}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 
     assert.commandWorked(
@@ -467,7 +467,7 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
         let param =
             mirrorMode == kGeneralMode
                 ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
+                : {samplingRate: 0.0, targetedMirroring: {samplingRate: samplingRate, tag: tag}};
         assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
         sendAndCheckReadsSucceedWithRate({
             rst: rst,
@@ -488,7 +488,7 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
         let param =
             mirrorMode == kGeneralMode
                 ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
+                : {samplingRate: 0.0, targetedMirroring: {samplingRate: samplingRate, tag: tag}};
 
         assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
         sendAndCheckReadsSucceedWithRate({
@@ -514,7 +514,7 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
         let param =
             mirrorMode == kGeneralMode
                 ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
+                : {samplingRate: 0.0, targetedMirroring: {samplingRate: samplingRate, tag: tag}};
         assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
         sendAndCheckReadsSucceedWithRate({
             rst: rst,
@@ -534,7 +534,7 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
     let param =
         mirrorMode == kGeneralMode
             ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-            : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
+            : {samplingRate: 0.0, targetedMirroring: {samplingRate: samplingRate, tag: tag}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 }
 
@@ -585,7 +585,7 @@ function verifyMirroringDistribution(rst, mirrorMode, dbName, collName) {
     let param =
         mirrorMode == kGeneralMode
             ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-            : {targetedMirroring: {samplingRate: samplingRate}};
+            : {samplingRate: 0.0, targetedMirroring: {samplingRate: samplingRate}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 
     let before = getMirroredReadsStats(nodeToReadFrom, dbName);
