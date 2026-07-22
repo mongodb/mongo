@@ -55,6 +55,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.data.getConcurrentOperations = () => [ConcurrentOperation.ValidationLevelChange];
 
+    // Original cursor-reaping parameter values, captured from setParameter's `was` field in setup
+    // and restored in teardown (see temporary workaround below).
+    let originalCursorTimeoutMillis;
+    let originalClientCursorMonitorFrequencySecs;
+
     // -------------------------------------------------------------------------
     // States
     // -------------------------------------------------------------------------
@@ -224,6 +229,18 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // -------------------------------------------------------------------------
 
     $config.setup = function setup(db, collName, cluster) {
+        // Temporarily lower the cursor timeout so that a dangling idle cursor left behind by the
+        // collMod constraint-upgrade scan is reaped quickly, instead of blocking range deletions.
+        // TODO SERVER-131725: Remove this workaround after a long-term fix is in place.
+        cluster.executeOnMongodNodes(function lowerCursorTimeout(db) {
+            originalCursorTimeoutMillis = assert.commandWorked(
+                db.adminCommand({setParameter: 1, cursorTimeoutMillis: 10000}),
+            ).was;
+            originalClientCursorMonitorFrequencySecs = assert.commandWorked(
+                db.adminCommand({setParameter: 1, clientCursorMonitorFrequencySecs: 1}),
+            ).was;
+        });
+
         // Base creates the sharded collection and inserts partitioned docs as {_id, skey, tid}.
         $super.setup.apply(this, arguments);
 
@@ -257,6 +274,23 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         this.cleanupInvalidDocs(db, collName);
 
         assert.commandWorked(db.runCommand({validate: collName}));
+
+        // Restore the cursor-reaping parameters lowered in setup to their defaults.
+        // TODO SERVER-131725: Remove this workaround after a long-term fix is in place.
+        cluster.executeOnMongodNodes(function resetCursorTimeout(db) {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    cursorTimeoutMillis: originalCursorTimeoutMillis,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    clientCursorMonitorFrequencySecs: originalClientCursorMonitorFrequencySecs,
+                }),
+            );
+        });
 
         $super.teardown.apply(this, arguments);
     };
