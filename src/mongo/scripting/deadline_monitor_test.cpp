@@ -165,4 +165,29 @@ TEST(DeadlineMonitor, IsKillPendingKills) {
     group.waitForKillCount(1);
     ASSERT(task._killed);
 }
+
+// Regression test for BF-44678. A task with an infinite deadline (timeoutMs <= 0) is killed only
+// via the periodic isKillPending() poll. Registering such a task must wake a monitor that is
+// already parked in its indefinite wait because it previously had no tasks -- otherwise the poll
+// never resumes and the task hangs forever (the notify used to be sent only when the new deadline
+// beat _nearestDeadlineWallclock, which an infinite deadline never does).
+TEST(DeadlineMonitor, InfiniteDeadlineWakesIdleMonitor) {
+    DeadlineMonitor<Task> dm;
+    TaskGroup group;
+
+    // Prime the monitor: register a task that expires almost immediately and wait for its kill.
+    // Once observed, the monitor has emptied its task list and is parking in the indefinite wait.
+    // This reliably reproduces the "monitor idle, then task added" order that hung.
+    Task primer(&group);
+    dm.startDeadline(&primer, 1);
+    group.waitForKillCount(1);
+
+    // The mutex is released by the monitor only once it is parked, so this call is serialized after
+    // the monitor is idle. Without the fix it sends no notify and the monitor sleeps forever.
+    Task task(&group);
+    dm.startDeadline(&task, -1);
+    task.killPending.store(true);
+    group.waitForKillCount(2);
+    ASSERT(task._killed);
+}
 }  // namespace mongo

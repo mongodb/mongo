@@ -90,7 +90,9 @@ public:
             _tasks.emplace(task, deadline);
         }
 
-        if (deadline < _nearestDeadlineWallclock) {
+        // Notify the monitor thread when either the nearest deadline moves earlier, or this is the
+        // first task in the queue.
+        if (deadline < _nearestDeadlineWallclock || _tasks.size() == 1) {
             _nearestDeadlineWallclock = deadline;
             _newDeadlineAvailable.notify_one();
         }
