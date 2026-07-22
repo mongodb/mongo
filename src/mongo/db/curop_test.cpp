@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -580,6 +581,90 @@ TEST(CurOpTest, GetCursorMetricsProducesValidObject) {
     auto curop = CurOp::get(*opCtx);
     auto metrics = curop->debug().getCursorMetrics();
     ASSERT_DOES_NOT_THROW(metrics.toBSON());
+}
+
+// A mock command with one redacted field, used to verify that reportState() applies the command's
+// field-level redaction (the same the slow-query log uses) to its output.
+class CurOpMockCmd : public BasicCommand {
+public:
+    CurOpMockCmd() : BasicCommand("curOpMockCmd") {}
+
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {"field"_sd};
+    }
+    bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) override {
+        return true;
+    }
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return false;
+    }
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+};
+
+TEST(CurOpTest, ReportStateRedactsCommandFields) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+
+    CurOpMockCmd cmd;
+    BSONObj cmdObj = BSON("curOpMockCmd" << 1 << "field"
+                                         << "value"
+                                         << "$db"
+                                         << "admin");
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        curOp->setGenericOpRequestDetails_inlock(
+            NamespaceString::createNamespaceString_forTest("admin.$cmd"),
+            &cmd,
+            cmdObj,
+            NetworkOp::dbQuery);
+    }
+
+    BSONObjBuilder bob;
+    curOp->reportState(&bob, SerializationContext{});
+    BSONObj state = bob.obj();
+
+    ASSERT_TRUE(state.hasField("command"));
+    BSONObj command = state["command"].Obj();
+    ASSERT_TRUE(command.hasField("field"));
+    // A field the command marks for redaction is scrubbed in the output, the
+    // same as the slow-query log.
+    ASSERT_EQ(command["field"].str(), "xxx");
+}
+
+TEST(CurOpTest, ReportStateReportsUnrecognizedCommand) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+
+    // A command op with no resolved Command* (unrecognized command).
+    BSONObj cmdObj = BSON("someUnknownCommand" << 1 << "field"
+                                               << "value"
+                                               << "$db"
+                                               << "admin");
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        curOp->setGenericOpRequestDetails_inlock(
+            NamespaceString::createNamespaceString_forTest("admin.$cmd"),
+            /*command*/ nullptr,
+            cmdObj,
+            NetworkOp::dbQuery);
+    }
+
+    BSONObjBuilder bob;
+    curOp->reportState(&bob, SerializationContext{});
+    BSONObj state = bob.obj();
+
+    // With no Command*, the request is reported as "unrecognized" rather than echoed, consistent
+    // with the slow-query log.
+    ASSERT_EQ(state["command"].str(), "unrecognized");
 }
 
 }  // namespace
