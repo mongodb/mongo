@@ -1,0 +1,42 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("@rules_python//python:defs.bzl", "py_library")
+
+py_library(
+    name = "all_python_files",
+    srcs = glob(["*.py"]),
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "package_test_commands",
+    srcs = [
+        "__init__.py",
+        "package_test_commands.py",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "package_test_internal",
+    srcs = [
+        "__init__.py",
+        "package_test_internal.py",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "package_test_provenance",
+    srcs = [
+        "__init__.py",
+        "package_test_provenance.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:bazel_spawn_pb2",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+    ],
+)

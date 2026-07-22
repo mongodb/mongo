@@ -24,9 +24,9 @@ from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
 from retry.api import retry_call
-from simple_report import Report, Result
 
-from buildscripts.package_test_provenance import (
+from buildscripts.package_test.package_test_commands import PACKAGE_MANAGER_COMMANDS
+from buildscripts.package_test.package_test_provenance import (
     RELEASE_BINARY_NAMES,
     combine_execution_log_validation_summaries,
     fetch_release_binary_provenance_from_tasks,
@@ -42,6 +42,7 @@ from buildscripts.package_test_provenance import (
     validate_release_build_command,
 )
 from buildscripts.resmokelib.utils import evergreen_conn
+from buildscripts.simple_report import Report, Result
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -336,21 +337,6 @@ def should_validate_package_build_provenance() -> bool:
     )
     return should_validate
 
-
-PACKAGE_MANAGER_COMMANDS = {
-    "apt": {
-        "update": "export DEBIAN_FRONTEND=noninteractive && apt-get update -y",
-        "install": "export DEBIAN_FRONTEND=noninteractive && apt-get install -y {}",
-    },
-    "yum": {
-        "update": "yum update -y",
-        "install": "yum install -y {}",
-    },
-    "zypper": {
-        "update": "zypper -n update",
-        "install": "zypper -n install {}",
-    },
-}
 
 # Lookup table used when building and running containers
 # os_name, Optional[(base_image, package_manager, frozenset(base_packages), python_command)]

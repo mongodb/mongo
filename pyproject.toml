@@ -263,7 +263,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # This file needs to support Python 3.5+ for old OS package testing
-"buildscripts/package_test_internal.py" = ["UP"]
+"buildscripts/package_test/package_test_internal.py" = ["UP"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["buildscripts", "buildscripts/idl", "evergreen", "tools"]

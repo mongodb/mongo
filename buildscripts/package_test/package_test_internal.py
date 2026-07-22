@@ -1,5 +1,8 @@
-# This script needs to be compatible with odler versions of python since it runs on older versions of OSs when testing packaging
-# For example ubuntu 1604 uses python3.5
+"""Package checks executed inside package-test containers.
+
+This script needs to support older Python versions because package testing runs it on older
+operating systems. For example, Ubuntu 16.04 uses Python 3.5.
+"""
 
 import json
 import logging

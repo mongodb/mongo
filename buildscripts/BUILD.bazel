@@ -841,28 +841,15 @@ py_library(
 )
 
 py_library(
-    name = "package_test_provenance",
-    srcs = [
-        "bazel_spawn_pb2.py",
-        "package_test_provenance.py",
-    ],
+    name = "bazel_spawn_pb2",
+    srcs = ["bazel_spawn_pb2.py"],
     visibility = ["//visibility:public"],
     deps = [
         dependency(
             "protobuf",
             group = "testing",
         ),
-        dependency(
-            "requests",
-            group = "core",
-        ),
     ],
-)
-
-py_library(
-    name = "package_test_internal",
-    srcs = ["package_test_internal.py"],
-    visibility = ["//visibility:public"],
 )
 
 py_library(

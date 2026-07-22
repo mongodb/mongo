@@ -308,7 +308,16 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:generate_bazel_spawn_pb2",
-        "//buildscripts:package_test_provenance",
+        "//buildscripts/package_test:package_test_provenance",
+    ],
+)
+
+py_test(
+    name = "test_package_test_commands",
+    srcs = ["test_package_test_commands.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/package_test:package_test_commands",
     ],
 )
 
@@ -317,7 +326,7 @@ py_test(
     srcs = ["test_package_test_internal.py"],
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts:package_test_internal",
+        "//buildscripts/package_test:package_test_internal",
     ],
 )
 

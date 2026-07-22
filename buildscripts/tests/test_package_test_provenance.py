@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from buildscripts import generate_bazel_spawn_pb2
-from buildscripts import package_test_provenance as under_test
+from buildscripts.package_test import package_test_provenance as under_test
 
 
 def release_local_suffix() -> str:

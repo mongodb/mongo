@@ -1,7 +1,7 @@
 import pathlib
 import unittest
 
-from buildscripts import package_test_internal as under_test
+from buildscripts.package_test import package_test_internal as under_test
 
 
 class PackageTestInternalHelpersTest(unittest.TestCase):
