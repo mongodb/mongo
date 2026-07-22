@@ -69,6 +69,12 @@ private:
      */
     std::error_code _getErrorCode();
 
+    /**
+     * Adds 'size' to both this File's tracked contribution and the process-wide
+     * fileSpilledStorageSize gauge.
+     */
+    void _addToStorageSizeGauge(long long size);
+
     // The current offset of the end of the file if there may be unflushed data, or -1 if the
     // file either has not yet been opened or has been flushed.
     std::streamoff _offset = -1;
@@ -81,6 +87,10 @@ private:
     // If set, this points to an external metrics holder for tracking storage open/close
     // activity.
     SorterFileStats* _stats;
+
+    // Bytes this File has added to the process-wide fileSpilledStorageSize gauge. Released from the
+    // gauge on destruction only when the on-disk file is removed.
+    long long _spilledBytes = 0;
 
     boost::filesystem::path _path;
 };

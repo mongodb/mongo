@@ -4,6 +4,7 @@
 #include "mongo/db/sorter/file.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/stats/counters_sort.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
@@ -15,8 +16,14 @@ namespace mongo::sorter {
 
 File::File(boost::filesystem::path path, SorterFileStats* stats) : _stats(stats), _path(path) {
     invariant(!_path.empty());
-    if (_stats && boost::filesystem::exists(_path) && boost::filesystem::is_regular_file(_path)) {
-        _stats->addSpilledDataSize(boost::filesystem::file_size(_path));
+    if (boost::filesystem::exists(_path) && boost::filesystem::is_regular_file(_path)) {
+        // This File is adopting an already-populated on-disk file (e.g. resuming persisted spill
+        // state). Account for its existing size in both the cumulative stats and the live gauge.
+        auto existingSize = static_cast<long long>(boost::filesystem::file_size(_path));
+        if (_stats) {
+            _stats->addSpilledDataSize(existingSize);
+        }
+        _addToStorageSizeGauge(existingSize);
     }
 }
 
@@ -59,6 +66,7 @@ File::~File() {
 
     try {
         boost::filesystem::remove(_path);
+        fileSpillingMetrics.fileSpilledStorageSize.decrement(_spilledBytes);
     } catch (...) {
         reportFailedDestructor(MONGO_SOURCE_LOCATION());
     }
@@ -108,6 +116,7 @@ void File::write(const char* data, std::streamsize size) {
         if (_stats) {
             this->_stats->addSpilledDataSize(size);
         };
+        _addToStorageSizeGauge(size);
     } catch (const std::system_error& ex) {
         if (ex.code() == std::errc::no_space_on_device) {
             uasserted(ErrorCodes::OutOfDiskSpace,
@@ -163,6 +172,11 @@ void File::_ensureOpenForWriting() {
         _offset = boost::filesystem::file_size(_path);
         _file.seekp(_offset);
     }
+}
+
+void File::_addToStorageSizeGauge(long long size) {
+    _spilledBytes += size;
+    fileSpillingMetrics.fileSpilledStorageSize.increment(size);
 }
 
 std::error_code File::_getErrorCode() {

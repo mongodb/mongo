@@ -61,6 +61,7 @@ mongo_cc_unit_test(
     name = "db_sorter_test",
     srcs = [
         "container_based_spiller_test.cpp",
+        "file_test.cpp",
         "sorter_checksum_calculator_test.cpp",
         "sorter_stats_test.cpp",
         "sorter_test.cpp",
