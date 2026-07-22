@@ -397,7 +397,14 @@ const featureFlagReshardingVerification = FeatureFlagUtil.isPresentAndEnabled(
     db,
     "ReshardingVerification",
 );
-if (featureFlagReshardingVerification) {
+// performVerification also requires the reshardingDocumentVerification server parameter, which test
+// fixtures only enable on non-multiversion clusters.
+//
+// TODO(SERVER-131910): Re-enable for mixed binary versions when last lts is 9.0 and the server parameter is always set in test fixtures.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+if (featureFlagReshardingVerification && !isMultiversion) {
     jsTest.log("Succeed if 'performVerification' parameter is set to true.");
 
     reshardCmdTest.assertReshardCollOk(

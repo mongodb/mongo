@@ -1315,6 +1315,7 @@ export class ShardingTest {
                     startOptions.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
                 }
                 // Enable resharding document-count validation (off by default) in test clusters.
+                // TODO(SERVER-131910): Re-enable for mixed binary versions when last lts is 9.0.
                 if (!clusterVersionInfo.isMixedVersion) {
                     startOptions.setParameter = startOptions.setParameter ?? {};
                     if (startOptions.setParameter.reshardingDocumentVerification === undefined) {
