@@ -105,6 +105,9 @@ template Status ClusterCursorManager::checkAuthCursor<AuthzCheckFnInputType>(
 template Status ClusterCursorManager::checkAuthCursor<ReleaseMemoryAuthzCheckFnInputType>(
     OperationContext* opCtx, CursorId cursorId, ReleaseMemoryAuthzCheckFn func);
 
+template Status ClusterCursorManager::checkAuthCursor<KillCursorAuthzCheckFnInputType>(
+    OperationContext* opCtx, CursorId cursorId, KillCursorAuthzCheckFn func);
+
 template StatusWith<ClusterCursorManager::PinnedCursor>
 ClusterCursorManager::checkOutCursor<AuthzCheckFnInputType>(CursorId cursorId,
                                                             OperationContext* opCtx,
@@ -413,7 +416,7 @@ void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry
 }
 
 Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursorId) {
-    AuthzCheckFn passingAuthChecker = [](AuthzCheckFnInputType) -> Status {
+    KillCursorAuthzCheckFn passingAuthChecker = [](const KillCursorAuthzCheckFnInput&) -> Status {
         return Status::OK();
     };
     return _killCursor(opCtx, cursorId, passingAuthChecker);
@@ -421,13 +424,13 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursor
 
 Status ClusterCursorManager::killCursorWithAuthCheck(OperationContext* opCtx,
                                                      CursorId cursorId,
-                                                     AuthzCheckFn authChecker) {
+                                                     KillCursorAuthzCheckFn authChecker) {
     return _killCursor(opCtx, cursorId, std::move(authChecker));
 }
 
 Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
                                          CursorId cursorId,
-                                         AuthzCheckFn authChecker) {
+                                         KillCursorAuthzCheckFn authChecker) {
     invariant(opCtx);
 
     std::unique_lock<std::mutex> lk(_mutex);
@@ -437,7 +440,7 @@ Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
         return cursorNotFoundStatus(cursorId);
     }
 
-    auto authCheckStatus = authChecker(entry->getAuthenticatedUser());
+    auto authCheckStatus = authChecker({entry->getNamespace(), entry->getAuthenticatedUser()});
     if (!authCheckStatus.isOK()) {
         return authCheckStatus.withContext(str::stream()
                                            << "cursor id " << cursorId
