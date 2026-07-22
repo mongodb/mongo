@@ -15,6 +15,7 @@ import {
     waitForMigrateStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
@@ -117,7 +118,9 @@ let runTest = function (testMode) {
     let prepareTimestamp = res.prepareTimestamp;
 
     if (testMode == TestMode.kWithStepUp) {
-        st.rs0.stepUp(st.rs0.getSecondary());
+        const newPrimary = st.rs0.getSecondary();
+        st.rs0.stepUp(newPrimary);
+        awaitRSClientHosts(st.s, {host: newPrimary.host}, {ok: true, ismaster: true}, st.rs0);
     } else if (testMode == TestMode.kWithRestart) {
         TestData.skipCollectionAndIndexValidation = true;
         // TODO(SERVER-113373): We can't use the new failpoint in multiversion
