@@ -280,28 +280,6 @@ repl::MutableOplogEntry makeShardCatalogCommandOplogEntry(OperationContext* opCt
     return oplogEntry;
 }
 
-void logShardCatalogCommandOplogEntry(OperationContext* opCtx,
-                                      repl::MutableOplogEntry& oplogEntry,
-                                      const char* opName) {
-    repl::OpTime slot;
-    writeConflictRetry(opCtx, opName, NamespaceString::kRsOplogNamespace, [&] {
-        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
-        WriteUnitOfWork wuow(opCtx);
-        slot = repl::logOp(opCtx, &oplogEntry);
-        uassert(10281501,
-                str::stream() << "Failed to create new oplog entry for " << opName
-                              << " with opTime: " << oplogEntry.getOpTime().toString() << ": "
-                              << redact(oplogEntry.toBSON()),
-                !slot.isNull());
-        wuow.commit();
-    });
-
-    // repl::logOp() clears the mutable oplog entry's OpTime before returning so the entry can be
-    // reused on a write-conflict retry. Restore the OpTime to the actual value after the oplog
-    // entry is successfully applied; otherwise, it will remain 0.
-    oplogEntry.setOpTime(slot);
-}
-
 void invalidateCollectionMetadata(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -619,6 +597,28 @@ void deleteOverlappingChunksLocally(OperationContext* opCtx,
 }
 
 }  // namespace
+
+void logShardCatalogCommandOplogEntry(OperationContext* opCtx,
+                                      repl::MutableOplogEntry& oplogEntry,
+                                      const char* opName) {
+    repl::OpTime slot;
+    writeConflictRetry(opCtx, opName, NamespaceString::kRsOplogNamespace, [&] {
+        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+        WriteUnitOfWork wuow(opCtx);
+        slot = repl::logOp(opCtx, &oplogEntry);
+        uassert(10281501,
+                str::stream() << "Failed to create new oplog entry for " << opName
+                              << " with opTime: " << oplogEntry.getOpTime().toString() << ": "
+                              << redact(oplogEntry.toBSON()),
+                !slot.isNull());
+        wuow.commit();
+    });
+
+    // repl::logOp() clears the mutable oplog entry's OpTime before returning so the entry can be
+    // reused on a write-conflict retry. Restore the OpTime to the actual value after the oplog
+    // entry is successfully committed; otherwise, it will remain 0.
+    oplogEntry.setOpTime(slot);
+}
 
 void commitDropCollectionLocally(OperationContext* opCtx,
                                  const NamespaceString& nss,

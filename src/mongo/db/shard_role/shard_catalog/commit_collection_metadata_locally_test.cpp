@@ -336,6 +336,17 @@ protected:
         return repl::OplogEntry(oplogEntry.toBSON());
     }
 
+    repl::MutableOplogEntry makeOplogEntry() {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss(kTestNss.getCommandNS());
+        oplogEntry.setUuid(UUID::gen());
+        oplogEntry.setObject(BSON("test" << 1));
+        oplogEntry.setOpTime(OplogSlot());
+        oplogEntry.setWallClockTime(operationContext()->fastClockSource().now());
+        return oplogEntry;
+    }
+
     BSONObj getRecoveryStats() {
         BSONObjBuilder builder;
         ShardingStatistics::get(operationContext()).report(&builder);
@@ -351,6 +362,15 @@ protected:
 private:
     MockCatalogClient* _mockCatalogClient = nullptr;
 };
+
+TEST_F(CommitCollectionMetadataLocallyTest, LogShardCatalogCommandOplogEntrySetsOpTime) {
+    auto oplogEntry = makeOplogEntry();
+
+    shard_catalog_commit::logShardCatalogCommandOplogEntry(
+        operationContext(), oplogEntry, "testShardCatalogCommandOplogEntry");
+
+    ASSERT_FALSE(oplogEntry.getOpTime().isNull());
+}
 
 TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyPersistsCollectionAndChunks) {
     auto [collType, chunks] = makeCollectionMetadata(3);

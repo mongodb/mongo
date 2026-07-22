@@ -6,11 +6,18 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
 namespace [[MONGO_MOD_PARENT_PRIVATE]] shard_catalog_commit {
+
+void writeDatabaseMetadataOplogEntry(OperationContext* opCtx,
+                                     repl::MutableOplogEntry& oplogEntry,
+                                     std::string_view commandName);
 
 /**
  * Persists the database metadata into the shard catalog (config.shard.catalog.databases), writes an

@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
@@ -14,6 +15,10 @@
 namespace mongo {
 
 namespace [[MONGO_MOD_PARENT_PRIVATE]] shard_catalog_commit {
+
+void logShardCatalogCommandOplogEntry(OperationContext* opCtx,
+                                      repl::MutableOplogEntry& oplogEntry,
+                                      const char* opName);
 
 /**
  * Deletes the collection and chunk metadata from the shard catalog

@@ -96,7 +96,26 @@ protected:
         const auto scopedDsr = DatabaseShardingRuntime::acquireShared(operationContext(), kDbName);
         return scopedDsr->getDbVersion(operationContext());
     }
+
+    repl::MutableOplogEntry makeOplogEntry() {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss(NamespaceString::makeCommandNamespace(kDbName));
+        oplogEntry.setObject(BSON("test" << 1));
+        oplogEntry.setOpTime(OplogSlot());
+        oplogEntry.setWallClockTime(operationContext()->fastClockSource().now());
+        return oplogEntry;
+    }
 };
+
+TEST_F(CommitDatabaseMetadataLocallyTest, WriteDatabaseMetadataOplogEntrySetsOpTime) {
+    auto oplogEntry = makeOplogEntry();
+
+    shard_catalog_commit::writeDatabaseMetadataOplogEntry(
+        operationContext(), oplogEntry, "testDatabaseMetadataOplogEntry");
+
+    ASSERT_FALSE(oplogEntry.getOpTime().isNull());
+}
 
 TEST_F(CommitDatabaseMetadataLocallyTest, CommitCreatePersistsMetadataAndInstallsDSR) {
     const auto dbType = makeDatabaseType();

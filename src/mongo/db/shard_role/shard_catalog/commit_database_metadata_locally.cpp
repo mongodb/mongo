@@ -37,13 +37,16 @@ repl::MutableOplogEntry makeDatabaseMetadataOplogEntry(OperationContext* opCtx,
     return oplogEntry;
 }
 
+}  // namespace
+
 void writeDatabaseMetadataOplogEntry(OperationContext* opCtx,
                                      repl::MutableOplogEntry& oplogEntry,
                                      std::string_view commandName) {
+    repl::OpTime opTime;
     writeConflictRetry(opCtx, commandName, NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork wuow(opCtx);
-        const repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
+        opTime = repl::logOp(opCtx, &oplogEntry);
         uassert(9980400,
                 str::stream() << "Failed to create oplog entry for " << commandName
                               << " with opTime: " << oplogEntry.getOpTime().toString() << ": "
@@ -51,9 +54,12 @@ void writeDatabaseMetadataOplogEntry(OperationContext* opCtx,
                 !opTime.isNull());
         wuow.commit();
     });
-}
 
-}  // namespace
+    // repl::logOp() clears the mutable oplog entry's OpTime before returning so the entry can be
+    // reused on a write-conflict retry. Restore the OpTime to the actual value after the oplog
+    // entry is successfully committed; otherwise, it will remain 0.
+    oplogEntry.setOpTime(opTime);
+}
 
 void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
                                          const DatabaseType& dbMetadata,
