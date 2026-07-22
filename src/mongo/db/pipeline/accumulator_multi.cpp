@@ -238,9 +238,11 @@ void AccumulatorMinMaxN::_processValue(const Value& val) {
         return _valueComp.compare(a.first, b.first) * _sense < 0;
     };
 
-    auto sz = static_cast<int64_t>(val.getApproximateSize());
-
+    // Defer computing getApproximateSize() until we know we will keep the value. In steady state
+    // the heap is full and most incoming values are rejected by the comparison below, so computing
+    // the (recursively-walked) approximate size up front would be wasted work on the common path.
     if (static_cast<long long>(_heap.size()) < *_n) {
+        auto sz = static_cast<int64_t>(val.getApproximateSize());
         _heap.push_back({val, sz});
         std::push_heap(_heap.begin(), _heap.end(), heapComp);
         _memUsageTracker.add(sz);
@@ -249,9 +251,11 @@ void AccumulatorMinMaxN::_processValue(const Value& val) {
         // The heap root is strictly worse than val (larger for kMin, smaller for kMax), so evict
         // it and insert val. Adjust memory before modifying the heap so the tracker stays
         // consistent if checkMemUsage throws.
+        auto sz = static_cast<int64_t>(val.getApproximateSize());
         std::pop_heap(_heap.begin(), _heap.end(), heapComp);
         _memUsageTracker.add(sz - _heap.back().second);
-        _heap.back() = {val, sz};
+        _heap.back().first = val;
+        _heap.back().second = sz;
         std::push_heap(_heap.begin(), _heap.end(), heapComp);
         checkMemUsage();
     }
@@ -324,22 +328,22 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
 }
 
 void AccumulatorFirstLastN::_processValue(const Value& val) {
-    auto valToProcess = val.missing() ? Value(BSONNULL) : val;
-
     if (_ringCount == static_cast<size_t>(*_n)) {
         if (_variant == Sense::kFirst) {
             // Once _ring contains 'n' elements and this is $firstN, we don't need to call process
-            // anymore.
+            // anymore. Return before copying 'val' since it is discarded here.
             _needsInput = false;
             return;
         }
         // $lastN full: evict the oldest slot. The stored size lets us update the tracker without
         // recomputing getApproximateSize() on the outgoing value.
+        auto valToProcess = val.missing() ? Value(BSONNULL) : val;
         const int64_t newSize = valToProcess.getApproximateSize();
         _memUsageTracker.add(newSize - _ring[_ringHead].second);
         _ring[_ringHead] = {std::move(valToProcess), newSize};
         _ringHead = (_ringHead + 1) % _ring.size();
     } else {
+        auto valToProcess = val.missing() ? Value(BSONNULL) : val;
         const int64_t newSize = valToProcess.getApproximateSize();
         _memUsageTracker.add(newSize);
         _ring.push_back({std::move(valToProcess), newSize});
