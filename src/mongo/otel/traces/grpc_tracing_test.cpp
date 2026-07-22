@@ -10,7 +10,7 @@
 #include <opentelemetry/sdk/trace/batch_span_processor_factory.h>
 #include <opentelemetry/sdk/trace/batch_span_processor_options.h>
 #include <opentelemetry/sdk/trace/tracer_provider_factory.h>
-#include <opentelemetry/trace/provider.h>
+#include <opentelemetry/trace/noop.h>
 
 namespace mongo {
 namespace otel {
@@ -23,7 +23,7 @@ public:
         // Initialize TracerProviderService with a basic provider
         auto tracerProviderService = createNoOpTracerProviderService();
         tracerProviderService->setTracerProvider_ForTest(
-            opentelemetry::trace::Provider::GetTracerProvider());
+            std::make_unique<opentelemetry::trace::NoopTracerProvider>());
         setGlobalTracerProviderService(std::move(tracerProviderService));
     }
 

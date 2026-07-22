@@ -326,6 +326,26 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "tracer_provider_service_test",
+    srcs = [
+        "tracer_provider_service_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "tracing_test",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":tracer_provider_service",
+        ":tracer_provider_service_factory",
+        "//src/mongo/db:server_base",
+        "//src/mongo/unittest",
+        "//src/third_party/opentelemetry-cpp/api",
+        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+    ],
+)
+
 mongo_cc_library(
     name = "traces_test_util",
     srcs = [

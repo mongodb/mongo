@@ -80,7 +80,7 @@ StatusWith<std::unique_ptr<TracerProviderService>> createHttpTracerProviderServi
     auto tracerProvider = opentelemetry::sdk::trace::TracerProviderFactory::Create(
         std::move(processor), makeResource(name, pid));
 
-    return std::make_unique<TracerProviderService>(std::move(tracerProvider), true);
+    return std::make_unique<TracerProviderService>(std::move(tracerProvider));
 }
 
 StatusWith<std::unique_ptr<TracerProviderService>> createFileTracerProviderService(
@@ -104,12 +104,12 @@ StatusWith<std::unique_ptr<TracerProviderService>> createFileTracerProviderServi
     auto tracerProvider = opentelemetry::sdk::trace::TracerProviderFactory::Create(
         std::move(processor), makeResource(name, pid));
 
-    return std::make_unique<TracerProviderService>(std::move(tracerProvider), true);
+    return std::make_unique<TracerProviderService>(std::move(tracerProvider));
 }
 
 std::unique_ptr<TracerProviderService> createNoOpTracerProviderService() {
     LOGV2(9859700, "Not initializing OpenTelemetry");
-    return std::make_unique<TracerProviderService>(nullptr, false);
+    return std::make_unique<TracerProviderService>(nullptr);
 }
 
 }  // namespace mongo::otel::traces

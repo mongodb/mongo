@@ -23,7 +23,7 @@ public:
         // Initialize TracerProviderService with no-op provider
         auto tracerProviderService = createNoOpTracerProviderService();
         tracerProviderService->setTracerProvider_ForTest(
-            std::make_shared<opentelemetry::trace::NoopTracerProvider>());
+            std::make_unique<opentelemetry::trace::NoopTracerProvider>());
         setGlobalTracerProviderService(std::move(tracerProviderService));
     }
 
@@ -41,7 +41,7 @@ TEST_F(TraceInitializationTest, NoTraceProvider) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->getTracerProvider());
 }
 
 TEST_F(TraceInitializationTest, Shutdown) {
@@ -49,14 +49,14 @@ TEST_F(TraceInitializationTest, Shutdown) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->getTracerProvider());
 
     unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
     shutdown();
 
     tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->getTracerProvider());
 }
 
 TEST_F(TraceInitializationTest, FileTraceProvider) {
@@ -65,8 +65,9 @@ TEST_F(TraceInitializationTest, FileTraceProvider) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_TRUE(tracerProviderService->isEnabled());
-    EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
+    auto* provider = tracerProviderService->getTracerProvider();
+    ASSERT_NE(provider, nullptr);
+    EXPECT_FALSE(isNoop(provider));
 }
 
 TEST_F(TraceInitializationTest, HttpTraceProvider) {
@@ -76,8 +77,9 @@ TEST_F(TraceInitializationTest, HttpTraceProvider) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_TRUE(tracerProviderService->isEnabled());
-    EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
+    auto* provider = tracerProviderService->getTracerProvider();
+    ASSERT_NE(provider, nullptr);
+    EXPECT_FALSE(isNoop(provider));
 }
 
 TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
@@ -88,8 +90,9 @@ TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_TRUE(tracerProviderService->isEnabled());
-    EXPECT_TRUE(isNoop(tracerProviderService->getTracerProvider().get()));
+    auto* provider = tracerProviderService->getTracerProvider();
+    ASSERT_NE(provider, nullptr);
+    EXPECT_TRUE(isNoop(provider));
 }
 
 TEST_F(TraceInitializationTest, InvalidCompressionFails) {
