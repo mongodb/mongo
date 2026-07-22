@@ -41,6 +41,8 @@ last-patch:
       ticket: SERVER-121084
     - test_file: jstests/fle2/implicit_ecoc_creation.js
       ticket: SERVER-126384
+    - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
+      ticket: SERVER-131540
   suites: null
 last-continuous:
   all:
@@ -92,6 +94,8 @@ last-continuous:
       ticket: SERVER-126384
     - test_file: jstests/noPassthrough/ddl/clear_jumbo.js
       ticket: SERVER-125661
+    - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
+      ticket: SERVER-131540
     - test_file: jstests/noPassthrough/read_write_concern/read_pref.js
       ticket: SERVER-128221
     - test_file: jstests/noPassthrough/read_write_concern/read_preference_metrics_mongos.js
@@ -529,6 +533,8 @@ last-lts:
       ticket: SERVER-126384
     - test_file: jstests/noPassthrough/ddl/clear_jumbo.js
       ticket: SERVER-125661
+    - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
+      ticket: SERVER-131540
     - test_file: jstests/noPassthrough/explain_optimization_stats.js
       ticket: SERVER-92476
     - test_file: jstests/noPassthrough/ftdc/ftdc_connection_reuse.js

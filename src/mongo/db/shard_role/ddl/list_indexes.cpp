@@ -34,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/list_indexes_allowed_fields.h"
 #include "mongo/db/shard_role/ddl/list_indexes_gen.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -99,11 +100,13 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
             .getDatabaseProfileLevel(origNssOrUUID.dbName())};
 
     // TODO SERVER-104759: switch to normal acquireCollection once 9.0 becomes last LTS
-    auto [collAcq, _] = timeseries::acquireCollectionWithBucketsLookup(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, origNssOrUUID, AcquisitionPrerequisites::OperationType::kRead),
-        LockMode::MODE_IS);
+    auto [collAcq, _] = writeConflictRetry(opCtx, "listIndexes", origNssOrUUID, [&]() {
+        return timeseries::acquireCollectionWithBucketsLookup(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, origNssOrUUID, AcquisitionPrerequisites::OperationType::kRead),
+            LockMode::MODE_IS);
+    });
 
     uassert(ErrorCodes::NamespaceNotFound,
             fmt::format("ns does not exist: {}", origNssOrUUID.toStringForErrorMsg()),

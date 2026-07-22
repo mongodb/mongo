@@ -45,6 +45,7 @@
 #include "mongo/db/shard_role/ddl/list_collections_filter.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -518,264 +519,281 @@ public:
             const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbName);
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             std::vector<mongo::ListCollectionsReplyItem> firstBatch;
-            {
-                // Acquire only the global lock and set up a consistent in-memory catalog and
-                // storage snapshot.
-                AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
-                auto catalog = CollectionCatalog::get(opCtx);
+            boost::optional<Reply> exhaustiveListCollectionsReply = writeConflictRetry(
+                opCtx, "listCollections", NamespaceString(dbName), [&]() -> boost::optional<Reply> {
+                    // Reset state so retries start fresh.
+                    exec.reset();
+                    firstBatch.clear();
 
-                // The replicated fast count timestamp store is a singleton, so read it a single
-                // time for the whole response; buildCollectionBson emits it on the first eligible
-                // collection. Only emit the metadata for rawData requests (initial sync, the sole
-                // consumer, sets rawData) to avoid changing the user-facing listCollections output
-                // and to limit the added per-collection reads.
-                auto fastCountState = FastCountListCollectionsState::disabled();
-                if (isRawData && isReplicatedFastCountListCollectionsEnabled(opCtx)) {
-                    fastCountState = FastCountListCollectionsState::enabled(
-                        replicated_fast_count::ReplicatedFastCountManager::get(
-                            opCtx->getServiceContext())
-                            .findPersistedTimestampStoreTs(opCtx));
-                }
+                    // Acquire only the global lock and set up a consistent in-memory catalog and
+                    // storage snapshot.
+                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
+                    auto catalog = CollectionCatalog::get(opCtx);
 
-                CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                    &hangBeforeListCollections,
-                    opCtx,
-                    "hangBeforeListCollections",
-                    []() {},
-                    cursorNss);
+                    // The replicated fast count timestamp store is a singleton, so read it a single
+                    // time for the whole response; buildCollectionBson emits it on the first
+                    // eligible collection. Only emit the metadata for rawData requests (initial
+                    // sync, the sole consumer, sets rawData) to avoid changing the user-facing
+                    // listCollections output and to limit the added per-collection reads.
+                    auto fastCountState = FastCountListCollectionsState::disabled();
+                    if (isRawData && isReplicatedFastCountListCollectionsEnabled(opCtx)) {
+                        fastCountState = FastCountListCollectionsState::enabled(
+                            replicated_fast_count::ReplicatedFastCountManager::get(
+                                opCtx->getServiceContext())
+                                .findPersistedTimestampStoreTs(opCtx));
+                    }
 
-                auto ws = std::make_unique<WorkingSet>();
-                auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
-                std::vector<WorkingSetID> results;
-                tassert(9089302,
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &hangBeforeListCollections,
+                        opCtx,
+                        "hangBeforeListCollections",
+                        []() {},
+                        cursorNss);
+
+                    auto ws = std::make_unique<WorkingSet>();
+                    auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+                    std::vector<WorkingSetID> results;
+                    tassert(
+                        9089302,
                         "point in time catalog lookup for a collection list is not supported",
                         RecoveryUnit::ReadSource::kNoTimestamp ==
                             shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
-                if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
-                    if (auto collNames = _getExactNameMatches(matcher.get())) {
-                        for (auto&& collName : *collNames) {
-                            auto nss = NamespaceStringUtil::deserialize(dbName, collName);
+                    if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
+                        if (auto collNames = _getExactNameMatches(matcher.get())) {
+                            for (auto&& collName : *collNames) {
+                                auto nss = NamespaceStringUtil::deserialize(dbName, collName);
 
-                            // Only validate on a per-collection basis if the user requested
-                            // a list of authorized collections
-                            if (authorizedCollections &&
-                                (!as->isAuthorizedForAnyActionOnResource(
-                                    ResourcePattern::forExactNamespace(nss)))) {
-                                continue;
-                            }
-
-                            auto collBson = [&] {
-                                auto collection =
-                                    catalog->establishConsistentCollection(opCtx, nss, boost::none);
-                                if (collection) {
-                                    return buildCollectionBson(opCtx,
-                                                               collection.get(),
-                                                               nameOnly,
-                                                               isRawData,
-                                                               fastCountState);
+                                // Only validate on a per-collection basis if the user requested
+                                // a list of authorized collections
+                                if (authorizedCollections &&
+                                    (!as->isAuthorizedForAnyActionOnResource(
+                                        ResourcePattern::forExactNamespace(nss)))) {
+                                    continue;
                                 }
 
-                                std::shared_ptr<const ViewDefinition> view =
-                                    catalog->lookupView(opCtx, nss);
+                                auto collBson = [&] {
+                                    auto collection = catalog->establishConsistentCollection(
+                                        opCtx, nss, boost::none);
+                                    if (collection) {
+                                        return buildCollectionBson(opCtx,
+                                                                   collection.get(),
+                                                                   nameOnly,
+                                                                   isRawData,
+                                                                   fastCountState);
+                                    }
+
+                                    std::shared_ptr<const ViewDefinition> view =
+                                        catalog->lookupView(opCtx, nss);
+                                    // TODO SERVER-101594: remove this once 9.0 becomes last LTS
+                                    // legacy timeseries view won't exist anymore.
+                                    if (view && view->timeseries()) {
+                                        if (auto bucketsCollection =
+                                                catalog->establishConsistentCollection(
+                                                    opCtx, view->viewOn(), boost::none)) {
+                                            return buildTimeseriesBson(
+                                                opCtx, bucketsCollection.get(), nameOnly);
+                                        } else {
+                                            // The buckets collection does not exist, so the
+                                            // time-series view will be appended when we iterate
+                                            // through the view catalog below.
+                                        }
+                                    }
+
+                                    return BSONObj{};
+                                }();
+
+                                if (!collBson.isEmpty()) {
+                                    _addWorkingSetMember(opCtx,
+                                                         collBson,
+                                                         matcher.get(),
+                                                         ws.get(),
+                                                         results,
+                                                         fastCountState);
+                                }
+                            }
+                        } else {
+                            auto perCollectionWork = [&](const Collection* collection) {
                                 // TODO SERVER-101594: remove this once 9.0 becomes last LTS
-                                // legacy timeseries view won't exist anymore.
-                                if (view && view->timeseries()) {
-                                    if (auto bucketsCollection =
-                                            catalog->establishConsistentCollection(
-                                                opCtx, view->viewOn(), boost::none)) {
-                                        return buildTimeseriesBson(
-                                            opCtx, bucketsCollection.get(), nameOnly);
-                                    } else {
-                                        // The buckets collection does not exist, so the
-                                        // time-series view will be appended when we iterate
-                                        // through the view catalog below.
+                                // buckets collection ('system.buckets') won't exist anymore.
+                                if (collection->isTimeseriesCollection() &&
+                                    !collection->isNewTimeseriesWithoutView()) {
+                                    auto viewNss = collection->ns().getTimeseriesViewNamespace();
+                                    auto view =
+                                        catalog->lookupViewWithoutValidatingDurable(opCtx, viewNss);
+                                    if (view && view->timeseries() &&
+                                        (!authorizedCollections ||
+                                         as->isAuthorizedForAnyActionOnResource(
+                                             ResourcePattern::forExactNamespace(viewNss)))) {
+                                        // The time-series view for this buckets namespace exists,
+                                        // so add it here while we have the collection options.
+                                        _addWorkingSetMember(
+                                            opCtx,
+                                            buildTimeseriesBson(opCtx, collection, nameOnly),
+                                            matcher.get(),
+                                            ws.get(),
+                                            results,
+                                            fastCountState);
                                     }
                                 }
 
-                                return BSONObj{};
-                            }();
+                                if (authorizedCollections &&
+                                    (!as->isAuthorizedForAnyActionOnResource(
+                                        ResourcePattern::forExactNamespace(collection->ns())))) {
+                                    return true;
+                                }
 
-                            if (!collBson.isEmpty()) {
-                                _addWorkingSetMember(opCtx,
-                                                     collBson,
-                                                     matcher.get(),
-                                                     ws.get(),
-                                                     results,
-                                                     fastCountState);
+                                BSONObj collBson = buildCollectionBson(
+                                    opCtx, collection, nameOnly, isRawData, fastCountState);
+                                if (!collBson.isEmpty()) {
+                                    _addWorkingSetMember(opCtx,
+                                                         collBson,
+                                                         matcher.get(),
+                                                         ws.get(),
+                                                         results,
+                                                         fastCountState);
+                                }
+
+                                return true;
+                            };
+
+                            auto collections =
+                                catalog->establishConsistentCollections(opCtx, dbName);
+                            for (const auto& collection : collections) {
+                                perCollectionWork(collection.get());
                             }
                         }
-                    } else {
-                        auto perCollectionWork = [&](const Collection* collection) {
-                            // TODO SERVER-101594: remove this once 9.0 becomes last LTS
-                            // buckets collection ('system.buckets') won't exists anymore.
-                            if (collection->isTimeseriesCollection() &&
-                                !collection->isNewTimeseriesWithoutView()) {
-                                auto viewNss = collection->ns().getTimeseriesViewNamespace();
-                                auto view =
-                                    catalog->lookupViewWithoutValidatingDurable(opCtx, viewNss);
-                                if (view && view->timeseries() &&
-                                    (!authorizedCollections ||
-                                     as->isAuthorizedForAnyActionOnResource(
-                                         ResourcePattern::forExactNamespace(viewNss)))) {
-                                    // The time-series view for this buckets namespace exists,
-                                    // so add it here while we have the collection options.
-                                    _addWorkingSetMember(
-                                        opCtx,
-                                        buildTimeseriesBson(opCtx, collection, nameOnly),
-                                        matcher.get(),
-                                        ws.get(),
-                                        results,
-                                        fastCountState);
+
+                        // Skipping views is only necessary for internal cloning operations.
+                        // Skip views if filter matches makeTypeCollectionFilter() or
+                        // makeExcludeViewsFilter().
+                        bool skipViews = false;
+                        if (listCollRequest.getFilter()) {
+                            const auto& filter = *listCollRequest.getFilter();
+                            skipViews =
+                                SimpleBSONObjComparator::kInstance.evaluate(
+                                    filter == ListCollectionsFilter::makeTypeCollectionFilter()) ||
+                                SimpleBSONObjComparator::kInstance.evaluate(
+                                    filter == ListCollectionsFilter::makeExcludeViewsFilter());
+                        }
+
+                        if (!skipViews) {
+                            catalog->iterateViews(opCtx, dbName, [&](const ViewDefinition& view) {
+                                if (authorizedCollections &&
+                                    !as->isAuthorizedForAnyActionOnResource(
+                                        ResourcePattern::forExactNamespace(view.name()))) {
+                                    return true;
                                 }
-                            }
 
-                            if (authorizedCollections &&
-                                (!as->isAuthorizedForAnyActionOnResource(
-                                    ResourcePattern::forExactNamespace(collection->ns())))) {
+                                // TODO SERVER-101594: remove once 9.0 becomes last LTS
+                                // legacy timeseries view won't exist anymore.
+                                if (view.timeseries()) {
+                                    if (!catalog->lookupCollectionByNamespace(opCtx,
+                                                                              view.viewOn())) {
+                                        // There is no buckets collection backing this time-series
+                                        // view, which means that it was not already added along
+                                        // with the buckets collection above.
+                                        _addWorkingSetMember(
+                                            opCtx,
+                                            buildTimeseriesBson(opCtx, view.name(), nameOnly),
+                                            matcher.get(),
+                                            ws.get(),
+                                            results,
+                                            fastCountState);
+                                    }
+                                    return true;
+                                }
+
+                                BSONObj viewBson = buildViewBson(opCtx, view, nameOnly);
+                                if (!viewBson.isEmpty()) {
+                                    _addWorkingSetMember(opCtx,
+                                                         viewBson,
+                                                         matcher.get(),
+                                                         ws.get(),
+                                                         results,
+                                                         fastCountState);
+                                }
                                 return true;
-                            }
-
-                            BSONObj collBson = buildCollectionBson(
-                                opCtx, collection, nameOnly, isRawData, fastCountState);
-                            if (!collBson.isEmpty()) {
-                                _addWorkingSetMember(opCtx,
-                                                     collBson,
-                                                     matcher.get(),
-                                                     ws.get(),
-                                                     results,
-                                                     fastCountState);
-                            }
-
-                            return true;
-                        };
-
-                        auto collections = catalog->establishConsistentCollections(opCtx, dbName);
-                        for (const auto& collection : collections) {
-                            perCollectionWork(collection.get());
+                            });
                         }
                     }
 
-                    // Skipping views is only necessary for internal cloning operations.
-                    // Skip views if filter matches makeTypeCollectionFilter() or
-                    // makeExcludeViewsFilter().
-                    bool skipViews = false;
-                    if (listCollRequest.getFilter()) {
-                        const auto& filter = *listCollRequest.getFilter();
-                        skipViews =
-                            SimpleBSONObjComparator::kInstance.evaluate(
-                                filter == ListCollectionsFilter::makeTypeCollectionFilter()) ||
-                            SimpleBSONObjComparator::kInstance.evaluate(
-                                filter == ListCollectionsFilter::makeExcludeViewsFilter());
+                    shuffleListCommandResults.execute([&](const auto&) {
+                        std::random_device rd;
+                        std::mt19937 g(rd());
+                        std::shuffle(results.begin(), results.end(), g);
+                    });
+
+                    for (const auto& id : results) {
+                        root->pushBack(id);
                     }
 
-                    if (!skipViews) {
-                        catalog->iterateViews(opCtx, dbName, [&](const ViewDefinition& view) {
-                            if (authorizedCollections &&
-                                !as->isAuthorizedForAnyActionOnResource(
-                                    ResourcePattern::forExactNamespace(view.name()))) {
-                                return true;
-                            }
+                    exec =
+                        plan_executor_factory::make(expCtx,
+                                                    std::move(ws),
+                                                    std::move(root),
+                                                    boost::none,
+                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                    false, /* whether owned BSON must be returned */
+                                                    cursorNss);
 
-                            // TODO SERVER-101594: remove once 9.0 becomes last LTS
-                            // legacy timeseries view won't exist anymore.
-                            if (view.timeseries()) {
-                                if (!catalog->lookupCollectionByNamespace(opCtx, view.viewOn())) {
-                                    // There is no buckets collection backing this time-series
-                                    // view, which means that it was not already added along
-                                    // with the buckets collection above.
-                                    _addWorkingSetMember(
-                                        opCtx,
-                                        buildTimeseriesBson(opCtx, view.name(), nameOnly),
-                                        matcher.get(),
-                                        ws.get(),
-                                        results,
-                                        fastCountState);
-                                }
-                                return true;
-                            }
-
-                            BSONObj viewBson = buildViewBson(opCtx, view, nameOnly);
-                            if (!viewBson.isEmpty()) {
-                                _addWorkingSetMember(opCtx,
-                                                     viewBson,
-                                                     matcher.get(),
-                                                     ws.get(),
-                                                     results,
-                                                     fastCountState);
-                            }
-                            return true;
-                        });
+                    long long batchSize = std::numeric_limits<long long>::max();
+                    if (listCollRequest.getCursor() &&
+                        listCollRequest.getCursor()->getBatchSize()) {
+                        batchSize = *listCollRequest.getCursor()->getBatchSize();
                     }
-                }
 
-                shuffleListCommandResults.execute([&](const auto&) {
-                    std::random_device rd;
-                    std::mt19937 g(rd());
-                    std::shuffle(results.begin(), results.end(), g);
+                    FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
+                    for (long long objCount = 0; objCount < batchSize; objCount++) {
+                        BSONObj nextDoc;
+                        PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
+                        if (state == PlanExecutor::IS_EOF) {
+                            break;
+                        }
+                        invariant(state == PlanExecutor::ADVANCED);
+
+                        // If we can't fit this result inside the current batch, then we stash it
+                        // for later.
+                        if (!responseSizeTracker.haveSpaceForNext(nextDoc)) {
+                            exec->stashResult(nextDoc);
+                            break;
+                        }
+
+                        try {
+                            firstBatch.push_back(ListCollectionsReplyItem::parse(
+                                nextDoc,
+                                IDLParserContext("ListCollectionsReplyItem",
+                                                 auth::ValidatedTenancyScope::get(opCtx),
+                                                 cursorNss.tenantId(),
+                                                 respSerializationContext)));
+                        } catch (const DBException& exc) {
+                            LOGV2_ERROR(
+                                5254300,
+                                "Could not parse catalog entry while replying to listCollections",
+                                "entry"_attr = nextDoc,
+                                "error"_attr = exc);
+                            fassertFailed(5254301);
+                        }
+                        responseSizeTracker.add(nextDoc);
+                    }
+                    if (exec->isEOF()) {
+                        return boost::make_optional(
+                            createListCollectionsCursorReply(0 /* cursorId */,
+                                                             cursorNss,
+                                                             respSerializationContext,
+                                                             std::move(firstBatch)));
+                    }
+                    exec->saveState();
+                    exec->detachFromOperationContext();
+                    return boost::none;
                 });
 
-                for (const auto& id : results) {
-                    root->pushBack(id);
-                }
+            if (exhaustiveListCollectionsReply) {
+                return std::move(*exhaustiveListCollectionsReply);
+            }
 
-                exec = plan_executor_factory::make(expCtx,
-                                                   std::move(ws),
-                                                   std::move(root),
-                                                   boost::none,
-                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                   false, /* whether owned BSON must be returned */
-                                                   cursorNss);
-
-                long long batchSize = std::numeric_limits<long long>::max();
-                if (listCollRequest.getCursor() && listCollRequest.getCursor()->getBatchSize()) {
-                    batchSize = *listCollRequest.getCursor()->getBatchSize();
-                }
-
-                FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
-                for (long long objCount = 0; objCount < batchSize; objCount++) {
-                    BSONObj nextDoc;
-                    PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
-                    if (state == PlanExecutor::IS_EOF) {
-                        break;
-                    }
-                    invariant(state == PlanExecutor::ADVANCED);
-
-                    // If we can't fit this result inside the current batch, then we stash it
-                    // for later.
-                    if (!responseSizeTracker.haveSpaceForNext(nextDoc)) {
-                        exec->stashResult(nextDoc);
-                        break;
-                    }
-
-                    try {
-                        firstBatch.push_back(ListCollectionsReplyItem::parse(
-                            nextDoc,
-                            IDLParserContext("ListCollectionsReplyItem",
-                                             auth::ValidatedTenancyScope::get(opCtx),
-                                             cursorNss.tenantId(),
-                                             respSerializationContext)));
-                    } catch (const DBException& exc) {
-                        LOGV2_ERROR(
-                            5254300,
-                            "Could not parse catalog entry while replying to listCollections",
-                            "entry"_attr = nextDoc,
-                            "error"_attr = exc);
-                        fassertFailed(5254301);
-                    }
-                    responseSizeTracker.add(nextDoc);
-                }
-                if (exec->isEOF()) {
-                    return createListCollectionsCursorReply(0 /* cursorId */,
-                                                            cursorNss,
-                                                            respSerializationContext,
-                                                            std::move(firstBatch));
-                }
-                exec->saveState();
-                exec->detachFromOperationContext();
-            }  // Drop db lock. Global cursor registration must be done without holding any
-               // locks.
-
+            // Global cursor registration must be done without holding any locks, so we do this
+            // outside the DBLock and the write conflict retry.
             auto cmdObj = listCollRequest.toBSON();
             auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                 opCtx,
