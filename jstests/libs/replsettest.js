@@ -1542,6 +1542,19 @@ export class ReplSetTest {
                         "perform a reconfig.",
                 );
                 config.version = this.getReplSetConfigFromNode().version;
+
+                // Record the optime of the FCV transition. At this point the set is still a single
+                // node, so this is the primary's last applied optime.
+                const fcvOpTime = _getLastOpTime(this, this.getPrimary());
+
+                // Force a checkpoint on the primary NOW, while the set is still single-node and
+                // before the reconfig adds any mixed-version nodes. A last-lts/last-continuous node
+                // that joins and initial syncs from this primary copies the primary's last
+                // checkpoint. If that checkpoint predates the FCV transition the new node crashes
+                // early in initial sync because it observes an FCV state inconsistent with its
+                // binary. Forcing the checkpoint here, on the only sync source at this point,
+                // closes that window.
+                this.forceCheckpointPastOpTime(fcvOpTime, [this.getPrimary()]);
             });
         }
 
@@ -2351,6 +2364,60 @@ export class ReplSetTest {
                 "established on " +
                 id,
         );
+    }
+
+    /**
+     * Forces every data-bearing node to take a checkpoint whose recovery timestamp is at or past
+     * 'opTime'.
+     *
+     * For each node: waits for its stable timestamp to advance past 'opTime' (so a checkpoint taken
+     * now would include the transition), forces a checkpoint with {fsync: 1} rather than waiting for
+     * the periodic checkpointer, then confirms the node's lastStableRecoveryTimestamp reached
+     * 'opTime'. This ensures a node that subsequently initial syncs from any member copies a
+     * checkpoint whose FCV is consistent with what its binary can interpret.
+     */
+    forceCheckpointPastOpTime(opTime, nodes = this.nodes) {
+        let rst = this;
+        const ts = opTime.ts;
+        if (!ts) {
+            jsTest.log.info(
+                "forceCheckpointPastOpTime: no timestamp in opTime, nothing to checkpoint",
+                {opTime},
+            );
+            return;
+        }
+        jsTest.log.info("forceCheckpointPastOpTime: forcing a checkpoint past optime", {
+            opTime,
+            nodes: nodes.map((n) => n.host),
+        });
+
+        for (let node of nodes) {
+            const res = asCluster(rst, node, () =>
+                assert.commandWorked(node.adminCommand({replSetGetStatus: 1})),
+            );
+            // Arbiters do not bear data and never take data checkpoints.
+            if (res.myState === ReplSetTest.State.ARBITER) {
+                continue;
+            }
+
+            asCluster(rst, node, () => {
+                // Wait for the stable timestamp to advance past the transition so the checkpoint we
+                // force below includes it.
+                this.waitForStableTimestampTobeAdvanced(node, ts);
+                // Force the checkpoint now rather than waiting for the periodic checkpointer.
+                jsTest.log.info("forceCheckpointPastOpTime: forcing a checkpoint via fsync", {
+                    node: node.host,
+                });
+                assert.commandWorked(node.adminCommand({fsync: 1}));
+                // Confirm the node's last checkpoint advanced to/past the transition.
+                this.waitForCheckpoint(node, ts);
+            });
+        }
+
+        jsTest.log.info("forceCheckpointPastOpTime: checkpointed past optime", {
+            opTime,
+            nodes: nodes.map((n) => n.host),
+        });
     }
 
     // Wait until the optime of the specified type reaches the primary or the targetNode's last
