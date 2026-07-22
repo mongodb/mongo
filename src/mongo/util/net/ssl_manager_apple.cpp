@@ -72,12 +72,27 @@ StatusWith<std::string> toString(::CFStringRef str) {
         return std::string();
     }
 
+    // Convert with CFStringGetBytes, which reports the true byte count, rather than treating the
+    // result as a C string: a certificate name with an embedded NUL would otherwise truncate at the
+    // NUL and spoof hostname/subject matching.
     std::string ret;
-    ret.resize(len + 1);
-    if (!::CFStringGetCString(str, &ret[0], len, ::kCFStringEncodingUTF8)) {
+    ret.resize(len);
+    ::CFIndex byteLen = 0;
+    if (::CFStringGetBytes(str,
+                           ::CFRangeMake(0, ::CFStringGetLength(str)),
+                           ::kCFStringEncodingUTF8,
+                           0,      // lossByte
+                           false,  // isExternalRepresentation
+                           reinterpret_cast<UInt8*>(ret.data()),
+                           len,
+                           &byteLen) == 0) {
         return Status(ErrorCodes::InternalError, "Unable to convert CoreFoundation string");
     }
-    ret.resize(strlen(ret.c_str()));
+    ret.resize(byteLen);
+    if (ret.find('\0') != std::string::npos) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      "String from certificate contains an embedded null byte");
+    }
     return ret;
 }
 

@@ -3427,8 +3427,21 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         for (int i = 0; i < sanNamesList; i++) {
             const GENERAL_NAME* currentName = sk_GENERAL_NAME_value(sanNames, i);
             if (currentName && currentName->type == GEN_DNS) {
-                std::string dnsName(
-                    reinterpret_cast<char*>(ASN1_STRING_data(currentName->d.dNSName)));
+                // Build the dNSName from its ASN.1 length, not as a C string: an IA5String may
+                // contain an embedded NUL that would truncate the name and spoof the match. Skip
+                // malformed entries (a real DNS name never contains a NUL).
+                const unsigned char* dnsNameData = ASN1_STRING_get0_data(currentName->d.dNSName);
+                const int dnsNameLen = ASN1_STRING_length(currentName->d.dNSName);
+                if (!dnsNameData || dnsNameLen < 0) {
+                    certificateNames << "<invalid SAN entry skipped>, ";
+                    continue;
+                }
+                std::string dnsName(reinterpret_cast<const char*>(dnsNameData),
+                                    static_cast<size_t>(dnsNameLen));
+                if (dnsName.find('\0') != std::string::npos) {
+                    certificateNames << "<invalid SAN entry skipped>, ";
+                    continue;
+                }
                 auto swCIDRDNSName = CIDR::parse(dnsName);
                 if (swCIDRDNSName.isOK()) {
                     LOGV2_WARNING(23237,

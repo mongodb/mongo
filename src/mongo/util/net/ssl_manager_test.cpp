@@ -238,6 +238,19 @@ TEST(SSLManager, matchHostname) {
     ASSERT_FALSE(failure);
 }
 
+TEST(SSLManager, matchHostnameRejectsEmbeddedNull) {
+    // SERVER-130792: a NUL-bearing certificate name must never match. The ""s literals preserve the
+    // embedded NUL (a plain C-string literal would itself truncate at it).
+    using namespace std::string_literals;
+    ASSERT_FALSE(
+        hostNameMatchForX509Certificates("target.example.com", "target.example.com\0.evil.com"s));
+    ASSERT_FALSE(hostNameMatchForX509Certificates("target", "target\0.evil.com"s));
+    ASSERT_FALSE(
+        hostNameMatchForX509Certificates("target.example.com\0.evil.com"s, "target.example.com"));
+    // A wildcard cert name with an embedded NUL must not match either.
+    ASSERT_FALSE(hostNameMatchForX509Certificates("foo.bar.bas", "*.bar.bas\0.evil.com"s));
+}
+
 std::vector<RoleName> getSortedRoles(const stdx::unordered_set<RoleName>& roles) {
     std::vector<RoleName> vec;
     vec.reserve(roles.size());

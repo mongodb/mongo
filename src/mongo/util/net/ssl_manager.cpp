@@ -1355,6 +1355,14 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
 
 // TODO SERVER-11601 Use NFC Unicode canonicalization
 bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
+    // Defense-in-depth: reject any NUL-bearing name so the comparisons below cannot be tricked into
+    // matching only the prefix before the NUL. Callers should already extract SAN/CN values by
+    // their true length and drop such entries.
+    if (nameToMatch.find('\0') != std::string::npos ||
+        certHostName.find('\0') != std::string::npos) {
+        return false;
+    }
+
     nameToMatch = removeFQDNRoot(std::move(nameToMatch));
     certHostName = removeFQDNRoot(std::move(certHostName));
 
