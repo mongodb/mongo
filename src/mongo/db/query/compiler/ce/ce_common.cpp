@@ -7,10 +7,13 @@
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/matcher/path.h"
 
 #include <algorithm>
 #include <concepts>
+#include <string>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -110,92 +113,122 @@ public:
  * This is used to approximate the transformation a multikey index would apply.
  *
  * As multikey indexes only permit a single array-valued index key component for a given document,
- * it is asserted that any provided document meets this expectation.
+ * it is asserted that any provided document meets this expectation. For instance, for input fields
+ * of {a, b}:
  *
  * {a:1, b:[1, 2]} -> (1, 1), (1, 2) // Ok
  * {a:[1, 2], b:1} -> (1, 1), (2, 1) // Ok
  * {a:[1, 2], b:[1, 2]} -> XXX // Assertion failure
+ *
+ * For dotted paths that share an array-valued prefix (e.g. 'a' and 'a.b' when 'a' is an array),
+ * the behavior matches BtreeKeyGenerator: each outer array element is visited once, and all field
+ * paths are resolved relative to that element. Under regular $eq semantics, scalar elements produce
+ * null for any remaining sub-path (e.g. element '1' yields null for 'a.b'); under $expr $eq the
+ * remaining sub-path stays missing (EOO). For example, for input fields {a, a.b}:
+ *
+ * {a:[{b:0}, {b:0}, 1]} -> ({b:0}, 0), ({b:0}, 0), (1, null)
+ *
+ * Here 'a' and 'a.b' both resolve against the same outer array. The scalar element '1' has no
+ * embedded 'b', so 'a.b' yields null for it. This is *not* a parallel-array case; the assertion
+ * only fires when two fields resolve to two genuinely distinct arrays.
  */
 class ArrayUnwindProjector {
 public:
-    ArrayUnwindProjector(const std::vector<FieldPathAndEqSemantics>& fields) : fields(fields) {
-        fieldsInDoc.reserve(fields.size());
-        iterators.reserve(fields.size());
-        for (const auto& field : fields) {
-            iterators.emplace_back(ElementPath{field.path.fullPath(),
-                                               ElementPath::LeafArrayBehavior::kTraverseOmitArray,
-                                               ElementPath::NonLeafArrayBehavior::kTraverse},
-                                   BSONElementIterator());
-        }
-    }
+    ArrayUnwindProjector(const std::vector<FieldPathAndEqSemantics>& fields) : _fields(fields) {}
 
     void operator()(const BSONObj& doc, std::invocable<std::vector<BSONElement>> auto&& callback) {
-        fieldsInDoc.clear();
-
-        for (auto& [path, iter] : iterators) {
-            iter.reset(&path, doc);
+        // Seed the recursion with the full, still-unresolved paths and an all-null value tuple.
+        std::vector<std::string_view> paths(_fields.size());
+        for (size_t i = 0; i < _fields.size(); ++i) {
+            paths[i] = _fields[i].path.fullPath();
         }
+        _processObj(
+            doc, std::move(paths), std::vector<BSONElement>(_fields.size(), kNullElt), callback);
+    }
 
-        // Exactly zero or one path may include an array if there is a multikey index over the
-        // provided fields.
-        // If an array is encountered, retain the index of the field/iterator required to "flatten"
-        // the array into multiple keys.
-        boost::optional<size_t> multiKeyFieldIndex;
+private:
+    // Recursively projects 'obj' down to one key tuple per array-element combination, mirroring
+    // BtreeKeyGenerator::_getKeysWithArray + _getKeysArrEltFixed.
+    //
+    // Invariant: for each field 'i', 'paths[i]' is the portion of the path still to be resolved
+    // (empty once fully resolved) and 'values[i]' is its value resolved so far. The recursion
+    // resolves fields against 'obj' until the first array is hit, then unwinds that array,
+    // resolving any remaining path suffixes against each element in a recursive call.
+    void _processObj(const BSONObj& obj,
+                     std::vector<std::string_view> paths,
+                     std::vector<BSONElement> values,
+                     std::invocable<std::vector<BSONElement>> auto&& callback) const {
+        // Phase 1: resolve each unresolved field against 'obj', stopping at the first array. Fields
+        // that hit the same array are correlated and unwound together below.
+        BSONElement arrElt;
+        std::vector<size_t> arrIdxs;
 
-        for (size_t idx = 0; idx < fields.size(); ++idx) {
-            const auto& field = fields[idx];
-
-            auto& it = iterators[idx].second;
-
-            if (!it.more()) {
-                // This document has an empty array at this path, so this iteration mode
-                // (traversing arrays) reports no values. A multikey index represents this as an
-                // undefined key.
-                fieldsInDoc.push_back(kUndefinedElt);
+        for (size_t i = 0; i < _fields.size(); ++i) {
+            // An empty path indicates it's fully resolved.
+            if (paths[i].empty()) {
                 continue;
             }
-            const auto elt = it.next();
-            if (elt.element().eoo() && !field.isExprEq) {
-                // Use $eq equality semantics, which consider null & missing to be equal.
-                fieldsInDoc.push_back(kNullElt);
-            } else {
-                // Use $expr equality semantics.
-                fieldsInDoc.push_back(elt.element());
-            }
 
-            if (it.more()) {
-                // This element of the index is multikey. There can be only one for a given doc
-                // in a given index.
-                tassert(10061113,
-                        "Parallel arrays are not supported; at most one index field may be "
-                        "array-valued per document",
-                        !multiKeyFieldIndex);
-                multiKeyFieldIndex = idx;
+            // extractElementAtOrArrayAlongDottedPath advances 'p' past the consumed prefix and
+            // stops at the first array along the path (if any).
+            const char* p = paths[i].data();
+            BSONElement elt = bson::extractElementAtOrArrayAlongDottedPath(obj, p);
+
+            if (elt.eoo()) {
+                // Path is missing. Under $eq semantics null == missing; under $expr keep the EOO.
+                values[i] = _fields[i].isExprEq ? elt : kNullElt;
+                paths[i] = {};
+            } else if (elt.type() == BSONType::array) {
+                // The unwind point. Only one distinct array may be indexed per document, so any
+                // other field reaching a *different* array is a genuine parallel-array case.
+                uassert(10061118,
+                        "Parallel arrays are not supported",
+                        arrElt.eoo() || elt.rawdata() == arrElt.rawdata());
+                arrElt = elt;
+                paths[i] = std::string_view{p};  // remaining suffix after the array
+                arrIdxs.push_back(i);
+            } else {
+                // Scalar (or subobject) leaf value; the field is fully resolved.
+                values[i] = elt;
+                paths[i] = {};
             }
         }
 
-        tassert(
-            10061112, "Unexpected number of fields in tuple", fieldsInDoc.size() == fields.size());
+        // Phase 2 (base case): no array was found, so every field is resolved -- emit one tuple.
+        if (arrElt.eoo()) {
+            callback(values);
+            return;
+        }
 
-        callback(fieldsInDoc);
+        // Phase 3: unwind the shared array. For each element, pin terminal fields (those whose
+        // remaining path ended at the array) to the element value, then recurse into the element's
+        // embedded object to resolve any deeper suffixes. Non-object elements recurse into an empty
+        // object, so their remaining suffixes resolve to null.
+        auto processElement = [&](const BSONElement& elem) {
+            auto pathsCopy = paths;
+            auto valuesCopy = values;
+            for (size_t i : arrIdxs) {
+                if (pathsCopy[i].empty()) {
+                    valuesCopy[i] = elem;
+                }
+            }
+            BSONObj sub = elem.type() == BSONType::object ? elem.embeddedObject() : BSONObj{};
+            _processObj(sub, std::move(pathsCopy), std::move(valuesCopy), callback);
+        };
 
-        if (multiKeyFieldIndex) {
-            auto idx = *multiKeyFieldIndex;
-            auto& iter = iterators[idx].second;
-            while (iter.more()) {
-                fieldsInDoc[idx] = iter.next().element();
-                callback(fieldsInDoc);
+        BSONObj arrObj = arrElt.embeddedObject();
+        if (arrObj.isEmpty()) {
+            // Empty array: emit one key with undefined for terminal fields (matching btree
+            // behavior).
+            processElement(kUndefinedElt);
+        } else {
+            for (const auto& elem : arrObj) {
+                processElement(elem);
             }
         }
     }
 
-    const std::vector<FieldPathAndEqSemantics>& fields;
-
-    // Scratch space for accumulating projected fields, avoids reallocating this vector for each
-    // document.
-    std::vector<BSONElement> fieldsInDoc;
-    // Pre-constructed iterators (and referenced paths) to avoid constructing for every document.
-    std::vector<std::pair<ElementPath, BSONElementIterator>> iterators;
+    const std::vector<FieldPathAndEqSemantics>& _fields;
 };
 
 namespace filter {
