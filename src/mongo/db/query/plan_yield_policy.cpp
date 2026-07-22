@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/plan_yield_policy.h"
 
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -111,7 +112,11 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
         if (_callbacks) {
             _callbacks->preCheckInterruptOnly(opCtx);
         }
-        return opCtx->checkForInterruptNoAssert();
+        if (Status status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
+            return status;
+        }
+        // Query-memory load shedding for classic PlanStages and interrupt-only SBE execution.
+        return queryMemoryCheckLoadShedding(opCtx);
     }
 
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
@@ -184,6 +189,8 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     // query execution. Yield points and interrupt points are one and the same.
     if (getPolicy() == PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
         opCtx->checkForInterrupt();  // throws
+        // Query-memory load shedding for classic PlanStages and yielding SBE execution.
+        uassertStatusOK(queryMemoryCheckLoadShedding(opCtx));
     }
 
     // After we've abandoned our snapshot, perform any work before yielding transaction resources.

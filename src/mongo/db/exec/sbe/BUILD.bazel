@@ -113,6 +113,23 @@ mongo_cc_library(
     ],
 )
 
+# The out-of-line query-memory load-shedding shim called from the CanInterrupt inline in stages.h.
+# It lives in its own leaf so both query_sbe_storage (lower layer) and query_sbe_stages (which
+# depends on query_sbe_storage) can link the symbol without a dependency cycle, and so the widely
+# included stages.h header does not pull the load-shedding library into every SBE compile.
+mongo_cc_library(
+    name = "query_sbe_load_shedding_shim",
+    srcs = [
+        "//src/mongo/db/exec/sbe/stages:stages.cpp",
+    ],
+    deps = [
+        ":query_sbe",
+        "//src/mongo:base",
+        "//src/mongo/db/memory_tracking:query_memory_load_shedding",
+        "//src/mongo/db/query:plan_yield_policy_sbe",
+    ],
+)
+
 mongo_cc_library(
     name = "query_sbe_stages",
     srcs = [
@@ -151,6 +168,7 @@ mongo_cc_library(
     ],
     deps = [
         ":query_sbe",
+        ":query_sbe_load_shedding_shim",
         ":query_sbe_plan_stats",
         ":query_sbe_storage",
         "//src/mongo/bson/dotted_path:dotted_path_support",
@@ -160,6 +178,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/memory_tracking:query_memory_load_shedding",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/query:plan_yield_policy",
         "//src/mongo/db/query:plan_yield_policy_sbe",
@@ -191,6 +210,7 @@ mongo_cc_library(
     ],
     deps = [
         ":query_sbe",
+        ":query_sbe_load_shedding_shim",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:preallocated_container_pool",

@@ -211,6 +211,8 @@ mongo_cc_library(
         "//src/mongo/db/commands/query_cmd:search_index_commands",
         "//src/mongo/db/ftdc:ftdc_server",
         "//src/mongo/db/matcher:expressions_mongod_only",
+        "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/memory_tracking:query_memory_load_shedding",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:map_reduce_output_format",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",

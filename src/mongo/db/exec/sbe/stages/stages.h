@@ -567,6 +567,13 @@ private:
 };
 
 /**
+ * Evaluates the query-memory load-shedding decision. This is deliberately *not* inlined here:
+ * stages.h is included widely, and inlining the call would force every includer to depend on the
+ * query_memory_load_shedding library.
+ */
+void checkForQueryMemoryLoadShedding(OperationContext* opCtx);
+
+/**
  * Provides a method which can be used to check if the current operation has been interrupted.
  * Maintains an internal state to maintain the interrupt check period. Also responsible for
  * triggering yields if this object has been configured with a yield policy.
@@ -640,6 +647,9 @@ public:
         if (--_interruptCounter == 0) {
             _interruptCounter = kInterruptCheckPeriod;
             opCtx->checkForInterrupt();
+            // Evaluate the query-memory load shedding decision. We also do this in
+            // PlanYieldPolicy::yieldOrInterrupt for the yielding path.
+            checkForQueryMemoryLoadShedding(opCtx);
         }
     }
 

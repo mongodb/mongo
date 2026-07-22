@@ -15,6 +15,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/database_name_util.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -218,6 +220,8 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             globalOpCounters().gotAggregate();
+
+            markOperationQueryMemorySheddingEligible(opCtx);
 
             if (_liteParsedPipeline.hasChangeStream()) {
                 change_stream::recordCursorOptionMetrics(request().getCursor().getBatchSize(),

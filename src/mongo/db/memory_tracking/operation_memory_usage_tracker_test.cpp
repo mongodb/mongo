@@ -3,6 +3,7 @@
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"

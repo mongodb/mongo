@@ -1335,6 +1335,11 @@ error_codes:
       name: DDLCoordinatorMustRetryDueToFCVTransition,
       categories: [InternalOnly],
     }
+  - {
+      code: 521,
+      name: QueryMemoryLimitExceeded,
+      categories: [SystemOverloadedError, RetriableError],
+    }
 
   # ^^^^
   # Add new codes, sequentially numbered, above.

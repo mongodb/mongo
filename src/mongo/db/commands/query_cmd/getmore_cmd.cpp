@@ -21,6 +21,8 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
@@ -854,6 +856,8 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             const auto& cmd = request();
+            // A memory shedding kill will also kill the underlying cursor, so this can free
+            markOperationQueryMemorySheddingEligible(opCtx);
             // Gets the number of write ops in the current multidocument transaction.
             auto getNumTxnOps = [opCtx]() -> boost::optional<size_t> {
                 if (opCtx->inMultiDocumentTransaction()) {

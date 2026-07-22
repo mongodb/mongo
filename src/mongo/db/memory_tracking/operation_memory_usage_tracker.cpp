@@ -6,7 +6,9 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 
 #include <limits>
 
@@ -131,6 +133,7 @@ std::unique_ptr<OperationMemoryUsageTracker> OperationMemoryUsageTracker::moveFr
     OperationContext* opCtx) {
     std::unique_ptr<OperationMemoryUsageTracker> tracker = std::move(_getFromOpCtx(opCtx));
     if (tracker) {
+        // The tracker outlives its opCtx while stashed on the cursor between getMores.
         tracker->_opCtx = nullptr;
     }
     return tracker;
@@ -149,6 +152,10 @@ void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
 
 bool OperationMemoryUsageTracker::hasTrackerOnOpCtx(OperationContext* opCtx) {
     return _getFromOpCtx(opCtx) != nullptr;
+}
+
+OperationMemoryUsageTracker* OperationMemoryUsageTracker::getIfExists(OperationContext* opCtx) {
+    return _getFromOpCtx(opCtx).get();
 }
 
 void OperationMemoryUsageTracker::rebindToOperation(SimpleMemoryUsageTracker& tracker,

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,6 +7,47 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "query_memory_load_shedding_gen",
+    src = "query_memory_load_shedding.idl",
+)
+
+mongo_cc_library(
+    name = "query_memory_load_shedding",
+    srcs = [
+        "query_memory_load_shedding.cpp",
+        ":query_memory_load_shedding_gen",
+    ],
+    hdrs = [
+        "query_memory_load_shedding.h",
+    ],
+    deps = [
+        ":memory_tracking",
+        "//src/mongo:base",
+        "//src/mongo/db:cluster_role",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/query:query_lifespan",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/otel/metrics:metric_unit",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_memory_server_status_section",
+    srcs = [
+        "query_memory_server_status_section.cpp",
+    ],
+    deps = [
+        ":query_memory_load_shedding",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
 )
 
 mongo_cc_library(
@@ -51,6 +92,31 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "query_memory_load_shedding_bm",
+    srcs = ["query_memory_load_shedding_bm.cpp"],
+    tags = ["query_bm"],
+    deps = [":query_memory_load_shedding"],
+)
+
+mongo_cc_unit_test(
+    name = "query_memory_load_shedding_test",
+    srcs = [
+        "query_memory_load_shedding_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":memory_tracking",
+        ":query_memory_load_shedding",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/query:query_lifespan",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/unittest",
     ],
 )
 

@@ -9,6 +9,7 @@
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -130,6 +131,10 @@ ExpressionContext::CollatorStash::~CollatorStash() {
 void ExpressionContext::InterruptChecker::checkForInterruptVerySlow() {
     _verySlowTick = kVerySlowInterruptCheckPeriod;
     CurOp::get(_expressionContext->getOperationContext())->maybeLogSlowQuery();
+}
+
+void ExpressionContext::InterruptChecker::checkForQueryMemoryLoadShedding(OperationContext* opCtx) {
+    uassertStatusOK(queryMemoryCheckLoadShedding(opCtx));
 }
 
 std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(

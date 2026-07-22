@@ -1,0 +1,64 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    mod_visibility: public
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/memory_tracking/query_memory_load_shedding.h"
+
+server_parameters:
+    # Probabilistic query-memory load shedding. See README.query_memory_load_shedding.md.
+    queryMemoryLoadSheddingLowMarkPercent:
+        description: >-
+            RSS, as a percentage of the process memory limit, at or below which no shedding occurs.
+            Between this and the high-water mark the shed probability rises from 0 to 1. -1 (default)
+            disables load shedding entirely, so the feature ships dark.
+        set_at: [startup, runtime]
+        cpp_varname: gQueryMemoryLoadSheddingLowMarkPercent
+        cpp_vartype: AtomicWord<int32_t>
+        on_update: onUpdateQueryMemoryLoadSheddingEnablement
+        default: -1
+        validator:
+            gte: -1
+            lte: 100
+            callback: validateQueryMemoryLoadSheddingLowMark
+        redact: false
+    queryMemoryLoadSheddingHighMarkPercent:
+        description: >-
+            RSS, as a percentage of the process memory limit, at or above which every eligible
+            operation is shed (shed probability 1). Must be greater than the low-water mark.
+        set_at: [startup, runtime]
+        cpp_varname: gQueryMemoryLoadSheddingHighMarkPercent
+        cpp_vartype: AtomicWord<int32_t>
+        default: 85
+        validator:
+            gte: 0
+            lte: 100
+            callback: validateQueryMemoryLoadSheddingHighMark
+        redact: false
+    queryMemoryLoadSheddingSizeReferenceBytes:
+        description: >-
+            Reference operation size, in bytes: an operation of this size has a 50% chance of being
+            shed per second when RSS is midway between the water marks -- equivalently, a one-second
+            shed half-life at mid-pressure. Shedding rate is proportional to tracked memory divided
+            by this, so an operation at twice the reference is shed twice as fast (a half-second
+            half-life) and one well below it is effectively never shed until pressure nears the high
+            mark.
+        set_at: [startup, runtime]
+        cpp_varname: gQueryMemoryLoadSheddingSizeReferenceBytes
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 32 * 1024 * 1024
+        validator: {gt: 0, lte: {expr: 1024 * 1024 * 1024}}
+        redact: false
+    queryMemoryRssMonitorIntervalMillis:
+        description: >-
+            How often the built-in monitor samples RSS, in milliseconds. Startup-only: read once when
+            the monitor's periodic job is created.
+        set_at: [startup]
+        cpp_varname: gQueryMemoryRssMonitorIntervalMillis
+        cpp_vartype: AtomicWord<int32_t>
+        default: 100
+        validator: {gte: 1, lte: 3600000}
+        redact: false

@@ -26,6 +26,8 @@
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -386,6 +388,10 @@ void runClusterAggregate(OperationContext* opCtx,
 void runAggregate(OperationContext* opCtx,
                   AggregateCommandRequest aggRequest,
                   std::function<void(const BSONObj&)> callbackFn) {
+    // Opt in to query-memory load shedding: analyzeShardKey's metrics aggregations are heavy
+    // diagnostic work for which a retryable back-off under memory pressure is acceptable.
+    markOperationQueryMemorySheddingEligible(opCtx);
+
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         return runClusterAggregate(opCtx, aggRequest, callbackFn);
     }
