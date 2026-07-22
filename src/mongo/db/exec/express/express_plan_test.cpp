@@ -496,7 +496,7 @@ TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonRejectsElementOverrunningO
 
 DEATH_TEST_REGEX(ExpressUpdateMalformedRecord,
                  MalformedFetchedRecordTripsUpdateInPlaceInvariant,
-                 R"(offset \+ elt\.size)") {
+                 R"(offset \+ elementSize <= object\.objsize\(\))") {
     // Deterministic repro of the crash: a record whose string element length overruns objsize (as
     // from a torn disagg page read) trips the getElementOffset() invariant once the update
     // machinery builds an in-place mutablebson::Document over it. The boundary validation added in
