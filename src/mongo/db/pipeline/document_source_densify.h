@@ -242,9 +242,9 @@ public:
         MutableDocument spec;
         spec[kArgStep] = opts.serializeLiteral(_step);
         spec[kArgBounds] =
-            visit(OverloadedVisitor{[&](Full) { return Value(kValFull); },
-                                    [&](Partition) { return Value(kValPartition); },
-                                    [&](ExplicitBounds bounds) {
+            visit(OverloadedVisitor{[&](const Full&) { return Value(kValFull); },
+                                    [&](const Partition&) { return Value(kValPartition); },
+                                    [&](const ExplicitBounds& bounds) {
                                         return Value(std::vector<Value>(
                                             {opts.serializeLiteral(bounds.first.toValue()),
                                              opts.serializeLiteral(bounds.second.toValue())}));
