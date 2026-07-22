@@ -652,7 +652,7 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
         # Ensure/refresh server & pid before we run (helps produce a fresh pidfile too).
         if ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
-            echo "[retry ${i}] Bazel server not running (likely OOM/killed); restarting…" >&2
+            echo "[retry ${i}] Bazel server not running; starting…" >&2
             "$BAZEL_BINARY" info >/dev/null 2>&1 || true
             bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
         fi
@@ -719,6 +719,11 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             fi
         fi
 
+        local has_next_attempt=false
+        if [[ "$i" -lt "$attempts" ]]; then
+            has_next_attempt=true
+        fi
+
         if bazel_evergreen_shutils::is_timeout_exit_code "$RET" "$timeout_str" "$timeout_duration" "$attempt_elapsed_seconds"; then
             if [[ $RET -eq 137 ]]; then
                 echo "Bazel timed out and was force-killed after SIGQUIT." >&2
@@ -729,18 +734,24 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             bazel_evergreen_shutils::capture_bazel_jvm_out "$BAZEL_BINARY" "$attempt_bazel_server_pid" >/dev/null || true
             bazel_evergreen_shutils::terminate_bazel_servers || true
         elif ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
-            echo "[retry ${i}] Bazel server down (OOM/killed). Enabling OOM guard for next attempt and restarting…" >&2
-            use_oom_guard=true
-            "$BAZEL_BINARY" shutdown || true
-            "$BAZEL_BINARY" info >/dev/null 2>&1 || true
-            bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
-        else
-            if [[ ${RETRY_ON_FAIL:-0} -eq 1 ]]; then
-                echo "Bazel failed (exit=$RET); restarting server before retry..." >&2
+            if $has_next_attempt; then
+                echo "[retry ${i}] Bazel server exited unexpectedly (possibly OOM/killed). Enabling OOM guard for next attempt and restarting…" >&2
+                use_oom_guard=true
                 "$BAZEL_BINARY" shutdown || true
+                "$BAZEL_BINARY" info >/dev/null 2>&1 || true
+                bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
             else
+                echo "[retry ${i}] Bazel server exited unexpectedly (possibly OOM/killed)." >&2
+            fi
+        else
+            if [[ ${RETRY_ON_FAIL:-0} -ne 1 ]] || ! $has_next_attempt; then
                 break
             fi
+            echo "Bazel failed (exit=$RET); retrying with existing server..." >&2
+        fi
+
+        if ! $has_next_attempt; then
+            break
         fi
 
         sleep 60
