@@ -383,3 +383,6 @@ filters:
   - "metrics_filtering_util*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "metrics_policy_manager*":
+    approvers:
+      - 10gen/server-networking-and-observability

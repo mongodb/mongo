@@ -2633,6 +2633,7 @@ mongo_cc_library(
         "keys_collection_client_direct",
         "//src/mongo/db/topology/vector_clock:logical_time_metadata_hook",
         "//src/mongo/db/matcher:expressions_mongod_only",
+        "metrics_policy_manager_impl",
         "mirror_maestro",
         "mongod_options",
         "mongod_options_init",
@@ -3664,6 +3665,7 @@ mongo_cc_benchmark(
     srcs = ["crud_bm.cpp"],
     tags = ["sep_bm"],
     deps = [
+        ":metrics_policy_manager_impl",
         ":mongod_options_init",
         ":read_write_concern_defaults_mock",
         ":server_base",
@@ -3914,4 +3916,62 @@ mongo_cc_unit_test(
         ":metrics_filtering_util_test_helpers",
         "//src/mongo/unittest",
     ],
+)
+
+mongo_cc_library(
+    name = "metrics_policy_manager",
+    srcs = [
+        "metrics_policy_manager.cpp",
+    ],
+    hdrs = [
+        "metrics_policy_manager.h",
+    ],
+    deps = [
+        ":metrics_filtering_util",
+        ":service_context",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "metrics_policy_manager_default",
+    srcs = [
+        "metrics_policy_manager_default.cpp",
+    ],
+    hdrs = [
+        "metrics_policy_manager_default.h",
+    ],
+    deps = [
+        ":metrics_policy_manager",
+        ":service_context",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "metrics_policy_manager_default_test",
+    srcs = [
+        "metrics_policy_manager_default_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":metrics_policy_manager",
+        ":metrics_policy_manager_default",
+        ":service_context",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "metrics_policy_manager_impl",
+    deps = [
+        ":metrics_policy_manager_default",
+        ":service_context",
+        "//src/mongo:base",
+    ] + select({
+        "//bazel/config:build_atlas_required_settings": [
+            "//src/mongo/db/modules/atlas/src/disagg_storage:metrics_policy_manager_disagg",
+        ],
+        "//conditions:default": [],
+    }),
 )
