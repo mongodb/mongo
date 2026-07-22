@@ -73,14 +73,10 @@ MONGO_FAIL_POINT_DEFINE(asyncConnectReturnsConnectionError);
 
 boost::optional<TelemetryContextSection> AsyncDBClient::makeEgressTelemetrySection(
     const executor::RemoteCommandRequest& request, int maxWireVersion) {
-    if (!request.telemetryContext) {
-        return boost::none;
-    }
     // std::numeric_limits<int>::max() is the StreamableReplicaSetMonitor sentinel for an unknown
     // topology; do not send the telemetry section in that case.
     if (maxWireVersion < WireVersion::WIRE_VERSION_90 ||
-        maxWireVersion == std::numeric_limits<int>::max() ||
-        !otel::traces::isTracingEnabled(request.opCtx)) {
+        maxWireVersion == std::numeric_limits<int>::max()) {
         return boost::none;
     }
     return otel::traces::toWireType(request.telemetryContext.get());
