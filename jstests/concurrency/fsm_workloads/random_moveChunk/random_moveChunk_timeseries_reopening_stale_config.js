@@ -104,6 +104,15 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             "Workload did not perform any archive-based bucket reopenings",
         );
 
+        // Verify that no duplicate measurements were inserted.
+        const coll = db[collName];
+        const dupes = coll
+            .aggregate([{$group: {_id: "$_id", n: {$sum: 1}}}, {$match: {n: {$gt: 1}}}])
+            .toArray();
+        assert.eq(dupes.length, 0, "Found duplicate measurements in the time-series collection", {
+            dupes,
+        });
+
         $super.teardown.apply(this, arguments);
     };
 
