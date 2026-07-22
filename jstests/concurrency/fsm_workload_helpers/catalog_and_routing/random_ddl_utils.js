@@ -32,3 +32,62 @@ export function getRandomDbName(threadCount, dbNames) {
 export function getRandomCollName(threadCount, collNames) {
     return collNames[Random.randInt(threadCount * threadCount) % collNames.length];
 }
+
+/**
+ * Repeatedly blocks writes on one random shard for a bounded duration. Intended to run as a
+ * ParallelTester Thread entry point, independently of FSM workers, so a DDL that is paused by a
+ * write block is always eventually unblocked even when every worker is waiting.
+ */
+export function runWriteBlockToggler(
+    shards,
+    stopLatch,
+    writeBlockReason,
+    maxWriteBlockTimeMS,
+    unblockedTimeMS,
+    randomSeed,
+    allowDeletions,
+) {
+    Random.setRandomSeed(randomSeed);
+    const transientContentionCodes = [
+        ErrorCodes.LockBusy,
+        ErrorCodes.LockTimeout,
+        ErrorCodes.ConflictingOperationInProgress,
+    ];
+    while (stopLatch.getCount() > 0) {
+        const shard = shards[Random.randInt(shards.length)];
+        const shardAdminDB = new Mongo(shard.host, undefined, {gRPC: false}).getDB("admin");
+
+        jsTest.log.info("Enabling replica set write block", {shard: shard.name});
+        assert.soon(() => {
+            const res = shardAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: allowDeletions,
+                reason: writeBlockReason,
+            });
+            if (res.ok) {
+                return true;
+            }
+            assert.contains(res.code, transientContentionCodes, () => tojson(res));
+            return false;
+        }, "Failed to enable replica set write block");
+        sleep(maxWriteBlockTimeMS);
+        assert.soon(() => {
+            const res = shardAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: false,
+                reason: writeBlockReason,
+            });
+            if (res.ok) {
+                return true;
+            }
+            assert.contains(res.code, transientContentionCodes, () => tojson(res));
+            return false;
+        }, "Failed to disable replica set write block");
+        jsTest.log.info("Disabled replica set write block", {shard: shard.name});
+
+        // Leave writes unblocked for a while before the next block to avoid starving a concurrent
+        // DDL operation on the DDL lock.
+        sleep(unblockedTimeMS);
+    }
+}
