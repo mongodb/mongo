@@ -318,6 +318,7 @@ let testCases = {
     listCommands: {skip: "does not return user data"},
     listDatabases: {skip: "primary only"},
     listIndexes: {skip: "primary only"},
+    listMetricsFilteringAllowlist: {skip: "does not return user data"},
     listSearchIndexes: {skip: "does not return user data"},
     listShards: {skip: "does not return user data"},
     lockInfo: {skip: "does not return user data"},

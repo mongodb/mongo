@@ -22,6 +22,7 @@ const fullNs = dbName + "." + collName;
 
 // Skip reasons.
 const isAnInternalCommand = "internal command";
+const isTestOnlyCommand = "test-only command";
 const requiresParallelShell = "requires parallel shell";
 const requiresCursor = "requires a pre-existing cursor";
 
@@ -227,6 +228,7 @@ const allCommands = {
         standbyAllowed: true,
     },
     listIndexes: {command: {listIndexes: collName}},
+    listMetricsFilteringAllowlist: {skip: isTestOnlyCommand},
     listSearchIndexes: {skip: "requires mongot mock setup"},
     listShards: {command: {listShards: 1}, isAdminCommand: true},
     lockInfo: {command: {lockInfo: 1}, isAdminCommand: true},

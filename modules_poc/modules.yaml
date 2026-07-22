@@ -669,6 +669,7 @@ observability.commands:
     jira: Networking & Observability
     fully_marked: true
   files:
+    - src/mongo/db/commands/list_metrics_filtering_allowlist*
     - src/mongo/db/commands/parse_log_component_settings*
     - src/mongo/db/commands/xray_commands*
     - src/mongo/s/commands/cluster_ftdc_commands.cpp

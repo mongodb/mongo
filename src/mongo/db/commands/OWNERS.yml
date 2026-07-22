@@ -168,3 +168,6 @@ filters:
   - "generic_servers*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "list_metrics_filtering_allowlist*":
+    approvers:
+      - 10gen/server-networking-and-observability

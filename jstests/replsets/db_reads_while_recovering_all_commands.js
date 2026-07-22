@@ -375,6 +375,7 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary,
     },
+    listMetricsFilteringAllowlist: {skip: isNotAUserDataRead},
     listSearchIndexes: {skip: isNotAUserDataRead},
     lockInfo: {skip: isAnInternalCommand},
     logApplicationMessage: {skip: isNotAUserDataRead},

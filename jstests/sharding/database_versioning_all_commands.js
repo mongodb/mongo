@@ -802,6 +802,9 @@ const allTestCases = {
                 },
             },
         },
+        listMetricsFilteringAllowlist: {
+            skip: "is test-only command and executes locally on mongos (not sent to any remote node)",
+        },
         listSearchIndexes: {skip: "executes locally on mongos", conditional: true},
         listShards: {skip: "does not forward command to primary shard"},
         lockInfo: {skip: "not on a user database"},
@@ -1442,6 +1445,7 @@ const allTestCases = {
         listDatabases: {skip: "TODO"},
         listDatabasesForAllTenants: {skip: "TODO"},
         listIndexes: {skip: "TODO"},
+        listMetricsFilteringAllowlist: {skip: "test-only command"},
         listSearchIndexes: {skip: "TODO"},
         lockInfo: {skip: "TODO"},
         logApplicationMessage: {skip: "TODO", conditional: true},

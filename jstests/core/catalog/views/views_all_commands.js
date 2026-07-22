@@ -570,6 +570,7 @@ let viewsCommandTests = {
     listDatabases: {skip: isUnrelated},
     listDatabasesForAllTenants: {skip: isUnrelated},
     listIndexes: {command: {listIndexes: "view"}, expectFailure: true},
+    listMetricsFilteringAllowlist: {skip: isUnrelated},
     listSearchIndexes: {skip: isUnrelated},
     listShards: {skip: isUnrelated},
     lockInfo: {skip: isUnrelated},

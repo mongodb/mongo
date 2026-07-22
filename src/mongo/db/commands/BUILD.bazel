@@ -423,6 +423,15 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "list_metrics_filtering_allowlist_command_gen",
+    src = "list_metrics_filtering_allowlist_command.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "umc_commands_idl",
     srcs = [
@@ -621,6 +630,7 @@ mongo_cc_library(
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:fle_compact_cleanup_mutex",
         "//src/mongo/db:fle_crud",
+        "//src/mongo/db:metrics_policy_manager_default",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth",
@@ -762,6 +772,7 @@ mongo_cc_library(
         "drop_connections_gen",
         "generic_servers.cpp",
         "isself.cpp",
+        "list_metrics_filtering_allowlist_command.cpp",
         "reap_logical_session_cache_now.cpp",
         "rotate_certificates_command.cpp",
         "test_api_version_2_commands.cpp",
@@ -771,6 +782,7 @@ mongo_cc_library(
         ":connection_status_gen",
         ":generic_servers_gen",
         ":internal_transactions_test_command_gen",
+        ":list_metrics_filtering_allowlist_command_gen",
         ":rotate_certificates_gen",
         "//src/mongo/db/commands/query_cmd:mr_common.cpp",
         "//src/mongo/db/commands/server_status:logical_session_server_status_section.cpp",

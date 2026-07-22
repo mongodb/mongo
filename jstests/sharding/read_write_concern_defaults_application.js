@@ -735,6 +735,7 @@ let testCases = {
     listDatabases: {skip: "does not accept read or write concern"},
     listDatabasesForAllTenants: {skip: "does not accept read or write concern"},
     listIndexes: {skip: "does not accept read or write concern"},
+    listMetricsFilteringAllowlist: {skip: "does not accept read or write concern"},
     listSearchIndexes: {skip: "does not accept read or write concern"},
     listShards: {skip: "does not accept read or write concern"},
     lockInfo: {skip: "does not accept read or write concern"},

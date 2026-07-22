@@ -25,6 +25,7 @@ const fullNs = dbName + "." + collName;
 
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
+const isTestOnlyCommand = "test-only command";
 const isDeprecated = "deprecated command";
 const commandIsDisabledOnLastLTS = "skip command on downgrading fcv";
 const requiresParallelShell = "requires parallel shell";
@@ -1095,6 +1096,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    listMetricsFilteringAllowlist: {skip: isTestOnlyCommand},
     listSearchIndexes: {
         // Skipping command as it requires additional Mongot mock setup (and is an enterprise
         // feature).

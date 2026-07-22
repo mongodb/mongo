@@ -1,0 +1,37 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/idl/generic_argument.idl"
+
+enums:
+    MetricsCategory:
+        description: "Enum for metrics filtering categories"
+        type: string
+        values:
+            serverStatus: "serverStatus"
+
+structs:
+    ListMetricsFilteringAllowlistReply:
+        description: "Reply for listMetricsFilteringAllowlist command"
+        is_command_reply: true
+        fields:
+            allowlist:
+                description: "Array of metric paths in the allowlist"
+                type: array<string>
+
+commands:
+    listMetricsFilteringAllowlist:
+        description: "Test command to get the metrics filtering allowlist for a specific category"
+        command_name: listMetricsFilteringAllowlist
+        namespace: ignored
+        api_version: ""
+        fields:
+            category:
+                description: "Metrics category"
+                type: MetricsCategory
+        reply_type: ListMetricsFilteringAllowlistReply

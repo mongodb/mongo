@@ -101,4 +101,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_configsvrCommitSplitChunk",
     "_shardsvrCheckMetadataConsistencySecondaryParticipant",
     "wiredTigerRepair",
+    "listMetricsFilteringAllowlist",
 ];
