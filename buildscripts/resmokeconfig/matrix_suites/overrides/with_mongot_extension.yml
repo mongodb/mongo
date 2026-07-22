@@ -10,6 +10,14 @@
 #   - with_mongot_extension_vectorSearch_disabled_*
 #   - with_mongot_extension_fully_enabled_*
 
+# Adds the search-extension-only test root, which lives outside the base-suite roots so it is
+# picked up only by the suites that enable the mongot SEARCH extension.
+- name: search_extension_only_roots
+  value:
+    selector:
+      roots:
+        - jstests/with_mongot/e2e_search_extension/**/*.js
+
 # Tests the mongot-extension cannot run.
 - name: exclude_incompatible_tests
   value:
@@ -55,6 +63,11 @@
       # 'shardedSearchOpCtxDisconnect' failpoint, which only exists on the legacy mongot_cursor
       # router path (runSearchCommandWithRetries).
       - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_network_interruption.js
+      # The legacy $search path rejects user-supplied internal routing fields outright (error
+      # 5491300). The search extension does not reject them -- see
+      # search_internal_fields_ignored_by_extension.js -- so this legacy-rejection test cannot pass
+      # when the $search extension is enabled.
+      - jstests/with_mongot/e2e/search_internal_fields_rejected_by_external_client.js
 
 - name: extension_flags_hybridSearch_disabled
   value:

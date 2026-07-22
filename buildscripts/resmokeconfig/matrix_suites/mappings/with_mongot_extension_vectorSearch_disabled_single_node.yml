@@ -9,3 +9,5 @@ excludes:
 overrides:
   - "with_mongot_extension.load_extension"
   - "with_mongot_extension.extension_flags_vectorSearch_disabled"
+extends:
+  - "with_mongot_extension.search_extension_only_roots"
