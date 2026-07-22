@@ -6,6 +6,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -320,7 +321,8 @@ public:
 
         doc.setPresetReshardedChunks(presetReshardedChunks);
 
-        return ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+        return ReshardingCoordinator::getOrCreate(
+            opCtx, _service, doc.toBSON(), FixedFCVRegion{opCtx});
     }
 
     using TransitionFunctionMap = stdx::unordered_map<CoordinatorStateEnum, std::function<void()>>;
@@ -1014,7 +1016,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
 
     doc.setPresetReshardedChunks(presetReshardedChunks);
 
-    (void)ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+    (void)ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON(), FixedFCVRegion{opCtx});
     auto instanceId =
         BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
@@ -1080,7 +1082,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
 
     doc.setPresetReshardedChunks(presetReshardedChunks);
 
-    (void)ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+    (void)ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON(), FixedFCVRegion{opCtx});
     auto instanceId =
         BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
@@ -1257,7 +1259,8 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
             BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)));
     }
 
-    auto coordinator = ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+    auto coordinator =
+        ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON(), FixedFCVRegion{opCtx});
     ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx), DBException, 13050500);
 
     // Check that reshardCollection keeps allowChunkOperations setting intact.
@@ -2370,6 +2373,23 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingFailsWithIllegalOperationWhen
     auto coordinator = initializeAndGetCoordinator();
     ASSERT_THROWS_CODE(
         coordinator->getCompletionFuture().get(opCtx), DBException, ErrorCodes::IllegalOperation);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, CreatingNewCoordinatorDuringFcvTransitionIsRejected) {
+    // Simulate an in-progress FCV downgrade by giving the in-memory FCV document a transition
+    // phase.
+    // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals
+    FeatureCompatibilityVersionDocument fcvDoc;
+    // (Generic FCV reference): This test simulates an in-progress FCV downgrade.
+    fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
+    fcvDoc.setTargetVersion(multiversion::GenericFCV::kLastLTS);
+    fcvDoc.setPreviousVersion(multiversion::GenericFCV::kLatest);
+    fcvDoc.setPhase(SetFCVPhaseEnum::kStart);
+    serverGlobalParams.mutableFCV.setVersionFromFCVDocument(fcvDoc);
+
+    // A brand-new resharding operation reaches the create path and must be rejected while the
+    // transition is in progress.
+    ASSERT_THROWS_CODE(initializeAndGetCoordinator(), DBException, ErrorCodes::CommandNotSupported);
 }
 
 }  // namespace

@@ -171,15 +171,6 @@ public:
                 FixedFCVRegion fixedFcv(opCtx);
 
                 const auto fcvSnapshot = (*fixedFcv).acquireFCVSnapshot();
-                // (Generic FCV reference): To run this command and ensure the consistency of
-                // the metadata we need to make sure we are on a stable state.
-                //
-                // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals
-                // via the isFcvTransitionInProgress() function.
-                uassert(ErrorCodes::CommandNotSupported,
-                        "Resharding is not supported during FCV changes, please wait for the FCV "
-                        "change to complete.",
-                        !isFcvTransitionInProgress(fixedFcv));
 
                 // We only want to use provenance in resharding if FCV is latest but it's still
                 // possible for a mongos on a higher fcv to send a reshard collection request to a
@@ -222,7 +213,7 @@ public:
                     coordinatorDoc.getCommonReshardingMetadata().getForwardableOpMetadata(),
                     request().getPerformVerification());
 
-                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
+                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc, fixedFcv);
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);
                 return instance;
             })();
@@ -241,7 +232,9 @@ public:
          * due to client disconnect etc.
          */
         std::shared_ptr<const ReshardingCoordinator> getOrCreateReshardingCoordinator(
-            OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
+            OperationContext* opCtx,
+            const ReshardingCoordinatorDocument& coordinatorDoc,
+            const FixedFCVRegion& fcvRegion);
 
     private:
         NamespaceString ns() const override {
@@ -284,11 +277,14 @@ MONGO_REGISTER_COMMAND(ConfigsvrReshardCollectionCommand).forShard();
 
 std::shared_ptr<const ReshardingCoordinator>
 ConfigsvrReshardCollectionCommand::Invocation::getOrCreateReshardingCoordinator(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    const FixedFCVRegion& fcvRegion) {
     try {
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
-        auto instance = ReshardingCoordinator::getOrCreate(opCtx, service, coordinatorDoc.toBSON());
+        auto instance =
+            ReshardingCoordinator::getOrCreate(opCtx, service, coordinatorDoc.toBSON(), fcvRegion);
 
         return std::shared_ptr<const ReshardingCoordinator>(instance);
     } catch (

@@ -3,6 +3,7 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
@@ -35,6 +36,18 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
     auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
         initialState,
         IDLParserContext("ReshardingCoordinatorService::checkIfConflictsWithOtherInstances"));
+
+    // Refuse to create a new resharding coordinator while an FCV upgrade/downgrade is in progress.
+    // Otherwise a resharding operation could start after existing reshardings have been drained as
+    // part of the FCV transition and then complete across the FCV change, potentially leaving the
+    // metadata in an inconsistent state.
+    //
+    // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals via the
+    // isFcvTransitionInProgress() function.
+    uassert(ErrorCodes::CommandNotSupported,
+            "Resharding is not supported during FCV changes, please wait for the FCV change to "
+            "complete.",
+            !isFcvTransitionInProgress(opCtx));
 
     for (const auto& instance : existingInstances) {
         auto typedInstance = checked_cast<const ReshardingCoordinator*>(instance);
@@ -97,6 +110,15 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
                                              IDLParserContext("ReshardingCoordinatorStateDoc")),
         std::make_shared<ReshardingCoordinatorExternalStateImpl>(),
         _serviceContext);
+}
+
+std::shared_ptr<ReshardingCoordinator> ReshardingCoordinator::getOrCreate(
+    OperationContext* opCtx,
+    repl::PrimaryOnlyService* service,
+    BSONObj initialState,
+    const FixedFCVRegion&,
+    bool checkOptions) {
+    return TypedInstance::getOrCreate(opCtx, service, std::move(initialState), checkOptions);
 }
 
 ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
