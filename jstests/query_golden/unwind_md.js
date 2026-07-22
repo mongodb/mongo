@@ -1,8 +1,10 @@
 /**
  * Test $unwind with 'includeArrayIndex'.
  */
-import {show} from "jstests/libs/query_optimization/golden_test.js";
+import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
+import {code, codeOneLine, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 
+section("$unwind");
 const coll = db.unwind;
 coll.drop();
 
@@ -165,14 +167,16 @@ let testcases = [
     [{$match: {_id: 25}}, {$unwind: {path: "$a.b.c", includeArrayIndex: "a.b"}}],
 ];
 
-coll.insert(docs);
+assert.commandWorked(coll.insert(docs));
+subSection("Inserted Docs");
+docs.forEach((doc) => {
+    code(tojsononeline(doc));
+});
 
 for (let i = 0; i < testcases.length; ++i) {
-    let pipeline = testcases[i].concat({$project: {x: 0}});
-
-    print(`Query ${i}: ${tojsononeline(pipeline)}\n`);
-
-    show(coll.aggregate(pipeline));
-
-    print("\n");
+    const pipeline = testcases[i].concat({$project: {x: 0}});
+    subSection(`Query Test-${i}`);
+    code(tojsononeline(pipeline));
+    subSection(`Results Test-${i}`);
+    code(normalizeArray(coll.aggregate(pipeline).toArray()));
 }
