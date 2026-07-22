@@ -7375,7 +7375,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1804-build
+    - release-ubuntu1804-build
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -7423,7 +7423,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2204-large
+    - release-ubuntu2204-large
   - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -7469,7 +7469,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1804-build
+    - release-ubuntu1804-build
   - name: compile_ninja_next_TG
     distros:
     - ubuntu1804-build
@@ -7531,7 +7531,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2204-large
+    - release-ubuntu2204-large
   - name: compile_ninja_next_TG
     distros:
     - ubuntu2204-large
@@ -7595,6 +7595,8 @@ buildvariants:
     scons_cache_scope: none
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu1804-arm64-build
   - name: build_variant_gen
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
@@ -7637,6 +7639,8 @@ buildvariants:
     scons_cache_scope: none
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2204-arm64-large
   - name: build_variant_gen
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
@@ -7680,6 +7684,8 @@ buildvariants:
     scons_cache_scope: none
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu1804-arm64-build
   - name: build_variant_gen
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -7706,6 +7712,8 @@ buildvariants:
     scons_cache_scope: none
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2204-arm64-large
   - name: build_variant_gen
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -7734,7 +7742,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2004-large
+    - release-ubuntu2004-large
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
@@ -7783,7 +7791,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2004-large
+    - release-ubuntu2004-large
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: audit
@@ -7830,6 +7838,8 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2004-arm64-large
   - name: build_variant_gen
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
@@ -7875,6 +7885,8 @@ buildvariants:
     scons_cache_scope: none
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2004-arm64-large
   - name: build_variant_gen
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -7905,7 +7917,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon1-2018-build
+    - release-amazon1-2018-build
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -7955,7 +7967,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon1-2018-build
+    - release-amazon1-2018-build
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -8004,7 +8016,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-latest-large
+    - release-amazon2-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -8054,7 +8066,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-latest-large
+    - release-amazon2-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -8100,7 +8112,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-latest-large
+    - release-amazon2-arm64-latest-large
   - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
@@ -8148,7 +8160,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-latest-large
+    - release-amazon2-arm64-latest-large
   - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -8194,7 +8206,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-large
+    - release-amazon2023.0-large
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
@@ -8248,7 +8260,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-large
+    - release-amazon2023.0-large
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
@@ -8295,7 +8307,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-arm64-large
+    - release-amazon2023.0-arm64-large
   - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -8346,7 +8358,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-arm64-large
+    - release-amazon2023.0-arm64-large
   - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
@@ -8648,7 +8660,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-vsCurrent-large
+    - release-windows-vsCurrent-large
   - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
@@ -8708,7 +8720,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-vsCurrent-large
+    - release-windows-vsCurrent-large
   - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
@@ -8789,6 +8801,8 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-macos-1014-aws
   - name: compile_build_tools_next_TG
   - name: build_variant_gen
   - name: aggregation
@@ -8846,6 +8860,8 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-macos-1014-aws
   - name: compile_ninja_next_TG
   - name: compile_build_tools_next_TG
   - name: libdeps_graph_linting_TG
@@ -8946,7 +8962,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel80-large
+    - release-rhel80-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
@@ -9702,7 +9718,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel70
+    - release-rhel70
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
@@ -9839,7 +9855,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel82-arm64-large
+    - release-rhel82-arm64-large
   - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
@@ -10019,7 +10035,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel70
+    - release-rhel70
   - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -10066,7 +10082,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel80-build
+    - release-rhel80-build
   - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -10111,7 +10127,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel82-arm64-large
+    - release-rhel82-arm64-large
   - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -10202,7 +10218,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel71-power8-large
+    - release-rhel71-power8-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel71-power8-large
@@ -10251,7 +10267,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel81-power8-large
+    - release-rhel81-power8-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel81-power8-large
@@ -10330,7 +10346,7 @@ buildvariants:
   tasks:
   - name: small_compile_test_and_package_serial_TG
     distros:
-    - rhel72-zseries-build
+    - release-rhel72-zseries-build
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel72-zseries-build
@@ -10379,7 +10395,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel83-zseries-large
+    - release-rhel83-zseries-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel83-zseries-large
@@ -10452,7 +10468,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse12-sp5-large
+    - release-suse12-sp5-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -10492,7 +10508,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse12-sp5-large
+    - release-suse12-sp5-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -10539,7 +10555,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse15-build
+    - release-suse15-build
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: audit
@@ -10581,7 +10597,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse15-build
+    - release-suse15-build
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
@@ -10633,7 +10649,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian92-build
+    - release-debian92-build
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -10674,7 +10690,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian92-build
+    - release-debian92-build
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -10724,7 +10740,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian10-build
+    - release-debian10-build
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -10766,7 +10782,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian10-build
+    - release-debian10-build
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -10814,7 +10830,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian11-large
+    - release-debian11-large
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: audit
@@ -10854,7 +10870,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian11-large
+    - release-debian11-large
   - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
