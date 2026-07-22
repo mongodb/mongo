@@ -2,27 +2,23 @@
  * Performs a series of CRUD operations while DDL commands are running in the background
  * and verifies guarantees are not broken.
  *
+ * When run with the balancer enabled, this test also covers concurrent chunk operations.
+ *
  * @tags: [
  *   requires_sharding,
- *   assumes_balancer_off,
  *   does_not_support_causal_consistency,
  *   # The mutex mechanism used in CRUD and drop states does not support stepdown
  *   does_not_support_stepdowns,
- *   # Can be removed once PM-1965-Milestone-1 is completed.
- *   does_not_support_transactions,
  *   # Relies on internalInsertMaxBatchSize to be 64 or above, but it may be fuzzed to lower values.
  *   does_not_support_config_fuzzer,
  *  ]
  */
 
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 export const $config = (function () {
-    function threadCollectionName(prefix, tid) {
-        return prefix + tid;
-    }
-
     function countDocuments(coll, query) {
         let count;
         assert.soon(() => {
@@ -41,6 +37,32 @@ export const $config = (function () {
         return count;
     }
 
+    /**
+     * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
+     * operation. Uses a different session to avoid having issues with multi-document transaction
+     * snapshots.
+     */
+    function mutexLock(mutexSession, db, tid, collName) {
+        jsTest.log.info("Trying to acquire mutexLock for resource", {
+            tid,
+        });
+        const sessionDb = mutexSession.getDatabase(db.getName());
+        assert.soon(() => {
+            let doc = sessionDb[data.CRUDMutex].findAndModify({
+                query: {tid: tid},
+                update: {$set: {mutex: 1}},
+            });
+            return doc.mutex === 0;
+        });
+        jsTest.log.info("Acquired mutexLock", {tid, collection: collName});
+    }
+
+    function mutexUnlock(mutexSession, db, tid, collName) {
+        const sessionDb = mutexSession.getDatabase(db.getName());
+        sessionDb[data.CRUDMutex].update({tid: tid}, {$set: {mutex: 0}});
+        jsTest.log.info("Unlocked lock", {tid, collection: collName});
+    }
+
     // Keep data less then 64 (internalInsertMaxBatchSize) to avoid insertMany to yield while
     // inserting. This might cause an rename to execute during the insertMany and post-assertions
     // checks to fail.
@@ -49,34 +71,23 @@ export const $config = (function () {
         numChunks: 20,
         documentsPerChunk: 3,
         CRUDMutex: "CRUDMutex",
+        kReshardingAcceptableErrors: [
+            // Concurrent resharding with the same collection is ongoing
+            ErrorCodes.ConflictingOperationInProgress,
+            ErrorCodes.ReshardCollectionInProgress,
+            // The collection got dropped so there's nothing to reshard
+            ErrorCodes.NamespaceNotSharded,
+            ErrorCodes.NamespaceNotFound,
+        ],
+        threadCollectionName: function (prefix, tid) {
+            return prefix + tid;
+        },
     };
-
-    /**
-     * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
-     * operation.
-     */
-    function mutexLock(db, tid, collName) {
-        jsTestLog(
-            "Trying to acquire mutexLock for resource tid:" + tid + " collection:" + collName,
-        );
-        assert.soon(() => {
-            let doc = db[data.CRUDMutex].findAndModify({
-                query: {tid: tid},
-                update: {$set: {mutex: 1}},
-            });
-            return doc.mutex === 0;
-        });
-        jsTestLog("Acquired mutexLock for tid:" + tid + " collection:" + collName);
-    }
-
-    function mutexUnlock(db, tid, collName) {
-        db[data.CRUDMutex].update({tid: tid}, {$set: {mutex: 0}});
-        jsTestLog("Unlocked lock for resource tid:" + tid + " collection:" + collName);
-    }
 
     let states = {
         init: function (db, collName, connCache) {
-            this.collName = threadCollectionName(collName, this.tid);
+            this.collName = this.threadCollectionName(collName, this.tid);
+            this.mutexSession = db.getMongo().startSession();
         },
 
         createUnsplittable: function (db, collName, connCache) {
@@ -84,13 +95,13 @@ export const $config = (function () {
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
-            const targetThreadColl = threadCollectionName(collName, tid);
+            const targetThreadColl = this.threadCollectionName(collName, tid);
             jsTest.log.info("createUnsplittable state", {
                 tid,
                 currentTid: this.tid,
                 collection: targetThreadColl,
             });
-            assert.commandWorkedOrFailedWithCode(
+            const res = assert.commandWorkedOrFailedWithCode(
                 db.runCommand({
                     createUnsplittableCollection: targetThreadColl,
                 }),
@@ -103,6 +114,14 @@ export const $config = (function () {
                 ],
             );
 
+            if (!res.ok) {
+                // If we're running with transactions and an acceptable error occurred then the transaction will
+                // fail due to an implicit abort. If the returned error is sticky then that would cause the
+                // operation to be retried indefinitely. To prevent this we force this command to be executed
+                // again outside of the transaction where it will see the acceptable error and succeed.
+                fsm.forceRunningOutsideTransaction(this);
+            }
+
             jsTest.log.info("createUnsplittable finished");
         },
         create: function (db, collName, connCache) {
@@ -110,7 +129,7 @@ export const $config = (function () {
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
-            const targetThreadColl = threadCollectionName(collName, tid);
+            const targetThreadColl = this.threadCollectionName(collName, tid);
             const coll = db[targetThreadColl];
             const fullNs = coll.getFullName();
             jsTestLog(
@@ -155,7 +174,7 @@ export const $config = (function () {
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
-            const targetThreadColl = threadCollectionName(collName, tid);
+            const targetThreadColl = this.threadCollectionName(collName, tid);
 
             jsTestLog(
                 "drop state tid:" +
@@ -165,11 +184,11 @@ export const $config = (function () {
                     " collection:" +
                     targetThreadColl,
             );
-            mutexLock(db, tid, targetThreadColl);
+            mutexLock(this.mutexSession, db, tid, targetThreadColl);
             try {
                 assert.eq(db[targetThreadColl].drop(), true);
             } finally {
-                mutexUnlock(db, tid, targetThreadColl);
+                mutexUnlock(this.mutexSession, db, tid, targetThreadColl);
             }
             jsTestLog("drop state finished");
         },
@@ -177,10 +196,10 @@ export const $config = (function () {
             let tid = this.tid;
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
-            const srcCollName = threadCollectionName(collName, tid);
+            const srcCollName = this.threadCollectionName(collName, tid);
             const srcColl = db[srcCollName];
             // Rename collection
-            const destCollName = threadCollectionName(
+            const destCollName = this.threadCollectionName(
                 collName,
                 tid + "_" + extractUUIDFromObject(UUID()),
             );
@@ -241,44 +260,31 @@ export const $config = (function () {
             let tid = this.tid;
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
-            const fullNs = db[threadCollectionName(collName, tid)].getFullName();
+            const fullNs = db[this.threadCollectionName(collName, tid)].getFullName();
             let newKey = "tid_" + tid + "_" + Random.randInt(2);
-            try {
-                jsTestLog(
-                    "resharding state tid:" +
-                        tid +
-                        " currentTid:" +
-                        this.tid +
-                        " collection:" +
-                        fullNs +
-                        " newKey " +
-                        newKey,
-                );
-                assert.commandWorked(
-                    db.adminCommand({
-                        reshardCollection: fullNs,
-                        key: {[`${newKey}`]: 1},
-                        numInitialChunks: 1,
-                    }),
-                );
-            } catch (e) {
-                const exceptionCode = e.code;
-                if (
-                    exceptionCode == ErrorCodes.ConflictingOperationInProgress ||
-                    exceptionCode == ErrorCodes.ReshardCollectionInProgress ||
-                    exceptionCode == ErrorCodes.NamespaceNotSharded ||
-                    exceptionCode == ErrorCodes.NamespaceNotFound
-                ) {
-                    // It is fine for a resharding operation to throw ConflictingOperationInProgress
-                    // if a concurrent resharding with the same collection is ongoing.
-                    // It is also fine for a resharding operation to throw NamespaceNotSharded or
-                    // NamespaceNotFound because a drop state could've happend recently.
-                    return;
-                }
-                throw e;
-            } finally {
-                jsTestLog("resharding state finished");
-            }
+            const isHashed = Random.rand() < 0.5;
+
+            jsTest.log.info("resharding state", {
+                tid,
+                currentTid: this.tid,
+                collection: fullNs,
+                newKey,
+                isHashed,
+            });
+
+            // We explicitly flip between hashed/plain shard keys because hashed keys can be pre-split.
+            // This is important for suites that have balancing enabled because those will trigger chunk
+            // operations in the background of this test which is a desirable testing action here.
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({
+                    reshardCollection: fullNs,
+                    key: {[`${newKey}`]: isHashed ? "hashed" : 1},
+                    numInitialChunks: isHashed ? 10 : 1,
+                }),
+                this.kReshardingAcceptableErrors,
+            );
+
+            jsTest.log.info("resharding state finished");
         },
         checkDatabaseMetadataConsistency: function (db, collName, connCache) {
             jsTestLog("Check database metadata state");
@@ -289,7 +295,7 @@ export const $config = (function () {
             let tid = this.tid;
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
-            const targetThreadColl = threadCollectionName(collName, tid);
+            const targetThreadColl = this.threadCollectionName(collName, tid);
             jsTestLog(
                 "Check collection metadata state tid:" +
                     tid +
@@ -305,38 +311,28 @@ export const $config = (function () {
             let tid = this.tid;
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
-            const targetThreadColl = threadCollectionName(collName, tid);
+            const targetThreadColl = this.threadCollectionName(collName, tid);
             const namespace = `${db}.${targetThreadColl}`;
             jsTest.log.info(`Started to unshard collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({unshardCollection: namespace}), [
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-                // Handles the case where another resharding operation is in progress
-                ErrorCodes.ConflictingOperationInProgress,
-                ErrorCodes.ReshardCollectionInProgress,
-                // Handles the case where the collection is already unsharded
-                ErrorCodes.NamespaceNotSharded,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({unshardCollection: namespace}),
+                this.kReshardingAcceptableErrors,
+            );
             jsTest.log.info(`Unsharding completed ${namespace}`);
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             let tid = this.tid;
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
-            const targetThreadColl = threadCollectionName(collName, tid);
+            const targetThreadColl = this.threadCollectionName(collName, tid);
             const namespace = `${db}.${targetThreadColl}`;
             jsTestLog(`Started to untrack collection ${namespace}`);
             // Attempt to unshard the collection first
             jsTestLog(`1. Attempting to unshard collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({unshardCollection: namespace}), [
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-                // Handles the case where another resharding operation is in progress
-                ErrorCodes.ConflictingOperationInProgress,
-                ErrorCodes.ReshardCollectionInProgress,
-                // Handles the case where the collection is already unsharded
-                ErrorCodes.NamespaceNotSharded,
-            ]);
+            const res = assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({unshardCollection: namespace}),
+                this.kReshardingAcceptableErrors,
+            );
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);
             // Note this command will behave as no-op in case the collection is not tracked.
@@ -358,13 +354,13 @@ export const $config = (function () {
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
-            const targetThreadColl = threadCollectionName(collName, tid);
+            const targetThreadColl = this.threadCollectionName(collName, tid);
             const threadInfos =
                 "tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl;
             jsTestLog("CRUD state " + threadInfos);
             const coll = db[targetThreadColl];
 
-            mutexLock(db, tid, targetThreadColl);
+            mutexLock(this.mutexSession, db, tid, targetThreadColl);
 
             const generation = new Date().getTime();
             // Insert Data
@@ -395,26 +391,24 @@ export const $config = (function () {
 
                 jsTestLog("CRUD - Update " + threadInfos);
                 res = coll.update({generation: generation}, {$set: {updated: true}}, {multi: true});
-                if (res.hasWriteError()) {
-                    let err = res.getWriteError();
-                    if (err.code == ErrorCodes.QueryPlanKilled) {
-                        // Update is expected to throw ErrorCodes::QueryPlanKilled if performed
-                        // concurrently with a rename (SERVER-31695).
-                        jsTestLog("CRUD state finished earlier because query plan was killed.");
-                        return;
-                    }
-                    throw err;
+                if (res instanceof WriteResult && res.hasWriteError()) {
+                    // Update is expected to throw ErrorCodes::QueryPlanKilled if performed
+                    // concurrently with a rename (SERVER-31695).
+                    assert.writeErrorWithCode(res, ErrorCodes.QueryPlanKilled);
+                    jsTest.log.info("CRUD state finished earlier because query plan was killed");
+                    return;
                 }
                 assert.commandWorked(res, threadInfos);
 
                 // Delete Data
                 jsTestLog("CRUD - Remove " + threadInfos);
                 // Check if delete succeeded
-                coll.remove({generation: generation}, {multi: true});
+                res = coll.remove({generation: generation}, {multi: true});
+                assert.commandWorked(res, threadInfos);
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 assert.eq(countDocuments(coll, {generation: generation}), 0, threadInfos);
             } finally {
-                mutexUnlock(db, tid, targetThreadColl);
+                mutexUnlock(this.mutexSession, db, tid, targetThreadColl);
             }
             jsTestLog("CRUD state finished");
         },
