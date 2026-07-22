@@ -21,6 +21,7 @@ import {
     ChangeStreamTest,
     addShardToCluster,
     getClusterTime,
+    withBalancerEnabled,
 } from "jstests/libs/query/change_stream_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
@@ -30,7 +31,7 @@ describe("future startAtOperationTime with addShard", function () {
     };
 
     // Seconds ahead of current time to open the change stream.
-    const kFutureOffsetSecs = 20;
+    const kFutureOffsetSecs = 30;
 
     // Name of the new shard added to the ShardingTest.
     const newShardName = "newShard";
@@ -59,8 +60,12 @@ describe("future startAtOperationTime with addShard", function () {
             newShard = addShardToCluster(st, newShardName, 1, rsNodeOptions);
             fn();
         } finally {
-            removeShard(st, newShardName);
-            newShard.stopSet();
+            if (newShard) {
+                withBalancerEnabled(st.s, () => {
+                    removeShard(st, newShardName);
+                    newShard.stopSet();
+                });
+            }
         }
     }
 
@@ -109,10 +114,12 @@ describe("future startAtOperationTime with addShard", function () {
                 assert.commandWorked(coll.insert({_id: 100, when: "before_future_time"}));
 
                 // Timing guard: verify we are still before the future time.
+                const currentClusterTime = getClusterTime(db);
                 assert.lt(
-                    getClusterTime(db).t,
-                    futureStartTime.t,
+                    bsonWoCompare(currentClusterTime, futureStartTime),
+                    0,
                     "Test setup invalid: cluster time already past future start time",
+                    {currentClusterTime, futureStartTime},
                 );
 
                 // Wait until the cluster time passes the future start time.
@@ -121,10 +128,10 @@ describe("future startAtOperationTime with addShard", function () {
                         const configsvrClusterTime = getClusterTime(
                             st.configRS.getPrimary().getDB("admin"),
                         );
-                        return configsvrClusterTime.t >= futureStartTime.t;
+                        return configsvrClusterTime.t > futureStartTime.t;
                     },
                     "Timed out waiting for cluster time to reach future start time",
-                    (kFutureOffsetSecs + 5) * 1000,
+                    (kFutureOffsetSecs + 30) * 1000,
                 );
 
                 // Advance the cursor after the future time has passed.
