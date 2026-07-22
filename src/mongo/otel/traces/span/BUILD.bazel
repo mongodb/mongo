@@ -88,7 +88,6 @@ mongo_cc_library(
     deps = [
         ":span_name",
         "//src/mongo:base",
-        "//src/mongo/otel/traces/sampler",
     ],
 )
 

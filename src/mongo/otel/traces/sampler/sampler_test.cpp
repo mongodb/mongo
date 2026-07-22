@@ -562,5 +562,55 @@ TEST(SamplerTest, ConcurrentAccessTest) {
         .join();
 }
 
+TEST(SamplerTest, InternalRateLimiterNotCreatedUntilSpanFires) {
+    TracingSamplerImpl sampler;
+
+    sampler.sampleByDefault(span_names::kTest1);
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0},
+                                 {{std::string(span_names::kTest2.getName()), {.factor = 1.0}}});
+
+    // Rate limiters are created lazily, so until a span actually fires, none exist.
+    EXPECT_EQ(sampler.getNumInternalRateLimiters(), 0);
+
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
+    EXPECT_EQ(sampler.getNumInternalRateLimiters(), 1);
+
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest2.getName(), 0.0));
+    EXPECT_EQ(sampler.getNumInternalRateLimiters(), 2);
+}
+
+TEST(SamplerTest, ConcurrentFirstSightCreatesSingleInternalRateLimiter) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    // Give the span a 1-token bucket and freeze the clock so no tokens ever refill.
+    sampler.sampleByDefault(span_names::kTest1);
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 1}}, {});
+
+    constexpr int kNumThreads = 16;
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        std::vector<stdx::thread> threads;
+        for (int i = 0; i < kNumThreads; ++i) {
+            threads.push_back(
+                monitor.spawn([&] { sampler.shouldSample(span_names::kTest1.getName(), 0.0); }));
+        }
+        for (auto& t : threads) {
+            t.join();
+        }
+    });
+
+    EXPECT_EQ(sampler.getNumInternalRateLimiters(), 1);
+
+    // All test threads above fire the same span, so if they share one limiter, we get exactly one
+    // admission.
+    const auto stats = sampler.getStats();
+    EXPECT_EQ(stats.internalSpans.admitted, 1);
+    EXPECT_EQ(stats.internalSpans.rejected, kNumThreads - 1);
+}
+
 }  // namespace
 }  // namespace mongo::otel::traces

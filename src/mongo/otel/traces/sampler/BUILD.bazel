@@ -36,6 +36,7 @@ mongo_cc_unit_test(
         ":sampler",
         ":sampling_config",
         "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/traces/span:span_names",
     ],
 )
 

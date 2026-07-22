@@ -87,21 +87,23 @@ public:
 
 /** Stores the current state of a sampler. */
 struct [[MONGO_MOD_PUBLIC]] SamplerState {
-    using RateLimiter = std::shared_ptr<admission::RateLimiter>;
-
-    /** Maps span name to its sampling factor. Absence is equivalent to a factor of 0.0. */
-    using SamplingFactorMap = StringMap<double>;
-
     /**
-     * Maps span name to its rate limiter. Each limiter is a shared_ptr so that _rebuild can copy
-     * existing limiters into a fresh map without resetting their token buckets.
+     * Fully-resolved sampling parameters (factor + rate limits) per span name, combining the
+     * default-sampled spans and the per-span overrides. Absence means the span is not sampled.
      */
-    using RateLimiterMap = StringMap<RateLimiter>;
+    using SamplingParamsMap = StringMap<SamplingParameters>;
 
-    SamplingFactorMap samplingFactorMap;
-    RateLimiterMap rateLimiterMap;
-    RateLimiter externalRateLimiter;
+    SamplingParamsMap samplingParamsMap;
 };
+
+/**
+ * A rate limiter, tagged with the config generation whose parameters it currently reflects.
+ */
+struct [[MONGO_MOD_PUBLIC]] RateLimiterEntry {
+    std::shared_ptr<admission::RateLimiter> limiter;
+    uint64_t generation = 0;
+};
+using RateLimiterMap = StringMap<RateLimiterEntry>;
 
 /**
  * Production `TracingSampler` implementation. This is designed to be a thread-safe singleton, and
@@ -126,12 +128,28 @@ public:
     /** Returns a TracingSamplerStats reporting the succeeded and rejected admissions. */
     TracingSamplerStats getStats() const override;
 
+    size_t getNumInternalRateLimiters() const;
+
 private:
-    /** Rebuilds _samplingFactors from _defaultSampledSpanNames and _samplingConfig. */
+    /** Rebuilds samplingParamsMap from _defaultSampledSpanNames and _samplingConfig. */
     void _rebuild(WithLock);
+
+    /**
+     * Returns the rate limiter to use for `name`, parameterized for config `generation`. If a
+     * limiter for `name` already exists it is re-parameterized in place (preserving its token
+     * bucket); otherwise a new limiter is created. The result is published into
+     * _internalRateLimiters.
+     */
+    std::shared_ptr<admission::RateLimiter> _getOrCreateRateLimiter(
+        std::string_view name, const RateLimitParams& rateLimits, uint64_t generation);
 
     static VersionedValue<const SamplerState> _samplerState;
     static thread_local VersionedValue<const SamplerState>::Snapshot _snapshot;
+
+    static VersionedValue<const RateLimiterMap> _internalRateLimiters;
+    static thread_local VersionedValue<const RateLimiterMap>::Snapshot _rlSnapshot;
+
+    std::unique_ptr<admission::RateLimiter> _externalRateLimiter;
 
     TickSource* _tickSource;
 

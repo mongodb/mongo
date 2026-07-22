@@ -3,7 +3,6 @@
 
 #include "mongo/otel/traces/span/span_names.h"
 
-#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/versioned_value.h"
 
