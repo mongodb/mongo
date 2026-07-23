@@ -11,7 +11,6 @@
 import {getWinningPlanFromExplain, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {runTestWithUnorderedComparison} from "jstests/libs/query/join_utils.js";
 
-// TODO SERVER-127575: remove the feature flag once the flag is defaulted to true.
 let conn = MongoRunner.runMongod({
     setParameter: {
         featureFlagPathArrayness: true,
