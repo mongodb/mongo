@@ -928,11 +928,11 @@ TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
         if (expected == elements.back().recordId) {
             expected = elements[elements.size() - 2].recordId;
         }
-        // exact match with no pin
-        checkMarker(expected, opCtx.get(), rs, RecordId(), element.wallTime);
-        // in between records with no pin should match older record,
+        // exact match with no pin limit
+        checkMarker(expected, opCtx.get(), rs, RecordId::maxLong(), element.wallTime);
+        // in between records with no pin limit should match older record,
         // and expiry time newer than newest record should match newest record
-        checkMarker(expected, opCtx.get(), rs, RecordId(), element.wallTime + Seconds(1));
+        checkMarker(expected, opCtx.get(), rs, RecordId::maxLong(), element.wallTime + Seconds(1));
         // check various pins when the expiry time is the limiting factor
         // pin equal to expiry is covered below with pin-limited truncation
         // note that pins require one unpinned entry to be retained, so don't start j equal to i
@@ -962,9 +962,12 @@ TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
         }
     }
     // corner cases not covered in the above for loops:
+    // no truncatable record if mayTruncateUpTo is null (RecordId(0)), regardless of expiry
+    EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+        opCtx.get(), rs, RecordId(), wallTime + Seconds(100)));
     // no truncatable record if expiry time is older than oldest record
     EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
-        opCtx.get(), rs, RecordId(), elements.at(0).wallTime - Seconds(1)));
+        opCtx.get(), rs, RecordId::maxLong(), elements.at(0).wallTime - Seconds(1)));
     // no truncatable record if oplog is all pinned
     EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
         opCtx.get(), rs, elements.at(0).recordId, wallTime + Seconds(25)));

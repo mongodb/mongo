@@ -68,21 +68,20 @@ boost::optional<CollectionTruncateMarkers::Marker> CollectionTruncateMarkers::ne
     RecordStore& recordStore,
     const RecordId& mayTruncateUpTo,
     Date_t expiryTime) {
+    if (mayTruncateUpTo.isNull()) {
+        return boost::none;
+    }
     // reverse cursor so that non-exact matches will give the next older entry, not the next newer
     auto recoveryUnit = shard_role_details::getRecoveryUnit(opCtx);
     auto cursor = recordStore.getCursor(opCtx, *recoveryUnit, /* forward */ false);
     auto record = cursor->next();
     RecordId newestId = record ? record->id : RecordId();
     RecordId newestUnpinnedId;
-    if (!mayTruncateUpTo.isNull()) {
-        record = cursor->seek(mayTruncateUpTo, SeekableRecordCursor::BoundInclusion::kInclude);
-        newestUnpinnedId = record ? record->id : RecordId();
-    }
+    record = cursor->seek(mayTruncateUpTo, SeekableRecordCursor::BoundInclusion::kInclude);
+    newestUnpinnedId = record ? record->id : RecordId();
     // it's OK to round off expiry time to the nearest second.
     RecordId seekTo(durationCount<Seconds>(expiryTime.toDurationSinceEpoch()), /* low */ 0);
-    if (!mayTruncateUpTo.isNull() && seekTo > mayTruncateUpTo) {
-        seekTo = mayTruncateUpTo;
-    }
+    seekTo = std::min(seekTo, mayTruncateUpTo);
     record = cursor->seek(seekTo, SeekableRecordCursor::BoundInclusion::kInclude);
     if (!record) {
         return {};
