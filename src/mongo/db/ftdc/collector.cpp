@@ -52,7 +52,8 @@ void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collec
     _collectors.emplace_back(std::move(collector));
 }
 
-std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
+std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
+    Client* client, std::vector<std::pair<std::string, int>>& sectionSizes) {
     // If there are no collectors, just return an empty BSONObj so that that are caller knows we did
     // not collect anything
     if (_collectors.empty()) {
@@ -99,11 +100,14 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
 
             end = client->getServiceContext()->getPreciseClockSource()->now();
             subObjBuilder.appendDate(kFTDCCollectEndField, end);
+            sectionSizes.emplace_back(collector->name(), subObjBuilder.len());
         } catch (...) {
             LOGV2_ERROR(9761500,
                         "Collector threw an error",
                         "error"_attr = exceptionToStatus(),
-                        "collector"_attr = collector->name());
+                        "collector"_attr = collector->name(),
+                        "size"_attr = builder.len());
+            sectionSizes.emplace_back(collector->name(), builder.len());
             throw;
         }
 

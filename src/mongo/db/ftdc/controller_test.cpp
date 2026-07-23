@@ -399,7 +399,7 @@ using FTDCControllerTestDeathTest = FTDCControllerTest;
 
 DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
                    LogAndTerminateWhenBSONObjectTooLargeExceptionThrown,
-                   "11558500.*Encountered an error while collecting an FTDC sample") {
+                   "11558500.*Encountered an error while collecting an FTDC sample.*sectionSizes") {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 
@@ -423,7 +423,7 @@ DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
 
 DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
                    LogAndTerminateWhenExceptionThrown,
-                   "9761500.*MockFailCollector") {
+                   "9761500.*MockFailCollector.*size") {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 

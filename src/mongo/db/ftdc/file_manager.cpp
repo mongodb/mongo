@@ -35,6 +35,8 @@
 #include <boost/filesystem.hpp>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
@@ -195,17 +197,25 @@ Status FTDCFileManager::openArchiveFile(
         }
     }
 
-    // After the system restarts or a new file has been started,
-    // collect one-time information
-    // This is appened after the file is opened to ensure a user can determine which bson objects
-    // where collected from which server instance.
-    auto sample = _rotateCollectors->collect(client);
-    if (!std::get<0>(sample).isEmpty()) {
-        Status s = _writer.writeMetadata(std::get<0>(sample), std::get<1>(sample));
+    // After the system restarts or a new file has been started, collect one-time information. This
+    // is appended after the file is opened to ensure a user can determine which bson objects were
+    // collected from which server instance.
+    std::vector<std::pair<std::string, int>> sectionSizes;
+    try {
+        auto sample = _rotateCollectors->collect(client, sectionSizes);
+        if (!std::get<0>(sample).isEmpty()) {
+            Status s = _writer.writeMetadata(std::get<0>(sample), std::get<1>(sample));
 
-        if (!s.isOK()) {
-            return s;
+            if (!s.isOK()) {
+                return s;
+            }
         }
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+        for (const auto& entry : sectionSizes) {
+            LOGV2_INFO(
+                10630203, "FTDC Entry", "name"_attr = entry.first, "size"_attr = entry.second);
+        }
+        throw;
     }
 
     return Status::OK();

@@ -33,6 +33,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 
@@ -147,7 +148,8 @@ public:
      *    "end" : Date_t,      <- Time at which all collecting ended
      * }
      */
-    std::tuple<BSONObj, Date_t> collect(Client* client);
+    std::tuple<BSONObj, Date_t> collect(Client* client,
+                                        std::vector<std::pair<std::string, int>>& sectionSizes);
 
 private:
     // collection of collectors

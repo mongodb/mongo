@@ -33,6 +33,9 @@
 #include "mongo/db/ftdc/controller.h"
 
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/counter.h"
 #include "mongo/db/client.h"
@@ -214,6 +217,7 @@ void FTDCController::doLoop() {
         _config = _configTemp;
     }
 
+    std::vector<std::pair<std::string, int>> sectionSizes;
     while (true) {
         // Compute the next interval to run regardless of how we were woken up
         // Skipping an interval due to a race condition with a config signal is harmless.
@@ -260,13 +264,14 @@ void FTDCController::doLoop() {
                 _mgr = uassertStatusOK(std::move(swMgr));
             }
 
+            sectionSizes.clear();
             try {
                 if (MONGO_unlikely(ftdcThrowBSONObjectTooLarge.shouldFail())) {
                     uasserted(ErrorCodes::BSONObjectTooLarge,
                               "Injected BSONObjectTooLarge exception for testing");
                 }
 
-                auto collectSample = _periodicCollectors.collect(client);
+                auto collectSample = _periodicCollectors.collect(client, sectionSizes);
 
                 Status s = _mgr->writeSampleAndRotateIfNeeded(
                     client, std::get<0>(collectSample), std::get<1>(collectSample));
@@ -279,7 +284,7 @@ void FTDCController::doLoop() {
                     _mostRecentPeriodicDocument = std::get<0>(collectSample);
                 }
             } catch (const DBException& e) {
-                logCollectionError(e.toStatus());
+                logCollectionError(e.toStatus(), sectionSizes);
                 // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
                 // catch the code directly because it does not have a definition in error_codes.yml.
                 if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
@@ -289,18 +294,20 @@ void FTDCController::doLoop() {
                 }
                 throw;
             } catch (...) {
-                logCollectionError(exceptionToStatus());
+                logCollectionError(exceptionToStatus(), sectionSizes);
                 throw;
             }
         }
     }
 }
 
-void FTDCController::logCollectionError(Status error) {
+void FTDCController::logCollectionError(
+    Status error, const std::vector<std::pair<std::string, int>>& sectionSizes) {
     LOGV2_DEBUG(11558500,
                 _serverStatusSectionsLogSeverity().toInt(),
                 "Encountered an error while collecting an FTDC sample",
-                "error"_attr = error);
+                "error"_attr = error,
+                "sectionSizes"_attr = logv2::mapLog(sectionSizes));
 }
 
 }  // namespace mongo
