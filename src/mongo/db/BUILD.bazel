@@ -340,6 +340,17 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "landlock",
+    srcs = ["landlock.cpp"],
+    deps = [
+        ":server_base",
+        "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
 idl_generator(
     name = "mongod_options_general_gen",
     src = "mongod_options_general.idl",
@@ -2581,6 +2592,7 @@ mongo_cc_library(
     deps = [
         # NOTE: If you need to add a static or mongo initializer to mongod startup,
         # please add that library here, as a private library dependency.
+        ":landlock",
         "//src/mongo/executor:async_rpc_error_info",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/logv2/log_metric_initializer",

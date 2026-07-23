@@ -88,3 +88,13 @@ configs:
         arg_vartype: Int
         source: [cli, yaml]
         validator: {gte: 1, lte: 65535}
+    "security.landlock.enabled":
+        description:
+            "Enable Landlock self-sandboxing, restricting the server's filesystem
+            access at startup to a least-privilege set of paths. Linux only."
+        short_name: landlock
+        arg_vartype: Bool
+        default: false
+        source: [cli, yaml]
+        condition:
+            preprocessor: "defined(__linux__)"

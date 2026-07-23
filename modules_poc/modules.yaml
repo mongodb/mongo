@@ -495,6 +495,7 @@ security:
     - src/mongo/db/commands/connection_status.*
     - src/mongo/db/commands/hashcmd.cpp
     - src/mongo/db/commands/rotate_certificates*
+    - src/mongo/db/landlock*
     - src/mongo/db/modules/enterprise/src/fips
     - src/mongo/db/modules/enterprise/src/kmip
     - src/mongo/db/system_index*

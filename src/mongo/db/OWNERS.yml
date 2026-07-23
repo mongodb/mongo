@@ -182,6 +182,9 @@ filters:
   - "/keyfile_option*":
     approvers:
       - 10gen/server-security
+  - "landlock*":
+    approvers:
+      - 10gen/server-security
   - "server_options*":
     approvers:
       - 10gen/server-programmability
