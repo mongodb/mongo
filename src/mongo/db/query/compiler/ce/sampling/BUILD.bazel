@@ -66,15 +66,11 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "persistent_samples",
-    srcs = [
-        "persistent_sample_loader.cpp",
-    ],
     hdrs = [
         "persistent_sample_loader.h",
     ],
     deps = [
         ":persistent_sample_gen_lib",
-        "//src/mongo/db:dbdirectclient",
         "//src/mongo/db/query:query_knobs",
     ],
 )

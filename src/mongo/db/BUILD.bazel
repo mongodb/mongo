@@ -945,6 +945,7 @@ mongo_cc_library(
         "//src/mongo/db/query:plan_yield_policy_impl.cpp",
         "//src/mongo/db/query:sbe_trial_runtime_executor.cpp",
         "//src/mongo/db/query/compiler/ce/exact:exact_cardinality_impl.cpp",
+        "//src/mongo/db/query/compiler/ce/sampling:persistent_sample_loader.cpp",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_impl.cpp",
         "//src/mongo/db/query/compiler/optimizer/join:agg_join_model.cpp",
         "//src/mongo/db/query/compiler/optimizer/join:executor.cpp",

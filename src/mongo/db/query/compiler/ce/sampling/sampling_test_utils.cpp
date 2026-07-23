@@ -9,6 +9,8 @@
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -161,7 +163,8 @@ std::pair<SamplingCEMethodEnum, boost::optional<int>> iniitalizeSamplingAlgoBase
 
 void createCollAndInsertDocuments(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  const std::vector<BSONObj>& docs) {
+                                  const std::vector<BSONObj>& docs,
+                                  bool clustered) {
     writeConflictRetry(opCtx, "createColl", nss, [&] {
         shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
             RecoveryUnit::ReadSource::kNoTimestamp);
@@ -170,7 +173,12 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
         WriteUnitOfWork wunit(opCtx);
         AutoGetDb db(opCtx, nss.dbName(), MODE_X);
         db.ensureDbExists(opCtx);
-        invariant(db.getDb()->createCollection(opCtx, nss, {}));
+
+        CollectionOptions options;
+        if (clustered) {
+            options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        }
+        invariant(db.getDb()->createCollection(opCtx, nss, options));
         wunit.commit();
     });
 

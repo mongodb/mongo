@@ -249,10 +249,15 @@ bool dataConfigurationCoversQueryWorkload(DataConfiguration& dataConfig,
 void initializeSamplingEstimator(DataConfiguration& configuration,
                                  SamplingEstimatorTest& samplingEstimatorTest);
 
-
+/**
+ * Create a collection with the given name and insert the given documents.
+ * Persistent sample docs must be stored in a clustered collection indexed on _id, so clustered =
+ * true must be passed when this helper is used to simulate the persisted samples collection.
+ */
 void createCollAndInsertDocuments(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  const std::vector<BSONObj>& docs);
+                                  const std::vector<BSONObj>& docs,
+                                  bool clustered = false);
 
 /**
  * Given a MatchExpression and a vector of BSONObj, evaluate the MatchExpression against all the

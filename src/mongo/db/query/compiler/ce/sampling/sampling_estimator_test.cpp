@@ -2219,6 +2219,65 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasse
     estimator.estimateNDVMultiKey({{.path = "a"}}, boost::none /* non-bounded */);
 }
 
+TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    // Source collection has docs that must NOT appear in the returned sample — hitting the
+    // persistent sample means we never read from them.
+    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
+    // Read the source collection UUID in a scope so its IS lock on the db is released before
+    // we create the samples collection (which needs MODE_X on the same db).
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 2 << "tag" << "persisted"),
+                                       BSON("_id" << 3 << "tag" << "persisted"),
+                                       BSON("_id" << 4 << "tag" << "persisted")};
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(uuid,
+                                  SamplingTechniqueEnum::kRandom,
+                                  persistedDocs.size(),
+                                  {persistedDocs[0], persistedDocs[1]},
+                                  boost::none,
+                                  kPersistentSampleSchemaVersion,
+                                  BSONObj(),
+                                  /*pageNo=*/0),
+         buildPersistentSampleDoc(uuid,
+                                  SamplingTechniqueEnum::kRandom,
+                                  persistedDocs.size(),
+                                  {persistedDocs[2]},
+                                  boost::none,
+                                  kPersistentSampleSchemaVersion,
+                                  BSONObj(),
+                                  /*pageNo=*/1)},
+        /*clustered=*/true);
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    // Cardinality estimate must exceed `sampleSize` so `generateSample` takes the
+    // generateRandomSample path (which consults the persistent sample) instead of falling
+    // into the full-collection-scan branch.
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(100),
+                                          nullptr /*customerQueryExpCtx*/);
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    ASSERT_EQUALS(sample.size(), persistedDocs.size());
+    for (const auto& doc : sample) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
+    }
+}
+
 TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
     // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
@@ -2238,7 +2297,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
+            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
@@ -2322,7 +2382,8 @@ TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
+            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        /*clustered=*/true);
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
 
@@ -2369,7 +2430,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
                                   SamplingTechniqueEnum::kChunk,
                                   persistedDocs.size(),
                                   persistedDocs,
-                                  /*numChunks=*/testNumChunks)});
+                                  /*numChunks=*/testNumChunks)},
+        /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
@@ -2409,7 +2471,8 @@ TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSampl
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
+            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
@@ -2515,7 +2578,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlag
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
+            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        /*clustered=*/true);
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
 
@@ -2568,7 +2632,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagD
                                   SamplingTechniqueEnum::kChunk,
                                   persistedDocs.size(),
                                   persistedDocs,
-                                  /*numChunks=*/testNumChunks)});
+                                  /*numChunks=*/testNumChunks)},
+        /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
@@ -2632,7 +2697,8 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
                                   /*numChunks=*/boost::none,
                                   /*schemaVersion=*/kPersistentSampleSchemaVersion,
                                   // Corrupt sampleSize: claims 1 doc but array has 3.
-                                  BSON(PersistentSampleDoc::kSampleSizeFieldName << 1LL))});
+                                  BSON(PersistentSampleDoc::kSampleSizeFieldName << 1LL))},
+        /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);

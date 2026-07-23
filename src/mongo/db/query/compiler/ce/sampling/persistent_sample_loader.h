@@ -12,6 +12,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -36,14 +37,21 @@ BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 
 /**
- * This class coordinates the loading of persisted samples from the
- * `<dbName>.system.stats.samples` collection.
+ * Reassembles a full persistent sample from individual page documents.
+
+ * Possible error codes:
+ * - `NoSuchKey` if `pages` is empty.
+ * - `UnsupportedFormat` if any page/the group of pages is malformed
+ */
+StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> pages);
+
+/**
+ * This class coordinates the loading of persisted samples.
  */
 class PersistentSampleLoader {
 public:
     /**
-     * Looks up the persistent sample in `<dbName>.system.stats.samples` matching the given
-     * identity fields
+     * Looks up the persistent sample matching the given identity fields.
      *
      * Possible error codes:
      * - `NoSuchKey` if no document matches

@@ -42,11 +42,13 @@ TEST(MakePersistentSampleIdObj, PopulatesFieldsInPrefixOrder) {
     ASSERT_TRUE(randomId[PersistentSampleId::kNumChunksFieldName].eoo());
     ASSERT_EQ(randomId[PersistentSampleId::kPageNoFieldName].numberInt(), 0);
 
+    // schemaVersion first, pageNo last, so the clustered key orders pages by pageNo.
     std::vector<std::string> fieldNames;
     for (auto&& e : randomId) {
         fieldNames.push_back(std::string{e.fieldNameStringData()});
     }
     ASSERT_EQ(fieldNames.front(), PersistentSampleId::kSchemaVersionFieldName);
+    ASSERT_EQ(fieldNames.back(), PersistentSampleId::kPageNoFieldName);
 
     const auto chunkId =
         makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
@@ -349,6 +351,170 @@ TEST(ParsePersistentSample, RejectsNonObjectEntryInDocsArray) {
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
                                  BSON(PersistentSampleDoc::kDocsFieldName << arr.arr())));
     ASSERT_NOT_OK(result.getStatus());
+}
+
+// ── reassemblePersistentSample ────────────────────────────────────────────────────────────────
+
+// Builds a single page document for `pageNo` of a logical sample. All pages of a sample share the
+// same identity fields and differ only in `_id.pageNo` and their slice of `docs`.
+BSONObj buildPage(const UUID& uuid,
+                  SamplingTechniqueEnum method,
+                  size_t sampleSize,
+                  const std::vector<BSONObj>& docs,
+                  int pageNo,
+                  boost::optional<int> numChunks = boost::none) {
+    return buildPersistentSampleDoc(
+        uuid,
+        method,
+        sampleSize,
+        docs,
+        numChunks,
+        /*schemaVersion=*/kPersistentSampleSchemaVersion,
+        /*overrides=*/
+        BSON("_id" << makePersistentSampleIdObj(uuid, method, sampleSize, numChunks, pageNo)));
+}
+
+TEST(ReassemblePersistentSample, EmptyPagesReturnsNoSuchKey) {
+    auto result = reassemblePersistentSample({});
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::NoSuchKey);
+}
+
+TEST(ReassemblePersistentSample, SinglePageRoundTrips) {
+    const UUID uuid = UUID::gen();
+    const std::vector<BSONObj> docs{BSON("_id" << 1), BSON("_id" << 2)};
+    auto result = reassemblePersistentSample(
+        {buildPage(uuid, SamplingTechniqueEnum::kRandom, docs.size(), docs, /*pageNo=*/0)});
+    ASSERT_OK(result.getStatus());
+    const auto& sample = result.getValue();
+    ASSERT_EQUALS(sample.getDocs().size(), docs.size());
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[0], docs[0]);
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[1], docs[1]);
+}
+
+TEST(ReassemblePersistentSample, MultiplePagesConcatenatedInPageNoOrder) {
+    const UUID uuid = UUID::gen();
+    const BSONObj d0 = BSON("_id" << 0);
+    const BSONObj d1 = BSON("_id" << 1);
+    const BSONObj d2 = BSON("_id" << 2);
+    const BSONObj d3 = BSON("_id" << 3);
+    const size_t sampleSize = 4;
+
+    // The clustered forward scan delivers pages already ordered by pageNo, so reassembly relies on
+    // that ordering rather than sorting.
+    auto result = reassemblePersistentSample({
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, sampleSize, {d0, d1}, /*pageNo=*/0),
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, sampleSize, {d2, d3}, /*pageNo=*/1),
+    });
+    ASSERT_OK(result.getStatus());
+    const auto& sample = result.getValue();
+    ASSERT_EQUALS(sample.getDocs().size(), 4u);
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[0], d0);
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[1], d1);
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[2], d2);
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[3], d3);
+}
+
+TEST(ReassemblePersistentSample, OutOfOrderPagesRejected) {
+    const UUID uuid = UUID::gen();
+    // reassembly requires pages in pageNo order (guaranteed by the clustered forward scan); an
+    // out-of-order sequence is treated as an incorrectly written sample.
+    auto result = reassemblePersistentSample({
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 1)}, /*pageNo=*/1),
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 0)}, /*pageNo=*/0),
+    });
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, MissingMiddlePageRejected) {
+    const UUID uuid = UUID::gen();
+    // pages 0 and 2 present, 1 missing
+    auto result = reassemblePersistentSample({
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 3, {BSON("a" << 0)}, /*pageNo=*/0),
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 3, {BSON("a" << 2)}, /*pageNo=*/2),
+    });
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, FirstPageNotZeroRejected) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample({
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 1)}, /*pageNo=*/1),
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 2)}, /*pageNo=*/2),
+    });
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, DuplicatePageNoRejected) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample({
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 0)}, /*pageNo=*/0),
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 1)}, /*pageNo=*/0),
+    });
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, IdentityMismatchAcrossPagesRejected) {
+    const UUID uuid = UUID::gen();
+    // page 0 declares sampleSize 4, page 1 declares sampleSize 5 — inconsistent identity.
+    auto result = reassemblePersistentSample({
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 4, {BSON("a" << 0)}, /*pageNo=*/0),
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 5, {BSON("a" << 1)}, /*pageNo=*/1),
+    });
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, ReassembledDocsExceedingSampleSizeRejected) {
+    const UUID uuid = UUID::gen();
+    // Each page is individually within sampleSize=2, but combined they hold 3 docs.
+    auto result = reassemblePersistentSample({
+        buildPage(uuid,
+                  SamplingTechniqueEnum::kRandom,
+                  2,
+                  {BSON("a" << 0), BSON("a" << 1)},
+                  /*pageNo=*/0),
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 2)}, /*pageNo=*/1),
+    });
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
+TEST(ReassemblePersistentSample, MalformedPagePropagatesError) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample({
+        buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("a" << 0)}, /*pageNo=*/0),
+        BSONObj{},  // empty/malformed page.
+    });
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(ReassemblePersistentSample, PreservesChunkNumChunks) {
+    const UUID uuid = UUID::gen();
+    auto result = reassemblePersistentSample({
+        buildPage(uuid,
+                  SamplingTechniqueEnum::kChunk,
+                  2,
+                  {BSON("a" << 0)},
+                  /*pageNo=*/0,
+                  /*numChunks=*/1),
+        buildPage(uuid,
+                  SamplingTechniqueEnum::kChunk,
+                  2,
+                  {BSON("a" << 1)},
+                  /*pageNo=*/1,
+                  /*numChunks=*/1),
+    });
+    ASSERT_OK(result.getStatus());
+    const auto& sample = result.getValue();
+    ASSERT_EQUALS(sample.getSamplingMethod(), SamplingTechniqueEnum::kChunk);
+    ASSERT_TRUE(sample.getNumChunks().has_value());
+    ASSERT_EQUALS(sample.getNumChunks().value(), 1);
+    ASSERT_EQUALS(sample.getDocs().size(), 2u);
 }
 
 }  // namespace
