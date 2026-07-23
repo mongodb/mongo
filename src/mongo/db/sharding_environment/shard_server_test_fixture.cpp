@@ -43,7 +43,7 @@ void ShardServerTestFixture::setUp() {
         ->setRecoveryCompleted({OID::gen(),
                                 ClusterRole::ShardServer,
                                 ConnectionString(kConfigHostAndPort),
-                                kMyShardHandle});
+                                kMyShardName});
 
     if (!_configServerCatalogCacheLoader) {
         _configServerCatalogCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderImpl>();

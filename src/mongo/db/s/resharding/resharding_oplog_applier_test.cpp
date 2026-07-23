@@ -154,7 +154,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    kMyShardHandle});
+                                    _sourceId.getShardId()});
 
         _mockConfigServerCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
         _mockShardServerCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
@@ -264,7 +264,7 @@ public:
                 ChunkRange{BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity()),
                            BSON(kOriginalShardKey << 0)},
                 ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
-                kOtherShardHandle.name()},
+                kOtherShardId},
             ChunkType{kCrudUUID,
                       ChunkRange{BSON(kOriginalShardKey << 0), BSON(kOriginalShardKey << MAXKEY)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
@@ -343,7 +343,7 @@ public:
                                         boost::none /* prevWrite */,
                                         boost::none /* preImage */,
                                         boost::none /* postImage */,
-                                        kMyShardHandle.name(),
+                                        kMyShardId,
                                         Value(id.toBSON()),
                                         boost::none /* needsRetryImage) */)};
     }
@@ -498,12 +498,11 @@ protected:
     const NamespaceString kOtherDonorStashNs =
         NamespaceString::makeReshardingLocalConflictStashNSS(UUID::gen(), "2");
     const std::vector<NamespaceString> kStashCollections{kStashNs, kOtherDonorStashNs};
-    const ShardHandle kMyShardHandle{ShardId("shard1"), UUID::gen()};
-    const ShardHandle kOtherShardHandle{ShardId("shard2"), UUID::gen()};
-    const std::vector<ShardType> kShardList = {
-        ShardType(kMyShardHandle.name().toString(), "Host0:12345"),
-        ShardType(kOtherShardHandle.name().toString(), "Host1:12345")};
-    const ReshardingSourceId _sourceId{UUID::gen(), kMyShardHandle.name()};
+    const ShardId kMyShardId{"shard1"};
+    const ShardId kOtherShardId{"shard2"};
+    const std::vector<ShardType> kShardList = {ShardType(kMyShardId.toString(), "Host0:12345"),
+                                               ShardType(kOtherShardId.toString(), "Host1:12345")};
+    const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
 
     service_context_test::ShardRoleOverride _shardRole;
 

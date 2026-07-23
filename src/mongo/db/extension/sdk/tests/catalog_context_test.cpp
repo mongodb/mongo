@@ -105,12 +105,11 @@ TEST(CatalogContextTest, CatalogContextWithShardId) {
 
     // Set up ShardingState with a known shard ID.
     const std::string expectedShardId = "myShard0";
-    const ShardHandle expectedShardHandle = ShardHandle(ShardId(expectedShardId), UUID::gen());
     ShardingState::get(testCtx.getServiceContext())
         ->setRecoveryCompleted({OID::gen(),
                                 ClusterRole::ShardServer,
                                 ConnectionString(HostAndPort("localhost", 27017)),
-                                expectedShardHandle});
+                                ShardId(expectedShardId)});
 
     const auto dbNameSd = "test"sv;
     const auto collNameSd = "namespace"sv;

@@ -6,6 +6,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -44,7 +45,7 @@ private:
 
 class ShardingDDLCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
-    static inline const ShardHandle kTestShardHandle{ShardId("test-shard"), UUID::gen()};
+    static inline const ShardId kTestShardId{"test-shard"};
 
     ShardingDDLCoordinatorTest() : repl::PrimaryOnlyServiceMongoDTest(makeOptions()) {}
 
@@ -60,7 +61,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(HostAndPort("localhost", 27017)),
-                                    kTestShardHandle});
+                                    kTestShardId});
 
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _network = network.get();

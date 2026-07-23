@@ -36,7 +36,7 @@ public:
 class ChunkOperationShardingCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     static inline const auto kTestNs = NamespaceString::createNamespaceString_forTest("test.test");
-    static inline const ShardHandle kTestShardHandle{ShardId("test-shard"), UUID::gen()};
+    static inline const ShardId kTestShardId{"test-shard"};
     static inline const KeyPattern kTestKeyPattern{BSON("x" << 1)};
 
     ChunkOperationShardingCoordinatorTest()
@@ -58,7 +58,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(HostAndPort("localhost", 27017)),
-                                    kTestShardHandle});
+                                    kTestShardId});
 
         _opCtx = cc().getOperationContext();
         if (!_opCtx) {
@@ -103,7 +103,7 @@ protected:
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(collUuid);
         chunk.setVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
-        chunk.setShard(kTestShardHandle.name());
+        chunk.setShard(kTestShardId);
         chunk.setRange({kTestKeyPattern.globalMin(), kTestKeyPattern.globalMax()});
         chunk.setOnCurrentShardSince(Timestamp(1, 0));
         chunk.setHistory({});
@@ -130,7 +130,7 @@ protected:
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata =
-            CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardHandle.name());
+            CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardId);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(_opCtx, kTestNs);
         scopedCSR->setCollectionMetadata(
             _opCtx, collectionMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);

@@ -588,12 +588,10 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
 
     try {
         _initFunc(opCtx, shardIdentity);
-        shardingState->setRecoveryCompleted(
-            {shardIdentity.getClusterId(),
-             serverGlobalParams.clusterRole,
-             shardIdentity.getConfigsvrConnectionString(),
-             ShardHandle(ShardId(std::string{shardIdentity.getShardName()}),
-                         shardIdentity.getUuid())});
+        shardingState->setRecoveryCompleted({shardIdentity.getClusterId(),
+                                             serverGlobalParams.clusterRole,
+                                             shardIdentity.getConfigsvrConnectionString(),
+                                             ShardId(std::string{shardIdentity.getShardName()})});
     } catch (const DBException& ex) {
         shardingState->setRecoveryFailed(ex.toStatus());
     }

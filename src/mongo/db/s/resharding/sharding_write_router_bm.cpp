@@ -120,8 +120,7 @@ protected:
             const uint32_t nChunks = 60;
             const auto clusterId = OID::gen();
             const auto shards = std::vector<ShardId>{ShardId("shard0")};
-            const auto originatorShardId = shards[0];
-            const auto originatorShardHandle = ShardHandle(originatorShardId, UUID::gen());
+            const auto originatorShard = shards[0];
 
             auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
 
@@ -137,9 +136,9 @@ protected:
                 ->setRecoveryCompleted({clusterId,
                                         ClusterRole::ShardServer,
                                         ConnectionString(kConfigHostAndPort),
-                                        originatorShardHandle});
+                                        originatorShard});
 
-            _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShardId));
+            _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShard));
 
             OperationShardingState::setShardRole(
                 opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);
@@ -148,7 +147,7 @@ protected:
             // collection with a routing table. The resharding key and temp namespace are
             // advertised separately through the LocalReshardingOperationsRegistry.
             CollectionShardingRuntime::acquireExclusive(opCtx, kNss)
-                ->setCollectionMetadata(opCtx, CollectionMetadata(chunkManager, originatorShardId));
+                ->setCollectionMetadata(opCtx, CollectionMetadata(chunkManager, originatorShard));
 
             const auto reshardingTempNs =
                 resharding::constructTemporaryReshardingNss(kNss, chunkManager.getUUID());

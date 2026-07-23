@@ -296,9 +296,6 @@ private:
             // ShardId of the shard to which the command will be sent.
             ShardId _shardId;
 
-            // ShardHandle of the shard to which the command was sent.
-            ShardHandle _shardHandle;
-
             // The command object to send to the remote host.
             BSONObj _cmdObj;
 

@@ -41,7 +41,6 @@ auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
 class ShardsvrProcessInterfaceTest : public ShardedAggTestFixture {
 public:
     static inline auto kMyShardName = ShardId{"DummyShard"};
-    static inline auto kMyShardUUID = UUID::gen();
 
     void setUp() override {
         ShardedAggTestFixture::setUp();
@@ -55,7 +54,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString{kConfigHostAndPort},
-                                    ShardHandle(kMyShardName, kMyShardUUID)});
+                                    kMyShardName});
 
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, settings);

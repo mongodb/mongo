@@ -270,7 +270,6 @@ protected:
         // The ShardingState must be set to 'config' to be able to call
         // metadata_consistency_util::checkChunksConsistency()
         kMyShardName = ShardId::kConfigServerId;
-        kMyShardHandle = ShardHandle(kMyShardName, UUID::gen());
         MetadataConsistencyTest::setUp();
     }
 };

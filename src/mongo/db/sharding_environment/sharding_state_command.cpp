@@ -70,11 +70,6 @@ public:
             result.append("shardName", shardingState->shardId());
             result.append("clusterId", shardingState->clusterId());
 
-            const auto& shardHandle = shardingState->getShardHandle();
-            if (const auto& shardUuid = shardHandle.uuid()) {
-                shardUuid->appendToBuilder(&result, "shardUuid");
-            }
-
             CollectionShardingState::appendInfoForShardingStateCommand(opCtx, &result);
         }
 

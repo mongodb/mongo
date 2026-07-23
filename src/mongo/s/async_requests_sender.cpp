@@ -297,13 +297,7 @@ SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::Impl::RemoteData::getSha
     }
     return Grid::get(getGlobalServiceContext())
         ->shardRegistry()
-        ->getShard(*impl->_subBaton, _shardId)
-        .thenRunOn(*impl->_subBaton)
-        .then([this, impl = std::move(impl)](auto&& shard) {
-            _shardHandle = shard->getHandle();
-            return shard;
-        })
-        .semi();
+        ->getShard(*impl->_subBaton, _shardId);
 }
 
 void AsyncRequestsSender::Impl::RemoteData::executeRequest(std::shared_ptr<Impl> impl) {

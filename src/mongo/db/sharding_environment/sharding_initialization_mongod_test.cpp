@@ -35,7 +35,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/uuid.h"
 
 #include <vector>
 
@@ -153,40 +152,6 @@ TEST_F(ShardingInitializationMongoDTest, ValidShardIdentitySucceeds) {
     ASSERT(shardingState()->enabled());
     ASSERT_EQ(kShardName, shardingState()->shardId());
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
-}
-
-TEST_F(ShardingInitializationMongoDTest, ShardIdentityWithUuidPopulatesShardingStateShardHandle) {
-    Lock::GlobalWrite lk(operationContext());
-
-    const auto shardUuid = UUID::gen();
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
-    shardIdentity.setShardName(kShardName);
-    shardIdentity.setClusterId(OID::gen());
-    shardIdentity.setUuid(shardUuid);
-
-    shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
-
-    ASSERT_EQ(ShardId(kShardName), shardingState()->shardId());
-    const auto& shardHandle = shardingState()->getShardHandle();
-    ASSERT_EQ(ShardHandle(kShardName, shardUuid), shardHandle);
-}
-
-TEST_F(ShardingInitializationMongoDTest, ShardIdentityWithoutUuidLeavesShardHandleUuidUnset) {
-    Lock::GlobalWrite lk(operationContext());
-
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
-    shardIdentity.setShardName(kShardName);
-    shardIdentity.setClusterId(OID::gen());
-
-    shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
-
-    ASSERT_EQ(ShardId(kShardName), shardingState()->shardId());
-    const auto& shardHandle = shardingState()->getShardHandle();
-    ASSERT_EQ(ShardHandle(kShardName, boost::none), shardHandle);
 }
 
 TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {

@@ -1643,7 +1643,7 @@ TEST_F(ShardingMongoDTestFixture, ShardingStateEnabledReturnsTrackedVersion) {
     // CollectionShardingRuntime will throw StaleConfig because the metadata needs to be recovered.
     ShardingState::RecoveredClusterRole rcr;
     rcr.role = ClusterRole::ShardServer;
-    rcr.shardHandle = ShardHandle(ShardId("0"), UUID::gen());
+    rcr.shardId = ShardId("0");
     ShardingState::get(opCtx)->setRecoveryCompleted(rcr);
     ASSERT_THROWS_CODE(csr.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);
     ASSERT_THROWS_CODE(csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::StaleConfig);
