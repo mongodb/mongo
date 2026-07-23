@@ -4,7 +4,6 @@
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
 #include "mongo/platform/random.h"
-#include "mongo/util/assert_util.h"
 
 #include <opentelemetry/trace/span_context.h>
 
@@ -19,22 +18,25 @@ PseudoRandom& defaultPrng() {
 }
 }  // namespace
 
-SpanTelemetryContextImpl::SpanTelemetryContextImpl() : _prng(&defaultPrng()) {}
+SpanTelemetryContextImpl::SpanTelemetryContextImpl()
+    : _samplingRoll(defaultPrng().nextCanonicalDouble()) {}
 
 SpanTelemetryContextImpl::SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng)
-    : _ctx(std::move(ctx)), _prng(prng ? prng : &defaultPrng()) {}
+    : _ctx(std::move(ctx)), _samplingRoll((prng ? *prng : defaultPrng()).nextCanonicalDouble()) {}
 
-double SpanTelemetryContextImpl::getSamplingValue() {
-    if (!_samplingRoll) {
-        invariant(_prng != nullptr);
-        _samplingRoll = _prng->nextCanonicalDouble();
-    }
-    return *_samplingRoll;
+SpanTelemetryContextImpl::SpanTelemetryContextImpl(OtelContext ctx, double samplingRoll)
+    : _ctx(std::move(ctx)), _samplingRoll(samplingRoll) {}
+
+std::shared_ptr<TelemetryContext> SpanTelemetryContextImpl::clone() const {
+    // Clones inherit the parent's roll so all telemetry contexts within one operation share the
+    // same sampling decision.
+    return std::shared_ptr<TelemetryContext>(
+        new SpanTelemetryContextImpl(_getContext(), _samplingRoll));
 }
 
 void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
                                          TextMapCarrier& carrier) const {
-    propagator.Inject(carrier, _ctx);
+    propagator.Inject(carrier, _getContext());
 }
 
 }  // namespace traces

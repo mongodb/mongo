@@ -3,7 +3,9 @@
 
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -46,12 +48,12 @@ TEST_F(SpanTelemetryContextImplTest, SamplingRollIsInUnitInterval) {
     ASSERT_LT(roll, 1.0);
 }
 
-TEST_F(SpanTelemetryContextImplTest, SamplingRollIsMemoized) {
+TEST_F(SpanTelemetryContextImplTest, SamplingRollIsStable) {
     PseudoRandom prng(int64_t{1});
     SpanTelemetryContextImpl impl(getSpanContext(), &prng);
     double first = impl.getSamplingValue();
 
-    // A second call must return the value drawn on the first call. This is the "one roll per
+    // Repeated calls must return the constructor-drawn value. This is the "one roll per
     // telemetry context" invariant.
     double second = impl.getSamplingValue();
     ASSERT_EQ(first, second);
@@ -66,6 +68,28 @@ TEST_F(SpanTelemetryContextImplTest, HasActiveTraceReturnsTrueWhenSpanIsSet) {
     SpanTelemetryContextImpl impl(getSpanContext());
     impl.setSpan(makeValidSpan());
     ASSERT_TRUE(impl.hasActiveTrace());
+}
+
+// TSAN regression for concurrent setSpan writes vs getSpan/hasActiveTrace reads of _ctx.
+// No ASSERT/EXPECT by design: correctness is enforced by ThreadSanitizer detecting a data race.
+TEST_F(SpanTelemetryContextImplTest, ConcurrentSetSpanAndGetSpan) {
+    constexpr int kReadIterations = 10000;
+    SpanTelemetryContextImpl impl(getSpanContext());
+    AtomicWord<bool> stop{false};
+
+    stdx::thread writer([&] {
+        while (!stop.load()) {
+            impl.setSpan(makeValidSpan());
+        }
+    });
+
+    for (int i = 0; i < kReadIterations; ++i) {
+        (void)impl.getSpan();
+        (void)impl.hasActiveTrace();
+    }
+
+    stop.store(true);
+    writer.join();
 }
 
 }  // namespace
