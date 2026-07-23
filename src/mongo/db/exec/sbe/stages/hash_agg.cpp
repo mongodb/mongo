@@ -162,7 +162,11 @@ void HashAggStage::prepare(CompileCtx& ctx) {
 
     _compiled = true;
 
-    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+    // Use a chunked tracker so that memory-usage stats are only pushed to CurOp when usage crosses
+    // a chunk boundary, rather than on every accumulator add(). Reporting on every add() is a
+    // per-document cost on the accumulation hot path (e.g. a $group with a single bucket) that
+    // does not scale with the amount of tracked memory.
+    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
         _opCtx, loadMemoryLimit(StageMemoryLimit::QuerySBEAggApproxMemoryUseInBytesBeforeSpill));
 }
 

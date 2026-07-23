@@ -7,6 +7,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
@@ -93,6 +94,63 @@ public:
         }
         auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
         ASSERT_GT(stats->peakTrackedMemBytes, 0);
+    }
+
+    // Returns the (inUse, peak) memory-tracking stats currently recorded in this operation's CurOp.
+    // The SBE HashAggStage's memory tracker reports these values to CurOp via the operation-wide
+    // memory tracker.
+    std::pair<int64_t, int64_t> getCurOpMemoryStats() {
+        CurOp* curOp = CurOp::get(operationContext());
+        return {curOp->getInUseTrackedMemoryBytes(), curOp->getPeakTrackedMemoryBytes()};
+    }
+
+    // Bundle that keeps a prepared-and-run HashAggStage (plus everything it depends on) alive so a
+    // caller can inspect memory-tracking state before the stage is destroyed.
+    struct RunResult {
+        std::unique_ptr<CompileCtx> ctx;
+        std::unique_ptr<PlanStage> stage;
+        value::TagValueOwned results;
+    };
+
+    // Builds a simple $group-style HashAggStage that groups a small integer input by value and sums
+    // a constant per document, runs it to completion, and returns the still-open stage so the
+    // caller can inspect its memory tracker and the CurOp stats.
+    RunResult runGroupingSumHashAgg() {
+        BSONArrayBuilder bab;
+        for (int i = 0; i < 100; ++i) {
+            bab.append(i % 10);
+        }
+        value::TagValueOwned inputOwned =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(bab.arr()));
+
+        auto makeStageFn = [this](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
+            auto countsSlot = generateSlotId();
+            auto spillSlot = generateSlotId();
+            auto hashAggStage = makeS<HashAggStage>(
+                std::move(scanStage),
+                makeSV(scanSlot),
+                makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
+                    countsSlot,
+                    spillSlot,
+                    makeFunction(EFn::kSum,
+                                 makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                  value::bitcastFrom<int64_t>(1))),
+                    makeFunction(EFn::kSum, makeVariable(spillSlot)))),
+                true,
+                boost::none,
+                false /* allowDiskUse */,
+                nullptr /* yieldPolicy */,
+                kEmptyPlanNodeId);
+            return std::make_pair(countsSlot, std::move(hashAggStage));
+        };
+
+        auto ctx = makeCompileCtx();
+        auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
+        auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
+        auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
+        value::TagValueOwned results =
+            value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessor));
+        return {std::move(ctx), std::move(stage), std::move(results)};
     }
 
 private:
@@ -195,6 +253,46 @@ void HashAggStageTest::performHashAggWithSpillChecking(
         ASSERT_GT(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
     }
 };
+
+// The SBE HashAggStage uses a "chunked" operation memory tracker, which only pushes memory-usage
+// updates to CurOp when usage crosses a chunk boundary. With a chunk size larger than anything this
+// small aggregation consumes, the tracker never crosses a boundary, so nothing is reported to CurOp
+// while the stage still holds its memory, even though the stage-local tracker reflects the exact
+// usage. A non-chunked tracker would instead report on every add().
+TEST_F(HashAggStageTest, ChunkedMemoryTrackerDefersCurOpReportingBelowChunkBoundary) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                             100 * 1024 * 1024);
+
+    auto run = runGroupingSumHashAgg();
+
+    // The stage-local tracker reflects exact, non-zero usage that is still being held.
+    ASSERT_GT(run.stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(run.stage->getMemoryTracker()->peakTrackedMemoryBytes(), 0);
+
+    // But because usage never crossed the (large) chunk boundary, CurOp was never updated.
+    auto [curOpInUse, curOpPeak] = getCurOpMemoryStats();
+    ASSERT_EQ(curOpInUse, 0);
+    ASSERT_EQ(curOpPeak, 0);
+}
+
+// With a chunk size of 1 byte the chunked tracker reports on essentially every add(), so CurOp ends
+// up mirroring the stage-local tracker's usage. This confirms that the SBE HashAggStage's tracker
+// actually consults the chunk-size knob (which only the chunked tracker does).
+TEST_F(HashAggStageTest, ChunkedMemoryTrackerReportsToCurOpWhenChunkBoundaryCrossed) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 1);
+
+    auto run = runGroupingSumHashAgg();
+
+    auto stageInUse = run.stage->getMemoryTracker()->inUseTrackedMemoryBytes();
+    auto stagePeak = run.stage->getMemoryTracker()->peakTrackedMemoryBytes();
+    ASSERT_GT(stageInUse, 0);
+
+    auto [curOpInUse, curOpPeak] = getCurOpMemoryStats();
+    ASSERT_EQ(curOpInUse, stageInUse);
+    ASSERT_EQ(curOpPeak, stagePeak);
+}
 
 TEST_F(HashAggStageTest, HashAggMinMaxTest) {
     using namespace std::literals;
