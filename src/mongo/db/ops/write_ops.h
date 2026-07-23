@@ -89,6 +89,11 @@ int32_t getStmtIdForWriteAt(const T& op, size_t writePos) {
     return getStmtIdForWriteAt(op.getWriteCommandRequestBase(), writePos);
 }
 
+/**
+ * Throws InvalidOptions when the statement id values are invalid.
+ */
+void validateStmtIds(const std::vector<std::int32_t>& stmtIds);
+
 // TODO: Delete this getter once IDL supports defaults for object and array fields
 template <class T>
 const BSONObj& collationOf(const T& opEntry) {

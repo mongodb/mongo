@@ -31,12 +31,15 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
+
+#include <absl/container/flat_hash_set.h>
 
 namespace mongo {
 
@@ -86,6 +89,7 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
                                                << "stmtIds" << *stmtIds)
                               << ". Write command: " << op.toBSON({}),
                 !op.getWriteCommandRequestBase().getStmtId());
+        write_ops::validateStmtIds(*stmtIds);
     }
 }
 
@@ -206,6 +210,26 @@ int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, siz
     const auto& stmtId = writeCommandBase.getStmtId();
     const int32_t kFirstStmtId = stmtId ? *stmtId : 0;
     return kFirstStmtId + writePos;
+}
+
+void validateStmtIds(const std::vector<std::int32_t>& stmtIds) {
+    // Statement ids are not allowed to repeat.
+    absl::flat_hash_set<std::int32_t> seen;
+    seen.reserve(stmtIds.size());
+    for (auto stmtId : stmtIds) {
+        if (stmtId == kUninitializedStmtId) {
+            // This sentinel marks a write that is not retryable, so it may repeat.
+            continue;
+        }
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Statement id must be non-negative. Got " << stmtId,
+                stmtId >= 0);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Statement ids must be unique within a write command. Found "
+                                 "duplicate statement id "
+                              << stmtId,
+                seen.insert(stmtId).second);
+    }
 }
 
 int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants) {

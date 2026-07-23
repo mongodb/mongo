@@ -66,7 +66,7 @@ function verifyOplogEntries(cmdObj,
 
     const writeRes = mongosTestDB.runCommand(writeCmdObj);
     if (customStmtIdsOption == kStmtIdsOption.isRepeated) {
-        assert.commandFailedWithCode(writeRes, 5875600);
+        assert.commandFailedWithCode(writeRes, ErrorCodes.InvalidOptions);
         assert.commandWorked(mongosTestColl.remove({}));
         return;
     }
