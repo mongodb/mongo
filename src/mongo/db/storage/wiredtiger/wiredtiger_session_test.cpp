@@ -152,4 +152,20 @@ TEST(WiredTigerSessionTest, CursorNotCachedAfterCleanShutdown) {
         << "Cursor should not be cached after clean-shutdown engine epoch bump";
 }
 
+TEST(WiredTigerSessionTest, VerifyConfig) {
+    WiredTigerHarnessHelper helper;
+    std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
+    std::unique_ptr<RecordStore> rs = helper.newRecordStore();
+    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+
+    auto* session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();
+
+    // Verify requires zero open cursors on the table.
+    session->closeAllCursors(uri);
+
+    ASSERT_EQ(0, session->verify(uri.c_str(), nullptr));
+    ASSERT_EQ(0, session->verify(uri.c_str(), ""));
+    ASSERT_EQ(0, session->verify(uri.c_str(), "skip_per_key_hs=false"));
+}
+
 }  // namespace mongo

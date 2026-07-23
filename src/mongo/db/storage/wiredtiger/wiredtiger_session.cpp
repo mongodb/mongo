@@ -112,6 +112,18 @@ void WiredTigerSession::_openCursor(WT_SESSION* session,
                         "message"_attr = kWTRepairMsg);
 }
 
+int WiredTigerSession::verify(const char* uri, const char* config) {
+    Timer timer(_tickSource);
+    ON_BLOCK_EXIT([&] { _storageEngineTime += timer.elapsed(); });
+
+    std::string merged{"skip_per_key_hs,"};
+    if (config) {
+        merged += config;
+    }
+
+    return _session->verify(_session, uri, merged.c_str());
+}
+
 WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& config) {
     // Find the most recently used cursor
     for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {

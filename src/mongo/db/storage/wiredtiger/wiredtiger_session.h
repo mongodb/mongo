@@ -131,8 +131,19 @@ public:
     WRAPPED_WT_SESSION_METHOD(timestamp_transaction_uint)
     WRAPPED_WT_SESSION_METHOD(transaction_pinned_range)
     WRAPPED_WT_SESSION_METHOD(truncate)
-    WRAPPED_WT_SESSION_METHOD(verify)
 #undef WRAPPED_WT_SESSION_METHOD
+
+    /**
+     * Perform a WiredTiger-level verification of a table.
+     *
+     * The config string specifies optional extra arguments made to the verify call, nullptr and
+     * empty strings are both permitted. These extra arguments will override any arguments that
+     * this wrapper adds internally.
+     *
+     * TODO SERVER-131939: Once we stop unconditionally skipping the extra HS key verification,
+     * remove this custom wrapper and go back to using the macro.
+     */
+    int verify(const char* uri, const char* config);
 
     /**
      * Gets a cursor on the table id 'id' with optional configuration, 'config'.
