@@ -8,7 +8,7 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -27,7 +27,13 @@ assert.commandWorked(
 // When DisableTransactionUpdateCoalescing is enabled, we disable transaction update coalescing on
 // secondaries to ensure that the history of updates is identical between the primary and
 // secondaries. Then, snapshot and point-in-time (PIT) reads are allowed.
-if (FeatureFlagUtil.isPresentAndEnabled(primary, "DisableTransactionUpdateCoalescing")) {
+if (
+    PersistenceProviderUtil.allNodesHavePropertyWithValue(
+        primaryDB,
+        "shouldDisableTransactionUpdateCoalescing",
+        true,
+    )
+) {
     assert.commandWorked(
         primaryDB.runCommand({
             find: "transactions",
