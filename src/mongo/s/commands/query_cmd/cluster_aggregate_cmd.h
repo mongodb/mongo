@@ -9,6 +9,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -134,8 +136,13 @@ public:
             }
 
             const auto& body = unparsedRequest().body;
-            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx,
-                                                             !Pipeline::aggHasWriteStage(body));
+            const bool hasWriteStage = Pipeline::aggHasWriteStage(body);
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx, !hasWriteStage);
+
+            // Opt in to query-memory load shedding for read-only aggregations.
+            if (!hasWriteStage) {
+                markOperationQueryMemorySheddingEligible(opCtx);
+            }
 
             // Run aggregate-specific semantic validation beyond what the IDL-parsing provides.
             aggregation_request_helper::validate(request(), body, ns(), opCtx->getClient());

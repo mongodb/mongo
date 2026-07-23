@@ -1351,6 +1351,7 @@ protected:
             invariant(opCtx);
 
             opCtx->checkForInterrupt();
+            checkForQueryMemoryLoadShedding(opCtx);
             if (--_verySlowTick == 0) {
                 checkForInterruptVerySlow();
             }
@@ -1358,6 +1359,9 @@ protected:
 
         // Performs the work around checking for interrupt that can't be inlined.
         void checkForInterruptVerySlow();
+
+        // Evaluates the query-memory load-shed decision.
+        void checkForQueryMemoryLoadShedding(OperationContext* opCtx);
 
         static constexpr int32_t kInterruptCheckPeriod = 128;
         static constexpr int32_t kVerySlowInterruptCheckPeriod = 8;  // Runs every 1024 ticks

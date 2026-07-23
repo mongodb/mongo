@@ -61,6 +61,7 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/mongod_options_general_gen.h"
@@ -585,6 +586,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     StorageControl::startStorageControls(
         serviceContext, false, rss.getPersistenceProvider().makeCheckpointSchedulePolicy());
+
+    // Start the RSS pressure sampler here because: (1) its only dependency, the PeriodicRunner, is
+    // now set up; (2) it precedes accepting connections, so it is live (and primed) before any
+    // sheddable query; and (3) storage is up, so the first sample reflects the real allocated
+    // footprint. A no-op if RSS monitoring is disabled.
+    startQueryMemoryRssMonitor(serviceContext);
 
     auto logStartupStats = std::make_unique<ScopeGuard<std::function<void()>>>([&] {
         initAndListenTotalTimer = {};

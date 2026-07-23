@@ -174,6 +174,8 @@ public:
         "mongodb.serverStatus.network.ingressRequestRateLimiter.timeQueuedMicros");
 
     // Query Execution Team Metrics
+    static constexpr MetricName kQueryMemoryLoadSheddingOperationsShed =
+        MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.operationsShed");
     static constexpr MetricName kChangeStreamCursorsTotalOpened =
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.totalOpened");
     static constexpr MetricName kChangeStreamCursorsLifespan =

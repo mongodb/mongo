@@ -22,6 +22,11 @@ namespace mongo {
  * writes will use a local read concern and see the latest version of the data. It will also reset
  * ignore_prepared on the recovery unit so that any reads or writes will block on a conflict with a
  * prepared transaction. Resets the OperationContext back to its original state upon destruction.
+ *
+ * It also marks the operation exempt from query-memory load shedding, so a $merge/$out write (which
+ * is not routed through PlanExecutor::executeWrite) cannot be shed mid-write. The exemption is a
+ * one-way latch, so the operation stays exempt afterward; the read side upstream of the write
+ * (which runs before this block is ever entered) stays sheddable.
  */
 class DocumentSourceWriteBlock {
     OperationContext* _opCtx;

@@ -4,6 +4,8 @@
 #pragma once
 
 #include "mongo/db/commands.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
@@ -102,6 +104,7 @@ public:
             globalOpCounters().gotGetMore();
 
             Impl::checkCanRunHere(opCtx);
+            markOperationQueryMemorySheddingEligible(opCtx);
 
             auto bob = reply->getBodyBuilder();
             auto response = uassertStatusOK(ClusterFind::runGetMore(opCtx, request()));

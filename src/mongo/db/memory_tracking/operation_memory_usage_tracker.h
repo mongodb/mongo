@@ -6,8 +6,10 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <limits>
 
 namespace mongo {
 
@@ -115,6 +117,13 @@ public:
     static bool hasTrackerOnOpCtx(OperationContext* opCtx);
 
     /**
+     * Returns the operation's tracker if one exists, otherwise nullptr. Never creates one. Lets the
+     * load-shedding decision read tracked-memory size without forcing a tracker onto operations
+     * that don't track memory.
+     */
+    static OperationMemoryUsageTracker* getIfExists(OperationContext* opCtx);
+
+    /**
      * Re-point 'tracker' at the operation memory tracker for 'opCtx'. For stages whose lifetime
      * spans getMore opCtx swaps to re-bind after being detached, since the operation tracker lives
      * on the OperationContext. No-op when memory tracking is disabled, matching the
@@ -146,4 +155,5 @@ private:
 
     OperationContext* _opCtx;
 };
+
 }  // namespace mongo
