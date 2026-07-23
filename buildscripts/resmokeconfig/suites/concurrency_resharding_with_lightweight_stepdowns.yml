@@ -9,7 +9,7 @@ selector:
 
     # tests that calls moveCollection and reshardCollection.
     - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_setFCV_operations_with_metadata_check.js
-    - jstests/concurrency/fsm_workloads/crud/random_ddl_crud_operations.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_crud_operations.js
     - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_bulkWrite_operations.js
     - jstests/concurrency/fsm_workloads/ddl/transaction_crud_ddl_isolation.js
     - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid_sharded.js
