@@ -353,7 +353,7 @@ feature_flags:
         cpp_varname: "gFeatureFlagUnifiedWriteExecutor"
         default: true
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: release
 
     featureFlagOriginalQueryShapeHash:
         description: "Feature flag to to pass 'originalQueryShapeHash' field in commands from router to shards."
