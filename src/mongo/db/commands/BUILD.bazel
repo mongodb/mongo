@@ -1635,3 +1635,16 @@ mongo_idl_library(
         "//src/mongo/db:vector_clock_idl",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "mongod_fcv_test",
+    srcs = [
+        "feature_compatibility_version_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        "mongod_fcv",
+        "//src/mongo/db/catalog:catalog_control",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+    ],
+)

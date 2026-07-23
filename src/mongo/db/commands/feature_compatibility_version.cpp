@@ -30,18 +30,15 @@
 
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -294,13 +291,28 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
-    invariant(autoColl.ensureDbExists(opCtx),
-              redactTenant(NamespaceString::kServerConfigurationNamespace));
-
-    const auto query = BSON("_id" << multiversion::kParameterName);
-    return repl::StorageInterface::get(opCtx)->findById(
-        opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
+    // FCV is initialized before catalog repair on startup (as index builds may care about FCV),
+    // which means that if we crash during initial sync there may be incomplete foreground index
+    // builds that stop us from loading the index catalog. As a result, we need to perform a
+    // collection scan instead of findById(). The collection also contains sharding configuration so
+    // there can be more than one document, but it should still be a very small number.
+    auto result = repl::StorageInterface::get(opCtx)->findDocuments(
+        opCtx,
+        NamespaceString::kServerConfigurationNamespace,
+        boost::none,
+        repl::StorageInterface::ScanDirection::kForward,
+        {},
+        BoundInclusion::kIncludeStartKeyOnly,
+        std::numeric_limits<size_t>::max());
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+    for (auto&& doc : result.getValue()) {
+        if (doc["_id"].valueStringDataSafe() == multiversion::kParameterName) {
+            return doc;
+        }
+    }
+    return {ErrorCodes::NoSuchKey, "FCV document not found"};
 }
 
 void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
@@ -573,6 +585,12 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     invariant(shard_role_details::getLocker(opCtx)->isW());
     auto featureCompatibilityVersion = findFeatureCompatibilityVersionDocument(opCtx);
     if (!featureCompatibilityVersion.isOK()) {
+        const auto& status = featureCompatibilityVersion.getStatus();
+        // NamespaceNotFound is expected on a new cluster, and NoSuchKey is expected if the
+        // featureCompatibilityVersion document is not found and --repair is used.
+        if (status != ErrorCodes::NamespaceNotFound && status != ErrorCodes::NoSuchKey) {
+            LOGV2_FATAL(11379202, "FCV initialization failed", "status"_attr = status);
+        }
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
             "startup"_sd);
         return;
