@@ -22,6 +22,12 @@ public:
     const std::vector<std::string>& getServerStatusAllowlistPaths() const override;
 
     const PathMatcherNode& getServerStatusAllowlistMatcher() const override;
+
+    bool requiresReplSetGetStatusFiltering(OperationContext* opCtx) const override;
+
+    const std::vector<std::string>& getReplSetGetStatusAllowlistPaths() const override;
+
+    const PathMatcherNode& getReplSetGetStatusAllowlistMatcher() const override;
 };
 
 }  // namespace mongo

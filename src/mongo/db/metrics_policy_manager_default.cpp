@@ -27,4 +27,17 @@ const PathMatcherNode& MetricsPolicyManagerDefault::getServerStatusAllowlistMatc
     _throwNoAllowlistError();
 }
 
+bool MetricsPolicyManagerDefault::requiresReplSetGetStatusFiltering(OperationContext* opCtx) const {
+    return false;
+}
+
+const std::vector<std::string>& MetricsPolicyManagerDefault::getReplSetGetStatusAllowlistPaths()
+    const {
+    _throwNoAllowlistError();
+}
+
+const PathMatcherNode& MetricsPolicyManagerDefault::getReplSetGetStatusAllowlistMatcher() const {
+    _throwNoAllowlistError();
+}
+
 }  // namespace mongo

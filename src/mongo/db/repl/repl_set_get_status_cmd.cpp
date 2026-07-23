@@ -9,6 +9,8 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/metrics_filtering_util.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_command.h"
@@ -35,7 +37,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
+             BSONObjBuilder& inputResultBuilder) override {
         // Critical to monitoring and observability, categorize the command as immediate priority.
         ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
             opCtx, AdmissionContext::Priority::kExempt);
@@ -43,7 +45,8 @@ public:
         if (cmdObj["forShell"].trueValue())
             NotPrimaryErrorTracker::get(opCtx->getClient()).disable();
 
-        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
+        Status status =
+            ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&inputResultBuilder);
         uassertStatusOK(status);
 
         // The initialSync parameter accepts:
@@ -84,9 +87,31 @@ public:
                               << typeName(initialSyncElem.type()));
             }
         }
+
+        // If filtering is required by the metrics policy, append the metrics fields to a temporary
+        // result builder and filter them at the end. Otherwise, append directly to the input result
+        // builder to avoid additional costs in the non-filtering case.
+        auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+        bool requireFiltering = metricsPolicyManager.requiresReplSetGetStatusFiltering(opCtx);
+
+        boost::optional<BSONObjBuilder> tmpResultBuilder;
+        if (requireFiltering) {
+            tmpResultBuilder.emplace();
+        }
+        BSONObjBuilder& result = requireFiltering ? *tmpResultBuilder : inputResultBuilder;
+
         status = ReplicationCoordinator::get(opCtx)->processReplSetGetStatus(
             opCtx, &result, responseStyle);
         uassertStatusOK(status);
+
+        // If filtering is required, we appended the metrics fields to a temporary result builder.
+        // Now extract and append only the ones matching the allowlist to the input result builder.
+        if (requireFiltering) {
+            const auto& matcher = metricsPolicyManager.getReplSetGetStatusAllowlistMatcher();
+            metrics_filtering_util::appendPaths(
+                inputResultBuilder, tmpResultBuilder->obj(), matcher);
+        }
+
         return true;
     }
 

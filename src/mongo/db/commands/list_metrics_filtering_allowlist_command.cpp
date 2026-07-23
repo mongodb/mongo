@@ -58,6 +58,9 @@ public:
                 case MetricsCategoryEnum::serverStatus: {
                     return {metricsPolicyManager.getServerStatusAllowlistPaths()};
                 }
+                case MetricsCategoryEnum::replSetGetStatus: {
+                    return {metricsPolicyManager.getReplSetGetStatusAllowlistPaths()};
+                }
             }
 
             uasserted(ErrorCodes::BadValue, "Unsupported metrics category");

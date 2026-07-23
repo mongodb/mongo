@@ -753,6 +753,8 @@ mongo_cc_library(
         ":repl_coordinator_interface",
         "//src/mongo:base",
         "//src/mongo/db:commands",
+        "//src/mongo/db:metrics_filtering_util",
+        "//src/mongo/db:metrics_policy_manager_default",
         "//src/mongo/db:not_primary_error_tracker",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
