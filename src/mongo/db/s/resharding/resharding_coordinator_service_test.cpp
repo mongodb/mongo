@@ -644,8 +644,14 @@ public:
         // and start recovering the resharding operation.
         pauseBeforeCTHolderInitialization->setMode(FailPoint::off, 0);
 
-        makeRecipientsProceedToDone(opCtx);
-        makeDonorsProceedToDone(opCtx);
+        // With featureFlagReshardingInitNoRefresh enabled, the abort path skips the
+        // observer wait and races kAborting -> kDone, so polling for kAborting and
+        // advancing participants would either spin or fail.
+        if (!resharding::gFeatureFlagReshardingInitNoRefresh.isEnabledAndIgnoreFCVUnsafe()) {
+            waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
+            makeRecipientsProceedToDone(opCtx);
+            makeDonorsProceedToDone(opCtx);
+        }
 
         // Wait for completion and verify the original abort reason is still used.
         ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), abortReason0);
