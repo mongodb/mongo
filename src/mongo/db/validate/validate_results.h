@@ -8,6 +8,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/validate/size_limited_bsonobj_heap.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
@@ -159,12 +160,12 @@ public:
     }
 
     const std::vector<BSONObj>& getExtraIndexEntries() const {
-        return _extraIndexEntries;
+        return _extraIndexEntries.entries();
     }
     void addExtraIndexEntry(BSONObj entry);
 
     const std::vector<BSONObj>& getMissingIndexEntries() const {
-        return _missingIndexEntries;
+        return _missingIndexEntries.entries();
     }
     void addMissingIndexEntry(BSONObj entry);
 
@@ -319,11 +320,11 @@ public:
 private:
     boost::optional<UUID> _uuid;
     boost::optional<NamespaceString> _nss;
+    // Up to 1MB of "inconsistency" errors will be kept, i.e. missing/extra index fields.
+    static constexpr size_t kMaxIndexInconsistencySize = 1 * 1024 * 1024;
 
-    size_t _extraIndexEntriesUsedBytes = 0;
-    size_t _missingIndexEntriesUsedBytes = 0;
-    std::vector<BSONObj> _extraIndexEntries;
-    std::vector<BSONObj> _missingIndexEntries;
+    SizeLimitedBSONObjHeap _extraIndexEntries{kMaxIndexInconsistencySize};
+    SizeLimitedBSONObjHeap _missingIndexEntries{kMaxIndexInconsistencySize};
     std::vector<RecordId> _corruptRecords;
 
     bool _repaired = false;

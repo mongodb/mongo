@@ -16,8 +16,6 @@ using namespace std::literals::string_view_literals;
 
 namespace {
 
-// Up to 1MB of "inconsistency" errors will be kept, i.e. missing/extra index fields.
-static constexpr int kMaxIndexInconsistencySize = 1 * 1024 * 1024;
 // Reserving 4MB for index details' error and warning messages.
 static constexpr size_t kMaxIndexDetailsSizeBytes = 4 * 1024 * 1024;
 
@@ -26,23 +24,6 @@ struct LargestObjsPopFirstCmp {
         return l.objsize() < r.objsize();
     }
 };
-
-// Helper for adding |obj| to a list of bson objs, where only the smallest objects up to a limit
-// will be kept. At least 1 object will always be kept. Returns true if an element was removed.
-bool addWithSizeLimit(const BSONObj& obj, std::vector<BSONObj>& dst, size_t& usedBytes) {
-    invariant(obj.objsize() > 0);
-    usedBytes += static_cast<size_t>(obj.objsize());
-    dst.push_back(std::move(obj));
-    std::push_heap(dst.begin(), dst.end(), LargestObjsPopFirstCmp{});
-    if (usedBytes <= kMaxIndexInconsistencySize || dst.size() <= 1) {
-        return false;
-    }
-    std::pop_heap(dst.begin(), dst.end(), LargestObjsPopFirstCmp{});
-    usedBytes -= dst.back().objsize();
-    dst.pop_back();
-    return true;
-}
-
 
 // Builds an array inside output containing the entries up to a given max size per entry.
 void buildFixedSizedArray(BSONObjBuilder& output,
@@ -74,14 +55,14 @@ void ValidateResultsIf::_mergeBase(const ValidateResultsIf& other) {
 }
 
 void ValidateResults::addExtraIndexEntry(BSONObj entry) {
-    if (addWithSizeLimit(std::move(entry), _extraIndexEntries, _extraIndexEntriesUsedBytes)) {
+    if (_extraIndexEntries.add(std::move(entry))) {
         addError("Not all extra index entry inconsistencies are listed due to size limitations.",
                  false);
     }
 }
 
 void ValidateResults::addMissingIndexEntry(BSONObj entry) {
-    if (addWithSizeLimit(std::move(entry), _missingIndexEntries, _missingIndexEntriesUsedBytes)) {
+    if (_missingIndexEntries.add(std::move(entry))) {
         addError("Not all missing index entry inconsistencies are listed due to size limitations.",
                  false);
     }
@@ -281,10 +262,10 @@ void ValidateResults::merge(const ValidateResults& other) {
                     ivr.getSpec().binaryEqual(otherIvr.getSpec()));
     }
 
-    for (const auto& eia : other._extraIndexEntries) {
+    for (const auto& eia : other._extraIndexEntries.entries()) {
         tmp.addExtraIndexEntry(eia);
     }
-    for (const auto& mie : other._missingIndexEntries) {
+    for (const auto& mie : other._missingIndexEntries.entries()) {
         tmp.addMissingIndexEntry(mie);
     }
 

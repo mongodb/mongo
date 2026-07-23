@@ -39,6 +39,7 @@ mongo_cc_library(
     name = "validate_results",
     srcs = [
         "bson_utf8.cpp",
+        "size_limited_bsonobj_heap.cpp",
         "validate_results.cpp",
     ],
     deps = [
@@ -115,6 +116,7 @@ mongo_cc_unit_test(
         "bson_utf8_test.cpp",
         "collection_validation_test.cpp",
         "key_string_index_consistency_test.cpp",
+        "size_limited_bsonobj_heap_test.cpp",
         "validate_results_test.cpp",
     ],
     tags = [
