@@ -168,7 +168,7 @@ void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundl
 }
 
 void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
-    if (gMultitenancySupport &&
+    if (value && gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
         DurableReplOperation::setTid(value);
