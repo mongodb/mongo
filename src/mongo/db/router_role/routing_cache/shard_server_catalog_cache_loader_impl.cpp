@@ -565,6 +565,8 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChu
                         "Unable to refresh routing table because replica set state changed or "
                         "the node is shutting down.",
                         _term == term);
+                // Ensure we haven't missed the interrupt after Authoritative Shards was enabled.
+                uassertAuthoritativeShardsDisabled(context.opCtx());
             }
 
             if (isPrimary) {
@@ -609,6 +611,8 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
                         "Unable to refresh database because replica set state changed or the node "
                         "is shutting down.",
                         _term == term);
+                // Ensure we haven't missed the interrupt after Authoritative Shards was enabled.
+                uassertAuthoritativeShardsDisabled(context.opCtx());
             }
 
             if (isPrimary) {

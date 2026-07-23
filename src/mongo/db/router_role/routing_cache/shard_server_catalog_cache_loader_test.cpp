@@ -809,5 +809,18 @@ TEST_F(ShardServerCatalogCacheLoaderTest, GetDatabaseMarksOpsNonDeprioritizable)
     assertSoon([&] { return getTotalMarkedNonDeprioritizable() - countBefore == 2; });
 }
 
+TEST_F(ShardServerCatalogCacheLoaderTest, NewLoadsFailWhenAuthoritativeShardsEnabled) {
+    unittest::ServerParameterGuard enableAuthShardsCRUD{"featureFlagAuthoritativeShardsCRUD", true};
+    unittest::ServerParameterGuard enableAuthShardsDDL{"featureFlagAuthoritativeShardsDDL", true};
+
+    ASSERT_THROWS_CODE(_shardLoader->getChunksSince(kNss, ChunkVersion::UNTRACKED()).get(),
+                       DBException,
+                       ErrorCodes::MetadataRefreshCanceledDueToFCVTransition);
+
+    ASSERT_THROWS_CODE(_shardLoader->getDatabase(kNss.dbName()).get(),
+                       DBException,
+                       ErrorCodes::MetadataRefreshCanceledDueToFCVTransition);
+}
+
 }  // namespace
 }  // namespace mongo
