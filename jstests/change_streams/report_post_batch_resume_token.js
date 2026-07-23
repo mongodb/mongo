@@ -3,8 +3,6 @@
  * test verifies postBatchResumeToken semantics that are common to sharded and unsharded streams.
  * @tags: [
  *   uses_transactions,
- *   # TODO SERVER-127094: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
