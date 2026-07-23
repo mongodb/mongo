@@ -159,10 +159,11 @@ void validateBucketConsistency(const Collection* collection, const BSONObj& buck
         BSONObj max = control[timeseries::kBucketControlMaxFieldName].Obj();
 
         if (version != timeseries::kTimeseriesControlUncompressedVersion &&
-            version != timeseries::kTimeseriesControlCompressedVersion) {
+            version != timeseries::kTimeseriesControlCompressedVersion &&
+            version != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
             uasserted(
                 ErrorCodes::BadValue,
-                fmt::format("Invalid value for 'control.version'. Expected 1 or 2, but got {}.",
+                fmt::format("Invalid value for 'control.version'. Expected 1, 2, or 3, but got {}.",
                             version));
         }
 
