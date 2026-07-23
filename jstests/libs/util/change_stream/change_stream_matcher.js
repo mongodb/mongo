@@ -134,6 +134,14 @@ class MultipleChangeStreamMatcher {
 
     getFirstMismatch() {
         for (const matcher of this.matchers) {
+            // A matcher's 'mismatch' field is overwritten on every declined match() attempt,
+            // including benign ones where the event legitimately belonged to a sibling stream
+            // (matches() is tried on every matcher in order via .some() for every event). A
+            // finished matcher's stale mismatch from earlier in the run is not a real problem;
+            // only report from matchers that are actually stuck.
+            if (matcher.isDone()) {
+                continue;
+            }
             const m = matcher.getFirstMismatch();
             if (m) {
                 return m;

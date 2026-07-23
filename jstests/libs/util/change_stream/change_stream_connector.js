@@ -22,6 +22,11 @@ class Connector {
     static notificationsCollection = "notifications";
 
     /**
+     * Collection name for storing coordination locks between independent writers.
+     */
+    static locksCollection = "locks";
+
+    /**
      * Read all change events for a specific instance.
      * @param {Mongo} conn - MongoDB connection.
      * @param {string} instanceName - Name of the test instance (also used as collection name).
@@ -154,6 +159,46 @@ class Connector {
      */
     static cleanupAll(conn) {
         conn.getDB(Connector.controlDatabase).dropDatabase();
+    }
+
+    /**
+     * Run `fn` while holding a lock scoped to `dbName`, acquired via atomic upsert against a
+     * well-known collection (retrying until acquired) and released once `fn` returns or throws.
+     * Used to serialize operations whose outcome depends on a resource shared across
+     * otherwise-independent writers targeting the same database. Scoped per-database so writers
+     * on unrelated databases don't serialize against each other.
+     * @param {Mongo} conn    - MongoDB connection.
+     * @param {string} dbName - Database whose primary-shard placement this lock protects.
+     * @param {Function} fn   - Callback to run while holding the lock.
+     * @returns {*} fn()'s return value.
+     */
+    static withDbLock(conn, dbName, fn) {
+        const coll = conn.getDB(Connector.controlDatabase).getCollection(Connector.locksCollection);
+        const holderId = new ObjectId().str;
+        assert.soon(() => {
+            try {
+                const doc = coll.findAndModify({
+                    query: {_id: dbName, holder: null},
+                    update: {$set: {holder: holderId}},
+                    upsert: true,
+                    new: true,
+                });
+                return doc !== null && doc.holder === holderId;
+            } catch (e) {
+                // Someone else holds the lock, or we raced them for the initial insert.
+                if (e.code === ErrorCodes.DuplicateKey) {
+                    return false;
+                }
+                throw e;
+            }
+        }, `Timed out acquiring lock for database '${dbName}'`);
+        try {
+            return fn();
+        } finally {
+            assert.commandWorked(
+                coll.updateOne({_id: dbName, holder: holderId}, {$set: {holder: null}}),
+            );
+        }
     }
 }
 
