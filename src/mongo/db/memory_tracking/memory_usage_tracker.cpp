@@ -213,12 +213,9 @@ void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
     }
 }
 
-void SimpleMemoryUsageTracker::assertWithinMemoryLimit(OperationContext* opCtx,
-                                                       std::string_view name,
-                                                       std::string_view stageName) const {
-    if (withinMemoryLimit(opCtx)) {
-        return;
-    }
+void SimpleMemoryUsageTracker::uassertedMemoryLimitExceeded(OperationContext* opCtx,
+                                                            std::string_view name,
+                                                            std::string_view stageName) const {
     str::stream msg;
     msg << name << " needs too much memory.";
     if (!stageName.empty()) {

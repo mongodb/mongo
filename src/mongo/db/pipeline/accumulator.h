@@ -164,8 +164,15 @@ protected:
 
     // Utility to check that memory limit isn't exceeded.
     void checkMemUsage() {
-        _memUsageTracker.assertWithinMemoryLimit(getExpressionContext()->getOperationContext(),
-                                                 getOpName());
+        auto* opCtx = getExpressionContext()->getOperationContext();
+        // The withinMemoryLimit() check is redundant with the call to assertWithinMemoryLimit(),
+        // but the call to getOpName() is a virtual function call, which is expensive, whereas
+        // withinMemoryLimit() is inlined and cheap.  Since the common case is that we are
+        // within the limit, check withinMemoryLimit() first to avoid the virtual call in the
+        // common case.  This avoids a performance regression.
+        if (MONGO_unlikely(!_memUsageTracker.withinMemoryLimit(opCtx))) {
+            _memUsageTracker.assertWithinMemoryLimit(opCtx, getOpName());
+        }
     }
 
     /// subclasses are expected to update this as necessary
