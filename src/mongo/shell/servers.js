@@ -135,13 +135,14 @@ MongoRunner.VersionSub = function (pattern, version) {
         print(`Running hang analyzer for pids [${pids}]`);
 
         const scriptPath = pathJoin(".", "buildscripts", "resmoke.py");
-        // We are using a raw "python" rather than selecting the approperate python here
-        // This is because as part of SERVER-79663 we noticed that servers.js is included in the legacy
-        // shell
+        // Prefer the interpreter resmoke itself is running under, exported as RESMOKE_PYTHON. When
+        // RESMOKE_PYTHON is unset we fall back to a raw "python": as part of SERVER-79663 we noticed
+        // that servers.js is included in the legacy shell.
         // See hang-analyzer argument options here:
         // https://github.com/10gen/mongo/blob/8636ede10bd70b32ff4b6cd115132ab0f22b89c7/buildscripts/resmokelib/hang_analyzer/hang_analyzer.py#L245
+        const python = _getEnv("RESMOKE_PYTHON") || "python";
         const args = [
-            "python",
+            python,
             scriptPath,
             "hang-analyzer",
             "-c",
