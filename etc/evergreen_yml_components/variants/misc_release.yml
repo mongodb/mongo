@@ -26,7 +26,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-latest-large
+    - release-amazon2-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - amazon2-latest-large
@@ -81,7 +81,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-latest-large
+    - release-amazon2-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - amazon2-latest-large
@@ -137,7 +137,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-latest-large
+    - release-amazon2-arm64-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - amazon2-arm64-latest-large
@@ -192,7 +192,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2-arm64-latest-large
+    - release-amazon2-arm64-latest-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - amazon2-arm64-latest-large
@@ -422,7 +422,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-large
+    - release-amazon2023.0-large
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -476,7 +476,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-large
+    - release-amazon2023.0-large
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: audit
@@ -525,7 +525,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-arm64-large
+    - release-amazon2023.0-arm64-large
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -624,7 +624,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - amazon2023.0-arm64-large
+    - release-amazon2023.0-arm64-large
   - name: .aggfuzzer !.multiversion
   - name: audit
   - name: auth_audit_gen
@@ -795,7 +795,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian10-build
+    - release-debian10-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - debian10-build
@@ -850,7 +850,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian10-build
+    - release-debian10-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - debian10-build
@@ -902,7 +902,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian11-large
+    - release-debian11-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - debian11-build
@@ -959,7 +959,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - debian11-large
+    - release-debian11-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - debian11-large
@@ -1007,7 +1007,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel70-large
+    - release-rhel70-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel70-large
@@ -1098,7 +1098,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel80-build
+    - release-rhel80-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel80-build
@@ -1157,7 +1157,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel80-large
+    - release-rhel80-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel80-large
@@ -1274,7 +1274,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel82-arm64-large
+    - release-rhel82-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel82-arm64-large
@@ -1323,7 +1323,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel82-arm64-large
+    - release-rhel82-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel82-arm64-large
@@ -1388,7 +1388,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel90-large
+    - release-rhel90-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel90-large
@@ -1441,7 +1441,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel90-large
+    - release-rhel90-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel90-large
@@ -1519,7 +1519,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel90-arm64-large
+    - release-rhel90-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel90-arm64-large
@@ -1568,7 +1568,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel90-arm64-large
+    - release-rhel90-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel90-arm64-large
@@ -1633,7 +1633,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse12-sp5-large
+    - release-suse12-sp5-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - suse12-sp5-large
@@ -1688,7 +1688,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse12-sp5-large
+    - release-suse12-sp5-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - suse12-sp5-large
@@ -1737,7 +1737,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse15-build
+    - release-suse15-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - suse15-build
@@ -1787,7 +1787,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse15-build
+    - release-suse15-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - suse15-build
@@ -1838,7 +1838,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1804-build
+    - release-ubuntu1804-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - ubuntu1804-build
@@ -1897,7 +1897,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1804-build
+    - release-ubuntu1804-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - ubuntu1804-build
@@ -1967,6 +1967,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu1804-arm64-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
@@ -2018,6 +2020,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu1804-arm64-build
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -2050,7 +2054,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2204-large
+    - release-ubuntu2204-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - ubuntu2204-large
@@ -2102,7 +2106,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2004-large
+    - release-ubuntu2004-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - ubuntu2004-large
@@ -2156,7 +2160,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2004-large
+    - release-ubuntu2004-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - ubuntu2004-large
@@ -2212,7 +2216,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu2204-large
+    - release-ubuntu2204-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - ubuntu2204-large
@@ -2294,6 +2298,8 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2004-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
@@ -2345,6 +2351,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2004-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -2380,6 +2388,8 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2204-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
@@ -2431,6 +2441,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu2204-arm64-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -2465,7 +2477,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-vsCurrent-large
+    - release-windows-vsCurrent-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - windows-vsCurrent-large
@@ -2528,7 +2540,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-vsCurrent-large
+    - release-windows-vsCurrent-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - windows-vsCurrent-large
@@ -2595,6 +2607,8 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-macos-11
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: aggregation
@@ -2629,6 +2643,8 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-macos-11-arm64
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: aggregation
@@ -2664,6 +2680,8 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-macos-11
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: audit
@@ -2705,6 +2723,8 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-macos-11-arm64
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: audit

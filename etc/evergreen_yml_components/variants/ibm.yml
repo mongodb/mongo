@@ -32,7 +32,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel8-power-large
+    - release-rhel8-power-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel8-power-large
@@ -99,7 +99,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel7-power-large
+    - release-rhel7-power-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel7-power-large
@@ -164,7 +164,7 @@ buildvariants:
   tasks:
   - name: small_compile_test_and_package_serial_TG
     distros:
-    - rhel7-zseries-large
+    - release-rhel7-zseries-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel7-zseries-large
@@ -229,6 +229,8 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_s390x,requires_increased_memlock_limits,requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - release-rhel8-zseries-large-legacy
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
   - name: .aggregation .common
   - name: audit

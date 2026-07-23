@@ -26,7 +26,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel70-large
+    - release-rhel70-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel70-large
