@@ -57,6 +57,7 @@ def _bolt_optimize_impl(ctx):
         "-split-eh",
         "-dyno-stats",
         "--lite",
+        "--lite-threshold-pct=40",
         "--update-debug-sections",
     ]
     if ctx.attr.use_gnu_stack:

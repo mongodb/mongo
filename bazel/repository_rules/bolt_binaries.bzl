@@ -2,12 +2,12 @@ load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP")
 
 _BOLT_BINARIES = {
     "aarch64": struct(
-        url = "https://mdb-build-public.s3.amazonaws.com/llvm-bolt/441/llvm-bolt-rhel88-arm64-ee20b106e.tgz",
-        sha256 = "973071c5bec7f64794cc5a9935f1bed80c4f0895648de55b37d49c43fcd5ed71",
+        url = "https://mdb-build-public.s3.amazonaws.com/llvm-bolt/444/llvm-bolt-rhel88-arm64-ef752a078.tgz",
+        sha256 = "8ff371db91902e632687de09061765f3c248714ba8b41415d4ff56c8e337f7f1",
     ),
     "x86_64": struct(
-        url = "https://mdb-build-public.s3.amazonaws.com/llvm-bolt/441/llvm-bolt-rhel88-ee20b106e.tgz",
-        sha256 = "b1ec25d2a479a990668d3992bd0cba9cc94d7f36213932fd56ed987009b8591d",
+        url = "https://mdb-build-public.s3.amazonaws.com/llvm-bolt/444/llvm-bolt-rhel88-ef752a078.tgz",
+        sha256 = "ba61e2f7fe7ea7d98c5c43b7d83c15b8df85137797bab157cfe8b84a7b369b1c",
     ),
 }
 
