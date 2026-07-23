@@ -5,7 +5,7 @@ test_kind: js_test
 
 selector:
   roots:
-    - jstests/product_limits/**/*.js
+    - jstests/product_limits/*.js
 executor:
   archive:
     hooks:
@@ -19,15 +19,9 @@ executor:
   fixture:
     class: MongoDFixture
     mongod_options:
+      # Set a high slowms to avoid unnecessary slow query logs, since the queries are big and
+      # make the logs hard to read. Each test prints before it runs a query, so if a failure
+      # occurs it's easy to trace it back to the query.
+      slowms: 1_000_000
       set_parameters:
         enableTestCommands: 1
-        # Enable join optimization so that the
-        # various extreme $lookup+$unwind queries pass
-        # through the join optimization code
-        internalEnableJoinOptimization: true
-        # Required for join optimization
-        featureFlagPathArrayness: true
-        # Join optimization needs samplingCE for cardinality estimation
-        featureFlagCostBasedRanker: true
-        internalQueryPlanRanker: "costBased"
-        internalQueryCBRCEMode: "samplingCE"

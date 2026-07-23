@@ -26,7 +26,6 @@ export class PipelineWorkload extends Workload {
     runWorkload(dataset, _, db) {
         const coll = db.getCollection(this.collection());
         const pipeline = this.pipeline(dataset);
-        jsTest.log.info({pipeline});
 
         if (!pipeline[0].hasOwnProperty("$documents")) {
             try {

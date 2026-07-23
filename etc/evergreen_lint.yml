@@ -261,4 +261,6 @@ rules:
             "selinux_rhel9_org",
             "selinux_rhel8_enterprise",
             "ssl_linear_macos",
+            # product_limits is explicitly scheduled (weekly cron) on selected variants.
+            "product_limits",
           ]
