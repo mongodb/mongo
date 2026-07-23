@@ -1945,3 +1945,19 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "core_high_yielding",
+    config = "//buildscripts/resmokeconfig:suites/core_high_yielding.yml",
+    shard_count = 10,
+    tags = [
+        "ci-default",
+        "common",
+        "jscore",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

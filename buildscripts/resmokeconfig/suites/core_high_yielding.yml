@@ -12,6 +12,8 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
+    # Shard level user write block is not supported on standalone.
+    - jstests/core/administrative/block_replica_set_writes.js
 executor:
   archive:
     hooks:
