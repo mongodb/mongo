@@ -397,6 +397,13 @@ crate.annotation(
 # (the test harness), and wasmtime-wave (the value serialisation layer) so
 # that all three agree on the Val enum layout.
 # TODO (SERVER-127394): Contribute these patches upstream to the wasmtime repo
+#
+# signals_sigaltstack_ss_disable.patch (BF-44398/BF-44848, wasmtime#13857):
+# Stack::drop munmaps the per-thread sigaltstack without SS_DISABLE, leaving a
+# dangling kernel registration. ASan's thread teardown then unmaps whatever
+# range is still registered, which by that point has been reused for live heap
+# allocations — corrupting the address space of unrelated threads on *aubsan
+# variants.
 crate.annotation(
     crate = "wasmtime",
     patch_args = ["-p1"],
@@ -404,6 +411,7 @@ crate.annotation(
         "//bazel/wasmtime:val_bytes_fast_path.patch",
         "//bazel/wasmtime:val_bytes_lift_fast_path.patch",
         "//bazel/wasmtime:val_bytes_wave_fast_path.patch",
+        "//bazel/wasmtime:signals_sigaltstack_ss_disable.patch",
     ],
 )
 crate.annotation(

@@ -1,5 +1,5 @@
 {
-  "checksum": "716b69ac49cc99f9d8e6be8fd1927249709a94bc8d290cb82893271f8e26962d",
+  "checksum": "d0586a407b6ad22b5d821ba5af99f35ff15d2de658b3feeaeee109bcbd233780",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -17153,6 +17153,7 @@
             "-p1"
           ],
           "patches": [
+            "@@//bazel/wasmtime:signals_sigaltstack_ss_disable.patch",
             "@@//bazel/wasmtime:val_bytes_fast_path.patch",
             "@@//bazel/wasmtime:val_bytes_lift_fast_path.patch",
             "@@//bazel/wasmtime:val_bytes_wave_fast_path.patch"
