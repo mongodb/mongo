@@ -7,6 +7,7 @@ import dataclasses
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -25,6 +26,7 @@ RELEASE_BINARY_NAMES = ("mongod", "mongos")
 CRYPT_RELEASE_BINARY_NAMES = ("mongo_crypt_v1.so",)
 DISALLOWED_EXECUTION_LOG_RUNNERS = {"remote", "remote cache hit"}
 SERVER_RELEASE_PROJECT_PREFIX = "mongo-release"
+RELEASE_BRANCH_PROJECT_PATTERN = re.compile(r"mongodb-mongo-v\d+\.\d+(?:-staging)?")
 
 RELEASE_LOCAL_SAFETY_FLAGS = (
     "--remote_executor= --noremote_accept_cached "
@@ -36,6 +38,12 @@ def is_server_release_project(evg_project: str | None) -> bool:
     """Return whether this Evergreen project is a server release project."""
 
     return bool(evg_project) and evg_project.startswith(SERVER_RELEASE_PROJECT_PREFIX)
+
+
+def is_release_branch_project(evg_project: str | None) -> bool:
+    """Return whether this is a regular or staging release-branch project."""
+
+    return bool(evg_project) and RELEASE_BRANCH_PROJECT_PATTERN.fullmatch(evg_project) is not None
 
 
 def find_build_task(tasks: list[Any], task_display_name: str) -> Any:

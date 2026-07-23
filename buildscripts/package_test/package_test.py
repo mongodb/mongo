@@ -35,6 +35,7 @@ from buildscripts.package_test.package_test_provenance import (
     find_build_task,
     find_task_artifact_url,
     hash_release_binaries_in_archive,
+    is_release_branch_project,
     is_server_release_project,
     release_binary_name_from_path,
     validate_compact_execution_log_file,
@@ -1066,7 +1067,7 @@ if args.command == "release":
             "Missing '--evg-project' command line option. If trying to run this locally, you will need to set the environment so that --evg-project=mongodb-mongo-master."
         )
         sys.exit(1)
-    if re.fullmatch(r"mongodb-mongo-v\d\.\d", evg_project):
+    if is_release_branch_project(evg_project):
         logging.info(
             "Non-master evergreen project detected: '%s', skipping release package testing which is expected to only be run from master branches.",
             evg_project,

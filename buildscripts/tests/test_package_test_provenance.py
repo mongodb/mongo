@@ -68,6 +68,27 @@ def compact_log_with_spawns(*spawns: tuple[str, bool]) -> bytes:
 
 
 class PackageTestProvenanceTest(unittest.TestCase):
+    def test_release_branch_projects_are_detected(self) -> None:
+        for project in (
+            "mongodb-mongo-v9.0",
+            "mongodb-mongo-v9.0-staging",
+            "mongodb-mongo-v10.12",
+            "mongodb-mongo-v10.12-staging",
+        ):
+            with self.subTest(project=project):
+                self.assertTrue(under_test.is_release_branch_project(project))
+
+    def test_non_release_branch_projects_are_not_detected(self) -> None:
+        for project in (
+            None,
+            "",
+            "mongodb-mongo-master",
+            "mongodb-mongo-master-nightly",
+            "mongodb-mongo-v9.0-staging-extra",
+        ):
+            with self.subTest(project=project):
+                self.assertFalse(under_test.is_release_branch_project(project))
+
     def test_generator_bazel_version_matches_workspace_bazelversion(self):
         bazel_version = workspace_file_path(".bazelversion").read_text().strip()
         self.assertEqual(generate_bazel_spawn_pb2.MONGODB_BAZEL_VERSION, bazel_version)
