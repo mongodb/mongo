@@ -61,4 +61,15 @@ MongoExtensionStatus* QueryExecutionContextAdapter::_extGetHostMetrics(
         *result = new ByteBuf(metrics);
     });
 }
+MongoExtensionStatus* QueryExecutionContextAdapter::_extSetBatchSize(
+    const MongoExtensionQueryExecutionContext* ctx, uint64_t batchSize) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        auto* adapter = static_cast<const QueryExecutionContextAdapter*>(ctx);
+        uassert(13150705,
+                "setBatchSize is not supported outside of a document results and metadata stream",
+                adapter->_dynamicBatchSize);
+        uassert(13150706, "batchSize must be greater than 0", batchSize > 0);
+        adapter->_dynamicBatchSize->docLimit = static_cast<size_t>(batchSize);
+    });
+}
 }  // namespace mongo::extension::host_connector

@@ -379,6 +379,34 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.sameMembers(result, expected, {result, nShards});
     });
 
+    it("[sharded] delivers all docs and metadata with batchSize in Exchange", function () {
+        if (nShards < 2) return;
+        const numDocs = 10;
+        const numMeta = 5;
+        const lowerBound = 7;
+        const result = coll
+            .aggregate([
+                {
+                    $extensionMultiStream: {
+                        numDocs,
+                        numMeta,
+                        batchSize: 5,
+                        meta: {count: {lowerBound}},
+                        mergePipeline: sumLowerBoundMergePipeline,
+                    },
+                },
+                {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+            ])
+            .toArray();
+        const mergedMeta = {count: {lowerBound: lowerBound * numMeta * nShards}};
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            name: `doc_${i}`,
+            meta: mergedMeta,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
     it("[sharded] default merge pipeline unions metadata fields across shards", function () {
         if (nShards < 2) return;
         // Give two shards disjoint slices of the metadata document and supply no explicit

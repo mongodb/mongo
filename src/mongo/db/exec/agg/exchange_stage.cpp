@@ -121,6 +121,23 @@ Exchange::Exchange(OperationContext* opCtx,
         _consumers.emplace_back(std::make_unique<ExchangeBuffer>());
     }
 
+    Stage* dynamicBatchStage = nullptr;
+    for (auto& stage : _execPipeline->getStages()) {
+        if (!stage->supportsDynamicBatchSize()) {
+            continue;
+        }
+        tassert(
+            13150702, "Multiple stages support dynamic batch size", dynamicBatchStage == nullptr);
+        dynamicBatchStage = stage.get();
+    }
+
+    if (dynamicBatchStage) {
+        uassert(13150700,
+                "Exchange dynamic batch size is only supported with the keyRange policy",
+                _policy == ExchangePolicyEnum::kKeyRange);
+        dynamicBatchStage->setDynamicBatchSize(&_dynamicBatchSize);
+    }
+
     if (_policy == ExchangePolicyEnum::kKeyRange) {
         uassert(50900,
                 "Exchange boundaries do not match number of consumers.",
@@ -402,13 +419,16 @@ size_t Exchange::loadNextBatch() {
                     return target;
             } break;
             case ExchangePolicyEnum::kKeyRange: {
-                size_t target = getTargetConsumer(input.getDocument());
-                bool full = _consumers[target]->appendDocument(std::move(input), _maxBufferSize);
-                if (full && _orderPreserving) {
-                    // TODO SERVER-123923: send the high watermark here.
-                }
-                if (full)
+                // Skip key range lookup when there is only one consumer.
+                size_t target = _consumers.size() == 1 ? 0 : getTargetConsumer(input.getDocument());
+                size_t docLimit = _dynamicBatchSize.docLimit;
+                if (_consumers[target]->appendDocument(
+                        std::move(input), _maxBufferSize, docLimit)) {
+                    if (_orderPreserving) {
+                        // TODO SERVER-123923: send the high watermark here.
+                    }
                     return target;
+                }
             } break;
             default:
                 MONGO_UNREACHABLE;
@@ -467,6 +487,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
 
     return cid;
 }
+
 
 void Exchange::updateMemoryTrackingForDispose(OperationContext* opCtx) {
     // opCtx might be null here if we are disposing outside of an operation. E.g., when the server
@@ -532,19 +553,36 @@ DocumentSource::GetNextResult Exchange::ExchangeBuffer::getNext() {
     return result;
 }
 
-bool Exchange::ExchangeBuffer::appendDocument(DocumentSource::GetNextResult input, size_t limit) {
-    // If the buffer is disposed then we simply ignore any appends.
+// If the buffer is disposed then we simply ignore any appends.
+bool Exchange::ExchangeBuffer::appendDocument(DocumentSource::GetNextResult input,
+                                              size_t memoryLimit,
+                                              size_t docCountLimit) {
     if (_disposed) {
         return false;
     }
 
     if (input.isAdvanced()) {
         _bytesInBuffer += input.getDocument().getApproximateSize();
+        if (docCountLimit > 0) {
+            ++_batchDocCount;
+        }
     }
     _buffer.push_back(std::move(input));
 
-    // The buffer is full.
-    return _bytesInBuffer >= limit;
+    if (_bytesInBuffer >= memoryLimit) {
+        return true;
+    }
+    // Indicate that the buffer is full when docCountLimit is reached, and reset
+    // the counter so the next batch starts fresh once this one is drained.
+    if (docCountLimit > 0 && _batchDocCount >= docCountLimit) {
+        _batchDocCount = 0;
+        return true;
+    }
+    return false;
+}
+
+size_t Exchange::getBatchDocCount_forTest(size_t consumerId) const {
+    return _consumers[consumerId]->getBatchDocCount();
 }
 
 ExchangeStage::ExchangeStage(std::string_view stageName,

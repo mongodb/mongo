@@ -6,6 +6,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/db/exec/agg/dynamic_batch_size.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -125,10 +126,17 @@ public:
         return _spec;
     }
 
+    [[MONGO_MOD_PRIVATE]] DynamicBatchSize* getDynamicBatchSize_forTest() {
+        return &_dynamicBatchSize;
+    }
+
     [[MONGO_MOD_PRIVATE]] const OperationMemoryUsageTracker* getOperationMemoryTracker_forTest()
         const {
         return _memoryTracker.get();
     }
+
+    [[MONGO_MOD_PRIVATE]] size_t getBatchDocCount_forTest(size_t consumerId) const;
+
 
     void dispose(OperationContext* opCtx, size_t consumerId);
 
@@ -170,7 +178,9 @@ private:
 
     class ExchangeBuffer {
     public:
-        bool appendDocument(DocumentSource::GetNextResult input, size_t limit);
+        bool appendDocument(DocumentSource::GetNextResult input,
+                            size_t memoryLimit,
+                            size_t docCountLimit = 0);
         DocumentSource::GetNextResult getNext();
         bool isEmpty() const {
             return _buffer.empty();
@@ -191,14 +201,28 @@ private:
             return _disposed;
         }
 
+        size_t getBatchDocCount() const {
+            return _batchDocCount;
+        }
+
     private:
         size_t _bytesInBuffer{0};
+        size_t _batchDocCount{0};
         std::deque<DocumentSource::GetNextResult> _buffer;
         bool _disposed{false};
     };
 
     // Keep a copy of the spec for serialization purposes.
     const ExchangeSpec _spec;
+
+    /**
+     * Dynamic batch size shared with the producer pipeline stage that controls
+     * docLimit. Consumers read it via appendDocument. One batch size is supported
+     * for all consumers, applied to the size of the buffer. For example, if the
+     * dynamic batch size is 10 when we are loading the next batch, if any
+     * consumer's buffer reaches 10 documents, we pause loading there.
+     */
+    DynamicBatchSize _dynamicBatchSize;
 
     // An input to the exchange operator
     std::unique_ptr<mongo::Pipeline> _pipeline;

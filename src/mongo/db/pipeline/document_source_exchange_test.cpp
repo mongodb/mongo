@@ -8,6 +8,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/dynamic_batch_size.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -44,6 +45,56 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+
+class DocumentSourceDynamicBatchMock : public DocumentSourceMock {
+public:
+    DocumentSourceDynamicBatchMock(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceMock({}, expCtx) {}
+
+    static boost::intrusive_ptr<DocumentSourceDynamicBatchMock> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceDynamicBatchMock(expCtx);
+    }
+
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(dynamicBatchMock, DocumentSourceDynamicBatchMock::id);
+
+namespace exec::agg {
+class DynamicBatchMockStage : public Stage {
+public:
+    DynamicBatchMockStage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : Stage("$dynamicBatchMock", expCtx) {}
+
+    bool supportsDynamicBatchSize() const override {
+        return true;
+    }
+
+    void setDynamicBatchSize(DynamicBatchSize* dbs) override {
+        _dynamicBatchSize = dbs;
+    }
+
+private:
+    GetNextResult doGetNext() override {
+        return pSource->getNext();
+    }
+
+    DynamicBatchSize* _dynamicBatchSize = nullptr;
+};
+}  // namespace exec::agg
+
+boost::intrusive_ptr<exec::agg::Stage> documentSourceDynamicBatchMockToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& documentSource) {
+    return make_intrusive<exec::agg::DynamicBatchMockStage>(documentSource->getExpCtx());
+}
+
+REGISTER_AGG_STAGE_MAPPING(dynamicBatchMockStage,
+                           DocumentSourceDynamicBatchMock::id,
+                           documentSourceDynamicBatchMockToStageFn);
 
 namespace {
 /**
@@ -148,7 +199,7 @@ protected:
         return Pipeline::create({mock, group}, getExpCtx());
     }
 
-    auto createNProducers(size_t nConsumers, boost::intrusive_ptr<exec::agg::Exchange> ex) {
+    auto createNConsumers(size_t nConsumers, boost::intrusive_ptr<exec::agg::Exchange> ex) {
         std::vector<ThreadInfo> threads;
         for (size_t idx = 0; idx < nConsumers; ++idx) {
             ServiceContext::UniqueClient client =
@@ -212,7 +263,7 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumer) {
     boost::intrusive_ptr<exec::agg::Exchange> ex =
         new exec::agg::Exchange(getOpCtx(), spec, Pipeline::create({source}, getExpCtx()));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
     for (size_t id = 0; id < nConsumers; ++id) {
@@ -258,7 +309,7 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumerMemoryTracking) {
     boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
         getOpCtx(), spec, makeGroupProducerPipeline(nInputDocs, nOutputDocs));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
     for (size_t id = 0; id < nConsumers; ++id) {
@@ -475,7 +526,7 @@ TEST_F(DocumentSourceExchangeTest, OwnWithoutReportingMultiConsumerThroughStageL
                                 exec::agg::Exchange::InputMemoryPolicy::kOwnWithoutReporting);
 
     // Drive both consumers through the real stage layer, each on its own opCtx.
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     for (size_t id = 0; id < nConsumers; ++id) {
         auto docSourceExchange = exec::agg::buildStage(threads[id].documentSourceExchange);
         size_t docs = 0;
@@ -611,7 +662,7 @@ TEST_F(DocumentSourceExchangeTest, ExchangeNConsumerEarlyout) {
     boost::intrusive_ptr<exec::agg::Exchange> ex =
         new exec::agg::Exchange(getOpCtx(), spec, Pipeline::create({source}, getExpCtx()));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
     for (size_t id = 0; id < nConsumers; ++id) {
@@ -734,7 +785,7 @@ TEST_F(DocumentSourceExchangeTest, BroadcastExchangeNConsumer) {
     boost::intrusive_ptr<exec::agg::Exchange> ex =
         new exec::agg::Exchange(getOpCtx(), spec, Pipeline::create({source}, getExpCtx()));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
     for (size_t id = 0; id < nConsumers; ++id) {
@@ -781,7 +832,7 @@ TEST_F(DocumentSourceExchangeTest, RangeExchangeNConsumer) {
     boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
         getOpCtx(), std::move(spec), Pipeline::create({source}, getExpCtx()));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
     for (size_t id = 0; id < nConsumers; ++id) {
@@ -843,7 +894,7 @@ TEST_F(DocumentSourceExchangeTest, RangeShardingExchangeNConsumer) {
     boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
         getOpCtx(), std::move(spec), Pipeline::create({source}, getExpCtx()));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
     for (size_t id = 0; id < nConsumers; ++id) {
@@ -896,7 +947,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomExchangeNConsumer) {
     boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
         getOpCtx(), std::move(spec), Pipeline::create({source}, getExpCtx()));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
 
     Atomic<size_t> processedDocs{0};
@@ -1044,7 +1095,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
     boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
         getOpCtx(), std::move(spec), Pipeline::create({source}, getExpCtx()));
 
-    std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
     Atomic<size_t> processedDocs{0};
 
@@ -1300,6 +1351,332 @@ TEST_F(DocumentSourceExchangeTest, QueryShape) {
             }
         })",
         redact(*stage));
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchSizeDeliversAllDocs) {
+    const size_t nDocs = 200;
+    auto source = getMockSource(nDocs);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << MAXKEY)});
+    spec.setConsumers(1);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    auto dbs = ex->getDynamicBatchSize_forTest();
+
+    dbs->docLimit = 50;
+
+    size_t totalDocs = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++totalDocs;
+    }
+
+    ASSERT_EQ(totalDocs, nDocs);
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchSizeZeroMeansNoLimit) {
+    const size_t nDocs = 100;
+    auto source = getMockSource(nDocs);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << MAXKEY)});
+    spec.setConsumers(1);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    auto dbs = ex->getDynamicBatchSize_forTest();
+
+    ASSERT_EQ(dbs->docLimit, 0u);
+
+    size_t totalDocs = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++totalDocs;
+    }
+
+    ASSERT_EQ(totalDocs, nDocs);
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchSizeMemBufferIsCeiling) {
+    const size_t nDocs = 200;
+    const size_t docLimit = 100;
+
+    std::vector<Document> docs;
+    docs.reserve(nDocs);
+    std::string largeStr(500, 'x');
+    for (size_t i = 0; i < nDocs; ++i)
+        docs.emplace_back(Document{{"a", static_cast<int>(i)}, {"b", largeStr}});
+    auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << MAXKEY)});
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    auto dbs = ex->getDynamicBatchSize_forTest();
+
+    dbs->docLimit = docLimit;
+
+    // Consume one doc to trigger the first loadNextBatch. Each doc is ~500 bytes so only a few
+    // fit in the 1024-byte buffer, well below the docLimit of 100.
+    auto firstDoc = ex->getNext(opCtx, 0, nullptr);
+    ASSERT(firstDoc.isAdvanced());
+
+    // The batch doc counter was not reset (batch ended by buffer size, not doc count).
+    size_t batchCount = ex->getBatchDocCount_forTest(0);
+    ASSERT_GT(batchCount, 0u);
+    ASSERT_LT(batchCount, docLimit);
+
+    size_t totalDocs = 1;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++totalDocs;
+    }
+    ASSERT_EQ(totalDocs, nDocs);
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchSkipsDisposedConsumer) {
+    const size_t nDocs = 50;
+
+    std::vector<Document> docs;
+    docs.reserve(nDocs);
+    for (size_t i = 0; i < nDocs; ++i)
+        docs.emplace_back(Document{{"a", static_cast<int>(i)}});
+    auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(
+        std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << 25), BSON("a" << MAXKEY)});
+    spec.setConsumerIds(std::vector<std::int32_t>{0, 1});
+    spec.setConsumers(2);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    auto dbs = ex->getDynamicBatchSize_forTest();
+
+    dbs->docLimit = 5;
+
+    // Consumer 0 reads a few docs then disposes, simulating $limit satisfaction.
+    for (size_t i = 0; i < 3; ++i) {
+        auto result = ex->getNext(opCtx, 0, nullptr);
+        ASSERT(result.isAdvanced());
+    }
+    ex->dispose(opCtx, 0);
+
+    // Consumer 1 must still drain all its docs without deadlocking because
+    // isBatchComplete skips disposed consumers.
+    size_t consumer1Docs = 0;
+    for (auto input = ex->getNext(opCtx, 1, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 1, nullptr)) {
+        ++consumer1Docs;
+    }
+    ASSERT_EQ(consumer1Docs, 25u);
+
+    ex->dispose(opCtx, 1);
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchBothConsumersAlive) {
+    const size_t nDocs = 500;
+    const size_t nConsumers = 2;
+
+    std::vector<Document> docs;
+    docs.reserve(nDocs);
+    for (size_t i = 0; i < nDocs; ++i)
+        docs.emplace_back(Document{{"a", static_cast<int>(i)}});
+    auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(
+        std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << 250), BSON("a" << MAXKEY)});
+    spec.setConsumerIds(std::vector<std::int32_t>{0, 1});
+    spec.setConsumers(nConsumers);
+
+    boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
+        getOpCtx(), std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    auto dbs = ex->getDynamicBatchSize_forTest();
+
+    dbs->docLimit = 10;
+
+    std::vector<ThreadInfo> threads = createNConsumers(nConsumers, ex);
+    std::vector<executor::TaskExecutor::CallbackHandle> handles;
+
+    for (size_t id = 0; id < nConsumers; ++id) {
+        auto docSourceExchange = exec::agg::buildStage(threads[id].documentSourceExchange);
+        auto handle = _executor->scheduleWork([docSourceExchange, id, nDocs, nConsumers](
+                                                  const executor::TaskExecutor::CallbackArgs& cb) {
+            PseudoRandom prng(getNewSeed());
+            size_t docs = 0;
+            for (auto input = docSourceExchange->getNext(); input.isAdvanced();
+                 input = docSourceExchange->getNext()) {
+                sleepmillis(prng.nextInt32() % 20 + 1);
+                ++docs;
+            }
+            ASSERT_EQ(docs, nDocs / nConsumers);
+        });
+        handles.emplace_back(std::move(handle.getValue()));
+    }
+
+    for (auto& h : handles)
+        _executor->wait(h);
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchLimitChangeMidStream) {
+    const size_t nDocs = 30;
+
+    std::vector<Document> docs;
+    docs.reserve(nDocs);
+    for (size_t i = 0; i < nDocs; ++i)
+        docs.emplace_back(Document{{"a", static_cast<int>(i)}});
+    auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << MAXKEY)});
+    spec.setConsumers(1);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    auto dbs = ex->getDynamicBatchSize_forTest();
+
+    dbs->docLimit = 5;
+
+    // Drain the first batch of 5 docs.
+    for (size_t i = 0; i < 5; ++i) {
+        auto result = ex->getNext(opCtx, 0, nullptr);
+        ASSERT(result.isAdvanced());
+    }
+    ASSERT_EQ(ex->getBatchDocCount_forTest(0), 0u);
+    ASSERT_EQ(dbs->docLimit, 5u);
+
+    // Double the batch size and drain the next batch of 10 docs.
+    dbs->docLimit = 10;
+    for (size_t i = 0; i < 10; ++i) {
+        auto result = ex->getNext(opCtx, 0, nullptr);
+        ASSERT(result.isAdvanced());
+    }
+    ASSERT_EQ(ex->getBatchDocCount_forTest(0), 0u);
+    ASSERT_EQ(dbs->docLimit, 10u);
+
+    // Drain the remaining 15 docs.
+    size_t remaining = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++remaining;
+    }
+    ASSERT_EQ(remaining, 15u);
+
+    ex->dispose(opCtx, 0);
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchBothConsumersOneDisposes) {
+    const size_t nDocs = 50;
+
+    std::vector<Document> docs;
+    docs.reserve(nDocs);
+    for (size_t i = 0; i < nDocs; ++i)
+        docs.emplace_back(Document{{"a", static_cast<int>(i)}});
+    auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(
+        std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << 25), BSON("a" << MAXKEY)});
+    spec.setConsumerIds(std::vector<std::int32_t>{0, 1});
+    spec.setConsumers(2);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    auto dbs = ex->getDynamicBatchSize_forTest();
+
+    dbs->docLimit = 5;
+
+    // Consumer 0 reads a few docs then disposes.
+    for (size_t i = 0; i < 3; ++i) {
+        auto result = ex->getNext(opCtx, 0, nullptr);
+        ASSERT(result.isAdvanced());
+    }
+    ex->dispose(opCtx, 0);
+
+    // Consumer 1 drains all its docs. The isDisposed() guard in appendDocument discards
+    // documents routed to disposed consumer 0's buffer so it never fills up. Without that
+    // guard, loadNextBatch would return consumer 0's id, setting _loadingThreadId to a
+    // consumer that will never drain, causing a deadlock.
+    size_t consumer1Docs = 0;
+    for (auto input = ex->getNext(opCtx, 1, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 1, nullptr)) {
+        ++consumer1Docs;
+    }
+    ASSERT_EQ(consumer1Docs, 25u);
+
+    ex->dispose(opCtx, 1);
+}
+
+TEST_F(DocumentSourceExchangeTest, DynamicBatchRejectsNonKeyRangePolicy) {
+    auto source = getMockSource(10);
+    auto dbsMock = DocumentSourceDynamicBatchMock::create(getExpCtx());
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kBroadcast);
+    spec.setConsumers(1);
+
+    ASSERT_THROWS_CODE(new exec::agg::Exchange(getOpCtx(),
+                                               std::move(spec),
+                                               Pipeline::create({source, dbsMock}, getExpCtx())),
+                       AssertionException,
+                       13150700);
+}
+
+DEATH_TEST_F(DocumentSourceExchangeDeathTest, DynamicBatchRejectsMultipleStages, "13150702") {
+    auto source =
+        DocumentSourceMock::createForTest(std::deque<DocumentSource::GetNextResult>{}, getExpCtx());
+    auto dbsMock1 = DocumentSourceDynamicBatchMock::create(getExpCtx());
+    auto dbsMock2 = DocumentSourceDynamicBatchMock::create(getExpCtx());
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(std::vector<BSONObj>{BSON("a" << MINKEY), BSON("a" << MAXKEY)});
+    spec.setConsumers(1);
+
+    new exec::agg::Exchange(
+        getOpCtx(), std::move(spec), Pipeline::create({source, dbsMock1, dbsMock2}, getExpCtx()));
+}
+
+DEATH_TEST_F(DocumentSourceExchangeDeathTest, SetDynamicBatchSizeOnUnsupportedStage, "13150707") {
+    auto source =
+        DocumentSourceMock::createForTest(std::deque<DocumentSource::GetNextResult>{}, getExpCtx());
+    auto stage = exec::agg::buildStage(source);
+    exec::agg::DynamicBatchSize dbs;
+    stage->setDynamicBatchSize(&dbs);
 }
 
 }  // namespace mongo

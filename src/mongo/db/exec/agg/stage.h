@@ -21,6 +21,8 @@ class DocumentSource;
 namespace exec {
 namespace agg {
 
+struct DynamicBatchSize;
+
 /**
  * This is what is returned from the main 'Stage' API: getNext(). It is essentially a
  * (ReturnStatus, Document) pair, with the first entry being used to communicate information
@@ -240,6 +242,14 @@ public:
      */
     virtual bool isEOF() const {
         return false;
+    }
+
+    virtual bool supportsDynamicBatchSize() const {
+        return false;
+    }
+
+    virtual void setDynamicBatchSize(DynamicBatchSize*) {
+        tasserted(13150707, "Dynamic batch size is not supported by this stage");
     }
 
     virtual Document getExplainOutput(

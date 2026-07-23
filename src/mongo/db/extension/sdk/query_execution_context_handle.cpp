@@ -50,4 +50,9 @@ BSONObj QueryExecutionContextAPI::getHostMetrics(
     ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
+void QueryExecutionContextAPI::setBatchSize(uint64_t batchSize) const {
+    sdk_uassert(13150704, "setBatchSize requires batchSize > 0", batchSize > 0);
+    invokeCAndConvertStatusToException(
+        [&]() { return _vtable().set_batch_size(get(), batchSize); });
+}
 }  // namespace mongo::extension::sdk

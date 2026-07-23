@@ -26,6 +26,7 @@ constexpr std::string_view kMetaField = "meta"sv;
 constexpr std::string_view kNumMetaField = "numMeta"sv;
 constexpr std::string_view kNumDocsField = "numDocs"sv;
 constexpr std::string_view kDocPadField = "docPad"sv;
+constexpr std::string_view kBatchSizeField = "batchSize"sv;
 constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"sv;
 constexpr std::string_view kReportObservedBoundsField = "reportObservedBounds"sv;
 constexpr std::string_view kAdvertiseSortKeyField = "advertiseSortKey"sv;
@@ -95,6 +96,7 @@ struct DocEmitConfig {
     int docPad = 0;
     bool addStreamTypeField = false;
     bool scoreDetails = false;
+    int batchSize = 0;
     bool reportObservedBounds = false;
     // The distinct states that can be observed from the applyPipelineBounds rule:
     //   boost::none            -> the rule never fired (kNoRuleFiredSentinel reported: -1)
@@ -108,6 +110,8 @@ struct DocEmitConfig {
         config.docPad = args[kDocPadField].isNumber() ? args[kDocPadField].safeNumberInt() : 0;
         config.addStreamTypeField = args[kAddStreamTypeField].booleanSafe();
         config.scoreDetails = args[kAdvertiseScoreDetailsField].booleanSafe();
+        config.batchSize =
+            args[kBatchSizeField].isNumber() ? args[kBatchSizeField].safeNumberInt() : 0;
         config.reportObservedBounds = args[kReportObservedBoundsField].booleanSafe();
         return config;
     }
@@ -177,7 +181,7 @@ public:
           _metaConfig(std::move(metaConfig)) {}
 
     extension::ExtensionGetNextResult getNext(
-        const sdk::QueryExecutionContextHandle& /*execCtx*/,
+        const sdk::QueryExecutionContextHandle& execCtx,
         ::MongoExtensionExecAggStage* /*execStage*/) override {
         if (!_metaConfig.skip && _metaConfig.isActive() && _metaEmitted < _metaConfig.numMeta) {
             ++_metaEmitted;
@@ -189,6 +193,9 @@ public:
         }
         if (_nextDoc >= _docConfig.numDocs) {
             return extension::ExtensionGetNextResult::eof();
+        }
+        if (_nextDoc == 0 && _docConfig.batchSize > 0) {
+            execCtx->setBatchSize(static_cast<uint64_t>(_docConfig.batchSize));
         }
         int i = _nextDoc++;
         int score = _docConfig.numDocs - i;

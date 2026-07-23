@@ -96,7 +96,8 @@ GetNextResult ExtensionStage::doGetNext() {
 
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(pExpCtx.get());
-    host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx),
+                                                            _dynamicBatchSize);
     tassert(11357601, "_execAggStageHandle is invalid", _execAggStageHandle.isValid());
     _lastGetNextResult = _execAggStageHandle->getNext(&ctxAdapter);
     switch (_lastGetNextResult.code) {
