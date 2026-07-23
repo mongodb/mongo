@@ -18,6 +18,11 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
+namespace {
+auto& numCommandsTargetingSystemBuckets =
+    *MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");
+}  // namespace
+
 // TODO SERVER-119235: Remove chunk-related commands once they support rawData.
 static const StringDataSet kCommandsAllowedToTargetBuckets = {"moveChunk"sv,
                                                               "split"sv,
@@ -28,10 +33,6 @@ static const StringDataSet kCommandsAllowedToTargetBuckets = {"moveChunk"sv,
                                                               "mergeAllChunksOnShard"sv,
                                                               "configureCollectionBalancing"sv,
                                                               "balancerCollectionStatus"sv};
-
-SystemBucketsMetricsCommandHooks::SystemBucketsMetricsCommandHooks() {
-    _commandsExecuted = &*MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");
-}
 
 // TODO SERVER-121176: Remove system.buckets metrics once 9.0 becomes last LTS
 void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
@@ -79,7 +80,7 @@ void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
                     "connId"_attr = opCtx->getClient()->getConnectionId(),
                     "appName"_attr = appName,
                     "driverName"_attr = driverName);
-        _commandsExecuted->increment();
+        numCommandsTargetingSystemBuckets.increment();
     }
 
     if (isRouter) {

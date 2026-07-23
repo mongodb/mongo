@@ -14,13 +14,11 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
  */
 class SystemBucketsMetricsCommandHooks final : public CommandInvocationHooks {
 public:
-    SystemBucketsMetricsCommandHooks();
     void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override;
     void onAfterRun(OperationContext* opCtx,
                     CommandInvocation* invocation,
                     rpc::ReplyBuilderInterface* response) override {}
 
-    Counter64* _commandsExecuted;
     logv2::SeveritySuppressor _logSuppressor{
         Hours{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };

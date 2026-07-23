@@ -808,8 +808,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ResourceYielderFactory::set(*serviceContext->getService(),
                                 std::make_unique<RouterResourceYielderFactory>());
 
-    // Initialize command hooks before freezing the metric tree, since
-    // SystemBucketsMetricsCommandHooks registers metrics in its constructor.
+    // Initialize command hooks before freezing the metric tree.
     initializeCommandHooks(serviceContext);
 
     // Since extensions modify the global parserMap and register metrics, both of which are not
