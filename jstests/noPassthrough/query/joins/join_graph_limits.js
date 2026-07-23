@@ -9,7 +9,7 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(`${jsTestName()}_db`);
@@ -33,7 +33,7 @@ function assertNonOptimizedLookups(coll, pipeline, expectedLookupStages) {
         ...getPlanStages(winningPlan, "EQ_LOOKUP"),
         ...getPlanStages(winningPlan, "EQ_LOOKUP_UNWIND"),
     ];
-    assert.eq(nonOptimizedLookupStages.length, expectedLookupStages);
+    assert.eq(nonOptimizedLookupStages.length, expectedLookupStages, explain);
 }
 
 function assertJoinPlanResults(coll, pipeline, expectedResults) {
@@ -112,9 +112,10 @@ setServerParameters({
     assertNonOptimizedLookups(
         coll,
         pipeline,
-        isDeferredGetExecutorEnabled(db)
-            ? 1 /* need deferred get executor enabled to pushdown lookup unwind*/
-            : 0,
+        // $lookup+$unwind suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage when either the
+        // deferred get executor is enabled or the full SBE engine is in use. Otherwise, the suffix
+        // is executed in document sources.
+        isDeferredGetExecutorEnabled(db) || checkSbeFullyEnabled(db) ? 1 : 0,
     );
 }
 
@@ -132,9 +133,10 @@ setServerParameters({
     assertNonOptimizedLookups(
         coll,
         pipeline,
-        isDeferredGetExecutorEnabled(db)
-            ? 1 /* need deferred get executor enabled to pushdown lookup unwind*/
-            : 0,
+        // $lookup+$unwind suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage when either the
+        // deferred get executor is enabled or the full SBE engine is in use. Otherwise, the suffix
+        // is executed in document sources.
+        isDeferredGetExecutorEnabled(db) || checkSbeFullyEnabled(db) ? 1 : 0,
     );
 }
 
