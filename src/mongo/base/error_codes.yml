@@ -1341,5 +1341,7 @@ error_codes:
       categories: [SystemOverloadedError, RetriableError],
     }
 
+  - {code: 522, name: RetryBackoff}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
