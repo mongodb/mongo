@@ -753,6 +753,16 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
         }
 
         appendAsObjOrString("command", bob.done(), maxQuerySize, builder);
+    } else if (_command) {
+        // Apply the command's own field-level redaction (the same the slow-query log uses) so this
+        // diagnostic output stays consistent with the log.
+        mutablebson::Document cmdToLog(obj, mutablebson::Document::kInPlaceDisabled);
+        _command->snipForLogging(&cmdToLog);
+        appendAsObjOrString("command", cmdToLog.getObject(), maxQuerySize, builder);
+    } else if (isCommand()) {
+        // No resolved Command* for this command; report it as "unrecognized" rather than echoing
+        // the request, consistent with the slow-query log.
+        builder->append("command", "unrecognized");
     } else {
         appendAsObjOrString("command", obj, maxQuerySize, builder);
     }
