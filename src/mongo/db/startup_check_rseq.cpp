@@ -46,15 +46,18 @@
 #include <sys/utsname.h>
 #endif
 
+#include <array>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
 
 bool isKernelVersionSafeForTCMallocPerCPUCache(StringData release) {
-    int major = 0, minor = 0;
+    std::array<int, 3> version;
     char* end = nullptr;
-    if (!NumberParser::strToAny(10)(release, &major, &end).isOK() || *end != '.' ||
-        !NumberParser::strToAny(10)(end + 1, &minor).isOK()) {
+    if (!NumberParser::strToAny(10)(release, &version[0], &end).isOK() || *end != '.' ||
+        !NumberParser::strToAny(10)(end + 1, &version[1], &end).isOK() || *end != '.' ||
+        !NumberParser::strToAny(10)(end + 1, &version[2]).isOK()) {
         // If the version cannot be parsed, assume the kernel is compatible
         LOGV2_WARNING(12257601,
                       "Unable to parse kernel version, cannot check for kernel "
@@ -62,7 +65,8 @@ bool isKernelVersionSafeForTCMallocPerCPUCache(StringData release) {
                       "kernel-version"_attr = release);
         return true;
     }
-    return major < 6 || (major == 6 && minor < 19);
+
+    return version < std::array{6, 19, 0} || std::array{7, 0, 13} < version;
 }
 
 namespace {
