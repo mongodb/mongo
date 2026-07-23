@@ -65,12 +65,20 @@ void ShardingTestFixtureCommon::shutdownExecutorPool() {
     }
     _executorPoolShutDown = true;
 
+    // Interrupt every in-flight operation so any command synchronously blocked on the mock network
+    // (e.g. a ShardRegistry lookup parked in Fetcher::join) unwinds instead of deadlocking the
+    // cooperative InNetworkGuard drain below. Cleared once the pool is joined so the remaining
+    // teardown can use fresh operation contexts.
+    getServiceContext()->setKillAllOperations();
+
     grid->getExecutorPool()->shutdown_forTest();
     for (auto mockNet : {&_mockNetwork, &_mockNetworkForPool}) {
         executor::NetworkInterfaceMock::InNetworkGuard(*mockNet)
             ->drainUnfinishedNetworkOperations();
     }
     grid->getExecutorPool()->join_forTest();
+
+    getServiceContext()->unsetKillAllOperations();
 }
 
 OperationContext* ShardingTestFixtureCommon::operationContext() const {
