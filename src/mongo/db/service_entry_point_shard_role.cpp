@@ -2296,8 +2296,12 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
 
     Command* c = execContext.getCommand();
     auto& telemetryCtx = execContext.getTelemetryContext();
-    execContext.setOtelSpan(
-        otel::traces::Span::startIngressSpan(telemetryCtx, c->getTraceSpanName()));
+    execContext.setOtelSpan(otel::traces::Span::startIngressSpan(
+        telemetryCtx,
+        c->getTraceSpanName(),
+        /*options=*/
+        {.kind = execContext.hasMoreToComeFlag() ? otel::traces::SpanKind::kConsumer
+                                                 : otel::traces::SpanKind::kServer}));
     // Keep the OpCtx decoration in sync so later Span::start(opCtx, ...) calls see the same
     // context. Skip when null so the common no-tracing path never touches the decoration.
     if (telemetryCtx) {
@@ -2337,7 +2341,7 @@ DbResponse makeCommandResponse(const HandleRequest::ExecutionContext& execContex
     const Command* c = execContext.getCommand();
     auto replyBuilder = execContext.getReplyBuilder();
 
-    if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
+    if (execContext.hasMoreToComeFlag()) {
         // Close the connection to get client to go through server selection again.
         if (NotPrimaryErrorTracker::get(opCtx->getClient()).hadError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)

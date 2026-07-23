@@ -685,6 +685,14 @@ TEST_F(ServiceEntryPointShardServerTest, SpanNotCreatedWhenTelemetryContextNotSe
     testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 }
 
+TEST_F(ServiceEntryPointShardServerTest, IngressSpanHasServerKind) {
+    testIngressSpanHasServerKind();
+}
+
+TEST_F(ServiceEntryPointShardServerTest, IngressSpanHasConsumerKindForMoreToCome) {
+    testIngressSpanHasConsumerKindForMoreToCome();
+}
+
 class ServiceEntryPointReplicaSetTest : public virtual service_context_test::ReplicaSetRoleOverride,
                                         public ServiceEntryPointShardRoleTest {};
 
@@ -804,6 +812,14 @@ TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextDeserializedFromSection)
 
 TEST_F(ServiceEntryPointReplicaSetTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {
     testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
+}
+
+TEST_F(ServiceEntryPointReplicaSetTest, IngressSpanHasServerKind) {
+    testIngressSpanHasServerKind();
+}
+
+TEST_F(ServiceEntryPointReplicaSetTest, IngressSpanHasConsumerKindForMoreToCome) {
+    testIngressSpanHasConsumerKindForMoreToCome();
 }
 
 // Test command that returns the opCtx deadline in its response (used as the child command).

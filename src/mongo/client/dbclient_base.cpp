@@ -205,7 +205,8 @@ namespace {
 /** Starts a span for the given command name if it will not be executed locally. */
 boost::optional<otel::traces::Span> maybeStartSpan(OperationContext* opCtx,
                                                    ConnectionString::ConnectionType connectionType,
-                                                   std::string_view commandName) {
+                                                   std::string_view commandName,
+                                                   otel::traces::SpanKind kind) {
     // For local connections, we will maintain the same opCtx and start a span when the command
     // starts, so we don't need to start a span here that would have the same name.
     if (connectionType == ConnectionString::ConnectionType::kLocal) {
@@ -213,7 +214,8 @@ boost::optional<otel::traces::Span> maybeStartSpan(OperationContext* opCtx,
     }
     const auto* spanName = otel::traces::lookupCommandSpanName(commandName);
     return otel::traces::Span::start(opCtx,
-                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC);
+                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC,
+                                     otel::traces::SpanOptions{.kind = kind});
 }
 }  // namespace
 
@@ -222,8 +224,9 @@ DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
     ensureConnection();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
+    // Fire-and-forget sets moreToCome on the wire; use PRODUCER per OTel messaging conventions.
     boost::optional<otel::traces::Span> span =
-        maybeStartSpan(opCtx, type(), request.getCommandName());
+        maybeStartSpan(opCtx, type(), request.getCommandName(), otel::traces::SpanKind::kProducer);
 
     appendMetadata(opCtx, _metadataWriter, _apiParameters, getMaxWireVersion(), type(), request);
     auto requestMsg = request.serialize();
@@ -249,7 +252,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     boost::optional<otel::traces::Span> span =
-        maybeStartSpan(opCtx, type(), request.getCommandName());
+        maybeStartSpan(opCtx, type(), request.getCommandName(), otel::traces::SpanKind::kClient);
 
     appendMetadata(opCtx, _metadataWriter, _apiParameters, getMaxWireVersion(), type(), request);
 

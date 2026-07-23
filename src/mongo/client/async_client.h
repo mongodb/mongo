@@ -139,12 +139,15 @@ public:
      * `span_names::kMongoRPC` otherwise. The span is started on `telemetryContext`, which is
      * mutated in place: if it was null and a new trace should be started, it will be populated
      * with a newly created TelemetryContext so that the caller can propagate it (e.g. via
-     * `makeEgressTelemetrySection`).
+     * `makeEgressTelemetrySection`). Uses CLIENT span kind by default, or PRODUCER when
+     * `fireAndForget` is true (moreToCome on the wire).
      *
      * This is a static helper to allow unit testing without a live connection.
      */
     [[nodiscard]] static otel::traces::Span startEgressSpan(
-        std::shared_ptr<otel::TelemetryContext>& telemetryContext, std::string_view commandName);
+        std::shared_ptr<otel::TelemetryContext>& telemetryContext,
+        std::string_view commandName,
+        bool fireAndForget);
 
     /**
      * If `isMoreToComeSet` is false and `span` holds a value, sets `status` on the span and then

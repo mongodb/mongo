@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -22,6 +23,8 @@
 #include <string_view>
 #include <vector>
 
+[[MONGO_MOD_PUBLIC]];
+
 namespace mongo::otel::traces {
 
 namespace traces_test_util_detail {
@@ -30,10 +33,11 @@ namespace traces_test_util_detail {
  * Internal storage for a captured span. Parent/child raw pointers are into storage owned by
  * OtelTracesCapturer and are valid for the capturer's lifetime (or until clearSpans()).
  */
-struct CapturedSpanData {
+struct [[MONGO_MOD_FILE_PRIVATE]] CapturedSpanData {
     std::string name;
     StringMap<std::string> attributes;
     bool isError = false;
+    SpanKind kind = SpanKind::kInternal;
     opentelemetry::trace::SpanId spanId;
     opentelemetry::trace::SpanId parentSpanId;
     opentelemetry::trace::TraceId traceId;
@@ -42,10 +46,10 @@ struct CapturedSpanData {
 };
 #endif
 
-inline std::string_view toStringView(std::string_view s) {
+[[MONGO_MOD_FILE_PRIVATE]] inline std::string_view toStringView(std::string_view s) {
     return s;
 }
-inline std::string_view toStringView(const SpanName& s) {
+[[MONGO_MOD_FILE_PRIVATE]] inline std::string_view toStringView(const SpanName& s) {
     return s.getName();
 }
 }  // namespace traces_test_util_detail
@@ -54,7 +58,7 @@ inline std::string_view toStringView(const SpanName& s) {
  * Lightweight view of a captured OTel span. Methods are no-ops when OTel is not compiled.  Valid
  * until OtelTracesCapturer::clearSpans() or the capturer is destroyed.
  */
-class [[MONGO_MOD_PUBLIC]] CapturedSpan {
+class CapturedSpan {
 public:
 #ifdef MONGO_CONFIG_OTEL
     /** `data` must not be null and must outlive the lifetime of this class. */
@@ -70,6 +74,7 @@ public:
     std::string_view attribute(std::string_view key) const;
     const StringMap<std::string>& attributes() const;
     bool isError() const;
+    SpanKind kind() const;
 
     std::optional<CapturedSpan> parent() const;
     std::vector<CapturedSpan> children() const;
@@ -113,7 +118,7 @@ private:
  *   auto spans = capturer.getSpans(SpanNames::kMySpan);
  *   ASSERT_THAT(spans, ElementsAre(HasSpanName("mySpan")));
  */
-class [[MONGO_MOD_PUBLIC]] OtelTracesCapturer {
+class OtelTracesCapturer {
 public:
     OtelTracesCapturer();
     ~OtelTracesCapturer();
@@ -173,6 +178,11 @@ MATCHER_P(HasSpanName, name, "") {
 /** Matches a CapturedSpan where isError() is true. */
 MATCHER(HasError, "") {
     return arg.isError();
+}
+
+/** Matches a CapturedSpan whose kind() equals the given SpanKind. */
+MATCHER_P(HasKind, expected, "") {
+    return arg.kind() == expected;
 }
 
 /**

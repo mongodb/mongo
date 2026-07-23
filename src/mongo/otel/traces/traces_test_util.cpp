@@ -30,6 +30,22 @@ std::string attributeValueToString(const opentelemetry::common::AttributeValue& 
         },
         val);
 }
+
+SpanKind fromOtelSpanKind(opentelemetry::trace::SpanKind kind) {
+    switch (kind) {
+        case opentelemetry::trace::SpanKind::kServer:
+            return SpanKind::kServer;
+        case opentelemetry::trace::SpanKind::kClient:
+            return SpanKind::kClient;
+        case opentelemetry::trace::SpanKind::kProducer:
+            return SpanKind::kProducer;
+        case opentelemetry::trace::SpanKind::kConsumer:
+            return SpanKind::kConsumer;
+        case opentelemetry::trace::SpanKind::kInternal:
+            return SpanKind::kInternal;
+    }
+    MONGO_UNREACHABLE;
+}
 #endif
 }  // namespace
 
@@ -67,6 +83,14 @@ bool CapturedSpan::isError() const {
         return _data->isError;
 #endif
     return false;
+}
+
+SpanKind CapturedSpan::kind() const {
+#ifdef MONGO_CONFIG_OTEL
+    if (_data)
+        return _data->kind;
+#endif
+    return SpanKind::kInternal;
 }
 
 std::string CapturedSpan::parentSpanIdHex() const {
@@ -158,6 +182,7 @@ void OtelTracesCapturer::_rebuild() const {
         auto data = std::make_unique<CapturedSpanData>(CapturedSpanData{
             .name = rec->name,
             .isError = (rec->status == opentelemetry::trace::StatusCode::kError),
+            .kind = fromOtelSpanKind(rec->kind),
             .spanId = rec->context.span_id(),
             .parentSpanId = rec->parentId,
             .traceId = rec->context.trace_id(),

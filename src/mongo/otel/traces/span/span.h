@@ -17,6 +17,27 @@ namespace mongo {
 namespace otel {
 namespace [[MONGO_MOD_PUBLIC]] traces {
 
+/** The kind of span. */
+enum class SpanKind {
+    /** A span started and ended internally in the current process. */
+    kInternal,
+    /** A span started as the result of an incoming RPC for which a response will be sent. */
+    kServer,
+    /** A span started as part of sending an outgoing RPC for which a response will be received. */
+    kClient,
+    /**
+     * A span initiating some work that may be completed after this span ends. This could be a
+     * fire-and-forget RPC, or something starting internal background work.
+     */
+    kProducer,
+    /** A span for work initiated by a span of kind `kProducer`. */
+    kConsumer,
+};
+
+struct SpanOptions {
+    SpanKind kind = SpanKind::kInternal;
+};
+
 #ifdef MONGO_CONFIG_OTEL
 
 /**
@@ -44,7 +65,9 @@ public:
      * propagation of parent-child relationships. If a `telemetryCtx` is not provided but will be
      * needed going forward, `telemetryCtx` will be populated with a newly created one.
      */
-    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name);
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                      SpanName name,
+                      SpanOptions options = {});
 
     /**
      * Wrapper around the other start function. It will also fetch and store the current
@@ -52,15 +75,17 @@ public:
      * OperationContext is available so that the calling code does not have to manage its own
      * TelemetryContext.
      */
-    static Span start(OperationContext* opCtx, SpanName name);
+    static Span start(OperationContext* opCtx, SpanName name, SpanOptions options = {});
 
     /**
      * Starts a new Span from an ingress source, which may be sampled differently than an
      * internally-started span (e.g. a separate rate limit). Uses the presence of `telemetryCtx` to
-     * determine if the ingress span is part of an external trace. If a context is created during
-     * this, `telemetryCtx` is updated in place.
+     * determine if the ingress span is part of an external trace. Defaults to SERVER span kind. If
+     * a context is created during this, `telemetryCtx` is updated in place.
      */
-    static Span startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name);
+    static Span startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                                 SpanName name,
+                                 SpanOptions options = {.kind = SpanKind::kServer});
 
     static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
@@ -100,8 +125,9 @@ private:
     // should be sampled or not.
     static Span _start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                        SpanName name,
-                       bool bypassSampling);
-    static Span _start(OperationContext* opCtx, SpanName name, bool bypassSampling);
+                       bool bypassSampling,
+                       SpanKind kind);
+    static Span _start(OperationContext* opCtx, SpanName name, bool bypassSampling, SpanKind kind);
 
     /** The actual span implementation. Null if this Span will not be part of an exported trace. */
     std::unique_ptr<SpanImpl> _impl;
@@ -119,13 +145,15 @@ private:
  */
 class Span {
 public:
-    static Span start(OperationContext* opCtx, SpanName) {
+    static Span start(OperationContext* opCtx, SpanName, SpanOptions = {}) {
         return Span{};
     }
-    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName) {
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName, SpanOptions = {}) {
         return Span{};
     }
-    static Span startIngressSpan(std::shared_ptr<TelemetryContext>&, SpanName) {
+    static Span startIngressSpan(std::shared_ptr<TelemetryContext>&,
+                                 SpanName,
+                                 SpanOptions = {.kind = SpanKind::kServer}) {
         return Span{};
     }
 

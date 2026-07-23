@@ -58,6 +58,58 @@ TEST_F(SpanTest, ExporterSingleSpan) {
     ASSERT_EQ(span->parentId, opentelemetry::trace::SpanId());
 }
 
+TEST_F(SpanTest, StartCreatesInternalSpanKind) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        auto span = Span::start(telemetryCtx, span_names::kTest1);
+    }
+    ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kInternal);
+}
+
+TEST_F(SpanTest, StartIngressSpanCreatesServerSpanKind) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        auto span = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kServer);
+}
+
+TEST_F(SpanTest, StartWithClientKindCreatesClientSpanKind) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        auto span =
+            Span::start(telemetryCtx, span_names::kTest1, SpanOptions{.kind = SpanKind::kClient});
+    }
+    ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kClient);
+}
+
+TEST_F(SpanTest, StartWithTelemetryContextAndClientKindCreatesClientSpanKind) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        auto span =
+            Span::start(telemetryCtx, span_names::kTest1, SpanOptions{.kind = SpanKind::kClient});
+    }
+    ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kClient);
+}
+
+TEST_F(SpanTest, StartWithProducerKindCreatesProducerSpanKind) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        auto span =
+            Span::start(telemetryCtx, span_names::kTest1, SpanOptions{.kind = SpanKind::kProducer});
+    }
+    ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kProducer);
+}
+
+TEST_F(SpanTest, StartIngressSpanWithConsumerKindCreatesConsumerSpanKind) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        auto span = Span::startIngressSpan(
+            telemetryCtx, span_names::kTest1, SpanOptions{.kind = SpanKind::kConsumer});
+    }
+    ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kConsumer);
+}
+
 TEST_F(SpanTest, ParentSpan) {
     auto opCtx = makeOperationContext();
     {

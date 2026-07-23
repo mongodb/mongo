@@ -336,5 +336,13 @@ TEST_F(ServiceEntryPointRouterRoleTest, SpanNotCreatedWhenTelemetryContextNotSet
     testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 }
 
+TEST_F(ServiceEntryPointRouterRoleTest, IngressSpanHasServerKind) {
+    testIngressSpanHasServerKind();
+}
+
+TEST_F(ServiceEntryPointRouterRoleTest, IngressSpanHasConsumerKindForMoreToCome) {
+    testIngressSpanHasConsumerKindForMoreToCome();
+}
+
 }  // namespace
 }  // namespace mongo

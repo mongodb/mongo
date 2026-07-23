@@ -86,6 +86,8 @@ public:
     void testWriteConcernClientUnspecifiedWithDefault();
     void testTelemetryContextDeserializedFromSection();
     void testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
+    void testIngressSpanHasServerKind();
+    void testIngressSpanHasConsumerKindForMoreToCome();
 
 protected:
     ReadWriteConcernDefaultsLookupMock _lookupMock;

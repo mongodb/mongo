@@ -358,6 +358,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/otel:otel_base",
+        "//src/mongo/otel/traces/span",
         "//src/mongo/otel/traces/span:span_names",
         "//src/mongo/unittest",
     ] + select({

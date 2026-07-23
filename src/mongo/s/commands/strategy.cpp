@@ -471,8 +471,12 @@ void ParseAndRunCommand::_parseCommand() {
 
     _rec->setCommand(command);
     auto& telemetryCtx = _rec->getTelemetryContext();
-    _rec->setOtelSpan(
-        otel::traces::Span::startIngressSpan(telemetryCtx, command->getTraceSpanName()));
+    _rec->setOtelSpan(otel::traces::Span::startIngressSpan(
+        telemetryCtx,
+        command->getTraceSpanName(),
+        /*options=*/
+        {.kind = _rec->hasMoreToComeFlag() ? otel::traces::SpanKind::kConsumer
+                                           : otel::traces::SpanKind::kServer}));
     // Keep the OpCtx decoration in sync so later Span::start(opCtx, ...) calls see the same
     // context. Skip when null so the common no-tracing path never touches the decoration.
     if (telemetryCtx) {
@@ -1318,7 +1322,7 @@ DbResponse ClientCommand::_produceResponse() {
     const auto& m = _rec->getMessage();
     auto reply = _rec->getReplyBuilder();
 
-    if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
+    if (_rec->hasMoreToComeFlag()) {
         return {};  // Don't reply.
     }
 

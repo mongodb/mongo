@@ -95,9 +95,26 @@ void Span::setStatus(const Status& status) {
     }
 }
 
+static opentelemetry::trace::SpanKind toOtelSpanKind(SpanKind kind) {
+    switch (kind) {
+        case SpanKind::kServer:
+            return opentelemetry::trace::SpanKind::kServer;
+        case SpanKind::kClient:
+            return opentelemetry::trace::SpanKind::kClient;
+        case SpanKind::kProducer:
+            return opentelemetry::trace::SpanKind::kProducer;
+        case SpanKind::kConsumer:
+            return opentelemetry::trace::SpanKind::kConsumer;
+        case SpanKind::kInternal:
+            return opentelemetry::trace::SpanKind::kInternal;
+    }
+    MONGO_UNREACHABLE;
+}
+
 Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                   SpanName name,
-                  bool bypassSampling) {
+                  bool bypassSampling,
+                  SpanKind kind) {
     TracerProviderService* tracerProviderService = getGlobalTracerProviderService();
     if (!tracerProviderService) {
         return Span{};
@@ -155,6 +172,7 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
 
     opentelemetry::trace::StartSpanOptions opts;
     opts.parent = parentSpan->GetContext();
+    opts.kind = toOtelSpanKind(kind);
 
     return Span(
         std::make_unique<Span::SpanImpl>(tracer->StartSpan(std::string{name.getName()}, opts),
@@ -162,11 +180,13 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                                          std::move(spanCtx)));
 }
 
-Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
-    return _start(telemetryCtx, name, false);
+Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                 SpanName name,
+                 SpanOptions options) {
+    return _start(telemetryCtx, name, false, options.kind);
 }
 
-Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling) {
+Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling, SpanKind kind) {
     if (opCtx == nullptr) {
         return Span{};
     }
@@ -176,7 +196,7 @@ Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling) {
 
     bool hadTelemetryCtx = telemetryCtx != nullptr;
 
-    Span span = _start(telemetryCtx, name, bypassSampling);
+    Span span = _start(telemetryCtx, name, bypassSampling, kind);
 
     // Start created a new TelemetryContext, so we need to store it for future use.
     if (!hadTelemetryCtx && telemetryCtx != nullptr) {
@@ -185,13 +205,15 @@ Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling) {
     return span;
 }
 
-Span Span::start(OperationContext* opCtx, SpanName name) {
-    return _start(opCtx, name, false);
+Span Span::start(OperationContext* opCtx, SpanName name, SpanOptions options) {
+    return _start(opCtx, name, false, options.kind);
 }
 
-Span Span::startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
+Span Span::startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                            SpanName name,
+                            SpanOptions options) {
     auto bypassSampling = telemetryCtx && TracingSampler::get().shouldAcceptExternalTrace();
-    return _start(telemetryCtx, name, bypassSampling);
+    return _start(telemetryCtx, name, bypassSampling, options.kind);
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {

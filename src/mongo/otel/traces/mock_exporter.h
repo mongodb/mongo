@@ -43,7 +43,9 @@ public:
                   const opentelemetry::common::KeyValueIterable& attributes) noexcept override {}
     void AddLink(const opentelemetry::trace::SpanContext& span_context,
                  const opentelemetry::common::KeyValueIterable& attributes) noexcept override {}
-    void SetSpanKind(opentelemetry::trace::SpanKind span_kind) noexcept override {}
+    void SetSpanKind(opentelemetry::trace::SpanKind span_kind) noexcept override {
+        kind = span_kind;
+    }
     void SetResource(const opentelemetry::sdk::resource::Resource& resource) noexcept override {}
     void SetStartTime(opentelemetry::common::SystemTimestamp start_time) noexcept override {}
     void SetDuration(std::chrono::nanoseconds duration) noexcept override {}
@@ -57,6 +59,7 @@ public:
     opentelemetry::trace::SpanContext context;
     opentelemetry::trace::SpanId parentId;
     opentelemetry::trace::StatusCode status = opentelemetry::trace::StatusCode::kUnset;
+    opentelemetry::trace::SpanKind kind = opentelemetry::trace::SpanKind::kInternal;
     std::string name;
     stdx::unordered_map<std::string, opentelemetry::common::AttributeValue> attributes;
 

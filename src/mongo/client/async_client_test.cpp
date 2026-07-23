@@ -34,6 +34,7 @@ namespace {
 
 using otel::TelemetryContextHolder;
 using otel::traces::HasError;
+using otel::traces::HasKind;
 using otel::traces::HasSpanName;
 using otel::traces::OtelTracesCapturer;
 using otel::traces::Parent;
@@ -160,8 +161,8 @@ using StartEgressSpanTest = EgressSpanTest;
 TEST_F(StartEgressSpanTest, FallsBackToGenericSpanNameForUnregisteredCommand) {
     std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
-        auto span =
-            AsyncDBClient::startEgressSpan(telemetryCtx, "test_only.async_client_unregistered");
+        auto span = AsyncDBClient::startEgressSpan(
+            telemetryCtx, "test_only.async_client_unregistered", /*fireAndForget=*/false);
     }
 
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
@@ -171,7 +172,8 @@ TEST_F(StartEgressSpanTest, UsesRegisteredSpanNameForKnownCommand) {
     static const auto& registeredSpan = registerCommandSpanName("test_only.async_client_known");
     std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
-        auto span = AsyncDBClient::startEgressSpan(telemetryCtx, "test_only.async_client_known");
+        auto span = AsyncDBClient::startEgressSpan(
+            telemetryCtx, "test_only.async_client_known", /*fireAndForget=*/false);
     }
 
     EXPECT_THAT(_capturer.getSpans(registeredSpan), SizeIs(1));
@@ -182,7 +184,8 @@ TEST_F(StartEgressSpanTest, PopulatesNullTelemetryContext) {
     std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     ASSERT_THAT(telemetryCtx, IsNull());
 
-    auto span = AsyncDBClient::startEgressSpan(telemetryCtx, "test_only.async_client_ping");
+    auto span = AsyncDBClient::startEgressSpan(
+        telemetryCtx, "test_only.async_client_ping", /*fireAndForget=*/false);
 
     EXPECT_THAT(telemetryCtx, Not(IsNull()));
 }
@@ -195,12 +198,35 @@ TEST_F(StartEgressSpanTest, IsChildOfExistingSpanOnTelemetryContext) {
         // is registered as a real command in this test binary), so this exercises the kMongoRPC
         // fallback path.
         {
-            auto childSpan = AsyncDBClient::startEgressSpan(telemetryCtx, "test_only.unregistered");
+            auto childSpan = AsyncDBClient::startEgressSpan(
+                telemetryCtx, "test_only.unregistered", /*fireAndForget=*/false);
         }
     }
 
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
                 ElementsAre(Parent(HasSpanName(span_names::kTest1))));
+}
+
+TEST_F(StartEgressSpanTest, CreatesClientSpanKind) {
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
+    {
+        auto span = AsyncDBClient::startEgressSpan(
+            telemetryCtx, "test_only.async_client_kind", /*fireAndForget=*/false);
+    }
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+                ElementsAre(HasKind(otel::traces::SpanKind::kClient)));
+}
+
+TEST_F(StartEgressSpanTest, CreatesProducerSpanKindForFireAndForget) {
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
+    {
+        auto span = AsyncDBClient::startEgressSpan(
+            telemetryCtx, "test_only.async_client_fire_and_forget_kind", /*fireAndForget=*/true);
+    }
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+                ElementsAre(HasKind(otel::traces::SpanKind::kProducer)));
 }
 
 using MaybeEndExhaustSpanTest = EgressSpanTest;

@@ -26,6 +26,7 @@ namespace {
 using otel::TelemetryContextHolder;
 using otel::traces::HasAttribute;
 using otel::traces::HasError;
+using otel::traces::HasKind;
 using otel::traces::OtelTracesCapturer;
 using otel::traces::Span;
 using ::testing::AllOf;
@@ -281,6 +282,15 @@ TEST_F(RunFireAndForgetCommandSpanTest, FallsBackToDefaultSpanNameForUnknownComm
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
 }
 
+TEST_F(RunFireAndForgetCommandSpanTest, CreatesProducerSpanKind) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.runFireAndForgetCommand(makeRequest("test_only.dbclient_fire_and_forget_kind"));
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+                ElementsAre(HasKind(otel::traces::SpanKind::kProducer)));
+}
+
 TEST_F(RunCommandWithTargetSpanTest, UsesRegisteredSpanNameForKnownCommand) {
     static const auto& registeredSpan =
         otel::traces::registerCommandSpanName("test_only.dbclient_run_command_known");
@@ -301,6 +311,16 @@ TEST_F(RunCommandWithTargetSpanTest, FallsBackToDefaultSpanNameForUnknownCommand
     client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_unregistered"));
 
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
+}
+
+TEST_F(RunCommandWithTargetSpanTest, CreatesClientSpanKind) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.setCannedReply(makeOkOpMsgReply());
+    client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_kind"));
+
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+                ElementsAre(HasKind(otel::traces::SpanKind::kClient)));
 }
 
 TEST_F(RunFireAndForgetCommandSpanTest, DoesNotStartSpanForLocalConnection) {

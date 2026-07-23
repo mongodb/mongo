@@ -83,10 +83,15 @@ boost::optional<TelemetryContextSection> AsyncDBClient::makeEgressTelemetrySecti
 }
 
 otel::traces::Span AsyncDBClient::startEgressSpan(
-    std::shared_ptr<otel::TelemetryContext>& telemetryContext, std::string_view commandName) {
+    std::shared_ptr<otel::TelemetryContext>& telemetryContext,
+    std::string_view commandName,
+    bool fireAndForget) {
     const auto* spanName = otel::traces::lookupCommandSpanName(commandName);
+    otel::traces::SpanKind spanKind =
+        fireAndForget ? otel::traces::SpanKind::kProducer : otel::traces::SpanKind::kClient;
     return otel::traces::Span::start(telemetryContext,
-                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC);
+                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC,
+                                     otel::traces::SpanOptions{.kind = spanKind});
 }
 
 bool AsyncDBClient::maybeEndExhaustSpan(boost::optional<otel::traces::Span>& span,
@@ -425,7 +430,8 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     const CancellationToken& token) {
     auto startTimer = Timer();
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
-    auto span = startEgressSpan(request.telemetryContext, opMsgRequest.getCommandName());
+    auto span = startEgressSpan(
+        request.telemetryContext, opMsgRequest.getCommandName(), request.fireAndForget);
     opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
 
     return runCommand(std::move(opMsgRequest),
@@ -509,7 +515,8 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
     const BatonHandle& baton,
     const CancellationToken& token) {
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
-    _exhaustSpan = startEgressSpan(request.telemetryContext, opMsgRequest.getCommandName());
+    _exhaustSpan = startEgressSpan(
+        request.telemetryContext, opMsgRequest.getCommandName(), /*fireAndForget=*/false);
     opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
     return runExhaustCommand(std::move(opMsgRequest), baton, token);
 }

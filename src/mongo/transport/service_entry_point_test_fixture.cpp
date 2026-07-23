@@ -33,6 +33,7 @@
 
 namespace mongo {
 
+using ::testing::Contains;
 using ::testing::IsEmpty;
 
 MONGO_REGISTER_COMMAND(TestCmdSucceeds).testOnly().forRouter().forShard();
@@ -595,6 +596,37 @@ void ServiceEntryPointTestFixture::testSpanNotCreatedWhenTelemetryContextNotSetI
     runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
 
     EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName), IsEmpty());
+}
+
+void ServiceEntryPointTestFixture::testIngressSpanHasServerKind() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+    otel::traces::OtelTracesCapturer capturer;
+
+    auto opCtx = makeOperationContext();
+    runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName),
+                Contains(otel::traces::HasKind(otel::traces::SpanKind::kServer)));
+}
+
+void ServiceEntryPointTestFixture::testIngressSpanHasConsumerKindForMoreToCome() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+    otel::traces::OtelTracesCapturer capturer;
+
+    auto opCtx = makeOperationContext();
+    // A request with the moreToCome flag set is fire-and-forget; the ingress span should be marked
+    // as a consumer span rather than a server span.
+    auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+    OpMsg::setFlag(&msg, OpMsg::kMoreToCome);
+    auto swDbResponse = handleRequest(msg, opCtx.get());
+    ASSERT_OK(swDbResponse);
+
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName),
+                Contains(otel::traces::HasKind(otel::traces::SpanKind::kConsumer)));
 }
 
 }  // namespace mongo
