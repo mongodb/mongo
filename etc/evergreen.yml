@@ -8912,7 +8912,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - ubuntu1804-build
+    - release-ubuntu1804-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -8999,7 +8999,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - ubuntu1804-build
+    - release-ubuntu1804-build
   - name: compile_ninja_next_TG
     distros:
     - ubuntu1804-build
@@ -9089,7 +9089,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - ubuntu1604-build
+    - release-ubuntu1604-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -9149,6 +9149,8 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_all_run_unittests_TG
+    distros:
+    - release-ubuntu1604-arm64-large
   - name: aggregation
   - name: .auth !.audit !.multiversion !.jscore
   - name: .misc_js
@@ -9188,6 +9190,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
+    distros:
+    - release-ubuntu1804-arm64-build
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -9269,6 +9273,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
+    distros:
+    - release-ubuntu1804-arm64-build
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
@@ -9320,7 +9326,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - ubuntu2004-large
+    - release-ubuntu2004-large
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -9366,7 +9372,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - ubuntu2004-large
+    - release-ubuntu2004-large
   - name: compile_ninja_next_TG
     distros:
     - ubuntu2004-large
@@ -9414,6 +9420,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
+    distros:
+    - release-ubuntu2004-arm64-large
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -9458,6 +9466,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
+    distros:
+    - release-ubuntu2004-arm64-large
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
@@ -9485,7 +9495,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - amazon1-2018-build
+    - release-amazon1-2018-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.gle !.multiversion
@@ -9534,7 +9544,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - amazon1-2018-build
+    - release-amazon1-2018-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -9581,7 +9591,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - amazon2-build
+    - release-amazon2-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: audit
@@ -9630,7 +9640,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - amazon2-build
+    - release-amazon2-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -9673,7 +9683,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - amazon2-arm64-large
+    - release-amazon2-arm64-large
   - name: .aggfuzzer !.multiversion
   - name: audit
   - name: auth_audit_gen
@@ -9720,7 +9730,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - amazon2-arm64-large
+    - release-amazon2-arm64-large
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -9889,7 +9899,7 @@ buildvariants:
   tasks:
     - name: compile_all_run_unittests_TG
       distros:
-        - windows-vsCurrent-large
+        - release-windows-vsCurrent-large
     - name: audit
     - name: auth_audit_gen
     - name: buildscripts_test
@@ -10002,7 +10012,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-vsCurrent-large
+    - release-windows-vsCurrent-large
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind !.large
   - name: .aggregation .large
@@ -10082,6 +10092,8 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
+    distros:
+    - release-macos-1014
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: .auth .gle
   - name: auth_gen
@@ -10152,6 +10164,8 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_all_run_unittests_TG
+    distros:
+    - release-macos-1014
   - name: compile_ninja_next_TG
   - name: audit
   - name: auth_audit_gen
@@ -10253,7 +10267,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel62-large
+    - release-rhel62-large
   - name: lint_pylinters
   - name: lint_clang_format
   - name: lint_eslint
@@ -10801,7 +10815,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel70
+    - release-rhel70
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
@@ -10859,7 +10873,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel80-build
+    - release-rhel80-build
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
@@ -10907,7 +10921,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel82-arm64-large
+    - release-rhel82-arm64-large
   - name: .aggfuzzer !.multiversion
   - name: audit
   - name: auth_audit_gen
@@ -11016,7 +11030,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel81-power8-large
+    - release-rhel81-power8-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -11107,7 +11121,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel62-large
+    - release-rhel62-large
   - name: aggregation
   - name: .auth !.multiversion !.audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -11151,7 +11165,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel70
+    - release-rhel70
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -11196,7 +11210,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel80-build
+    - release-rhel80-build
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -11239,7 +11253,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel82-arm64-large
+    - release-rhel82-arm64-large
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -11303,7 +11317,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel71-power8-build
+    - release-rhel71-power8-build
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -11351,7 +11365,7 @@ buildvariants:
   tasks:
   - name: small_compile_TG
     distros:
-    - rhel72-zseries-build
+    - release-rhel72-zseries-build
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -11399,7 +11413,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - ubuntu1604-build
+    - release-ubuntu1604-build
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -11515,7 +11529,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - suse12-sp5-large
+    - release-suse12-sp5-large
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -11554,7 +11568,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - suse12-sp5-large
+    - release-suse12-sp5-large
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -11598,7 +11612,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - suse15-build
+    - release-suse15-build
   - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -11637,7 +11651,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - suse15-build
+    - release-suse15-build
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -11685,7 +11699,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - debian92-build
+    - release-debian92-build
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -11724,7 +11738,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - debian92-build
+    - release-debian92-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
@@ -11769,7 +11783,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - debian10-build
+    - release-debian10-build
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -11808,7 +11822,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - debian10-build
+    - release-debian10-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
