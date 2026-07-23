@@ -158,7 +158,7 @@ TEST(WasmtimeScope, GetNumberLongLong_ReturnsMillisForDateValue) {
 // The idle-bridge revival path hits resetRealm() on every request.
 TEST(WasmtimeBridge, DateNow_SurvivesRealmReset) {
     WasmtimeScriptEngine engine;
-    auto ctx = engine.createWasmEngineContext();
+    auto ctx = engine.getWasmEngineContext();
     wasm::MozJSWasmBridge::Options opts;
     opts.linearMemoryLimitMB = static_cast<uint32_t>(gWasmtimeStoreMemoryLimitMB.load());
     auto bridge = std::make_unique<wasm::MozJSWasmBridge>(ctx, opts);

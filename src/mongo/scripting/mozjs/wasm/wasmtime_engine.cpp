@@ -12,6 +12,7 @@
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 #include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/scripting/mozjs/wasm/scope/scope.h"
+#include "mongo/util/timer.h"
 
 #include <mutex>
 
@@ -88,33 +89,26 @@ WasmtimeScriptEngine::WasmtimeScriptEngine() {}
 
 WasmtimeScriptEngine::~WasmtimeScriptEngine() {}
 
-std::shared_ptr<wasm::WasmEngineContext> WasmtimeScriptEngine::createWasmEngineContext() const {
-    // Serialise all context creation (pool hit and fallback) under a single lock.
-    // Concurrent wasmtime_component_deserialize calls on the same pre-compiled bytes share
-    // internal JIT allocations without Arc protection, causing an ASAN double-free when the
-    // resulting WasmEngineContexts are later destroyed on separate threads.
-    // Holding the pool mutex for the fallback is acceptable: the hot path (pool hit) is a fast
-    // vector pop, and the cold path (fresh deserialise) is bounded by the number of concurrent
-    // threads that have simultaneously exhausted their idle-bridge slot.
+std::shared_ptr<wasm::WasmEngineContext> WasmtimeScriptEngine::getWasmEngineContext() const {
+    // Deserialize the Engine + Component + Linker exactly once and share the resulting
+    // WasmEngineContext with every scope. A context is immutable after construction and is designed
+    // to back many bridges (each MozJSWasmBridge instantiates its own Store/Instance from the
+    // shared component under wasmLifecycleMutex()).
     //
-    // Pool is filled lazily on the first JS scope request so that workloads that never execute
-    // JS (e.g. top_ten_queries_locust) pay no upfront memory cost (BF-44070).
-    std::call_once(_poolOnce, [this] {
+    // Deserializing once also sidesteps the concurrent-deserialise ASAN double-free and the
+    // cross-thread destruction hazard the previous pool guarded against: the shared context is
+    // built once (under call_once) and destroyed once at engine teardown.
+    //
+    // Built lazily on the first JS scope request so workloads that never execute JS pay no upfront
+    // memory cost.
+    std::call_once(_wasmContextOnce, [this] {
         auto [data, size] = wasm::getEmbeddedWasmResource();
-        std::lock_guard<std::mutex> lk(_contextPoolMutex);
-        _contextPool.reserve(kContextPoolSize);
-        for (size_t i = 0; i < kContextPoolSize; ++i) {
-            _contextPool.push_back(wasm::WasmEngineContext::createFromPrecompiled(data, size));
-        }
+        Timer timer;
+        _wasmContext = wasm::WasmEngineContext::createFromPrecompiled(data, size);
+        LOGV2(
+            11600003, "Initialized shared WASM engine context", "durationMs"_attr = timer.millis());
     });
-    std::lock_guard<std::mutex> lk(_contextPoolMutex);
-    if (!_contextPool.empty()) {
-        auto ctx = std::move(_contextPool.back());
-        _contextPool.pop_back();
-        return ctx;
-    }
-    auto [data, size] = wasm::getEmbeddedWasmResource();
-    return wasm::WasmEngineContext::createFromPrecompiled(data, size);
+    return _wasmContext;
 }
 
 mongo::Scope* WasmtimeScriptEngine::createScope() {
@@ -195,7 +189,7 @@ mongo::Scope* WasmtimeScriptEngine::createScopeForCurrentThread(
     tl_idleBridge = {};
     LOGV2_DEBUG(
         11542379, 2, "WASM scope creating fresh bridge", "heapLimitMB"_attr = resolvedLimit);
-    return new WasmtimeImplScope(createWasmEngineContext(), resolvedLimit);
+    return new WasmtimeImplScope(getWasmEngineContext(), resolvedLimit);
 }
 
 void WasmtimeScriptEngine::parkBridgeForCurrentThread(std::unique_ptr<wasm::MozJSWasmBridge> bridge,
