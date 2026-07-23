@@ -130,6 +130,12 @@ public:
      */
     Status parse(ReadConcernIdl inner);
 
+    /**
+     * Verifies that this ReadConcernArgs instance represents a valid combination of readConcern
+     * level and associated timing options.
+     */
+    Status validate() const;
+
     static ReadConcernArgs fromBSONThrows(const BSONObj& readConcernObj);
     static ReadConcernArgs fromIDLThrows(ReadConcernIdl readConcern);
 
@@ -189,6 +195,13 @@ public:
      */
     bool hasLevel() const {
         return _level.has_value();
+    }
+
+    /**
+     * Sets the read concern level (used to merge a default level into a partial RC).
+     */
+    void setLevel(ReadConcernLevel level) {
+        _level = level;
     }
 
     /**

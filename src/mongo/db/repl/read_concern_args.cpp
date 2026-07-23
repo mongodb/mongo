@@ -113,6 +113,15 @@ Status ReadConcernArgs::parse(ReadConcernIdl inner) {
         _provenance = *provenance;
     }
 
+    auto status = validate();
+    if (status.isOK()) {
+        _specified = true;
+        return Status::OK();
+    }
+    return status;
+}
+
+Status ReadConcernArgs::validate() const {
     if (_afterClusterTime && _opTime) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream()
@@ -174,7 +183,6 @@ Status ReadConcernArgs::parse(ReadConcernIdl inner) {
                       str::stream() << kAfterClusterTimeFieldName << " cannot be a null timestamp");
     }
 
-    _specified = true;
     return Status::OK();
 }
 
