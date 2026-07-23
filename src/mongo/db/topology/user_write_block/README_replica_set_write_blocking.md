@@ -149,11 +149,11 @@ traffic. This is handled by `ReplicaSetWriteBlockBypass`
 (`replica_set_write_block_bypass.h`/`.cpp`), an `OperationContext` decoration that mirrors the
 `WriteBlockBypass` mechanism used by user write blocking. Every `check...Allowed` predicate consults
 it. On internal requests the originator propagates the bypass through the
-`mayBypassReplicaSetWriteBlocking` request-metadata field (`writeAsMetadata` / `setFromMetadata`);
+`mayBypassReplicaSetWritesBlocking` request-metadata field (`writeAsMetadata` / `setFromMetadata`);
 this field is only honored from clients that hold the `internal` action on the `cluster` resource.
 On external requests the bypass is derived from the `AuthorizationSession`
-(`AuthorizationSession::mayBypassReplicaSetWriteBlocking`), which is true for a user that holds the
-`bypassReplicaSetWriteBlocking` action on the `cluster` resource — granted through the
+(`AuthorizationSession::mayBypassReplicaSetWritesBlocking`), which is true for a user that holds the
+`bypassReplicaSetWritesBlocking` action on the `cluster` resource — granted through the
 `clusterManager` built-in role (and roles that include it, such as `clusterAdmin` and `root`). This
 is the replica-set analogue of user write blocking's `bypassWriteBlockingMode` action. This
 propagation model ensures, for example, that internal writes issued on behalf of an operation that

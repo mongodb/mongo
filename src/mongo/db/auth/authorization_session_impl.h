@@ -154,7 +154,7 @@ public:
 
     bool mayBypassWriteBlockingMode() const override;
 
-    bool mayBypassReplicaSetWriteBlocking() const override;
+    bool mayBypassReplicaSetWritesBlocking() const override;
 
     bool isExpired() const override;
     const boost::optional<Date_t>& getExpiration() const override {

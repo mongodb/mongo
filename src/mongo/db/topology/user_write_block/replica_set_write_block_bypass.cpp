@@ -35,9 +35,9 @@ void ReplicaSetWriteBlockBypass::setFromMetadata(OperationContext* opCtx,
         as->isAuthorizedForActionsOnResource(
             ResourcePattern::forClusterResource(as->getUserTenantId()), ActionType::internal));
 
-    // If the mayBypassReplicaSetWriteBlocking field is set, set our state from that field.
+    // If the mayBypassReplicaSetWritesBlocking field is set, set our state from that field.
     // Otherwise, set our state based on the AuthorizationSession state.
-    set(val.has_value() ? *val : as->mayBypassReplicaSetWriteBlocking());
+    set(val.has_value() ? *val : as->mayBypassReplicaSetWritesBlocking());
 }
 
 void ReplicaSetWriteBlockBypass::set(bool bypassEnabled) {
@@ -45,7 +45,7 @@ void ReplicaSetWriteBlockBypass::set(bool bypassEnabled) {
 }
 
 void ReplicaSetWriteBlockBypass::writeAsMetadata(BSONObjBuilder* builder) {
-    builder->append(GenericArguments::kMayBypassReplicaSetWriteBlockingFieldName, _enabled);
+    builder->append(GenericArguments::kMayBypassReplicaSetWritesBlockingFieldName, _enabled);
 }
 
 ReplicaSetWriteBlockBypass& ReplicaSetWriteBlockBypass::get(OperationContext* opCtx) {

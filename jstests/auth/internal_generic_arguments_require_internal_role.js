@@ -16,7 +16,7 @@ assert.commandFailedWithCode(
     9955800,
 );
 assert.commandFailedWithCode(
-    db.runCommand({listCollections: 1, mayBypassReplicaSetWriteBlocking: true}),
+    db.runCommand({listCollections: 1, mayBypassReplicaSetWritesBlocking: true}),
     12097002,
 );
 
@@ -27,6 +27,6 @@ assert(admin.auth("system", "pass"));
 
 assert.commandWorked(db.runCommand({listCollections: 1, mayBypassWriteBlocking: true}));
 assert.commandWorked(db.runCommand({listCollections: 1, versionContext: {OFCV: latestFCV}}));
-assert.commandWorked(db.runCommand({listCollections: 1, mayBypassReplicaSetWriteBlocking: true}));
+assert.commandWorked(db.runCommand({listCollections: 1, mayBypassReplicaSetWritesBlocking: true}));
 
 MongoRunner.stopMongod(mongod);
