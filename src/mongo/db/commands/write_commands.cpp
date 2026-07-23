@@ -489,6 +489,17 @@ public:
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
             doTransactionValidationForWrites(opCtx, ns());
+
+            // Session collection upserts from internal clients (refreshSessions) must make forward
+            // progress to prevent TooManyLogicalSessions errors under heavy write load.
+            boost::optional<ScopedAdmissionPriorityForLock> admissionPriority;
+            if (ns() == NamespaceString::kLogicalSessionsNamespace &&
+                opCtx->getClient()->session() &&
+                (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient)) {
+                admissionPriority.emplace(opCtx->lockState(),
+                                          AdmissionContext::Priority::kImmediate);
+            }
+
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
@@ -698,6 +709,17 @@ public:
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
             doTransactionValidationForWrites(opCtx, ns());
+
+            // Session collection deletes from internal clients (removeRecords) must make forward
+            // progress to prevent TooManyLogicalSessions errors under heavy write load.
+            boost::optional<ScopedAdmissionPriorityForLock> admissionPriority;
+            if (ns() == NamespaceString::kLogicalSessionsNamespace &&
+                opCtx->getClient()->session() &&
+                (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient)) {
+                admissionPriority.emplace(opCtx->lockState(),
+                                          AdmissionContext::Priority::kImmediate);
+            }
+
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
 

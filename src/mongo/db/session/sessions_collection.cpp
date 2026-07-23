@@ -40,6 +40,7 @@
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/sessions_server_parameters_gen.h"
@@ -140,6 +141,19 @@ constexpr StringData SessionsCollection::kSessionsTTLIndex;
 SessionsCollection::SessionsCollection() = default;
 
 SessionsCollection::~SessionsCollection() = default;
+
+std::function<void(BSONObj)> SessionsCollection::withRefreshTimeout(
+    std::function<void(BSONObj)> fn) {
+    if (!logicalSessionCacheJobTimeoutEnabled.load()) {
+        return fn;
+    }
+    const auto timeoutMs = static_cast<long long>(logicalSessionRefreshMillis) * 9 / 10;
+    return [fn = std::move(fn), timeoutMs](BSONObj batch) {
+        BSONObjBuilder builder(batch);
+        builder.append("maxTimeMS", timeoutMs);
+        fn(builder.obj());
+    };
+}
 
 SessionsCollection::SendBatchFn SessionsCollection::makeSendFnForBatchWrite(
     const NamespaceString& ns, DBClientBase* client) {

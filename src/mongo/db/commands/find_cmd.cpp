@@ -461,6 +461,13 @@ public:
                 // stalled replicating because of an inability to acquire a read ticket.
                 opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
             }
+            // Session collection reads from internal clients (findRemovedSessions) must make
+            // forward progress to prevent TooManyLogicalSessions errors under heavy load.
+            if (!(term && isOplogNss) && _ns == NamespaceString::kLogicalSessionsNamespace &&
+                opCtx->getClient()->session() &&
+                (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient)) {
+                opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+            }
 
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility
             // rules in the case of secondaries. We normally only read from these nodes at batch
