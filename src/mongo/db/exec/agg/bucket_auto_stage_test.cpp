@@ -119,7 +119,7 @@ TEST_F(BucketAutoStageTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTracki
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
 }
 
-TEST_F(BucketAutoStageTest, MemoryTrackerLimitReflectsKnob) {
+TEST_F(BucketAutoStageTest, MemoryTrackerHasNoPerStageLimit) {
     unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
     const long long customLimit = 2 * 1024 * 1024;
@@ -129,7 +129,7 @@ TEST_F(BucketAutoStageTest, MemoryTrackerLimitReflectsKnob) {
     runBucketAutoWithObservingGroupBy(getExpCtx());
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 3);
-    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, INT64_MAX);
 }
 
 TEST_F(BucketAutoStageTest, StageNameIsSetInEvaluationContext) {

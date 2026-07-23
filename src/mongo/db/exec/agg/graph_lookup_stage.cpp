@@ -72,13 +72,15 @@ GraphLookUpStage::GraphLookUpStage(
           *pExpCtx,
           pExpCtx->getAllowDiskUse(),
           loadMemoryLimit(StageMemoryLimit::DocumentSourceGraphLookupMaxMemoryBytes))),
+      _expressionEvaluationMemoryTracker(
+          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)),
       _queue(pExpCtx.get(), &_memoryUsageTracker),
       _visitedDocuments(pExpCtx.get(), &_memoryUsageTracker, "VisitedDocumentsMap"),
       _visitedFromValues(pExpCtx.get(), &_memoryUsageTracker, "VisitedFromValuesSet"),
       _cache(pExpCtx->getValueComparator()) {
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
-        _expressionEvalCtx.tracker = &_memoryUsageTracker["expressionEvaluation"];
+        _expressionEvalCtx.tracker = &_expressionEvaluationMemoryTracker;
     }
     _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }

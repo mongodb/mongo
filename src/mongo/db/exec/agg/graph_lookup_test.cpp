@@ -948,7 +948,7 @@ TEST_F(GraphLookUpTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDi
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
 }
 
-TEST_F(GraphLookUpTest, MemoryTrackerLimitReflectsKnob) {
+TEST_F(GraphLookUpTest, MemoryTrackerHasNoPerStageLimit) {
     unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
     const long long customLimit = 2 * 1024 * 1024;
@@ -958,7 +958,7 @@ TEST_F(GraphLookUpTest, MemoryTrackerLimitReflectsKnob) {
     runGraphLookupWithObservingStartWith(getExpCtx());
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
-    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, INT64_MAX);
 }
 
 TEST_F(GraphLookUpTest, StageNameIsSetInEvaluationContext) {

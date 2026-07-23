@@ -142,9 +142,14 @@ private:
 
     MemoryUsageTracker _memoryTracker;
 
-    // Pre-built context passed to every expression evaluation. tracker points to a sub-tracker of
-    // _memoryTracker ("expressionEvaluation") when expression memory tracking is enabled, and is
-    // null otherwise. Both fields are stable for the stage's lifetime.
+    // Tracks memory used while evaluating expressions. Reports to the operation-wide
+    // tracker so all stages contribute to the operation memory total.
+    SimpleMemoryUsageTracker _expressionEvaluationMemoryTracker;
+
+    // Pre-built context passed to every expression evaluation. tracker points to
+    // _expressionEvaluationMemoryTracker when expression memory tracking is enabled, and is
+    // null otherwise. stageName is always set so it can be reported in ExceededMemoryLimit errors.
+    // Both fields are stable for the stage's lifetime.
     EvaluationContext _expressionEvalCtx;
 };
 

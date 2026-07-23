@@ -60,13 +60,15 @@ BucketAutoStage::BucketAutoStage(
       _memoryTracker{OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
           *pExpCtx,
           pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter(),
-          loadMemoryLimit(StageMemoryLimit::DocumentSourceBucketAutoMaxMemoryBytes))} {
+          loadMemoryLimit(StageMemoryLimit::DocumentSourceBucketAutoMaxMemoryBytes))},
+      _expressionEvaluationMemoryTracker(
+          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     for (auto&& accumulationStatement : *_accumulatedFields) {
         _accumulatedFieldMemoryTrackers.push_back(&_memoryTracker[accumulationStatement.fieldName]);
     }
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
-        _expressionEvalCtx.tracker = &_memoryTracker["expressionEvaluation"];
+        _expressionEvalCtx.tracker = &_expressionEvaluationMemoryTracker;
     }
     _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }
