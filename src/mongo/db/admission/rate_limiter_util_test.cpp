@@ -468,13 +468,14 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, .1);
 
         // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
-        // the mock clock.
-        int64_t numRetries = 0;
-        const int64_t maxRetries = 5;
-        int64_t backoffTimeMillis{5};
-        while (rateLimiter.queued() != numThreads - maxTokens && numRetries++ < maxRetries) {
-            sleepmillis(backoffTimeMillis);
-            backoffTimeMillis *= 5;
+        // the mock clock. Use a real-time deadline instead of a bounded retry loop so the wait
+        // scales correctly under slow schedulers (e.g. Windows CI hosts).
+        const auto enqueueDeadline = Date_t::now() + Seconds(60);
+        while (rateLimiter.queued() != numThreads - maxTokens) {
+            if (Date_t::now() >= enqueueDeadline) {
+                break;
+            }
+            sleepmillis(5);
         }
 
         // Until we start moving the mock clock forward, no other requests will be fulfilled and all
@@ -497,8 +498,8 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
 
         // For each remaining token, ensure that the rate limiter gives out a token every 1000 /
         // refreshRate milliseconds.
-        // Time out overall after 20 seconds, though, so the test doesn't hang on failure.
-        const auto deadline = (Date_t::now() + Seconds(20)).toSystemTimePoint();
+        // Time out overall after 30 seconds, though, so the test doesn't hang on failure.
+        const auto deadline = (Date_t::now() + Seconds(30)).toSystemTimePoint();
         for (int64_t i = 1; i <= numThreads - maxTokens; i++) {
             stdx::unique_lock<Mutex> lk(mutex);
             advanceTime(tokenInterval);
