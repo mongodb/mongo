@@ -135,6 +135,11 @@ evergreen_buildvariants:
     platform: rhel9
     architecture: ppc64le
 
+  - name: enterprise-rhel-10-ppc64le
+    edition: enterprise
+    platform: rhel10
+    architecture: ppc64le
+
   - name: rhel-67-s390x
     edition: targeted
     platform: rhel67
@@ -153,6 +158,11 @@ evergreen_buildvariants:
   - name: enterprise-rhel-72-s390x
     edition: enterprise
     platform: rhel72
+    architecture: s390x
+
+  - name: enterprise-rhel-10-s390x
+    edition: enterprise
+    platform: rhel10
     architecture: s390x
 
   - name: suse12

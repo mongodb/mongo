@@ -163,6 +163,16 @@ platform(
 )
 
 platform(
+    name = "rhel10_ppc64le",
+    constraint_values = [
+        "@platforms//cpu:ppc64le",
+        "@platforms//os:linux",
+        ":use_mongo_toolchain",
+        ":rhel10",
+    ],
+)
+
+platform(
     name = "rhel8_s390x",
     constraint_values = [
         "@platforms//cpu:s390x",
@@ -179,6 +189,16 @@ platform(
         "@platforms//os:linux",
         ":use_mongo_toolchain",
         ":rhel9",
+    ],
+)
+
+platform(
+    name = "rhel10_s390x",
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+        ":use_mongo_toolchain",
+        ":rhel10",
     ],
 )
 

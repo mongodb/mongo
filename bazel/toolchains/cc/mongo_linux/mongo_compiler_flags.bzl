@@ -14,7 +14,7 @@ visibility("//bazel/toolchains/cc")
 # TODO(SERVER-101099): Remove this once builds are containerized and system libraries inside the containers
 # no longer contain debug symbols.
 #
-# In RHEL8 and RHEL9 the debug symbols for libgcc aren't stripped and are instead split, which still leaves behind
+# In RHEL8, RHEL9, and RHEL10 the debug symbols for libgcc aren't stripped and are instead split, which still leaves behind
 # debug symbols in the libgcc shared object file. These debug symbols are created with gdwarf32, so they're limited to
 # a 32 bit address space. Even if the mongodb binaries are compiled with gdwarf64, there's a chance that the gdwarf32
 # libgcc debug symbols will be placed after the gdwarf64 debug symbols. This started happening in the RHEL9 ppc64le
@@ -26,6 +26,7 @@ visibility("//bazel/toolchains/cc")
 # before gdwarf64 symbols. See https://reviews.llvm.org/D96144
 LIBGCC_LINKFLAGS = select({
     "//bazel/config:rhel9_ppc64le_gcc_linkstatic": ["-static-libgcc"],
+    "//bazel/config:rhel10_ppc64le_gcc_linkstatic": ["-static-libgcc"],
     "//conditions:default": [],
 })
 

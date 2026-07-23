@@ -853,7 +853,10 @@ py_library(
 
 py_library(
     name = "packager",
-    srcs = ["packager.py"],
+    srcs = [
+        "packager.py",
+        "packager_enterprise.py",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         dependency(
