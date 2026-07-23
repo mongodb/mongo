@@ -5190,13 +5190,11 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
                               "offendingConfigs"_attr = offendingConfigs);
     }
 
-    // If the SplitHorizon has changed, reply to all waiting hellos with an error.
-    _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, _selfIndex, myIndex);
-
     LOGV2(21392,
           "New replica set config in use: {config}",
           "New replica set config in use",
           "config"_attr = _rsConfig.toBSON());
+    const auto oldIndex = _selfIndex;
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
         LOGV2(21393,
@@ -5206,6 +5204,9 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     } else {
         LOGV2(21394, "This node is not a member of the config");
     }
+
+    // If the SplitHorizon has changed, reply to all waiting hellos with an error.
+    _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, oldIndex, myIndex);
 
     // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.
     _replicationWaiterList.setValueIf_inlock([this](const OpTime& opTime,
