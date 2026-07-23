@@ -62,14 +62,19 @@ tests = [
         # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
         # to see.
         copts = [
-            "-Wno-unused-but-set-parameter",
             "-Wno-unused-variable",
             "-Wno-return-type",
             "-Isrc/mongo/tools/mongo_tidy_checks/tests",
             "-Isrc/mongo",  # for mongo header path test
         ] + select({
-            "//bazel/config:compiler_type_gcc": ["-Wno-volatile"],
-            "//bazel/config:compiler_type_clang": ["-Wno-deprecated-volatile"],
+            "//bazel/config:compiler_type_gcc": [
+                "-Wno-unused-but-set-parameter",
+                "-Wno-volatile",
+            ],
+            "//bazel/config:compiler_type_clang": [
+                "-Wno-deprecated-volatile",
+                "-Wno-unused-parameter",
+            ],
             "//conditions:default": [],
         }),
         skip_global_deps = [
