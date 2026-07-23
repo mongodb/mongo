@@ -30,6 +30,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -80,6 +81,10 @@ Status WiredTigerGlobalOptions::validateStatisticsSetting(const std::string& set
     }
 
     return Status::OK();
+}
+
+Status WiredTigerGlobalOptions::validateWiredTigerConfigString(const std::string& config) {
+    return WiredTigerUtil::checkConfigStringBannedKeys(config);
 }
 
 Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& value) {

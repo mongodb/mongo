@@ -74,6 +74,7 @@ public:
 
     static Status validateWiredTigerCompressor(const std::string&);
     static Status validateStatisticsSetting(const std::string&);
+    static Status validateWiredTigerConfigString(const std::string&);
 
     /**
      * Returns current history file size limit in MB.

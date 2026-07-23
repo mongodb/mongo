@@ -556,6 +556,29 @@ TEST_F(WiredTigerUtilTest, RemoveEncryptionFromConfigString) {
     }
 }
 
+TEST_F(WiredTigerUtilTest, CheckTableCreationOptionsRejectsManagedKeys) {
+    auto check = [](const std::string& config) {
+        return WiredTigerUtil::checkTableCreationOptions(
+            BSON(WiredTigerUtil::kConfigStringField << config).firstElement());
+    };
+
+    // Ordinary creation options are allowed.
+    ASSERT_OK(check("split_pct=88"));
+    ASSERT_OK(check(""));
+
+    // The backing file must not be overridden.
+    ASSERT_EQ(check("source=\"file:example.wt\"").code(), ErrorCodes::BadValue);
+
+    // Import settings must not be overridden.
+    ASSERT_EQ(check("import=(enabled=true)").code(), ErrorCodes::BadValue);
+
+    // A banned key mixed in with allowed options is still rejected.
+    ASSERT_EQ(check("split_pct=88,source=\"file:example.wt\"").code(), ErrorCodes::BadValue);
+
+    // A banned key name appearing inside a value (rather than as a top-level key) is allowed.
+    ASSERT_OK(check("app_metadata=\"source=file:example.wt\""));
+}
+
 TEST_F(WiredTigerUtilTest, GetSanitizedStorageOptionsForSecondaryReplication) {
     {  // Empty storage options.
         auto input = BSONObj();
@@ -715,6 +738,41 @@ TEST(WiredTigerUtilTest, WTCacheSizeCalculation) {
 
 DEATH_TEST_F(WiredTigerUtilTest, WTCacheSizeInvalidValues, "invariant") {
     WiredTigerUtil::getCacheSizeMB(10, 0.1);
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysRejectsImportEnabled) {
+    ASSERT_EQ(WiredTigerUtil::checkConfigStringBannedKeys("import=(enabled=true)").code(),
+              ErrorCodes::BadValue);
+    ASSERT_EQ(
+        WiredTigerUtil::checkConfigStringBannedKeys("block_compressor=snappy,import=(enabled=true)")
+            .code(),
+        ErrorCodes::BadValue);
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysRejectsSource) {
+    ASSERT_EQ(WiredTigerUtil::checkConfigStringBannedKeys("source=\"file:foo.wt\"").code(),
+              ErrorCodes::BadValue);
+    ASSERT_EQ(WiredTigerUtil::checkConfigStringBannedKeys(
+                  "block_compressor=snappy,source=\"file:foo.wt\"")
+                  .code(),
+              ErrorCodes::BadValue);
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysAllowsBenignConfig) {
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys(""));
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("block_compressor=snappy"));
+    // import is always present in a collection or index's own creation string, disabled by
+    // default. Only enabling it is rejected.
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("import=(enabled=false)"));
+    // source is always present, empty, in a collection or index's own creation string, since
+    // mongod never sets it. Only a non-empty value is rejected.
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("source="));
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysIgnoresMalformedConfig) {
+    // Malformed config strings are caught earlier, by wiredtiger_config_validate in
+    // checkTableCreationOptions, so this just needs to not fassert or throw.
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("key=\"unterminated"));
 }
 
 }  // namespace

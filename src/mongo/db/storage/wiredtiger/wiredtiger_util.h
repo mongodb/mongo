@@ -339,6 +339,13 @@ public:
     static Status checkTableCreationOptions(const BSONElement& configElem);
 
     /**
+     * Rejects a WiredTiger config string that enables 'import', or that sets 'source' to anything
+     * but empty. Mongod never sets 'source' itself, so empty is the only value that should ever
+     * appear here.
+     */
+    static Status checkConfigStringBannedKeys(StringData config);
+
+    /**
      * Reads individual statistics using URI.
      * List of statistics keys WT_STAT_* can be found in wiredtiger.h.
      */
