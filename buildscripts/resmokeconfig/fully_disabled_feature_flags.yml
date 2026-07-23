@@ -36,6 +36,8 @@
 - featureFlagUniqueShardIdentifiers
 # TODO SERVER-130858: Enable in the all-feature-flags variant.
 - featureFlagContinuousInternodeValidationPerDocument
+# TODO SERVER-131999: Enable in the all-feature-flags variant.
+- featureFlagContinuousInternodeValidationPerCollection
 # TODO (SERVER-131692): Enable metrics filtering feature flags in all-feature-flags variants.
 - featureFlagServerStatusMetricsFiltering
 - featureFlagReplSetGetStatusMetricsFiltering
