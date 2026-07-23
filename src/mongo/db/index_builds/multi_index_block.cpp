@@ -1775,10 +1775,32 @@ IndexStateInfo MultiIndexBlock::_buildIndexStateInfo(const IndexToBuild& index) 
     }
 
     indexStateInfo.setSpec(index.block->getSpec());
-    indexStateInfo.setIsMultikey(index.bulk->isMultikey());
+
+    bool isMultikey = index.bulk->isMultikey();
+    MultikeyPaths multikeyPathsToPersist = index.bulk->getMultikeyPaths();
+
+    // Writes which happen after the collection scan's snapshot are recorded only by the side
+    // writes interceptor, and the multikey information they generate exists only in memory in the
+    // interceptor until commit time. The side writes table itself stores bare index keys, so
+    // draining it again after a restart cannot reconstruct this information. Fold it into the
+    // persisted multikey state; on resume it is restored into the bulk builder, which marks the
+    // index multikey at commit.
+    if (const auto* interceptor = index.block->getIndexBuildInterceptor()) {
+        if (auto sideWritesMultikeyPaths = interceptor->getMultikeyPaths()) {
+            isMultikey = true;
+            if (multikeyPathsToPersist.empty()) {
+                multikeyPathsToPersist = std::move(*sideWritesMultikeyPaths);
+            } else if (multikeyPathsToPersist.size() == sideWritesMultikeyPaths->size()) {
+                MultikeyPathTracker::mergeMultikeyPaths(&multikeyPathsToPersist,
+                                                        *sideWritesMultikeyPaths);
+            }
+        }
+    }
+
+    indexStateInfo.setIsMultikey(isMultikey);
 
     std::vector<MultikeyPath> multikeyPaths;
-    for (const auto& multikeyPath : index.bulk->getMultikeyPaths()) {
+    for (const auto& multikeyPath : multikeyPathsToPersist) {
         MultikeyPath multikeyPathObj;
         std::vector<int32_t> multikeyComponents;
         for (const auto& multikeyComponent : multikeyPath) {
