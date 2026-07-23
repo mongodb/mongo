@@ -431,6 +431,13 @@ class ScopeCache {
 public:
     using PoolName = std::tuple<DatabaseName, string>;
     void release(const PoolName& poolName, const std::shared_ptr<Scope>& scope) {
+        // The scope may still be registered to the releasing operation if it is being released
+        // on an exception path (e.g. getPooledScope() interrupted in loadStored() before the
+        // caller could arm its own unregisterOperation() guard). A scope must never sit in the
+        // pool -- or be destroyed from it -- while registered: the OperationContext it points to
+        // belongs to a request that may complete and be freed at any time.
+        scope->unregisterOperation();
+
         std::lock_guard<std::mutex> lk(_mutex);
 
         if (scope->hasOutOfMemoryException()) {
@@ -677,6 +684,14 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
                                                const DatabaseName& db,
                                                const string& scopeType) {
     const auto fullPoolName = std::make_tuple(db, scopeType);
+
+    // Fail before registering the operation on a scope: an already-interrupted operation (e.g.
+    // maxTimeMS expired) would only throw part-way through the setup below, leaving a scope
+    // registered to a soon-to-be-destroyed OperationContext.
+    if (opCtx) {
+        opCtx->checkForInterrupt();
+    }
+
     std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());

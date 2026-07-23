@@ -81,7 +81,9 @@ public:
     void registerOperation(OperationContext* ctx,
                            WasmtimeImplScope* scope,
                            std::function<void()> onTeardown);
-    void unregisterOperation(OperationContext* opCtx);
+    // Removes 'scope's entry from the registrations on 'opCtx'. Other scopes' overlapping
+    // registrations are left intact: a stale unregister must never remove another registrant.
+    void unregisterOperation(OperationContext* opCtx, WasmtimeImplScope* scope);
 
     // Returns the process-wide shared WasmEngineContext, deserializing it once on first use. Every
     // scope shares the same context; kills stay isolated per Store via each bridge's epoch-deadline

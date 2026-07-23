@@ -646,3 +646,133 @@ TEST(WasmtimeScopeConcurrency, EpochBleed_KillingOneScopeDoesNotInterruptAnother
     bool scopeBSucceeded = (scopeB->invoke(fnB, nullptr, nullptr, /*timeoutMs=*/30000) == 0);
     ASSERT_TRUE(scopeBSucceeded) << "Killing scope A must not interrupt scope B (epoch bleed)";
 }
+
+// Regression test: getPooledScope() must refuse to register an already-interrupted
+// operation on a scope. Pre-fix it registered the opCtx and only failed later (in loadStored()),
+// releasing a still-registered scope into the global ScopeCache.
+TEST_F(WasmtimeScopeInterruptTranslationTest, GetPooledScopeThrowsOnInterruptedOpCtx) {
+    auto client = getService()->makeClient("get-pooled-scope-interrupted-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+    opCtx->markKilled(ErrorCodes::MaxTimeMSExpired);
+
+    const auto db = DatabaseName::createDatabaseName_forTest(boost::none, "pooled_scope_test");
+    ASSERT_THROWS_CODE(
+        getGlobalScriptEngine()->getPooledScope(opCtx.get(), db, "pooled_scope_test"),
+        DBException,
+        ErrorCodes::MaxTimeMSExpired);
+    ScriptEngine::dropScopeCache();
+}
+
+// Regression test: a scope released to the ScopeCache on an exception path was
+// still registered to its OperationContext. Once that opCtx was freed, destroying the pooled
+// scope called engine->unregisterOperation() on the dangling pointer (heap-use-after-free in
+// OperationContext::getClient(), caught by ASan).
+TEST_F(WasmtimeScopeInterruptTranslationTest, PooledScopeReleasedOnExceptionIsUnregistered) {
+    auto client = getService()->makeClient("pooled-scope-exception-release-test");
+    AlternativeClientRegion acr(client);
+    const auto db = DatabaseName::createDatabaseName_forTest(boost::none, "pooled_scope_test");
+
+    {
+        auto opCtx = cc().makeOperationContext();
+        // getPooledScope() registers the opCtx on a fresh scope and then throws from
+        // loadStored(): unit tests have no DBDirectClientFactory implementation, so this
+        // exercises the exception/unwind path after the scope has been registered.
+        // ~PooledScope() releases the scope into the global ScopeCache on this unwind path.
+        ASSERT_THROWS(getGlobalScriptEngine()->getPooledScope(opCtx.get(), db, "pooled_scope_test"),
+                      DBException);
+
+        // Re-register the opCtx with a different scope so the opCtx's teardown decoration no
+        // longer points at the pooled scope. In the original failure the pooled scope's
+        // back-pointer was orphaned by a cross-thread race instead; this makes it deterministic.
+        std::unique_ptr<Scope> other(getGlobalScriptEngine()->newScopeForCurrentThread());
+        other->registerOperation(opCtx.get());
+        other->unregisterOperation();
+    }  // The opCtx is destroyed and its memory freed here.
+
+    // Destroy the pooled scope. Pre-fix it still held the freed opCtx and dereferenced it via
+    // engine->unregisterOperation(); post-fix it was unregistered when released to the cache.
+    ScriptEngine::dropScopeCache();
+}
+
+// Regression test: scopes with overlapping registrations on one OperationContext must each keep
+// their own teardown. Historically the decoration was a single slot, so a second registration
+// displaced the first scope's teardown; when the opCtx was destroyed only the newest scope had
+// its _opCtx cleared, and the displaced scope dereferenced the freed opCtx on destruction
+// (heap-use-after-free in OperationContext::getClient(), caught by ASan).
+TEST_F(WasmtimeScopeInterruptTranslationTest, SecondRegistrationSeversPreviousScopeBackPointer) {
+    auto client = getService()->makeClient("double-registration-test");
+    AlternativeClientRegion acr(client);
+
+    std::unique_ptr<Scope> scopeA(getGlobalScriptEngine()->newScopeForCurrentThread());
+    std::unique_ptr<Scope> scopeB(getGlobalScriptEngine()->newScopeForCurrentThread());
+    {
+        auto opCtx = cc().makeOperationContext();
+        scopeA->registerOperation(opCtx.get());
+        // Second registration on the same opCtx while scopeA is still registered.
+        scopeB->registerOperation(opCtx.get());
+        scopeB->unregisterOperation();
+    }  // The opCtx is destroyed and its memory freed here.
+
+    // scopeA's destructor calls unregisterOperation(); it must not dereference the freed opCtx.
+    scopeA.reset();
+    scopeB.reset();
+}
+
+// Regression test: a scope must keep receiving interrupts while another scope's shorter-lived
+// registration on the same OperationContext comes and goes. With a single-slot decoration, the
+// inner scope's unregister blanket-nulled the slot, so a later kill (maxTimeMS / killOp /
+// disconnect) found no scope and no-oped -- leaving the outer scope's JS running unkillable.
+// This overlap occurs in production when a JsExecution scope is registered for the whole
+// operation while a $where JsFunction re-registers a pooled scope per predicate call.
+TEST_F(WasmtimeScopeInterruptTranslationTest, OverlappingRegistrationKeepsInterruptDelivery) {
+    auto client = getService()->makeClient("overlapping-registration-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+
+    std::unique_ptr<Scope> outer(getGlobalScriptEngine()->newScopeForCurrentThread());
+    std::unique_ptr<Scope> inner(getGlobalScriptEngine()->newScopeForCurrentThread());
+
+    outer->registerOperation(opCtx.get());
+    inner->registerOperation(opCtx.get());
+    inner->unregisterOperation();
+
+    {
+        ClientLock lk(opCtx->getClient());
+        static_cast<mozjs::WasmtimeScriptEngine*>(getGlobalScriptEngine())
+            ->interrupt(lk, opCtx.get());
+    }
+
+    // Unregister before checking so isKillPending() reflects only the bridge state (the kill
+    // delivered by interrupt()), not the registered opCtx.
+    outer->unregisterOperation();
+    ASSERT_TRUE(outer->isKillPending())
+        << "kill was not delivered to the outer scope after the inner scope unregistered";
+    ASSERT_FALSE(inner->isKillPending());
+}
+
+// Both scopes with live overlapping registrations must receive a kill: interrupt() has to fan
+// out to every registered scope, since any of them may be the one currently executing JS.
+TEST_F(WasmtimeScopeInterruptTranslationTest, InterruptFansOutToAllRegisteredScopes) {
+    auto client = getService()->makeClient("interrupt-fan-out-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+
+    std::unique_ptr<Scope> scopeA(getGlobalScriptEngine()->newScopeForCurrentThread());
+    std::unique_ptr<Scope> scopeB(getGlobalScriptEngine()->newScopeForCurrentThread());
+    scopeA->registerOperation(opCtx.get());
+    scopeB->registerOperation(opCtx.get());
+
+    {
+        ClientLock lk(opCtx->getClient());
+        static_cast<mozjs::WasmtimeScriptEngine*>(getGlobalScriptEngine())
+            ->interrupt(lk, opCtx.get());
+    }
+
+    // Unregister before checking so isKillPending() reflects only the bridge state (the kill
+    // delivered by interrupt()), not the registered opCtx.
+    scopeA->unregisterOperation();
+    scopeB->unregisterOperation();
+    ASSERT_TRUE(scopeA->isKillPending());
+    ASSERT_TRUE(scopeB->isKillPending());
+}
