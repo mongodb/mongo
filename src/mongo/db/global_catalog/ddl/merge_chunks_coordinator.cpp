@@ -137,7 +137,7 @@ std::vector<BSONObj> commitToGlobalCatalog(OperationContext* opCtx,
                                            OperationSessionInfo session) {
     ConfigSvrCommitMergeChunksRequest request(nss);
     request.setDbName(DatabaseName::kAdmin);
-    request.setShard(ShardRef(shardId));
+    request.setShard(ShardRef(shardId.toString()));
     request.setChunkRange(chunkRange);
     request.setShardVersionPreMerge(shardVersionPreMerge);
     generic_argument_util::setMajorityWriteConcern(request);

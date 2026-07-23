@@ -64,7 +64,6 @@
 #include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/add_shard_gen.h"
@@ -1745,7 +1744,7 @@ void addShardInTransaction(OperationContext* opCtx,
                            [&](const DatabaseName& dbName) {
                                return DatabaseType(
                                           dbName,
-                                          ShardRef(newShard.getName()),
+                                          newShard.getName(),
                                           DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
                                    .toBSON();
                            });

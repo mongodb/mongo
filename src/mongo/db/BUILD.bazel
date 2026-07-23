@@ -3221,7 +3221,6 @@ mongo_cc_unit_test(
         "startup_warnings_mongod_thp_test.cpp",
         "//src/mongo/db:namespace_string_test.cpp",
         "//src/mongo/db/sharding_environment:shard_id_test.cpp",
-        "//src/mongo/db/sharding_environment:shard_ref_test.cpp",
     ],
     tags = ["mongo_unittest_fifth_group"],
     target_compatible_with = select({

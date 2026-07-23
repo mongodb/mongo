@@ -19,7 +19,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -149,11 +148,7 @@ bool CollectionRoutingInfo::hasRoutingTable() const {
     return getChunkManager().hasRoutingTable();
 }
 
-ShardId CollectionRoutingInfo::getDbPrimaryShardId() const {
-    return _dbInfo->getPrimary();
-}
-
-const ShardRef& CollectionRoutingInfo::getDbPrimaryShardRef() const {
+const ShardId& CollectionRoutingInfo::getDbPrimaryShardId() const {
     return _dbInfo->getPrimary();
 }
 
@@ -330,7 +325,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCt
         // finding the CatalogCache thread pool is full when the aggregation itself needs to refresh
         // the cache (i.e. $unionWith).
         return CachedDatabaseInfo{
-            DatabaseType(dbName, ShardRef{ShardId::kConfigServerId}, DatabaseVersion::makeFixed())};
+            DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed())};
     }
 
     Timer t{};

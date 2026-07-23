@@ -43,7 +43,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -387,14 +386,12 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
 
     // The admin database is always hosted on the config server.
     if (dbName.isAdminDB()) {
-        return DatabaseType(
-            dbName, ShardRef{ShardId::kConfigServerId}, DatabaseVersion::makeFixed());
+        return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     // The config database's primary shard is always config, and it is always sharded.
     if (dbName.isConfigDB()) {
-        return DatabaseType(
-            dbName, ShardRef{ShardId::kConfigServerId}, DatabaseVersion::makeFixed());
+        return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     // If config only mode is enabled, we are not allowed to access any databases other than the

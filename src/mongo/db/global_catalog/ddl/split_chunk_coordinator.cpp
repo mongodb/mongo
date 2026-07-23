@@ -177,7 +177,7 @@ std::vector<BSONObj> commitToGlobalCatalog(OperationContext* opCtx,
                                            OperationSessionInfo session) {
     ConfigSvrCommitSplitChunkRequest request(nss);
     request.setDbName(DatabaseName::kAdmin);
-    request.setShard(ShardRef(shardId));
+    request.setShard(ShardRef(shardId.toString()));
     request.setRange(chunkRange);
     request.setSplitPoints(splitKeys);
     request.setShardVersionPreSplit(shardVersionPreSplit);

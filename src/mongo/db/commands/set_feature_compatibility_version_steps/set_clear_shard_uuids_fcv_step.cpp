@@ -141,7 +141,7 @@ void generateShardUUIDMetadata(OperationContext* opCtx) {
         entry.setMulti(false);
         updateOp.setUpdates({entry});
         updateOp.setWriteConcern(defaultMajorityWriteConcern());
-        requests.emplace_back(ShardRef(shardType.getName()), updateOp.toBSON());
+        requests.emplace_back(shardType.getName(), updateOp.toBSON());
     }
 
     if (!requests.empty()) {

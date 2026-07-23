@@ -11,7 +11,6 @@
 #include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 
@@ -176,7 +175,7 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
           CollectionRoutingInfo{
               std::move(cm),
               DatabaseTypeValueHandle(DatabaseType{
-                  nss.dbName(), ShardRef{"0"}, DatabaseVersion(UUID::gen(), validAfter)})}}});
+                  nss.dbName(), ShardId("0"), DatabaseVersion(UUID::gen(), validAfter)})}}});
     return CollectionRoutingInfoTargeter(nss, *routingCtx);
 }
 

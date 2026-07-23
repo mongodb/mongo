@@ -22,11 +22,6 @@ std::string ShardRef::toString() const {
                  _ref);
 }
 
-ShardRef::operator ShardId() const {
-    invariant(isString());
-    return ShardId(getString());
-}
-
 ShardRef ShardRef::parse(const BSONElement& element) {
     if (element.type() == BSONType::string) {
         return ShardRef(element.str());

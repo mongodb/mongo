@@ -2452,7 +2452,7 @@ bool MigrationDestinationManager::migrationWouldDropPITHistory(OperationContext*
     // recipient therefore records it as a past owner, and onCurrentShardSince (the newest ownership
     // transition) bounds the reachability of that past ownership, so history need not be scanned.
     const auto isConflict = [&](const ChunkType& chunk) {
-        if (chunk.getShard() == ShardRef(recipientShardId)) {
+        if (chunk.getShard() == recipientShardId) {
             return false;
         }
         if (!enclosingChunk.overlaps(chunk.getRange())) {

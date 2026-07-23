@@ -70,8 +70,8 @@ void AbslStringify(Sink& sink, const BSONObj& value) {
 }
 
 template <typename Sink>
-void AbslStringify(Sink& sink, const ShardRef& value) {
-    absl::Format(&sink, "ShardRef{\"%s\"}", value.toString());
+void AbslStringify(Sink& sink, const ShardId& value) {
+    absl::Format(&sink, "\"%s\"_shardId", value.toString());
 }
 
 namespace {
@@ -90,13 +90,19 @@ auto ArbitraryNamespace() {
     return ElementOf<NamespaceString>(kNamespacesToTest);
 }
 
-const ShardRef kThisShard{"myShardName"};
-const ShardRef kOtherShard1{"other1"};
-const ShardRef kOtherShard2{"other2"};
+const ShardId kThisShard{"myShardName"};
+const ShardId kOtherShard1{"other1"};
+const ShardId kOtherShard2{"other2"};
 
-auto ArbitraryShardRef() {
-    return ElementOf<ShardRef>({kThisShard, kOtherShard1, kOtherShard2});
+// The domain produces std::string rather than ShardId directly: ShardId's implicit conversion to
+// std::string_view makes fuzztest misdetect it as a string-like container to print natively,
+// which fails to compile since ShardId doesn't actually expose data()/size()/iterators itself.
+// Callers should wrap the generated value with ShardId{...} wherever the real API is needed.
+auto ArbitraryShardId() {
+    return ElementOf<std::string>(
+        {kThisShard.toString(), kOtherShard1.toString(), kOtherShard2.toString()});
 }
+
 
 struct ClearMetadataDDL {
     NamespaceString nss;
@@ -111,16 +117,15 @@ enum class ShardingCollType { kUntracked, kUnsplittable, kSharded };
 struct Chunk {
     BSONObj min;
     BSONObj max;
-    ShardRef owner;
+    ShardId owner;
 };
 
 auto ArbitraryUnsplittableChunk() {
     return Map(
-        [](const auto& shardRef) {
-            return std::vector<Chunk>{
-                Chunk{BSON("_id" << MINKEY), BSON("_id" << MAXKEY), shardRef}};
+        [](const auto& shardId) {
+            return std::vector<Chunk>{Chunk{BSON("_id" << MINKEY), BSON("_id" << MAXKEY), shardId}};
         },
-        ArbitraryShardRef());
+        ArbitraryShardId());
 }
 
 auto ArbitraryMultipleChunks(int maxSplitPoints) {
@@ -128,10 +133,10 @@ auto ArbitraryMultipleChunks(int maxSplitPoints) {
         [](auto splitPoints) {
             std::sort(splitPoints.begin(), splitPoints.end());
             return PairOf(Just(splitPoints),
-                          VectorOf(ArbitraryShardRef()).WithSize(splitPoints.size()));
+                          VectorOf(ArbitraryShardId()).WithSize(splitPoints.size()));
         },
         NonEmpty(UniqueElementsVectorOf(Arbitrary<int>()).WithMaxSize(maxSplitPoints)));
-    auto arbMinKeyOwner = ArbitraryShardRef();
+    auto arbMinKeyOwner = ArbitraryShardId();
     auto arbChunks = Map(
         [](auto splitPointsAndOwners, const auto& minKeyShard) {
             std::vector<Chunk> results;
@@ -230,12 +235,25 @@ struct RenameDDL {
 };
 
 struct MovePrimaryDDL {
-    ShardRef to;
+    ShardId to;
+
+    // A user-declared constructor makes this a non-aggregate type on purpose: fuzztest's
+    // autodetected aggregate printer would otherwise try (and fail) to print the ShardId field
+    // on its own, since ShardId's implicit conversion to std::string_view makes fuzztest misdetect
+    // it as a string-like container. With this type no longer an aggregate, fuzztest falls back to
+    // the AbslStringify overload defined below instead.
+    explicit MovePrimaryDDL(ShardId to) : to(std::move(to)) {}
 
     static auto arbitrary() {
-        return StructOf<MovePrimaryDDL>(ArbitraryShardRef());
+        return Map([](const std::string& to) { return MovePrimaryDDL{ShardId{to}}; },
+                   ArbitraryShardId());
     }
 };
+
+template <typename Sink>
+void AbslStringify(Sink& sink, const MovePrimaryDDL& value) {
+    absl::Format(&sink, "MovePrimaryDDL{%v}", value.to);
+}
 
 struct SplitChunkDDL {
     int key;
@@ -269,13 +287,28 @@ struct MergeChunkDDL {
 
 struct MoveChunkDDL {
     int key;
-    ShardRef destination;
+    ShardId destination;
     NamespaceString nss;
 
+    // See the comment on MovePrimaryDDL's constructor for why this is needed.
+    MoveChunkDDL(int key, ShardId destination, NamespaceString nss)
+        : key(key), destination(std::move(destination)), nss(std::move(nss)) {}
+
     static auto arbitrary() {
-        return StructOf<MoveChunkDDL>(Arbitrary<int>(), ArbitraryShardRef(), ArbitraryNamespace());
+        return Map(
+            [](int key, const std::string& destination, const NamespaceString& nss) {
+                return MoveChunkDDL{key, ShardId{destination}, nss};
+            },
+            Arbitrary<int>(),
+            ArbitraryShardId(),
+            ArbitraryNamespace());
     }
 };
+
+template <typename Sink>
+void AbslStringify(Sink& sink, const MoveChunkDDL& value) {
+    absl::Format(&sink, "MoveChunkDDL{%v, %v, %v}", value.key, value.destination, value.nss);
+}
 
 struct ReshardCollectionDDL {
     NamespaceString nss;
@@ -291,14 +324,28 @@ struct ReshardCollectionDDL {
 
 struct MoveCollectionDDL {
     NamespaceString nss;
-    ShardRef to;
+    ShardId to;
     bool isUpgrading;
 
+    // See the comment on MovePrimaryDDL's constructor for why this is needed.
+    MoveCollectionDDL(NamespaceString nss, ShardId to, bool isUpgrading)
+        : nss(std::move(nss)), to(std::move(to)), isUpgrading(isUpgrading) {}
+
     static auto arbitrary() {
-        return StructOf<MoveCollectionDDL>(
-            ArbitraryNamespace(), ArbitraryShardRef(), Arbitrary<bool>());
+        return Map(
+            [](const NamespaceString& nss, const std::string& to, bool isUpgrading) {
+                return MoveCollectionDDL{nss, ShardId{to}, isUpgrading};
+            },
+            ArbitraryNamespace(),
+            ArbitraryShardId(),
+            Arbitrary<bool>());
     }
 };
+
+template <typename Sink>
+void AbslStringify(Sink& sink, const MoveCollectionDDL& value) {
+    absl::Format(&sink, "MoveCollectionDDL{%v, %v, %v}", value.nss, value.to, value.isUpgrading);
+}
 
 
 using DDL = std::variant<ClearMetadataDDL,
@@ -371,7 +418,7 @@ public:
 
         const auto uuid = invariantStatusOK(UUID::parse(filter[ChunkType::collectionUUID.name()]));
         const auto conditions = filter["$or"].Array();
-        const auto shardRef = ShardRef{conditions[0][ChunkType::shard.name()].String()};
+        const auto shardId = ShardId{conditions[0][ChunkType::shard.name()].String()};
 
         std::vector<ChunkType> results;
         for (const auto& [coll, chunks] : _collsAndChunks) {
@@ -379,14 +426,14 @@ public:
                 continue;
             }
             for (const auto& chunk : chunks) {
-                if (chunk.getShard() == shardRef) {
+                if (chunk.getShard() == shardId) {
                     results.emplace_back(chunk);
                     continue;
                 }
                 auto inHistory = std::any_of(
                     chunk.getHistory().begin(),
                     chunk.getHistory().end(),
-                    [&](const ChunkHistory& elem) { return elem.getShard() == shardRef; });
+                    [&](const ChunkHistory& elem) { return elem.getShard() == shardId; });
                 if (inHistory) {
                     results.emplace_back(chunk);
                     continue;
@@ -431,9 +478,9 @@ public:
                                                           repl::ReadConcernArgs readConcern,
                                                           BSONObj filter) override {
         std::vector<ShardType> result = {
-            ShardType{kThisShard.getShardId().toString(), boost::none, "localhost-1"},
-            ShardType{kOtherShard1.getShardId().toString(), boost::none, "localhost-2"},
-            ShardType{kOtherShard2.getShardId().toString(), boost::none, "localhost-3"},
+            ShardType{kThisShard.toString(), boost::none, "localhost-1"},
+            ShardType{kOtherShard1.toString(), boost::none, "localhost-2"},
+            ShardType{kOtherShard2.toString(), boost::none, "localhost-3"},
         };
         return repl::OpTimeWith{std::move(result)};
     }
@@ -1096,12 +1143,12 @@ private:
                 const auto& shardingDesc = acq.getShardingDescription();
                 if (!isTracked) {
                     invariant(!shardingDesc.hasRoutingTable());
-                    invariant(cri.getDbPrimaryShardRef() == kThisShard);
+                    invariant(cri.getDbPrimaryShardId() == kThisShard);
                     return;
                 }
 
                 cri.getChunkManager().forEachChunk([&](const auto& chunk) {
-                    bool isOwnedByShard = chunk.getShardRef() == kThisShard;
+                    bool isOwnedByShard = chunk.getShardId() == kThisShard;
                     bool isInHistory = std::any_of(chunk.getHistory().begin(),
                                                    chunk.getHistory().end(),
                                                    [&](const auto& historyElem) {
@@ -1123,9 +1170,9 @@ private:
                         shardingDesc.forEachOverlappingChunk(
                             chunk.getMin(), chunk.getMax(), false, [&](const auto& shardChunk) {
                                 if (isOwnedByShard) {
-                                    invariant(shardChunk.getShardRef() == kThisShard);
+                                    invariant(shardChunk.getShardId() == kThisShard);
                                 } else {
-                                    invariant(shardChunk.getShardRef() != kThisShard);
+                                    invariant(shardChunk.getShardId() != kThisShard);
                                 }
                                 shardRanges.emplace_back(shardChunk.getRange());
                                 return true;

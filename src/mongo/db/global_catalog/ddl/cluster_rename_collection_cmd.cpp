@@ -23,7 +23,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/idl/idl_parser.h"
@@ -123,8 +122,7 @@ public:
                     Request::kCommandName,
                     [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                         // Creates the destination database if it doesn't exist already.
-                        const ShardId suggestedPrimaryId = dbInfo->getPrimary();
-                        cluster::createDatabase(opCtx, toNss.dbName(), suggestedPrimaryId);
+                        cluster::createDatabase(opCtx, toNss.dbName(), dbInfo->getPrimary());
 
                         CurOpFailpointHelpers::waitWhileFailPointEnabled(
                             &renameWaitAfterDatabaseCreation,

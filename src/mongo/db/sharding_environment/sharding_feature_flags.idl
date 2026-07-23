@@ -230,9 +230,6 @@ feature_flags:
         version: 9.0
         fcv_gated: true
     # TODO (SERVER-126212): remove feature flag once 9.0 becomes last LTS.
-    # TODO (SERVER-127411): keep default: false until all types and APIs have been migrated to ShardRef.
-    # Enabling earlier would allow UUID primaries to be written
-    # into config.databases while not-yet-migrated types still expect ShardIds.
     featureFlagUniqueShardIdentifiers:
         description:
             "Feature flag to refer to shards by their UUID, to uniquely identify each shard across

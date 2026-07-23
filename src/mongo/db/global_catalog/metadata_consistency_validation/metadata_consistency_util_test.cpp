@@ -21,7 +21,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_test_util.h"
@@ -750,7 +749,7 @@ TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard)
 
     // Introduce an inconsistency in the shard catalog
     DBDirectClient client(operationContext());
-    DatabaseType shardDb{_dbName, ShardRef{std::string{"otherShard"}}, {_dbUuid, dbTimestamp}};
+    DatabaseType shardDb{_dbName, ShardId{"otherShard"}, {_dbUuid, dbTimestamp}};
     client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace, shardDb.toBSON());
 
     // Validate that we can find the inconsistency.

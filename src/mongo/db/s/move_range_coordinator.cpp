@@ -424,8 +424,8 @@ std::vector<BSONObj> MoveRangeCoordinator::_commitToGlobalCatalog(OperationConte
     // changed chunks.
     CommitMoveRangeRequest request(
         nss(),
-        _request.getFromShard(),
-        _request.getToShard(),
+        ShardRef(_request.getFromShard().toString()),
+        ShardRef(_request.getToShard().toString()),
         MigratedChunkType(doc->getPreMigrationChunkVersion(), range.getMin(), range.getMax()),
         *_doc.getDonorShardVersionPreMigration());
 
@@ -505,14 +505,13 @@ void MoveRangeCoordinator::_commitToShardCatalog(
     // donating the last chunk) and any split side chunks, must overwrite its now-stale ownership of
     // the migrated range, and appears in the migrated chunk's history, so holding all of them in
     // its shard catalog is valid.
-    sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(
-        opCtx,
-        nss(),
-        changedChunks,
-        {ShardRef(_request.getFromShard())},
-        getNewSession(opCtx),
-        executor,
-        token);
+    sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(opCtx,
+                                                                   nss(),
+                                                                   changedChunks,
+                                                                   {_request.getFromShard()},
+                                                                   getNewSession(opCtx),
+                                                                   executor,
+                                                                   token);
 
     // The recipient keeps only chunks it currently owns or has owned before (that is, chunks whose
     // history includes the recipient). This always includes the migrated chunk, because its history
@@ -544,7 +543,7 @@ void MoveRangeCoordinator::_commitToShardCatalog(
     sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(opCtx,
                                                                    nss(),
                                                                    std::move(recipientChunks),
-                                                                   {ShardRef(toShard)},
+                                                                   {toShard},
                                                                    getNewSession(opCtx),
                                                                    executor,
                                                                    token,

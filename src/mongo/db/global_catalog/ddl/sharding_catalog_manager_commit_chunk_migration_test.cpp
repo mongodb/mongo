@@ -230,10 +230,10 @@ TEST_F(CommitChunkMigrate, RejectMigrationWhenChangedChunksExceedSizeLimit) {
         migratedChunk.setName(OID::gen());
         migratedChunk.setCollectionUUID(collUUID);
         migratedChunk.setVersion(origVersion);
-        migratedChunk.setShard(ShardRef{shard0.getName()});
+        migratedChunk.setShard(shard0.getName());
         migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
         migratedChunk.setHistory(
-            {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+            {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
         // A large string sorts after every number but before MaxKey in BSON order, so it is a valid
         // interior boundary between MinKey and MaxKey.
         migratedChunk.setRange({BSON("a" << MINKEY), BSON("a" << bigValue)});
@@ -243,10 +243,10 @@ TEST_F(CommitChunkMigrate, RejectMigrationWhenChangedChunksExceedSizeLimit) {
         controlChunk.setName(OID::gen());
         controlChunk.setCollectionUUID(collUUID);
         controlChunk.setVersion(origVersion);
-        controlChunk.setShard(ShardRef{shard0.getName()});
+        controlChunk.setShard(shard0.getName());
         controlChunk.setOnCurrentShardSince(Timestamp(50, 0));
         controlChunk.setHistory(
-            {ChunkHistory(*controlChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+            {ChunkHistory(*controlChunk.getOnCurrentShardSince(), shard0.getName())});
         controlChunk.setRange({BSON("a" << bigValue), BSON("a" << MAXKEY)});
     }
 
@@ -302,10 +302,10 @@ TEST_F(CommitChunkMigrate, RejectDuringFCVTransitionWithStableOperationFCV) {
     migratedChunk.setName(OID::gen());
     migratedChunk.setCollectionUUID(collUUID);
     migratedChunk.setVersion(version);
-    migratedChunk.setShard(ShardRef{shard0.getName()});
+    migratedChunk.setShard(shard0.getName());
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
-        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
     migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {migratedChunk});
@@ -342,10 +342,10 @@ TEST_F(CommitChunkMigrate, RetryCommittedMigrationSucceedsDuringFCVTransition) {
     migratedChunk.setName(OID::gen());
     migratedChunk.setCollectionUUID(collUUID);
     migratedChunk.setVersion(version);
-    migratedChunk.setShard(ShardRef{shard0.getName()});
+    migratedChunk.setShard(shard0.getName());
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
-        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
     migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {migratedChunk});

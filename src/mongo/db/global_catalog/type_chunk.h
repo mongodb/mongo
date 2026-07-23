@@ -254,7 +254,7 @@ public:
      * Returns true if the given shard currently owns this chunk or previously owned it, i.e. it
      * appears anywhere in the chunk's ownership history.
      */
-    bool isOwnedNowOrHistoricallyBy(const ShardRef& shard) const {
+    bool isOwnedNowOrHistoricallyBy(const ShardId& shard) const {
         if (getShard() == shard) {
             return true;
         }
