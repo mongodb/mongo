@@ -36,6 +36,7 @@
 #include "mongo/db/repl/initial_sync_base_cloner.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
 #include "mongo/db/repl/task_runner.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
@@ -255,7 +256,6 @@ private:
     ScheduleDbWorkFn _scheduleDbWorkFn;  // (R)
     // Documents read from source to insert.
     std::vector<BSONObj> _documentsToInsert;  // (M)
-    Stats _stats;                             // (M)
     // Putting _dbWorkTaskRunner last ensures anything the database work threads depend on,
     // like _documentsToInsert, is destroyed after those threads exit.
     TaskRunner _dbWorkTaskRunner;  // (R)
@@ -273,6 +273,18 @@ private:
     // Signifies that there were changes to the collection on the sync source that resulted in
     // our remote cursor getting killed.
     bool _lostNonResumableCursor = false;  // (X)
+
+    // (S) self-synchronizing via Atomic:
+    AtomicWord<Date_t> _statsStart;
+    AtomicWord<Date_t> _statsEnd;
+    AtomicWord<size_t> _documentToCopy{0};
+    AtomicWord<size_t> _documentsCopied{0};
+    AtomicWord<size_t> _indexes{0};
+    AtomicWord<size_t> _fetchedBatches{0};
+    AtomicWord<size_t> _receivedBatches{0};
+    AtomicWord<long long> _bytesToCopy{0};
+    AtomicWord<long long> _avgObjSize{0};
+    AtomicWord<long long> _approxBytesCopied{0};
 };
 
 }  // namespace repl
