@@ -36,6 +36,30 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "hyperloglog",
+    srcs = [
+        "hyperloglog.cpp",
+    ],
+    hdrs = [
+        "hyperloglog.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "hyperloglog_test",
+    srcs = [
+        "hyperloglog_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":hyperloglog",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "ce_common_test",
     srcs = [
