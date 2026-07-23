@@ -152,7 +152,6 @@ public:
     virtual void resumeMigrations(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const UUID& expectedCollectionUUID,
         ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
         std::function<OperationSessionInfo()> osiGenerator) = 0;
     /**
@@ -243,7 +242,6 @@ public:
 
     void resumeMigrations(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const UUID& expectedCollectionUUID,
                           ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
                           std::function<OperationSessionInfo()> osiGenerator) override;
 

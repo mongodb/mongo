@@ -117,6 +117,10 @@ public:
             Status{errorCode, "Failing call to searchIndexExistsForCollection"});
     }
 
+    void pushResumeMigrationsError(ErrorCodes::Error errorCode) {
+        _resumeMigrationsErrors.push_back(errorCode);
+    }
+
     void tellAllDonorsToRefresh(OperationContext* opCtx,
                                 const NamespaceString& sourceNss,
                                 const UUID& reshardingUUID,
@@ -288,9 +292,14 @@ public:
 
     void resumeMigrations(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const UUID&,
                           ReshardingAuthoritativeMetadataAccessLevelEnum,
                           std::function<OperationSessionInfo()>) override {
+        if (!_resumeMigrationsErrors.empty()) {
+            auto errorCode = _resumeMigrationsErrors.front();
+            _resumeMigrationsErrors.erase(_resumeMigrationsErrors.begin());
+            uasserted(errorCode, "Simulating resumeMigrations failure");
+        }
+
         DBDirectClient client(opCtx);
         client.update(NamespaceString::kConfigsvrCollectionsNamespace,
                       BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
@@ -349,6 +358,8 @@ private:
 
     std::vector<StatusWith<bool>> _searchIndexResults;
     bool _searchIndexDefaultResult{false};
+
+    std::vector<ErrorCodes::Error> _resumeMigrationsErrors;
 
     CoordinatorStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
         DBDirectClient client(opCtx);

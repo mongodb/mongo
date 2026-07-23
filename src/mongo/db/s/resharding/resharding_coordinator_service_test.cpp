@@ -1374,6 +1374,30 @@ TEST_F(ReshardingCoordinatorServiceTest, AbortingReshardingOperationIncrementsMe
     ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countCanceled"].numberInt(), 1);
 }
 
+TEST_F(ReshardingCoordinatorServiceTest, AbortTeardownRetriesResumeMigrationsBeforeRemovingDoc) {
+    externalState()->pushResumeMigrationsError(ErrorCodes::InternalError);
+
+    auto pauseAfterInsertCoordinatorDoc =
+        globalFailPointRegistry().find("pauseAfterInsertCoordinatorDoc");
+    auto timesEnteredFailPoint = pauseAfterInsertCoordinatorDoc->setMode(FailPoint::alwaysOn, 0);
+    auto coordinator = initializeAndGetCoordinator();
+
+    pauseAfterInsertCoordinatorDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
+    coordinator->abort({resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
+    pauseAfterInsertCoordinatorDoc->setMode(FailPoint::off, 0);
+
+    coordinator->getCompletionFuture().wait();
+    checkCoordinatorDocumentRemoved(operationContext());
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, CommitTeardownRetriesResumeMigrationsBeforeRemovingDoc) {
+    externalState()->pushResumeMigrationsError(ErrorCodes::InternalError);
+    externalState()->pushResumeMigrationsError(ErrorCodes::HostUnreachable);
+
+    runReshardingToCompletion();
+    checkCoordinatorDocumentRemoved(operationContext());
+}
+
 TEST_F(ReshardingCoordinatorServiceTest, CoordinatorReturnsErrorCode) {
     const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
                                                       CoordinatorStateEnum::kCloning,
