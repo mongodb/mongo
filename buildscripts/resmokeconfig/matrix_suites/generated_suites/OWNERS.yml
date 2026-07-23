@@ -97,6 +97,9 @@ filters:
   - "/replica_sets_ese_gcm.yml":
     approvers:
       - 10gen/server-security
+  - "/replica_sets_jscore_passthrough_continuous_internode_validation.yml":
+    approvers:
+      - 10gen/server-collection-write-path
   - "/replica_sets_jscore_passthrough_last_continuous_new_new_old.yml":
     approvers:
       - 10gen/server-jstest-infra

@@ -1,0 +1,31 @@
+## Need to update a resmoke_suite_test?
+# Explanations of fields of the resmoke_suite_test rule are in bazel/resmoke/README.md.
+# In addition, certain `tags` and `target_compatible_with` are used to control which
+# tests are run in which CI tasks. Common cases are enumerated in jstests/suites/README.md.
+#
+# To run a suite:
+# bazel test //jstests/suites/continuous-internode-validation:replica_sets_jscore_passthrough_continuous_internode_validation
+#
+# To run a single test in a suite:
+# bazel test //jstests/suites/continuous-internode-validation:replica_sets_jscore_passthrough_continuous_internode_validation --test_sharding_strategy=disabled --test_arg=jstests/core/some_test.js
+#
+# To run outside the bazel sandbox, you may still use:
+# python buildscripts/resmoke.py run --suites=replica_sets_jscore_passthrough_continuous_internode_validation
+
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+# TODO(SERVER-131724): Remove this temporary suite.
+resmoke_suite_test(
+    name = "replica_sets_jscore_passthrough_continuous_internode_validation",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_passthrough_continuous_internode_validation.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "continuous_internode_validation",
+        "jscore",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)

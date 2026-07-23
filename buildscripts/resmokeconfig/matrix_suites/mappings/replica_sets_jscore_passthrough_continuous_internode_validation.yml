@@ -1,0 +1,8 @@
+# Temporary suite to assist the development of continuous internode validation.
+# Run all tests in the replica set jscore passthrough suite with the
+# ContinuousInternodeValidationPerDocument feature flag enabled on a 3-node
+# replica set.
+base_suite: replica_sets_jscore_passthrough_base
+overrides:
+  - "continuous_internode_validation.enable_continuous_internode_validation_per_document_feature_flag_mongod"
+  - "continuous_internode_validation.three_node_replica_set"

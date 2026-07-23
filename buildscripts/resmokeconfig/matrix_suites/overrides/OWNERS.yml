@@ -6,6 +6,9 @@ filters:
   - "bulk_write.yml":
     approvers:
       - 10gen/query-execution-write-exec
+  - "continuous_internode_validation.yml":
+    approvers:
+      - 10gen/server-collection-write-path
   - "change_streams*":
     approvers:
       - 10gen/query-execution-change-streams

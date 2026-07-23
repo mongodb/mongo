@@ -1,0 +1,14 @@
+# Temporary overrides to assist the development of continuous internode validation.
+- name: enable_continuous_internode_validation_per_document_feature_flag_mongod
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagContinuousInternodeValidationPerDocument: true
+            featureFlagRecordIdsReplicated: true
+- name: three_node_replica_set
+  value:
+    executor:
+      fixture:
+        num_nodes: 3

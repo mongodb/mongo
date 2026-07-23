@@ -106,6 +106,9 @@ filters:
   - "*primary_driven_index_builds.yml":
     approvers:
       - 10gen/server-index-builds
+  - "*continuous_internode_validation.yml":
+    approvers:
+      - 10gen/server-collection-write-path
   - "replica_sets_kill_secondaries_jscore_passthrough.yml":
     approvers:
       - 10gen/server-replication-reviewers
