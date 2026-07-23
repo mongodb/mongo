@@ -49,6 +49,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
@@ -1247,6 +1248,51 @@ void CurOp::reportState(BSONObjBuilder* builder,
 
     if (auto&& queryShapeHash = _debug.getQueryShapeHash()) {
         builder->append("queryShapeHash", queryShapeHash->toHexString());
+    }
+}
+
+void CurOp::reportDebugInfo(BSONObjBuilder* builder) {
+    builder->append("ns",
+                    NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
+
+    // Report the redacted command, snipped for logging in the same way as the slow-op log line.
+    auto query = curop_bson_helpers::appendCommentField(opCtx(), _opDescription);
+    if (!query.isEmpty()) {
+        if (_isCommand) {
+            if (const Command* curCommand = getCommand()) {
+                builder->append("command", redact(snipCommandForLogging(curCommand, query)));
+            } else {
+                // We don't know what the request payload is intended to be, so it might be
+                // sensitive, and we don't know how to redact it properly without a 'Command*'.
+                builder->append("command", "unrecognized");
+            }
+        } else {
+            builder->append("command", redact(query));
+        }
+    }
+
+    if (_debug.planCacheShapeHash) {
+        builder->append("planCacheShapeHash", zeroPaddedHex(*_debug.planCacheShapeHash));
+    }
+    if (_debug.planCacheKey) {
+        builder->append("planCacheKey", zeroPaddedHex(*_debug.planCacheKey));
+    }
+
+    if (!_planSummary.empty()) {
+        builder->append("planSummary", _planSummary);
+    }
+
+    if (auto start = _start.load()) {
+        auto elapsedTimeTotal = computeElapsedTimeTotal(start, _end.load());
+        builder->append("secs_running", durationCount<Seconds>(elapsedTimeTotal));
+    }
+
+    builder->append("numYields", _numYields.load());
+
+    // Only report storage statistics that have already been gathered; do not call into the storage
+    // engine from here, as this runs while the lock manager buckets are held.
+    if (_debug.storageStats) {
+        builder->append("storage", _debug.storageStats->toBSON());
     }
 }
 

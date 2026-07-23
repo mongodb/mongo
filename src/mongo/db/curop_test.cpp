@@ -11,18 +11,21 @@
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_stats/mock_key.h"
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
@@ -1839,6 +1842,98 @@ TEST(CurOpTest, ExecutionTimeMicrosPreservesSubMillisecondPrecision) {
     // The microsecond value must not be a round multiple of 1,000 (which would indicate it was
     // derived from a millisecond value rather than stored directly).
     ASSERT_NE(bson["durationMicros"].safeNumberLong() % 1'000, 0LL);
+}
+
+// A minimal StorageStats implementation so the test can populate CurOp's storage statistics
+// without depending on a storage engine. Only toBSON()/bytesRead() are exercised here.
+class MockStorageStats : public StorageStats {
+public:
+    explicit MockStorageStats(uint64_t bytesRead) : _bytesRead(bytesRead) {}
+
+    void appendToBsonObjBuilder(BSONObjBuilder& builder) const override {
+        BSONObjBuilder dataSection(builder.subobjStart("data"));
+        dataSection.append("bytesRead", static_cast<long long>(_bytesRead));
+    }
+
+    BSONObj toBSON() const override {
+        BSONObjBuilder builder;
+        appendToBsonObjBuilder(builder);
+        return builder.obj();
+    }
+
+    uint64_t bytesRead() const override {
+        return _bytesRead;
+    }
+    Microseconds readingTime() const override {
+        return Microseconds{0};
+    }
+    std::unique_ptr<StorageStats> clone() const override {
+        return std::make_unique<MockStorageStats>(_bytesRead);
+    }
+    StorageStats& operator+=(const StorageStats&) override {
+        return *this;
+    }
+    StorageStats& operator-=(const StorageStats&) override {
+        return *this;
+    }
+
+private:
+    uint64_t _bytesRead;
+};
+
+TEST(CurOpTest, ReportDebugInfoIncludesCurOpState) {
+    QueryTestServiceContext serviceContext;
+
+    auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
+    // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
+    // not-started timer.
+    tickSourceMock->advance(Milliseconds{100});
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->setTickSource_forTest(tickSourceMock.get());
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const BSONObj command = BSON("find" << "coll");
+    {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        curop->setNS(lk, nss);
+        curop->setOpDescription(lk, command);
+        curop->setPlanSummary(lk, std::string{"COLLSCAN"});
+    }
+    curop->ensureStarted();
+    // Advance beyond one second so that 'secs_running' rounds to a non-zero value.
+    tickSourceMock->advance(Seconds{2});
+
+    curop->debug().planCacheShapeHash = 12345u;
+    curop->debug().planCacheKey = 67890u;
+    curop->debug().storageStats = std::make_unique<MockStorageStats>(4096);
+    curop->yielded(3);
+
+    BSONObjBuilder builder;
+    {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportDebugInfo(&builder);
+    }
+    auto bsonObj = builder.done();
+
+    // ns
+    ASSERT_EQ(bsonObj.getStringField("ns"),
+              NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+    // redacted command
+    ASSERT_TRUE(bsonObj.hasField("command"));
+    ASSERT_EQ(bsonObj["command"].Obj().firstElementFieldName(), std::string{"find"});
+    // planCacheShapeHash (formerly 'queryHash') and planCacheKey
+    ASSERT_EQ(bsonObj.getStringField("planCacheShapeHash"), zeroPaddedHex(12345u));
+    ASSERT_EQ(bsonObj.getStringField("planCacheKey"), zeroPaddedHex(67890u));
+    // planSummary
+    ASSERT_EQ(bsonObj.getStringField("planSummary"), "COLLSCAN");
+    // secs_running
+    ASSERT_EQ(bsonObj["secs_running"].numberLong(), 2);
+    // numYields
+    ASSERT_EQ(bsonObj["numYields"].numberInt(), 3);
+    // storage.data.bytesRead
+    ASSERT_EQ(bsonObj["storage"]["data"]["bytesRead"].numberLong(), 4096);
 }
 
 }  // namespace
