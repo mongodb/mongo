@@ -730,7 +730,7 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         // system.buckets.* namespaces is blocked. This can happen on restored backups
         // where legacy system.buckets collections survive because _finalizeUpgrade
         // (upgradeAllTimeseriesToViewless) was never replayed.
-        // TODO SERVER-106164: Remove this condition once this ticket is done.
+        // TODO SERVER-127882: Remove this condition once this ticket is done.
         const skipLegacyBucketsForListIndexes = FeatureFlagUtil.isPresentAndEnabled(
             db,
             "BlockDirectSystemBucketsAccess",
@@ -799,7 +799,7 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             // This is transient: on retry, either the upgrade to viewless completes and
             // listCollections stops returning the buckets namespace, or the feature flag is
             // detected as enabled and `skipLegacyBucketsForListIndexes` filters it out.
-            // TODO(SERVER-106164): Remove this workaround once legacy buckets namespaces are gone.
+            // TODO(SERVER-127882): Remove this workaround once legacy buckets namespaces are gone.
             if (ex.code === ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace) {
                 return false;
             }

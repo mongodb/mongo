@@ -3,16 +3,30 @@
 
 #include "mongo/db/feature_compatibility_version_parser.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/version/releases.h"
+
+#include <functional>
+#include <string_view>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace {
 
 using FCV = multiversion::FeatureCompatibilityVersion;
 using GenericFCV = multiversion::GenericFCV;
+
+const std::string_view kLastLTS =
+    FeatureCompatibilityVersionParser::serializeVersionForFcvString(GenericFCV::kLastLTS);
+const std::string_view kLatest =
+    FeatureCompatibilityVersionParser::serializeVersionForFcvString(GenericFCV::kLatest);
+constexpr std::string_view kUnknownVersion = "99999.0";
+constexpr std::string_view kUnknownPhase = "not_a_real_phase";
 
 // Test fixture for parser cases that exercise FCV documents with a 'phase' field set. Phase is
 // only ever written under Symmetric FCV, so reading such a doc requires the flag enabled — the
@@ -296,6 +310,66 @@ TEST(FCVParserSymmetricFCVGuardTest, PhasePresentWithSymmetricDisabledIsRejected
     doc.setPhase(SetFCVPhaseEnum::kEnableTargetFeatures);
     auto result = FeatureCompatibilityVersionParser::parse(doc.toBSON());
     ASSERT_EQ(result.getStatus().code(), 11948500);
+}
+
+// ---------- Rejected cases ----------
+
+struct ParseRejectedCase {
+    std::string name;
+    std::function<BSONObj()> buildDoc;
+    int expectedCode;
+};
+
+class ParseRejectedTest : public ::testing::TestWithParam<ParseRejectedCase> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    FeatureCompatibilityVersionParserTest,
+    ParseRejectedTest,
+    testing::ValuesIn(std::vector<ParseRejectedCase>{
+        // Unknown version strings — rejected by the fcv_string IDL deserializer (4926900)
+        // before any field-combination logic runs.
+        {"UnknownVersion", [] { return BSON("version" << kUnknownVersion); }, 4926900},
+        {"UnknownTargetVersion",
+         [] { return BSON("version" << kLastLTS << "targetVersion" << kUnknownVersion); },
+         4926900},
+        {"UnknownPreviousVersion",
+         [] {
+             return BSON("version" << kLastLTS << "targetVersion" << kLastLTS << "previousVersion"
+                                   << kUnknownVersion);
+         },
+         4926900},
+        // Structural errors — rejected by the IDL parser or parse() before version checks.
+        {"MissingVersionField",
+         [] { return BSON("targetVersion" << kLatest); },
+         ErrorCodes::IDLFailedToParse},
+        {"NonStringVersion", [] { return BSON("version" << 10); }, ErrorCodes::TypeMismatch},
+        // Unknown phase string — IDL SetFCVPhase enum deserializer throws.
+        {"UnknownPhaseString",
+         [] {
+             return BSON("version" << kLastLTS << "targetVersion" << kLatest << "phase"
+                                   << kUnknownPhase);
+         },
+         ErrorCodes::BadValue},
+        // Field-combination errors caught by parse() logic.
+        {"DowngradingMissingPreviousVersion",
+         [] { return BSON("version" << kLastLTS << "targetVersion" << kLastLTS); },
+         4926902},
+        {"PreviousVersionNotLatestInDowngrading",
+         [] {
+             return BSON("version" << kLastLTS << "targetVersion" << kLastLTS << "previousVersion"
+                                   << kLastLTS);
+         },
+         4926901},
+        {"PreviousVersionInSteadyState",
+         [] { return BSON("version" << kLatest << "previousVersion" << kLatest); },
+         4926903},
+    }),
+    [](const testing::TestParamInfo<ParseRejectedCase>& info) { return info.param.name; });
+
+TEST_P(ParseRejectedTest, IsRejected) {
+    auto result = FeatureCompatibilityVersionParser::parse(GetParam().buildDoc());
+
+    ASSERT_EQ(result.getStatus().code(), GetParam().expectedCode);
 }
 
 }  // namespace
