@@ -255,7 +255,9 @@ __page_free_delta_leaf_merge_state(
 
 /*
  * __time_window_clear_obsolete --
- *     Where possible modify time window values to avoid writing obsolete values to the cell.
+ *     Clear a globally visible start from a value's time window to avoid writing obsolete values to
+ *     the cell. A globally visible stop is not handled here: the caller drops the whole cell in
+ *     that case, so it is never packed.
  */
 static WT_INLINE void
 __time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
@@ -264,28 +266,12 @@ __time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
     if (WT_TIME_WINDOW_IS_EMPTY(tw))
         return;
 
-    /*
-     * Check if the start of the time window is globally visible, and if so remove unnecessary
-     * values.
-     */
     if (__wt_txn_tw_start_visible_all(session, tw)) {
         /* The durable timestamp should never be less than the start timestamp. */
         WT_ASSERT(session, tw->start_ts <= tw->durable_start_ts);
 
         tw->start_ts = tw->durable_start_ts = WT_TS_NONE;
         tw->start_txn = WT_TXN_NONE;
-    }
-
-    /*
-     * Check if the stop of the time window is globally visible, and if so remove unnecessary
-     * values.
-     */
-    if (__wt_txn_tw_stop_visible_all(session, tw)) {
-        /* The durable timestamp should never be less than the stop timestamp. */
-        WT_ASSERT(session, tw->stop_ts <= tw->durable_stop_ts);
-
-        tw->stop_ts = tw->durable_stop_ts = WT_TS_NONE;
-        tw->stop_txn = WT_TXN_NONE;
     }
 }
 
@@ -370,21 +356,29 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
             WT_ERR(__wt_compare(
               session, btree->collator, base_state.current_key, delta_state[j].current_key, &cmp));
 
-        /* Build disk image */
+        /*
+         * Build the disk image. A key whose stop is globally visible is a globally visible delete
+         * that no reader can see, so skip it entirely rather than materializing an obsolete cell.
+         * Dropping it only lowers the page's aggregate, so it stays covered by the parent, and it
+         * removes the obsolete stop that would otherwise have to be normalized.
+         */
         if (cmp < 0) {
-            __time_window_clear_obsolete(session, &base_state.unpack_value->tw);
-            /* Pack row-leaf base key/value. */
-            WT_ERR(__wt_cell_pack_leaf_kv(session, base_state.empty_value_cell,
-              base_state.current_key->data, base_state.current_key->size,
-              base_state.unpack_value->data, base_state.unpack_value->size,
-              &base_state.unpack_value->tw, new_image, &disk_s));
+            if (!__wt_txn_tw_stop_visible_all(session, &base_state.unpack_value->tw)) {
+                __time_window_clear_obsolete(session, &base_state.unpack_value->tw);
+                /* Pack row-leaf base key/value. */
+                WT_ERR(__wt_cell_pack_leaf_kv(session, base_state.empty_value_cell,
+                  base_state.current_key->data, base_state.current_key->size,
+                  base_state.unpack_value->data, base_state.unpack_value->size,
+                  &base_state.unpack_value->tw, new_image, &disk_s));
 
 #ifdef HAVE_DIAGNOSTIC
-            WT_TIME_AGGREGATE_UPDATE(session, ta, &base_state.unpack_value->tw);
+                WT_TIME_AGGREGATE_UPDATE(session, ta, &base_state.unpack_value->tw);
 #endif
+            }
         } else {
-            /* Pack row-leaf delta entry. */
-            if (!F_ISSET(delta_state[j].unpack, WT_DELTA_LEAF_IS_DELETE)) {
+            /* Pack row-leaf delta entry, dropping globally visible deletes. */
+            if (!F_ISSET(delta_state[j].unpack, WT_DELTA_LEAF_IS_DELETE) &&
+              !__wt_txn_tw_stop_visible_all(session, &delta_state[j].unpack->delta_value.tw)) {
                 __time_window_clear_obsolete(session, &delta_state[j].unpack->delta_value.tw);
                 WT_ERR(__wt_cell_pack_leaf_kv(session,
                   delta_state[j].unpack->delta_value_data.size == 0 &&
@@ -437,10 +431,16 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
     dsk->type = WT_PAGE_ROW_LEAF;
     dsk->flags = 0;
 
-    if (disk_s.all_empty_value)
-        F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
-    if (!disk_s.any_empty_value)
-        F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
+    /*
+     * The all-empty and no-empty value flags are mutually exclusive; with no entries both would be
+     * set vacuously (an invalid combination), so only set them when the page has values.
+     */
+    if (disk_s.entries != 0) {
+        if (disk_s.all_empty_value)
+            F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
+        if (!disk_s.any_empty_value)
+            F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
+    }
 
     /* Compute final on-disk image size using pointer difference. */
     new_image->size = WT_PTRDIFF(disk_s.cell_ptr, new_image->mem);

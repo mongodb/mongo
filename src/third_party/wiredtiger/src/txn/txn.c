@@ -408,7 +408,7 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
   uint64_t *metadata_pinnedp, WT_SESSION_IMPL **oldest_sessionp)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_SESSION_IMPL *oldest_session;
+    WT_SESSION_IMPL *last_running_session, *oldest_session;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *s;
     uint64_t id, last_running, metadata_pinned, oldest_id, prev_oldest_id;
@@ -416,7 +416,7 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
 
     conn = S2C(session);
     txn_global = &conn->txn_global;
-    oldest_session = NULL;
+    last_running_session = oldest_session = NULL;
 
     /* The oldest ID cannot change while we are holding the scan lock. */
     prev_oldest_id = __wt_atomic_load_uint64_v_relaxed(&txn_global->oldest_id);
@@ -447,6 +447,7 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
                 WT_ACQUIRE_BARRIER();
                 if (id == __wt_atomic_load_uint64_v_relaxed(&s->id)) {
                     last_running = id;
+                    last_running_session = &WT_CONN_SESSIONS_GET(conn)[i];
                     break;
                 }
             }
@@ -474,8 +475,10 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
     }
     WT_STAT_CONN_INCRV(session, txn_sessions_walked, i);
 
-    if (last_running < oldest_id)
+    if (last_running < oldest_id) {
         oldest_id = last_running;
+        oldest_session = last_running_session;
+    }
 
     /* The metadata pinned ID can't move past the oldest ID. */
     if (oldest_id < metadata_pinned)

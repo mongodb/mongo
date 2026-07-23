@@ -468,12 +468,22 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     }
 
     /*
-     * Dirty pages on an outdated disaggregated read-only btree can never be written to shared
-     * storage. Clear the dirty flag so eviction discards the page cleanly instead of attempting
-     * reconciliation.
+     * A page on an outdated disaggregated read-only btree that is not clean-evictable carries
+     * content that can never be written to shared storage nor read back from it. While the previous
+     * generation's readers still hold the handle, keep such a page resident so a reader positioned
+     * elsewhere on the tree can navigate back to it; the stepdown is only elegant if reads survive
+     * it. Once the last reader releases the handle, discard the page cleanly rather than routing it
+     * to a dirty split that would fail against shared storage. A clean-evictable page is exempt
+     * from the gate: its disk image is fully described by the page's address, so it can be re-read
+     * from storage and eviction may discard it normally even with readers present.
      */
-    if (__wt_btree_is_stale_disagg(session))
+    if (__wt_btree_is_stale_disagg(session) && !__wt_page_evict_clean(page)) {
+        if (__wt_atomic_load_int32_relaxed(&session->dhandle->session_inuse) > 0) {
+            ret = __wt_set_return(session, EBUSY);
+            goto err;
+        }
         __wt_page_modify_clear(session, page);
+    }
 
     if (__wt_page_is_modified(page))
         is_dirty = true;
@@ -525,8 +535,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     if (!closing && F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_internal);
 
-    /* Figure out whether reconciliation was done on the page */
-    if (__wt_page_evict_clean(page)) {
+    /*
+     * Figure out whether reconciliation was done on the page. A stale disaggregated page has had
+     * its dirty flag cleared above, but a non-zero reconciliation result left over from the leader
+     * era keeps the clean check false and would route the page to a dirty split that can never
+     * write back to shared storage. Force clean eviction so the page is discarded instead of
+     * trapped in cache.
+     */
+    if (__wt_page_evict_clean(page) || __wt_btree_is_stale_disagg(session)) {
         evict_clean = true;
         FLD_SET(stats_flags, WT_EVICT_STATS_CLEAN);
     }

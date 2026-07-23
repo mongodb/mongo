@@ -69,11 +69,11 @@ __curstat_size_only(WT_SESSION_IMPL *session, const char *uri, bool *was_fast, W
     WT_ITEM namebuf;
     int64_t size;
     char *tableconf;
-    bool disagg;
+    const char *table_name;
 
     WT_CLEAR(namebuf);
-    disagg = false;
     size = 0;
+    table_name = uri + strlen("table:");
     *was_fast = false;
 
     /* Retrieve the metadata for this table. */
@@ -89,31 +89,19 @@ __curstat_size_only(WT_SESSION_IMPL *session, const char *uri, bool *was_fast, W
     if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
         goto err;
 
-    /*
-     * Layered tables use a .wt_stable file in the metadata rather than a local .wt file. Detect
-     * them so we can build the correct filename and use the disagg size path.
-     */
-    ret = __wt_config_getones(session, tableconf, "type", &cval);
-    WT_ERR_NOTFOUND_OK(ret, false);
-    if (ret == 0 && WT_CONFIG_LIT_MATCH("layered", cval))
-        disagg = true;
-
-    /*
-     * Build up the file name from the table URI using the appropriate extension. For disagg the
-     * helper expects a file: URI; for local it expects a bare filename.
-     */
-    WT_ERR(__wt_buf_fmt(session, &namebuf, "%s%s.%s", disagg ? "file:" : "", uri + strlen("table:"),
-      disagg ? "wt_stable" : "wt"));
-
-    /*
-     * Get the size of the underlying file. This will fail for anything other than simple tables and
-     * will fail if there are concurrent schema level operations (for example drop). That is fine -
-     * failing here results in falling back to the slow path of opening the handle.
-     */
-    if (disagg)
+    /* Only probe for a stable file on a connection that can create one. */
+    if (__wt_conn_is_disagg(session)) {
+        WT_ERR(__wt_buf_fmt(session, &namebuf, "file:%s.wt_stable", table_name));
         WT_ERR(__wt_curstat_size_disagg(session, namebuf.data, was_fast, &size));
-    else
+    }
+
+    /*
+     * At this point, disagg or not, fall back to the local non-layered file.
+     */
+    if (!*was_fast) {
+        WT_ERR(__wt_buf_fmt(session, &namebuf, "%s.wt", table_name));
         WT_ERR(__wt_curstat_size_local(session, namebuf.data, was_fast, &size));
+    }
 
     if (*was_fast) {
         __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);

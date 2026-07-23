@@ -845,9 +845,9 @@ class DisaggSizeTestMixin:
         extlist.skip_if_missing = True
         DisaggConfigMixin.conn_extensions(self, extlist)
 
-    def get_checkpoint_size(self):
+    def get_checkpoint_size(self, uri=None):
         mc = self.session.open_cursor('metadata:')
-        mc.set_key(self.stable_uri)
+        mc.set_key(uri if uri is not None else self.stable_uri)
         self.assertEqual(mc.search(), 0)
         sizes = re.findall(r',size=(\d+),', mc.get_value())
         mc.close()
