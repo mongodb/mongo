@@ -16,6 +16,7 @@ import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 
@@ -6583,7 +6584,7 @@ function shouldSkipTestCase(
         // TODO SERVER-125423: confirm whether this skip is still needed on viewless timeseries
         // and either remove the branch or update this comment.
         if (
-            FeatureFlagUtil.isEnabled(coll.getDB(), "UnifiedWriteExecutor") &&
+            isUweEnabled(coll.getDB()) &&
             clusterType == "sharded" &&
             ["findAndModify", "findOneAndUpdate"].includes(command) &&
             shardedCollection &&
