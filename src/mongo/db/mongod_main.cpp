@@ -639,6 +639,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
                     "storageEngine"_attr = storageGlobalParams.engine);
         exitCleanly(ExitCode::badOptions);
     }
+    if (!rss.getPersistenceProvider().supportsProfilingLevel(serverGlobalParams.defaultProfile)) {
+        LOGV2_ERROR(13170500,
+                    "Profile level is not supported in this storage mode",
+                    "profilingLevel"_attr = serverGlobalParams.defaultProfile,
+                    "storageMode"_attr = rss.getPersistenceProvider().name());
+        exitCleanly(ExitCode::badOptions);
+    }
 
     if (storageGlobalParams.repair && replSettings.isReplSet()) {
         LOGV2_ERROR(5019200,
