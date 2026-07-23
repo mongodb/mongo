@@ -114,6 +114,7 @@
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -122,6 +123,7 @@
 
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(hangAfterFirstListCatalogRead);
 namespace {
 
 // Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and each
@@ -280,6 +282,11 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         // the system.views collections.
         docs.clear();
 
+        if (MONGO_unlikely(hangAfterFirstListCatalogRead.shouldFail())) {
+            LOGV2(12223800, "Hanging after first listCatalog read");
+            hangAfterFirstListCatalogRead.pauseWhileSet(opCtx);
+        }
+
         // We want to read all the system.views as well as _mdb_catalog (again) using a consistent
         // snapshot.
         AutoGetCollectionForReadCommandMaybeLockFree collLock(
@@ -305,6 +312,7 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         if (!std::equal(systemViewsNamespaces.cbegin(),
                         systemViewsNamespaces.cend(),
                         systemViewsNamespacesFromSecondCatalogRead.cbegin(),
+                        systemViewsNamespacesFromSecondCatalogRead.cend(),
                         [](const auto& lhs, const auto& rhs) { return lhs.nss() == rhs.nss(); })) {
             continue;
         }
