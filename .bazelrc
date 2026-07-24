@@ -660,9 +660,6 @@ try-import %workspace%/.bazelrc.common_bes
 # Settings unconditionally written by the wrapper hook
 try-import %workspace%/.bazelrc.wrapper_hook
 
-# local git version info
-try-import %workspace%/.bazelrc.git
-
 # Used for build profiles and any settings a user wants to consistently use
 try-import %workspace%/.bazelrc.local
 
@@ -677,6 +674,12 @@ try-import %workspace%/.bazelrc.engflow_creds
 
 # Flags for fuzztest
 try-import %workspace%/.bazelrc.fuzztest
+
+# Default mongo version
+try-import %workspace%/.bazelrc.target_mongo_version
+
+# local git version info (after target_mongo_version so its MONGO_VERSION override wins)
+try-import %workspace%/.bazelrc.git
 
 # Repository root absolute path to set --execution_log_compact_file
 #try-import %workspace%/.bazelrc.exec_log_file
