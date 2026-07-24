@@ -245,7 +245,17 @@ function runCommandWithRetryUponMigration(
         (TestData.networkErrorAndTxnOverrideConfig &&
             TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions);
 
-    if (!inTransaction && kQueryCommands.has(commandName)) {
+    // An inline mapReduce is read-only, so it can be retried wholesale like the query commands
+    // above (e.g. when its cursor is invalidated by a moveCollection/reshardCollection swapping in
+    // a new collection UUID underneath it). A mapReduce that writes its output to a collection is
+    // intentionally excluded, since re-running it from scratch could double-apply "merge"/"reduce"
+    // output modes.
+    const isRetryableMapReduce = OverrideHelpers.isMapReduceWithInlineOutput(
+        commandName,
+        commandObj,
+    );
+
+    if (!inTransaction && (kQueryCommands.has(commandName) || isRetryableMapReduce)) {
         return _runAndExhaustQueryWithRetryUponMigration(
             conn,
             commandName,
