@@ -114,25 +114,33 @@ internal rate-selection policy in this mechanism.
 
 - `writeThrottlerEnabled` (bool, default false): master on/off switch. When off, the gate is a
   no-op.
-- `writeThrottlerTargetRatePerSec` (int32, default `kMaxRate`): target write rate in documents per
-  second (see batch-aware charging below). Must be >= 1.
+- `writeThrottlerTargetRatePerSec` (int32, default `kMaxRate`): target write-work units per second
+  (see batch-aware charging below). Must be >= 1. Rate selection is external to this mechanism
+  (operators/`setParameter` only); there is no built-in controller or engage/release policy here.
 - `writeThrottlerBurstCapacitySecs` (double, default 0.5): seconds of unused rate that can
   accumulate as burst capacity.
 - `writeThrottlerMaxQueueDepth` (long long, default 1000000): max threads that may block waiting for
   a token; requests exceeding it are rejected with `RateLimitExceeded`.
 - `writeThrottlerMaxCostPerOp` (int, default 0 = no limit): upper bound on the token cost charged
-  for a single operation, capping the borrowed-balance spike from one large batch.
+  for a single operation, capping the borrowed-balance spike from one large batch (applies to both
+  pre-charge and command-end true-up).
 
 ## Batch-Aware Charging
 
-The throttler is always batch-aware. Each admission consumes one token up front to gate the op
-entering. Successful regular write paths record their document cost into
-`WriteThrottlerAdmissionContext`; at command completion, `WriteThrottler::finalizeAdmission` debits
-the remaining cost — accumulated documents written minus admission tokens already acquired, capped
-by `writeThrottlerMaxCostPerOp` — from the bucket. This makes batched writes (insertMany,
-updateMany) throttle by their true document count while keeping a single command-end finalization
-point. Recording is skipped when the operation had no write-throttler admission. Timeseries
-reconciliation is deferred to `SERVER-130859`.
+The throttler is always batch-aware. Service entry takes one admission token to arm the operation
+and to give the first known child write a one-token credit. Child write paths then admit known write
+statements before execution via `WriteThrottler::admitKnownWrites`: update/delete children pass `1`,
+and insert flushes pass their `batch.size()`. This preserves mid-command pacing without keeping a
+separate estimated-cost accumulator.
+
+Successful WiredTiger key writes (document records and index keys) increment
+`WriteThrottlerAdmissionContext` at the cursor-helper chokepoints. At command completion,
+`WriteThrottler::finalizeAdmission` reconciles the bucket by comparing storage-write count with the
+known-write admissions already charged, capped by `writeThrottlerMaxCostPerOp`. Storage
+amplification debits remaining cost; known writes that did not materialize return surplus tokens.
+Rejected WT writes are not counted; write-conflict retries accumulate. Recording is skipped when the
+operation had no write-throttler admission. Timeseries charge-unit semantics remain deferred to
+`SERVER-130859`.
 
 ## Metrics
 
@@ -142,7 +150,8 @@ reconciliation is deferred to `SERVER-130859`.
   admission queues.
 - The underlying `RateLimiter`'s token-bucket stats (attempted/successful/rejected admissions, queue
   depth, available tokens, and the effective refresh rate via `RateLimiter::refreshRate()`) are
-  surfaced through `serverStatus.queues.writeThrottler` / FTDC.
+  surfaced through `serverStatus.queues.writeThrottler` / FTDC. `targetRateLimit` is the bucket's
+  current refresh rate (from `writeThrottlerTargetRatePerSec` when enabled).
 
 # Session Establishment Rate Limiter
 

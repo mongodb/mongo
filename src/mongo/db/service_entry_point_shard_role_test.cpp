@@ -414,7 +414,7 @@ public:
              const DatabaseName&,
              const BSONObj&,
              BSONObjBuilder&) override {
-        WriteThrottlerAdmissionContext::get(opCtx).recordWriteCostForReconciliation(10);
+        WriteThrottlerAdmissionContext::get(opCtx).recordStorageWrites(10);
         auto* enabledParameter =
             ServerParameterSet::getNodeParameterSet()->get("writeThrottlerEnabled");
         uassertStatusOK(enabledParameter->setFromString("false", boost::none));

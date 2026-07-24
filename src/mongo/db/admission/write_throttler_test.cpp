@@ -57,8 +57,12 @@ public:
             "writeThrottlerTargetRatePerSec", targetRatePerSec);
     }
 
-    static void recordWriteCost(OperationContext* opCtx, int64_t docsWritten) {
-        WriteThrottlerAdmissionContext::get(opCtx).recordWriteCostForReconciliation(docsWritten);
+    static void recordStorageWrites(OperationContext* opCtx, int64_t storageWrites) {
+        WriteThrottlerAdmissionContext::get(opCtx).recordStorageWrites(storageWrites);
+    }
+
+    static int64_t storageWrites(OperationContext* opCtx) {
+        return WriteThrottlerAdmissionContext::get(opCtx).getStorageWrites();
     }
 
     WriteThrottler* armForReconciliation() {
@@ -138,30 +142,129 @@ TEST_F(WriteThrottlerTest, OnUpdateTargetRatePerSecClampsAboveMaxRate) {
 
 // ---- Batch-aware cost reconciliation (finalizeAdmission) ----
 
-TEST_F(WriteThrottlerTest, FinalizeAdmissionDebitsExtraDocumentCost) {
+TEST_F(WriteThrottlerTest, KnownWritesAdmissionUsesServiceEntryCreditOnce) {
     auto* throttler = armForReconciliation();
 
     auto opCtx = makeOperationContext();
-    WriteThrottlerAdmissionContext::get(opCtx.get()).recordAdmission();
-    recordWriteCost(opCtx.get(), 10);
-
-    // 10 documents modified, 1 token already charged at admission -> 9 extra debited.
     const auto before = tokenBalance(*throttler);
-    throttler->finalizeAdmission(opCtx.get());
-    ASSERT_EQ(tokenBalance(*throttler), before - 9);
+
+    throttler->admitOperation(opCtx.get());
+    throttler->admitKnownWrites(opCtx.get(), 10);
+
+    ASSERT_EQ(admissionsFor(opCtx.get()), 10);
+    ASSERT_EQ(tokenBalance(*throttler), before - 10);
 }
 
-TEST_F(WriteThrottlerTest, FinalizeAdmissionSingleDocIsNoExtraDebit) {
+TEST_F(WriteThrottlerTest, SingleKnownWriteDoesNotDoubleChargeServiceEntryAdmission) {
     auto* throttler = armForReconciliation();
 
     auto opCtx = makeOperationContext();
-    WriteThrottlerAdmissionContext::get(opCtx.get()).recordAdmission();
-    recordWriteCost(opCtx.get(), 1);
-
-    // Single-document op: docs == admissions -> no extra debit (parity with one token per op).
     const auto before = tokenBalance(*throttler);
+
+    throttler->admitOperation(opCtx.get());
+    ASSERT_EQ(tokenBalance(*throttler), before - 1);
+
+    throttler->admitKnownWrites(opCtx.get(), 1);
+
+    ASSERT_EQ(admissionsFor(opCtx.get()), 1);
+    ASSERT_EQ(tokenBalance(*throttler), before - 1);
+}
+
+TEST_F(WriteThrottlerTest, RepeatedKnownWritesPreserveMidFlightPacing) {
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    const auto before = tokenBalance(*throttler);
+
+    throttler->admitOperation(opCtx.get());
+    throttler->admitKnownWrites(opCtx.get(), 1);
+    throttler->admitKnownWrites(opCtx.get(), 1);
+    throttler->admitKnownWrites(opCtx.get(), 1);
+
+    ASSERT_EQ(admissionsFor(opCtx.get()), 3);
+    ASSERT_EQ(tokenBalance(*throttler), before - 3);
+}
+
+TEST_F(WriteThrottlerTest, FinalizeAdmissionTrueUpsUnderchargedKnownWrites) {
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    throttler->admitOperation(opCtx.get());
+    throttler->admitKnownWrites(opCtx.get(), 3);
+    recordStorageWrites(opCtx.get(), 5);
+
+    const auto beforeFinalize = tokenBalance(*throttler);
     throttler->finalizeAdmission(opCtx.get());
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize - 2);
+}
+
+TEST_F(WriteThrottlerTest, FinalizeAdmissionRefundsOverchargedKnownWrites) {
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    throttler->admitOperation(opCtx.get());
+    throttler->admitKnownWrites(opCtx.get(), 10);
+    recordStorageWrites(opCtx.get(), 4);
+
+    const auto beforeFinalize = tokenBalance(*throttler);
+    throttler->finalizeAdmission(opCtx.get());
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize + 6);
+}
+
+TEST_F(WriteThrottlerTest, KnownWritesAdmissionRespectsMaxCostPerOp) {
+    unittest::ServerParameterGuard maxCost{"writeThrottlerMaxCostPerOp", 5};
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    const auto before = tokenBalance(*throttler);
+
+    throttler->admitOperation(opCtx.get());
+    throttler->admitKnownWrites(opCtx.get(), 100);
+    recordStorageWrites(opCtx.get(), 100);
+    throttler->finalizeAdmission(opCtx.get());
+
+    ASSERT_EQ(admissionsFor(opCtx.get()), 5);
+    ASSERT_EQ(tokenBalance(*throttler), before - 5);
+}
+
+TEST_F(WriteThrottlerTest, KnownWritesAdmissionNoOpsWithoutServiceEntryAdmission) {
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    const auto before = tokenBalance(*throttler);
+
+    throttler->admitKnownWrites(opCtx.get(), 10);
+    recordStorageWrites(opCtx.get(), 10);
+    throttler->finalizeAdmission(opCtx.get());
+
+    ASSERT_EQ(admissionsFor(opCtx.get()), 0);
     ASSERT_EQ(tokenBalance(*throttler), before);
+}
+
+TEST_F(WriteThrottlerTest, FinalizeAdmissionDebitsExtraStorageWriteCost) {
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    throttler->admitOperation(opCtx.get());
+    recordStorageWrites(opCtx.get(), 10);
+
+    // 10 storage-engine key writes, 1 known-write admission -> 9 extra debited.
+    const auto beforeFinalize = tokenBalance(*throttler);
+    throttler->finalizeAdmission(opCtx.get());
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize - 9);
+}
+
+TEST_F(WriteThrottlerTest, FinalizeAdmissionSingleStorageWriteIsNoExtraDebit) {
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    throttler->admitOperation(opCtx.get());
+    recordStorageWrites(opCtx.get(), 1);
+
+    // Single key write: cost == admissions -> no extra debit (parity with one token per op).
+    const auto beforeFinalize = tokenBalance(*throttler);
+    throttler->finalizeAdmission(opCtx.get());
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize);
 }
 
 TEST_F(WriteThrottlerTest, FinalizeAdmissionRespectsMaxCostPerOp) {
@@ -169,70 +272,87 @@ TEST_F(WriteThrottlerTest, FinalizeAdmissionRespectsMaxCostPerOp) {
     auto* throttler = armForReconciliation();
 
     auto opCtx = makeOperationContext();
-    WriteThrottlerAdmissionContext::get(opCtx.get()).recordAdmission();
-    recordWriteCost(opCtx.get(), 100);
+    throttler->admitOperation(opCtx.get());
+    recordStorageWrites(opCtx.get(), 100);
 
-    // 100 docs capped at 5 -> 4 extra tokens debited.
-    const auto before = tokenBalance(*throttler);
+    // 100 storage writes capped at 5 -> 4 extra tokens debited.
+    const auto beforeFinalize = tokenBalance(*throttler);
     throttler->finalizeAdmission(opCtx.get());
-    ASSERT_EQ(tokenBalance(*throttler), before - 4);
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize - 4);
 }
 
-TEST_F(WriteThrottlerTest, FinalizeAdmissionIgnoresZeroDocumentWrites) {
+TEST_F(WriteThrottlerTest, FinalizeAdmissionRefundsZeroStorageWrites) {
     auto* throttler = armForReconciliation();
 
     auto opCtx = makeOperationContext();
-    WriteThrottlerAdmissionContext::get(opCtx.get()).recordAdmission();
-    recordWriteCost(opCtx.get(), 0);
+    throttler->admitOperation(opCtx.get());
+    recordStorageWrites(opCtx.get(), 0);
+
+    const auto beforeFinalize = tokenBalance(*throttler);
+    throttler->finalizeAdmission(opCtx.get());
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize + 1);
+}
+
+TEST_F(WriteThrottlerTest, StorageWritesWithoutAdmissionAreIgnored) {
+    auto* throttler = armForReconciliation();
+
+    auto opCtx = makeOperationContext();
+    recordStorageWrites(opCtx.get(), 10);
 
     const auto before = tokenBalance(*throttler);
     throttler->finalizeAdmission(opCtx.get());
     ASSERT_EQ(tokenBalance(*throttler), before);
-}
-
-TEST_F(WriteThrottlerTest, WriteCostWithoutAdmissionIsIgnored) {
-    auto* throttler = armForReconciliation();
-
-    auto opCtx = makeOperationContext();
-    recordWriteCost(opCtx.get(), 10);
-
-    const auto before = tokenBalance(*throttler);
-    throttler->finalizeAdmission(opCtx.get());
-    ASSERT_EQ(tokenBalance(*throttler), before);
+    ASSERT_EQ(storageWrites(opCtx.get()), 0);
 }
 
 // ---- Batch-aware command-level accumulation (finalizeAdmission accounting) ----
 
-TEST_F(WriteThrottlerTest, AdmissionContextAccumulatesWriteCost) {
+TEST_F(WriteThrottlerTest, AdmissionContextAccumulatesStorageWrites) {
     auto opCtx = makeOperationContext();
     auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
 
-    admCtx.recordWriteCostForReconciliation(10);
-    ASSERT_EQ(admCtx.consumeWriteCostForReconciliation(), 0);
+    admCtx.recordStorageWrites(10);
+    ASSERT_EQ(admCtx.getStorageWrites(), 0);
 
     admCtx.recordAdmission();
-    admCtx.recordWriteCostForReconciliation(3);
-    admCtx.recordWriteCostForReconciliation(4);
-    admCtx.recordWriteCostForReconciliation(0);
-    ASSERT_EQ(admCtx.consumeWriteCostForReconciliation(), 7);
-    ASSERT_EQ(admCtx.consumeWriteCostForReconciliation(), 0);
+    admCtx.recordStorageWrite();
+    admCtx.recordStorageWrite();
+    admCtx.recordStorageWrites(3);
+    admCtx.recordStorageWrites(0);
+    ASSERT_EQ(admCtx.getStorageWrites(), 5);
 }
 
-TEST_F(WriteThrottlerTest, BatchedStatementsDebitTotalDocsMinusTotalAdmissions) {
-    // Simulates a batched update: one command-level admission (delta=1 for the first statement,
-    // each statement modifying 1 document. Command-level finalization must yield total extra tokens
-    // debited = totalDocs - totalAdmissions = N - 1, not 0.
+TEST_F(WriteThrottlerTest, FinalizeAdmissionChargesIndexAmplification) {
+    // Known write cost of 1 is undercharged when storage applied record + two index keys.
     auto* throttler = armForReconciliation();
     auto opCtx = makeOperationContext();
-    WriteThrottlerAdmissionContext::get(opCtx.get()).recordAdmission();
+    throttler->admitOperation(opCtx.get());
+    throttler->admitKnownWrites(opCtx.get(), 1);
+    recordStorageWrites(opCtx.get(), 3);
+
+    const auto beforeFinalize = tokenBalance(*throttler);
+    throttler->finalizeAdmission(opCtx.get());
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize - 2);
+}
+
+TEST_F(WriteThrottlerTest, BatchedStatementsDebitTotalStorageWritesMinusTotalAdmissions) {
+    // Simulates a batched update: known statements are admitted before execution and finalization
+    // only debits storage-write amplification beyond that known statement count.
+    auto* throttler = armForReconciliation();
+    auto opCtx = makeOperationContext();
 
     const int64_t kNumStatements = 5;
-    const auto before = tokenBalance(*throttler);
-    for (int64_t i = 0; i < kNumStatements; ++i) {
-        recordWriteCost(opCtx.get(), 1);
+    throttler->admitOperation(opCtx.get());
+    throttler->admitKnownWrites(opCtx.get(), kNumStatements);
+    ASSERT_EQ(admissionsFor(opCtx.get()), kNumStatements);
+
+    const int64_t kStorageWrites = 7;
+    const auto beforeFinalize = tokenBalance(*throttler);
+    for (int64_t i = 0; i < kStorageWrites; ++i) {
+        recordStorageWrites(opCtx.get(), 1);
     }
     throttler->finalizeAdmission(opCtx.get());
-    ASSERT_EQ(tokenBalance(*throttler), before - (kNumStatements - 1));
+    ASSERT_EQ(tokenBalance(*throttler), beforeFinalize - (kStorageWrites - kNumStatements));
 }
 
 // ---- Rate source: on_update path (mirrors ingress rate limiter) ----

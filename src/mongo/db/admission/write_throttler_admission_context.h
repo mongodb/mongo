@@ -10,7 +10,6 @@
 
 namespace mongo {
 
-class CurOp;
 class OperationContext;
 
 /**
@@ -29,37 +28,63 @@ public:
     static WriteThrottlerAdmissionContext& get(OperationContext* opCtx);
 
     /**
-     * Adds successful written documents to the command-level reconciliation accumulator. If this
-     * OperationContext did not pass through write-throttler admission, recording is skipped so
-     * internal/direct writes cannot create orphan reconciliation work.
+     * Records that a single key write actually happened against the storage engine (one document
+     * record or one index key). Called from WiredTiger cursor helpers only after a successful
+     * write (ret == 0). Rejected writes are not counted; write-conflict retries accumulate as each
+     * retry re-applies its successful writes. If this OperationContext did not pass through
+     * write-throttler admission, recording is skipped.
      */
-    void recordWriteCostForReconciliation(int64_t docsWritten) {
-        if (docsWritten <= 0 || getAdmissions() <= 0) {
+    void recordStorageWrite() {
+        if (getAdmissions() <= 0) {
             return;
         }
-        _writeCostForReconciliation.fetchAndAddRelaxed(docsWritten);
+        _storageWrites.fetchAndAddRelaxed(1);
     }
 
     /**
-     * Returns the accumulated successful document cost and clears it. This supports one
-     * command-level reconciliation from HandleRequest::completeOperation().
+     * Adds `count` successful storage-engine key writes to the reconciliation accumulator. Used by
+     * unit tests to simulate WiredTiger increments without going through the storage layer.
      */
-    int64_t consumeWriteCostForReconciliation() {
-        const int64_t current = _writeCostForReconciliation.loadRelaxed();
-        _writeCostForReconciliation.storeRelaxed(0);
-        return current;
+    void recordStorageWrites(int64_t count) {
+        if (count <= 0 || getAdmissions() <= 0) {
+            return;
+        }
+        _storageWrites.fetchAndAddRelaxed(count);
+    }
+
+    /**
+     * Returns the number of storage-engine key writes recorded for this operation.
+     */
+    int64_t getStorageWrites() const {
+        return _storageWrites.loadRelaxed();
+    }
+
+    /**
+     * Marks the service-entry admission as available to cover the first known child write. This
+     * lets mid-flight admission preserve one-token-per-statement accounting without double
+     * charging the first child write.
+     */
+    void markServiceEntryAdmissionCredit() {
+        _serviceEntryAdmissionCredit.storeRelaxed(true);
+    }
+
+    /**
+     * Consumes the service-entry admission credit once. Operation contexts are single-owner for
+     * command execution, so relaxed load/store is sufficient here.
+     */
+    bool consumeServiceEntryAdmissionCredit() {
+        if (!_serviceEntryAdmissionCredit.loadRelaxed()) {
+            return false;
+        }
+        _serviceEntryAdmissionCredit.storeRelaxed(false);
+        return true;
     }
 
 private:
-    AtomicWord<int64_t> _writeCostForReconciliation{0};
+    // Count of individual key writes that WiredTiger actually applied (document records and index
+    // keys). Rejected writes are not counted; write-conflict retries accumulate.
+    AtomicWord<int64_t> _storageWrites{0};
+    AtomicWord<bool> _serviceEntryAdmissionCredit{false};
 };
-
-/**
- * Records successful written documents from a CurOp's additive metrics into the operation's
- * write-throttler reconciliation accumulator. If the operation did not pass through write-throttler
- * admission, recording is skipped by WriteThrottlerAdmissionContext.
- */
-[[MONGO_MOD_PUBLIC]] void recordWriteThrottlerCostForReconciliation(OperationContext* opCtx,
-                                                                    CurOp* curOp);
 
 }  // namespace mongo

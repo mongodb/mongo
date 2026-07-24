@@ -191,7 +191,8 @@ bool isWriteThrottlerOperation(Command::ReadWriteType readWriteType) {
 void admitWriteThrottlerIfNeeded(OperationContext* opCtx,
                                  CommandInvocation* invocation,
                                  bool isExemptFromAdmissionControl) {
-    if (isExemptFromAdmissionControl || !invocation->supportsWriteConcern() ||
+    if (!gWriteThrottlerEnabled.load() || isExemptFromAdmissionControl ||
+        !invocation->supportsWriteConcern() ||
         !isWriteThrottlerOperation(invocation->definition()->getReadWriteType())) {
         return;
     }
@@ -1877,9 +1878,7 @@ void ExecCommandDatabase::_initiateCommand() {
         _admissionTicket = admissionController.admitOperation(opCtx);
     }
 
-    if (gWriteThrottlerEnabled.load()) {
-        admitWriteThrottlerIfNeeded(opCtx, getInvocation(), isExemptFromAdmissionControl);
-    }
+    admitWriteThrottlerIfNeeded(opCtx, getInvocation(), isExemptFromAdmissionControl);
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 

@@ -148,10 +148,11 @@ public:
     void returnTokens(double numTokensToReturn);
 
     /**
-     * Reconciles a post-hoc cost by draining numTokens from the bucket without queuing or blocking.
-     * The balance may go negative (borrow), delaying subsequent acquisitions. Unlike
-     * acquireToken/tryAcquireToken this does not record an admission, since the operation being
-     * charged was already admitted; it only adjusts the bucket balance.
+     * Adjusts the bucket balance for a post-hoc cost true-up without queuing, blocking, or
+     * recording an admission (the operation was already admitted).
+     *
+     * Positive numTokens drains/borrows that many tokens (balance may go negative). Negative
+     * numTokens returns |numTokens| to the bucket (same as returnTokens). Zero is a no-op.
      */
     void reconcileTokens(double numTokens);
 
@@ -169,6 +170,13 @@ public:
      * stored away before rate-limiting kicks in.
      */
     void updateRateParameters(double refreshRatePerSec, double burstCapacitySecs);
+
+    /**
+     * Like updateRateParameters(), but preserves the current token balance, including negative
+     * borrowed balance from reconcileTokens(). Positive balances remain capped by the new burst
+     * size.
+     */
+    void updateRateParametersPreservingBalance(double refreshRatePerSec, double burstCapacitySecs);
 
     /**
      * The maximum number of requests enqueued waiting for a token. Token requests that come in and

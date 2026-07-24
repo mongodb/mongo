@@ -118,6 +118,12 @@ public:
             _tb.reset(rt, b, now);
         }
 
+        void resetPreservingBalance(double rt, double b, double now) {
+            const double balance = _tb.balance(now);
+            _tb.reset(rt, b, now);
+            _tb.setCapacity(balance, now);
+        }
+
     private:
         WriteRarelyRWMutex::WriteLock _l;
         folly::TokenBucket& _tb;
@@ -366,7 +372,11 @@ void RateLimiter::returnTokens(double numTokensToReturn) {
 }
 
 void RateLimiter::reconcileTokens(double numTokens) {
-    if (numTokens <= 0.0) {
+    if (numTokens == 0.0) {
+        return;
+    }
+    if (numTokens < 0.0) {
+        _impl->readScopedTokenBucket().returnTokens(-numTokens);
         return;
     }
     // Borrow-consume: drains the bucket immediately, allowing the balance to go negative. The
@@ -388,6 +398,19 @@ void RateLimiter::updateRateParameters(double refreshRatePerSec, double burstCap
             burstCapacitySecs > 0.0);
     auto burstSize = calculateBurstSize(refreshRatePerSec, burstCapacitySecs);
     _impl->writeScopedTokenBucket().reset(refreshRatePerSec, burstSize, _impl->nowInSeconds());
+}
+
+void RateLimiter::updateRateParametersPreservingBalance(double refreshRatePerSec,
+                                                        double burstCapacitySecs) {
+    uassert(ErrorCodes::InvalidOptions,
+            fmt::format("burstCapacitySecs cannot be less than or equal to 0.0. "
+                        "burstCapacitySecs={}; rateLimiterName={}",
+                        burstCapacitySecs,
+                        _impl->name),
+            burstCapacitySecs > 0.0);
+    auto burstSize = calculateBurstSize(refreshRatePerSec, burstCapacitySecs);
+    _impl->writeScopedTokenBucket().resetPreservingBalance(
+        refreshRatePerSec, burstSize, _impl->nowInSeconds());
 }
 
 void RateLimiter::setMaxQueueDepth(int64_t maxQueueDepth) {

@@ -970,22 +970,49 @@ TEST_F(RateLimiterWithMockClockTest, ReconcileTokens) {
     const auto maxTokens = 100 * 3;  // refreshRate * burstCapacitySecs
     ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens);
 
-    // Non-positive reconciliations are no-ops.
+    // Zero is a no-op. Negative credits are capped by burst capacity when the bucket is full.
     rateLimiter.reconcileTokens(0);
     rateLimiter.reconcileTokens(-5);
     ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens);
 
-    // Reconciliation drains the bucket without blocking.
+    // Positive reconciliation drains the bucket without blocking.
     rateLimiter.reconcileTokens(50);
     ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - 50);
 
+    // Negative reconciliation returns tokens (same effect as returnTokens).
+    rateLimiter.reconcileTokens(-20);
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - 30);
+
     // Reconciling past the available balance borrows (the balance goes negative).
     rateLimiter.reconcileTokens(maxTokens);
-    ASSERT_EQ(rateLimiter.tokenBalance(), -50);
+    ASSERT_EQ(rateLimiter.tokenBalance(), -30);
 
     // Reconciliation adjusts only the balance; it records no admission.
     ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 0);
     ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), 0);
+}
+
+TEST_F(RateLimiterWithMockClockTest, UpdateRateParametersPreservingBalanceKeepsDebt) {
+    RateLimiter rateLimiter = makeRateLimiter("RateLimiterPreserveDebt",
+                                              /*refreshRate=*/100,
+                                              /*burstCapacitySecs=*/3,
+                                              /*maxQueueDepth=*/100);
+    const auto maxTokens = 100 * 3;  // refreshRate * burstCapacitySecs
+
+    rateLimiter.reconcileTokens(maxTokens);
+    rateLimiter.reconcileTokens(50);
+    ASSERT_EQ(rateLimiter.tokenBalance(), -50);
+
+    rateLimiter.updateRateParametersPreservingBalance(/*refreshRatePerSec=*/10,
+                                                      /*burstCapacitySecs=*/0.5);
+    ASSERT_EQ(rateLimiter.tokenBalance(), -50);
+
+    // Positive surplus is still capped by the new burst size.
+    rateLimiter.returnTokens(100);
+    ASSERT_EQ(rateLimiter.tokenBalance(), 5);
+    rateLimiter.updateRateParametersPreservingBalance(/*refreshRatePerSec=*/10,
+                                                      /*burstCapacitySecs=*/0.5);
+    ASSERT_EQ(rateLimiter.tokenBalance(), 5);
 }
 
 }  // namespace

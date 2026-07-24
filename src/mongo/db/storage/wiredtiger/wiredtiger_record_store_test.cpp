@@ -9,6 +9,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
@@ -125,6 +126,99 @@ TEST(WiredTigerRecordStoreTest, ConfigStringValueFormatOverridesUserSuppliedForm
     BSONObj readBack;
     ASSERT_DOES_NOT_THROW(readBack = rs->dataFor(opCtx.get(), ru, id).toBson());
     ASSERT_BSONOBJ_EQ(doc, readBack);
+}
+
+TEST(WiredTigerRecordStoreTest, WriteThrottlerStorageWriteCountedOnInsert) {
+    // Each successful record write is counted on WriteThrottlerAdmissionContext when the op was
+    // write-throttle admitted. A record store with no indexes writes exactly one key per inserted
+    // document.
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+    admCtx.recordAdmission();
+
+    ASSERT_EQ(admCtx.getStorageWrites(), 0);
+
+    BSONObj doc = BSON("x" << "hello");
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(rs->insertRecord(opCtx.get(), ru, doc.objdata(), doc.objsize(), Timestamp())
+                      .getStatus());
+        txn.commit();
+    }
+    ASSERT_EQ(admCtx.getStorageWrites(), 1);
+
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(rs->insertRecord(opCtx.get(), ru, doc.objdata(), doc.objsize(), Timestamp())
+                      .getStatus());
+        txn.commit();
+    }
+    ASSERT_EQ(admCtx.getStorageWrites(), 2);
+}
+
+TEST(WiredTigerRecordStoreTest, WriteThrottlerStorageWriteNotCountedWithoutAdmission) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+
+    BSONObj doc = BSON("x" << "hello");
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(rs->insertRecord(opCtx.get(), ru, doc.objdata(), doc.objsize(), Timestamp())
+                      .getStatus());
+        txn.commit();
+    }
+    ASSERT_EQ(admCtx.getStorageWrites(), 0);
+}
+
+// A write that WiredTiger rejects with a write-conflict must NOT be counted: it never took effect.
+TEST(WiredTigerRecordStoreTest, WriteThrottlerStorageWriteNotCountedOnWriteConflict) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    RecordId id;
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
+        auto res = rs->insertRecord(opCtx.get(), ru, "a", 2, Timestamp());
+        ASSERT_OK(res.getStatus());
+        id = res.getValue();
+        txn.commit();
+    }
+
+    auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
+    auto t1 = harnessHelper->newOperationContext(client1.get());
+    auto& ru1 = *shard_role_details::getRecoveryUnit(t1.get());
+    WriteThrottlerAdmissionContext::get(t1.get()).recordAdmission();
+
+    auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
+    auto t2 = harnessHelper->newOperationContext(client2.get());
+    auto& ru2 = *shard_role_details::getRecoveryUnit(t2.get());
+    WriteThrottlerAdmissionContext::get(t2.get()).recordAdmission();
+
+    auto w1 = std::make_unique<StorageWriteTransaction>(ru1);
+    auto w2 = std::make_unique<StorageWriteTransaction>(ru2);
+
+    rs->dataFor(t1.get(), ru1, id);
+    rs->dataFor(t2.get(), ru2, id);
+
+    ASSERT_OK(rs->updateRecord(t1.get(), ru1, id, "b", 2));
+    ASSERT_EQ(WriteThrottlerAdmissionContext::get(t1.get()).getStorageWrites(), 1);
+
+    ASSERT_THROWS(rs->updateRecord(t2.get(), ru2, id, "c", 2).transitional_ignore(),
+                  StorageUnavailableException);
+    ASSERT_EQ(WriteThrottlerAdmissionContext::get(t2.get()).getStorageWrites(), 0);
+
+    w2.reset();
+    w1->commit();
 }
 
 TEST(WiredTigerRecordStoreTest, Isolation1) {

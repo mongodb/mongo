@@ -65,9 +65,10 @@ server_parameters:
 
     writeThrottlerMaxCostPerOp:
         description: >-
-            Upper bound on the token cost charged for a single write operation. Caps the borrowed
-            (negative) balance a single very large batch can create, bounding how long it stalls
-            subsequent writes. 0 means no limit (charge the full document count).
+            Upper bound on the token cost charged for a single write operation (pre-charge and
+            command-end true-up). Caps the borrowed (negative) balance a single very large batch
+            can create, bounding how long it stalls subsequent writes. 0 means no limit (charge the
+            full reconciled cost).
         set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<int>"
         cpp_varname: "gWriteThrottlerMaxCostPerOp"

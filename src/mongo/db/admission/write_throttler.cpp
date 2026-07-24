@@ -19,6 +19,33 @@ namespace {
 const auto getWriteThrottlerDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<WriteThrottler>>();
 
+// Bounds a single acquireToken() wait when writeThrottlerMaxCostPerOp is unlimited, so one large
+// admission cannot queue for an unbounded token request size.
+constexpr int64_t kMaxAdmissionTokenChunk = 1024;
+
+void recordAdmissions(WriteThrottlerAdmissionContext& admCtx, int64_t admissions) {
+    for (int64_t i = 0; i < admissions; ++i) {
+        admCtx.recordAdmission();
+    }
+}
+
+int64_t capRemainingCost(WriteThrottlerAdmissionContext& admCtx, int64_t cost) {
+    if (cost <= 0) {
+        return 0;
+    }
+
+    const int64_t maxCost = gWriteThrottlerMaxCostPerOp.load();
+    if (maxCost <= 0) {
+        return cost;
+    }
+
+    const int64_t admissions = admCtx.getAdmissions();
+    if (admissions >= maxCost) {
+        return 0;
+    }
+    return std::min(cost, maxCost - admissions);
+}
+
 bool shouldInstallWriteThrottler() {
     return serverGlobalParams.clusterRole.has(ClusterRole::None) ||
         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
@@ -48,22 +75,49 @@ void WriteThrottler::updateRate(int targetRatePerSec) {
     // kMaxRate so the idle state is represented consistently in serverStatus/FTDC and the bucket is
     // not armed with a rate above kMaxRate.
     auto rate = std::max(1, std::min(targetRatePerSec, kMaxRate));
-    _rateLimiter->updateRateParameters(static_cast<double>(rate),
-                                       gWriteThrottlerBurstCapacitySecs.load());
+    _rateLimiter->updateRateParametersPreservingBalance(static_cast<double>(rate),
+                                                        gWriteThrottlerBurstCapacitySecs.load());
     _rateLimiter->setMaxQueueDepth(gWriteThrottlerMaxQueueDepth.load());
 }
 
-void WriteThrottler::admitOperation(OperationContext* opCtx) {
+void WriteThrottler::admitOperation(OperationContext* opCtx, int64_t cost) {
     // Always forward to the rate limiter (like the always-on ingress rate limiter): when idle
     // (rate == kMaxRate) the token bucket admits immediately. The wait, if any, is attributed to
     // the WriteThrottlerAdmissionContext so curOp/serverStatus report the write-throttle queue.
     auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx);
-    {
-        WaitingForAdmissionGuard admissionGuard(&admCtx,
-                                                opCtx->getServiceContext()->getTickSource());
-        uassertStatusOK(_rateLimiter->acquireToken(opCtx));
+    const bool serviceEntryAdmission = admCtx.getAdmissions() == 0 && cost == 1;
+    cost = capRemainingCost(admCtx, cost);
+    if (cost <= 0) {
+        return;
     }
-    admCtx.recordAdmission();
+
+    int64_t remaining = cost;
+    while (remaining > 0) {
+        const int64_t chunk = std::min(remaining, kMaxAdmissionTokenChunk);
+        {
+            WaitingForAdmissionGuard admissionGuard(&admCtx,
+                                                    opCtx->getServiceContext()->getTickSource());
+            uassertStatusOK(_rateLimiter->acquireToken(opCtx, static_cast<double>(chunk)));
+        }
+        remaining -= chunk;
+    }
+
+    recordAdmissions(admCtx, cost);
+    if (serviceEntryAdmission) {
+        admCtx.markServiceEntryAdmissionCredit();
+    }
+}
+
+void WriteThrottler::admitKnownWrites(OperationContext* opCtx, int64_t knownWrites) {
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx);
+    if (knownWrites <= 0 || admCtx.getAdmissions() <= 0) {
+        return;
+    }
+
+    if (admCtx.consumeServiceEntryAdmissionCredit()) {
+        --knownWrites;
+    }
+    admitOperation(opCtx, knownWrites);
 }
 
 void WriteThrottler::finalizeAdmission(OperationContext* opCtx) {
@@ -73,21 +127,17 @@ void WriteThrottler::finalizeAdmission(OperationContext* opCtx) {
         return;
     }
 
-    const int64_t docs = admCtx.consumeWriteCostForReconciliation();
-    if (docs <= 0) {
-        return;
-    }
-
-    int64_t cost = docs;
+    // True-up against storage-engine key writes (document records + index keys) recorded at the WT
+    // cursor helpers. Known writes already charged through admissions are reconciled here.
+    const int64_t storageWrites = admCtx.getStorageWrites();
+    int64_t cost = storageWrites;
     const int64_t maxCost = gWriteThrottlerMaxCostPerOp.load();
     if (maxCost > 0) {
         cost = std::min(cost, maxCost);
     }
 
-    const int64_t extra = cost - admissions;
-    if (extra > 0) {
-        _rateLimiter->reconcileTokens(static_cast<double>(extra));
-    }
+    // Signed true-up: positive extra drains/borrows; negative returns surplus tokens.
+    _rateLimiter->reconcileTokens(static_cast<double>(cost - admissions));
 }
 
 void WriteThrottler::appendStats(BSONObjBuilder* bob) const {
@@ -150,8 +200,8 @@ Status WriteThrottler::onUpdateBurstCapacitySecs(double burstCapacitySecs) {
     // is passive bucket configuration, so it is safe to apply while the throttler is off.
     if (auto client = Client::getCurrent()) {
         if (auto* t = WriteThrottler::get(client->getServiceContext())) {
-            t->_rateLimiter->updateRateParameters(t->_rateLimiter->refreshRate(),
-                                                  burstCapacitySecs);
+            t->_rateLimiter->updateRateParametersPreservingBalance(t->_rateLimiter->refreshRate(),
+                                                                   burstCapacitySecs);
         }
     }
     return Status::OK();

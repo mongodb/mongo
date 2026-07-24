@@ -69,7 +69,7 @@ describe("write throttler admission", function () {
         const before = getThrottlerStats();
         const res = assert.commandWorked(db.runCommand({update: coll.getName(), updates}));
         assert.eq(res.n, kNumDocs, res);
-        assertThrottlerAdmission(before, getThrottlerStats());
+        assertThrottlerAdmission(before, getThrottlerStats(), kNumDocs);
     });
 
     it("admits insert batches", function () {
@@ -78,7 +78,7 @@ describe("write throttler admission", function () {
 
         const before = getThrottlerStats();
         assert.commandWorked(coll.insertMany(docs));
-        assertThrottlerAdmission(before, getThrottlerStats());
+        assertThrottlerAdmission(before, getThrottlerStats(), kNumDocs);
     });
 
     it("admits batched deletes", function () {
@@ -93,7 +93,7 @@ describe("write throttler admission", function () {
         const before = getThrottlerStats();
         const res = assert.commandWorked(db.runCommand({delete: coll.getName(), deletes}));
         assert.eq(res.n, kNumDocs, res);
-        assertThrottlerAdmission(before, getThrottlerStats());
+        assertThrottlerAdmission(before, getThrottlerStats(), kNumDocs);
     });
 
     it("admits findAndModify updates", function () {
@@ -164,7 +164,7 @@ function disarmThrottler() {
     );
 }
 
-function assertThrottlerAdmission(before, after) {
+function assertThrottlerAdmission(before, after, minTokensAcquired = 1) {
     const dAttempts = after.attemptedAdmissions - before.attemptedAdmissions;
     const dAdmissions = after.successfulAdmissions - before.successfulAdmissions;
     const dTokensAcquired = after.tokensAcquired - before.tokensAcquired;
@@ -177,9 +177,14 @@ function assertThrottlerAdmission(before, after) {
         before,
         after,
     });
-    assert(dTokensAcquired >= 1, "write did not acquire a write-throttle token", {
-        before,
-        after,
-        dTokensAcquired,
-    });
+    assert(
+        dTokensAcquired >= minTokensAcquired,
+        "write did not acquire enough write-throttle tokens",
+        {
+            before,
+            after,
+            dTokensAcquired,
+            minTokensAcquired,
+        },
+    );
 }

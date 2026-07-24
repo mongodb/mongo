@@ -252,6 +252,14 @@ public:
     virtual void setOperationContext(OperationContext* opCtx);
 
     /**
+     * Returns the OperationContext that currently owns this RecoveryUnit, or nullptr if none is set
+     * (e.g. for internal RecoveryUnits not tied to a user operation).
+     */
+    OperationContext* getOperationContext() const {
+        return _opCtx;
+    }
+
+    /**
      * Extensible structure for configuring options to begin a new transaction.
      *
      * - roundUpPreparedTimestamps dictates whether to round up prepare and commit timestamp of a

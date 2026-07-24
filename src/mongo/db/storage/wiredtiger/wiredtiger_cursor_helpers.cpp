@@ -6,6 +6,8 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/platform/compiler.h"
@@ -34,12 +36,24 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, WT_CURSOR* curso
         ru.storeWriteContextForDebugging(builder.obj());
     }
 }
+
+// Records a single key write (one document record or one index key) that WiredTiger actually
+// applied, on the operation's WriteThrottlerAdmissionContext. A write that WiredTiger rejects
+// (WT_ROLLBACK conflict, duplicate key, cache-pressure rejection) is not counted because it never
+// happened. Write-conflict retries still accumulate rather than reset, because each retry
+// physically re-applies its successful writes.
+void maybeRecordStorageWrite(WiredTigerRecoveryUnit& ru) {
+    if (auto* opCtx = ru.getOperationContext()) {
+        WriteThrottlerAdmissionContext::get(opCtx).recordStorageWrite();
+    }
+}
 }  // namespace
 
 int wiredTigerCursorInsert(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->insert(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);
@@ -54,6 +68,7 @@ int wiredTigerCursorModify(WiredTigerRecoveryUnit& ru,
     int ret = cursor->modify(cursor, entries, nentries);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);
@@ -65,6 +80,7 @@ int wiredTigerCursorUpdate(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->update(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);
@@ -76,6 +92,7 @@ int wiredTigerCursorRemove(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->remove(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);

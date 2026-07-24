@@ -26,9 +26,9 @@ class TickSource;
  *
  * The target rate is configured through the writeThrottlerTargetRatePerSec server parameter (set
  * via setParameter); the on_update handler pushes the new rate into the token bucket. Until the
- * rate is lowered below kMaxRate, the throttler stays idle (no throttling). The throttler is always
- * batch-aware: it charges one token per admission and reconciles the remaining accumulated
- * document cost after the command completes, so it meters documents/sec rather than operations/sec.
+ * rate is lowered below kMaxRate, the throttler stays idle (no throttling). The throttler charges
+ * one token per known write admission and reconciles the remaining accumulated storage-engine
+ * key-write cost after command completion, so it meters write work/sec rather than operations/sec.
  * This object owns no threads; it is a thin mechanism plus the observability state surfaced via
  * serverStatus/FTDC.
  *
@@ -49,18 +49,24 @@ public:
      * token bucket admits immediately. Rejects with RateLimitExceeded if the queue depth is
      * exceeded.
      */
-    void admitOperation(OperationContext* opCtx);
+    void admitOperation(OperationContext* opCtx, int64_t cost = 1);
+
+    /**
+     * Admits known child-write cost before those children execute. The service-entry admission is
+     * treated as a one-token credit for the first known child write, preserving one-token-per-write
+     * accounting without double charging the first child. No-ops for operations that did not pass
+     * service-entry admission.
+     */
+    void admitKnownWrites(OperationContext* opCtx, int64_t knownWrites);
 
     double tokenBalance_forTest() const {
         return _rateLimiter->tokenBalance();
     }
 
     /**
-     * Finalizes write-throttle admission for a completed command. This reconciles the
-     * one-token-per-admission upfront charge with the accumulated successful document count from
-     * the WriteThrottlerAdmissionContext, debiting the remaining cost (capped by
-     * writeThrottlerMaxCostPerOp) from the bucket so the throttler meters documents/sec rather than
-     * operations/sec.
+     * Finalizes write-throttle admission for a completed command. This reconciles known-write
+     * admissions charged before child writes with accumulated successful storage-engine key writes
+     * from the WriteThrottlerAdmissionContext. Storage amplification debits remaining cost.
      */
     void finalizeAdmission(OperationContext* opCtx);
 
