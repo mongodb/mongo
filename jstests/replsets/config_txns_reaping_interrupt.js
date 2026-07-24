@@ -110,7 +110,12 @@ function runTest({committedTxnOpts, inProgressTxnOpts, expectInterrupt}) {
         collName,
         inProgressTxnOpts.isRetryableWrite,
     );
-    let fp = configureFailPoint(primary, "hangDuringBatchInsert", {shouldCheckForInterrupt: true});
+    // Scope the failpoint to this test's collection so a concurrent background insert (e.g. HMAC
+    // key initialization into admin.system.keys) cannot satisfy fp.wait() before ours hangs.
+    let fp = configureFailPoint(primary, "hangDuringBatchInsert", {
+        shouldCheckForInterrupt: true,
+        nss: ns,
+    });
     inProgressTxnThread.start();
 
     fp.wait();
