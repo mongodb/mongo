@@ -332,7 +332,8 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
     }
 
     // TODO SERVER-109664: remove this check since the above protocol check is sufficient
-    if (index_builds::primary_driven::enabled(opCtx)) {
+    if (index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;
     }
 
@@ -871,7 +872,8 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             const auto resetIndexIdent = [&] {
                 // TODO (SERVER-109664): Early return whenever the protocol is not primary driven.
                 if (protocol != IndexBuildProtocol::kTwoPhase ||
-                    !index_builds::primary_driven::enabled(opCtx)) {
+                    !index_builds::primary_driven::enabled(
+                        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     return true;
                 }
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -1292,7 +1294,9 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.indexBuildMethod = oplogEntry.indexBuildMethod;
     indexBuildOptions.applicationMode = applicationMode;
-    indexBuildOptions.indexBuildProtocol = index_builds::primary_driven::enabled(opCtx)
+    indexBuildOptions.indexBuildProtocol =
+        index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
         ? IndexBuildProtocol::kPrimaryDriven
         : IndexBuildProtocol::kTwoPhase;
     if (repl::feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
@@ -2154,7 +2158,8 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                 opCtx, uuid, IndexBuildProtocol::kPrimaryDriven);
         }
 
-        if (index_builds::primary_driven::enabled(opCtx)) {
+        if (index_builds::primary_driven::enabled(
+                opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             // Must be fully primary before starting resumed builds.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
@@ -2307,7 +2312,8 @@ void IndexBuildsCoordinator::_restartIndexBuild(OperationContext* opCtx,
     // The commit quorum gets set during _onStepUpAsyncTaskFn in _signalIfCommitQuorumNotEnabled, so
     // we don't need to expicitely set the commit quorum of a primary-driven index build to be
     // kDisabled here.
-    const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx);
+    const bool pdibEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
         // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
         .indexBuildMethod =
@@ -3801,7 +3807,9 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
         invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
         // Primary-driven index builds need to replicate container writes.
-        auto operationType = index_builds::primary_driven::enabled(opCtx)
+        auto operationType =
+            index_builds::primary_driven::enabled(
+                opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
             ? AcquisitionPrerequisites::kWrite
             : AcquisitionPrerequisites::kUnreplicatedWrite;
         const auto collection = acquireCollection(
@@ -3836,7 +3844,8 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
         // Primary-driven index builds need to replicate container writes.
-        auto intent = index_builds::primary_driven::enabled(opCtx)
+        auto intent = index_builds::primary_driven::enabled(
+                          opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
             ? rss::consensus::IntentRegistry::Intent::Write
             : rss::consensus::IntentRegistry::Intent::LocalWrite;
         auto autoGetCollOptions = auto_get_collection::Options{}.globalLockOptions(

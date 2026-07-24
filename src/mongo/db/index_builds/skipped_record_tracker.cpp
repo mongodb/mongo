@@ -67,7 +67,8 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "recordSkippedRecordTracker", NamespaceString::kIndexBuildEntryNamespace, [&]() {
             WriteUnitOfWork wuow(opCtx);
-            if (index_builds::primary_driven::enabled(opCtx)) {
+            if (index_builds::primary_driven::enabled(
+                    opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 LOGV2_DEBUG(
                     10966701,
                     1,

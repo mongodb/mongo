@@ -148,7 +148,8 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
         // Primary-driven index builds use replicated tables rather than temporary local tables, so
         // they need to be created at a consistent timestamp on all nodes. Currently this is done by
         // creating them eagerly rather than as needed.
-        auto isPrimaryDrivenIndexBuild = index_builds::primary_driven::enabled(opCtx);
+        auto isPrimaryDrivenIndexBuild = index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         auto mode = isPrimaryDrivenIndexBuild ? LazyRecordStore::CreateMode::immediate
                                               : LazyRecordStore::CreateMode::deferred;
 

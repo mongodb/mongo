@@ -367,9 +367,11 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
         // This spawns a new thread and returns immediately once the index build has been
         // registered with the IndexBuildsCoordinator.
         try {
-            auto indexBuildMethod = (index_builds::primary_driven::enabled(opCtx.get())
-                                         ? IndexBuildMethodEnum::kPrimaryDriven
-                                         : IndexBuildMethodEnum::kHybrid);
+            auto indexBuildMethod =
+                (index_builds::primary_driven::enabled(
+                     opCtx.get(), serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+                     ? IndexBuildMethodEnum::kPrimaryDriven
+                     : IndexBuildMethodEnum::kHybrid);
 
             IndexBuildsCoordinator::get(opCtx.get())
                 ->applyStartIndexBuild(opCtx.get(),

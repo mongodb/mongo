@@ -86,7 +86,8 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
     std::vector<RecordId> rids;
     rs.reserveRecordIds(opCtx, *shard_role_details::getRecoveryUnit(opCtx), &rids, toInsert.size());
 
-    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(opCtx);
+    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     LOGV2_DEBUG(20691,
                 2,
@@ -241,7 +242,8 @@ Status SideWritesTracker::drainWritesIntoIndex(
     invariant(kBatchMaxMB <= std::numeric_limits<int32_t>::max() / kMB);
     const int32_t kBatchMaxBytes = kBatchMaxMB * kMB;
 
-    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(opCtx);
+    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     // In a single WriteUnitOfWork, scan the side table up to the batch or memory limit, apply
     // the keys to the index, and delete the side table records. Returns true if the cursor has

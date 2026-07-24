@@ -694,7 +694,8 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     }
 
     // TODO SERVER-109664: use IndexBuildProtocol::kPrimaryDriven
-    const bool usingPrimaryDrivenIndexBuilds = index_builds::primary_driven::enabled(opCtx);
+    const bool usingPrimaryDrivenIndexBuilds = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (usingPrimaryDrivenIndexBuilds) {
         bool isPrimary = [&]() {

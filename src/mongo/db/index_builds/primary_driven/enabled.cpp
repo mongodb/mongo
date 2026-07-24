@@ -39,10 +39,6 @@
 
 namespace mongo::index_builds::primary_driven {
 
-bool enabled(OperationContext* opCtx) {
-    return enabled(opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-}
-
 bool enabled(OperationContext* opCtx, const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
     return enabled(opCtx, VersionContext::getDecoration(opCtx), fcvSnapshot);
 }
@@ -67,7 +63,8 @@ namespace {
 class IndexBuildOplogGroupingPolicy : public OplogGroupingPolicy {
 public:
     bool shouldGroupOplogEntries(OperationContext* opCtx) const override {
-        return index_builds::primary_driven::enabled(opCtx);
+        return index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }
 };
 

@@ -328,7 +328,8 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         }
     }
 
-    if (index_builds::primary_driven::enabled(opCtx)) {
+    if (index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return reconcileResult;
     }
 

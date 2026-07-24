@@ -110,7 +110,7 @@ TEST_F(PrimaryDrivenIndexBuildEnabledTest, ProviderRequirementOverridesDisabledF
     unittest::ServerParameterGuard flag("featureFlagPrimaryDrivenIndexBuilds", false);
     installProvider(kPrimaryDrivenIndexBuildsRequired);
 
-    ASSERT_TRUE(enabled(opCtx()));
+    ASSERT_TRUE(enabled(opCtx(), serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 TEST_F(PrimaryDrivenIndexBuildEnabledTest, ProviderRequirementOverridesUninitializedFCV) {
@@ -118,7 +118,7 @@ TEST_F(PrimaryDrivenIndexBuildEnabledTest, ProviderRequirementOverridesUninitial
     unittest::ServerParameterGuard flag("featureFlagPrimaryDrivenIndexBuilds", true);
     installProvider(kPrimaryDrivenIndexBuildsRequired);
 
-    ASSERT_TRUE(enabled(opCtx()));
+    ASSERT_TRUE(enabled(opCtx(), serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 TEST_F(PrimaryDrivenIndexBuildEnabledTest, FallsBackToEnabledFlagWhenProviderDoesNotMandate) {
@@ -127,7 +127,7 @@ TEST_F(PrimaryDrivenIndexBuildEnabledTest, FallsBackToEnabledFlagWhenProviderDoe
     unittest::ServerParameterGuard flag("featureFlagPrimaryDrivenIndexBuilds", true);
     installProvider(kPrimaryDrivenIndexBuildsNotRequired);
 
-    ASSERT_TRUE(enabled(opCtx()));
+    ASSERT_TRUE(enabled(opCtx(), serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 TEST_F(PrimaryDrivenIndexBuildEnabledTest, FallsBackToDisabledFlagWhenProviderDoesNotMandate) {
@@ -136,7 +136,7 @@ TEST_F(PrimaryDrivenIndexBuildEnabledTest, FallsBackToDisabledFlagWhenProviderDo
     unittest::ServerParameterGuard flag("featureFlagPrimaryDrivenIndexBuilds", false);
     installProvider(kPrimaryDrivenIndexBuildsNotRequired);
 
-    ASSERT_FALSE(enabled(opCtx()));
+    ASSERT_FALSE(enabled(opCtx(), serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 TEST_F(PrimaryDrivenIndexBuildEnabledTest, ToleratesUninitializedFCV) {
@@ -144,7 +144,7 @@ TEST_F(PrimaryDrivenIndexBuildEnabledTest, ToleratesUninitializedFCV) {
     unittest::ServerParameterGuard flag("featureFlagPrimaryDrivenIndexBuilds", true);
     installProvider(kPrimaryDrivenIndexBuildsNotRequired);
 
-    ASSERT_FALSE(enabled(opCtx()));
+    ASSERT_FALSE(enabled(opCtx(), serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 TEST_F(PrimaryDrivenIndexBuildEnabledTest, FCVSnapshotOverloadHonorsCallerSnapshot) {

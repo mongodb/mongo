@@ -948,7 +948,8 @@ Status performAtomicTimeseriesWrites(
     curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                    .getDatabaseProfileLevel(ns.dbName()));
 
-    const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx);
+    const bool pdibEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
     const bool shouldGroup = pdibEnabled ? (insertOps.size() + updateOps.size() > 1)

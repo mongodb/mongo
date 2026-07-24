@@ -1038,7 +1038,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               }
           }
 
-          if (index_builds::primary_driven::enabled(opCtx)) {
+          if (index_builds::primary_driven::enabled(
+                  opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
               return index_builds::primary_driven::start(opCtx,
                                                          entry.getNss().dbName(),
                                                          oplogEntry.collUUID,
@@ -1082,7 +1083,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
           auto oplogEntry = std::move(swOplogEntry.getValue());
 
-          if (index_builds::primary_driven::enabled(opCtx)) {
+          if (index_builds::primary_driven::enabled(
+                  opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
               return index_builds::primary_driven::commit(opCtx,
                                                           entry.getNss().dbName(),
                                                           oplogEntry.collUUID,
@@ -1117,7 +1119,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
           auto oplogEntry = std::move(swOplogEntry.getValue());
 
-          if (index_builds::primary_driven::enabled(opCtx)) {
+          if (index_builds::primary_driven::enabled(
+                  opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
               return index_builds::primary_driven::abort(opCtx,
                                                          op->getNss().dbName(),
                                                          oplogEntry.collUUID,

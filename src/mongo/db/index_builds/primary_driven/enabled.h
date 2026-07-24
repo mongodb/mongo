@@ -43,12 +43,6 @@ namespace mongo::index_builds::primary_driven {
 
 /**
  * Returns true if the provider mandates primary-driven index builds or the feature flag is
- * enabled. Acquires its own FCV snapshot.
- */
-bool enabled(OperationContext* opCtx);
-
-/**
- * Returns true if the provider mandates primary-driven index builds or the feature flag is
  * enabled. Uses the supplied FCV snapshot and the operation's decorated version context.
  */
 bool enabled(OperationContext* opCtx, const ServerGlobalParams::FCVSnapshot& fcvSnapshot);

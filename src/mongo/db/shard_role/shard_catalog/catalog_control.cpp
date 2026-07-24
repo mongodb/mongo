@@ -247,7 +247,8 @@ void openCatalogAfterRollbackToStable(OperationContext* opCtx,
                                                           StorageEngine::LastShutdownState::kClean,
                                                           false /* forRepair */));
 
-    if (index_builds::primary_driven::enabled(opCtx)) {
+    if (index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         for (auto&& [buildUUID, entry] : reconcileResult.indexBuildsToRestart) {
             std::vector<IndexBuildInfo> builds;
             builds.reserve(entry.indexSpecsAndIdents.size());

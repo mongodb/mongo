@@ -71,7 +71,8 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
     StackBufBuilder builder;
     key.serializeWithoutRecordId(builder);
 
-    if (index_builds::primary_driven::enabled(opCtx)) {
+    if (index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         LOGV2_DEBUG(10966700,
                     1,
                     "Index build: writing to duplicate key tracker container for primary-driven "
@@ -142,7 +143,8 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
                      opCtx);
     }
 
-    const bool primaryDrivenIndexBuild = index_builds::primary_driven::enabled(opCtx);
+    const bool primaryDrivenIndexBuild = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     int resolved = 0;
     while (record) {

@@ -376,7 +376,8 @@ StatusWith<CommitQuorumOptions> getCommitQuorum(OperationContext* opCtx, UUID in
     // primary-driven index build.
     // TODO(SERVER-109664): Do not use the feature-flag to disable commit quorum for
     // primary-driven index builds.
-    if (index_builds::primary_driven::enabled(opCtx)) {
+    if (index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote);
     }
     StatusWith<IndexBuildEntry> status = getIndexBuildEntry(opCtx, indexBuildUUID);

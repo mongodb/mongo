@@ -198,7 +198,8 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
             }
         }
 
-        const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx);
+        const bool pdibEnabled = index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
         if (o2HasInternalIdents && !pdibEnabled) {
             return {ErrorCodes::BadValue,

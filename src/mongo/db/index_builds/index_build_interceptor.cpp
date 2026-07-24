@@ -75,7 +75,8 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
             opCtx, *indexBuildInfo.constraintViolationsIdent, createMode);
     }
-    auto isPrimaryDrivenIndexBuild = index_builds::primary_driven::enabled(opCtx);
+    auto isPrimaryDrivenIndexBuild = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (isPrimaryDrivenIndexBuild) {
         uassert(11411100, "sorterIdent is not provided", indexBuildInfo.sorterIdent);
         uassert(11411101,

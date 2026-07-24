@@ -792,7 +792,8 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     const KeyStringSet keySet{keyString};
 
-    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(opCtx);
+    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (opType == IndexBuildInterceptor::Op::kInsert) {
         int64_t numInserted;
         auto status = insertKeysAndUpdateMultikeyPaths(

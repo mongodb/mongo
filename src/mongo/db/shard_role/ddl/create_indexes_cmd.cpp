@@ -253,7 +253,9 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
     // TODO(SERVER-109664): Do not use the feature-flag to disable commit quorum for
     // primary-driven index builds.
     auto isPrimaryDrivenIndexBuild =
-        replCoord->getSettings().isReplSet() && index_builds::primary_driven::enabled(opCtx);
+        replCoord->getSettings().isReplSet() &&
+        index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     // Commit quorum is disabled for primary-driven index builds.
     auto commitQuorum = cmd.getCommitQuorum();
@@ -469,7 +471,8 @@ bool isCreatingInternalConfigTxnsPartialIndex(const CreateIndexesCommand& cmd) {
 IndexBuildProtocol determineProtocol(OperationContext* opCtx, const NamespaceString& ns) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
         return IndexBuildProtocol::kSinglePhase;
-    } else if (index_builds::primary_driven::enabled(opCtx)) {
+    } else if (index_builds::primary_driven::enabled(
+                   opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return IndexBuildProtocol::kPrimaryDriven;
     }
     return IndexBuildProtocol::kTwoPhase;
@@ -661,7 +664,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
     ReplIndexBuildState::IndexCatalogStats stats;
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
         // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
-        .indexBuildMethod = index_builds::primary_driven::enabled(opCtx)
+        .indexBuildMethod = index_builds::primary_driven::enabled(
+                                opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
             ? IndexBuildMethodEnum::kPrimaryDriven
             : IndexBuildMethodEnum::kHybrid,
         .indexBuildProtocol = protocol,
