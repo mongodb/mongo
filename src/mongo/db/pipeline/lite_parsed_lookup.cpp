@@ -232,7 +232,7 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
                                                subpipelineViewPolicy);
 }
 
-void LiteParsedLookUp::validate() const {
+void LiteParsedLookUp::validate(const OperationContext* opCtx) const {
     if (_hasForeignDB) {
         // Enforce the cross-db $lookup restriction. This mirrors the check on the legacy
         // createFromBson path via expCtx and ensures validation fires before the stage is

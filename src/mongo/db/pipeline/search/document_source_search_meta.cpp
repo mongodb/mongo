@@ -77,8 +77,6 @@ DocumentSourceSearchMeta::distributedPlanLogic(const DistributedPlanContext* ctx
 namespace {
 InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
     const BSONObj& spec, const intrusive_ptr<ExpressionContext>& expCtx) {
-    search_helpers::validateViewNotSetByUser(expCtx, spec);
-
     if (spec.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)) {
         // The existence of this field name indicates that this spec was already serialized from a
         // mongos process. Parse out of the IDL spec format, rather than just expecting only the

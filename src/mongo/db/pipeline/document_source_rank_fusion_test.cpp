@@ -35,7 +35,7 @@ protected:
                                         spec.firstElement(),
                                         LiteParserOptions{.ifrContext = ctx->getIfrContext(),
                                                           .opCtx = ctx->getOperationContext()});
-        liteParsed->validate();
+        liteParsed->validate(ctx->getOperationContext());
         return DocumentSourceRankFusion::createFromBson(spec.firstElement(), ctx);
     }
 

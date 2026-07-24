@@ -150,7 +150,7 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const override;
 
-    void validate() const override;
+    void validate(const OperationContext* opCtx) const override;
 
     // Moved from document_source_lookup.cpp so createFromBson can still call it.
     static void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline);

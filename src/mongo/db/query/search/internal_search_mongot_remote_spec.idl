@@ -15,6 +15,9 @@ structs:
         description: Specification for a $_internalSearchMongotRemote stage given in the full, explicit format.
         # Because the specification is internal only, we permit extra fields. This avoids some upgrade/downngrade
         # concerns where a router may send a command to a node with fields not known by the node.
+        # NOTE: Every field below is router-set internal and must never be accepted from an external
+        # client. When adding a field here, also add it to getInternalOnlyFieldNames() in
+        # src/mongo/db/pipeline/search/search_helper.cpp so the LiteParse-layer check rejects it.
         strict: false
         fields:
             mongotQuery:

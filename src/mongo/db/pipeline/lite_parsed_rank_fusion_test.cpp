@@ -95,7 +95,8 @@ TEST_F(LiteParsedRankFusionTest, ErrorsIfPipelineNameEmpty) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 15998);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 15998);
 }
 
 TEST_F(LiteParsedRankFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
@@ -114,7 +115,8 @@ TEST_F(LiteParsedRankFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 16410);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 16410);
 }
 
 TEST_F(LiteParsedRankFusionTest, ErrorsIfPipelineNameContainsDot) {
@@ -133,7 +135,8 @@ TEST_F(LiteParsedRankFusionTest, ErrorsIfPipelineNameContainsDot) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 16412);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 16412);
 }
 
 TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnDuplicatePipelineNames) {
@@ -146,7 +149,8 @@ TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnDuplicatePipelineNames) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108714);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108714);
 }
 
 TEST_F(LiteParsedRankFusionTest, ErrorsIfRankFusionNotFirstStage) {
@@ -224,7 +228,7 @@ TEST_F(LiteParsedRankFusionTest, ValidateSucceedsWithValidRankedPipeline) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    liteParsed->validate();  // Should not throw.
+    liteParsed->validate(getExpCtx()->getOperationContext());  // Should not throw.
 }
 
 TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnEmptySubpipeline) {
@@ -232,7 +236,8 @@ TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnEmptySubpipeline) {
     auto spec =
         BSON("$rankFusion" << BSON("input" << BSON("pipelines" << BSON("p1" << BSONArray()))));
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108700);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108700);
 }
 
 TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnNonRankedPipeline) {
@@ -248,7 +253,8 @@ TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnNonRankedPipeline) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108702);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108702);
 }
 
 TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnNonSelectionStage) {
@@ -264,7 +270,8 @@ TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnNonSelectionStage) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108704);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108704);
 }
 
 TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnNestedHybridSearch) {
@@ -280,7 +287,8 @@ TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnNestedHybridSearch) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108701);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108701);
 }
 
 TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnScoreStageInPipeline) {
@@ -296,7 +304,8 @@ TEST_F(LiteParsedRankFusionTest, ValidateThrowsOnScoreStageInPipeline) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108703);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108703);
 }
 
 TEST_F(LiteParsedRankFusionTest, ValidateSucceedsWithMultipleValidPipelines) {
@@ -313,7 +322,7 @@ TEST_F(LiteParsedRankFusionTest, ValidateSucceedsWithMultipleValidPipelines) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedRankFusion::parse(nss, spec.firstElement(), {});
-    liteParsed->validate();  // Should not throw.
+    liteParsed->validate(getExpCtx()->getOperationContext());  // Should not throw.
 }
 
 }  // namespace
