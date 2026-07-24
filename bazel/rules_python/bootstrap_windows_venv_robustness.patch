@@ -1,0 +1,95 @@
+Windows: make runtime-venv creation robust to MAX_PATH and symlink refusal.
+
+Under `bootstrap_impl=script` with `venvs_use_declare_symlink=no`, the
+stage-2 bootstrap recreates the binary's venv at runtime (in $TMP or
+RULES_PYTHON_EXTRACT_ROOT) and populates it by symlinking the
+interpreter, bin entries, and the site-packages tree out of runfiles
+(`_create_venv` / `_symlink_tree` in python_bootstrap_template.txt).
+
+Two Windows failure modes are handled:
+
+1. MAX_PATH. Win32 path-based APIs reject paths longer than 260 chars
+   unless the host enables the LongPathsEnabled registry setting, which
+   cannot be relied upon. Deep runfiles venv trees regularly exceed the
+   limit — observed in mongodb CI with a 265-char source path (while
+   its 245-char parent directory still listed fine via os.walk):
+
+     os.symlink(...)   -> OSError: [WinError 87] The parameter is incorrect
+     shutil.copy2(...) -> FileNotFoundError: [WinError 3] The system
+                          cannot find the path specified  (CopyFile2)
+
+   Fix: route both ends of every symlink/copy through the \\?\
+   extended-length prefix (\\?\UNC\ for UNC paths) when the path
+   exceeds the limit.
+
+2. Symlink refusal. Symlink creation requires
+   SeCreateSymbolicLinkPrivilege or Developer Mode; hosts without it
+   fail with ERROR_PRIVILEGE_NOT_HELD (WinError 1314) or
+   ERROR_INVALID_PARAMETER (WinError 87). Fix: fall back to copying
+   (shutil.copy2 / copytree) — the same degradation strategy CPython's
+   own venv module uses on Windows. The runtime venv is ephemeral or
+   per-binary cached, so a copy is functionally equivalent to a
+   symlink, just slower to create.
+
+Non-Windows behavior is unchanged (OSError re-raised, no path munging).
+
+Applied via `single_version_override(patches=...)` on rules_python in
+//MODULE.bazel. Candidate for upstreaming to bazel-contrib/rules_python.
+
+--- a/python/private/python_bootstrap_template.txt	2026-07-23 10:54:27
++++ b/python/private/python_bootstrap_template.txt	2026-07-23 14:29:06
+@@ -558,8 +558,31 @@
+     with open(python_program, 'rb') as f:
+       print_verbose("pyprog head:" + str(f.read(50)))
+     raise
++
++def _win_extended_path(p):
++  r"""Return an extended-length (\\?\) form of an absolute Windows path.
++
++  Win32 path-based APIs (CreateSymbolicLinkW, CopyFile2, ...) reject paths
++  longer than MAX_PATH (260) unless the host opts in via the registry
++  LongPathsEnabled setting, which can't be relied upon. Deep runfiles
++  venv trees regularly exceed 260 chars; the failures surface as
++  ERROR_INVALID_PARAMETER (WinError 87) from CreateSymbolicLinkW and
++  ERROR_PATH_NOT_FOUND (WinError 3) from CopyFile2. The \\?\ prefix
++  bypasses MAX_PATH regardless of host configuration. Only applied when
++  the path actually exceeds the limit, to minimize behavior change.
++  """
++  p = abspath(p)
++  if len(p) < 260 or p.startswith("\\\\?\\"):
++    return p
++  if p.startswith("\\\\"):
++    return "\\\\?\\UNC\\" + p[2:]
++  return "\\\\?\\" + p
+ 
++
+ def _symlink_exist_ok(*, from_, to):
++  if IS_WINDOWS:
++    from_ = _win_extended_path(from_)
++    to = _win_extended_path(to)
+   try:
+     # On Windows, symlinks have to be told whether they're
+     # pointing to a file or directory. Python is supposed to auto-detect
+@@ -567,6 +590,22 @@
+     os.symlink(to, from_, target_is_directory=os.path.isdir(to))
+   except FileExistsError:
+     pass
++  except OSError:
++    if not IS_WINDOWS:
++      raise
++    # Windows hosts may also refuse symlink creation outright: it
++    # requires SeCreateSymbolicLinkPrivilege or Developer Mode, and the
++    # refusal surfaces as ERROR_PRIVILEGE_NOT_HELD (WinError 1314) or
++    # ERROR_INVALID_PARAMETER (WinError 87, when the unprivileged-create
++    # flag isn't supported). Fall back to copying — the same strategy
++    # CPython's venv module uses on Windows. The runtime-recreated venv
++    # is ephemeral (or cached under RULES_PYTHON_EXTRACT_ROOT), so the
++    # copy is functionally equivalent to a symlink, just slower to
++    # create.
++    if os.path.isdir(to):
++      shutil.copytree(to, from_, dirs_exist_ok=True)
++    else:
++      shutil.copy2(to, from_)
+ 
+ 
+ def main():

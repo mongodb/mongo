@@ -76,15 +76,11 @@ filters:
   - "pnpm-lock.yaml":
     approvers:
       - 10gen/devprod-test-infrastructure
-  - "poetry.lock":
+  - "uv.lock":
     approvers:
       - 10gen/devprod-test-infrastructure
       - 10gen/devprod-build
   - "pyproject.toml":
-    approvers:
-      - 10gen/devprod-test-infrastructure
-      - 10gen/devprod-build
-  - "poetry_requirements.txt":
     approvers:
       - 10gen/devprod-test-infrastructure
       - 10gen/devprod-build

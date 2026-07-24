@@ -1,11 +1,10 @@
 import hashlib
 import os
 import pathlib
-import platform
+import re
 import shutil
 import subprocess
 import sys
-import tempfile
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
@@ -14,91 +13,166 @@ from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 MODULES_READY_ENV = "MONGO_BAZEL_WRAPPER_MODULES_READY"
 
+# The wrapper hook's third-party deps are declared as the `wrapper-hook`
+# PEP 735 dependency group in //pyproject.toml — that group is the single
+# source of truth for the package list. Bootstrap is a targeted
+# `uv sync --only-group wrapper-hook`:
+#   --locked   uv.lock must already satisfy pyproject.toml (never rewrite it)
+#   --inexact  additive: never prune packages other groups installed into
+#              the same venv (a bare sync would strip a fully-populated
+#              dev venv down to just this group)
+_UV_SYNC_ARGS = [
+    "sync",
+    "--only-group",
+    "wrapper-hook",
+    "--locked",
+    "--inexact",
+    # `--only-group` already omits the project; this just silences uv's
+    # entry-points warning about the unpackaged root project.
+    "--no-install-project",
+]
 
-def get_deps_dirs(deps):
-    tmp_dir = pathlib.Path(os.environ["Temp"] if platform.system() == "Windows" else "/tmp")
-    bazel_bin = REPO_ROOT / "bazel-bin"
-    for dep in deps:
-        try:
-            for out_dir in [
-                REPO_ROOT / "bazel-out",
-                tmp_dir / "compiledb-out",
-            ]:
-                for child in os.listdir(out_dir):
-                    yield f"{out_dir}/{child}/bin/external/poetry/{dep}", dep
-        except OSError:
-            pass
-        yield f"{bazel_bin}/external/poetry/{dep}", dep
+# Name of the stamp file written into the target venv after a successful
+# bootstrap sync. Contains the sha256 of uv.lock at sync time; when it
+# matches the current uv.lock the sync is skipped entirely, keeping the
+# per-invocation overhead to one small file read.
+_STAMP_NAME = ".wrapper_hook_uv_stamp"
+
+# Cygwin-style path prefix: `/cygdrive/<letter>/...`. Evergreen's Windows
+# hosts run bash steps under Cygwin/Git-Bash and export `$VIRTUAL_ENV`
+# in that form (e.g. `/cygdrive/c/data/mci/0f83/venv`). The wrapper runs
+# under Windows-native Python (`py_host/dist/python.exe`), which needs
+# `C:\data\mci\0f83\venv` to resolve the same path.
+_CYGDRIVE_RE = re.compile(r"^/cygdrive/([a-zA-Z])(/.*)?$")
 
 
-def add_module_to_path(poetry_dir, modules_added):
-    for module in poetry_dir.iterdir():
-        try:
-            entries = list(module.iterdir())
-        except FileNotFoundError:
-            # Entry may be a dangling symlink in the bazel output tree
-            continue
-        for dist_info in entries:
-            if str(dist_info).endswith(".dist-info"):
-                dirname = dist_info.parent
-                module = dirname.name
-                if module not in modules_added:
-                    modules_added.add(module)
-                    sys.path.append(str(dirname))
+def _from_cygwin_path(p):
+    """Translate a Cygwin-style `/cygdrive/<letter>/...` path to native
+    Windows form when we're running under Windows Python. On non-Windows
+    hosts, return the input unchanged.
+    """
+    if os.name != "nt" or not p:
+        return p
+    m = _CYGDRIVE_RE.match(str(p))
+    if not m:
+        return p
+    drive_letter = m.group(1).upper()
+    tail = (m.group(2) or "").replace("/", "\\")
+    return f"{drive_letter}:{tail}"
+
+
+def _target_venv():
+    """The venv the wrapper syncs into and imports from: the active venv
+    pointed at by $VIRTUAL_ENV (Evergreen activates `${workdir}/venv` via
+    `prelude_venv.sh::activate_venv` before invoking bazel), else the
+    workstation `python3-venv` at the repo root.
+
+    A $VIRTUAL_ENV that doesn't actually contain an interpreter (stale env
+    var, venv deleted out from under it) is ignored so the bootstrap and
+    sys.path setup agree on the python3-venv fallback.
+    """
+    active_venv = os.environ.get("VIRTUAL_ENV")
+    if active_venv:
+        venv_root = pathlib.Path(_from_cygwin_path(active_venv))
+        if _venv_python(venv_root).exists():
+            return venv_root
+        wrapper_debug(f"$VIRTUAL_ENV={active_venv} has no interpreter; falling back")
+    return REPO_ROOT / "python3-venv"
+
+
+def _venv_python(venv_root):
+    if os.name == "nt":
+        return venv_root / "Scripts" / "python.exe"
+    return venv_root / "bin" / "python3"
+
+
+def _venv_site_packages(venv_root):
+    """Yield site-packages directories under a venv root, or nothing if
+    `venv_root` isn't a venv-shaped tree.
+
+    Two layouts to handle:
+      - Unix: `<venv>/lib/python<major>.<minor>/site-packages/` (site-packages
+        sits under a per-version subdir).
+      - Windows: `<venv>/Lib/site-packages/` (site-packages sits directly
+        under Lib — no per-version subdir).
+
+    We can't dispatch by testing `.exists()` on `lib` vs `Lib` because
+    Windows is case-insensitive — `venv / "lib"` matches `Lib` on Windows,
+    which would send us down the Unix branch by mistake. Instead we probe
+    for both site-packages patterns unconditionally under the resolved
+    lib dir (matched case-insensitively) and yield whichever exists.
+    """
+    if venv_root is None or not venv_root.exists():
+        return
+
+    lib_dir = venv_root / "lib"
+    if not lib_dir.exists():
+        lib_dir = venv_root / "Lib"
+    if not lib_dir.exists():
+        return
+
+    # Windows layout: site-packages directly under Lib.
+    direct = lib_dir / "site-packages"
+    if direct.exists():
+        yield direct
+
+    # Unix layout: site-packages under pythonX.Y/ subdirs. Both branches
+    # may fire on the rare Unix venv that also has a stray Lib/site-packages
+    # sibling, which is harmless — callers iterate all yielded paths.
+    for entry in lib_dir.iterdir():
+        if entry.name == "site-packages":
+            continue  # Already yielded above.
+        sp = entry / "site-packages"
+        if sp.exists():
+            yield sp
 
 
 def setup_python_path():
-    tmp_dir = pathlib.Path(os.environ["Temp"] if platform.system() == "Windows" else "/tmp")
-    modules_added = set()
+    """Append the target venv's site-packages to sys.path so that
+    subsequent imports in the wrapper hook resolve.
 
-    for out_dir in [
-        REPO_ROOT / "bazel-out",
-        tmp_dir / "compiledb-out",
-    ]:
-        if out_dir.exists():
-            for child in out_dir.iterdir():
-                poetry_dir = child / "bin" / "external" / "poetry"
-                if poetry_dir.exists():
-                    add_module_to_path(poetry_dir, modules_added)
-
-    poetry_dir = REPO_ROOT / "bazel-bin" / "external" / "poetry"
-    if poetry_dir.exists():
-        add_module_to_path(poetry_dir, modules_added)
+    install_modules() guarantees the venv satisfies the `wrapper-hook`
+    dependency group before this runs, so the venv is the only package
+    source needed. Appending (not prepending) keeps the running
+    interpreter's stdlib first.
+    """
+    for sp in _venv_site_packages(_target_venv()):
+        sys.path.append(str(sp))
 
 
-def search_for_modules(deps, deps_installed, lockfile_changed=False):
-    deps_not_found = deps.copy()
-    wrapper_debug(f"deps_installed: {deps_installed}")
-    for target_dir, dep in get_deps_dirs(deps):
-        wrapper_debug(f"checking for {dep} in target_dir: {target_dir}")
-        if dep in deps_installed:
-            continue
-
-        if not pathlib.Path(target_dir).exists():
-            continue
-
-        if not lockfile_changed:
-            for entry in os.listdir(target_dir):
-                if entry.endswith(".dist-info"):
-                    wrapper_debug(f"found: {target_dir}")
-                    deps_installed.append(dep)
-                    deps_not_found.remove(dep)
-                    break
-        else:
-            os.chmod(target_dir, 0o777)
-            for root, dirs, files in os.walk(target_dir):
-                for somedir in dirs:
-                    os.chmod(pathlib.Path(root) / somedir, 0o777)
-                for file in files:
-                    os.chmod(pathlib.Path(root) / file, 0o777)
-            shutil.rmtree(target_dir)
-    wrapper_debug(f"deps_not_found: {deps_not_found}")
-    return deps_not_found
+def _uv_lock_hash():
+    lock_file = REPO_ROOT / "uv.lock"
+    if not lock_file.exists():
+        return None
+    return hashlib.sha256(lock_file.read_bytes()).hexdigest()
 
 
-def skip_cplusplus_toolchain(args):
-    if any("no_c++_toolchain" in arg for arg in args):
-        return True
+def _run_uv_sync(venv_root):
+    """Run the targeted wrapper-hook group sync into `venv_root` with the
+    first available uv. Returns True on success.
+
+    uv candidates, in order:
+      1. The venv's own interpreter's uv module (uv is in the lock's
+         `export` group, so any venv populated by uv_sync.sh/venv_setup.sh
+         has it).
+      2. A `uv` binary on PATH (workstations that installed uv via pipx).
+    """
+    candidates = []
+    venv_py = _venv_python(venv_root)
+    if venv_py.exists():
+        candidates.append([str(venv_py), "-m", "uv"])
+    uv_on_path = shutil.which("uv")
+    if uv_on_path:
+        candidates.append([uv_on_path])
+
+    env = dict(os.environ, UV_PROJECT_ENVIRONMENT=str(venv_root))
+    for uv_cmd in candidates:
+        cmd = uv_cmd + _UV_SYNC_ARGS
+        wrapper_debug(f"wrapper bootstrap: {' '.join(cmd)}")
+        proc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env)
+        if proc.returncode == 0:
+            return True
+        wrapper_debug(f"wrapper bootstrap sync failed (exit {proc.returncode}); trying next uv")
     return False
 
 
@@ -112,8 +186,6 @@ def _reexec_current_python(env_var: str = MODULES_READY_ENV) -> None:
         # before the new process has written it.  subprocess.run keeps the
         # current process alive until the child finishes, so bazel.bat reads
         # the file only after the child has written the correct args.
-        import subprocess
-
         result = subprocess.run([sys.executable, *sys.argv], env=env)
         sys.exit(result.returncode)
     os.execve(sys.executable, [sys.executable, *sys.argv], env)
@@ -130,65 +202,79 @@ def bootstrap_modules(bazel, args):
 
     if install_modules(bazel, args):
         _reexec_current_python()
+    else:
+        setup_python_path()
 
 
 def install_modules(bazel, args):
-    need_to_install = False
-    pwd_hash = hashlib.md5(str(REPO_ROOT).encode()).hexdigest()
-    lockfile_hash_file = pathlib.Path(tempfile.gettempdir()) / f"{pwd_hash}_lockfile_hash"
-    with open(REPO_ROOT / "poetry.lock", "rb") as f:
-        current_hash = hashlib.md5(f.read()).hexdigest()
+    """Ensure the wrapper hook's python deps (the `wrapper-hook` dependency
+    group in //pyproject.toml) are installed in the target venv.
 
-    old_hash = None
-    if lockfile_hash_file.exists():
-        with open(lockfile_hash_file) as f:
-            old_hash = f.read()
+    The check-and-install step is a single idempotent
+    `uv sync --only-group wrapper-hook --locked --inexact`, skipped when a
+    stamp file in the venv already records the current uv.lock hash. If no
+    venv exists at all (fresh host), `buildscripts/uv_sync.sh -f` bootstraps
+    `python3-venv` from scratch (creating the venv, installing pinned uv
+    into it, and running a full `--all-groups` sync, which includes this
+    group).
 
-    if old_hash != current_hash:
-        with open(lockfile_hash_file, "w") as f:
-            f.write(current_hash)
+    Notably, we do NOT try to materialize wheels via
+    `bazel build @pypi//:<pkg>`. That path used to be here (matching the
+    zac/uv-poc pip.parse implementation's approach), but under
+    rules_pycross the wheel_installer.exe launcher fails with
+    STATUS_DLL_NOT_FOUND on Windows exec-config due to a
+    rules_python+Bazel Windows launcher / Python DLL loading issue that
+    we don't own. Routing through uv sidesteps that entire launcher path —
+    uv is a self-contained Rust binary that doesn't need Bazel's py_binary
+    infrastructure — and uniformly works on all three platforms.
 
-    deps = ["retry", "gitpython", "requests", "timeout-decorator", "boto3", "pyyaml", "pymongo"]
-    deps_installed = []
-    deps_needed = search_for_modules(
-        deps, deps_installed, lockfile_changed=old_hash != current_hash
-    )
+    Returns True if the venv was modified (caller must re-exec so the
+    fresh venv is scanned), False if no work was needed.
+    """
+    venv_root = _target_venv()
+    lock_hash = _uv_lock_hash()
+    stamp = venv_root / _STAMP_NAME
 
-    if deps_needed:
-        need_to_install = True
+    if lock_hash is not None and stamp.exists():
+        try:
+            if stamp.read_text(encoding="utf-8").strip() == lock_hash:
+                wrapper_debug("wrapper deps in sync with uv.lock (stamp match); skipping")
+                return False
+        except OSError:
+            pass
 
-    if old_hash != current_hash:
-        need_to_install = True
-        deps_needed = deps
+    if _venv_python(venv_root).exists():
+        synced = _run_uv_sync(venv_root)
+    else:
+        # Fresh host: no venv anywhere. uv_sync.sh -f creates python3-venv,
+        # installs the pinned uv into it, and runs the full sync. Invoke via
+        # bash so this works uniformly on Linux/macOS + Windows (Evergreen
+        # Windows hosts have Git Bash / Cygwin on PATH).
+        wrapper_debug("no venv found; bootstrapping python3-venv via uv_sync.sh -f")
+        uv_sync_sh = REPO_ROOT / "buildscripts" / "uv_sync.sh"
+        if not uv_sync_sh.exists():
+            # This shouldn't happen inside a mongo repo, but if it does — fall
+            # through and let the wrapper's first missing-import fail loudly
+            # with a real ImportError.
+            return False
+        proc = subprocess.run(["bash", str(uv_sync_sh), "-f"], cwd=str(REPO_ROOT))
+        synced = proc.returncode == 0
+        venv_root = _target_venv()
+        stamp = venv_root / _STAMP_NAME
 
-    if need_to_install:
-        cmd = [
-            bazel,
-            "build",
-        ] + ["@poetry//:library_" + dep.replace("-", "_") for dep in deps_needed]
-
-        if skip_cplusplus_toolchain(args):
-            cmd += ["--repo_env=no_c++_toolchain=1"]
-
-        proc = subprocess.run(
-            cmd
-            + [
-                "--remote_download_all",
-                "--bes_backend=",
-                "--bes_results_url=",
-                "--workspace_status_command=",
-            ]
+    if not synced:
+        print(
+            "Warning: failed to sync the `wrapper-hook` dependency group into "
+            f"{venv_root}. The bazel wrapper hook may fail on its next import; "
+            "run `bash buildscripts/uv_sync.sh` to repair the venv.",
+            file=sys.stderr,
         )
-        if proc.returncode != 0:
-            print("Failed to install modules using remote exec/cache, falling back to local...")
-            proc = subprocess.run(
-                cmd
-                + [
-                    "--config=local",
-                ]
-            )
-        deps_missing = search_for_modules(deps_needed, deps_installed)
-        if deps_missing:
-            raise Exception(f"Failed to install python deps {deps_missing}")
-    setup_python_path()
-    return need_to_install
+        return False
+
+    if lock_hash is not None:
+        try:
+            stamp.write_text(lock_hash + "\n", encoding="utf-8")
+        except OSError as exc:
+            wrapper_debug(f"could not write wrapper bootstrap stamp: {exc}")
+
+    return True

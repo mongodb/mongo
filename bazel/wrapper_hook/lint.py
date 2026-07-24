@@ -886,8 +886,8 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     elif existing_python_files:
         lr.run_bazel("//buildscripts:pyrightlint", ["lints"] + existing_python_files)
 
-    if lint_all or "poetry.lock" in files_to_lint or "pyproject.toml" in files_to_lint:
-        lr.run_bazel("//buildscripts:poetry_lock_check")
+    if lint_all or "uv.lock" in files_to_lint or "pyproject.toml" in files_to_lint:
+        lr.run_bazel("//buildscripts:uv_lock_check")
 
     if _should_check_copybara_generated_evergreen(lint_all, files_to_lint):
         lr.check_copybara_generated_evergreen(
@@ -1071,6 +1071,13 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     # Check pass: always run without fix mode to find remaining violations.
     # Runs after the fix pass (if any) so that auto-fixed violations are no longer
     # reported, but unfixable violations still cause a non-zero exit.
+    #
+    # check=True: any bazel-level failure fails lint immediately — a broken
+    # BUILD file in the change under lint, an aspect failure, or an owner
+    # target that is explicitly requested but platform-incompatible on the
+    # running host (e.g. //bazel/wrapper_hook:wrapper_hook on macOS via its
+    # transitive setup_clang_tidy dep). Fail-fast is deliberate: CI should
+    # surface these rather than skip them.
     subprocess.run([bazel_bin, "build"] + args, check=True, stdout=sys.stdout, stderr=sys.stderr)
 
     failing_reports = 0

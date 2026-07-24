@@ -2,6 +2,7 @@
 """
 
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_python//python:py_info.bzl", "PyInfo")
 
 MONGO_TOOLCHAIN_V4_PATH = "/opt/mongodbtoolchain/v4"
 MONGO_TOOLCHAIN_V5_PATH = "external/mongo_toolchain_v5/v5"

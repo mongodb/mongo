@@ -1,0 +1,95 @@
+Support `[tool.uv.sources] pkg = { url = "..." }` in uv.lock
+
+When a package is sourced from a URL (e.g. a GitHub archive tarball),
+uv writes:
+
+    source = { url = "..." }
+    sdist = { hash = "sha256:..." }
+
+Note that `sdist` has no `url` — the URL lives at the source level.
+The stock uv_translator.py assumes every wheel/sdist entry carries a
+`url` or `file` field, so it raises AssertionError:
+
+    File "pycross/private/tools/uv_translator.py", line 121, in parse_file_info
+        raise AssertionError("file entry has no file or url member")
+
+This patch propagates `source.url` into the sdist entry before file
+parsing, so URL-sourced packages resolve the same way PyPI-sourced
+ones do. The tarball's sha256 comes straight from uv.lock — committed
+at `uv lock` time, verified by Bazel's http_file at download time; no
+translation-time network access.
+
+Additionally, URL sources need not have a PEP 517-shaped basename:
+GitHub archive tarballs are named `<sha>.tar.gz`, which
+packaging.utils.parse_sdist_filename rejects. For such URLs the patch
+synthesizes a canonical `<name>-<version>.tar.gz` file name (carried
+via a `_pycross_filename` field honored by parse_file_info). The
+download URL is unchanged — only Bazel-side target/file naming uses
+the synthesized name.
+
+Used for e.g. PyKMIP (mongodb-forks fork consumed as a GitHub archive
+tarball) and the mdb-build-public cryptography wheels.
+
+Applied in mongo repo via `single_version_override(patches=...)` on
+rules_pycross in //MODULE.bazel. Candidate for upstreaming to
+jvolkman/rules_pycross.
+
+--- a/pycross/private/tools/uv_translator.py	2026-07-21 15:01:26
++++ b/pycross/private/tools/uv_translator.py	2026-07-21 15:01:50
+@@ -114,8 +114,15 @@
+         urls = tuple()
+     elif "url" in file_info:
+         url = file_info["url"]
+-        _, file_name = urlparse(url).path.rsplit("/", 1)
+-        file_name = unquote(file_name)
++        if "_pycross_filename" in file_info:
++            # Set for URL sources whose basename isn't a valid
++            # PEP 517 sdist filename (e.g. GitHub /archive/<sha>.tar.gz).
++            # The URL is still downloaded verbatim; this only controls the
++            # local/canonical file name.
++            file_name = file_info["_pycross_filename"]
++        else:
++            _, file_name = urlparse(url).path.rsplit("/", 1)
++            file_name = unquote(file_name)
+         urls = (url,)
+     else:
+         raise AssertionError("file entry has no file or url member")
+@@ -367,9 +374,37 @@
+ 
+             dependencies.add(Requirement(dep_string))
+ 
++        # When a package is sourced via `[tool.uv.sources] pkg = { url = ... }`,
++        # uv writes `source = { url = "..." }` at the package level and
++        # `sdist = { hash = "..." }` without a url (the source URL doubles as
++        # the sdist URL). parse_file_info() below rejects any file entry
++        # without a url; propagate source.url into the sdist entry here so
++        # URL-sourced packages behave the same as PyPI-sourced ones.
++        _source = lock_pkg.get("source", {})
++        _sdist_raw = lock_pkg.get("sdist")
++        if (
++            isinstance(_sdist_raw, dict)
++            and "url" not in _sdist_raw
++            and "file" not in _sdist_raw
++            and isinstance(_source, dict)
++            and isinstance(_source.get("url"), str)
++        ):
++            _sdist_raw = dict(_sdist_raw, url=_source["url"])
++            # URL sources need not have a PEP 517-shaped basename (e.g.
++            # GitHub archive tarballs are named `<sha>.tar.gz`). Downstream
++            # parsing (packaging.utils.parse_sdist_filename) requires
++            # `<name>-<version>.tar.gz`, so synthesize that shape when the
++            # basename doesn't already carry it. The download URL is
++            # unchanged — only the canonical file name differs.
++            _, _url_basename = urlparse(_source["url"]).path.rsplit("/", 1)
++            _expected_prefix = f"{package_name}-{package_version}"
++            if not unquote(_url_basename).lower().startswith(_expected_prefix.lower()):
++                _sdist_raw["_pycross_filename"] = f"{_expected_prefix}.tar.gz"
++            lock_pkg = dict(lock_pkg, sdist=_sdist_raw)
++
+         files = lock_pkg.get("wheels", [])
+         if lock_pkg.get("sdist"):
+-            files.append(lock_pkg.get("sdist"))
++            files.append(_sdist_raw if _sdist_raw is not None else lock_pkg.get("sdist"))
+ 
+         files = {parse_file_info(f) for f in files}
+ 

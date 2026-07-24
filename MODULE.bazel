@@ -88,19 +88,55 @@ single_version_override(
     version = "6.3.0",
 )
 
-bazel_dep(name = "rules_poetry", version = "")
-git_override(
-    module_name = "rules_poetry",
-    commit = "092d43107d13e711ac4ac92050d8b570bcc8ef43",
-    patches = ["//bazel/rules_poetry:rules_poetry.patch"],
-    remote = "https://github.com/mongodb-forks/rules_poetry",
+# rules_pycross reads uv.lock directly and generates Bazel-native targets
+# (http_file for wheels, pycross_wheel_build for sdists). Pinned to 0.8.3,
+# the last stable release before the v2.0 API rework. The hub is named
+# `pypi` (see lock_import.import_uv() further down); callers reference deps
+# as `@pypi//:<pkg>` via the shim in //bazel/uv:defs.bzl.
+#
+# Patches (all upstream-worthy):
+#   uv_translator_url_source: handle url-sourced `[tool.uv.sources]` entries
+#     whose sdist sub-entry has no url field, synthesizing a PEP 517-shaped
+#     file name for URLs (like GitHub /archive/<sha>.tar.gz) whose basename
+#     isn't one. Hashes come from uv.lock — no translation-time fetching.
+#   wheel_library_windows_dll_path: inject Python DLL dir onto action PATH so
+#     wheel_installer.exe's launcher can LoadLibrary python313.dll on Windows.
+#   installer_repo_extract + installer_tools_build: extract the `installer`
+#     wheel at repo-rule time and expose as a py_library instead of via
+#     zipimport (Windows runfiles staging bug).
+#   wheel_build_cargo_home: default CARGO_HOME into the WheelBuild action
+#     sandbox so Rust-backed sdist builds don't reach for an unwritable
+#     $HOME/.cargo (carried over from mongo's old rules_poetry patch; no
+#     current lock entry needs it — insurance for the first one that does).
+#   wheel_build_no_werror: strip -Werror from the toolchain flags forwarded
+#     into sdist builds — third-party build systems aren't held to mongo's
+#     warning policy (clang otherwise fatals on the harmless -L../lib that
+#     python-build-standalone's sysconfig adds to compile lines).
+bazel_dep(name = "rules_pycross", version = "0.8.3")
+single_version_override(
+    module_name = "rules_pycross",
+    patch_strip = 1,
+    patches = [
+        "//bazel/rules_pycross:uv_translator_url_source.patch",
+        "//bazel/rules_pycross:wheel_library_windows_dll_path.patch",
+        "//bazel/rules_pycross:installer_repo_extract.patch",
+        "//bazel/rules_pycross:installer_tools_build.patch",
+        "//bazel/rules_pycross:wheel_build_cargo_home.patch",
+        "//bazel/rules_pycross:wheel_build_no_werror.patch",
+    ],
+    version = "0.8.3",
 )
 
-#
-## We need skylib to be able to use config_setting_group in rule_poetry below
-## https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
+# Required by rules_pycross's wheel-install helpers.
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_pkg", version = "1.2.0")
+single_version_override(
+    module_name = "rules_pkg",
+    patch_strip = 1,
+    patches = ["//bazel/rules_pkg:pkg_zip_windows_dll_path.patch"],
+    version = "1.2.0",
+)
+
 bazel_dep(name = "abseil-cpp", version = "20250512.1", repo_name = "com_google_absl")
 local_path_override(
     module_name = "abseil-cpp",
@@ -174,7 +210,34 @@ local_path_override(
     path = "src/third_party/fuzztest/dist",
 )
 
-bazel_dep(name = "rules_python", version = "1.8.5")
+bazel_dep(name = "rules_python", version = "2.2.0")
+single_version_override(
+    module_name = "rules_python",
+    patch_strip = 1,
+    patches = [
+        # rules_python's ppc64le platform metadata uses legacy "ppc"
+        # identifiers, breaking two things: host-runtime detection (arch
+        # says "ppc", host detection says "ppc64le" -> no
+        # `python_<version>_host` repo -> rules_pycross's use_repo of it
+        # hard-fails module resolution) and the compatible_with constraint
+        # (cpu:ppc, while mongo's platforms declare cpu:ppc64le -> the
+        # pycross per-environment config_settings never match -> every
+        # @pypi wheel select() fails analysis on ppc64le). Upstream-worthy;
+        # see the patch header.
+        "//bazel/rules_python:host_platform_ppc64le.patch",
+        # Windows: under bootstrap_impl=script + venvs_use_declare_symlink=no,
+        # the stage-2 bootstrap recreates the venv at runtime by symlinking
+        # out of runfiles. Two host-dependent failure modes: paths beyond
+        # MAX_PATH (260) when LongPathsEnabled is off (WinError 87/3 —
+        # runfiles venv trees regularly exceed it), and outright symlink
+        # refusal without SeCreateSymbolicLinkPrivilege / Developer Mode
+        # (WinError 1314/87). Use \\?\ extended-length paths and fall
+        # back to copying, like CPython's venv module does. Upstream-worthy;
+        # see the patch header.
+        "//bazel/rules_python:bootstrap_windows_venv_robustness.patch",
+    ],
+    version = "2.2.0",
+)
 
 bazel_dep(name = "buildifier_prebuilt", version = "6.4.0", dev_dependency = True)
 single_version_override(
@@ -551,3 +614,103 @@ spidermonkey_repo(
     sha256_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-sha256sum",
     version_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-version",
 )
+
+###################### PYTHON DEPS (uv + rules_pycross) ######################
+#
+# rules_pycross consumes uv.lock directly and generates Bazel-native targets:
+# every wheel is materialized via `http_file` (remote-cacheable), and any
+# sdist that has to be built becomes a `pycross_wheel_build` action
+# (remote-executable, sandbox-aware — unlike the WORKSPACE-phase `pip install`
+# that rules_python's `whl_library` repository_rule performs).
+#
+# The @pypi hub name is chosen to match the label shape assumed by
+# //bazel/uv:defs.bzl:dependency() — callers reference deps as @pypi//:<pkg>
+# with PEP 503 normalized names (lowercase, `-` separators).
+
+# rules_pycross's `environments.create_for_python_toolchains` extension
+# consumes rules_python's `@python_versions` toolchain repo to enumerate
+# per-platform PEP 425 tags and environment markers. We add a
+# `python.toolchain()` call here PURELY for that metadata — we do NOT
+# register these toolchains. Actual runtime Python selection stays with
+# mongo's own custom python-build-standalone toolchains registered further
+# up in this file (`@py_host`, `@py_linux_*`, `@py_macos_*`,
+# `@py_windows_x86_64`), which take precedence via their explicit
+# `register_toolchains(...)` calls.
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.13")
+
+# `python.defaults()` (rules_python 2.x-only API) sets the default Python
+# version at the root-module level and takes precedence over any
+# `is_default = True` markings from transitive dependencies. Setting it
+# to 3.13 forces both target and exec toolchain resolution to pick 3.13
+# — critical for rules_pycross, whose per-wheel select() gates on
+# `_env_python_3.13_*` config_settings and would otherwise fail under
+# the exec config where transitive deps (grpc/protobuf/rules_pycross
+# itself) push python_version to 3.12.
+python.defaults(python_version = "3.13")
+use_repo(python, "python_versions", "pythons_hub")
+
+# Declare the (platform × python_version) matrix pycross should target.
+# `create_for_python_toolchains` walks @python_versions to emit one
+# `pycross_target_environment` JSON per (platform, version). rules_python's
+# runtime manifest includes s390x/ppc64le entries for 3.13 (host detection
+# on ppc64le additionally needs the host_platform_ppc64le.patch applied
+# above), so this covers every platform mongo builds for.
+environments = use_extension("@rules_pycross//pycross/extensions:environments.bzl", "environments")
+environments.create_for_python_toolchains(
+    name = "mongo_pycross_environments",
+    platforms = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "ppc64le-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+    ],
+)
+use_repo(environments, "mongo_pycross_environments")
+
+lock_import = use_extension("@rules_pycross//pycross/extensions:lock_import.bzl", "lock_import")
+lock_import.import_uv(
+    all_development_groups = True,
+    all_optional_groups = True,
+    # pycross builds sdists WITHOUT pip's build isolation, so PEP 517
+    # backends are not auto-provisioned. Nearly every sdist in this lock
+    # uses a setuptools-based backend (either `setuptools.build_meta`
+    # directly, the `:__legacy__` fallback for setup.py-only packages, or
+    # in-tree wrapper backends like pyyaml's `_pyyaml_pep517` and pyzstd's
+    # `pyzstd_pep517` that import setuptools at load time). Without this
+    # default, every such build fails with:
+    #   BuildBackendException: Backend '<name>' is not available.
+    # setuptools and wheel are pinned in the `compile` dependency group.
+    default_build_dependencies = [
+        "setuptools",
+        "wheel",
+    ],
+    lock_file = "//:uv.lock",
+    project_file = "//:pyproject.toml",
+    repo = "pypi",
+    # `uv lock --static-urls` is required by pycross so each locked package
+    # ships a concrete download URL rather than a URL template. See
+    # buildscripts/uv_sync.sh for the wrapper that enforces this.
+    require_static_urls = True,
+    target_environments = ["@mongo_pycross_environments//:environments"],
+)
+
+# `markdown-it-py` and `mdit-py-plugins` are mutually recursive: the former
+# lists `mdit-py-plugins` as an optional extra dependency, the latter
+# imports from `markdown-it-py`. Bazel refuses to configure a target graph
+# with cycles, so break the edge on the markdown-it-py side (matches what
+# the prior rules_poetry setup did via
+# `poetry(excludes = ["mdit-py-plugins"])` in WORKSPACE.bazel). Callers
+# that need mdit-py-plugins can still depend on it directly.
+lock_import.package(
+    name = "markdown-it-py",
+    ignore_dependencies = ["mdit-py-plugins"],
+    repo = "pypi",
+)
+
+lock_repos = use_extension("@rules_pycross//pycross/extensions:lock_repos.bzl", "lock_repos")
+use_repo(lock_repos, "pypi")
+###################### END PYTHON DEPS ######################

@@ -2,9 +2,10 @@
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:py_info.bzl", "PyInfo")
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 load("//bazel/resmoke:.resmoke_suites_derived.bzl", "SUITE_SELECTORS")
-load("@rules_python//python:defs.bzl", "py_binary")
 
 def _config_fuzz_seed_file_impl(ctx):
     seed_file = ctx.actions.declare_file(ctx.label.name + ".txt")

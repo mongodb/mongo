@@ -4,7 +4,6 @@ version = "1.0.0"
 requires-python = ">=3.13,<4.0"
 description = "MongoDB python dependencies"
 authors = [ { name = "MongoDB" } ]
-package-mode = false
 readme = "README.md"
 # These packages are included as a TODO if we want to run resmoke with pex
 # Currently this does nothing
@@ -18,207 +17,21 @@ packages = [
 ]
 dependencies = [
     "networkx",                               # This is also used as a part of build_metrics so it is sort of required
-    "pyright (==1.1.393)",
-    "flask",
-    "flask-cors",
-    "lxml",
-    "eventlet",
-    "gevent",
-    "progressbar2",
-    "cxxfilt",
-    "pympler",
-    "faker (==37.1.0)",
-    "pymongo (==4.12.0)",
+    "pyright==1.1.393",
+    "faker==37.1.0",
+    "pymongo==4.12.0",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.13,<4.0"
-# OPTIONAL
-# Libdeps depdencies
-networkx = "*"                                    # This is also used as a part of build_metrics so it is sort of required
-flask = { version = "*", optional = true }
-flask-cors = { version = ">=4.0.2", optional = true }
-lxml = { version = "*", optional = true }
-eventlet = { version = "*", optional = true }
-gevent = { version = "*", optional = true }
-progressbar2 = { version = "*", optional = true }
-cxxfilt = { version = "*", optional = true }
-pympler = { version = "*", optional = true }
-pyright = "1.1.393"
-
-[[tool.poetry.source]]
-name = "mdb-build-public"
-url = "https://mdb-build-public.s3.amazonaws.com/rapidyaml_wheels/simple/"
-priority = "explicit"
-
-[tool.poetry.group.aws.dependencies]
-boto3 = "^1.34.156"
-botocore = "^1.34.156"
-
-[tool.poetry.group.build-metrics.dependencies]
-jsonschema = "^4.23.0"
-psutil = "^6.0.0"
-memory-profiler = "^0.61.0"
-puremagic = "^1.26"
-tabulate = "^0.9.0"
-
-[tool.poetry.group.compile.dependencies]
-ct3 = "3.4.0.post5" # Renamed from cheetah3
-packaging = "^25.0"
-regex = "^2024.11.6"
-setuptools = "^80.9.0"
-wheel = "0.45.0"
-
-[tool.poetry.group.core.dependencies]
-psutil = "^6.0.0"
-pymongo = "4.12.0"
-PyYAML = "^6.0.2"
-types-PyYAML = "^6.0.12.20240808"
-requests = "^2.32.3"
-typing-extensions = "^4.12.2"
-typer = "^0.12.3"
-tenacity = "^9.0.0"
-
-# specifically rapidyaml is broken on atlas distros with powercycle.
-# current we exclude this when running poetry install in powercycle.
-# Use the S3 simple index so Poetry can pick a matching wheel or fall back to
-# the sdist when a wheel is unavailable for the current platform.
-[tool.poetry.group.powercycle-incompatible.dependencies]
-rapidyaml = { version = "==0.9.0.post0", source = "mdb-build-public", markers = "python_version == '3.13'" }
-
-[tool.poetry.group.export.dependencies]
-pipx = "1.6.0"
-# TODO: Add in pex as we move forward with this
-# pex = "^2.1.137"
-poetry = "2.0.0"
-
-[tool.poetry.group.evergreen.dependencies]
-click = "^8.1.7"
-inject = "^5.2.1"
-GitPython = "^3.1.43"
-pydantic = "*"
-structlog = "^24.4.0"
-
-[tool.poetry.group.external-auth.dependencies]
-# These are the dependencies of ldaptor
-passlib = "^1.7.4"
-pyOpenSSL = "^25.0.0"
-pyparsing = "^2.4.7"
-service_identity = "^18.1.0"
-twisted = "^26.4.0"
-twisted-iocpsupport = { version = "^1.0.4", markers = "sys_platform == 'win32'" }
-'zope.interface' = "^8.1.1"
-ldaptor = "19.0.0"
-
-[tool.poetry.group.idl.dependencies]
-unittest-xml-reporting = "3.2.0"
-packaging = "^25.0"
-
-[tool.poetry.group.jira-client.dependencies]
-jira = "^3.10.5"
-requests-oauth = "<=0.4.1"
-PyJWT = "^2.12.0"
-# We are omitting pycrypto based on https://github.com/pycontribs/jira/pull/629
-
-[tool.poetry.group.lint.dependencies]
-# Note: These versions are checked by python modules in buildscripts/linter/
-GitPython = "^3.1.7"
-mypy = "^1.11.1"
-structlog = "^24.4.0"
-yamllint = "^1.35.1"
-types-setuptools = "^80.9.0"
-types-requests = "^2.32.0.20240712"
-tqdm = "*"
-colorama = "^0.4.6"
-evergreen-lint = "^0.1.10"
-ruff = "^0.6.7"
-license-expression = "^30.4.4"
-
-[tool.poetry.group.modules_poc.dependencies]
-codeowners = { version = "^0.8.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-progressbar2 = { version = "^4.4.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-textual = {extras = ["syntax"], version = "^3.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-tree-sitter = { version = "^0.24.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-tree-sitter-cpp = { version = "^0.23.4", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-pyzstd = { version =  "^0.16.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-cffi = "^2.0.0"
-
-[tool.poetry.group.platform.dependencies]
-pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
-pywin32 = { version = ">=225", markers = "sys_platform == 'win32'" }
-python-msilib = { version = "^0.5.0", markers = "sys_platform == 'win32' and python_version >= '3.13'" }
-# cryptography 41+ ships a Rust extension and PyPI carries no
-# s390x / ppc64le wheels for it. On those archs we previously fell
-# through to the sdist build, which required a stable-<arch>-unknown-
-# linux-gnu Rust toolchain to be installed on every CI host that ran
-# `poetry install` (rhel83-zseries-small, rhel81-power8-small). To
-# remove that environmental dependency, we host pre-built
-# manylinux_2_28 wheels for both archs in `mdb-build-public` (see
-# `buildscripts/mongo_cryptography_builds/` for the build/upload
-# procedure) and point Poetry's multi-constraint resolution at them
-# via direct URLs. On every other arch we continue to pull the normal
-# cp37-abi3 wheel from PyPI.
-cryptography = [
-    { version = "==44.0.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
-    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl", markers = "platform_machine == 's390x'" },
-    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl", markers = "platform_machine == 'ppc64le'" },
-]
-
-[tool.poetry.group.testing.dependencies]
-bazel-runfiles = "^1.8.3"
-curatorbin = "^1.2.4"
-PyKMIP = {git = "https://github.com/mongodb-forks/PyKMIP.git", rev = "c48cb01635819e478b573e3245ef840a11d78865"}
-kafka-python = "^2.0.2"
-avro-python3 = "^1.10.2"
-evergreen-py = { version = "^3.15.0", python = ">=3.10,<3.14"}
-mock = "^5.1.0"
-shrub-py = "^3.1.4"
-ocspresponder = "^0.5.0"
-flask = "^2.3.3"
-ocspbuilder = "^0.10.2"
-ecdsa = "^0.19.0"
-asn1crypto = "^1.5.1"
-toml = ">=0.10.2,<0.11.0"
-filelock = "^3.18.0"
-numpy = { version = "2.2.6", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-oscrypto = { version = "^1.3.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-
-# Werkzeug is needed for ocsp tests in ocsp_mock.py
-Werkzeug = "<=3.1.6"
-PyGithub = "^1.58"
-urllib3 = "^2.7.0"
-distro = "^1.9.0"
-dnspython = "^2.6.1"
-proxy-protocol = "^0.11.3"
-pkce = "^1.0.3"
-pexpect = "^4.9.0"
-oauthlib = "^3.1.1"
-requests-oauthlib = "^2.0.0"
-packaging = "^25.0"
-protobuf = "5.29.3"
-docker = "^7.1.0"
-mongomock = "^4.1.2"
-pyjwt = "^2.12.0"
-selenium = "^4.23.1"
-geckodriver-autoinstaller = "^0.1.0"
-retry = "^0.9.2"
-gdbmongo = "^0.16.0"
-googleapis-common-protos = "^1.63.2"
-google-api-python-client="^2.19.0"
-google-auth-oauthlib="^1.2.1"
-gcovr = "7.2"
-opentelemetry-api = "*"
-opentelemetry-sdk = "*"
-opentelemetry-exporter-otlp-proto-common = "*"
-opentelemetry-exporter-otlp-proto-grpc = { version = "*", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-opentelemetry-exporter-otlp-proto-http = { version = "*", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
-timeout-decorator = "0.5.0"
-
-# This can be installed with "poetry install -E libdeps"
+# Optional extras. These mirror the prior Poetry `optional = true` entries
+# under [tool.poetry.dependencies] — opt-in for libdeps-graph analysis, not
+# installed by `uv sync --all-groups`. Install with `uv sync --extra libdeps`
+# or `pip install '.[libdeps]'`. Keeping them out of [project.dependencies]
+# avoids forcing an `lxml` sdist build on s390x / ppc64le where the
+# manylinux wheel set doesn't cover cp313.
 [project.optional-dependencies]
 libdeps = [
     "flask",
-    "flask-cors",
+    "flask-cors>=4.0.2",
     "lxml",
     "eventlet",
     "gevent",
@@ -232,11 +45,313 @@ libdeps = [
 [project.scripts]
 resmoke = "buildscripts.resmoke:entrypoint"
 
+# PEP 735 dependency groups. Mirrors the prior [tool.poetry.group.*] layout.
+# Install all groups: `uv sync --all-groups`.
+# Install a single group: `uv sync --only-group lint`.
+# Exclude a group:        `uv sync --all-groups --no-group powercycle-incompatible`.
+[dependency-groups]
+aws = [
+    "boto3>=1.34.156,<2",
+    "botocore>=1.34.156,<2",
+]
+
+# Deps the bazel wrapper hook needs at import time, before any other
+# tooling has run (see bazel/wrapper_hook/install_modules.py). This group
+# is the single source of truth for that list: the wrapper bootstraps
+# itself with `uv sync --only-group wrapper-hook --locked --inexact`.
+# Constraints deliberately mirror the pins these packages carry in their
+# other groups so resolution stays unified.
+wrapper-hook = [
+    "retry>=0.9.2,<1",
+    "GitPython>=3.1.43,<4",
+    "requests>=2.32.3,<3",
+    "timeout-decorator==0.5.0",
+    "boto3>=1.34.156,<2",
+    "PyYAML>=6.0.2,<7",
+    "pymongo==4.12.0",
+]
+
+build-metrics = [
+    "jsonschema>=4.23.0,<5",
+    "psutil>=6.0.0,<7",
+    "memory-profiler>=0.61.0,<0.62",
+    "puremagic>=1.26,<1.27",
+    "tabulate>=0.9.0,<0.10",
+]
+
+compile = [
+    "ct3==3.4.0.post5",                       # Renamed from cheetah3
+    "packaging>=25.0,<26",
+    "regex>=2024.11.6,<2025",
+    "setuptools>=80.9.0,<81",
+    "wheel==0.45.0",
+]
+
+core = [
+    "psutil>=6.0.0,<7",
+    "pymongo==4.12.0",
+    "PyYAML>=6.0.2,<7",
+    "types-PyYAML>=6.0.12.20240808,<7",
+    "requests>=2.32.3,<3",
+    "typing-extensions>=4.12.2,<5",
+    "typer>=0.12.3,<0.13",
+    "tenacity>=9.0.0,<10",
+]
+
+# rapidyaml is broken on atlas distros with powercycle. The powercycle remote
+# bootstrap excludes this group via `uv sync --no-group powercycle-incompatible`.
+# The S3 wheel index is configured under [[tool.uv.index]] below; regenerate
+# it via `buildscripts/mongo_rapidyaml_builds/regenerate_simple_index.py`
+# after publishing new wheels so uv can persist `#sha256=<hex>` hashes into
+# uv.lock (rules_pycross requires them).
+powercycle-incompatible = [
+    "rapidyaml==0.9.0.post0 ; python_version == '3.13'",
+]
+
+export = [
+    "pipx==1.6.0",
+    # TODO: Add in pex as we move forward with this
+    # "pex>=2.1.137,<3",
+    # uv is referenced by buildscripts/uv_lock_check.py via `python -m uv`.
+    # The canonical pin lives at buildscripts/uv_version.txt — all shell
+    # / Docker / Python installers read it directly. TOML can't do
+    # command-substitution, so this string is checked for parity with
+    # uv_version.txt by buildscripts/uv_lock_check.py.
+    "uv==0.11.13",
+]
+
+# bazel_rules_mongo (previously had its own poetry.lock/pyproject.toml). Its
+# BUILD.bazel files reference `@poetry//:<pkg>` which is repo-mapped to the
+# outer workspace's `@pypi` — see the `local_repository(..., repo_mapping=...)`
+# call in //WORKSPACE.bazel. Every dep in this group must therefore also be
+# reachable from the pycross hub, which is automatic since it comes from the
+# same uv.lock.
+bazel_rules_mongo = [
+    "pyyaml>=6.0.2,<7",
+    "retry>=0.9.2,<1",
+    "gitpython>=3.1.44,<4",
+    "requests>=2.32.5,<3",
+    "structlog>=25.5.0,<26",
+]
+
+evergreen = [
+    # click 8.2 changed Parameter.make_metavar()'s signature in a way that
+    # broke typer 0.12.x (the version pinned in the `core` group below).
+    # Cap at <8.2 until typer is bumped to a click-8.2+ compatible release
+    # (typer >= 0.15).
+    "click>=8.1.7,<8.2",
+    "inject>=5.2.1,<6",
+    "GitPython>=3.1.43,<4",
+    "pydantic>=2,<3",
+    # pydantic 2 moved `BaseSettings` into the separate pydantic-settings
+    # package; only buildscripts/client/jiraclient.py imports it.
+    "pydantic-settings>=2,<3",
+    "structlog>=24.4.0,<26",
+    # pathspec is imported directly by buildscripts/validate_commit_message.py
+    # for gitignore-style pattern matching. Previously arrived transitively
+    # via `poetry` (which uses it internally); making it a direct dep here
+    # so the Bazel graph stays honest under pycross now that Poetry itself
+    # has been removed.
+    "pathspec>=0.12,<1",
+]
+
+external-auth = [
+    # Dependencies of ldaptor
+    "passlib>=1.7.4,<2",
+    "pyOpenSSL>=25.0.0,<26",
+    "pyparsing>=2.4.7,<3",
+    "service_identity>=18.1.0,<19",
+    "twisted>=26.4.0,<27",
+    "twisted-iocpsupport>=1.0.4,<2 ; sys_platform == 'win32'",
+    "zope.interface>=8.1.1,<9",
+    "ldaptor==19.0.0",
+]
+
+idl = [
+    # `unittest-xml-reporting` pulls in lxml transitively; lxml ships no
+    # s390x cp313 wheel and its sdist fails to build against RHEL9 s390x's
+    # libxml2 (xmlHashScanner typedef mismatch). XML-format test reports
+    # aren't needed on s390x archive_dist_test; mark it platform-conditional.
+    "unittest-xml-reporting==3.2.0 ; platform_machine != 's390x'",
+    "packaging>=25.0,<26",
+]
+
+jira-client = [
+    "jira>=3.10.5,<4",
+    "requests-oauth<=0.4.1",
+    "PyJWT>=2.12.0,<3",
+    # python-dateutil is imported directly by
+    # buildscripts/monitor_build_status/jira_service.py to parse ISO-8601
+    # datetimes returned by the Jira REST API. Previously arrived
+    # transitively via `jira` under Poetry; making it a direct dep here so
+    # the Bazel graph stays honest under pycross.
+    "python-dateutil>=2.9,<3",
+    # We are omitting pycrypto based on https://github.com/pycontribs/jira/pull/629
+]
+
+lint = [
+    # Note: These versions are checked by python modules in buildscripts/linter/
+    "GitPython>=3.1.7,<4",
+    "mypy>=1.11.1,<2",
+    "structlog>=24.4.0,<26",
+    "yamllint>=1.35.1,<2",
+    "types-setuptools>=80.9.0,<81",
+    "types-requests>=2.32.0.20240712,<3",
+    "tqdm",
+    "colorama>=0.4.6,<0.5",
+    "evergreen-lint>=0.1.10,<0.2",
+    "ruff>=0.6.7,<0.7",
+    "license-expression>=30.4.4,<31",
+]
+
+modules_poc = [
+    "codeowners>=0.8.0,<0.9 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "progressbar2>=4.4.2,<5 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "textual[syntax]>=3.0.0,<4 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "tree-sitter>=0.24.0,<0.25 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "tree-sitter-cpp>=0.23.4,<0.24 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "pyzstd>=0.16.2,<0.17 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "cffi>=2.0.0,<3",
+]
+
+platform = [
+    "pypiwin32>=223 ; sys_platform == 'win32'",
+    "pywin32>=225 ; sys_platform == 'win32'",
+    "python-msilib>=0.5.0,<0.6 ; sys_platform == 'win32' and python_version >= '3.13'",
+    # cryptography 41+ ships a Rust extension and PyPI carries no
+    # s390x / ppc64le wheels for it (only manylinux/musllinux x86_64 +
+    # aarch64 + armv7l). For those archs we host pre-built manylinux_2_28
+    # wheels in mdb-build-public — see [tool.uv.sources] at the bottom of
+    # this file and buildscripts/mongo_cryptography_builds/README.md.
+    # Pinned to ==44.0.2 (rather than >=44.0.2,<45) so the version
+    # uv picks on every platform matches the version of the wheels we've
+    # uploaded; bumping requires rebuilding both s390x and ppc64le wheels
+    # first (see the README).
+    "cryptography==44.0.2",
+]
+
+testing = [
+    "bazel-runfiles>=1.8.3,<2",
+    "curatorbin>=1.2.4,<2",
+    # Pinned to exactly 5.29.3 because `buildscripts/bazel_spawn_pb2.py`
+    # (protoc-generated) hardcodes `_runtime_version.ValidateProtobufRuntimeVersion(5, 29, 3, ...)`
+    # — it validates at import time that the installed protobuf runtime
+    # matches the version protoc used to generate the file. Any other
+    # major version raises. Matches master's pin. Regenerate the _pb2.py
+    # via buildscripts/generate_bazel_spawn_pb2.py if bumping.
+    "protobuf==5.29.3",
+    # Matches master's mongodb-forks/PyKMIP pin. See [tool.uv.sources]
+    # further down for the URL source configuration; rules_pycross's URL
+    # source handling is enabled by the uv_translator_url_source patch
+    # applied in MODULE.bazel.
+    "pykmip",
+    "kafka-python>=2.0.2,<3",
+    "avro-python3>=1.10.2,<2",
+    # evergreen-py upstream caps at python<3.14; project is constrained to
+    # python 3.13 so we only need the marker for forward-compatibility.
+    "evergreen-py>=3.15.0,<4 ; python_version < '3.14'",
+    "mock>=5.1.0,<6",
+    "shrub-py>=3.1.4,<4",
+    "ocspresponder>=0.5.0,<0.6",
+    "flask>=2.3.3,<3",
+    "ocspbuilder>=0.10.2,<0.11",
+    "ecdsa>=0.19.0,<0.20",
+    "asn1crypto>=1.5.1,<2",
+    "toml>=0.10.2,<0.11",
+    "filelock>=3.18.0,<4",
+    "numpy==2.2.6 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "oscrypto>=1.3.0,<2 ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    # Werkzeug is needed for ocsp tests in ocsp_mock.py.
+    "Werkzeug<=3.1.6",
+    "PyGithub>=1.58,<2",
+    "urllib3>=2.7.0,<3",
+    "distro>=1.9.0,<2",
+    "dnspython>=2.6.1,<3",
+    "proxy-protocol>=0.11.3,<0.12",
+    "pkce>=1.0.3,<2",
+    "pexpect>=4.9.0,<5",
+    "oauthlib>=3.1.1,<4",
+    "requests-oauthlib>=2.0.0,<3",
+    "packaging>=25.0,<26",
+    "docker>=7.1.0,<8",
+    "mongomock>=4.1.2,<5",
+    "pyjwt>=2.12.0,<3",
+    "selenium>=4.23.1,<5",
+    "geckodriver-autoinstaller>=0.1.0,<0.2",
+    "retry>=0.9.2,<1",
+    "gdbmongo>=0.16.0,<0.17",
+    "googleapis-common-protos>=1.63.2,<2",
+    "google-api-python-client>=2.19.0,<3",
+    "google-auth-oauthlib>=1.2.1,<2",
+    # `gcovr` pulls in lxml transitively; lxml ships no s390x cp313 wheel
+    # (see the unittest-xml-reporting comment in the idl group). Code-
+    # coverage builds aren't run on s390x, so excluding it there is safe.
+    "gcovr==7.2 ; platform_machine != 's390x'",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-common",
+    "opentelemetry-exporter-otlp-proto-grpc ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "opentelemetry-exporter-otlp-proto-http ; platform_machine != 's390x' and platform_machine != 'ppc64le'",
+    "timeout-decorator==0.5.0",
+]
+
+# ---------------------------------------------------------------------------
+# uv-specific config
+# ---------------------------------------------------------------------------
+
+# This project is the dev/build toolbelt, not a published package. Tell uv not
+# to try to build it (mirrors the prior Poetry `package-mode = false`).
+[tool.uv]
+package = false
+
+# Custom wheel index for rapidyaml. Mirrors the prior
+# [[tool.poetry.source]] entry; `explicit = true` matches `priority = "explicit"`
+# in Poetry — uv will only consult this index for packages that opt in via
+# [tool.uv.sources].
+[[tool.uv.index]]
+name = "mdb-build-public"
+url = "https://mdb-build-public.s3.amazonaws.com/rapidyaml_wheels/simple/"
+explicit = true
+
+[tool.uv.sources]
+rapidyaml = { index = "mdb-build-public" }
+# Match master's Poetry pin (mongodb-forks/PyKMIP @ c48cb016). Declared as a
+# direct URL to the GitHub archive tarball for that rev — rather than a git
+# source — so uv records the tarball's sha256 in uv.lock and rules_pycross
+# (via the uv_translator_url_source patch) can generate a hash-verified
+# http_file for it without any translation-time network fetch. If GitHub
+# ever re-rolls its archive tarballs (changing the bytes), `uv lock` must be
+# re-run to refresh the committed hash; alternatively mirror the sdist to
+# mdb-build-public like the cryptography wheels.
+pykmip = { url = "https://github.com/mongodb-forks/PyKMIP/archive/c48cb01635819e478b573e3245ef840a11d78865.tar.gz" }
+# Pre-built cryptography wheels for s390x / ppc64le. PyPI carries no
+# wheels for those archs and the sdist needs a Rust toolchain that
+# pip.parse's hermetic sandbox can't see — see
+# buildscripts/mongo_cryptography_builds/README.md for the build /
+# upload procedure. uv picks the URL whose marker matches the current
+# platform; on every other arch it falls back to PyPI (where 44.0.2 is
+# available as the standard cp37-abi3 wheel).
+cryptography = [
+    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl", marker = "platform_machine == 's390x'" },
+    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl", marker = "platform_machine == 'ppc64le'" },
+]
+
+# ---------------------------------------------------------------------------
+# Tool-specific config (unchanged from Poetry era)
+# ---------------------------------------------------------------------------
+
 [tool.ruff]
 force-exclude = true
 extend-exclude = [
-    "buildscripts/bazel_spawn_pb2.py",
     "src/third_party",
+    # protoc-generated files. Their `from google.protobuf import X_pb2` lines
+    # look "unused" to static analyzers but are load-order-critical (they
+    # register descriptor types with the global protobuf pool via import-time
+    # side effects), and their formatting is dictated by the protobuf
+    # compiler — not something we should reflow with `ruff format`. Applies
+    # to master's `buildscripts/bazel_spawn_pb2.py` and any future generated
+    # protobuf files anywhere in the tree.
+    "**/*_pb2.py",
 ]
 
 line-length = 100
@@ -274,7 +389,6 @@ include = [
     "src"
 ]
 exclude = [
-    "buildscripts/bazel_spawn_pb2.py",
     "**/third_party/**",
     "**/external/**"
 ]
@@ -328,8 +442,3 @@ reportUnsupportedDunderAll = "error"
 reportUnusedExpression = "error"
 reportWildcardImportFromLibrary = "error"
 reportConstantRedefinition = "none"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"

@@ -1,5 +1,5 @@
 load("//bazel/install_rules:install_rules.bzl", "extensions_with_config")
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel:signing.bzl", "signed_mongo_cc_extension_shared_library")
 

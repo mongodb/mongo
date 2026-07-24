@@ -1,95 +1,92 @@
 # -*- mode: python; -*-
 
-# Try to keep this modules imports minimum and only
+# Try to keep this module's imports minimal and only
 # import python standard modules, because this module
 # should be used for finding such external modules or
 # missing dependencies.
-import re
+import os
+import pathlib
 import subprocess
 import sys
 
+_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 
 class MissingRequirements(Exception):
-    """Raised when when verify_requirements() detects missing requirements."""
+    """Raised when verify_requirements() detects missing requirements."""
 
     pass
 
 
 def verify_requirements(silent: bool = False, executable=sys.executable):
-    """Check if the modules in a pip requirements file are installed.
-    This allows for a more friendly user message with guidance on how to
-    resolve the missing dependencies.
-    Args:
-        requirements_file: path to a pip requirements file.
-        silent: True if the function should print.
+    """Check if the locked Python deps from `uv.lock` are installed in the
+    interpreter pointed at by `executable`. Provides a friendly remediation
+    hint when something is missing or stale.
+
     Raises:
-        MissingRequirements if any requirements are missing
+        MissingRequirements if any requirements are missing or out of date.
     """
 
     def verbose(*args, **kwargs):
         if not silent:
             print(*args, **kwargs)
 
-    def raiseSuggestion(ex, pip_pkg):
-        raise MissingRequirements(
-            f"{ex}\n" f"Try running:\n" f"    {executable} -m pip install {pip_pkg}"
-        ) from ex
+    fix_hint = (
+        f"Detected one or more packages are out of date.\n"
+        f"Try running:\n"
+        f"    buildscripts/uv_sync.sh -p '{executable}'\n"
+    )
 
-    # Import poetry. If this fails then we know the next function will fail.
-    # This is so the user will have an easier time diagnosing the problem
+    # uv ships its own CLI; if it's not importable from this interpreter, the
+    # sync script hasn't been run yet.
     try:
-        import poetry  # noqa: F401
+        import uv  # noqa: F401
     except ModuleNotFoundError:
-        raise MissingRequirements(
-            f"Detected one or more packages are out of date. "
-            f"Try running:\n"
-            f"    buildscripts/poetry_sync.sh -p '{executable}'\n"
-        )
+        raise MissingRequirements(fix_hint)
 
     verbose("Checking required python packages...")
 
+    # `uv sync --check` validates uv's *project environment*, which defaults
+    # to `<repo>/.venv` — NOT the environment `executable` lives in (the
+    # interpreter merely hosts the uv module). Point uv at `executable`'s
+    # own environment via UV_PROJECT_ENVIRONMENT, and anchor project
+    # discovery at the repo root so this works regardless of caller cwd.
+    if executable == sys.executable:
+        env_prefix = sys.prefix
+    else:
+        env_prefix = subprocess.run(
+            [executable, "-c", "import sys; print(sys.prefix)"],
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout.strip()
+
+    # `uv sync --check` exits non-zero when that environment doesn't match
+    # uv.lock. It does not modify the venv. --all-groups + --no-install-
+    # project mirror the install-time invocation in buildscripts/uv_sync.sh.
     try:
-        poetry_dry_run_proc = subprocess.run(
-            [executable, "-m", "poetry", "install", "--no-root", "--sync", "--dry-run"],
+        proc = subprocess.run(
+            [
+                executable,
+                "-m",
+                "uv",
+                "sync",
+                "--locked",
+                "--all-groups",
+                "--no-install-project",
+                "--check",
+            ],
             check=True,
             text=True,
             capture_output=True,
             errors="backslashreplace",
+            cwd=_REPO_ROOT,
+            env=dict(os.environ, UV_PROJECT_ENVIRONMENT=env_prefix),
         )
     except subprocess.CalledProcessError as exc:
-        print("ERROR: poetry packages verification failed.")
+        print("ERROR: uv package verification failed.")
         print(exc.stdout)
         print(exc.stderr)
-        raise MissingRequirements(
-            f"Detected one or more packages are out of date. "
-            f"Try running:\n"
-            f"    buildscripts/poetry_sync.sh -p '{executable}'\n"
-        )
+        raise MissingRequirements(fix_hint)
 
-    # String match should look like the following
-    # Package operations: 2 installs, 3 updates, 0 removals, 165 skipped
-    match = re.search(
-        r"Package operations: (\d+) \w+, (\d+) \w+, (\d+) \w+, (\d+) \w+",
-        poetry_dry_run_proc.stdout,
-    )
-    verbose("Requirements list:")
-    verbose(poetry_dry_run_proc.stdout)
-    installs = int(match[1])
-    updates = int(match[2])
-    removals = int(match[3])
-    if (
-        updates == 1
-        and sys.platform == "win32"
-        and "Updating pywin32" in poetry_dry_run_proc.stdout
-    ):
-        # We have no idea why pywin32 thinks it needs to be updated
-        # We could use some more investigation into this
-        verbose(
-            "Windows detected a single update to pywin32 which is known to be buggy. Continuing."
-        )
-    elif installs + updates + removals > 0:
-        raise MissingRequirements(
-            f"Detected one or more packages are out of date. "
-            f"Try running:\n"
-            f"    buildscripts/poetry_sync.sh -p '{executable}'\n"
-        )
+    verbose(proc.stdout)

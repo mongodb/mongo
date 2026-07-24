@@ -1,6 +1,6 @@
 load("//bazel/install_rules:install_rules.bzl", "extensions_with_config")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel/config:python_genrule.bzl", "python_genrule")
 
 package(default_visibility = ["//visibility:public"])

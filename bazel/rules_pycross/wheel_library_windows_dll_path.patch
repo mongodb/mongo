@@ -1,0 +1,60 @@
+Windows: put the Python toolchain's dist/ directory on PATH for the
+wheel_installer action.
+
+pycross_wheel_library invokes the wheel_installer py_binary via
+ctx.actions.run() with an explicit `env` dict that fully replaces the
+default action env. On Windows, the rules_python 2.x launcher.exe
+LoadLibrary's python313.dll at process start — if the DLL isn't on
+the launcher's DLL search path (which for a Bazel action means the
+action-env PATH), it fails with STATUS_DLL_NOT_FOUND (0xC0000135)
+before main() runs. python313.dll is co-located with python.exe in
+mongo's python-build-standalone toolchain (dist/python.exe +
+dist/python313.dll), so adding the toolchain's interpreter dirname to
+PATH resolves it. No-op on Linux/macOS.
+
+Applied via `single_version_override(patches=[...])` on rules_pycross
+in //MODULE.bazel. Candidate for upstreaming to jvolkman/rules_pycross.
+
+--- a/pycross/private/wheel_library.bzl	2026-07-14 14:22:38
++++ b/pycross/private/wheel_library.bzl	2026-07-14 14:23:57
+@@ -31,16 +31,29 @@
+     for install_exclude_glob in ctx.attr.install_exclude_globs:
+         args.add("--install-exclude-glob", install_exclude_glob)
+ 
++    # Set environment variables to make generated .pyc files reproducible.
++    env = {
++        "SOURCE_DATE_EPOCH": "315532800",
++        "PYTHONHASHSEED": "0",
++    }
++
++    # On Windows, the rules_python 2.x py_binary launcher LoadLibrary's
++    # python313.dll at process start. Put the toolchain's interpreter
++    # directory (where python313.dll lives, co-located with python.exe
++    # in the python-build-standalone layout) on PATH so the loader
++    # finds it. No-op on Linux/macOS.
++    _py = ctx.toolchains["@rules_python//python:toolchain_type"]
++    if _py and _py.py3_runtime and _py.py3_runtime.interpreter:
++        _interp = _py.py3_runtime.interpreter
++        if _interp.basename.endswith(".exe"):
++            env["PATH"] = _interp.dirname
++
+     ctx.actions.run(
+         inputs = inputs,
+         outputs = [out],
+         executable = ctx.executable._tool,
+         arguments = [args],
+-        # Set environment variables to make generated .pyc files reproducible.
+-        env = {
+-            "SOURCE_DATE_EPOCH": "315532800",
+-            "PYTHONHASHSEED": "0",
+-        },
++        env = env,
+         mnemonic = "WheelInstall",
+         progress_message = "Installing %s" % ctx.file.wheel.basename,
+     )
+@@ -130,4 +143,5 @@
+             executable = True,
+         ),
+     },
++    toolchains = ["@rules_python//python:toolchain_type"],
+ )

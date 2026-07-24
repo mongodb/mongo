@@ -29,7 +29,7 @@ flowchart TD
     BaseImage["Base Image<br/>(Bazel RBE Ubuntu)"]
     Toolchain["MongoDB Toolchain<br/>(GCC, Clang, etc.)"]
     Features["Features<br/>- workstation<br/>- git<br/>- bazel<br/>- docker"]
-    PostCreate["Post-Create Commands<br/>- setup poetry<br/>- setup venv<br/>- setup clangd"]
+    PostCreate["Post-Create Commands<br/>- setup uv<br/>- setup venv<br/>- setup clangd"]
 
     VSCode --> Extension
     Extension -->|reads| DevContainer
@@ -348,7 +348,7 @@ features/workstation/
 
 2. **Runs setup script** that installs:
    - pipx (Python package installer)
-   - poetry (dependency manager)
+   - uv (Python dependency manager)
    - db-contrib-tool (MongoDB contribution tool)
    - clangd configuration
    - GDB pretty printers for Boost
@@ -449,7 +449,7 @@ After the container starts, several commands run to finalize setup:
 ```json
 "postCreateCommand": {
   "fixVolumePerms": "sudo chown -R $(whoami): ${containerEnv:HOME}/.config/engflow_auth && sudo chown -R $(whoami): ${containerEnv:HOME}/.cache",
-  "venvActivation": "echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.bashrc && echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.zshrc;",
+  "venvActivation": "echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/uv_sync.sh' >> ~/.bashrc && echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/uv_sync.sh' >> ~/.zshrc;",
   "createDataDir": "sudo mkdir -p /data/db && sudo chown -R $(whoami): /data/db",
   "reportDockerServerPlatform": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_platform=$(docker version --format '\"{{.Server.Platform.Name}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
   "reportDockerServerVersion": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_version=$(docker version --format '\"{{.Server.Version}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
@@ -482,12 +482,14 @@ The `setup.sh` script then:
 
 1. Sets up Bash profile
 2. Installs pipx
-3. Installs poetry via pipx
+3. Installs uv via pipx
 4. Installs db-contrib-tool
 5. Builds clangd configuration
 6. Sets up GDB pretty printers
 7. Creates Python virtual environment
-8. Runs `poetry install` to install all dependencies
+8. Runs `uv sync --locked --all-groups --no-install-project` (targeted at the venv via
+   `UV_PROJECT_ENVIRONMENT` — a bare `uv sync` would install into `.venv` instead) to install all
+   dependencies
 
 ## Environment Variables
 
@@ -542,7 +544,7 @@ This sets:
 2. Install feature dependencies
 3. Fix volume permissions
 4. Setup Bash/Zsh
-5. Install Python tools (pipx, poetry, db-contrib-tool)
+5. Install Python tools (pipx, uv, db-contrib-tool)
 6. Build clangd config
 7. Setup GDB
 8. Create Python venv

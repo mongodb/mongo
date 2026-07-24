@@ -1,0 +1,72 @@
+Windows fix: rules_pkg pkg_zip PackageZip action needs Python DLL dir on PATH.
+
+rules_pkg 1.2.0's pkg_zip_impl invokes the build_zip py_binary with
+use_default_shell_env=True plus a small hardcoded env dict:
+
+    env = {"LANG": ..., "LC_CTYPE": ..., "PYTHONIOENCODING": ..., "PYTHONUTF8": ...}
+    use_default_shell_env = True
+
+On Windows this results in an action PATH curated by Bazel that omits
+the Python toolchain's directory (where python313.dll lives). The
+rules_python 2.x py_binary launcher.exe LoadLibrary's python313.dll at
+process start and exits with STATUS_DLL_NOT_FOUND (0xC0000135) before
+main() runs. Symptom: `PackageZip dist-test-stripped.zip failed:
+(Exit -1073741515)` when Bazel packages an archive on Windows CI.
+
+Fix: inject env["PATH"] = ctx.toolchains["@rules_python//python:toolchain_type"]
+    .py3_runtime.interpreter.dirname on Windows. Overrides the shell PATH
+Bazel would otherwise provide; no-op on Linux/macOS
+(interpreter.basename doesn't end in .exe).
+
+Applied via `single_version_override(patches=...)` on rules_pkg in
+//MODULE.bazel. Candidate for upstreaming to bazelbuild/rules_pkg.
+
+--- a/pkg/private/zip/zip.bzl	2026-07-14 23:02:54
++++ b/pkg/private/zip/zip.bzl	2026-07-14 23:06:33
+@@ -65,18 +65,32 @@
+ 
+     all_inputs = depset(direct = inputs, transitive = mapping_context.file_deps)
+ 
++    _env = {
++        "LANG": "en_US.UTF-8",
++        "LC_CTYPE": "UTF-8",
++        "PYTHONIOENCODING": "UTF-8",
++        "PYTHONUTF8": "1",
++    }
++
++    # Windows fix: rules_python 2.x py_binary launcher.exe LoadLibrary's
++    # python313.dll at process start. use_default_shell_env below gives the
++    # action a Bazel-curated PATH that doesn't include the Python toolchain
++    # directory (where python313.dll lives, co-located with python.exe in
++    # python-build-standalone). Override PATH here so the launcher finds
++    # the DLL. No-op on Linux/macOS.
++    _py = ctx.toolchains["@rules_python//python:toolchain_type"]
++    if _py and _py.py3_runtime and _py.py3_runtime.interpreter:
++        _interp = _py.py3_runtime.interpreter
++        if _interp.basename.endswith(".exe"):
++            _env["PATH"] = _interp.dirname
++
+     ctx.actions.run(
+         mnemonic = "PackageZip",
+         inputs = all_inputs,
+         executable = ctx.executable._build_zip,
+         arguments = [args],
+         outputs = [output_file],
+-        env = {
+-            "LANG": "en_US.UTF-8",
+-            "LC_CTYPE": "UTF-8",
+-            "PYTHONIOENCODING": "UTF-8",
+-            "PYTHONUTF8": "1",
+-        },
++        env = _env,
+         use_default_shell_env = True,
+     )
+     return [
+@@ -88,6 +102,7 @@
+ 
+ pkg_zip_impl = rule(
+     implementation = _pkg_zip_impl,
++    toolchains = ["@rules_python//python:toolchain_type"],
+     # @unsorted-dict-items
+     attrs = {
+         "srcs": attr.label_list(

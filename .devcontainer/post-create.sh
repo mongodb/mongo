@@ -137,7 +137,6 @@ fi
 echo "Creating Python virtual environment..."
 venv_created=false
 if [ ! -d "${WORKSPACE_FOLDER}/python3-venv/bin" ]; then
-    export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
     /opt/mongodbtoolchain/v5/bin/python3.13 -m venv "${WORKSPACE_FOLDER}/python3-venv"
     venv_created=true
 
@@ -146,11 +145,13 @@ if [ ! -d "${WORKSPACE_FOLDER}/python3-venv/bin" ]; then
     source "${WORKSPACE_FOLDER}/python3-venv/bin/activate"
     set -o nounset
 
-    if command -v poetry &>/dev/null; then
-        POETRY_VIRTUALENVS_IN_PROJECT=true poetry install --no-root --sync
+    if command -v uv &>/dev/null; then
+        # UV_PROJECT_ENVIRONMENT is required: uv ignores $VIRTUAL_ENV for
+        # project commands and would otherwise sync into `<repo>/.venv`.
+        UV_PROJECT_ENVIRONMENT="${WORKSPACE_FOLDER}/python3-venv" uv sync --locked --all-groups --no-install-project
         echo "[OK] Python virtual environment created and dependencies installed"
     else
-        echo "Warning: poetry not available, skipping dependency installation"
+        echo "Warning: uv not available, skipping dependency installation"
     fi
 
     set +o nounset
@@ -258,11 +259,11 @@ echo "Syncing Python dependencies..."
 if [ -f "${WORKSPACE_FOLDER}/python3-venv/bin/activate" ]; then
     # Only run sync if venv was just created OR if we're updating an existing one
     if [ "${venv_created}" = true ]; then
-        echo "Info: Skipping sync for newly created venv (already installed via poetry)"
+        echo "Info: Skipping sync for newly created venv (already installed via uv)"
     else
         source "${WORKSPACE_FOLDER}/python3-venv/bin/activate"
 
-        if "${WORKSPACE_FOLDER}/buildscripts/poetry_sync.sh"; then
+        if "${WORKSPACE_FOLDER}/buildscripts/uv_sync.sh"; then
             echo "[OK] Python dependencies synced successfully"
         else
             echo "Warning: Failed to sync Python dependencies"

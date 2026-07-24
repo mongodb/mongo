@@ -1,4 +1,4 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel:mongo_src_rules.bzl", "TCMALLOC_DEPS", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test_deprecated", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library", "windows_rc")
 load("//bazel/config:render_template.bzl", "render_template")
 

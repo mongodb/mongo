@@ -1,4 +1,5 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("@rules_python//python:py_info.bzl", "PyInfo")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel/config:render_template.bzl", "render_template")
 
 def _generate_certificates(ctx):

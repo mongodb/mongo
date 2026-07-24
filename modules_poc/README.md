@@ -122,7 +122,7 @@ Documentation for individual `MONGO_MOD_*` tags is present in
 This will build the `merged_decls.json` file in the current directory:
 
 ```bash
-buildscripts/poetry_sync.sh # make sure the python env has the right packages installed
+buildscripts/uv_sync.sh # make sure the python env has the right packages installed
 python modules_poc/merge_decls.py
 ```
 

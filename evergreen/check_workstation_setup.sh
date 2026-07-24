@@ -11,10 +11,10 @@ else
     failed_setup=true
 fi
 
-if command -v poetry &>/dev/null; then
-    echo "'poetry' command exists"
+if command -v uv &>/dev/null; then
+    echo "'uv' command exists"
 else
-    echo "poetry command not found - failed setup"
+    echo "uv command not found - failed setup"
     failed_setup=true
 fi
 

@@ -1,6 +1,7 @@
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
+load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
 load("//bazel:utils.bzl", "write_target")
 
 def generate_config_header_impl(ctx):
@@ -103,6 +104,10 @@ def generate_config_header_impl(ctx):
                         "--env-vars",
                         json.encode(env_flags | {"SDKROOT": ctx.attr._sdkroot[sdkroot_provider].path}),
                     ],
+        # Windows-only: put the Python toolchain's dist/ dir on PATH so the
+        # py_binary launcher.exe can LoadLibrary python313.dll at start.
+        # No-op on Linux/macOS.
+        env = py_action_env_windows_dll_path(ctx),
     )
 
     return [DefaultInfo(files = depset([ctx.outputs.output]))]

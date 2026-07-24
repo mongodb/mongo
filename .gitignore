@@ -234,6 +234,9 @@ codereview.rc
 python-venv*
 python3-venv*
 python2-venv*
+# uv's default project environment (created if uv sync runs without
+# UV_PROJECT_ENVIRONMENT / --active)
+.venv/
 
 # Generated resmoke configuration file
 resmoke.ini

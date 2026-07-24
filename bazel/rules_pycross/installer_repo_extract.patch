@@ -1,0 +1,45 @@
+Windows fix step 1: extract installer wheel at repo-rule time.
+
+See installer_tools_build.patch for the corresponding tools/BUILD.bazel
+change. Split into two patch files because Bazel's ctx.patch is strict
+about multi-file diff separation.
+
+--- a/pycross/private/internal_repo.bzl	2026-07-14 16:00:15
++++ b/pycross/private/internal_repo.bzl	2026-07-14 20:08:32
+@@ -159,6 +159,36 @@
+     else:
+         create_venv(rctx, python_executable, venv_path, [pycross_path] + wheel_paths)
+ 
++
++    # Windows fix: extract the installer wheel at repo-rule time so it can
++    # be exposed as a normal py_library rather than via
++    # pycross_wheel_zipimport_library. On Windows, the zipimport approach
++    # fails at wheel_installer.exe runtime with
++    # `ModuleNotFoundError: No module named 'installer'` because the .whl
++    # file isn't reliably staged in the runfiles tree on that platform.
++    # Extracting at repo-rule time and using a py_library sidesteps the
++    # issue on all platforms.
++    _installer_whl_label = None
++    for _label, _name in rctx.attr.wheels.items():
++        if _name.startswith("installer-"):
++            _installer_whl_label = _label
++            break
++    if _installer_whl_label:
++        # rctx.extract requires a known archive suffix; wheels are zip files
++        # but named .whl, so symlink to a .zip name first.
++        _installer_zip = rctx.path("_installer_source.zip")
++        rctx.symlink(rctx.path(_installer_whl_label), _installer_zip)
++        rctx.extract(archive = _installer_zip, output = "_installer_extracted")
++        rctx.file("_installer_extracted/BUILD.bazel", """load("@rules_python//python:defs.bzl", "py_library")
++
++py_library(
++    name = "installer",
++    srcs = glob(["installer/**/*.py"]),
++    imports = ["."],
++    visibility = ["//visibility:public"],
++)
++""")
++
+     # All deps
+     rctx.file(
+         "deps/BUILD.bazel",

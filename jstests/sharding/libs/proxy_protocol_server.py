@@ -5,8 +5,8 @@ Python script to interact with proxy protocol server.
 This script is a wrapper around the [proxy-protocol][1] package.
 The most recent source code is available on [GitHub][2].
 
-The installed version is listed in the
-"[tool.poetry.group.testing.dependencies]" section of `pyproject.toml`.
+The installed version is listed in the `[dependency-groups]` "testing"
+section of `pyproject.toml`.
 
 This wrapper adds two patches:
 1. Logs "Now listening on [...]" when the server is ready

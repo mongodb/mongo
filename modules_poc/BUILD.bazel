@@ -1,5 +1,19 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary")
+
+# pyzstd has no s390x/ppc64le wheels and its sdist uses an in-tree PEP 517
+# build backend (pyzstd_pep517) that pycross can't invoke. Consumer .py
+# code already handles pyzstd being unavailable at runtime (falls back to
+# pigz / uncompressed). Drop the Bazel-level dep on those platforms.
+_PYZSTD_DEP = select({
+    "//bazel/config:ppc_or_s390x": [],
+    "//conditions:default": [
+        dependency(
+            "pyzstd",
+            group = "modules_poc",
+        ),
+    ],
+})
 
 py_binary(
     name = "mod_scanner",
@@ -32,11 +46,7 @@ py_binary(
             "codeowners",
             group = "modules_poc",
         ),
-        dependency(
-            "pyzstd",
-            group = "modules_poc",
-        ),
-    ],
+    ] + _PYZSTD_DEP,
 )
 
 py_binary(
@@ -50,14 +60,10 @@ py_binary(
             group = "core",
         ),
         dependency(
-            "pyzstd",
-            group = "modules_poc",
-        ),
-        dependency(
             "progressbar2",
             group = "modules_poc",
         ),
-    ],
+    ] + _PYZSTD_DEP,
 )
 
 py_binary(

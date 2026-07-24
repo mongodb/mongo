@@ -141,7 +141,11 @@ RUN /opt/mongodbtoolchain/v5/bin/python3.13 -m venv /tmp/pipx-venv && \
 # Install db-contrib-tool using pipx
 RUN /home/${USERNAME}/.local/bin/pipx install db-contrib-tool
 
-# Install poetry with pinned dependencies
-COPY --chown=${USERNAME}:${USERNAME} poetry_requirements.txt /tmp/poetry_requirements.txt
-RUN /home/${USERNAME}/.local/bin/pipx install poetry --pip-args="-r /tmp/poetry_requirements.txt" && \
-  rm /tmp/poetry_requirements.txt
+# Install uv (pinned). uv is the dependency manager for the top-level
+# Python deps; version comes from buildscripts/uv_version.txt so all
+# uv installers in the repo (venv_setup.sh, uv_sync.sh, this Dockerfile,
+# antithesis workload Dockerfile, powercycle bootstrap) resolve to the
+# same pin. `--mount=type=bind` reads the version file at build time
+# without leaving it in the final image layer.
+RUN --mount=type=bind,source=buildscripts/uv_version.txt,target=/tmp/uv_version.txt \
+    /home/${USERNAME}/.local/bin/pipx install "uv==$(cat /tmp/uv_version.txt)"

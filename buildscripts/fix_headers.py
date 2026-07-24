@@ -6,7 +6,7 @@
 5. Print report with targets and buildozer commands to fix each one.
 """
 
-# TODO(SERVER-94780) Add buildozer dep to poetry
+# TODO(SERVER-94780) Add buildozer dep to pyproject.toml
 import json
 import os
 import pprint

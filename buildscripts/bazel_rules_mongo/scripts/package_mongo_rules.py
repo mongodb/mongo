@@ -4,7 +4,6 @@ import pathlib
 import shutil
 import tarfile
 
-import toml
 import typer
 import yaml
 
@@ -57,9 +56,12 @@ def get_sha256(file_path: str) -> str:
 
 
 def get_current_version():
-    toml_path = os.path.join(RULE_ROOT, "pyproject.toml")
-    data = toml.load(toml_path)
-    return data["tool"]["poetry"]["version"]
+    # The version used to live in this package's pyproject.toml, which was
+    # removed when its python deps were folded into the top-level uv-managed
+    # pyproject.toml (as the `bazel_rules_mongo` dependency group).
+    version_path = os.path.join(RULE_ROOT, "version.txt")
+    with open(version_path, encoding="utf-8") as f:
+        return f.read().strip()
 
 
 app = typer.Typer(pretty_exceptions_show_locals=False)

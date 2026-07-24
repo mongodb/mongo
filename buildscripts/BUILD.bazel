@@ -1,4 +1,4 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@npm//:eslint/package_json.bzl", "bin")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
@@ -273,11 +273,6 @@ sh_binary(
 )
 
 sh_binary(
-    name = "poetry_sync",
-    srcs = ["poetry_sync.sh"],
-)
-
-sh_binary(
     name = "wt_dump_catalog",
     srcs = ["wt_dump_catalog_main.sh"],
     data = ["wt_functions.sh"],
@@ -442,15 +437,22 @@ py_binary(
 )
 
 py_binary(
-    name = "poetry_lock_check",
-    srcs = ["poetry_lock_check.py"],
+    name = "uv_lock_check",
+    srcs = ["uv_lock_check.py"],
     visibility = ["//visibility:public"],
     deps = [
         dependency(
-            "poetry",
+            "uv",
             group = "export",
         ),
     ],
+)
+
+sh_binary(
+    name = "uv_sync",
+    srcs = ["uv_sync.sh"],
+    data = ["uv_version.txt"],
+    visibility = ["//visibility:public"],
 )
 
 py_binary(
@@ -531,14 +533,24 @@ py_binary(
     srcs = ["archive_artifacts.py"],
     deps = [
         dependency(
-            "pyzstd",
-            group = "modules_poc",
-        ),
-        dependency(
             "cffi",
             group = "modules_poc",
         ),
-    ],
+    ] + select({
+        # pyzstd has no s390x/ppc64le wheels and its sdist uses an
+        # in-tree PEP 517 build backend (pyzstd_pep517) that pycross
+        # can't invoke. archive_artifacts.py already handles pyzstd
+        # being unavailable at runtime (`try: from pyzstd ... except: pass`
+        # → falls back to pigz), so drop the Bazel-level dep on those
+        # platforms rather than fail the build.
+        "//bazel/config:ppc_or_s390x": [],
+        "//conditions:default": [
+            dependency(
+                "pyzstd",
+                group = "modules_poc",
+            ),
+        ],
+    }),
 )
 
 py_library(
@@ -906,7 +918,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "@bazel_rules_mongo//utils:evergreen_git",
-        "@poetry//:library_pathspec",
+        "@pypi//:pathspec",
         dependency(
             "requests",
             group = "core",

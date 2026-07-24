@@ -107,7 +107,7 @@ compelling use case for this.
 ## What tooling exists to help me?
 
 Note that all tooling should be run from within a properly set-up python virtual environment. This
-includes running `buildscripts/poetry_sync.sh` to ensure you have the correct dependencies.
+includes running `buildscripts/uv_sync.sh` to ensure you have the correct dependencies.
 
 ### The scanner and merger
 
@@ -191,7 +191,7 @@ should run a rescan prior to running this tool.
 The general workflow for each PR will generally be the same:
 
 1. Ensure that you are in a python virtualenv, creating one if needed, and run
-   `buildscripts/poetry_sync.sh` to update python deps.
+   `buildscripts/uv_sync.sh` to update python deps.
 2. Run [the merger](#the-scanner-and-merger) to scan the code base: `modules_poc/merge_decls.py`
 3. Mark some headers
 4. Rerun the merger to ensure that there are no violations, and update `merged_decls.json`

@@ -118,19 +118,12 @@ load("@rules_coverity//coverity:repositories.bzl", "rules_coverity_toolchains")
 
 rules_coverity_toolchains()
 
-load("@rules_poetry//rules_poetry:poetry.bzl", "poetry")
-
-poetry(
-    name = "poetry",
-    excludes = [
-        "mdit-py-plugins",  # plugins for markdown-it-py. Introduces an optional circular dependency that bazel does not like.
-    ],
-    lockfile = "//:poetry.lock",
-    pyproject = "//:pyproject.toml",
-    python_interpreter_target_default = "@py_host//:dist/bin/python3",
-    python_interpreter_target_mac = "@py_host//:dist/bin/python3",
-    python_interpreter_target_win = "@py_host//:dist/python.exe",
-)
+# Note: The prior `poetry(name = "poetry", ...)` block that lived here has
+# been removed as part of the Poetry -> uv migration. Python dependencies
+# are now sourced from //:uv.lock via rules_pycross's `lock_import.import_uv`
+# extension in //MODULE.bazel — see the PYTHON DEPS block near the end of
+# that file. Callers reference deps as `@pypi//<pkg>` through the shim in
+# //bazel/uv:defs.bzl.
 
 load("@aspect_rules_js//js:toolchains.bzl", "DEFAULT_NODE_VERSION", "rules_js_register_toolchains")
 
@@ -184,10 +177,18 @@ filegroup(
     path = "mongot-localdev",
 )
 
+# bazel_rules_mongo used to declare its own poetry.lock / pyproject.toml and
+# was wired through a `@poetry_bazel_rules_mongo` hub via repo_mapping. Under
+# the uv migration, its 6 python deps (pyyaml, retry, gitpython, requests,
+# structlog) have been merged into the top-level pyproject.toml as the
+# `bazel_rules_mongo` PEP 735 dependency group. That way we have a single
+# uv.lock (and therefore a single pycross hub, `@pypi`), and the sub-repo's
+# BUILD.bazel files can reference deps as `@pypi//<pkg>` via the same
+# `repo_mapping` mechanism.
 local_repository(
     name = "bazel_rules_mongo",
     path = "buildscripts/bazel_rules_mongo",
-    repo_mapping = {"@poetry": "@poetry_bazel_rules_mongo"},
+    repo_mapping = {"@poetry": "@pypi"},
 )
 
 load("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator")
@@ -197,15 +198,6 @@ codeowners_validator()
 load("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary")
 
 codeowners_binary()
-
-poetry(
-    name = "poetry_bazel_rules_mongo",
-    lockfile = "@bazel_rules_mongo//:poetry.lock",
-    pyproject = "@bazel_rules_mongo//:pyproject.toml",
-    python_interpreter_target_default = "@py_host//:dist/bin/python3",
-    python_interpreter_target_mac = "@py_host//:dist/bin/python3",
-    python_interpreter_target_win = "@py_host//:dist/python.exe",
-)
 
 load("//bazel/format:shfmt.bzl", "shfmt")
 

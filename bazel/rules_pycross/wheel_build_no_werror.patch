@@ -1,0 +1,56 @@
+Don't inherit the workspace's -Werror into third-party sdist builds.
+
+pycross_wheel_build forwards the resolved C/C++ toolchain flags into
+the wheel build's sysconfig (CC/CFLAGS/CXXFLAGS...), which includes
+whatever copts the workspace compiles its own code with. A workspace
+-Werror policy routinely breaks foreign build systems it was never
+meant to govern. Concretely, with a clang toolchain:
+
+    clang: error: argument unused during compilation: '-L../lib'
+    [-Werror,-Wunused-command-line-argument]
+
+where the harmless `-L../lib` comes from python-build-standalone's
+sysconfig contribution to extension compile lines — failing every
+C-extension sdist build (psutil, zope-interface, tree-sitter*, ...).
+
+Strip `-Werror` and `-Werror=<warning>` from the CFLAGS/CXXFLAGS
+handed to wheel builds; all other flags (defines, sysroot, -std,
+optimization level) pass through unchanged. Third-party sdists are
+not the workspace's code and shouldn't be held to its warning policy.
+
+Applied via `single_version_override(patches=...)` on rules_pycross in
+//MODULE.bazel. Candidate for upstreaming to jvolkman/rules_pycross.
+
+--- a/pycross/private/wheel_build.bzl	2026-07-24 12:57:33
++++ b/pycross/private/wheel_build.bzl	2026-07-24 12:57:33
+@@ -33,6 +33,19 @@
+ def _join_flags_list(workspace_name, flags):
+     return " ".join([absolutize_path_in_str(workspace_name, "$$EXT_BUILD_ROOT$$/", flag) for flag in flags])
+ 
++def _drop_werror(flag_list):
++    """Third-party sdist builds shouldn't inherit the workspace's -Werror.
++
++    The C/C++ toolchain flags forwarded into wheel builds include whatever
++    copts the workspace compiles its own code with. Warning-as-error
++    policies routinely break foreign build systems — e.g. clang's
++    -Wunused-command-line-argument fires on the harmless `-L../lib` that
++    python-build-standalone's sysconfig contributes to extension compile
++    lines, turning every C-extension sdist build into a hard failure.
++    Keep all other flags (defines, sysroot, -std, optimization) intact.
++    """
++    return [f for f in flag_list if f != "-Werror" and not f.startswith("-Werror=")]
++
+ def _get_sysconfig_data(workspace_name, tools, flags):
+     cc = _absolute_tool_value(workspace_name, tools.cc)
+     cxx = _absolute_tool_value(workspace_name, tools.cxx)
+@@ -47,8 +60,8 @@
+     vars = {
+         "CC": cc,
+         "CXX": cxx,
+-        "CFLAGS": _join_flags_list(workspace_name, flags.cc),
+-        "CXXFLAGS": _join_flags_list(workspace_name, flags.cxx),
++        "CFLAGS": _join_flags_list(workspace_name, _drop_werror(flags.cc)),
++        "CXXFLAGS": _join_flags_list(workspace_name, _drop_werror(flags.cxx)),
+         "CCSHARED": "-fPIC" if flags.needs_pic_for_dynamic_libraries else "",
+         "LDSHAREDFLAGS": _join_flags_list(workspace_name, flags.cxx_linker_shared),
+         "AR": ar,

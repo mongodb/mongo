@@ -1,4 +1,4 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 

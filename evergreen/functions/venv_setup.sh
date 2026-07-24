@@ -13,36 +13,32 @@ if [ -d "$venv_dir" ] && [ -z "${FORCE_CREATE:-}" ]; then
     exit 0
 fi
 
-# We create a venv for poetry
-# We cannot install poetry into the same virtual environment as the rest of our tools
-# If there is a conflict between poetry and our other deps windows fails to upgrade the package
-# See issue SERVER-80781
-POETRY_VENV="${workdir}/poetry_venv"
-if [ "Windows_NT" = "$OS" ]; then
-    POETRY_VENV_PYTHON="$POETRY_VENV/Scripts/python.exe"
-else
-    POETRY_VENV_PYTHON="$POETRY_VENV/bin/python3"
-fi
-"$python_loc" -m venv "$POETRY_VENV"
+# uv version pin — canonical source is buildscripts/uv_version.txt. Kept in
+# lockstep across every uv installer in the repo (uv_sync.sh, set_up_workstation.sh,
+# Dockerfiles, powercycle bootstrap, pyproject.toml `export` group).
+UV_VERSION="$(cat "$evergreen_dir/../buildscripts/uv_version.txt")"
 
-# Loop 5 times to retry the poetry install
-# We have seen weird network errors that can sometimes mess up the pip install
-# By retrying we would like to only see errors that happen consistently
-poetry_dir="${workdir}/poetry_dir"
-mkdir -p $poetry_dir
-export POETRY_CONFIG_DIR="$poetry_dir/config"
-export POETRY_DATA_DIR="$poetry_dir/data"
-export POETRY_CACHE_DIR="$poetry_dir/cache"
-export PIP_CACHE_DIR="$poetry_dir/pip_cache"
-pushd src
+# Standalone venv that holds the `uv` binary. We keep it separate from the
+# main venv so that the dependency installer is not itself a managed dep —
+# this mirrors the prior split between `$POETRY_VENV` and `$venv_dir`.
+UV_VENV="${workdir}/uv_venv"
+if [ "Windows_NT" = "$OS" ]; then
+    UV_VENV_PYTHON="$UV_VENV/Scripts/python.exe"
+else
+    UV_VENV_PYTHON="$UV_VENV/bin/python3"
+fi
+"$python_loc" -m venv "$UV_VENV"
+
+# Loop 5 times to retry the uv install — we have seen weird network errors
+# that can sometimes mess up the pip install. By retrying we would like to
+# only see errors that happen consistently.
 for i in {1..5}; do
-    $POETRY_VENV_PYTHON -m pip install -r poetry_requirements.txt && RET=0 && break || RET=$? && sleep 1
-    echo "Python failed to install poetry, retrying..."
+    "$UV_VENV_PYTHON" -m pip install --disable-pip-version-check "uv==${UV_VERSION}" && RET=0 && break || RET=$? && sleep 1
+    echo "Python failed to install uv, retrying..."
 done
-popd
 
 if [ $RET -ne 0 ]; then
-    echo "Pip install error for poetry"
+    echo "Pip install error for uv"
     exit $RET
 fi
 
@@ -114,8 +110,8 @@ cd src
 
 # Fix for Python 3.13+ on Windows: Python 3.11.4+ converts VIRTUAL_ENV to Cygwin path format
 # (e.g., /cygdrive/c/path) when running under Cygwin/MSYS bash, but sys.prefix remains a
-# Windows path (e.g., C:\path). This breaks Poetry's venv detection since it compares these
-# paths. Normalize VIRTUAL_ENV back to Windows format so Poetry can detect the venv correctly.
+# Windows path (e.g., C:\path). This breaks venv detection in tools that compare these
+# paths. Normalize VIRTUAL_ENV back to Windows format so uv can detect the venv correctly.
 # See: https://github.com/python/cpython/issues/103088
 if [ "Windows_NT" = "$OS" ] && [ -n "$VIRTUAL_ENV" ]; then
     if [[ "$VIRTUAL_ENV" == /cygdrive/* ]] || [[ "$VIRTUAL_ENV" == /[a-z]/* ]]; then
@@ -124,22 +120,40 @@ if [ "Windows_NT" = "$OS" ] && [ -n "$VIRTUAL_ENV" ]; then
     fi
 fi
 
+# SERVER-XXXX: cryptography 41+ ships a Rust extension and PyPI carries
+# no s390x / ppc64le wheels for it, so on those archs uv has to build
+# from sdist. The sdist build uses maturin which needs a matching rust
+# toolchain (`stable-<arch>-unknown-linux-gnu`) installed via rustup;
+# the rhel83-zseries-small and rhel81-power8-small distros ship rustup
+# but not the host-arch toolchain. Install it on demand. On x86_64 /
+# aarch64 the precompiled wheel is used so this step is unnecessary.
+case "$(uname -m 2>/dev/null)" in
+s390x | ppc64le)
+    if command -v rustup >/dev/null 2>&1; then
+        rust_target="stable-$(uname -m)-unknown-linux-gnu"
+        if ! rustup toolchain list 2>/dev/null | grep -q "${rust_target}"; then
+            echo "Installing rust toolchain ${rust_target} for cryptography sdist build..."
+            rustup toolchain install "${rust_target}" --profile minimal --no-self-update || true
+        fi
+    fi
+    ;;
+esac
+
 # Loop 5 times to retry full venv install
 # We have seen weird network errors that can sometimes mess up the pip install
 # By retrying we would like to only see errors that happen consistently
+# Point uv at the activated venv ($venv_dir) explicitly via UV_PROJECT_ENVIRONMENT.
 count=0
 for i in {1..5}; do
-    yes | $POETRY_VENV_PYTHON -m poetry cache clear . --all
-    rm -rf $poetry_dir/*
-    $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+    UV_PROJECT_ENVIRONMENT="$VIRTUAL_ENV" "$UV_VENV_PYTHON" -m uv sync --locked --all-groups --no-install-project && RET=0 && break || RET=$? && sleep 1
 
-    echo "Python failed install required deps with poetry, retrying..."
+    echo "uv failed to install required deps, retrying..."
     sleep $((count * count * 20))
     count=$((count + 1))
 done
 
 if [ $RET -ne 0 ]; then
-    echo "Poetry install error for full venv"
+    echo "uv install error for full venv"
     exit $RET
 fi
 

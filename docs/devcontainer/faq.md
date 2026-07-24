@@ -338,7 +338,7 @@ which python
 **Reinstall packages:**
 
 ```bash
-poetry install --no-root --sync
+bash buildscripts/uv_sync.sh
 ```
 
 ### VS Code extensions aren't working

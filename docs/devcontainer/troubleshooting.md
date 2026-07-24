@@ -429,7 +429,7 @@ For additional VS Code-specific troubleshooting, see:
    rm -rf python3-venv
    /opt/mongodbtoolchain/v5/bin/python3.13 -m venv python3-venv
    source python3-venv/bin/activate
-   poetry install --no-root --sync
+   bash buildscripts/uv_sync.sh
    ```
 
 4. **Check settings.json:**
@@ -790,20 +790,22 @@ KeyringError: ...
 
    ```bash
    export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
-   poetry install --no-root --sync
+   bash buildscripts/uv_sync.sh
    ```
 
 2. **Clear Poetry cache:**
 
    ```bash
-   poetry cache clear --all pypi
-   poetry install --no-root --sync
+   uv cache prune
+   bash buildscripts/uv_sync.sh
    ```
 
-3. **Verify Poetry version:**
+3. **Verify uv version:**
    ```bash
-   poetry --version
-   # Should be version specified in poetry_requirements.txt
+   uv --version
+   # Should match the pin in buildscripts/uv_version.txt (the canonical
+   # source consumed by uv_sync.sh, venv_setup.sh, the Dockerfiles, and
+   # the powercycle bootstrap).
    ```
 
 ### Virtual Environment Not Activating
@@ -854,13 +856,13 @@ ModuleNotFoundError: No module named 'pymongo'
 
    ```bash
    source python3-venv/bin/activate
-   poetry install --no-root --sync
+   bash buildscripts/uv_sync.sh
    ```
 
 3. **Check Poetry lock file:**
    ```bash
-   poetry check
-   poetry lock --check
+   uv lock --check
+   uv lock --check
    ```
 
 ## Volume and Persistence Issues

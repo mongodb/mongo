@@ -1,0 +1,31 @@
+Windows fix step 2: alias installer target at extracted py_library.
+
+See installer_repo_extract.patch for the corresponding
+internal_repo.bzl change that extracts the wheel at repo-rule time.
+
+--- a/pycross/private/tools/BUILD.bazel	2026-07-14 16:00:15
++++ b/pycross/private/tools/BUILD.bazel	2026-07-14 16:31:46
+@@ -1,5 +1,4 @@
+ load("@rules_pycross_internal//:python.bzl", "py_binary", "py_library", "py_test")
+-load("//pycross/private:wheel_zipimport_library.bzl", "pycross_wheel_zipimport_library")
+ 
+ package(default_visibility = ["//pycross:__subpackages__"])
+ 
+@@ -54,9 +53,15 @@
+     ],
+ )
+ 
+-pycross_wheel_zipimport_library(
++# Extract the installer wheel at repo-rule time (see internal_repo.bzl) and
++# expose it as a normal py_library rather than via
++# pycross_wheel_zipimport_library. Sidesteps a Windows-specific bug where
++# the zipimported .whl isn't reliably staged in wheel_installer.exe's
++# runfiles tree.
++alias(
+     name = "installer",
+-    wheel = "@rules_pycross_internal//:installer_whl",
++    actual = "@rules_pycross_internal//_installer_extracted:installer",
++    visibility = ["//pycross:__subpackages__"],
+ )
+ 
+ py_library(

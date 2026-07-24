@@ -1,0 +1,38 @@
+Set CARGO_HOME inside the WheelBuild action sandbox.
+
+pycross_wheel_build's action env is the C++ toolchain vars plus
+--action_env entries; nothing provides CARGO_HOME. When an sdist's
+PEP 517 backend invokes cargo (setuptools-rust, maturin), cargo
+resolves $HOME/.cargo — which is unwritable inside Bazel's sandbox
+(failing the build) and non-hermetic outside it (registry/cache state
+leaks between builds). Default CARGO_HOME to `.cargo`, relative to the
+action's working directory, so cargo state stays inside the sandbox
+and is discarded with it.
+
+No package in mongodb's current uv.lock builds Rust from sdist (the
+one Rust-heavy dep, cryptography, uses prebuilt wheels for the
+platforms PyPI doesn't cover), so this is insurance for the first dep
+that does — carried over from the equivalent tweak mongodb applied to
+rules_poetry's deterministic_env() in the pre-uv setup.
+
+Applied via `single_version_override(patches=...)` on rules_pycross in
+//MODULE.bazel. Candidate for upstreaming to jvolkman/rules_pycross.
+
+--- a/pycross/private/wheel_build.bzl	2026-07-24 10:35:15
++++ b/pycross/private/wheel_build.bzl	2026-07-24 10:35:31
+@@ -348,6 +348,15 @@
+     env = dict(cc_vars)
+     env.update(ctx.configuration.default_shell_env)
+ 
++    # Keep Rust-backed sdist builds (cargo, invoked by build backends like
++    # setuptools-rust / maturin) inside the action's writable sandbox.
++    # Without CARGO_HOME, cargo resolves $HOME/.cargo — unwritable in the
++    # sandbox and non-hermetic outside it. The relative path lands under the
++    # action's working directory (the execroot) and is discarded with the
++    # sandbox. Carried over from the equivalent tweak mongodb applied to
++    # rules_poetry's deterministic_env().
++    env.setdefault("CARGO_HOME", ".cargo")
++
+     ctx.actions.run(
+         inputs = inputs,
+         outputs = [pycross_wheel_info.wheel_file, pycross_wheel_info.name_file],

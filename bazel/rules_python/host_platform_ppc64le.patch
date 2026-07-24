@@ -1,0 +1,67 @@
+Fix ppc64le platform metadata: host detection and constraint value.
+
+rules_python 2.2.0's PLATFORMS entry for `ppc64le-unknown-linux-gnu`
+has two problems on ppc64le, both stemming from using the legacy "ppc"
+identifiers:
+
+1. `arch = "ppc"` — but `repo_utils.get_platforms_cpu_name()` returns
+   "ppc64le" on ppc64le hosts. `_is_compatible_with_host()` compares
+   the two strings for equality, so no runtime is ever considered
+   host-compatible on ppc64le, even though the bundled runtimes
+   manifest carries ppc64le entries for every recent CPython version.
+   As a result the `python_<version>_host` repo is not generated, and
+   any module that imports it (e.g. rules_pycross 0.8.3's
+   `use_repo(python, "python_3_12_host")`) fails module resolution:
+
+     module extension "python" ... does not generate repository
+     "python_3_12_host", yet it is imported as "python_3_12_host" ...
+
+2. `compatible_with = [..., "@platforms//cpu:ppc"]` — this list is
+   consumed downstream as config_setting constraint_values (e.g.
+   rules_pycross's `environments.create_for_python_toolchains` bakes
+   it into the per-environment config_settings that gate every wheel
+   select()). Platform definitions that declare ppc64le targets use
+   `@platforms//cpu:ppc64le`, so those config_settings can never
+   match, failing analysis of anything depending on a hub package:
+
+     configurable attribute "actual" in @@..//_lock:_wheel_pyyaml@6.0.3
+     doesn't match this configuration. Would a default condition help?
+
+The sibling `s390x-unknown-linux-gnu` entry already uses the matching
+`arch = "s390x"` / `@platforms//cpu:s390x` pair, which is why s390x
+hosts are unaffected by either problem. Align ppc64le the same way.
+
+Applied via `single_version_override(patches=...)` on rules_python in
+//MODULE.bazel. Candidate for upstreaming to bazel-contrib/rules_python.
+
+--- a/python/versions.bzl	2026-07-22 11:22:02
++++ b/python/versions.bzl	2026-07-24 12:24:57
+@@ -115,15 +115,26 @@
+             arch = "x86_32",
+         ),
+         "ppc64le-unknown-linux-gnu": platform_info(
++            # @platforms//cpu:ppc64le (not the legacy :ppc): this list is
++            # what downstream tooling (e.g. rules_pycross target
++            # environments) uses as config_setting constraint_values, and
++            # platform definitions that declare ppc64le hosts/targets use
++            # the ppc64le constraint. With :ppc here, those settings can
++            # never match on ppc64le target platforms.
+             compatible_with = [
+                 "@platforms//os:linux",
+-                "@platforms//cpu:ppc",
++                "@platforms//cpu:ppc64le",
+             ],
+             target_settings = [
+                 is_libc_glibc,
+             ],
+             os_name = LINUX_NAME,
+-            arch = "ppc",
++            # Must match repo_utils.get_platforms_cpu_name(), which returns
++            # "ppc64le" on ppc64le hosts. With "ppc" here,
++            # _is_compatible_with_host() never matches on ppc64le, so no
++            # python_*_host repo is generated for any version even though
++            # the runtime manifest carries ppc64le entries.
++            arch = "ppc64le",
+         ),
+         "riscv64-unknown-linux-gnu": platform_info(
+             compatible_with = [

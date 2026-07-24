@@ -1,4 +1,5 @@
 load("//bazel:utils.bzl", "write_target")
+load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
 load("@rules_python//python:defs.bzl", "py_binary")
 
 def render_template_impl(ctx):
@@ -10,6 +11,7 @@ def render_template_impl(ctx):
     # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
     runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
     env = {"PYTHONPATH": runfiles_package_dir}
+    env.update(py_action_env_windows_dll_path(ctx))
 
     ctx.actions.run(
         executable = ctx.executable.python_binary,
@@ -41,7 +43,7 @@ render_template_rule = rule(
             cfg = "exec",
         ),
     },
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
     output_to_genfiles = True,
 )
 
@@ -72,6 +74,7 @@ def render_templates_impl(ctx):
     # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
     runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
     env = {"PYTHONPATH": runfiles_package_dir}
+    env.update(py_action_env_windows_dll_path(ctx))
 
     ctx.actions.run(
         executable = ctx.executable.python_binary,
@@ -103,7 +106,7 @@ render_templates_rule = rule(
             cfg = "exec",
         ),
     },
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
     output_to_genfiles = True,
 )
 

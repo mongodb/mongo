@@ -1,5 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
 genrule(

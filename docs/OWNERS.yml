@@ -39,9 +39,6 @@ filters:
   - "owners/**":
     approvers:
       - 10gen/devprod-test-infrastructure
-  - "poetry_execution.md":
-    approvers:
-      - 10gen/devprod-test-infrastructure
   - "server_parameters.md":
     approvers:
       - 10gen/server-programmability
@@ -54,3 +51,6 @@ filters:
   - "fuzztest.md":
     approvers:
       - 10gen/platsec-server
+  - "uv_execution.md":
+    approvers:
+      - 10gen/devprod-build

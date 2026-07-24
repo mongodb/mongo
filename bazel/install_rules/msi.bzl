@@ -1,3 +1,5 @@
+load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
+
 # Build an msi using the wix toolset.
 # Building the msi involves running candle.exe -> light.exe -> msitrim.py
 def mongo_msi_impl(ctx):
@@ -119,6 +121,9 @@ def mongo_msi_impl(ctx):
         inputs = depset(transitive = [depset(light_out), ctx.attr._msi_trim_script[DefaultInfo].default_runfiles.files, python.files]),
         executable = ctx.executable._msi_trim_script,
         arguments = [light_msi.path, output_msi.path],
+        # msi_trim_script is a py_binary; the Windows launcher.exe needs
+        # python313.dll on PATH to LoadLibrary at start.
+        env = py_action_env_windows_dll_path(ctx),
     )
 
     return [DefaultInfo(

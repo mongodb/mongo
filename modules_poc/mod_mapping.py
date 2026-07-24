@@ -36,7 +36,7 @@ def perr_exit(*values) -> NoReturn:
 if codeowners.path_to_regex("/**/bar").match("/foobar"):
     # Detect an outdated version suffering from https://github.com/sbdchd/codeowners/issues/43.
     # We need to update to at least 0.8.0 to get the fix.
-    perr_exit("please run buildscripts/poetry_sync.sh to update dependencies")
+    perr_exit("please run buildscripts/uv_sync.sh to update dependencies")
 
 
 with open(root / ".github/CODEOWNERS") as f:

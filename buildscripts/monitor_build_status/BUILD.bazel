@@ -1,4 +1,4 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_library")
 
 py_library(
@@ -12,7 +12,7 @@ py_library(
             "jira",
             group = "jira-client",
         ),
-        "@poetry//:library_python_dateutil",
+        "@pypi//:python-dateutil",
         dependency(
             "requests",
             group = "core",

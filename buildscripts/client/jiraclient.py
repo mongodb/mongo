@@ -6,7 +6,7 @@ from typing import Any, Iterable, Optional, Sequence
 
 from jira import JIRA, Issue
 from jira.client import ResultList
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ASSIGNED_TEAMS_FIELD = "customfield_12751"
 
@@ -23,16 +23,18 @@ class SecurityLevel(Enum):
 class JiraAuth(BaseSettings):
     """Auth information to connect to Jira."""
 
-    access_token: Optional[str]
-    access_token_secret: Optional[str]
-    consumer_key: Optional[str]
-    key_cert: Optional[str]
-    pat: Optional[str]
+    # Pydantic 2 dropped the implicit-None default for `Optional` fields; every
+    # field that should be allowed to remain unset needs an explicit `= None`.
+    access_token: Optional[str] = None
+    access_token_secret: Optional[str] = None
+    consumer_key: Optional[str] = None
+    key_cert: Optional[str] = None
+    pat: Optional[str] = None
 
-    class Config:
-        """Configuration for JiraAuth."""
-
-        env_prefix = "JIRA_AUTH_"
+    # `BaseSettings` moved to the separate `pydantic-settings` package in
+    # pydantic 2, and the inner `class Config:` pattern was replaced by
+    # `model_config = SettingsConfigDict(...)`.
+    model_config = SettingsConfigDict(env_prefix="JIRA_AUTH_")
 
     def get_token_auth(self) -> Optional[str]:
         return self.pat
