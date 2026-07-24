@@ -21,6 +21,8 @@
 #
 last-patch:
   all:
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/core/administrative/block_replica_set_writes.js
@@ -48,6 +50,8 @@ last-patch:
   suites: null
 last-continuous:
   all:
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_reopening_stale_config.js
@@ -247,6 +251,8 @@ last-lts:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
       ticket: SERVER-107819
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/query/remove/update_and_batched_delete.js
