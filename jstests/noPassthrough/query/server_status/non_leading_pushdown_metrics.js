@@ -4,10 +4,10 @@
  * @tags: [
  *   requires_sbe,
  *   incompatible_with_join_optimization,
- *   featureFlagGetExecutorDeferredEngineChoice,
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 function getCounters(db) {
@@ -22,12 +22,21 @@ describe("nonLeadingPushdown metrics", function () {
             setParameter: {
                 internalQueryFrameworkControl: "trySbeRestricted",
                 featureFlagSbeFull: false,
-                featureFlagSbeNonLeadingMatch: true,
-                featureFlagSbeTransformStages: true,
             },
         });
         assert.neq(null, conn);
         db = conn.getDB(jsTestName());
+
+        if (
+            !FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice") ||
+            !FeatureFlagUtil.isEnabled(db, "SbeNonLeadingMatch") ||
+            !FeatureFlagUtil.isEnabled(db, "SbeTransformStages")
+        ) {
+            jsTest.log.info("Skipping: one or more required feature flags are disabled.");
+            MongoRunner.stopMongod(conn);
+            quit(0);
+        }
+
         coll = db.coll;
         foreign = db.foreign;
         coll.drop();
@@ -209,12 +218,21 @@ describe("nonLeadingPushdown metrics with some disabled feature flags", function
             setParameter: {
                 internalQueryFrameworkControl: "trySbeRestricted",
                 featureFlagSbeFull: false,
-                featureFlagSbeNonLeadingMatch: false,
-                featureFlagSbeTransformStages: false,
             },
         });
         assert.neq(null, conn);
         db = conn.getDB(jsTestName());
+
+        if (
+            !FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice") ||
+            FeatureFlagUtil.isEnabled(db, "SbeNonLeadingMatch") ||
+            FeatureFlagUtil.isEnabled(db, "SbeTransformStages")
+        ) {
+            jsTest.log.info("Skipping: one or more required feature flags are disabled.");
+            MongoRunner.stopMongod(conn);
+            quit(0);
+        }
+
         coll = db.coll;
         coll.drop();
         for (let i = 0; i < 5; i++) {
