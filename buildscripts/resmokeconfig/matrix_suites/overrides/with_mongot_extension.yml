@@ -24,19 +24,13 @@
     # Risks leaving FCV stuck below 8.3, breaking all subsequent FCV-gated tests.
     # Extension is unsupported on FCV < 8.3.
     exclude_files:
-      # Tests that fail due to unimplemented behavior in mongot-extension.
+      # Tests that fail due to intentionally different behavior in mongot-extension.
       - jstests/with_mongot/e2e/views/search_with_view_injected.js
       - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition.js
 
-# Tests excluded only from sharded suites (sharded_cluster, sharded_collections).
-- name: exclude_sharded_incompatible_tests
-  value:
-    # TODO SERVER-131492: Extension serialize() does not round-trip requiresSearchSequenceToken
-    # across pipeline split, so searchSequenceToken is lost on shards.
-    exclude_files:
-      - jstests/with_mongot/e2e/search/search_sequence_token.js
-      - jstests/with_mongot/e2e/search/search_sequence_token_in_lookup.js
-      - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_sequence_token.js
+      # This test drives the 'shardedSearchOpCtxDisconnect' failpoint, which only exists on the
+      # legacy mongot_cursor router path (runSearchCommandWithRetries).
+      - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_network_interruption.js
 
 # REPLACES the base suite's list, dropping its in-tree test extensions (see note at top).
 - name: load_extension
@@ -52,16 +46,6 @@
 # Extensions API; hybrid search ($rankFusion/$scoreFusion) exercises the IFR kickback to the
 # legacy stages.
 # ---------------------------------------------------------------------------------------------
-
-# Tests that fail only when featureFlagSearchExtension is on. Stacked on top of
-# exclude_incompatible_tests by every family that enables the $search extension.
-- name: exclude_search_extension_incompatible
-  value:
-    exclude_files:
-      # Permanently excluded from the extension suites. This test drives the
-      # 'shardedSearchOpCtxDisconnect' failpoint, which only exists on the legacy mongot_cursor
-      # router path (runSearchCommandWithRetries).
-      - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_network_interruption.js
 
 - name: extension_flags_hybridSearch_disabled
   value:
@@ -131,10 +115,7 @@
 # ---------------------------------------------------------------------------------------------
 # with_mongot_extension_vectorSearch_disabled_* family: every extension flag on except
 # featureFlagVectorSearchExtension. $vectorSearch uses the server's legacy implementation while
-# $search/$searchMeta and hybrid search run through the Extensions API. Its mappings stack
-# exclude_incompatible_tests + exclude_search_extension_incompatible (and exclude_sharded_incompatible_tests
-# on the sharded mappings). The extension-$vectorSearch exclusions do not apply since $vectorSearch
-# runs the legacy path.
+# $search/$searchMeta and hybrid search run through the Extensions API.
 # ---------------------------------------------------------------------------------------------
 
 - name: extension_flags_vectorSearch_disabled
@@ -168,9 +149,7 @@
 # ---------------------------------------------------------------------------------------------
 # with_mongot_extension_fully_enabled_* family: every extension feature flag on. $search,
 # $searchMeta, $vectorSearch, and extension stages inside hybrid search all run through the
-# Extensions API. Its mappings stack exclude_incompatible_tests + exclude_search_extension_incompatible
-# (and exclude_sharded_incompatible_tests on the sharded mappings) -- no fully_enabled-only failures
-# are known.
+# Extensions API.
 # ---------------------------------------------------------------------------------------------
 
 - name: extension_flags_fully_enabled

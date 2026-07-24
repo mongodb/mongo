@@ -4,7 +4,6 @@ description: >-
   real mongot-extension, with every extension feature flag enabled except featureFlagSearchExtension.
 excludes:
   - "with_mongot_extension.exclude_incompatible_tests"
-  - "with_mongot_extension.exclude_sharded_incompatible_tests"
 overrides:
   - "with_mongot_extension.load_extension"
   - "with_mongot_extension.extension_flags_search_disabled_sharded"

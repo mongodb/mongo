@@ -12,6 +12,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -344,9 +345,11 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(OperationContext* opCtx,
         return privileges;
     }
 
+    LiteParserOptions options{.ifrContext = IncrementalFeatureRolloutContext::get(opCtx)};
+
     // If the first stage of the pipeline is not an initial source, the pipeline is implicitly
     // reading documents from the underlying collection. The client must be authorized to do so.
-    auto liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipeline[0]);
+    auto liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipeline[0], options);
     if (!liteParsedDocSource->isInitialSource()) {
         Privilege currentPriv =
             Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find);
@@ -355,7 +358,7 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(OperationContext* opCtx,
 
     // Confirm privileges for the pipeline.
     for (auto&& pipelineStage : pipeline) {
-        liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipelineStage);
+        liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipelineStage, options);
         PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(
             isMongos, request.getBypassDocumentValidation().value_or(false));
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);

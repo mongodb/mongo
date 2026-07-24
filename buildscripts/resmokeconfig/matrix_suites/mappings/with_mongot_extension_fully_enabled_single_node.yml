@@ -4,7 +4,6 @@ description: >-
   mongot-extension, with every extension feature flag enabled.
 excludes:
   - "with_mongot_extension.exclude_incompatible_tests"
-  - "with_mongot_extension.exclude_search_extension_incompatible"
 overrides:
   - "with_mongot_extension.load_extension"
   - "with_mongot_extension.extension_flags_fully_enabled"
