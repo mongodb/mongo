@@ -15,6 +15,7 @@ enums:
         values:
             serverStatus: "serverStatus"
             replSetGetStatus: "replSetGetStatus"
+            collStats: "collStats"
 
 structs:
     ListMetricsFilteringAllowlistReply:

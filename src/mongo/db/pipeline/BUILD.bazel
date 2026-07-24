@@ -581,6 +581,8 @@ mongo_cc_library(
         "//src/mongo/db:curop_metrics",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:expression_context_builder",
+        "//src/mongo/db:metrics_filtering_util",
+        "//src/mongo/db:metrics_policy_manager",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:query_matcher",

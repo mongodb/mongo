@@ -71,6 +71,23 @@ public:
      */
     virtual const PathMatcherNode& getReplSetGetStatusAllowlistMatcher() const = 0;
 
+    /**
+     * Returns whether collStats metrics filtering is required for the given client.
+     */
+    virtual bool requiresCollStatsFiltering(OperationContext* opCtx) const = 0;
+
+    /**
+     * Returns a reference to the allowlist paths for collStats filtering. Throws
+     * IllegalOperation if metrics should never be filtered.
+     */
+    virtual const std::vector<std::string>& getCollStatsAllowlistPaths() const = 0;
+
+    /**
+     * Returns a reference to the path matcher for collStats filtering. Throws IllegalOperation
+     * if metrics should never be filtered.
+     */
+    virtual const PathMatcherNode& getCollStatsAllowlistMatcher() const = 0;
+
 protected:
     /**
      * Throws IllegalOperation with the message that it is illegal to get an allowlist as

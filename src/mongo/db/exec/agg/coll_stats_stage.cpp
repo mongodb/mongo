@@ -8,6 +8,8 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/metrics_filtering_util.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
@@ -121,6 +123,20 @@ BSONObj CollStatsStage::makeStatsForNs(const boost::intrusive_ptr<ExpressionCont
                                        expCtx->getOperationContext(), nss, &builder),
                                    "Unable to retrieve queryExecStats in $collStats stage");
     }
+
+    // If filtering is required by the metrics policy, extract and append only the
+    // metrics matching the allowlist to a separate builder and return the resulting object.
+    auto& metricsPolicyManager = MetricsPolicyManager::get(expCtx->getOperationContext());
+    bool shouldFilter =
+        metricsPolicyManager.requiresCollStatsFiltering(expCtx->getOperationContext());
+
+    if (shouldFilter) {
+        const auto& matcher = metricsPolicyManager.getCollStatsAllowlistMatcher();
+        BSONObjBuilder filteredBuilder;
+        metrics_filtering_util::appendPaths(filteredBuilder, builder.obj(), matcher);
+        return filteredBuilder.obj();
+    }
+
     return builder.obj();
 }
 
