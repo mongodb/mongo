@@ -377,7 +377,7 @@ export function describeWriteCmdQueryStatsShardedTests(label, bodyFn) {
             resetQueryStatsStore(st.s, "1MB");
         });
 
-        bodyFn(() => ({st, testDB, coll, collName}));
+        bodyFn(() => ({conn: st.s, st, testDB, coll, collName}));
     });
 }
 

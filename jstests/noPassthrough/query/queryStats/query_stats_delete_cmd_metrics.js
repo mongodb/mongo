@@ -316,23 +316,31 @@ describeWriteCmdQueryStatsReplicaSetTests(
 describeWriteCmdQueryStatsShardedTests("query stats delete command metrics (sharded)", (ctxFn) => {
     describe("delete types", function () {
         it("should record single delete metrics", function () {
-            const {testDB, coll, collName} = ctxFn();
-            testSingleDelete(testDB, coll, collName);
+            retryDeleteMetricTestOnWriteConflict(ctxFn, () => {
+                const {testDB, coll, collName} = ctxFn();
+                testSingleDelete(testDB, coll, collName);
+            });
         });
 
         it("should record simple _id delete metrics", function () {
-            const {testDB, coll, collName} = ctxFn();
-            testIdDelete(testDB, coll, collName);
+            retryDeleteMetricTestOnWriteConflict(ctxFn, () => {
+                const {testDB, coll, collName} = ctxFn();
+                testIdDelete(testDB, coll, collName);
+            });
         });
 
         it("should record multi delete metrics", function () {
-            const {testDB, coll, collName} = ctxFn();
-            testMultiDelete(testDB, coll, collName);
+            retryDeleteMetricTestOnWriteConflict(ctxFn, () => {
+                const {testDB, coll, collName} = ctxFn();
+                testMultiDelete(testDB, coll, collName);
+            });
         });
 
         it("should record multi delete metrics when no documents match the filter", function () {
-            const {testDB, coll, collName, st} = ctxFn();
-            testDeleteNoMatches(testDB, coll, collName);
+            retryDeleteMetricTestOnWriteConflict(ctxFn, () => {
+                const {testDB, coll, collName} = ctxFn();
+                testDeleteNoMatches(testDB, coll, collName);
+            });
         });
     });
 });
