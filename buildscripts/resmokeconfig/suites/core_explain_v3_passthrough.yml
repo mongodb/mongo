@@ -50,6 +50,14 @@ selector:
     - jstests/core/index/index_for_sort.js
     - jstests/core/index/wildcard/compound_wildcard_index_or.js
     - jstests/core/query/explain/explain6.js
+
+    # Asserts the legacy display data model of the mixed CBR/multi-planning path, where the same
+    # logical plan appears twice among the rejected plans (the multi-planner's trial tree and the
+    # cost-based ranker's costed clone). The V3 format intentionally merges those duplicates into
+    # a single plans[] entry carrying both statistics families, so the test's rejected-plan counts
+    # do not apply. The merged V3 representation is covered by
+    # jstests/noPassthroughWithMongod/query/explain/v3/explain_plans_array.js.
+    - jstests/core/query/plan_ranking/cbr_for_no_mp_results.js
 executor:
   archive:
     hooks:

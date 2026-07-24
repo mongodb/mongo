@@ -109,6 +109,35 @@ export function getSingleNodeExplain(explain) {
 }
 
 /**
+ * Returns true if this 'queryPlanner' section is in the V3 explain shape, where every candidate
+ * plan lives in a unified "plans" array (winner first) instead of the legacy
+ * winningPlan/rejectedPlans pair.
+ */
+export function isV3QueryPlanner(queryPlanner) {
+    return queryPlanner.hasOwnProperty("plans") && !queryPlanner.hasOwnProperty("winningPlan");
+}
+
+/**
+ * Presents one V3 "plans" array entry in the legacy plan shape this library's accessors consume:
+ * the plan's stage tree, with the plan-level fields (isCached, multiPlanStats, ...) kept on the
+ * root - the place the legacy winningPlan/rejectedPlans entries carry them.
+ */
+function v3PlanToLegacyShape(planEntry) {
+    const {planStages, ...planLevelFields} = planEntry;
+    return Object.assign(planLevelFields, planStages);
+}
+
+/**
+ * Returns the rejected plans of one 'queryPlanner' section (not the whole explain; use
+ * getRejectedPlans() for that), handling both the legacy and the V3 section shape.
+ */
+function getRejectedPlansFromQueryPlanner(queryPlanner) {
+    return isV3QueryPlanner(queryPlanner)
+        ? queryPlanner.plans.slice(1).map(v3PlanToLegacyShape)
+        : queryPlanner.rejectedPlans;
+}
+
+/**
  * Returns the winning plan from the corresponding sub-node of classic/SBE explain output. Takes
  * into account that the plan may or may not have agg stages.
  * For sharded collections, this may return the top-level "winningPlan" which contains the shards.
@@ -118,13 +147,18 @@ export function getSingleNodeExplain(explain) {
 export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
     let getWinningSBEPlan = (queryPlanner) => queryPlanner.winningPlan.slotBasedPlan;
 
-    // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
+    // In the V3 shape the winner is the first entry of the unified "plans" array. Otherwise, the
+    // 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
     // it will hold a serialized winning plan, otherwise it will be stored in the 'winningPlan'
     // field itself.
-    let getWinningPlan = (queryPlanner) =>
-        queryPlanner.winningPlan.hasOwnProperty("queryPlan")
+    let getWinningPlan = (queryPlanner) => {
+        if (isV3QueryPlanner(queryPlanner)) {
+            return v3PlanToLegacyShape(queryPlanner.plans[0]);
+        }
+        return queryPlanner.winningPlan.hasOwnProperty("queryPlan")
             ? queryPlanner.winningPlan.queryPlan
             : queryPlanner.winningPlan;
+    };
 
     if ("shards" in explain) {
         for (const shardName in explain.shards) {
@@ -272,6 +306,8 @@ export function normalizePlan(plan, flatten = true) {
     }
 
     // Expand this array if you find new fields which are inconsistent across different test runs.
+    // The last three are the V3 explain shape's per-node statistics grouping and plan-level
+    // fields, which carry the same run-varying content as the legacy estimate fields above.
     const ignoreFields = [
         "isCached",
         "indexVersion",
@@ -279,6 +315,9 @@ export function normalizePlan(plan, flatten = true) {
         "cardinalityEstimate",
         "costEstimate",
         "estimatesMetadata",
+        "statistics",
+        "multiPlanStats",
+        "solutionHashUnstable",
     ];
 
     // Iterates over the plan while ignoring the `ignoreFields`, to create flattened stages whenever
@@ -319,7 +358,9 @@ export function normalizePlan(plan, flatten = true) {
 export function formatQueryPlanner(queryPlanner, shouldFlatten = true) {
     let winningPlan = normalizePlan(getWinningPlanFromExplain(queryPlanner), shouldFlatten);
     let rejectedPlans =
-        queryPlanner.rejectedPlans?.map((plan) => normalizePlan(plan, shouldFlatten)) ?? [];
+        getRejectedPlansFromQueryPlanner(queryPlanner)?.map((plan) =>
+            normalizePlan(plan, shouldFlatten),
+        ) ?? [];
     return {winningPlan, rejectedPlans};
 }
 
@@ -437,7 +478,11 @@ export function formatExplainRoot(explain, shouldFlatten = true, fieldsToExclude
                     ? formatQueryPlanner(shardExplain.queryPlanner, shouldFlatten)
                     : formatExplainPipeline(shardExplain.stages);
         }
-    } else if ("queryPlanner" in explain && "shards" in explain.queryPlanner.winningPlan) {
+    } else if (
+        "queryPlanner" in explain &&
+        "winningPlan" in explain.queryPlanner &&
+        "shards" in explain.queryPlanner.winningPlan
+    ) {
         res = {...res, ...invertShards(explain.queryPlanner, shouldFlatten)};
     } else if ("queryPlanner" in explain) {
         res = {...res, ...formatQueryPlanner(explain.queryPlanner, shouldFlatten)};
@@ -588,6 +633,9 @@ export function getPlanStage(root, stage) {
  */
 export function getRejectedPlans(root) {
     if (root.hasOwnProperty("queryPlanner")) {
+        if (isV3QueryPlanner(root.queryPlanner)) {
+            return getRejectedPlansFromQueryPlanner(root.queryPlanner);
+        }
         if (root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
             const rejectedPlans = [];
             for (let shard of root.queryPlanner.winningPlan.shards) {
@@ -613,6 +661,10 @@ export function getRejectedPlans(root) {
  */
 export function hasRejectedPlans(root) {
     function sectionHasRejectedPlans(explainSection) {
+        if (isV3QueryPlanner(explainSection)) {
+            // The V3 "plans" array holds the winner first, then the rejected plans.
+            return explainSection.plans.length > 1;
+        }
         assert(explainSection.hasOwnProperty("rejectedPlans"), tojson(explainSection));
         return explainSection.rejectedPlans.length !== 0;
     }
@@ -641,6 +693,9 @@ export function hasRejectedPlans(root) {
     } else {
         // This is some sort of query explain.
         assert(root.hasOwnProperty("queryPlanner"), tojson(root));
+        if (isV3QueryPlanner(root.queryPlanner)) {
+            return sectionHasRejectedPlans(root.queryPlanner);
+        }
         assert(root.queryPlanner.hasOwnProperty("winningPlan"), tojson(root));
         if (!root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
             // This is an unsharded explain.
@@ -1612,6 +1667,10 @@ export function canonicalizePlan(p) {
     delete p.cardinalityEstimate;
     delete p.costEstimate;
     delete p.estimatesMetadata;
+    // The V3 explain shape's per-node statistics grouping and plan-level fields.
+    delete p.statistics;
+    delete p.multiPlanStats;
+    delete p.solutionHashUnstable;
     if (p.hasOwnProperty("inputStage")) {
         canonicalizePlan(p.inputStage);
     } else if (p.hasOwnProperty("inputStages")) {

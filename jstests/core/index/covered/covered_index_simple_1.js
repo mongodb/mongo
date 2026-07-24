@@ -9,7 +9,7 @@
 // Simple covered index query test
 
 // Include helpers for analyzing explain output.
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.getCollection("covered_simple_1");
 coll.drop();
@@ -30,7 +30,7 @@ coll.createIndex({foo: 1});
 // Test equality with int value
 var plan = coll.find({foo: 1}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "simple.1.1 - indexOnly should be true on covered query",
 );
 assert.eq(
@@ -42,7 +42,7 @@ assert.eq(
 // Test equality with string value
 var plan = coll.find({foo: "string"}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "simple.1.2 - indexOnly should be true on covered query",
 );
 assert.eq(
@@ -57,7 +57,7 @@ var plan = coll
     .hint({foo: 1})
     .explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "simple.1.3 - indexOnly should be true on covered query",
 );
 assert.eq(
@@ -73,7 +73,7 @@ if (!TestData.isHintsToQuerySettingsSuite) {
     // indexes, and therefore empty filter will result in collection scans.
     var plan = coll.find({}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
     assert(
-        isIndexOnly(db, plan.queryPlanner.winningPlan),
+        isIndexOnly(db, getWinningPlanFromExplain(plan)),
         "simple.1.4 - indexOnly should be true on covered query",
     );
     assert.eq(
@@ -89,7 +89,7 @@ var plan = coll
     .hint({foo: 1})
     .explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "simple.1.5 - indexOnly should be true on covered query",
 );
 assert.eq(
@@ -104,7 +104,7 @@ var plan = coll
     .hint({foo: 1})
     .explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "simple.1.6 - indexOnly should be true on covered query",
 );
 assert.eq(
@@ -116,7 +116,7 @@ assert.eq(
 // Test no return
 var plan = coll.find({foo: "2"}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "simple.1.7 - indexOnly should be true on covered query",
 );
 assert.eq(

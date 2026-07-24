@@ -86,6 +86,8 @@ void generateQueryKnobs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 }
 
 void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out) {
+    // TODO SERVER-132079: source the hash from the query itself instead of the per-operation
+    // diagnostics state.
     if (auto&& queryShapeHash = mongo::CurOp::get(opCtx)->debug().getQueryShapeHash()) {
         out->append("queryShapeHash", queryShapeHash->toHexString());
     }

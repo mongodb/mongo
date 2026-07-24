@@ -9,7 +9,7 @@
 // Compound index covered query tests with sort
 
 // Include helpers for analyzing explain output.
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.getCollection("covered_sort_3");
 coll.drop();
@@ -26,7 +26,7 @@ let plan = coll
     .hint({a: 1, b: -1, c: 1})
     .explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "sort.3.1 - indexOnly should be true on covered query",
 );
 assert.eq(

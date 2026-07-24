@@ -13,7 +13,8 @@ using V = ExplainOptions::Verbosity;
 using C = ExplainSettings;
 
 // The compile-guard from explain_options.h, mirrored here for visibility: an ordinal Verbosity
-// comparison must not compile (that is the by-construction proof of G2). See the comment on
+// comparison must not compile, so no explain content decision can depend on the enum's value
+// order by construction. See the comment on
 // explain::HasOrdinalVerbosityComparison for why this is a trait rather than a requires-expression.
 static_assert(!explain::HasOrdinalVerbosityComparison<V>::value,
               "Ordinal Verbosity comparison must not compile - use ExplainPolicy");
@@ -58,21 +59,36 @@ TEST(ExplainPolicyTest, LegacyPredicates) {
     ASSERT_TRUE(internal.hasByteCode());
 }
 
-// TODO SERVER-130529: Remove this test with the transitional V3 rows. Until the V3 output format is
-// implemented, every V3 verbosity behaves exactly like kExecAllPlans (it was ordinally wedged
-// between kExecAllPlans and kInternal).
-TEST(ExplainPolicyTest, TransitionalV3RowsMatchExecAllPlans) {
-    const auto execAllPlans = explainPolicyFor(V::kExecAllPlans);
-    ASSERT_TRUE(explainPolicyFor(V::kPlanSummary) == execAllPlans);
-    ASSERT_TRUE(explainPolicyFor(V::kPlannerChoice) == execAllPlans);
-    ASSERT_TRUE(explainPolicyFor(V::kPlannerStats) == execAllPlans);
-    ASSERT_TRUE(explainPolicyFor(V::kExecStatsV3) == execAllPlans);
+// For every V3 verbosity, explainPolicyFor() yields exactly the expected flag set.
+TEST(ExplainPolicyTest, V3Rows) {
+    ASSERT_TRUE(explainPolicyFor(V::kPlanSummary) ==
+                ExplainPolicy(C::kPlannerInfo | C::kRejectedPlans));
+    ASSERT_TRUE(explainPolicyFor(V::kPlannerChoice) ==
+                ExplainPolicy(C::kPlannerInfo | C::kRejectedPlans));
+    ASSERT_TRUE(explainPolicyFor(V::kPlannerStats) ==
+                ExplainPolicy(C::kPlannerInfo | C::kRejectedPlans | C::kAllPlansExecStats));
+    ASSERT_TRUE(
+        explainPolicyFor(V::kExecStatsV3) ==
+        ExplainPolicy(C::kPlannerInfo | C::kRejectedPlans | C::kAllPlansExecStats | C::kExecStats));
 }
 
-// Monotonicity: the current baseline ladder is additive (each legacy verbosity's content is a
-// superset of the previous one's). Phase 3/4's additive V3 ladder relies on this, while the type
-// still permits non-nested subsets for future deltas.
-TEST(ExplainPolicyTest, BaselineLadderIsMonotone) {
+// The V3-distinctive predicate combination: plannerStats carries per-candidate trial statistics
+// without winner-execution statistics — a combination no legacy verbosity produces (with legacy
+// verbosities kAllPlansExecStats implies kExecStats).
+TEST(ExplainPolicyTest, PlannerStatsHasTrialStatsWithoutExecStats) {
+    const auto plannerStats = explainPolicyFor(V::kPlannerStats);
+    ASSERT_TRUE(plannerStats.hasAllPlansStats());
+    ASSERT_FALSE(plannerStats.hasExecStats());
+
+    // execStats adds exactly the winner-execution statistics on top.
+    const auto execStatsV3 = explainPolicyFor(V::kExecStatsV3);
+    ASSERT_TRUE(execStatsV3 == plannerStats.with(C::kExecStats));
+}
+
+// Monotonicity: the current two sets of verbosities are additive (each verbosity's content is a
+// superset of the previous one's). The V3 verbosities rely on this, while the type still permits
+// non-nested subsets for future deltas.
+TEST(ExplainPolicyTest, VerbositiesAreMonotone) {
     const auto queryPlanner = explainPolicyFor(V::kQueryPlanner);
     const auto execStats = explainPolicyFor(V::kExecStats);
     const auto execAllPlans = explainPolicyFor(V::kExecAllPlans);
@@ -87,10 +103,23 @@ TEST(ExplainPolicyTest, BaselineLadderIsMonotone) {
         }
     }
     ASSERT_TRUE(queryPlanner == queryPlanner.mergedWith(execStats).without(C::kExecStats));
+
+    // The V3 verbosities nest: planSummary = plannerChoice ⊆ plannerStats ⊆ execStats(V3).
+    ASSERT_TRUE(explainPolicyFor(V::kPlanSummary) == explainPolicyFor(V::kPlannerChoice));
+    const auto plannerChoice = explainPolicyFor(V::kPlannerChoice);
+    const auto plannerStats = explainPolicyFor(V::kPlannerStats);
+    const auto execStatsV3 = explainPolicyFor(V::kExecStatsV3);
+    for (auto flag : {C::kPlannerInfo, C::kRejectedPlans, C::kExecStats, C::kAllPlansExecStats}) {
+        if (plannerChoice.has(flag)) {
+            ASSERT_TRUE(plannerStats.has(flag));
+        }
+        if (plannerStats.has(flag)) {
+            ASSERT_TRUE(execStatsV3.has(flag));
+        }
+    }
 }
 
-// Set-ops: with/without/mergedWith/has behave as a set. This is the future baseline-plus-deltas
-// surface (G3).
+// Set-ops: with/without/mergedWith/has behave as a set.
 TEST(ExplainPolicyTest, SetOperations) {
     const ExplainPolicy empty;
     ASSERT_FALSE(empty.hasPlannerInfo());

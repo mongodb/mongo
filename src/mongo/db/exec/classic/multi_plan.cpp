@@ -640,10 +640,14 @@ bool MultiPlanStage::hasBackupPlan() const {
     }
 
     for (size_t i = 0; i < _rejected.size(); ++i) {
-        planExplainerData.rejectedPlansWithStages.push_back(
-            // Rejected plans are reordered after the non-rejected plans in the _candidates vector.
-            // See _candidates and _rejected.
-            {std::move(_candidates[i + _children.size()].solution), std::move(_rejected[i])});
+        // Rejected plans are reordered after the non-rejected plans in the _candidates vector.
+        // See _candidates and _rejected. These stage trees ran a multi-planning trial, so
+        // their counters are trial statistics ('ranTrial').
+        auto& candidate = _candidates[i + _children.size()];
+        planExplainerData.rejectedPlansWithStages.push_back({std::move(candidate.solution),
+                                                             std::move(_rejected[i]),
+                                                             /*ranTrial*/ true,
+                                                             candidate.adjustedScore});
     }
     _rejected.clear();
     return planExplainerData;

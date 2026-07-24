@@ -56,10 +56,16 @@ TimeseriesTest.run((insert) => {
                 testDB.runCommand({explain: deleteCommand, verbosity: "executionStats"}),
             );
             jsTestLog(tojson(explain));
+            // Check the executed plan rather than the winning query plan: when the delete is
+            // multi-planned, the V3 explain shape shows the candidates' find-shaped trial trees
+            // in the query planner section, and the write stage root appears only in the
+            // execution section (where it is present in the legacy shape too).
+            const executionStages = explain.executionStats.executionStages;
             assert(
-                planHasStage(testDB, explain.queryPlanner.winningPlan, "BATCHED_DELETE") ||
-                    planHasStage(testDB, explain.queryPlanner.winningPlan, "DELETE") ||
-                    planHasStage(testDB, explain.queryPlanner.winningPlan, "TS_MODIFY"),
+                planHasStage(testDB, executionStages, "BATCHED_DELETE") ||
+                    planHasStage(testDB, executionStages, "DELETE") ||
+                    planHasStage(testDB, executionStages, "TS_MODIFY"),
+                explain,
             );
         }
 

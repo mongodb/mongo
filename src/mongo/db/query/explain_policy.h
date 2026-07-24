@@ -102,14 +102,16 @@ private:
 ExplainPolicy explainPolicyFor(ExplainOptions::Verbosity v);
 
 /**
- * Maps a requested (possibly V3) verbosity to the nearest legacy verbosity. Used only by the
- * interim V3 explain hooks, which still delegate to the legacy generators; the mapping matches the
- * legacy verbosities the pre-refactor dispatch passed explicitly (planSummary / plannerChoice ->
- * queryPlanner, plannerStats -> execAllPlans, execStatsV3 -> execStats), and legacy verbosities map
- * to themselves.
+ * Maps a requested (possibly V3) verbosity to the nearest legacy verbosity (planSummary /
+ * plannerChoice -> queryPlanner, plannerStats -> execAllPlans, execStatsV3 -> execStats; legacy
+ * verbosities map to themselves). Used by the remaining legacy-delegation code paths:
  *
- * TODO SERVER-130529 (find path) / SERVER-130810 (aggregation path): remove this once the real V3
- * output format is produced directly instead of via legacy delegation.
+ * - Find path: only the planSummary/plannerChoice reductions (until SERVER-131451) and the
+ *   explainers without a per-plan enumerator (SBE, Express; until SERVER-132033) still delegate.
+ *   The
+ *   stats-rich modes (plannerStats, execStats) render the real V3 output on the classic
+ *   engine.
+ * - Aggregation path: delegates end-to-end until SERVER-130810.
  */
 ExplainOptions::Verbosity mapV3ToLegacyVerbosity(ExplainOptions::Verbosity v);
 

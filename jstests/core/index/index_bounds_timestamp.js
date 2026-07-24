@@ -7,7 +7,11 @@
 //   requires_fcv_82,
 // ]
 
-import {assertExplainCount, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    assertExplainCount,
+    getWinningPlanFromExplain,
+    isIndexOnly,
+} from "jstests/libs/query/analyze_plan.js";
 
 // Setup the test collection.
 let coll = db.index_bounds_timestamp;
@@ -36,7 +40,7 @@ plan = coll
     .explain("executionStats")
     .find({ts: {$gt: Timestamp(0, 0)}})
     .count();
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "ts $gt count should be a covered query");
+assert(isIndexOnly(db, getWinningPlanFromExplain(plan)), "ts $gt count should be a covered query");
 assertExplainCount({explainResults: plan, expectedCount: 5});
 
 // Check that find over (Timestamp(0, 0), Timestamp(2^32 - 1, 2^32 - 1)] does not require a
@@ -46,7 +50,7 @@ plan = coll
     .find({ts: {$gt: Timestamp(0, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gt find with project should be a covered query",
 );
 
@@ -55,7 +59,7 @@ plan = coll
     .explain("executionStats")
     .find({ts: {$gte: Timestamp(0, 0)}})
     .count();
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "ts $gte count should be a covered query");
+assert(isIndexOnly(db, getWinningPlanFromExplain(plan)), "ts $gte count should be a covered query");
 assertExplainCount({explainResults: plan, expectedCount: 5});
 
 // Check that find over [Timestamp(0, 0), Timestamp(2^32 - 1, 2^32 - 1)] does not require a
@@ -65,7 +69,7 @@ plan = coll
     .find({ts: {$gte: Timestamp(0, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gte find with project should be a covered query",
 );
 
@@ -74,7 +78,7 @@ plan = coll
     .explain("executionStats")
     .find({ts: {$lt: Timestamp(1, 0)}})
     .count();
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "ts $lt count should be a covered query");
+assert(isIndexOnly(db, getWinningPlanFromExplain(plan)), "ts $lt count should be a covered query");
 assertExplainCount({explainResults: plan, expectedCount: 3});
 
 // Check that find over [Timestamp(0, 0), Timestamp(1, 0)) does not require a FETCH stage when
@@ -84,7 +88,7 @@ plan = coll
     .find({ts: {$lt: Timestamp(1, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $lt find with project should be a covered query",
 );
 
@@ -93,7 +97,7 @@ plan = coll
     .explain("executionStats")
     .find({ts: {$lte: Timestamp(1, 0)}})
     .count();
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "ts $lte count should be a covered query");
+assert(isIndexOnly(db, getWinningPlanFromExplain(plan)), "ts $lte count should be a covered query");
 assertExplainCount({explainResults: plan, expectedCount: 4});
 
 // Check that find over [Timestamp(0, 0), Timestamp(1, 0)] does not require a FETCH stage when
@@ -103,7 +107,7 @@ plan = coll
     .find({ts: {$lte: Timestamp(1, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $lte find with project should be a covered query",
 );
 
@@ -113,7 +117,7 @@ plan = coll
     .find({ts: {$gt: Timestamp(0, 1), $lt: Timestamp(1, 0)}})
     .count();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gt, $lt count should be a covered query",
 );
 assertExplainCount({explainResults: plan, expectedCount: 2});
@@ -125,7 +129,7 @@ plan = coll
     .find({ts: {$gt: Timestamp(0, 1), $lt: Timestamp(1, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gt, $lt find with project should be a covered query",
 );
 
@@ -135,7 +139,7 @@ plan = coll
     .find({ts: {$gt: Timestamp(0, 1), $lte: Timestamp(1, 0)}})
     .count();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gt, $lte count should be a covered query",
 );
 assertExplainCount({explainResults: plan, expectedCount: 3});
@@ -147,7 +151,7 @@ plan = coll
     .find({ts: {$gt: Timestamp(0, 1), $lte: Timestamp(1, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gt, $lte find with project should be a covered query",
 );
 
@@ -157,7 +161,7 @@ plan = coll
     .find({ts: {$gte: Timestamp(0, 1), $lt: Timestamp(1, 0)}})
     .count();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gte, $lt count should be a covered query",
 );
 assertExplainCount({explainResults: plan, expectedCount: 3});
@@ -169,7 +173,7 @@ plan = coll
     .find({ts: {$gte: Timestamp(0, 1), $lt: Timestamp(1, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gte, $lt find with project should be a covered query",
 );
 
@@ -179,7 +183,7 @@ plan = coll
     .find({ts: {$gte: Timestamp(0, 1), $lte: Timestamp(1, 0)}})
     .count();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gte, $lte count should be a covered query",
 );
 assertExplainCount({explainResults: plan, expectedCount: 4});
@@ -191,6 +195,6 @@ plan = coll
     .find({ts: {$gte: Timestamp(0, 1), $lte: Timestamp(1, 0)}}, {ts: 1, _id: 0})
     .finish();
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "ts $gte, $lte find with project should be a covered query",
 );

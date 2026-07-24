@@ -194,6 +194,14 @@ struct BaseCandidatePlan {
     bool fromPlanCache{false};
     // Any results produced during the plan's execution prior to scoring are retained here.
     std::deque<ResultType> results;
+    // The plan's final ranking score - the trial score (QuerySolution::score) plus any
+    // tie-breaking heuristics bonuses - set by pickBestPlan() when it ranks the candidates.
+    // Sorting by it descending reproduces PlanRankingDecision::candidateOrder. Kept separate from
+    // QuerySolution::score, which explain displays: the bonuses participate in the ranking but are
+    // not part of the displayed trial score.
+    // TODO SERVER-131545 Refactor QuerySolution::score into BaseCandidatePlan and unify it with
+    // this field as one per-candidate scores record.
+    boost::optional<double> adjustedScore;
 };
 
 using CandidatePlan = BaseCandidatePlan<PlanStage*, WorkingSetID, WorkingSet*>;

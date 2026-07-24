@@ -21,10 +21,19 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash = boost::none,
                                     boost::optional<std::string> replanReason = boost::none);
 
+/**
+ * 'isExplain' states whether the executor being explained serves an explain command; it lets the
+ * classic explainer take its pre-execution snapshot of an in-tree MultiPlanStage's trial
+ * statistics at construction without imposing that cost on normal queries.
+ *
+ * TODO SERVER-132012: replace the flag by choosing an explain-specialized PlanExplainer subclass
+ * here in the factory.
+ */
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash,
                                     boost::optional<std::string> replanReason,
-                                    boost::optional<PlanExplainerData> maybeExplainData);
+                                    boost::optional<PlanExplainerData> maybeExplainData,
+                                    bool isExplain);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);

@@ -28,18 +28,21 @@ ExplainPolicy explainPolicyFor(ExplainOptions::Verbosity v) {
             // allPlansExecution content.
             return ExplainPolicy(execAllPlans | C::kBytecode);
 
-        // TODO SERVER-130529: Remove these transitional V3 rows. Until the V3 output format is
-        // implemented, a V3 verbosity is normally translated to a legacy verbosity before any
-        // content decision. The one exception is DocumentSourceUnionWith::optimizeAt(), which reads
-        // the originally requested (possibly-V3) verbosity straight off the ExpressionContext and
-        // feeds it here. Mapping every V3 value to the kExecAllPlans policy keeps that site
-        // byte-identical: before SERVER-130812 it evaluated "v3Verbosity >= kExecStats", which was
-        // true for every V3 value, so its effective content matched kExecAllPlans.
+        // Explain V3 verbosities: a separate sequence of verbosities, each one adds contents on
+        // top of the previous one: planSummary = plannerChoice ⊆ plannerStats ⊆ execStats.
         case V::kPlanSummary:
         case V::kPlannerChoice:
+            // Planner-only content, no execution statistics. The output of these two reduction
+            // modes is still legacy-delegated (TODO SERVER-131451), but the policy is real.
+            return ExplainPolicy(queryPlanner);
         case V::kPlannerStats:
+            // Trial/per-candidate statistics without winner-execution statistics — a combination
+            // no legacy verbosity produces; the V3 plan serializer keys off it. The query is not
+            // executed at this verbosity.
+            return ExplainPolicy(queryPlanner | C::kAllPlansExecStats);
         case V::kExecStatsV3:
-            return ExplainPolicy(execAllPlans);
+            // plannerStats content plus the retained "executionStats" section (winner executed).
+            return ExplainPolicy(queryPlanner | C::kAllPlansExecStats | C::kExecStats);
     }
     MONGO_UNREACHABLE_TASSERT(10812000);
 }

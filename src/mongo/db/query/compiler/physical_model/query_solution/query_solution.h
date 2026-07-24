@@ -520,6 +520,9 @@ public:
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
 
     // Score calculated by PlanRanker. Only present if there are multiple candidate plans.
+    // TODO SERVER-131545 Refactor QuerySolution::score into BaseCandidatePlan: a score is a
+    // property of a candidacy, not of the plan, and belongs next to
+    // BaseCandidatePlan::adjustedScore as one per-candidate scores record.
     boost::optional<double> score;
 
     // Used for populating the 'isCached' field in explain when the query is not parameterized.
@@ -1927,7 +1930,7 @@ struct EqLookupNode : public QuerySolutionNode {
      * Only meaningful when 'lookupStrategy' is kDynamicIndexedLoopJoin. True if the chosen index
      * has a collation compatible with the query (no run-time type check needed for collation).
      * False if the collation is incompatible and the type check is required. (The other reason for
-     * DILJ -- a sparse index -- is derived at lowering directly from the index's 'sparse' flag.)
+     * DILJ - a sparse index - is derived at lowering directly from the index's 'sparse' flag.)
      */
     bool collationCompatibleForDilj = true;
 

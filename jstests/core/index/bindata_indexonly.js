@@ -7,7 +7,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.jstests_bindata_indexonly;
 
@@ -36,7 +36,7 @@ function testIndexOnlyBinData(blob) {
         .explain("executionStats");
 
     assert(
-        isIndexOnly(db, explain.queryPlanner.winningPlan),
+        isIndexOnly(db, getWinningPlanFromExplain(explain)),
         "indexonly.BinData(0, " + blob + ") - must be index-only",
     );
     assert.eq(

@@ -297,6 +297,11 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
         double score = scoresAndCandidateIndices[i].first;
         size_t candidateIndex = scoresAndCandidateIndices[i].second;
 
+        // Retain the final (tie-breaking-adjusted) ranking score on the candidate itself:
+        // 'why' is consumed by the plan cache callback, but explain needs the ranking order
+        // (candidateOrder equivalent) after the decision object is gone.
+        candidates[candidateIndex].adjustedScore = score;
+
         why->stats.candidatePlanStats.push_back(std::move(statTrees[candidateIndex]));
         why->scores.push_back(score);
         why->candidateOrder.push_back(candidateIndex);

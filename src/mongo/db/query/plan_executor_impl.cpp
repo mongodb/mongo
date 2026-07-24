@@ -99,8 +99,12 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(plan_explainer_factory::make(
-          _root.get(), cachedPlanHash, std::move(replanReason), std::move(maybeExplainData))),
+      _planExplainer(
+          plan_explainer_factory::make(_root.get(),
+                                       cachedPlanHash,
+                                       std::move(replanReason),
+                                       std::move(maybeExplainData),
+                                       _cq && _cq->getExplain().has_value() /* isExplain */)),
       _mustReturnOwnedBson(returnOwnedBson),
       // Read value of 'operationResponseMaxMS' query knob once, here at construction, where the
       // knob configuration is resolved and available. The knob is fixed for the query's lifetime,
@@ -333,7 +337,7 @@ void PlanExecutorImpl::doWaitDuringYield() {
     // If we yielded because we encountered a sharding critical section, wait for the critical
     // section to end before continuing. By waiting for the critical section to be exited we avoid
     // busy spinning immediately and encountering the same critical section again. It is important
-    // that this wait happens after having released the lock hierarchy -- otherwise deadlocks could
+    // that this wait happens after having released the lock hierarchy - otherwise deadlocks could
     // happen, or the very least, locks would be unnecessarily held while waiting.
     const auto& shardingCriticalSection = planExecutorShardingState(_opCtx).criticalSectionFuture;
     if (shardingCriticalSection) {
@@ -628,7 +632,7 @@ void PlanExecutorImpl::_handleNeedYield(WriteConflictRetryState& retryState) {
     } else if (!_oplogWaitConfig || !_oplogWaitConfig->waitedForOplogVisiblity()) {
         // If we didn't wait for oplog visibility, then we must be yielding because of a
         // WriteConflictException. Oplog-visibility yields and TUE yields (handled above) do
-        // not contribute to the retry-limit gauge -- only the WCE path below acquires the
+        // not contribute to the retry-limit gauge - only the WCE path below acquires the
         // streak guard.
         if (!_yieldPolicy->canAutoYield() ||
             MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {

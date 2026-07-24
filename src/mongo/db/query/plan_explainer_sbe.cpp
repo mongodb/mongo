@@ -722,7 +722,12 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
               ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(),
                                              cachedPlanHash,
                                              boost::none /* replanReason */,
-                                             std::move(maybeExplainData))
+                                             std::move(maybeExplainData),
+                                             // This embedded classic explainer serves only the
+                                             // legacy accessors (SBE V3 parity is
+                                             // SERVER-132033), which need no construction-time
+                                             // trial snapshot.
+                                             false /* isExplain */)
               : nullptr} {
     if (_classicRuntimePlannerExplainer) {
         // 'solution' is always non-null when 'classicRuntimePlannerStage' is non-null

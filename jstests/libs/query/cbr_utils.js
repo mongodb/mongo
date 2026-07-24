@@ -26,10 +26,15 @@ export function planEstimatedWithHistogram(plan) {
 }
 
 /**
- * Returns whether the given plan was costed or not.
+ * Returns whether the given plan was costed or not. Legacy explain places the cost estimate flat
+ * on the plan node; the V3 explain shape groups it under the per-node "statistics.costBased"
+ * subobject.
  */
 export function isPlanCosted(plan) {
-    return plan.hasOwnProperty("costEstimate");
+    return (
+        plan.hasOwnProperty("costEstimate") ||
+        plan.statistics?.costBased?.hasOwnProperty("costEstimate") === true
+    );
 }
 
 /**

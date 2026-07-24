@@ -23,8 +23,10 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/util/assert_util.h"
@@ -97,6 +99,8 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
         plannerBob.append("planCacheKey", zeroPaddedHex(*plannerContext.planCacheKeyHash));
     }
 
+    // TODO SERVER-132079: source the planning time from the executor's own explain data instead
+    // of the per-operation diagnostics state.
     if (exec->getOpCtx() != nullptr) {
         const auto planningTimeOpt =
             CurOp::get(exec->getOpCtx())->debug().getAdditiveMetrics().planningTime;
@@ -344,14 +348,20 @@ BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
 }
 
 /**
- * The V3 analogue of generatePlannerInfo(): the hook where the new (version 3) "queryPlanner"
- * output will be produced. It is invoked in place of generatePlannerInfo() when a V3 verbosity is
- * requested.
+ * The V3 analogue of generatePlannerInfo(): produces the version 3 "queryPlanner" section for the
+ * stats-rich V3 verbosities (plannerStats, execStats) - the version-independent general block
+ * followed by one uniform "plans" array of per-plan objects (winner first, then the remaining
+ * candidates ordered by the deciding ranker's metric), replacing the legacy winningPlan /
+ * rejectedPlans split. There are two deliberate delegation windows:
  *
- * TODO SERVER-130529 Implement the V3 queryPlanner output format here. Until then this skeleton
- * takes the real requested V3 verbosity, maps it to the nearest legacy verbosity internally, and
- * delegates to the legacy generatePlannerInfo() so the V3 modes produce meaningful (legacy-shaped)
- * output while reporting "explainVersion: '3'".
+ * - planSummary / plannerChoice still render legacy-shaped output under explainVersion "3".
+ *   TODO SERVER-131451 (the reductions) closes that window.
+ * - Explainers that do not implement the per-plan enumerator (SBE, Express: default-empty
+ *   getPlanEntries()) keep the legacy delegation. TODO SERVER-132033 routes them through
+ *   getPlanEntries(); the classic engine always yields at least one entry.
+ *
+ * Both delegations must map the verbosity to legacy first: the legacy generators tassert on a V3
+ * verbosity.
  */
 void generatePlannerInfoV3(PlanExecutor* exec,
                            ExplainOptions::Verbosity v3Verbosity,
@@ -360,23 +370,84 @@ void generatePlannerInfoV3(PlanExecutor* exec,
                            BSONObj extraInfo,
                            const SerializationContext& serializationContext,
                            BSONObjBuilder* out) {
-    generatePlannerInfo(exec,
-                        mapV3ToLegacyVerbosity(v3Verbosity),
-                        cmd,
-                        plannerContext,
-                        extraInfo,
-                        serializationContext,
-                        out);
+    if (v3Verbosity == ExplainOptions::Verbosity::kPlanSummary ||
+        v3Verbosity == ExplainOptions::Verbosity::kPlannerChoice) {
+        generatePlannerInfo(exec,
+                            mapV3ToLegacyVerbosity(v3Verbosity),
+                            cmd,
+                            plannerContext,
+                            extraInfo,
+                            serializationContext,
+                            out);
+        return;
+    }
+
+    const ExplainPolicy policy = explainPolicyFor(v3Verbosity);
+    auto&& explainer = exec->getPlanExplainer();
+    // The ranker that decided the winning plan, as recorded by the plan ranking strategies in
+    // OpDebug (their single write point); it determines the ordering of plans[] after the winner
+    // and is threaded explicitly rather than inferred from which statistics are present.
+    // TODO SERVER-132079: carry it on PlanExplainerData instead of reading it back from the
+    // per-operation diagnostics state.
+    tassert(
+        13152501, "explain requires an executor attached to an OperationContext", exec->getOpCtx());
+    const PlanRankerMethod decidingPlanRanker =
+        CurOp::get(exec->getOpCtx())->debug().planRankerMethod;
+    auto entries = explainer.getPlanEntries(policy, PlanStatsFormat::kV3, decidingPlanRanker);
+    // Zero entries means the explainer does not implement the per-plan enumerator and inherited
+    // the default-empty getPlanEntries(): SBE, Express, and the pipeline explainer. Those paths
+    // keep the legacy-shaped sections under explainVersion "3" until SERVER-132033 (engine
+    // parity); the classic explainer always returns at least the winning plan.
+    if (entries.empty()) {
+        generatePlannerInfo(exec,
+                            mapV3ToLegacyVerbosity(v3Verbosity),
+                            cmd,
+                            plannerContext,
+                            extraInfo,
+                            serializationContext,
+                            out);
+        return;
+    }
+
+    BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
+    appendQueryPlannerCommonInfo(exec, plannerContext, extraInfo, serializationContext, plannerBob);
+
+    BSONArrayBuilder plansBob(plannerBob.subarrayStart("plans"));
+    for (auto&& entry : entries) {
+        BSONObjBuilder planBob(plansBob.subobjStart());
+        planBob.append("isCached", entry.isCached);
+        if (internalQueryAllowForcedPlanByHash.load() && entry.solutionHash) {
+            planBob.append("solutionHashUnstable", static_cast<long long>(*entry.solutionHash));
+        }
+        if (entry.hasTrialStats && entry.summary) {
+            // Plan-level multi-planning trial totals - present for every plan that ran a trial,
+            // regardless of which ranker decided.
+            BSONObjBuilder multiPlanStatsBob(planBob.subobjStart("multiPlanStats"));
+            if (entry.summary->score) {
+                multiPlanStatsBob.appendNumber("score", *entry.summary->score);
+            }
+            multiPlanStatsBob.appendNumber("nReturned",
+                                           static_cast<long long>(entry.summary->nReturned));
+            appendExecutionTimeFields(multiPlanStatsBob, entry.summary->executionTime);
+            multiPlanStatsBob.appendNumber(
+                "totalKeysExamined", static_cast<long long>(entry.summary->totalKeysExamined));
+            multiPlanStatsBob.appendNumber(
+                "totalDocsExamined", static_cast<long long>(entry.summary->totalDocsExamined));
+        }
+        planBob.append("planStages", entry.planStatsTree);
+    }
+    plansBob.doneFast();
+    plannerBob.doneFast();
 }
 
 /**
- * The V3 analogue of generateExecutionInfo(): the hook where the new (version 3) "executionStats"
- * output will be produced. It is invoked in place of generateExecutionInfo() when a V3 verbosity
- * that warrants execution statistics is requested.
- *
- * TODO SERVER-130529 Implement the V3 execution output format here. Until then this skeleton takes
- * the real requested V3 verbosity, maps it to the nearest legacy verbosity internally, and
- * delegates to the legacy generateExecutionInfo().
+ * The V3 analogue of generateExecutionInfo(): emits the retained "executionStats" section for the
+ * V3 execStats verbosity. By design the section is the legacy kExecStats section unchanged -
+ * legacy node shape (fused counters, no per-node statistics grouping) and never an
+ * allPlansExecution array (that content lives in queryPlanner.plans[]) - which is why this
+ * delegates to the legacy generator at the kExecStats verbosity. Do not fork the section's
+ * generation path: V3 execStats' executionStats must stay information-identical to the legacy
+ * executionStats verbosity's section.
  */
 void generateExecutionInfoV3(PlanExecutor* exec,
                              ExplainOptions::Verbosity v3Verbosity,
@@ -384,7 +455,7 @@ void generateExecutionInfoV3(PlanExecutor* exec,
                              boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
                              BSONObjBuilder* out) {
     generateExecutionInfo(
-        exec, mapV3ToLegacyVerbosity(v3Verbosity), executePlanStatus, winningPlanTrialStats, out);
+        exec, ExplainOptions::Verbosity::kExecStats, executePlanStatus, winningPlanTrialStats, out);
 }
 
 template <typename EntryType>
@@ -448,52 +519,26 @@ void Explain::explainStages(PlanExecutor* exec,
     auto&& explainer = exec->getPlanExplainer();
     out->appendElements(explainVersionToBson(explainer.getVersion(verbosity)));
 
-    // Dispatch on the verbosity. Each V3 verbosity is routed to the V3 section generators, which
-    // are the hooks for the future V3 output format; they receive the real requested verbosity and,
-    // for now, map it to the nearest legacy verbosity internally and reuse the legacy generators.
-    // This switch is intentionally exhaustive (no 'default') so that any future verbosity must be
-    // classified here.
-    // TODO SERVER-130529 Replace the legacy delegation in generatePlannerInfoV3()/
-    // generateExecutionInfoV3() with the real V3 output format.
-    // TODO SERVER-130529 Rewrite the switch as
-    // if (isV3(verbosity)) {
-    //     if (explainPolicy(verbosity).hasExecStats()) {
-    //         generateV3exec();
-    //     else ...
-    //  else {
-    //      if (explainPolicy(verbosity).hasExecStats()) {
-    //          generateExecStats();
-    //      else ...
-    // }
-    switch (verbosity) {
-        case ExplainOptions::Verbosity::kPlanSummary:
-        case ExplainOptions::Verbosity::kPlannerChoice:
-            generatePlannerInfoV3(
-                exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
-            break;
-        case ExplainOptions::Verbosity::kPlannerStats:
-            generatePlannerInfoV3(
-                exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
+    // Policy-driven dispatch: the V3 verbosities are routed to the V3 section generators, the
+    // legacy verbosities to the legacy ones; within each family the policy decides which sections
+    // are present. In particular, the V3 planner-side modes (planSummary, plannerChoice,
+    // plannerStats) have no execution statistics, so only execStats emits the retained
+    // executionStats section.
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
+    if (ExplainOptions::isV3Verbosity(verbosity)) {
+        generatePlannerInfoV3(
+            exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
+        if (explainPolicy.hasExecStats()) {
             generateExecutionInfoV3(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
-            break;
-        case ExplainOptions::Verbosity::kExecStatsV3:
-            generatePlannerInfoV3(
+        }
+    } else {
+        if (explainPolicy.hasPlannerInfo()) {
+            generatePlannerInfo(
                 exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
-            generateExecutionInfoV3(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
-            break;
-        case ExplainOptions::Verbosity::kQueryPlanner:
-        case ExplainOptions::Verbosity::kExecStats:
-        case ExplainOptions::Verbosity::kExecAllPlans:
-        case ExplainOptions::Verbosity::kInternal:
-            if (explainPolicyFor(verbosity).hasPlannerInfo()) {
-                generatePlannerInfo(
-                    exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
-            }
-            if (explainPolicyFor(verbosity).hasExecStats()) {
-                generateExecutionInfo(
-                    exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
-            }
-            break;
+        }
+        if (explainPolicy.hasExecStats()) {
+            generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
+        }
     }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
@@ -587,25 +632,11 @@ void Explain::explainStages(PlanExecutor* exec,
     Status executePlanStatus = Status::OK();
     const MultipleCollectionAccessor* collectionsPtr = &collections;
 
-    // Whether the plan must be executed to gather execution statistics. This mirrors the verbosity
-    // dispatch in the sibling explainStages() overload: the planner-only modes (legacy queryPlanner
-    // and the planner-only V3 modes) do not execute; everything else does. Exhaustive switch (no
-    // 'default') so a future verbosity must be classified here too.
-    const bool requiresExecution = [&] {
-        switch (verbosity) {
-            case ExplainOptions::Verbosity::kQueryPlanner:
-            case ExplainOptions::Verbosity::kPlanSummary:
-            case ExplainOptions::Verbosity::kPlannerChoice:
-                return false;
-            case ExplainOptions::Verbosity::kExecStats:
-            case ExplainOptions::Verbosity::kExecAllPlans:
-            case ExplainOptions::Verbosity::kInternal:
-            case ExplainOptions::Verbosity::kPlannerStats:
-            case ExplainOptions::Verbosity::kExecStatsV3:
-                return true;
-        }
-        MONGO_UNREACHABLE_TASSERT(10905002);
-    }();
+    // Whether the plan must be executed to gather execution statistics: exactly when the
+    // verbosity's policy has winner-execution statistics. The planner-side modes - legacy
+    // queryPlanner and the V3 planSummary/plannerChoice/plannerStats - do not execute the query;
+    // in particular plannerStats reports the multi-planning trial statistics without executing.
+    const bool requiresExecution = explainPolicyFor(verbosity).hasExecStats();
 
     // If we need execution stats, then run the plan in order to gather the stats.
     const MultipleCollectionAccessor emptyCollections;
