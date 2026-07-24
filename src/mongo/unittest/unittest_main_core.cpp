@@ -242,7 +242,11 @@ void installEnhancedReporter(EnhancedReporter::Options options) {
 
 class MongoExceptionPrinter : public testing::EmptyTestEventListener {
 public:
-    void OnTestPartResult(const testing::TestPartResult& res) override {
+    void OnTestPartResult(const testing::TestPartResult& result) override {
+        if (result.type() == testing::TestPartResult::kSuccess ||
+            result.type() == testing::TestPartResult::kSkip)
+            return;
+
         details::printExceptionInfo(stdout);
         fflush(stdout);
         printStackTrace();
