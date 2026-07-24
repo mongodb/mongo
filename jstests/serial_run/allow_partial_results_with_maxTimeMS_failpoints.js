@@ -12,6 +12,14 @@
  *   requires_getmore,
  *   requires_fcv_62,
  *   requires_scripting,
+ *   # This test calibrates maxTimeMS off a measured baseline query runtime and then asserts on exact
+ *   # partial-result batch lengths at the timeout boundary. Under ASAN/UBSAN the instrumented
+ *   # slowdown plus heavy job parallelism (burn_in runs it 8-up) makes the baseline sample
+ *   # unrepresentative of later queries, so the healthy shard intermittently misses its deadline and
+ *   # returns the wrong batch length. The timing is inherently too noisy to be reliable on aubsan.
+ *   # TODO SERVER-128404: add a WASM aubsan partial-results test that asserts on outcomes (partial
+ *   # vs complete, error codes) rather than calibrated wall-clock thresholds.
+ *   incompatible_aubsan,
  *   # TODO SERVER-128404: Wasmtime's sigaction-based SIGSEGV trap detection conflicts with TSAN's
  *   # pthread_kill interceptor (CHECK thr->slot!=0 in tsan_interceptors_posix.cpp). Fix is
  *   # Config::signals_based_traps(false) in TSAN builds (bridge.cpp), deferred to a separate
@@ -129,8 +137,38 @@ const neverTimeout = new MultiController([
 // so use a larger multiplier to stay clear of the timeout boundary.
 // Pass the mongos admin DB explicitly: the global `db` variable is not set in sharding tests.
 const adminDb = st.s0.getDB("admin");
-const ampleTimeMSBase = runtimeMillis(() => runQueryWithTimeout(true, 999999999));
-const ampleTimeMSMultiplier = isMozjsWasm(adminDb) ? 20 : 10;
+// Cache the engine check once: it is a buildInfo round-trip and gates all three WASM-only blocks
+// below (warm-up, cold sample, multiplier).
+const isWasm = isMozjsWasm(adminDb);
+// The server retires an idle scope after this window (kMaxScopeReuseTime in scripting/engine.cpp);
+// past it, the next query rebuilds a cold WASM bridge. Kept in sync with the server constant.
+const kScopeReuseWindowMS = 10 * 1000;
+// On WASM the very first $where in a mongod builds the shared engine context (a one-time
+// deserialize that is seconds-long on debug builds). Run a throwaway query first so that one-time
+// cost is not measured by the calibration below and does not inflate ampleTimeMS (SERVER-131822).
+// TODO SERVER-131930: remove once the engine context is pre-warmed at startup.
+if (isWasm) {
+    runQueryWithTimeout(true, 999999999);
+}
+let ampleTimeMSBase = runtimeMillis(() => runQueryWithTimeout(true, 999999999));
+// The warm sample above reuses the scope built by the warm-up query. But the server retires an idle
+// scope after kScopeReuseWindowMS (kMaxScopeReuseTime in scripting/engine.cpp), so any test query
+// that runs after that window lands on a fresh, cold-built WASM bridge (a new Store instantiate +
+// JIT), which is far slower than the warm sample. Failpoint toggling and the multi-second controller
+// sleeps below routinely open gaps past the window, so calibrating ampleTimeMS off the warm sample
+// alone sets it too low and the healthy shard can occasionally miss its deadline (wrong partial
+// batch length, intermittently on slow debug variants). Take one cold sample past the reuse window
+// and use the larger of the two so ampleTimeMS bounds the cold path too. Note this cold sample adds
+// ~kScopeReuseWindowMS of wall time to every WASM run of this serial test. TODO SERVER-131930: with
+// the bridge pool pre-warmed there are no cold mid-test bridges, so this cold sample can be removed.
+if (isWasm) {
+    sleep(kScopeReuseWindowMS + 1000); // exceed the reuse window so the next query rebuilds cold
+    ampleTimeMSBase = Math.max(
+        ampleTimeMSBase,
+        runtimeMillis(() => runQueryWithTimeout(true, 999999999)),
+    );
+}
+const ampleTimeMSMultiplier = isWasm ? 20 : 10;
 const ampleTimeMS = 2000 + ampleTimeMSMultiplier * ampleTimeMSBase;
 print("ampleTimeMS: " + ampleTimeMS);
 

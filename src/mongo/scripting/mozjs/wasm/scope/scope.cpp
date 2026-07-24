@@ -90,6 +90,11 @@ WasmtimeImplScope::~WasmtimeImplScope() {
 }
 
 void WasmtimeImplScope::reset() {
+    // A live scope always holds its shared engine context: getWasmEngineContext() memoizes and
+    // returns the process-wide context, and it is only cleared when the scope is parked/destroyed.
+    // reset() must never rebuild it (a no-op now that the context is shared).
+    invariant(_wasmEngineCtx);
+
     // Clear the decoration under the Client lock before tearing down _bridge, so a racing
     // interrupt() cannot call kill() on a dangling bridge.
     unregisterOperation();
@@ -116,18 +121,6 @@ void WasmtimeImplScope::reset() {
         }
         _bridge = nullptr;
         _emitSetupBytes = 0;
-
-        // Only recreate WasmEngineContext when a kill was pending. kill() calls
-        // Engine::increment_epoch(), which is engine-wide state — a fresh Engine+Component avoids
-        // epoch contamination on the next Store instantiation. For non-kill resets the existing
-        // Engine is clean and a new Store can be safely created from it.
-        if (wasKillPending || !_wasmEngineCtx) {
-            _wasmEngineCtx.reset();
-            if (auto* engine = getGlobalScriptEngine()) {
-                _wasmEngineCtx =
-                    static_cast<WasmtimeScriptEngine*>(engine)->createWasmEngineContext();
-            }
-        }
         // Handles from the old bridge are invalid after recreation — must recompile.
         _cachedFunctions.clear();
     }

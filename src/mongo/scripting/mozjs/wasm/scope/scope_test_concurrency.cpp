@@ -57,12 +57,12 @@ TEST(WasmtimeScopeConcurrency, ConcurrentIndependentScopes) {
     ASSERT_EQ(successCount.load(), kThreads);
 }
 
-// More threads than the pre-warmed pool size (kContextPoolSize == 4) forces pool exhaustion and
-// on-demand context creation — verifies the pool's mutex and fallback path are race-free. 12 is
-// comfortably above the pool size to keep several threads racing on the fallback while bounding
-// peak memory: each scope holds a ~1.2 GB store, so larger counts swap slower CI hosts into the
-// unit-test timeout.
-TEST(WasmtimeScopeConcurrency, ConcurrentPoolExhaustion) {
+// Many threads create scopes concurrently from the single shared WasmEngineContext — verifies that
+// concurrent Store instantiation from the shared Engine/Component/Linker (serialised under
+// wasmLifecycleMutex()) is race-free. 12 keeps several threads racing while bounding peak memory:
+// each scope holds a ~1.2 GB store, so larger counts swap slower CI hosts into the unit-test
+// timeout.
+TEST(WasmtimeScopeConcurrency, ConcurrentSharedContextScopeCreation) {
     constexpr int kThreads = 12;
     WasmtimeScriptEngine engine;
 

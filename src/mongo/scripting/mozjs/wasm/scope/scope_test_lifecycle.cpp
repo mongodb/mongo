@@ -111,7 +111,7 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsEmitState) {
 // directly against the bridge to lock the invalidation contract in place.
 TEST(WasmtimeBridge, RealmReset_InvalidatesHandles) {
     WasmtimeScriptEngine engine;
-    auto ctx = engine.createWasmEngineContext();
+    auto ctx = engine.getWasmEngineContext();
     wasm::MozJSWasmBridge::Options opts;
     opts.linearMemoryLimitMB = static_cast<uint32_t>(gWasmtimeStoreMemoryLimitMB.load());
     auto bridge = std::make_unique<wasm::MozJSWasmBridge>(ctx, opts);
