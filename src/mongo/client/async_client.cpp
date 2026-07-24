@@ -86,11 +86,10 @@ otel::traces::Span AsyncDBClient::startEgressSpan(
     std::shared_ptr<otel::TelemetryContext>& telemetryContext,
     std::string_view commandName,
     bool fireAndForget) {
-    const auto* spanName = otel::traces::lookupCommandSpanName(commandName);
     otel::traces::SpanKind spanKind =
         fireAndForget ? otel::traces::SpanKind::kProducer : otel::traces::SpanKind::kClient;
     return otel::traces::Span::start(telemetryContext,
-                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC,
+                                     otel::traces::getOrRegisterCommandSpanName(commandName),
                                      otel::traces::SpanOptions{.kind = spanKind});
 }
 

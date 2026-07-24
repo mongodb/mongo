@@ -212,9 +212,8 @@ boost::optional<otel::traces::Span> maybeStartSpan(OperationContext* opCtx,
     if (connectionType == ConnectionString::ConnectionType::kLocal) {
         return boost::none;
     }
-    const auto* spanName = otel::traces::lookupCommandSpanName(commandName);
     return otel::traces::Span::start(opCtx,
-                                     spanName ? *spanName : otel::traces::span_names::kMongoRPC,
+                                     otel::traces::getOrRegisterCommandSpanName(commandName),
                                      otel::traces::SpanOptions{.kind = kind});
 }
 }  // namespace

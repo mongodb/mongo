@@ -108,15 +108,17 @@ SPAN_NAME_(kTest4, "test_only.span4");
 
 /**
  * Registers a span name for a `mongo::Command`. Must only be called from `Command`'s constructor.
- * Do not add calls to this function anywhere else.
+ * Do not add calls to this function anywhere else. Must not be called with an empty name.
  * The returned reference is stable for the lifetime of the process.
  */
 [[MONGO_MOD_PUBLIC]] const SpanName& registerCommandSpanName(std::string_view name);
 
 /**
- * Gets the span name for a command name. Returns nullptr if the command name is not found. The
- * returned pointer will remain valid for the lifetime of the process.
+ * Returns a SpanName for `name`, registering if not present, which will be valid for the lifetime
+ * of the process. Calling with an empty name returns kMongoRPC. Intended for egress span creation
+ * where the command name may not have been registered via `registerCommandSpanName` (e.g.
+ * cross-role commands).
  */
-[[MONGO_MOD_PUBLIC]] const SpanName* lookupCommandSpanName(std::string_view name);
+[[MONGO_MOD_PUBLIC]] const SpanName& getOrRegisterCommandSpanName(std::string_view name);
 
 }  // namespace mongo::otel::traces

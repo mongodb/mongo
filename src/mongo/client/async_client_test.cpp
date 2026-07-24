@@ -158,14 +158,25 @@ protected:
 
 using StartEgressSpanTest = EgressSpanTest;
 
-TEST_F(StartEgressSpanTest, FallsBackToGenericSpanNameForUnregisteredCommand) {
+TEST_F(StartEgressSpanTest, RegistersSpanNameForUnregisteredCommand) {
     std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
         auto span = AsyncDBClient::startEgressSpan(
             telemetryCtx, "test_only.async_client_unregistered", /*fireAndForget=*/false);
     }
 
+    EXPECT_THAT(_capturer.getSpans("test_only.async_client_unregistered"), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
+}
+
+TEST_F(StartEgressSpanTest, FallsBackToGenericSpanNameForEmptyCommandName) {
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
+    {
+        auto span = AsyncDBClient::startEgressSpan(telemetryCtx, "", /*fireAndForget=*/false);
+    }
+
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(""), IsEmpty());
 }
 
 TEST_F(StartEgressSpanTest, UsesRegisteredSpanNameForKnownCommand) {
@@ -194,16 +205,13 @@ TEST_F(StartEgressSpanTest, IsChildOfExistingSpanOnTelemetryContext) {
     auto telemetryCtx = Span::createTelemetryContext();
     {
         auto parentSpan = Span::start(telemetryCtx, span_names::kTest1);
-        // Use a command name that is guaranteed to not be registered (unlike e.g. "ping", which
-        // is registered as a real command in this test binary), so this exercises the kMongoRPC
-        // fallback path.
         {
             auto childSpan = AsyncDBClient::startEgressSpan(
                 telemetryCtx, "test_only.unregistered", /*fireAndForget=*/false);
         }
     }
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+    EXPECT_THAT(_capturer.getSpans("test_only.unregistered"),
                 ElementsAre(Parent(HasSpanName(span_names::kTest1))));
 }
 
@@ -214,7 +222,7 @@ TEST_F(StartEgressSpanTest, CreatesClientSpanKind) {
             telemetryCtx, "test_only.async_client_kind", /*fireAndForget=*/false);
     }
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+    EXPECT_THAT(_capturer.getSpans("test_only.async_client_kind"),
                 ElementsAre(HasKind(otel::traces::SpanKind::kClient)));
 }
 
@@ -225,7 +233,7 @@ TEST_F(StartEgressSpanTest, CreatesProducerSpanKindForFireAndForget) {
             telemetryCtx, "test_only.async_client_fire_and_forget_kind", /*fireAndForget=*/true);
     }
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+    EXPECT_THAT(_capturer.getSpans("test_only.async_client_fire_and_forget_kind"),
                 ElementsAre(HasKind(otel::traces::SpanKind::kProducer)));
 }
 
@@ -391,6 +399,18 @@ protected:
 };
 
 using RunCommandRequestSpanTest = CommandSpanLifetimeTest;
+
+TEST_F(RunCommandRequestSpanTest, UsesMongoRpcSpanNameForEmptyCommandName) {
+    _session->queueReply(
+        [](const Message& request) { return makeReplyTo(request, BSON("ok" << 1)); });
+
+    auto future = _client->runCommandRequest(makeRemoteCommandRequest(""));
+
+    ASSERT_TRUE(future.isReady());
+    EXPECT_THAT(std::move(future).getNoThrow(), StatusIsOK());
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(""), IsEmpty());
+}
 
 TEST_F(RunCommandRequestSpanTest, IsOpenUntilResponseAndThenEndsOk) {
     static const auto& registeredSpan = registerCommandSpanName("test_only.run_command_request_ok");

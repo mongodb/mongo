@@ -274,12 +274,22 @@ TEST_F(RunFireAndForgetCommandSpanTest, UsesRegisteredSpanNameForKnownCommand) {
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
 }
 
-TEST_F(RunFireAndForgetCommandSpanTest, FallsBackToDefaultSpanNameForUnknownCommand) {
+TEST_F(RunFireAndForgetCommandSpanTest, RegistersSpanNameForUnknownCommand) {
     auto opCtx = makeOperationContext();
     FakeDBClient client(WireVersion::WIRE_VERSION_90);
     client.runFireAndForgetCommand(makeRequest("test_only.dbclient_fire_and_forget_unregistered"));
 
+    EXPECT_THAT(_capturer.getSpans("test_only.dbclient_fire_and_forget_unregistered"), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
+}
+
+TEST_F(RunFireAndForgetCommandSpanTest, UsesMongoRpcSpanNameForEmptyCommandName) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.runFireAndForgetCommand(makeRequest(""));
+
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(""), IsEmpty());
 }
 
 TEST_F(RunFireAndForgetCommandSpanTest, CreatesProducerSpanKind) {
@@ -287,7 +297,7 @@ TEST_F(RunFireAndForgetCommandSpanTest, CreatesProducerSpanKind) {
     FakeDBClient client(WireVersion::WIRE_VERSION_90);
     client.runFireAndForgetCommand(makeRequest("test_only.dbclient_fire_and_forget_kind"));
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+    EXPECT_THAT(_capturer.getSpans("test_only.dbclient_fire_and_forget_kind"),
                 ElementsAre(HasKind(otel::traces::SpanKind::kProducer)));
 }
 
@@ -304,13 +314,24 @@ TEST_F(RunCommandWithTargetSpanTest, UsesRegisteredSpanNameForKnownCommand) {
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
 }
 
-TEST_F(RunCommandWithTargetSpanTest, FallsBackToDefaultSpanNameForUnknownCommand) {
+TEST_F(RunCommandWithTargetSpanTest, RegistersSpanNameForUnknownCommand) {
     auto opCtx = makeOperationContext();
     FakeDBClient client(WireVersion::WIRE_VERSION_90);
     client.setCannedReply(makeOkOpMsgReply());
     client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_unregistered"));
 
+    EXPECT_THAT(_capturer.getSpans("test_only.dbclient_run_command_unregistered"), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
+}
+
+TEST_F(RunCommandWithTargetSpanTest, UsesMongoRpcSpanNameForEmptyCommandName) {
+    auto opCtx = makeOperationContext();
+    FakeDBClient client(WireVersion::WIRE_VERSION_90);
+    client.setCannedReply(makeOkOpMsgReply());
+    client.runCommandWithTarget(makeRequest(""));
+
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
+    EXPECT_THAT(_capturer.getSpans(""), IsEmpty());
 }
 
 TEST_F(RunCommandWithTargetSpanTest, CreatesClientSpanKind) {
@@ -319,7 +340,7 @@ TEST_F(RunCommandWithTargetSpanTest, CreatesClientSpanKind) {
     client.setCannedReply(makeOkOpMsgReply());
     client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_kind"));
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC),
+    EXPECT_THAT(_capturer.getSpans("test_only.dbclient_run_command_kind"),
                 ElementsAre(HasKind(otel::traces::SpanKind::kClient)));
 }
 
@@ -355,7 +376,8 @@ TEST_F(RunFireAndForgetCommandSpanStatusTest, SuccessfulSendDoesNotMarkSpanAsErr
     FakeDBClient client(WireVersion::WIRE_VERSION_90);
     client.runFireAndForgetCommand(makeRequest("test_only.dbclient_fire_and_forget_status_ok"));
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), ElementsAre(Not(HasError())));
+    EXPECT_THAT(_capturer.getSpans("test_only.dbclient_fire_and_forget_status_ok"),
+                ElementsAre(Not(HasError())));
 }
 
 TEST_F(RunFireAndForgetCommandSpanStatusTest, SendFailureMarksSpanAsError) {
@@ -371,7 +393,7 @@ TEST_F(RunFireAndForgetCommandSpanStatusTest, SendFailureMarksSpanAsError) {
     // Verify the thrown status was recorded on the span, not just that the span was marked as
     // errored by unwinding.
     EXPECT_THAT(
-        _capturer.getSpans(span_names::kMongoRPC),
+        _capturer.getSpans("test_only.dbclient_fire_and_forget_status_error"),
         ElementsAre(AllOf(HasError(), HasAttribute("errorCodeString", "simulated send error"))));
 }
 
@@ -383,7 +405,8 @@ TEST_F(RunCommandWithTargetSpanStatusTest, OkReplyDoesNotMarkSpanAsError) {
     client.setCannedReply(makeOkOpMsgReply());
     client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_status_ok"));
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), ElementsAre(Not(HasError())));
+    EXPECT_THAT(_capturer.getSpans("test_only.dbclient_run_command_status_ok"),
+                ElementsAre(Not(HasError())));
 }
 
 TEST_F(RunCommandWithTargetSpanStatusTest, CommandErrorReplyMarksSpanAsError) {
@@ -392,7 +415,8 @@ TEST_F(RunCommandWithTargetSpanStatusTest, CommandErrorReplyMarksSpanAsError) {
     client.setCannedReply(makeErrorOpMsgReply(ErrorCodes::BadValue, "some command error"));
     client.runCommandWithTarget(makeRequest("test_only.dbclient_run_command_status_error"));
 
-    EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), ElementsAre(HasError()));
+    EXPECT_THAT(_capturer.getSpans("test_only.dbclient_run_command_status_error"),
+                ElementsAre(HasError()));
 }
 
 TEST_F(RunCommandWithTargetSpanStatusTest, NetworkErrorMarksSpanAsError) {
@@ -408,7 +432,7 @@ TEST_F(RunCommandWithTargetSpanStatusTest, NetworkErrorMarksSpanAsError) {
     // Verify the thrown status (with its added network-error context) was recorded on the span,
     // not just that the span was marked as errored by unwinding.
     EXPECT_THAT(
-        _capturer.getSpans(span_names::kMongoRPC),
+        _capturer.getSpans("test_only.dbclient_run_command_status_network"),
         ElementsAre(AllOf(HasError(),
                           HasAttribute("errorCodeString", HasSubstr("simulated network error")))));
 }
@@ -428,7 +452,7 @@ TEST_F(RunCommandWithTargetSpanStatusTest, ProtocolNegotiationFailureMarksSpanAs
     // Verify the protocol-negotiation status was recorded on the span, not just that the span was
     // marked as errored by unwinding.
     EXPECT_THAT(
-        _capturer.getSpans(span_names::kMongoRPC),
+        _capturer.getSpans("test_only.dbclient_run_command_status_protocol"),
         ElementsAre(AllOf(HasError(),
                           HasAttribute("errorCodeString", HasSubstr("Mismatched RPC protocols")))));
 }

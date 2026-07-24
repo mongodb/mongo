@@ -134,13 +134,12 @@ public:
         const executor::RemoteCommandRequest& request, int maxWireVersion);
 
     /**
-     * Starts a Span for an outgoing `commandName`, using the span name registered for it (via
-     * `registerCommandSpanName`) if one exists, or falling back to the generic
-     * `span_names::kMongoRPC` otherwise. The span is started on `telemetryContext`, which is
-     * mutated in place: if it was null and a new trace should be started, it will be populated
-     * with a newly created TelemetryContext so that the caller can propagate it (e.g. via
-     * `makeEgressTelemetrySection`). Uses CLIENT span kind by default, or PRODUCER when
-     * `fireAndForget` is true (moreToCome on the wire).
+     * Starts a Span for an outgoing `commandName`, registering the command name if needed and
+     * falling back to the generic `span_names::kMongoRPC` only when no command name is available.
+     * The span is started on `telemetryContext`, which is mutated in place: if it was null and a
+     * new trace should be started, it will be populated with a newly created TelemetryContext so
+     * that the caller can propagate it (e.g. via `makeEgressTelemetrySection`). Uses CLIENT span
+     * kind by default, or PRODUCER when `fireAndForget` is true (moreToCome on the wire).
      *
      * This is a static helper to allow unit testing without a live connection.
      */

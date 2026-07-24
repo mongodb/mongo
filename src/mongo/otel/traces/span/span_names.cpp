@@ -61,11 +61,20 @@ SpanNameRegistry& globalSpanNameRegistry() {
 }  // namespace
 
 const SpanName& registerCommandSpanName(std::string_view name) {
+    invariant(!name.empty());
     return globalSpanNameRegistry().insert(name);
 }
 
-const SpanName* lookupCommandSpanName(std::string_view name) {
-    return globalSpanNameRegistry().lookup(name);
+const SpanName& getOrRegisterCommandSpanName(std::string_view name) {
+    if (name.empty()) {
+        return span_names::kMongoRPC;
+    }
+    SpanNameRegistry& registry = globalSpanNameRegistry();
+    // Lock-free fast path: `insert` always takes the write mutex.
+    if (const SpanName* existing = registry.lookup(name)) {
+        return *existing;
+    }
+    return registry.insert(name);
 }
 
 }  // namespace mongo::otel::traces
