@@ -97,6 +97,8 @@ configs:
         cpp_varname: 'wiredTigerGlobalOptions.engineConfig'
         short_name: wiredTigerEngineConfigString
         hidden: true
+        validator:
+            callback: WiredTigerGlobalOptions::validateWiredTigerConfigString
     "storage.wiredTiger.engineConfig.statistics":
         description: "Statistics collection mode [all|cache_walk|fast|none|clear|tree_walk]"
         arg_vartype: String
@@ -121,6 +123,8 @@ configs:
         cpp_varname: 'wiredTigerGlobalOptions.collectionConfig'
         short_name: wiredTigerCollectionConfigString
         hidden: true
+        validator:
+            callback: WiredTigerGlobalOptions::validateWiredTigerConfigString
 
     # WiredTiger index options
     "storage.wiredTiger.indexConfig.prefixCompression":
@@ -135,3 +139,5 @@ configs:
         cpp_varname: 'wiredTigerGlobalOptions.indexConfig'
         short_name: wiredTigerIndexConfigString
         hidden: true
+        validator:
+            callback: WiredTigerGlobalOptions::validateWiredTigerConfigString

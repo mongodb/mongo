@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include "mongo/logv2/log.h"
 
@@ -86,6 +87,10 @@ Status WiredTigerGlobalOptions::validateStatisticsSetting(const std::string& set
     }
 
     return Status::OK();
+}
+
+Status WiredTigerGlobalOptions::validateWiredTigerConfigString(const std::string& config) {
+    return WiredTigerUtil::checkConfigStringBannedKeys(config);
 }
 
 Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& value) {
