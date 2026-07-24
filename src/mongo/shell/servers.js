@@ -58,6 +58,10 @@ MongoRunner.getMongoShellPath = function () {
 };
 
 MongoRunner.getExtensionPath = function (shared_library_name) {
+    const testSrcDir = _getEnv("TEST_SRCDIR");
+    if (testSrcDir) {
+        return pathJoin(testSrcDir, "_main", "install-extensions", "lib", shared_library_name);
+    }
     return MongoRunner.getInstallPath("..", "lib", shared_library_name);
 };
 

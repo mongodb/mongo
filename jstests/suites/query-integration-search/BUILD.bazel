@@ -462,10 +462,15 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "vector_search",
     config = "//buildscripts/resmokeconfig:suites/vector_search.yml",
-    shard_count = 2,
+    data = [
+        # Ship the extension shared objects (e.g. libvector_search_extension.so) into the
+        # sandbox so remote executors can load them via loadExtensions.
+        "//:install-extensions",
+        "//jstests/with_mongot/mongotmock/lib",
+        "//src/mongo/db/extension/test_examples:resmoke_data",
+    ],
     tags = [
         "ci-release-critical",
-        "incompatible_with_bazel_remote_test",  # vector_search_ifr_toggle.js fails, looking for ../lib/libvector_search_extension.so
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -473,6 +478,8 @@ resmoke_suite_test(
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "@platforms//os:windows": ["@platforms//:incompatible"],
+        # Extensions are not supported on amazon2 (see extension_helpers.js).
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     deps = [
@@ -486,9 +493,16 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "vector_search_auth",
     config = "//buildscripts/resmokeconfig:suites/vector_search_auth.yml",
+    data = [
+        # Ship the extension shared objects (e.g. libvector_search_extension.so) into the
+        # sandbox so remote executors can load them via loadExtensions.
+        "//:install-extensions",
+        "//jstests/libs:authTestsKey",
+        "//jstests/with_mongot/mongotmock/lib",
+        "//src/mongo/db/extension/test_examples:resmoke_data",
+    ],
     tags = [
         "ci-release-critical",
-        "incompatible_with_bazel_remote_test",  # vector_search_ifr_toggle.js fails, looking for ../lib/libvector_search_extension.so
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -496,6 +510,8 @@ resmoke_suite_test(
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "@platforms//os:windows": ["@platforms//:incompatible"],
+        # Extensions are not supported on amazon2 (see extension_helpers.js).
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     deps = [
