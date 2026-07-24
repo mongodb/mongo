@@ -2,7 +2,8 @@
  * Tests that modal validation at 'atClusterTime' gracefully skips collections that are present in
  * the latest catalog but did not exist at 'atClusterTime', e.g. collections created or renamed into
  * place afterwards. Such collections should be reported as valid with a warning rather than failing
- * validation and preventing startup.
+ * validation and preventing startup. Also tests startup validation for a single collection created after 'atClusterTime', the command
+ * should return non-OK status to indicate that the collection was not validated.
  *
  * @tags: [
  *   requires_persistence,
@@ -77,3 +78,22 @@ assert(
     !resultsByNs[`${dbName}.renamed`],
     `'renamed' should not be validated: ${tojson(validateResults)}`,
 );
+
+const exitCode = runMongoProgram(
+    "mongod",
+    "--port",
+    allocatePort(),
+    "--dbpath",
+    dbpath,
+    "--validate",
+    "--setParameter",
+    `collectionValidateOptions=${tojson({options: {atClusterTime}})}`,
+    "--setParameter",
+    `validateDbName=${dbName}`,
+    "--setParameter",
+    `validateCollectionName=late`,
+);
+// we expect validate to fail for this single collection.
+assert.neq(0, exitCode, "modal validate for missing collection at atClusterTime should fail");
+const failLogs = rawMongoProgramOutput("(11790202)");
+assert(failLogs.includes(`${dbName}.late`), `'late' should show validation failure: ${failLogs}`);

@@ -767,6 +767,16 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
         // validate() throws NamespaceNotFound. That is a valid catalog state rather than
         // corruption, so skip the collection and continue validating the rest.
         if (e.code() == ErrorCodes::NamespaceNotFound && parsedOptions.getReadTimestamp()) {
+            if (!gValidateCollectionName.empty()) {
+                // If validating a single collection, return non-OK status to indicate that the
+                // collection was not validated and return early.
+                LOGV2_ERROR(
+                    11790202,
+                    "Single collection validation failed to complete, see logs for more details",
+                    "nss"_attr = nss.toStringForErrorMsg(),
+                    "error"_attr = e.toString());
+                return e.toStatus();
+            }
             LOGV2(11790100,
                   "Skipping validation of collection because it did not exist at atClusterTime",
                   "nss"_attr = nss.toStringForErrorMsg(),
