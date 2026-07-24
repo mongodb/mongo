@@ -991,9 +991,10 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
               "recordId"_attr = recordId,
               "record"_attr = redact(recordBson),
               "error"_attr = ex.toString());
-        results->addError(fmt::format("Could not build key for index {} with error {}",
+        results->addError(fmt::format("Could not build key for index {} with error {}, see LOG "
+                                      "8411400 for the failing document",
                                       descriptor->indexName(),
-                                      ex.codeString()),
+                                      ex.toString()),
                           /*stopValidation=*/false);
         return;
     }

@@ -80,8 +80,7 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, std::string_view path) {
         return nullElt;
     }
     uassert(ErrorCodes::CannotBuildIndexKeys,
-            str::stream() << "Field '" << path
-                          << "' of text index contains an array in document: " << obj,
+            str::stream() << "Field '" << path << "' of text index contains an array in document",
             arrayComponents.empty());
 
     // Since there aren't any arrays, there cannot be more than one extracted element on 'path'.
@@ -104,8 +103,7 @@ BSONElement extractNonFTSKeyElementLegacy(const BSONObj& obj, std::string_view p
         return nullElt;
     }
     uassert(ErrorCodes::CannotBuildIndexKeys,
-            str::stream() << "Field '" << path
-                          << "' of text index contains an array in document: " << obj,
+            str::stream() << "Field '" << path << "' of text index contains an array in document",
             arrayComponents.empty());
 
     // Since there aren't any arrays, there cannot be more than one extracted element on 'path'.
