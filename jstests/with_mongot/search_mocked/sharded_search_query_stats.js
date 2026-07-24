@@ -1,8 +1,8 @@
 /**
  * queryStats test for sharded $search queries.
  *
- * TODO (SERVER-131073): Migrate this test to an e2e suite once native $search and $searchMeta query
- * stats serialization on mongos is fixed.
+ * TODO (SERVER-131069): Ensure all coverage is migrated to
+ * jstests/with_mongot/e2e/search/search_query_stats.js before removing.
  *
  * @tags: [featureFlagQueryStats]
  */

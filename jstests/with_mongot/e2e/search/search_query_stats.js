@@ -3,17 +3,13 @@
  * with real mongot.
  *
  * Uses an empty collection so query stats are collected without needing actual search results.
- *
- * @tags: [
- *   # TODO (SERVER-131073): remove this tag once $searchMeta query-stats collection on mongos is fixed.
- *   assumes_against_mongod_not_mongos,
- * ]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {
     assertAggregatedMetricsSingleExec,
     getLatestQueryStatsEntry,
+    getQueryStats,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 
@@ -61,14 +57,23 @@ describe("$search query stats", function () {
         assertAggregatedMetricsSingleExec(stats, {docsExamined: 0, keysExamined: 0});
     });
 
-    it("should anonymize the $search stage as one object", function () {
-        assert.commandWorked(
-            db.runCommand({aggregate: collName, pipeline: [{$search: searchQuery}], cursor: {}}),
-        );
+    it("should group repeated $searchMeta executions into a single shape", function () {
+        resetQueryStatsStore(db.getMongo(), "1MB");
 
-        const stats = getLatestQueryStatsEntry(db.getMongo(), {collName});
-        assert.eq(stats.key.queryShape.pipeline, [{$search: "?object"}], stats);
-        // The collection is empty, so the $_internalSearchIdLookup stage examines no documents.
-        assertAggregatedMetricsSingleExec(stats, {docsExamined: 0, keysExamined: 0});
+        const numExecs = 3;
+        for (let i = 0; i < numExecs; i++) {
+            // Test with different literals to confirm they don't affect the anonymized shape.
+            const query = Object.assign({}, searchQuery, {
+                text: {query: "cakes" + i, path: "title"},
+            });
+            assert.commandWorked(
+                db.runCommand({aggregate: collName, pipeline: [{$searchMeta: query}], cursor: {}}),
+            );
+        }
+
+        const stats = getQueryStats(db, {collName});
+        assert.eq(stats.length, 1, stats);
+        assert.eq(stats[0].key.queryShape.pipeline, [{$searchMeta: "?object"}], stats[0]);
+        assert.eq(stats[0].metrics.execCount, numExecs, stats[0]);
     });
 });

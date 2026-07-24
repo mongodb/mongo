@@ -33,6 +33,8 @@ public:
         return kStageName;
     }
 
+    Value serialize(const query_shape::SerializationOptions& opts) const override;
+
     static const Id& id;
 
     Id getId() const override {
