@@ -27,14 +27,17 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
 }
 
 void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
-    {
-        std::lock_guard<std::mutex> lock(_ttlInfosLock);
-        _ttlInfos[uuid].push_back(info);
-    }
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo_inlock(uuid, info);
+    _ttlInfos[uuid].push_back(info);
 }
 
 void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
     std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo_inlock(uuid, info);
+}
+
+void TTLCollectionCache::_deregisterTTLInfo_inlock(UUID uuid, const Info& info) {
     auto infoIt = _ttlInfos.find(uuid);
     if (infoIt == _ttlInfos.end()) {
         LOGV2_DEBUG(9150100,
