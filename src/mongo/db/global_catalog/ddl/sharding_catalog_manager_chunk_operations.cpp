@@ -491,6 +491,10 @@ std::vector<int> mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
 
     auto updateChunksFn = [collectionUUID, shardId, &newChunks, &numMergedChunksPerRange](
                               const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        // The transaction body may be executed more than once if the transaction is retried. Reset
+        // the accumulator on each attempt.
+        numMergedChunksPerRange.clear();
+
         std::vector<ExecutorFuture<void>> statementsChain;
 
         StmtId stmtId{};
