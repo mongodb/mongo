@@ -1489,25 +1489,28 @@ Value evaluate(const ExpressionZip& expr,
         }
     }
 
-    std::vector<Value> evaluatedDefaults(inputs.size(), Value(BSONNULL));
-    int64_t defaultsSize =
-        inputs.size() ? static_cast<int64_t>(evaluatedDefaults[0].getApproximateSize()) : 0;
-    memToken.add(static_cast<int64_t>(inputs.size()) * defaultsSize);
-    tracker.assertWithinMemoryLimit(
-        expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
+    Value evaluatedDefaults(std::vector<Value>(inputs.size(), Value(BSONNULL)));
 
-    // If we need default values, evaluate each expression.
-    if (minArraySize != maxArraySize) {
-        auto& defaults = expr.getDefaults();
-        for (size_t i = 0; i < defaults.size(); i++) {
-            evaluatedDefaults[i] = defaults[i].get()->evaluate(root, variables, ctx);
-            memToken.add(static_cast<int64_t>(evaluatedDefaults[i].getApproximateSize()) -
-                         defaultsSize);
-            tracker.assertWithinMemoryLimit(expr.getExpressionContext()->getOperationContext(),
-                                            expr.getOpName(),
-                                            ctx.stageName);
+    // If we need default values, evaluate the defaults expression. A nullish result is treated
+    // the same as absent defaults, so each missing input element falls back to null.
+    if (minArraySize != maxArraySize && expr.getDefaults()) {
+        Value evaluated = expr.getDefaults()->get()->evaluate(root, variables, ctx);
+        if (!evaluated.nullish()) {
+            uassert(10961500,
+                    str::stream() << expr.getOpName()
+                                  << " defaults must resolve to an array, but the expression "
+                                     "evaluated to "
+                                  << evaluated.toString(),
+                    evaluated.isArray());
+            uassert(10961501,
+                    "defaults and inputs must have the same length",
+                    evaluated.getArrayLength() == inputs.size());
+            evaluatedDefaults = evaluated;
         }
     }
+    memToken.add(static_cast<int64_t>(evaluatedDefaults.getApproximateSize()));
+    tracker.assertWithinMemoryLimit(
+        expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
 
     size_t outputLength = expr.getUseLongestLength() ? maxArraySize : minArraySize;
 

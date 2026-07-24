@@ -3099,7 +3099,8 @@ public:
 
         binds[0] = _b.makeInt32Constant(expr->getInputs().size());
         binds[1] = _b.makeBoolConstant(expr->getUseLongestLength());
-        // Pop expressions from the stack in reverse, so that inputs come before defaults.
+        // Pop expressions from the stack in reverse, so that the inputs come before the optional
+        // trailing child that evaluates to the whole defaults array.
         for (size_t i = binds.size(); i > localVariables;) {
             --i;
             binds[i] = popExpr();

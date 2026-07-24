@@ -3838,6 +3838,15 @@ const char* ExpressionZip::getOpName() const {
     return "$zip";
 }
 
+void ExpressionZip::_validateZipDefaults(const boost::intrusive_ptr<Expression>& defaults,
+                                         size_t numInputs) {
+    if (auto* arrayDefaults = dynamic_cast<ExpressionArray*>(defaults.get())) {
+        uassert(34467,
+                "defaults and inputs must have the same length",
+                arrayDefaults->getChildren().size() == numInputs);
+    }
+}
+
 intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vps) {
@@ -3848,9 +3857,10 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
 
     auto useLongestLength = false;
     std::vector<boost::intrusive_ptr<Expression>> children;
-    // We need to ensure defaults appear after inputs so we build them seperately and then
-    // concatenate them.
-    std::vector<boost::intrusive_ptr<Expression>> tempDefaultChildren;
+    // The defaults are stored as a single expression that evaluates to the whole defaults array.
+    // A literal defaults array parses to an ExpressionArray; any other expression is used as-is
+    // and its array-ness and length are validated at evaluation time.
+    boost::intrusive_ptr<Expression> defaultsExpr;
 
     for (auto&& elem : expr.Obj()) {
         const auto field = elem.fieldNameStringData();
@@ -3863,13 +3873,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
                 children.push_back(parseOperand(expCtx, subExpr, vps));
             }
         } else if (field == "defaults") {
-            uassert(34462,
-                    str::stream() << "defaults must be an array of expressions, found "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::array);
-            for (auto&& subExpr : elem.Array()) {
-                tempDefaultChildren.push_back(parseOperand(expCtx, subExpr, vps));
-            }
+            defaultsExpr = parseOperand(expCtx, elem, vps);
         } else if (field == "useLongestLength") {
             uassert(34463,
                     str::stream() << "useLongestLength must be a bool, found "
@@ -3882,27 +3886,32 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
         }
     }
 
-    auto numInputs = children.size();
-    std::move(tempDefaultChildren.begin(), tempDefaultChildren.end(), std::back_inserter(children));
+    const auto numInputs = children.size();
+    uassert(34465, "$zip requires at least one input array", numInputs > 0);
 
-    std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> inputs;
-    std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> defaults;
-    for (auto&& child : children) {
-        if (numInputs == 0) {
-            defaults.push_back(child);
-        } else {
-            inputs.push_back(child);
-            numInputs--;
-        }
+    // An empty literal defaults array is equivalent to not specifying defaults at all.
+    if (auto* arrayDefaults = dynamic_cast<ExpressionArray*>(defaultsExpr.get());
+        arrayDefaults && arrayDefaults->getChildren().empty()) {
+        defaultsExpr = nullptr;
     }
-
-    uassert(34465, "$zip requires at least one input array", !inputs.empty());
+    if (defaultsExpr) {
+        _validateZipDefaults(defaultsExpr, numInputs);
+    }
     uassert(34466,
             "cannot specify defaults unless useLongestLength is true",
-            (useLongestLength || defaults.empty()));
-    uassert(34467,
-            "defaults and inputs must have the same length",
-            (defaults.empty() || defaults.size() == inputs.size()));
+            (useLongestLength || !defaultsExpr));
+
+    boost::optional<ExprRef> defaults;
+    if (defaultsExpr) {
+        children.push_back(std::move(defaultsExpr));
+        defaults = ExprRef(children.back());
+    }
+
+    std::vector<ExprRef> inputs;
+    inputs.reserve(numInputs);
+    for (size_t i = 0; i < numInputs; ++i) {
+        inputs.push_back(children[i]);
+    }
 
     return new ExpressionZip(
         expCtx, useLongestLength, std::move(children), std::move(inputs), std::move(defaults));
@@ -3917,27 +3926,66 @@ Value ExpressionZip::evaluate(const Document& root,
 boost::intrusive_ptr<Expression> ExpressionZip::optimize() {
     for (auto&& input : _inputs)
         input.get() = input.get()->optimize();
-    for (auto&& zipDefault : _defaults)
-        zipDefault.get() = zipDefault.get()->optimize();
+    if (_defaults) {
+        // An all-constant literal defaults array folds into a single constant here; serialize()
+        // reconstructs the per-element query shape from it. A defaults expression that folds
+        // into a non-array constant is deliberately not rejected here: see the comment on
+        // _validateZipDefaults.
+        _defaults->get() = _defaults->get()->optimize();
+    }
     return this;
 }
 
 Value ExpressionZip::serialize(const query_shape::SerializationOptions& options) const {
     vector<Value> serializedInput;
-    vector<Value> serializedDefaults;
     Value serializedUseLongestLength = Value(_useLongestLength);
 
     for (auto&& expr : _inputs) {
         serializedInput.push_back(expr.get()->serialize(options));
     }
 
-    for (auto&& expr : _defaults) {
-        serializedDefaults.push_back(expr.get()->serialize(options));
-    }
+    // Absent defaults serialize to an empty array, which parses back to absent defaults.
+    Value serializedDefaults = [&]() -> Value {
+        if (!_defaults) {
+            return Value(std::vector<Value>{});
+        }
+        // A literal defaults array serializes per element. Delegating to
+        // ExpressionArray::serialize instead would collapse an all-constant array into a single
+        // placeholder literal whenever literals are being replaced (query shape serialization),
+        // changing the queryShapeHash.
+        if (auto* literalDefaults = dynamic_cast<ExpressionArray*>(_defaults->get().get())) {
+            vector<Value> perElement;
+            perElement.reserve(literalDefaults->getChildren().size());
+            for (auto&& element : literalDefaults->getChildren()) {
+                perElement.push_back(element->serialize(options));
+            }
+            return Value(std::move(perElement));
+        }
+        // A defaults array that constant-folded during optimization serializes per element as
+        // well, so that the query shape is identical before and after optimization. The length
+        // guard keeps representative shapes re-parseable: array placeholders have fixed lengths,
+        // so a wrong-length constant (which can only fail at evaluation) must keep serializing
+        // as a single literal that re-parses as a constant, rather than as a literal defaults
+        // array that parse would reject.
+        if (auto* constDefaults = dynamic_cast<ExpressionConstant*>(_defaults->get().get())) {
+            const Value& value = constDefaults->getValue();
+            if (value.isArray() && value.getArrayLength() == _inputs.size()) {
+                vector<Value> perElement;
+                perElement.reserve(value.getArrayLength());
+                for (auto&& element : value.getArray()) {
+                    perElement.push_back(ExpressionConstant::serializeConstant(options, element));
+                }
+                return Value(std::move(perElement));
+            }
+        }
+        // Any other defaults expression serializes to the expression itself, so that re-parsing
+        // the serialization produces the same mode.
+        return _defaults->get()->serialize(options);
+    }();
 
-    return Value(DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults"
-                                            << Value(serializedDefaults) << "useLongestLength"
-                                            << serializedUseLongestLength)));
+    return Value(
+        DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults" << serializedDefaults
+                                   << "useLongestLength" << serializedUseLongestLength)));
 }
 
 /* -------------------------- ExpressionConvert ------------------------------ */

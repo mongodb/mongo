@@ -160,6 +160,8 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
         fromjson("{$week: {date: '$foo', timezone: '$tz'}}"),
         fromjson("{$year: {date: '$foo', timezone: '$tz'}}"),
         fromjson("{$zip: {inputs: [['a'], ['b'], ['c']]}}"),
+        fromjson("{$zip: {inputs: [['a'], ['b']], defaults: ['x', 'y'], useLongestLength: true}}"),
+        fromjson("{$zip: {inputs: [['a'], ['b']], defaults: '$foo', useLongestLength: true}}"),
         fromjson("{$_internalFindAllValuesAtPath: 'foo'}"),
         fromjson(R"({
             "$_internalFleBetween": {

@@ -1392,7 +1392,7 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenDefaultExceedsLimit) {
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
-        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+        ASSERT_STRING_CONTAINS(ex.reason(), "$array");
     }
     ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
     ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
@@ -1413,8 +1413,10 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputAndDefaultCombinationExceeds
     int64_t defaultSize = static_cast<int64_t>(Value(moderateDefault).getApproximateSize());
     int64_t nullSize = static_cast<int64_t>(Value(BSONNULL).getApproximateSize());
 
-    // token at the failing assert = inputsSize + nullSize + defaultSize (one null replaced by
-    // default)
+    // The defaults are stored as a single ExpressionArray child, which charges
+    // its elements against the same operation tracker while $zip still holds the inputs and the
+    // placeholder nulls, so the tracked total at the failing assert is at least
+    // inputsSize + 2 * nullSize + defaultSize.
     int64_t limit = inputsSize + nullSize + defaultSize - 1;
     ASSERT_GT(limit, inputsSize + 2 * nullSize);  // inputs + placeholder nulls fit
     ASSERT_GT(limit, defaultSize);                // default alone fits
@@ -1437,7 +1439,8 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenInputAndDefaultCombinationExceeds
         FAIL("Expected ExceededMemoryLimit to be thrown");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
-        ASSERT_STRING_CONTAINS(ex.reason(), "$zip");
+        // The offending allocation happens while evaluating the ExpressionArray defaults child.
+        ASSERT_STRING_CONTAINS(ex.reason(), "$array");
     }
     ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
     ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
@@ -1481,6 +1484,100 @@ TEST(ExpressionZipTest, MemoryTrackerThrowsWhenOutputExceedsLimit) {
     }
     ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
     ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
+}
+
+TEST(ExpressionZipTest, NullishWholeArrayDefaultsFillWithNullNotMissing) {
+    auto expCtx = ExpressionContextForTest{};
+    // 'defaults' is a whole-array expression (a field path) that resolves to missing, so it
+    // must be treated the same as omitting 'defaults': missing input slots fall back to an
+    // explicit null, not a missing/absent value.
+    auto expr =
+        Expression::parseExpression(&expCtx,
+                                    BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv)
+                                                                 << "defaults" << "$missingField"
+                                                                 << "useLongestLength" << true)),
+                                    expCtx.variablesParseState);
+    Document doc{{"a", Value(std::vector<Value>{Value(1), Value(2), Value(3)})},
+                 {"b", Value(std::vector<Value>{Value("A"sv), Value("B"sv)})}};
+
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
+    EvaluationContext ctx{.tracker = &tracker};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables, ctx),
+                    Value(BSON_ARRAY(BSON_ARRAY(1 << "A"sv)
+                                     << BSON_ARRAY(2 << "B"sv) << BSON_ARRAY(3 << BSONNULL))));
+}
+
+TEST(ExpressionZipTest, ShapifiedNonArrayDefaultsReparseAndReoptimize) {
+    auto expCtx = ExpressionContextForTest{};
+    // A $zip whose defaults expression resolves to a non-array only fails at evaluation time,
+    // so query stats still records its shape, with the defaults collapsed to a constant object
+    // placeholder ({$const: {?: "?"}}). The $queryStats transformIdentifiers pass (exercised by
+    // the RunQueryStats hook) re-parses that representative query, and stages like
+    // $setWindowFields optimize their expressions at parse time — so neither parse() nor
+    // optimize() may eagerly reject a constant non-array defaults value. It must fail only at
+    // evaluation, like the original query did.
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv) << "defaults"
+                                     << BSON("$const" << BSON("?" << "?")) << "useLongestLength"
+                                     << true)),
+        expCtx.variablesParseState);
+    expr = expr->optimize();
+
+    Document unequal{{"a", Value(std::vector<Value>{Value(1), Value(2)})},
+                     {"b", Value(std::vector<Value>{Value(1)})}};
+    ASSERT_THROWS_CODE(
+        expr->evaluate(unequal, &expCtx.variables, {}), AssertionException, 10961500);
+}
+
+TEST(ExpressionZipTest, ConstantArrayDefaultsLengthIsCheckedLazily) {
+    auto expCtx = ExpressionContextForTest{};
+    // A constant array's length is deliberately not validated at parse or optimize time:
+    // query-shape representative serialization replaces constant arrays with fixed-shape
+    // placeholders, so re-parsed representative queries would fail an eager length check. A
+    // wrong-length constant only fails when the defaults are actually needed.
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv) << "defaults"
+                                     << BSON("$const" << BSON_ARRAY(1 << 2 << 3))
+                                     << "useLongestLength" << true)),
+        expCtx.variablesParseState);
+    expr = expr->optimize();
+
+    // Equal-length inputs never evaluate the defaults, so the query succeeds.
+    Document equal{{"a", Value(std::vector<Value>{Value(1)})},
+                   {"b", Value(std::vector<Value>{Value(2)})}};
+    ASSERT_VALUE_EQ(expr->evaluate(equal, &expCtx.variables, {}),
+                    Value(BSON_ARRAY(BSON_ARRAY(1 << 2))));
+
+    Document unequal{{"a", Value(std::vector<Value>{Value(1), Value(2)})},
+                     {"b", Value(std::vector<Value>{Value(1)})}};
+    ASSERT_THROWS_CODE(
+        expr->evaluate(unequal, &expCtx.variables, {}), AssertionException, 10961501);
+}
+
+TEST(ExpressionZipTest, LiteralDefaultsKeepPerElementQueryShape) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = Expression::parseExpression(
+        &expCtx,
+        BSON("$zip" << BSON("inputs" << BSON_ARRAY("$a"sv << "$b"sv) << "defaults"
+                                     << BSON_ARRAY("x"sv << BSON_ARRAY(1 << 2))
+                                     << "useLongestLength" << true)),
+        expCtx.variablesParseState);
+
+    const auto& opts = query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    // The query shape of a literal defaults array is per-element, matching the shape recorded
+    // by pre-SERVER-109615 binaries (which stored one child expression per default). Serializing
+    // or folding the array into a single constant would change pre-existing queryShapeHashes.
+    const Value expectedDefaults =
+        Value(BSON_ARRAY(BSON("$const" << "?") << BSON("$const" << BSON_ARRAY(1))));
+    ASSERT_VALUE_EQ(expr->serialize(opts)["$zip"]["defaults"], expectedDefaults);
+
+    // The shape must also survive optimization: $setWindowFields optimizes its partitionBy at
+    // parse time, before the query shape hash is computed, so an all-constant defaults array
+    // must not constant-fold away its per-element structure.
+    expr = expr->optimize();
+    ASSERT_VALUE_EQ(expr->serialize(opts)["$zip"]["defaults"], expectedDefaults);
 }
 
 }  // namespace expression_evaluation_test
