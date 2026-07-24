@@ -26,6 +26,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -118,24 +119,6 @@ repl::OplogEntrySizeMetadata makeOperationSizeMetadata(boost::optional<int32_t> 
     return m;
 }
 
-bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const auto& vCtx = VersionContext::getDecoration(opCtx);
-    return gFeatureFlagContinuousInternodeValidationPerDocument
-        .isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
-}
-
-// Computes a per-document hash to be stored on the oplog entry for continuous internode
-// validation.
-int64_t computeDocValidationHash(const BSONObj& doc) {
-    // Reuse a single EVP_MD_CTX per thread across all documents this thread hashes, rather than
-    // allocating one per operation.
-    thread_local HashContext ctx;
-    auto sha =
-        SHA256Block::computeHashWithCtx(&ctx, {ConstDataRange(doc.objdata(), doc.objsize())});
-    return ConstDataView(reinterpret_cast<const char*>(sha.data())).read<LittleEndian<int64_t>>();
-}
-
 // Computes the per-document validation hash if needed, and, if there is any size metadata to
 // record, attaches it to the given oplog entry.
 template <typename OplogEntryOrOperation>
@@ -145,7 +128,7 @@ void setSizeMetadataIfNeeded(OplogEntryOrOperation& entry,
                              bool useValidationHash) {
     boost::optional<int64_t> docHash;
     if (useValidationHash) {
-        docHash = computeDocValidationHash(doc);
+        docHash = repl::computeDocValidationHash(doc);
     }
     if (replicatedSizeDelta || docHash) {
         entry.setSizeMetadata(makeOperationSizeMetadata(replicatedSizeDelta, docHash));
@@ -741,7 +724,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
 
     const bool useValidationHash =
-        isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
+        repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
 
     std::vector<repl::OpTime> opTimes(count);
     std::vector<Timestamp> timestamps(count);
@@ -877,7 +860,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     const bool useReplicatedSizeCount = isReplicatedFastCountEnabled(opCtx);
     if (inBatchedWrite) {
         const bool useValidationHash =
-            isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
+            repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
@@ -922,7 +905,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
         const bool useValidationHash =
-            isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
+            repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
 
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
@@ -1042,7 +1025,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
 
-    const bool useValidationHash = isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
+    const bool useValidationHash = repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
         !args.updateArgs->replicatedRecordId.isNull();
 
     OpTimeBundle opTime;
@@ -1236,7 +1219,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         return;
     }
 
-    const bool useValidationHash = isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
+    const bool useValidationHash = repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
         !args.replicatedRecordId.isNull();
 
     OpTimeBundle opTime;

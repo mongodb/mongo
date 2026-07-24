@@ -273,6 +273,16 @@ OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
                                             const RecordId& rid);
 
 /**
+ * Creates an insert oplog entry with the given recordId and document hash.
+ */
+OplogEntry makeInsertOplogEntryWithRecordIdAndHash(OpTime opTime,
+                                                   const NamespaceString& nss,
+                                                   const UUID& uuid,
+                                                   const BSONObj& docToInsert,
+                                                   const RecordId& rid,
+                                                   int64_t hash);
+
+/**
  * Creates an update oplog entry with the given recordId and size metadata (m.sz).
  */
 OplogEntry makeUpdateOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,

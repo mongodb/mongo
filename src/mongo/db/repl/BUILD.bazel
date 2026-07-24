@@ -21,6 +21,22 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "internode_validation_hash_utils",
+    srcs = [
+        "internode_validation_hash_utils.cpp",
+    ],
+    hdrs = [
+        "internode_validation_hash_utils.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/crypto:sha256_block",
+        "//src/mongo/crypto:sha_block",
+        "//src/mongo/db:server_feature_flags",
+    ],
+)
+
+mongo_cc_library(
     name = "intent_registry",
     srcs = [
         "intent_guard.cpp",
@@ -867,6 +883,7 @@ mongo_cc_library(
     deps = [
         ":apply_ops_command_info",
         ":image_collection_entry",
+        ":internode_validation_hash_utils",
         ":local_oplog_info",
         ":oplog_constraint_violation_logger",
         ":repl_coordinator_interface",
@@ -917,6 +934,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/transaction",
+        "//src/mongo/db/update:update_document_diff",
         "//src/mongo/rpc:command_status",
         "//src/mongo/s:common_s",
     ],
@@ -2121,6 +2139,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "oplog_replicated_record_id_test",
     srcs = [
+        "internode_validation_hash_test.cpp",
         "oplog_clustered_collection_fast_path_test.cpp",
         "oplog_delete_record_id_test.cpp",
         "oplog_insert_record_id_test.cpp",
@@ -2128,6 +2147,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [
+        ":internode_validation_hash_utils",
         ":oplog_applier_impl_test_fixture",
         ":oplog_entry",
         ":oplog_entry_test_helpers",

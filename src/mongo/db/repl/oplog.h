@@ -273,6 +273,20 @@ Status applyCommand_inlock(OperationContext* opCtx,
                            OplogApplication::Mode mode);
 
 /**
+ * Returns true iff the per-document validation hash 'h' carried on an oplog entry should be
+ * verified against a recomputed hash on the secondary upon oplog application. All of the following
+ * must hold:
+ *   - 'mode' is steady-state secondary application (excludes initial sync, recovery, applyOps),
+ *   - the continuous internode per-document validation feature is enabled,
+ *   - 'collection' is a supported (recordIdsReplicated) collection, and
+ *   - 'h' is present on the entry.
+ */
+bool shouldVerifyValidationHash(OperationContext* opCtx,
+                                const CollectionPtr& collection,
+                                OplogApplication::Mode mode,
+                                const OplogEntry& op);
+
+/**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.
  */
 void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplogNS);

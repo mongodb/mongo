@@ -1082,6 +1082,7 @@ replication.oplog:
     - src/mongo/db/repl/*apply_ops*
     - src/mongo/db/repl/*bgsync*
     - src/mongo/db/repl/*consistency_markers*
+    - src/mongo/db/repl/*internode_validation_hash*
     - src/mongo/db/repl/*get_next_optimes_test*
     - src/mongo/db/repl/*idempotency_test_fixture*
     - src/mongo/db/repl/*insert_group*

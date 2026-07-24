@@ -9,6 +9,9 @@ filters:
   - "*oplog*":
     approvers:
       - 10gen/server-oplog
+  - "internode_validation_hash*":
+    approvers:
+      - 10gen/server-collection-write-path
   - "change_stream_oplog_notification*":
     approvers:
       - 10gen/query-execution-change-streams

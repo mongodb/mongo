@@ -166,6 +166,7 @@ Diff computeOplogDiff_forTest(const BSONObj& pre, const BSONObj& post);
  * }
  * Returns 'boost::none' if the diff exceeds the BSON size limit.
  */
-boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& post);
+[[MONGO_MOD_PUBLIC]] boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre,
+                                                                const BSONObj& post);
 
 };  // namespace mongo::doc_diff

@@ -54,6 +54,7 @@
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -123,6 +124,7 @@
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries_oplog_entry_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
@@ -1602,7 +1604,69 @@ void assertOnInconsistentDocuments(OperationContext* opCtx,
 bool isReshardingInternalCollection(const NamespaceString& nss) {
     return nss.isTemporaryReshardingCollection() || nss.isReshardingConflictStashCollection();
 }
+
+// Extracts the per-document hash 'h' carried on an oplog entry, if present.
+boost::optional<int64_t> getValidationHash(const OplogEntry& op) {
+    const auto& sizeMeta = op.getDurableReplOperation().getSizeMetadata();
+    if (!sizeMeta) {
+        return boost::none;
+    }
+    const SingleOpSizeMetadata* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value());
+    if (!singleOpMeta) {
+        return boost::none;
+    }
+    return singleOpMeta->getH();
+}
+
+// Recomputes the post-image hash of an inserted document and fasserts on mismatch. 'doc' is the
+// object carried on the oplog entry (the primary's intended content) that this node just inserted
+// at 'recordId'; 'op' carries the primary's per-document hash in its size metadata.
+void verifyValidationHash(OperationContext* opCtx,
+                          const CollectionPtr& collection,
+                          const RecordId& recordId,
+                          const BSONObj& doc,
+                          const OplogEntry& op) {
+    const int64_t actualHash = computeDocValidationHash(doc);
+    const boost::optional<int64_t> expectedHash = getValidationHash(op);
+    if (expectedHash.value() == actualHash) {
+        return;
+    }
+
+    // Read back the document we just persisted to compare the oplog object against what this node
+    // actually stored.
+    const BSONObj& oplogObject = op.getObject();
+    const BSONObj storedDocument = collection->docFor(opCtx, recordId).value().getOwned();
+    boost::optional<BSONObj> fieldLevelDiff =
+        doc_diff::computeInlineDiff(oplogObject, storedDocument);
+
+    const HostAndPort nodeId = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
+
+    LOGV2_FATAL(12851600,
+                "Document validation hash mismatch",
+                "expectedHash"_attr = expectedHash.value(),
+                "actualHash"_attr = actualHash,
+                "ns"_attr = op.getNss().toStringForErrorMsg(),
+                "id"_attr = redact(oplogObject["_id"].wrap()),
+                "recordId"_attr = recordId,
+                "timestamp"_attr = op.getTimestamp().toString(),
+                "opType"_attr = idl::serialize(op.getOpType()),
+                "nodeId"_attr = nodeId,
+                "oplogEntry"_attr = redact(op.toBSONForLogging()),
+                "oplogObject"_attr = redact(oplogObject),
+                "storedDocument"_attr = redact(storedDocument),
+                "fieldLevelDiff"_attr = (fieldLevelDiff ? redact(*fieldLevelDiff).toString()
+                                                        : std::string("<not derivable>")));
+}
 }  // namespace
+
+bool shouldVerifyValidationHash(OperationContext* opCtx,
+                                const CollectionPtr& collection,
+                                OplogApplication::Mode mode,
+                                const OplogEntry& op) {
+    return mode == OplogApplication::Mode::kSecondary && collection->areRecordIdsReplicated() &&
+        getValidationHash(op).has_value() &&
+        isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+}
 
 constexpr std::string_view OplogApplication::kInitialSyncOplogApplicationMode;
 constexpr std::string_view OplogApplication::kRecoveringOplogApplicationMode;
@@ -2452,6 +2516,25 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 if (!status.isOK()) {
                     return status;
                 }
+
+                // These conditions mirror shouldVerifyValidationHash() but are hoisted out of the
+                // loop because mode, collection, and the feature flag are stay the same across a
+                // grouped insert. We evaluate them once here and perform only the per-entry hash
+                // check inside the loop.
+                if (mode == OplogApplication::Mode::kSecondary &&
+                    collection->areRecordIdsReplicated() &&
+                    isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
+                    for (size_t i = 0; i < insertObjs.size(); i++) {
+                        if (getValidationHash(*insertOps[i]).has_value()) {
+                            verifyValidationHash(opCtx,
+                                                 collection,
+                                                 insertObjs[i].replicatedRecordId,
+                                                 insertObjs[i].doc,
+                                                 *insertOps[i]);
+                        }
+                    }
+                }
+
                 wuow.commit();
                 for (size_t i = 0; i < insertObjs.size(); i++) {
                     opCountersToUse->gotInsert();
@@ -2553,6 +2636,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         opCtx, collection, insertStmt, nullOpDebug, false /* fromMigrate */);
 
                     if (status.isOK()) {
+                        if (shouldVerifyValidationHash(opCtx, collection, mode, op)) {
+                            verifyValidationHash(
+                                opCtx, collection, insertStmt.replicatedRecordId, o, op);
+                        }
                         wuow.commit();
                     } else if (status == ErrorCodes::DuplicateKey) {
                         // Transactions cannot be retried as upserts once they fail with a duplicate

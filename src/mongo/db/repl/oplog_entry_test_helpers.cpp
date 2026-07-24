@@ -532,6 +532,21 @@ OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
     return {DurableOplogEntry(builder.obj())};
 }
 
+OplogEntry makeInsertOplogEntryWithRecordIdAndHash(OpTime opTime,
+                                                   const NamespaceString& nss,
+                                                   const UUID& uuid,
+                                                   const BSONObj& docToInsert,
+                                                   const RecordId& rid,
+                                                   int64_t hash) {
+    OplogEntry baseEntry = makeInsertOplogEntryWithRecordId(opTime, nss, uuid, docToInsert, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSON("h" << hash));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
 OplogEntry makeUpdateOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
                                                            const NamespaceString& nss,
                                                            const BSONObj& documentToUpdate,
