@@ -1598,10 +1598,20 @@ private:
     }
 
     /**
+     * Returns true when the graph covers the entire pipeline.
+     */
+    bool isComplete() const {
+        return _stages.size() == _container.size();
+    }
+
+    /**
      * Gets the stage node that represents the given DocumentSource in the graph.
      */
     StageId getStageId(const DocumentSource* ds) const {
         if (!ds) {
+            tassert(13118101,
+                    "Cannot resolve the end of the pipeline on a partially built dependency graph",
+                    isComplete());
             return _stages.getLastId();
         }
         if (auto it = _dsToStageId.find(ds); it != _dsToStageId.end()) {

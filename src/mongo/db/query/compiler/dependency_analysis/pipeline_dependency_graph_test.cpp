@@ -21,6 +21,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -1935,6 +1936,48 @@ TEST_F(PipelineDependencyGraphTest, TruncateWithSwappedStages) {
 
     // Must grow to size 5, not truncate because of stale B.
     ASSERT_DOES_NOT_THROW(graph->resize(container.end()));
+}
+
+using PipelineDependencyGraphDeathTest = PipelineDependencyGraphTest;
+
+DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
+                   PipelineEndOnPartialGraphThrows,
+                   "Tripwire assertion.*13118101") {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {a: 2}}]");
+    auto& container = pipeline->getSources();
+    graph = std::make_unique<DependencyGraph>(container, std::next(container.begin()));
+
+    ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
+}
+
+DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
+                   PipelineEndOnPartialGraphAfterResizeThrows,
+                   "Tripwire assertion.*13118101") {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {a: 2}}]");
+    auto& container = pipeline->getSources();
+    ASSERT_DOES_NOT_THROW(graph->getPrevModifyingStage(nullptr, "a"));
+
+    graph->resize(std::next(container.begin()));
+    ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
+}
+
+DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
+                   PipelineEndOnEmptyGraphThrows,
+                   "Tripwire assertion.*13118101") {
+    setPipeline("[{$set: {a: 1}}]");
+    auto& container = pipeline->getSources();
+    graph = std::make_unique<DependencyGraph>(container, container.begin());
+
+    ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
+}
+
+TEST_F(PipelineDependencyGraphTest, PipelineEndOnEmptyPipelineWorks) {
+    setPipeline("[]");
+    ASSERT_DOES_NOT_THROW(graph->getPrevModifyingStage(nullptr, "a"));
 }
 
 TEST_F(PipelineDependencyGraphTest, ArrayLeafSiblingRedeclared) {
