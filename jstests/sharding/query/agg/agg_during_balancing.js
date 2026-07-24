@@ -58,7 +58,17 @@ for (let i = 0; i < nItems; ++i) {
     // Generate one chunk for each 1000 documents so the balancer is kept busy throughout the
     // execution of the test
     if (i % 1000 == 0) {
-        assert.commandWorked(shardedAggTest.splitAt("aggShard.ts1", {_id: i}));
+        assert.soon(
+            () => {
+                const res = shardedAggTest.splitAt("aggShard.ts1", {_id: i});
+                if (res.ok) {
+                    return true;
+                }
+                assert.commandFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
+                return false;
+            },
+            () => `Timed out splitting aggShard.ts1 at _id ${i}`,
+        );
     }
 }
 assert.commandWorked(bulk.execute());
