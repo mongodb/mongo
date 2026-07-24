@@ -731,11 +731,11 @@ bool isInfinity(TypeTags tag, Value val) noexcept {
 
 bool ArraySet::push_back_raw(TypeTags tag, Value val) {
     if (tag != TypeTags::Nothing) {
-        ValueGuard guard{tag, val};
+        TagValueOwned owned = TagValueOwned::fromRaw(tag, val);
         auto [it, inserted] = _values.insert({tag, val});
 
         if (inserted) {
-            guard.reset();
+            owned.reset();
         }
 
         return inserted;
@@ -762,14 +762,13 @@ bool ArraySet::push_back(TagValueOwned value) {
 std::pair<TypeTags, Value> makeNewArraySet(TypeTags tag,
                                            Value value,
                                            const CollatorInterface* collator) {
-    auto [resTag, resVal] = makeNewArraySet(collator);
-    ValueGuard guard(resTag, resVal);
-    ArraySet* setValues = getArraySetView(resVal);
+    TagValueOwned res = TagValueOwned::fromRaw(makeNewArraySet(collator));
+    ArraySet* setValues = getArraySetView(res.value());
     setValues->reserve(getArraySize(tag, value));
     arrayForEach(tag, value, [&](TypeTags elemTag, Value elemVal) {
         setValues->push_back_clone(elemTag, elemVal);
     });
-    guard.reset();
+    auto [resTag, resVal] = res.releaseToRaw();
     return {resTag, reinterpret_cast<Value>(setValues)};
 }
 
@@ -922,9 +921,8 @@ std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val, CollatorInterface
         }
     }
 
-    auto [setTag, setVal] = makeNewArraySet(collator);
-    ValueGuard guard{setTag, setVal};
-    auto setView = getArraySetView(setVal);
+    TagValueOwned set = TagValueOwned::fromRaw(makeNewArraySet(collator));
+    auto setView = getArraySetView(set.value());
 
     auto arrIter = ArrayEnumerator{tag, val};
     while (!arrIter.atEnd()) {
@@ -933,8 +931,7 @@ std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val, CollatorInterface
         setView->push_back_raw(copyTag, copyVal);
         arrIter.advance();
     }
-    guard.reset();
-    return {setTag, setVal};
+    return set.releaseToRaw();
 }
 
 bool operator==(const ArraySet& lhs, const ArraySet& rhs) {

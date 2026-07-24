@@ -29,9 +29,9 @@ using namespace std::literals::string_view_literals;
  * This file contains tests for sbe::value::writeValueToStream.
  */
 TEST(ValueSerializeForSorter, Serialize) {
-    auto [testDataTag, testDataVal] = sbe::value::makeNewArray();
-    sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
-    auto testData = sbe::value::getArrayView(testDataVal);
+    sbe::value::TagValueOwned testDataOwned =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+    auto testData = sbe::value::getArrayView(testDataOwned.value());
 
     testData->push_back_raw(value::TypeTags::Nothing, 0);
     testData->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(33550336));
@@ -240,9 +240,11 @@ TEST_F(ValueSerializeForKeyString, Numerics) {
 }
 
 TEST_F(ValueSerializeForKeyString, RecordIdMinKeyMaxKey) {
-    auto [ridTag, ridVal] = value::makeNewRecordId(8589869056);
-    sbe::value::ValueGuard guard{ridTag, ridVal};
-    runTest({{value::TypeTags::MinKey, 0}, {value::TypeTags::MaxKey, 0}, {ridTag, ridVal}});
+    sbe::value::TagValueOwned ridOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewRecordId(8589869056));
+    runTest({{value::TypeTags::MinKey, 0},
+             {value::TypeTags::MaxKey, 0},
+             {ridOwned.tag(), ridOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, BoolNullAndNothing) {
@@ -260,47 +262,48 @@ TEST_F(ValueSerializeForKeyString, AllNothing) {
 }
 
 TEST_F(ValueSerializeForKeyString, BsonArray) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(
-        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
-    sbe::value::ValueGuard testDataGuard{inputTag, inputVal};
+    sbe::value::TagValueOwned inputOwned =
+        sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(
+            BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23))));
 
-    runTest({{inputTag, inputVal}, {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0)}});
+    runTest({{inputOwned.tag(), inputOwned.value()},
+             {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0)}});
 }
 
 TEST_F(ValueSerializeForKeyString, SbeArray) {
-    auto [testDataTag, testDataVal] = sbe::value::makeNewArray();
-    sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
-    auto testData = sbe::value::getArrayView(testDataVal);
+    sbe::value::TagValueOwned testDataOwned =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+    auto testData = sbe::value::getArrayView(testDataOwned.value());
 
     testData->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     testData->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     testData->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
 
-    runTest({{testDataTag, testDataVal}});
+    runTest({{testDataOwned.tag(), testDataOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, ArraySet) {
-    auto [tag, val] = sbe::value::makeNewArraySet();
-    sbe::value::ValueGuard guard{tag, val};
-    auto* arraySet = sbe::value::getArraySetView(val);
+    sbe::value::TagValueOwned arraySetOwned =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArraySet());
+    auto* arraySet = sbe::value::getArraySetView(arraySetOwned.value());
 
     arraySet->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     arraySet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     arraySet->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
 
-    runTest({{tag, val}});
+    runTest({{arraySetOwned.tag(), arraySetOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, ArrayMultiSet) {
-    auto [tag, val] = sbe::value::makeNewArrayMultiSet();
-    sbe::value::ValueGuard guard{tag, val};
-    auto* arrayMultiSet = sbe::value::getArrayMultiSetView(val);
+    sbe::value::TagValueOwned arrayMultiSetOwned =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArrayMultiSet());
+    auto* arrayMultiSet = sbe::value::getArrayMultiSetView(arrayMultiSetOwned.value());
 
     arrayMultiSet->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     arrayMultiSet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
     arrayMultiSet->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0));
 
-    runTest({{tag, val}});
+    runTest({{arrayMultiSetOwned.tag(), arrayMultiSetOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, DateTime) {
@@ -321,23 +324,22 @@ TEST_F(ValueSerializeForKeyString, BigString) {
     std::string_view bigStringWithNull = "too big string \0 to fit into value"sv;
     ASSERT(bigStringWithNull.size() > sbe::value::kSmallStringMaxLength);
 
-    auto [bigStringTag, bigStringVal] = value::makeNewString(bigString);
-    sbe::value::ValueGuard testDataGuard{bigStringTag, bigStringVal};
+    sbe::value::TagValueOwned bigStringOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewString(bigString));
 
-    auto [bigStringSymbolTag, bigStringSymbolVal] = value::makeNewBsonSymbol(bigString);
-    sbe::value::ValueGuard testDataGuard2{bigStringSymbolTag, bigStringSymbolVal};
+    sbe::value::TagValueOwned bigStringSymbolOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonSymbol(bigString));
 
-    auto [bigStringWithNullTag, bigStringWithNullVal] = value::makeNewString(bigStringWithNull);
-    sbe::value::ValueGuard testDataGuard3{bigStringWithNullTag, bigStringWithNullVal};
+    sbe::value::TagValueOwned bigStringWithNullOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewString(bigStringWithNull));
 
-    auto [bigStringSymbolNullTag, bigStringSymbolNullVal] =
-        value::makeNewBsonSymbol(bigStringWithNull);
-    sbe::value::ValueGuard testDataGuard4{bigStringSymbolNullTag, bigStringSymbolNullVal};
+    sbe::value::TagValueOwned bigStringSymbolNullOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonSymbol(bigStringWithNull));
 
-    runTest({{bigStringTag, bigStringVal},
-             {bigStringSymbolTag, bigStringSymbolVal},
-             {bigStringWithNullTag, bigStringWithNullVal},
-             {bigStringSymbolNullTag, bigStringSymbolNullVal}});
+    runTest({{bigStringOwned.tag(), bigStringOwned.value()},
+             {bigStringSymbolOwned.tag(), bigStringSymbolOwned.value()},
+             {bigStringWithNullOwned.tag(), bigStringWithNullOwned.value()},
+             {bigStringSymbolNullOwned.tag(), bigStringSymbolNullOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, EmptyAndNullTerminatedStrings) {
@@ -347,51 +349,50 @@ TEST_F(ValueSerializeForKeyString, EmptyAndNullTerminatedStrings) {
     auto nullTerm = "\0"sv;
     auto nullTerms = "\0\0\0"sv;
 
-    auto [aStringTag, aStringVal] = value::makeNewString(aString);
-    sbe::value::ValueGuard testDataGuard{aStringTag, aStringVal};
+    sbe::value::TagValueOwned aStringOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewString(aString));
 
-    auto [aStringSymbolNullTag, aStringSymbolNullVal] = value::makeNewBsonSymbol(aString);
-    sbe::value::ValueGuard testDataGuard2{aStringSymbolNullTag, aStringSymbolNullVal};
+    sbe::value::TagValueOwned aStringSymbolOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonSymbol(aString));
 
-    auto [aStringNullTermTag, aStringNullTermVal] = value::makeNewString(aStringNullTerm);
-    sbe::value::ValueGuard testDataGuard3{aStringNullTermTag, aStringNullTermVal};
+    sbe::value::TagValueOwned aStringNullTermOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewString(aStringNullTerm));
 
-    auto [aStringSymbolNullTermTag, aStringSymbolNullTermVal] =
-        value::makeNewBsonSymbol(aStringNullTerm);
-    sbe::value::ValueGuard testDataGuard4{aStringSymbolNullTermTag, aStringSymbolNullTermVal};
+    sbe::value::TagValueOwned aStringSymbolNullTermOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonSymbol(aStringNullTerm));
 
-    auto [nullTermTag, nullTermVal] = value::makeNewString(nullTerm);
-    sbe::value::ValueGuard testDataGuard5{nullTermTag, nullTermVal};
+    sbe::value::TagValueOwned nullTermOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewString(nullTerm));
 
-    auto [symbolNullTermTag, symbolNullTermVal] = value::makeNewBsonSymbol(nullTerm);
-    sbe::value::ValueGuard testDataGuard6{symbolNullTermTag, symbolNullTermVal};
+    sbe::value::TagValueOwned symbolNullTermOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonSymbol(nullTerm));
 
-    auto [nullTermsTag, nullTermsVal] = value::makeNewString(nullTerms);
-    sbe::value::ValueGuard testDataGuard7{nullTermsTag, nullTermsVal};
+    sbe::value::TagValueOwned nullTermsOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewString(nullTerms));
 
-    auto [symbolNullTermsTag, symbolNullTermsVal] = value::makeNewBsonSymbol(nullTerms);
-    sbe::value::ValueGuard testDataGuard8{symbolNullTermsTag, symbolNullTermsVal};
+    sbe::value::TagValueOwned symbolNullTermsOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonSymbol(nullTerms));
 
-    runTest({{aStringTag, aStringVal},
-             {aStringSymbolNullTag, aStringSymbolNullVal},
-             {aStringNullTermTag, aStringNullTermVal},
-             {aStringSymbolNullTermTag, aStringSymbolNullTermVal},
-             {nullTermTag, nullTermVal},
-             {symbolNullTermTag, symbolNullTermVal},
-             {nullTermsTag, nullTermsVal},
-             {symbolNullTermsTag, symbolNullTermsVal}});
+    runTest({{aStringOwned.tag(), aStringOwned.value()},
+             {aStringSymbolOwned.tag(), aStringSymbolOwned.value()},
+             {aStringNullTermOwned.tag(), aStringNullTermOwned.value()},
+             {aStringSymbolNullTermOwned.tag(), aStringSymbolNullTermOwned.value()},
+             {nullTermOwned.tag(), nullTermOwned.value()},
+             {symbolNullTermOwned.tag(), symbolNullTermOwned.value()},
+             {nullTermsOwned.tag(), nullTermsOwned.value()},
+             {symbolNullTermsOwned.tag(), symbolNullTermsOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, SbeObject) {
-    auto [testDataTag, testDataVal] = sbe::value::makeNewObject();
-    sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
-    auto testData = sbe::value::getObjectView(testDataVal);
+    sbe::value::TagValueOwned testDataOwned =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewObject());
+    auto testData = sbe::value::getObjectView(testDataOwned.value());
 
     testData->push_back_raw("A", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     testData->push_back_raw("b", value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     testData->push_back_raw("C", value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
 
-    runTest({{testDataTag, testDataVal}});
+    runTest({{testDataOwned.tag(), testDataOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, BsonBinData) {
@@ -399,15 +400,15 @@ TEST_F(ValueSerializeForKeyString, BsonBinData) {
     auto bson = BSON_ARRAY(BSONBinData(byteArray, sizeof(byteArray), BinDataGeneral)
                            << BSONBinData(byteArray, sizeof(byteArray), ByteArrayDeprecated));
 
-    auto [binDataTag, binDataVal] = value::copyValue(
-        value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(bson[0].value()));
-    sbe::value::ValueGuard testDataGuard{binDataTag, binDataVal};
+    sbe::value::TagValueOwned binDataOwned = sbe::value::TagValueOwned::fromRaw(value::copyValue(
+        value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(bson[0].value())));
 
-    auto [binDataTagDeprecated, binDataValDeprecated] = value::copyValue(
-        value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(bson[0].value()));
-    sbe::value::ValueGuard testDataGuardDep{binDataTagDeprecated, binDataValDeprecated};
+    sbe::value::TagValueOwned binDataDeprecatedOwned =
+        sbe::value::TagValueOwned::fromRaw(value::copyValue(
+            value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(bson[1].value())));
 
-    runTest({{binDataTag, binDataVal}, {binDataTagDeprecated, binDataValDeprecated}});
+    runTest({{binDataOwned.tag(), binDataOwned.value()},
+             {binDataDeprecatedOwned.tag(), binDataDeprecatedOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, KeyString) {
@@ -417,65 +418,65 @@ TEST_F(ValueSerializeForKeyString, KeyString) {
     keyStringBuilder.appendNumberLong(3);
     keyStringBuilder.appendString("aaa");
     auto ks = keyStringBuilder.getValueCopy();
-    auto [keyStringTag, keyStringVal] = value::makeKeyString(ks);
-    sbe::value::ValueGuard testGuard{keyStringTag, keyStringVal};
+    sbe::value::TagValueOwned keyStringOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeKeyString(ks));
 
-    runTest({{keyStringTag, keyStringVal}});
+    runTest({{keyStringOwned.tag(), keyStringOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, BsonJavaScript) {
-    auto [plainCodeTag, plainCodeVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"sv);
-    sbe::value::ValueGuard testDataGuard{plainCodeTag, plainCodeVal};
+    sbe::value::TagValueOwned plainCodeOwned = sbe::value::TagValueOwned::fromRaw(
+        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"sv));
 
-    auto [codeWithNullTag, codeWithNullVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"sv);
-    sbe::value::ValueGuard testDataGuard2{codeWithNullTag, codeWithNullVal};
+    sbe::value::TagValueOwned codeWithNullOwned = sbe::value::TagValueOwned::fromRaw(
+        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"sv));
 
-    runTest({{plainCodeTag, plainCodeVal}, {codeWithNullTag, codeWithNullVal}});
+    runTest({{plainCodeOwned.tag(), plainCodeOwned.value()},
+             {codeWithNullOwned.tag(), codeWithNullOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, BsonRegex) {
-    auto [noFlagsTag, noFlagsVal] = value::makeNewBsonRegex("[a-z]+"sv, ""sv);
-    sbe::value::ValueGuard testDataGuard{noFlagsTag, noFlagsVal};
+    sbe::value::TagValueOwned noFlagsOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonRegex("[a-z]+"sv, ""sv));
 
-    auto [withFlagsTag, withFlagsVal] = value::makeNewBsonRegex(".*"sv, "i"sv);
-    sbe::value::ValueGuard testDataGuard2{withFlagsTag, withFlagsVal};
+    sbe::value::TagValueOwned withFlagsOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonRegex(".*"sv, "i"sv));
 
-    auto [empPatterNoFlagsTag, empPatterNoFlagsVal] = value::makeNewBsonRegex(""sv, ""sv);
-    sbe::value::ValueGuard testDataGuard3{empPatterNoFlagsTag, empPatterNoFlagsVal};
+    sbe::value::TagValueOwned empPatterNoFlagsOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonRegex(""sv, ""sv));
 
-    auto [empPatterWithFlagsTag, empPatterWithFlagsVal] = value::makeNewBsonRegex(""sv, "s"sv);
-    sbe::value::ValueGuard testDataGuard4{empPatterWithFlagsTag, empPatterWithFlagsVal};
+    sbe::value::TagValueOwned empPatterWithFlagsOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonRegex(""sv, "s"sv));
 
-    runTest({{noFlagsTag, noFlagsVal},
-             {withFlagsTag, withFlagsVal},
-             {empPatterNoFlagsTag, empPatterNoFlagsVal},
-             {empPatterWithFlagsTag, empPatterWithFlagsVal}});
+    runTest({{noFlagsOwned.tag(), noFlagsOwned.value()},
+             {withFlagsOwned.tag(), withFlagsOwned.value()},
+             {empPatterNoFlagsOwned.tag(), empPatterNoFlagsOwned.value()},
+             {empPatterWithFlagsOwned.tag(), empPatterWithFlagsOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, BsonDBPointer) {
-    auto [dbptrTag, dbptrVal] = value::makeNewBsonDBPointer(
-        "db.c", value::ObjectIdType{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}.data());
-    sbe::value::ValueGuard testDataGuard{dbptrTag, dbptrVal};
+    sbe::value::TagValueOwned dbptrOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonDBPointer(
+            "db.c", value::ObjectIdType{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}.data()));
 
-    runTest({{dbptrTag, dbptrVal}});
+    runTest({{dbptrOwned.tag(), dbptrOwned.value()}});
 }
 
 TEST_F(ValueSerializeForKeyString, BsonCodeWScope) {
-    auto [cwsTag1, cwsVal1] = value::makeNewBsonCodeWScope(
-        "function test() { return 'Hello world!'; }", BSONObj().objdata());
-    sbe::value::ValueGuard testDataGuard{cwsTag1, cwsVal1};
+    sbe::value::TagValueOwned cwsOwned1 =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonCodeWScope(
+            "function test() { return 'Hello world!'; }", BSONObj().objdata()));
 
-    auto [cwsTag2, cwsVal2] = value::makeNewBsonCodeWScope(
-        "function test() { return 'Danger\0us!'; }", BSON("a" << 1).objdata());
-    sbe::value::ValueGuard testDataGuard2{cwsTag2, cwsVal2};
+    sbe::value::TagValueOwned cwsOwned2 =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewBsonCodeWScope(
+            "function test() { return 'Danger\0us!'; }", BSON("a" << 1).objdata()));
 
-    auto [cwsTag3, cwsVal3] =
-        value::makeNewBsonCodeWScope("", BSON("b" << 2 << "c" << BSON_ARRAY(3 << 4)).objdata());
-    sbe::value::ValueGuard testDataGuard3{cwsTag3, cwsVal3};
+    sbe::value::TagValueOwned cwsOwned3 = sbe::value::TagValueOwned::fromRaw(
+        value::makeNewBsonCodeWScope("", BSON("b" << 2 << "c" << BSON_ARRAY(3 << 4)).objdata()));
 
-    runTest({{cwsTag1, cwsVal1}, {cwsTag2, cwsVal2}, {cwsTag3, cwsVal3}});
+    runTest({{cwsOwned1.tag(), cwsOwned1.value()},
+             {cwsOwned2.tag(), cwsOwned2.value()},
+             {cwsOwned3.tag(), cwsOwned3.value()}});
 }
 
 // Test that roundtripping through KeyString works for a wide row. KeyStrings used in indexes are
@@ -493,14 +494,14 @@ TEST_F(ValueSerializeForKeyString, RoundtripWideRow) {
 
 // Test that roundtripping through KeyString works for ObjectIdType: ObjectId; bsonObjectId.
 TEST_F(ValueSerializeForKeyString, RoundtripObjectIdType) {
-    auto [objectIdTag, objectIdVal] = value::makeNewObjectId();
+    sbe::value::TagValueOwned objectIdOwned =
+        sbe::value::TagValueOwned::fromRaw(value::makeNewObjectId());
 
     auto oid = OID::gen();
     auto obj = BSON("" << oid);
     auto oidStorage = obj.firstElement().value();
 
-    sbe::value::ValueGuard testDataGuard{objectIdTag, objectIdVal};
-    runTest({{objectIdTag, objectIdVal},
+    runTest({{objectIdOwned.tag(), objectIdOwned.value()},
              {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(oidStorage)}});
 }
 }  // namespace mongo::sbe
