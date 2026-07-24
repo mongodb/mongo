@@ -14,6 +14,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_reserved.h"
@@ -383,15 +384,11 @@ void setIndexBuildO2(OperationContext* opCtx,
                      const UUID& indexBuildUUID,
                      const std::vector<IndexBuildInfo>& indexes,
                      const NamespaceString& nss) {
-    // Acquire one FCV snapshot so the two feature-flag checks see the same FCV value.
-    const auto vCtx = VersionContext::getDecoration(opCtx);
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool pdibEnabled =
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            vCtx, fcvSnapshot);
+    const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx, fcvSnapshot);
     const bool resumablePdibEnabled =
         feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            vCtx, fcvSnapshot);
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
 
     repl::IndexBuildOplogEntryO2 o2;
     o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss, pdibEnabled));

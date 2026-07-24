@@ -19,6 +19,7 @@
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string_util.h"
@@ -1353,13 +1354,11 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
 
                            // TODO(SERVER-109664): Do not use the feature-flag to disable commit
                            // quorum for primary-driven index builds.
-                           const auto fcvSnapshot =
-                               serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                            const auto isPrimaryDrivenIndexBuild =
-                               fcvSnapshot.isVersionInitialized() &&
-                               resharding::isEnabledWithPinnedVersion(
-                                   _forwardableOpMetadata,
-                                   feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds);
+                               index_builds::primary_driven::enabled(
+                                   opCtx.get(),
+                                   resharding::getVersionContextOrDefault(_forwardableOpMetadata),
+                                   serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
                            IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
                                // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
                                .indexBuildMethod =

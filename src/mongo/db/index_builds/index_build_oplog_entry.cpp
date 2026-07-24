@@ -9,6 +9,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
@@ -197,10 +198,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
             }
         }
 
-        const auto vCtx = VersionContext::getDecoration(opCtx);
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        const bool pdibEnabled = feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-                                     .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
+        const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx);
 
         if (o2HasInternalIdents && !pdibEnabled) {
             return {ErrorCodes::BadValue,
