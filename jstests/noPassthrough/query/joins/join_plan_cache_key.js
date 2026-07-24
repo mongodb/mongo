@@ -3,6 +3,8 @@
  * queryPlanner.joinPlanCacheKey, and that the hash changes when the cache key
  * encoding should change and stays stable when it should not.
  *
+ * See jstests/query_golden/join_opt/join_plan_cache_key_md.js for additional test cases.
+ *
  * @tags: [
  *   requires_fcv_90,
  *   requires_sbe,
