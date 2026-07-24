@@ -113,8 +113,7 @@ static opentelemetry::trace::SpanKind toOtelSpanKind(SpanKind kind) {
 
 Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                   SpanName name,
-                  bool bypassSampling,
-                  SpanKind kind) {
+                  StartSpanConfig config) {
     TracerProviderService* tracerProviderService = getGlobalTracerProviderService();
     if (!tracerProviderService) {
         return Span{};
@@ -156,6 +155,11 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
             !feature_flags::gFeatureFlagOtelTraceSampling.isEnabledAndIgnoreFCVUnsafe()) {
             return Span{};
         }
+
+        if (config.preventSampling) {
+            return Span{};
+        }
+
         // We need a telemetryCtx for sampling, but it is slightly expensive to create, so do so
         // only if needed.
         if (!telemetryCtx) {
@@ -164,7 +168,7 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
             parentSpan = spanCtx->getSpan();
         }
 
-        if (!bypassSampling &&
+        if (!config.bypassSampling &&
             !TracingSampler::get().shouldSample(name.getName(), spanCtx->getSamplingValue())) {
             return Span{};
         }
@@ -172,7 +176,7 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
 
     opentelemetry::trace::StartSpanOptions opts;
     opts.parent = parentSpan->GetContext();
-    opts.kind = toOtelSpanKind(kind);
+    opts.kind = toOtelSpanKind(config.opts.kind);
 
     return Span(
         std::make_unique<Span::SpanImpl>(tracer->StartSpan(std::string{name.getName()}, opts),
@@ -183,10 +187,10 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
 Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                  SpanName name,
                  SpanOptions options) {
-    return _start(telemetryCtx, name, false, options.kind);
+    return _start(telemetryCtx, name, {.opts = std::move(options)});
 }
 
-Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling, SpanKind kind) {
+Span Span::_start(OperationContext* opCtx, SpanName name, StartSpanConfig config) {
     if (opCtx == nullptr) {
         return Span{};
     }
@@ -196,7 +200,7 @@ Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling, S
 
     bool hadTelemetryCtx = telemetryCtx != nullptr;
 
-    Span span = _start(telemetryCtx, name, bypassSampling, kind);
+    Span span = _start(telemetryCtx, name, config);
 
     // Start created a new TelemetryContext, so we need to store it for future use.
     if (!hadTelemetryCtx && telemetryCtx != nullptr) {
@@ -206,14 +210,25 @@ Span Span::_start(OperationContext* opCtx, SpanName name, bool bypassSampling, S
 }
 
 Span Span::start(OperationContext* opCtx, SpanName name, SpanOptions options) {
-    return _start(opCtx, name, false, options.kind);
+    return _start(opCtx, name, {.opts = std::move(options)});
 }
 
 Span Span::startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
                             SpanName name,
                             SpanOptions options) {
     auto bypassSampling = telemetryCtx && TracingSampler::get().shouldAcceptExternalTrace();
-    return _start(telemetryCtx, name, bypassSampling, options.kind);
+    return _start(
+        telemetryCtx, name, {.opts = std::move(options), .bypassSampling = bypassSampling});
+}
+
+Span Span::startEgressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                           SpanName name,
+                           SpanOptions options) {
+    return _start(telemetryCtx, name, {.opts = std::move(options), .preventSampling = true});
+}
+
+Span Span::startEgressSpan(OperationContext* opCtx, SpanName name, SpanOptions options) {
+    return _start(opCtx, name, {.opts = std::move(options), .preventSampling = true});
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {

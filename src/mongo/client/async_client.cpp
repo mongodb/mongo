@@ -88,9 +88,10 @@ otel::traces::Span AsyncDBClient::startEgressSpan(
     bool fireAndForget) {
     otel::traces::SpanKind spanKind =
         fireAndForget ? otel::traces::SpanKind::kProducer : otel::traces::SpanKind::kClient;
-    return otel::traces::Span::start(telemetryContext,
-                                     otel::traces::getOrRegisterCommandSpanName(commandName),
-                                     otel::traces::SpanOptions{.kind = spanKind});
+    return otel::traces::Span::startEgressSpan(
+        telemetryContext,
+        otel::traces::getOrRegisterCommandSpanName(commandName),
+        otel::traces::SpanOptions{.kind = spanKind});
 }
 
 bool AsyncDBClient::maybeEndExhaustSpan(boost::optional<otel::traces::Span>& span,

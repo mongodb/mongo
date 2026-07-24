@@ -212,9 +212,10 @@ boost::optional<otel::traces::Span> maybeStartSpan(OperationContext* opCtx,
     if (connectionType == ConnectionString::ConnectionType::kLocal) {
         return boost::none;
     }
-    return otel::traces::Span::start(opCtx,
-                                     otel::traces::getOrRegisterCommandSpanName(commandName),
-                                     otel::traces::SpanOptions{.kind = kind});
+    return otel::traces::Span::startEgressSpan(
+        opCtx,
+        otel::traces::getOrRegisterCommandSpanName(commandName),
+        otel::traces::SpanOptions{.kind = kind});
 }
 }  // namespace
 

@@ -83,15 +83,6 @@ TEST_F(SpanTest, StartWithClientKindCreatesClientSpanKind) {
     ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kClient);
 }
 
-TEST_F(SpanTest, StartWithTelemetryContextAndClientKindCreatesClientSpanKind) {
-    auto telemetryCtx = Span::createTelemetryContext();
-    {
-        auto span =
-            Span::start(telemetryCtx, span_names::kTest1, SpanOptions{.kind = SpanKind::kClient});
-    }
-    ASSERT_EQ(getSpan(0, span_names::kTest1)->kind, opentelemetry::trace::SpanKind::kClient);
-}
-
 TEST_F(SpanTest, StartWithProducerKindCreatesProducerSpanKind) {
     auto telemetryCtx = Span::createTelemetryContext();
     {
@@ -441,6 +432,60 @@ TEST_F(SpanTest, ClonedContextSpanOutlivesOriginalContext) {
     auto clonedSpanRecord = getSpan(1, span_names::kTest2);
 
     EXPECT_EQ(clonedSpanRecord->parentId, rootSpanRecord->context.span_id());
+}
+
+TEST_F(SpanTest, RootEgressClientSpanNeverSampled) {
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; });
+    auto opCtx = makeOperationContext();
+    {
+        auto span = Span::startEgressSpan(
+            opCtx.get(), span_names::kTest1, SpanOptions{.kind = SpanKind::kClient});
+    }
+    EXPECT_TRUE(isEmpty());
+}
+
+TEST_F(SpanTest, RootEgressProducerSpanNeverSampled) {
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; });
+    auto opCtx = makeOperationContext();
+    {
+        auto span = Span::startEgressSpan(
+            opCtx.get(), span_names::kTest1, SpanOptions{.kind = SpanKind::kProducer});
+    }
+    EXPECT_TRUE(isEmpty());
+}
+
+TEST_F(SpanTest, EgressClientSpanWithLocalParentBypassesSamplingDrop) {
+    auto guard = setTraceSamplingFnForTest(
+        [&](std::string_view name, double) { return name == span_names::kTest1.getName(); });
+    auto opCtx = makeOperationContext();
+    {
+        auto parent = Span::start(opCtx.get(), span_names::kTest1);
+        auto child = Span::startEgressSpan(
+            opCtx.get(), span_names::kTest2, SpanOptions{.kind = SpanKind::kClient});
+    }
+
+    ASSERT_FALSE(isEmpty());
+    auto parentRecord = getSpan(1, span_names::kTest1);
+    auto childRecord = getSpan(0, span_names::kTest2);
+    EXPECT_EQ(childRecord->kind, opentelemetry::trace::SpanKind::kClient);
+    EXPECT_EQ(childRecord->parentId, parentRecord->context.span_id());
+}
+
+TEST_F(SpanTest, EgressProducerSpanWithLocalParentBypassesSamplingDrop) {
+    auto guard = setTraceSamplingFnForTest(
+        [&](std::string_view name, double) { return name == span_names::kTest1.getName(); });
+    auto opCtx = makeOperationContext();
+    {
+        auto parent = Span::start(opCtx.get(), span_names::kTest1);
+        auto child = Span::startEgressSpan(
+            opCtx.get(), span_names::kTest2, SpanOptions{.kind = SpanKind::kProducer});
+    }
+
+    ASSERT_FALSE(isEmpty());
+    auto parentRecord = getSpan(1, span_names::kTest1);
+    auto childRecord = getSpan(0, span_names::kTest2);
+    EXPECT_EQ(childRecord->kind, opentelemetry::trace::SpanKind::kProducer);
+    EXPECT_EQ(childRecord->parentId, parentRecord->context.span_id());
 }
 
 using IngressSpanTest = SpanTest;

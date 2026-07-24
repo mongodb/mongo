@@ -87,6 +87,18 @@ public:
                                  SpanName name,
                                  SpanOptions options = {.kind = SpanKind::kServer});
 
+    /**
+     * Starts a new Span for an egress source. Egress spans are never sampled by the internal
+     * sampling mechanism; they are only started when created as a child of an already-sampled
+     * parent span. Defaults to CLIENT span kind.
+     */
+    static Span startEgressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                                SpanName name,
+                                SpanOptions options = {.kind = SpanKind::kClient});
+    static Span startEgressSpan(OperationContext* opCtx,
+                                SpanName name,
+                                SpanOptions options = {.kind = SpanKind::kClient});
+
     static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
     ~Span();
@@ -116,6 +128,12 @@ public:
     void setStatus(const Status& status);
 
 private:
+    struct StartSpanConfig {
+        SpanOptions opts;
+        bool bypassSampling = false;
+        bool preventSampling = false;
+    };
+
     /** Construction of Spans should be done through Span::start(context, name). */
     Span();
     Span(std::unique_ptr<SpanImpl> impl);
@@ -125,9 +143,8 @@ private:
     // should be sampled or not.
     static Span _start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                        SpanName name,
-                       bool bypassSampling,
-                       SpanKind kind);
-    static Span _start(OperationContext* opCtx, SpanName name, bool bypassSampling, SpanKind kind);
+                       StartSpanConfig config);
+    static Span _start(OperationContext* opCtx, SpanName name, StartSpanConfig config);
 
     /** The actual span implementation. Null if this Span will not be part of an exported trace. */
     std::unique_ptr<SpanImpl> _impl;
@@ -154,6 +171,16 @@ public:
     static Span startIngressSpan(std::shared_ptr<TelemetryContext>&,
                                  SpanName,
                                  SpanOptions = {.kind = SpanKind::kServer}) {
+        return Span{};
+    }
+    static Span startEgressSpan(std::shared_ptr<TelemetryContext>&,
+                                SpanName,
+                                SpanOptions = {.kind = SpanKind::kClient}) {
+        return Span{};
+    }
+    static Span startEgressSpan(OperationContext*,
+                                SpanName,
+                                SpanOptions = {.kind = SpanKind::kClient}) {
         return Span{};
     }
 

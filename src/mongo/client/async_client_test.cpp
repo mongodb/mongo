@@ -43,7 +43,6 @@ using otel::traces::Span;
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::IsEmpty;
-using ::testing::IsNull;
 using ::testing::Not;
 using ::testing::SizeIs;
 using unittest::match::StatusIsOK;
@@ -150,19 +149,23 @@ public:
         if (!OtelTracesCapturer::canReadSpans()) {
             GTEST_SKIP() << "Requires OTel build";
         }
+
+        // Since egress spans can't start a trace, create a parent span first.
+        _parentSpan = std::make_unique<Span>(Span::start(_telemetryCtx, span_names::kTest1));
     }
 
 protected:
     OtelTracesCapturer _capturer;
+    std::shared_ptr<otel::TelemetryContext> _telemetryCtx;
+    std::unique_ptr<Span> _parentSpan;
 };
 
 using StartEgressSpanTest = EgressSpanTest;
 
 TEST_F(StartEgressSpanTest, RegistersSpanNameForUnregisteredCommand) {
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
         auto span = AsyncDBClient::startEgressSpan(
-            telemetryCtx, "test_only.async_client_unregistered", /*fireAndForget=*/false);
+            _telemetryCtx, "test_only.async_client_unregistered", /*fireAndForget=*/false);
     }
 
     EXPECT_THAT(_capturer.getSpans("test_only.async_client_unregistered"), SizeIs(1));
@@ -170,9 +173,8 @@ TEST_F(StartEgressSpanTest, RegistersSpanNameForUnregisteredCommand) {
 }
 
 TEST_F(StartEgressSpanTest, FallsBackToGenericSpanNameForEmptyCommandName) {
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
-        auto span = AsyncDBClient::startEgressSpan(telemetryCtx, "", /*fireAndForget=*/false);
+        auto span = AsyncDBClient::startEgressSpan(_telemetryCtx, "", /*fireAndForget=*/false);
     }
 
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), SizeIs(1));
@@ -181,45 +183,32 @@ TEST_F(StartEgressSpanTest, FallsBackToGenericSpanNameForEmptyCommandName) {
 
 TEST_F(StartEgressSpanTest, UsesRegisteredSpanNameForKnownCommand) {
     static const auto& registeredSpan = registerCommandSpanName("test_only.async_client_known");
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
         auto span = AsyncDBClient::startEgressSpan(
-            telemetryCtx, "test_only.async_client_known", /*fireAndForget=*/false);
+            _telemetryCtx, "test_only.async_client_known", /*fireAndForget=*/false);
     }
 
     EXPECT_THAT(_capturer.getSpans(registeredSpan), SizeIs(1));
     EXPECT_THAT(_capturer.getSpans(span_names::kMongoRPC), IsEmpty());
 }
 
-TEST_F(StartEgressSpanTest, PopulatesNullTelemetryContext) {
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
-    ASSERT_THAT(telemetryCtx, IsNull());
-
-    auto span = AsyncDBClient::startEgressSpan(
-        telemetryCtx, "test_only.async_client_ping", /*fireAndForget=*/false);
-
-    EXPECT_THAT(telemetryCtx, Not(IsNull()));
-}
-
 TEST_F(StartEgressSpanTest, IsChildOfExistingSpanOnTelemetryContext) {
-    auto telemetryCtx = Span::createTelemetryContext();
     {
-        auto parentSpan = Span::start(telemetryCtx, span_names::kTest1);
-        {
-            auto childSpan = AsyncDBClient::startEgressSpan(
-                telemetryCtx, "test_only.unregistered", /*fireAndForget=*/false);
-        }
+        auto childSpan = AsyncDBClient::startEgressSpan(
+            _telemetryCtx, "test_only.unregistered", /*fireAndForget=*/false);
     }
 
-    EXPECT_THAT(_capturer.getSpans("test_only.unregistered"),
+    // End the parent span so it is exported and the child's parent linkage can be resolved.
+    _parentSpan.reset();
+
+    EXPECT_THAT(_capturer.getSpans(("test_only.unregistered")),
                 ElementsAre(Parent(HasSpanName(span_names::kTest1))));
 }
 
 TEST_F(StartEgressSpanTest, CreatesClientSpanKind) {
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
         auto span = AsyncDBClient::startEgressSpan(
-            telemetryCtx, "test_only.async_client_kind", /*fireAndForget=*/false);
+            _telemetryCtx, "test_only.async_client_kind", /*fireAndForget=*/false);
     }
 
     EXPECT_THAT(_capturer.getSpans("test_only.async_client_kind"),
@@ -227,10 +216,9 @@ TEST_F(StartEgressSpanTest, CreatesClientSpanKind) {
 }
 
 TEST_F(StartEgressSpanTest, CreatesProducerSpanKindForFireAndForget) {
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx;
     {
         auto span = AsyncDBClient::startEgressSpan(
-            telemetryCtx, "test_only.async_client_fire_and_forget_kind", /*fireAndForget=*/true);
+            _telemetryCtx, "test_only.async_client_fire_and_forget_kind", /*fireAndForget=*/true);
     }
 
     EXPECT_THAT(_capturer.getSpans("test_only.async_client_fire_and_forget_kind"),
@@ -394,6 +382,15 @@ public:
     }
 
 protected:
+    // Builds a request whose telemetry context is the fixture's, so that egress spans started by
+    // the command APIs are children of the parent span created in setUp and therefore not dropped
+    // by the egress no-sampling rule.
+    executor::RemoteCommandRequest makeRequest(std::string_view commandName) {
+        auto request = makeRemoteCommandRequest(commandName);
+        request.telemetryContext = _telemetryCtx;
+        return request;
+    }
+
     std::shared_ptr<FakeAsyncSession> _session;
     std::shared_ptr<AsyncDBClient> _client;
 };
@@ -404,7 +401,7 @@ TEST_F(RunCommandRequestSpanTest, UsesMongoRpcSpanNameForEmptyCommandName) {
     _session->queueReply(
         [](const Message& request) { return makeReplyTo(request, BSON("ok" << 1)); });
 
-    auto future = _client->runCommandRequest(makeRemoteCommandRequest(""));
+    auto future = _client->runCommandRequest(makeRequest(""));
 
     ASSERT_TRUE(future.isReady());
     EXPECT_THAT(std::move(future).getNoThrow(), StatusIsOK());
@@ -417,8 +414,7 @@ TEST_F(RunCommandRequestSpanTest, IsOpenUntilResponseAndThenEndsOk) {
     auto continueReply = _session->queueDeferredReply(
         [](const Message& request) { return makeReplyTo(request, BSON("ok" << 1)); });
 
-    auto future =
-        _client->runCommandRequest(makeRemoteCommandRequest("test_only.run_command_request_ok"));
+    auto future = _client->runCommandRequest(makeRequest("test_only.run_command_request_ok"));
 
     // The request has been sunk, but the deferred reply has not been fulfilled yet, so the
     // command future (and therefore the egress span) must still be open.
@@ -444,8 +440,8 @@ TEST_F(RunCommandRequestSpanTest, EndsWithErrorOnCommandLevelErrorInSuccessfulRe
                                      << "mock command error"));
     });
 
-    auto future = _client->runCommandRequest(
-        makeRemoteCommandRequest("test_only.run_command_request_command_error"));
+    auto future =
+        _client->runCommandRequest(makeRequest("test_only.run_command_request_command_error"));
     auto swResponse = std::move(future).getNoThrow();
     // runCommandRequest itself succeeds (it returns the RemoteCommandResponse containing the
     // error reply); it is the caller's responsibility to interpret the command reply's status.
@@ -460,8 +456,7 @@ TEST_F(RunCommandRequestSpanTest, EndsWithErrorOnFailedResponse) {
     // No reply is queued, so `sourceMessage` will return an error status, simulating a network
     // failure while waiting for the response.
 
-    auto future =
-        _client->runCommandRequest(makeRemoteCommandRequest("test_only.run_command_request_error"));
+    auto future = _client->runCommandRequest(makeRequest("test_only.run_command_request_error"));
     auto swResponse = std::move(future).getNoThrow();
     EXPECT_THAT(swResponse, Not(StatusIsOK()));
 
@@ -507,11 +502,10 @@ TEST_F(RunCommandRequestSpanTest, EndsEvenWhenCanceledBeforeStarting) {
     CancellationSource source;
     source.cancel();
 
-    auto future = _client->runCommandRequest(
-        makeRemoteCommandRequest("test_only.run_command_request_canceled"),
-        /*baton=*/nullptr,
-        /*fromConnAcquiredTimer=*/nullptr,
-        source.token());
+    auto future = _client->runCommandRequest(makeRequest("test_only.run_command_request_canceled"),
+                                             /*baton=*/nullptr,
+                                             /*fromConnAcquiredTimer=*/nullptr,
+                                             source.token());
     auto swResponse = std::move(future).getNoThrow();
     ASSERT_NOT_OK(swResponse);
 
@@ -528,8 +522,7 @@ TEST_F(BeginExhaustCommandRequestSpanTest,
     _session->queueReply(
         [](const Message& request) { return makeReplyTo(request, BSON("ok" << 1), true); });
 
-    auto beginFuture =
-        _client->beginExhaustCommandRequest(makeRemoteCommandRequest("test_only.exhaust_ok"));
+    auto beginFuture = _client->beginExhaustCommandRequest(makeRequest("test_only.exhaust_ok"));
     auto swFirstResponse = std::move(beginFuture).getNoThrow();
     ASSERT_OK(swFirstResponse);
     ASSERT_TRUE(swFirstResponse.getValue().moreToCome);
@@ -554,8 +547,7 @@ TEST_F(BeginExhaustCommandRequestSpanTest, EndsWithErrorIfAwaitExhaustCommandFai
     _session->queueReply(
         [](const Message& request) { return makeReplyTo(request, BSON("ok" << 1), true); });
 
-    auto beginFuture =
-        _client->beginExhaustCommandRequest(makeRemoteCommandRequest("test_only.exhaust_error"));
+    auto beginFuture = _client->beginExhaustCommandRequest(makeRequest("test_only.exhaust_error"));
     auto swFirstResponse = std::move(beginFuture).getNoThrow();
     ASSERT_OK(swFirstResponse);
     EXPECT_THAT(_capturer.getSpans(registeredSpan), IsEmpty());
