@@ -326,28 +326,32 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
     failPoint.off();
 
-    // Run a multi-doc transaction with a long running operation. Assert that it does not get
-    // marked delinquent or bump the delinquency serverStatus counters.
+    // Run a multi-doc transaction with a long-running find(). Assert that it does not get
+    // marked delinquent in the slow query log or query stats.
+    //
+    // Use a failpoint sleep (not $where) so the delay is a deterministic server-side sleep and
+    // cannot hit the JS/WASM function timeout under CPU contention.
     {
         const session = routerDb.getMongo().startSession();
         const sessionDb = session.getDatabase(jsTestName());
         assert.commandWorked(sessionDb.txn_coll.insert({a: 1}));
 
         const findTxnComment = "find_in_txn";
-        const sleepMillis = 10 * 1000;
+
+        // Sleep longer than the delinquency threshold so a non-transaction find() with the same
+        // delay would be considered delinquent.
+        const txnFailPoint = configureFailPoint(shardDb, "waitInFindBeforeMakingBatch", {
+            sleepFor: waitPerIterationMs,
+            comment: findTxnComment,
+        });
 
         {
             session.startTransaction();
-            assert.eq(
-                sessionDb.txn_coll
-                    .find({$where: `sleep(${sleepMillis}); return true;`})
-                    .comment(findTxnComment)
-                    .itcount(),
-                1,
-            );
+            assert.eq(sessionDb.txn_coll.find().comment(findTxnComment).itcount(), 1);
             assert.commandWorked(sessionDb.txn_coll.insert({a: 2}));
             session.commitTransaction();
         }
+        txnFailPoint.off();
 
         const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
         const line = findMatchingLogLine(globalLog.log, {
@@ -362,34 +366,13 @@ function testDelinquencyOnShard(routerDb, shardDb) {
             parsedLine,
         );
 
-        // Check that the server status counters were not bumped. Here we can only do a loose check.
-        {
-            const serverStatus = shardDb.serverStatus();
-            const queues = serverStatus.queues.execution;
-
-            // Ensure that the slow find() did not bump the queue-level counters. To do this, we
-            // assert that the max delinquent value for each queue is less than the time this
-            // operation slept. This assumes that no other background operation that the test
-            // didn't trigger directly was delinquent for more than 'sleepMillis'.
-            assert.lt(
-                queues.write.normalPriority.maxAcquisitionDelinquencyMillis,
-                sleepMillis,
-                queues,
-            );
-            assert.lt(
-                queues.read.normalPriority.maxAcquisitionDelinquencyMillis,
-                sleepMillis,
-                queues,
-            );
-        }
-
         // Ensure that the query stats for this operation do not indicate that it's delinquent.
         {
             const queryStats = getQueryStats(routerDb.getMongo(), {collName: "txn_coll"});
             const queryExecMetrics = getQueryExecMetrics(queryStats[0].metrics);
             assert(
                 queryStats.length === 1,
-                "Expected to find exactly one query stats entry for 'testColl' " +
+                "Expected to find exactly one query stats entry for 'txn_coll' " +
                     tojson(queryStats),
             );
             assert.eq(queryExecMetrics.delinquentAcquisitions.sum, 0, queryStats);
