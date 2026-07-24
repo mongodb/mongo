@@ -531,6 +531,12 @@ protected:
             .read<LittleEndian<int64_t>>();
     }
 
+    // Matches the hash computed for updates: the pre-image and post-image are hashed
+    // independently and XOR-ed together.
+    int64_t calculateUpdateDocHash(const BSONObj& preImage, const BSONObj& postImage) {
+        return calculateDocHash(preImage) ^ calculateDocHash(postImage);
+    }
+
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "testDB", "testColl");
     const UUID uuid{UUID::gen()};
@@ -1919,7 +1925,7 @@ TEST_F(OpObserverTest, CheckHashExistsOnUpdateWithFlagAndRecordId) {
         opCtx, nss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId(1), /*replicatedSizeDelta=*/{});
     ASSERT(sizeMetadata);
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), calculateDocHash(kUpdatedDoc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateUpdateDocHash(kPreImageDoc, kUpdatedDoc));
     EXPECT_FALSE(sizeMetadata->getSz().has_value());
 }
 
@@ -2032,7 +2038,7 @@ TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnUpdate) {
     ASSERT(sizeMetadata->getSz());
     EXPECT_EQ(*sizeMetadata->getSz(), 10);
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), calculateDocHash(kUpdatedDoc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateUpdateDocHash(kPreImageDoc, kUpdatedDoc));
 }
 
 TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnDelete) {
@@ -2459,7 +2465,7 @@ TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionInsertWithou
 TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionUpdateWithFlagAndRecordId) {
     unittest::ServerParameterGuard continuousInternodeScope{
         "featureFlagContinuousInternodeValidationPerDocument", true};
-    const int64_t expectedHash = calculateDocHash(kUpdatedDoc);
+    const int64_t expectedHash = calculateUpdateDocHash(kPreImageDoc, kUpdatedDoc);
     const auto sizeMetadata =
         txnUpdateAndGetSizeMetadata(nss1, kPreImageDoc, kUpdatedDoc, RecordId(1));
     ASSERT(sizeMetadata);
@@ -5916,8 +5922,8 @@ TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedUpdateWithFlagAndRecordI
     const BSONObj updatedDoc1 = BSON("_id" << 0 << "data" << "y");
     const BSONObj preImageDoc2 = BSON("_id" << 1 << "data" << 1);
     const BSONObj updatedDoc2 = BSON("_id" << 1 << "data" << 2);
-    const int64_t expectedHash1 = calculateDocHash(updatedDoc1);
-    const int64_t expectedHash2 = calculateDocHash(updatedDoc2);
+    const int64_t expectedHash1 = calculateUpdateDocHash(preImageDoc1, updatedDoc1);
+    const int64_t expectedHash2 = calculateUpdateDocHash(preImageDoc2, updatedDoc2);
     const auto sizeMetadata = batchedUpdateAndGetSizeMetadata(opCtx,
                                                               _nss,
                                                               preImageDoc1,

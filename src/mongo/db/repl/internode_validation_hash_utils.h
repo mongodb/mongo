@@ -18,6 +18,13 @@ namespace repl {
 int64_t computeDocValidationHash(const BSONObj& doc);
 
 /**
+ * Computes the validation hash for an update. The pre-image and post-image are hashed independently
+ * and XOR-ed together so the value composes with the delta-based collection validation hash:
+ * XOR-ing removes the pre-image's contribution and adds the post-image's.
+ */
+int64_t computeUpdateValidationHash(const BSONObj& preImage, const BSONObj& postImage);
+
+/**
  * Returns true if continuous internode validation per document is enabled for the given
  * OperationContext. This indicates whether per-document validation hashes should be computed
  * and stored on the oplog entries.

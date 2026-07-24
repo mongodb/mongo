@@ -22,6 +22,10 @@ int64_t computeDocValidationHash(const BSONObj& doc) {
     return ConstDataView(reinterpret_cast<const char*>(sha.data())).read<LittleEndian<int64_t>>();
 }
 
+int64_t computeUpdateValidationHash(const BSONObj& preImage, const BSONObj& postImage) {
+    return computeDocValidationHash(preImage) ^ computeDocValidationHash(postImage);
+}
+
 bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     const auto& vCtx = VersionContext::getDecoration(opCtx);

@@ -28,8 +28,9 @@ structs:
                 type: safeInt64
                 optional: true
                 description:
-                    "Hash of the document affected by this operation. For inserts and updates,
-                    this is the post-image. For deletes, this is the pre-image."
+                    "Hash of the document affected by this operation. For inserts, this is the
+                    inserted document. For deletes, this is the pre-image. For updates, this is the
+                    hash of the pre-image XOR-ed with the hash of the post-image."
 
     MultiOpSizeMetadata:
         description:

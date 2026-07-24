@@ -119,6 +119,17 @@ repl::OplogEntrySizeMetadata makeOperationSizeMetadata(boost::optional<int32_t> 
     return m;
 }
 
+// Attaches size metadata to the given oplog entry if there is a size delta or a validation hash to
+// record.
+template <typename OplogEntryOrOperation>
+void setSizeMetadata(OplogEntryOrOperation& entry,
+                     boost::optional<int32_t> replicatedSizeDelta,
+                     boost::optional<int64_t> docHash) {
+    if (replicatedSizeDelta || docHash) {
+        entry.setSizeMetadata(makeOperationSizeMetadata(replicatedSizeDelta, docHash));
+    }
+}
+
 // Computes the per-document validation hash if needed, and, if there is any size metadata to
 // record, attaches it to the given oplog entry.
 template <typename OplogEntryOrOperation>
@@ -130,9 +141,22 @@ void setSizeMetadataIfNeeded(OplogEntryOrOperation& entry,
     if (useValidationHash) {
         docHash = repl::computeDocValidationHash(doc);
     }
-    if (replicatedSizeDelta || docHash) {
-        entry.setSizeMetadata(makeOperationSizeMetadata(replicatedSizeDelta, docHash));
+    setSizeMetadata(entry, replicatedSizeDelta, docHash);
+}
+
+// Computes the update validation hash (over both the pre-image and post-image) if needed and
+// attaches any size metadata to the given oplog entry.
+template <typename OplogEntryOrOperation>
+void setUpdateSizeMetadataIfNeeded(OplogEntryOrOperation& entry,
+                                   boost::optional<int32_t> replicatedSizeDelta,
+                                   const BSONObj& preImage,
+                                   const BSONObj& postImage,
+                                   bool useValidationHash) {
+    boost::optional<int64_t> docHash;
+    if (useValidationHash) {
+        docHash = repl::computeUpdateValidationHash(preImage, postImage);
     }
+    setSizeMetadata(entry, replicatedSizeDelta, docHash);
 }
 
 repl::OpTime logOperation(OperationContext* opCtx,
@@ -1037,8 +1061,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
-        setSizeMetadataIfNeeded(
-            operation, args.replicatedSizeDelta, args.updateArgs->updatedDoc, useValidationHash);
+        setUpdateSizeMetadataIfNeeded(operation,
+                                      args.replicatedSizeDelta,
+                                      args.updateArgs->preImageDoc,
+                                      args.updateArgs->updatedDoc,
+                                      useValidationHash);
         if (args.updateArgs->mustCheckExistenceForInsertOperations) {
             operation.setCheckExistenceForDiffInsert(true);
         }
@@ -1113,8 +1140,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             operation.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
-        setSizeMetadataIfNeeded(
-            operation, args.replicatedSizeDelta, args.updateArgs->updatedDoc, useValidationHash);
+        setUpdateSizeMetadataIfNeeded(operation,
+                                      args.replicatedSizeDelta,
+                                      args.updateArgs->preImageDoc,
+                                      args.updateArgs->updatedDoc,
+                                      useValidationHash);
 
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
             invariant(!args.updateArgs->preImageDoc.isEmpty(),
@@ -1162,8 +1192,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             oplogEntry.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
-        setSizeMetadataIfNeeded(
-            oplogEntry, args.replicatedSizeDelta, args.updateArgs->updatedDoc, useValidationHash);
+        setUpdateSizeMetadataIfNeeded(oplogEntry,
+                                      args.replicatedSizeDelta,
+                                      args.updateArgs->preImageDoc,
+                                      args.updateArgs->updatedDoc,
+                                      useValidationHash);
 
         opTime = replLogUpdate(opCtx, args, &oplogEntry, _operationLogger.get());
         if (opAccumulator) {
