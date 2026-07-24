@@ -14,18 +14,14 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/util/validate_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
-#include "mongo/db/update/storage_validation.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -207,7 +203,13 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
     }
 
     if (ns.isSystemDotProfile()) {
-        return Status::OK();
+        if (rss::ReplicatedStorageService::get(opCtx)
+                .getPersistenceProvider()
+                .supportsLocalCollections()) {
+            return Status::OK();
+        }
+        return Status(ErrorCodes::InvalidNamespace,
+                      "system.profile unsupported when local collections are not supported");
     }
 
     if (ns.isSystem() && !ns.isLegalClientSystemNS()) {
@@ -240,6 +242,13 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
 
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid namespace: " << ns.toStringForErrorMsg());
+    }
+
+    if (ns.isLocalDB() &&
+        !rss::ReplicatedStorageService::get(opCtx)
+             .getPersistenceProvider()
+             .supportsLocalCollections()) {
+        return Status(ErrorCodes::InvalidNamespace, "Local collections are not supported");
     }
 
     return Status::OK();

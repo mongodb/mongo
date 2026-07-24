@@ -1710,28 +1710,6 @@ void ExecCommandDatabase::_initiateCommand() {
     boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
     auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
 
-    // On DSC, we block writes to local collections.
-    // We block transactions to local collections in case part of the transaction is a write for
-    // future proofing.
-    if (dbName == DatabaseName::kLocal &&
-        !rss.getPersistenceProvider().supportsLocalCollections()) {
-        bool commandIsWrite = (command->getReadWriteType() == Command::ReadWriteType::kWrite ||
-                               command->getReadWriteType() == Command::ReadWriteType::kTransaction);
-        uassert(ErrorCodes::IllegalOperation,
-                "Not allowed to write to 'local' database",
-                !commandIsWrite);
-
-        bool commandIsCreateCollection = command->getName() == "create";
-        uassert(ErrorCodes::IllegalOperation,
-                "Not allowed to create 'local' collections",
-                !commandIsCreateCollection);
-
-        bool commandIsCreateIndex = command->getName() == "createIndexes";
-        uassert(ErrorCodes::IllegalOperation,
-                "Not allowed to create indexes on 'local' collections",
-                !commandIsCreateIndex);
-    }
-
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
         const bool inMultiDocumentTransaction = (_sessionOptions.getAutocommit() == false);

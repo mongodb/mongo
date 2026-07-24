@@ -1215,6 +1215,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/repl/dbcheck:dbcheck_test_fixture",
         "//src/mongo/db/repl/dbcheck:health_log",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",

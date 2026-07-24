@@ -8,6 +8,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -73,6 +75,38 @@ TEST_F(CreateIndexesTest, CreateIndexOnPreimagesCollectionFails) {
     ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;
     ASSERT(result.hasField("code"));
     ASSERT_EQ(result.getIntField("code"), 8293400);
+}
+
+TEST_F(CreateIndexesTest, CreateIndexOnLocalCollectionFailsWhenUnsupported) {
+    // Register a custom persistence provider which disallows local collections
+    struct NoLocalCollectionsPersistenceProvider : public rss::AttachedPersistenceProvider {
+        bool supportsLocalCollections() const override {
+            return false;
+        }
+    };
+    rss::ReplicatedStorageService::get(getServiceContext())
+        .setPersistenceProvider(std::make_unique<NoLocalCollectionsPersistenceProvider>());
+
+    auto opCtx = operationContext();
+    DBDirectClient client(opCtx);
+    const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+    const auto index = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
+                                << "a_1");
+    BSONObj result;
+
+    {
+        auto nss = NamespaceString::createNamespaceString_forTest("local.collection");
+        auto cmd = BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index));
+        ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;
+        ASSERT_EQ(result.getIntField("code"), ErrorCodes::InvalidNamespace);
+    }
+
+    {
+        auto nss = NamespaceString::createNamespaceString_forTest("db.system.profile");
+        auto cmd = BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index));
+        ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;
+        ASSERT_EQ(result.getIntField("code"), ErrorCodes::InvalidNamespace);
+    }
 }
 
 }  // namespace
