@@ -35,6 +35,7 @@
  */
 
 import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
+import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 
 /**
  * Sharding type constants.
@@ -60,9 +61,17 @@ function getShardKeySpec(shardingType) {
  * @returns {string} The primary shard ID.
  */
 function getDbPrimary(connection, dbName) {
-    const dbDoc = connection.getDB("config").databases.findOne({_id: dbName});
-    assert(dbDoc, `${this}: database ${dbName} not in config.databases`);
-    return dbDoc.primary;
+    // Read from the primary: a stale secondary read of config.databases right after a
+    // concurrent movePrimary can make a caller think the db is still on its old shard,
+    // which defeats callers (e.g. MoveCollectionCommand's target-shard selection) that
+    // rely on this to avoid picking a shard the collection is already on.
+    const cursor = connection
+        .getDB("config")
+        .databases.find({_id: dbName})
+        .readPref("primary")
+        .limit(1);
+    assert(cursor.hasNext(), `database ${dbName} not in config.databases`);
+    return cursor.next().primary;
 }
 
 /**
@@ -1008,10 +1017,14 @@ class MoveCommandBase extends Command {
     _getShardFromChunks(connection, sort = null) {
         const ns = `${this.dbName}.${this.collName}`;
         const configDb = connection.getDB("config");
-        const collDoc = configDb.collections.findOne({_id: ns});
-        assert(collDoc, `${this}: collection ${ns} not in config.collections`);
-        const query = configDb.chunks.find({uuid: collDoc.uuid});
-        const chunk = sort ? query.sort(sort).limit(1).next() : query.next();
+
+        // Read from the primary as a stale secondary read here could report a chunk's old shard
+        // right after it moved.
+        const collCursor = configDb.collections.find({_id: ns}).readPref("primary").limit(1);
+        assert(collCursor.hasNext(), `${this}: collection ${ns} not in config.collections`);
+        const collDoc = collCursor.next();
+        const query = configDb.chunks.find({uuid: collDoc.uuid}).readPref("primary");
+        const chunk = sort ? query.sort(sort).limit(1).next() : query.limit(1).next();
         assert(chunk, `${this}: no chunks for ${ns}`);
         return chunk.shard;
     }
@@ -1034,7 +1047,22 @@ class MoveCommandBase extends Command {
         return otherShards[Random.randInt(otherShards.length)]._id;
     }
 
+    /**
+     * Whether this command needs to run in isolation and can not be interleaved with other
+     * commands over the same database.
+     */
+    _needsDbLock() {
+        return false;
+    }
+
     execute(connection) {
+        if (!this._needsDbLock()) {
+            return this._doExecute(connection);
+        }
+        return Connector.withDbLock(connection, this.dbName, () => this._doExecute(connection));
+    }
+
+    _doExecute(connection) {
         const targetShardId = this._getTargetShard(connection);
         const moveCommand = this._buildMoveCommand(targetShardId);
         assert.commandWorked(connection.adminCommand(moveCommand));
@@ -1049,6 +1077,10 @@ class MovePrimaryCommand extends MoveCommandBase {
     constructor({dbName, collName, shardSet, collectionCtx, targetShard = null}) {
         super({dbName, collName, shardSet, collectionCtx});
         this.targetShard = targetShard;
+    }
+
+    _needsDbLock() {
+        return true;
     }
 
     _getTargetShard(connection) {
@@ -1088,6 +1120,12 @@ class MovePrimaryCommand extends MoveCommandBase {
  * event.
  */
 class MoveCollectionCommand extends MoveCommandBase {
+    _needsDbLock() {
+        // Only an untracked collection's placement is tied to database placement. For
+        // unsplittable (or sharded) the placement is unaffected by any writer's movePrimary.
+        return !this.collectionCtx.isUnsplittable && !this.collectionCtx.shardKeySpec;
+    }
+
     _getCurrentShard(connection) {
         if (this.collectionCtx.isUnsplittable) {
             return this._getShardFromChunks(connection);
