@@ -11,6 +11,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_metadata_accessor.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_recoverer_tracker.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
@@ -199,8 +200,9 @@ public:
     /**
      * Sets the database metadata refresh future for other threads to wait on it.
      */
-    void setDbMetadataRefreshFuture_DEPRECATED(SharedSemiFuture<void> future,
-                                               CancellationSource cancellationSource);
+    void setDbMetadataRefreshFuture_DEPRECATED(
+        SharedSemiFuture<void> future,
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition);
 
     /**
      * If there is an ongoing database metadata refresh, returns the future to wait on it,
@@ -226,14 +228,16 @@ private:
     // DEPRECATED methods and attributes
 
     struct DbMetadataRefresh {
-        DbMetadataRefresh(SharedSemiFuture<void> future, CancellationSource cancellationSource)
-            : future(std::move(future)), cancellationSource(std::move(cancellationSource)) {};
+        DbMetadataRefresh(SharedSemiFuture<void> future,
+                          ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition)
+            : future(std::move(future)),
+              recovererTrackerAcquisition(std::move(recovererTrackerAcquisition)) {}
 
         // Tracks the ongoing database metadata refresh.
         SharedSemiFuture<void> future;
 
-        // Cancellation source to cancel the ongoing database metadata refresh.
-        CancellationSource cancellationSource;
+        // Keeps the recovery registered with ShardCatalogRecovererTracker until completion.
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition;
     };
 
     /**
@@ -242,7 +246,7 @@ private:
     void _cancelDbMetadataRefresh_DEPRECATED();
 
     // Tracks the ongoing database metadata refresh. Possibly keeps a future for other threads
-    // to wait on it, and a cancellation source to cancel the ongoing database metadata refresh.
+    // to wait on it, and a tracker acquisition used to cancel the refresh.
     boost::optional<DbMetadataRefresh> _dbMetadataRefresh;
 };
 

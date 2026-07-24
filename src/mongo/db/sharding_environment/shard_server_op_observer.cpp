@@ -854,15 +854,16 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
     // We have to consider concurrent recovery threads reading the durable state. As the drain and
-    // install is an atomic operation the presence of a recoverer means that we still haven't
-    // drained and applied the changes. The invalidate has to be communicated to the recovery
-    // threads such that a new durable read is performed as whatever was read before is now invalid.
-    // The recoverer evaluates the entry's precondition against the metadata it recovers from disk.
+    // install is an atomic operation the presence of a metadata synchronizer means that we still
+    // haven't drained and applied the changes. The invalidate has to be communicated to the
+    // recovery threads such that a new durable read is performed as whatever was read before is now
+    // invalid. The synchronizer evaluates the entry's precondition against the metadata it recovers
+    // from disk.
     //
-    // The lack of a recoverer means we're free to evaluate the precondition against the currently
-    // installed collection metadata and, if it holds, clear it.
-    if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
-        recoverer->onOplogEntry(op.getTimestamp(), entry);
+    // The lack of a metadata synchronizer means we're free to evaluate the precondition against the
+    // currently installed collection metadata and, if it holds, clear it.
+    if (auto synchronizer = scopedCsr->getMetadataSynchronizer()) {
+        synchronizer->onOplogEntry(op.getTimestamp(), entry);
     } else if (shouldInvalidateCollectionMetadataLocally(entry, *scopedCsr)) {
         scopedCsr->clearCollectionMetadata(opCtx, entry.getForDroppedCollection());
     }
@@ -897,11 +898,11 @@ void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    // If cache recovery is in progress, defer applying the delta update until the recovery has
-    // installed the durable metadata snapshot read from disk. The recoverer will replay this oplog
-    // entry on top of that snapshot before the CSR publishes the recovered metadata.
-    if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
-        recoverer->onOplogEntry(op.getTimestamp(), entry);
+    // If disk recovery is in progress, defer applying the delta update until the recovery has
+    // installed the durable metadata snapshot read from disk. The metadata synchronizer will replay
+    // this oplog entry on top of that snapshot before the CSR publishes the recovered metadata.
+    if (auto synchronizer = scopedCsr->getMetadataSynchronizer()) {
+        synchronizer->onOplogEntry(op.getTimestamp(), entry);
         return;
     }
 

@@ -1,7 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata_synchronizer.h"
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -52,7 +52,7 @@ std::pair<CollectionType, std::vector<ChunkType>> makeShardedMetadataForDisk(
 }
 
 // Packs the changed chunks into a single UpdateCollectionMetadata oplog entry. Used to feed changed
-// chunks to the recoverer so they get merged onto the recovered routing table.
+// chunks to the synchronizer so they get merged onto the recovered routing table.
 UpdateCollectionMetadataOplogEntry makeDeltaEntry(const std::vector<ChunkType>& chunks) {
     std::vector<BSONObj> changedChunks;
     changedChunks.reserve(chunks.size());
@@ -100,7 +100,7 @@ void assertChunkAt(const CollectionMetadata& metadata,
     ASSERT_EQ(chunk.getLastmod(), expectedVersion);
 }
 
-class RecovererFixture : public ShardServerTestFixture {
+class MetadataSynchronizerFixture : public ShardServerTestFixture {
 protected:
     void seedShardCatalogOnDisk(OperationContext* opCtx,
                                 const CollectionType& collType,
@@ -151,17 +151,17 @@ private:
 
 }  // namespace
 
-TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDisk) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerCanRecoverFromDisk) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    auto roundId = recoverer.start(operationContext(), getExecutor());
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    synchronizer.start(operationContext(), getExecutor());
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
 
@@ -170,7 +170,7 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDisk) {
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), shardVersionExpected);
 }
 
-TEST_F(RecovererFixture, QueryableBackupModeRecoversFromLocalCatalogWithoutExecutor) {
+TEST_F(MetadataSynchronizerFixture, QueryableBackupModeRecoversFromLocalCatalogWithoutExecutor) {
     OperationContext* opCtx = operationContext();
     const auto originalQueryableBackupMode = storageGlobalParams.queryableBackupMode;
     ON_BLOCK_EXIT([&] { storageGlobalParams.queryableBackupMode = originalQueryableBackupMode; });
@@ -180,11 +180,11 @@ TEST_F(RecovererFixture, QueryableBackupModeRecoversFromLocalCatalogWithoutExecu
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    auto roundId = recoverer.start(opCtx, nullptr /* executor */);
-    ASSERT_OK(recoverer.waitForInitialPass(opCtx, roundId));
-    auto collMetadata = recoverer.drainAndApply(opCtx, roundId);
+    synchronizer.start(opCtx, nullptr /* executor */);
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(opCtx));
+    auto collMetadata = synchronizer.drainAndApply(opCtx);
 
     ASSERT_TRUE(collMetadata);
     ASSERT_TRUE(collMetadata->isSharded());
@@ -193,7 +193,7 @@ TEST_F(RecovererFixture, QueryableBackupModeRecoversFromLocalCatalogWithoutExecu
     ASSERT_TRUE(repl::ReadConcernArgs::get(opCtx).isEmpty());
 }
 
-TEST_F(RecovererFixture,
+TEST_F(MetadataSynchronizerFixture,
        TestingSnapshotBehaviorInIsolationRecoversFromLocalCatalogWithoutExecutor) {
     OperationContext* opCtx = operationContext();
     const auto originalTestingSnapshotBehaviorInIsolation = gTestingSnapshotBehaviorInIsolation;
@@ -205,11 +205,11 @@ TEST_F(RecovererFixture,
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    auto roundId = recoverer.start(opCtx, nullptr /* executor */);
-    ASSERT_OK(recoverer.waitForInitialPass(opCtx, roundId));
-    auto collMetadata = recoverer.drainAndApply(opCtx, roundId);
+    synchronizer.start(opCtx, nullptr /* executor */);
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(opCtx));
+    auto collMetadata = synchronizer.drainAndApply(opCtx);
 
     ASSERT_TRUE(collMetadata);
     ASSERT_TRUE(collMetadata->isSharded());
@@ -218,7 +218,8 @@ TEST_F(RecovererFixture,
     ASSERT_TRUE(repl::ReadConcernArgs::get(opCtx).isEmpty());
 }
 
-TEST_F(RecovererFixture, CacheRecovererRecoversAllChunksRegardlessOfDiskInsertionOrder) {
+TEST_F(MetadataSynchronizerFixture,
+       MetadataSynchronizerRecoversAllChunksRegardlessOfDiskInsertionOrder) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
@@ -238,11 +239,11 @@ TEST_F(RecovererFixture, CacheRecovererRecoversAllChunksRegardlessOfDiskInsertio
         client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, it->toConfigBSON());
     }
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    auto roundId = recoverer.start(operationContext(), getExecutor());
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    synchronizer.start(operationContext(), getExecutor());
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
     ASSERT_TRUE(collMetadata->isSharded());
@@ -250,7 +251,7 @@ TEST_F(RecovererFixture, CacheRecovererRecoversAllChunksRegardlessOfDiskInsertio
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
 }
 
-TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskAnUntrackedCollection) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerCanRecoverFromDiskAnUntrackedCollection) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
@@ -258,57 +259,26 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskAnUntrackedCollection) 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    auto roundId = recoverer.start(operationContext(), getExecutor());
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    synchronizer.start(operationContext(), getExecutor());
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
 
     ASSERT_FALSE(collMetadata->isSharded());
 }
 
-TEST_F(RecovererFixture, CacheRecovererAppliesOplogChanges) {
-    OperationContext* opCtx = operationContext();
-    int numChunks = 20;
-    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
-    seedShardCatalogOnDisk(opCtx, collType, chunks);
-
-    auto collMetadata = [&] {
-        CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
-
-        auto roundId = recoverer.start(operationContext(), getExecutor());
-        ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-        return recoverer.drainAndApply(operationContext(), roundId);
-    }();
-
-    ASSERT_TRUE(collMetadata);
-
-    auto changedChunk = chunks.front();
-    auto changedChunkVersion = chunks.back().getVersion();
-    changedChunkVersion.incMajor();
-    changedChunk.setVersion(changedChunkVersion);
-
-    CollectionCacheRecoverer recoverer{
-        kTestNss, CancellationToken::uncancelable(), std::move(*collMetadata)};
-    auto roundId = recoverer.start(operationContext(), getExecutor());
-    recoverer.onOplogEntry(lastWrittenTimestamp() + 1, makeDeltaEntry({changedChunk}));
-    collMetadata = recoverer.drainAndApply(operationContext(), roundId);
-
-    ASSERT_TRUE(collMetadata);
-    ASSERT_EQ(collMetadata->getCollPlacementVersion(), changedChunkVersion);
-}
-
 // A delta that arrives during recovery is applied on top of the metadata recovered from disk.
-TEST_F(RecovererFixture, CacheRecovererMergesDeltaOntoDiskRecoveredBase) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerMergesDeltaOntoDiskRecoveredBase) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
-    auto roundId = recoverer.start(operationContext(), getExecutor());
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.start(operationContext(), getExecutor());
 
     // The delta splits the recovered chunk [100, 200) into [100, 150) and [150, 200). It is
     // enqueued before the disk pass produces the base, so it must be replayed on top of the
@@ -319,12 +289,12 @@ TEST_F(RecovererFixture, CacheRecovererMergesDeltaOntoDiskRecoveredBase) {
     };
     const auto firstHalfVersion = nextVersion();
     const auto secondHalfVersion = nextVersion();
-    recoverer.onOplogEntry(
+    synchronizer.onOplogEntry(
         lastWrittenTimestamp() + 1,
         makeDeltaEntry(splitChunk(chunks[1], 150, firstHalfVersion, secondHalfVersion)));
 
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), secondHalfVersion);
@@ -337,14 +307,14 @@ TEST_F(RecovererFixture, CacheRecovererMergesDeltaOntoDiskRecoveredBase) {
 }
 
 // Several queued deltas are applied, each introducing brand new chunks.
-TEST_F(RecovererFixture, CacheRecovererDrainsMultipleDeltas) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerDrainsMultipleDeltas) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
-    auto roundId = recoverer.start(operationContext(), getExecutor());
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.start(operationContext(), getExecutor());
 
     // Two deltas, each carrying chunks that do not exist on disk: they split recovered chunks at
     // new boundaries (50 and 150). The drain applies them front-to-back, so all four new
@@ -364,11 +334,11 @@ TEST_F(RecovererFixture, CacheRecovererDrainsMultipleDeltas) {
     auto secondSplit = splitChunk(chunks[1], 150, secondLowVersion, secondHighVersion);
 
     const auto baseTs = lastWrittenTimestamp();
-    recoverer.onOplogEntry(baseTs + 1, makeDeltaEntry(frontSplit));
-    recoverer.onOplogEntry(baseTs + 2, makeDeltaEntry(secondSplit));
+    synchronizer.onOplogEntry(baseTs + 1, makeDeltaEntry(frontSplit));
+    synchronizer.onOplogEntry(baseTs + 2, makeDeltaEntry(secondSplit));
 
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), secondHighVersion);
@@ -389,57 +359,59 @@ TEST_F(RecovererFixture, CacheRecovererDrainsMultipleDeltas) {
 }
 
 // An invalidate queued after a delta forces a new recovery round and drops the delta.
-TEST_F(RecovererFixture, CacheRecovererRestartsWhenDeltaFollowedByInvalidate) {
+// An invalidate queued after a delta forces the caller to discard this synchronizer; a new
+// instance re-reads disk and is unaffected by the discarded delta.
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerRestartsWhenDeltaFollowedByInvalidate) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
-    auto roundId = recoverer.start(operationContext(), getExecutor());
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.start(operationContext(), getExecutor());
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
 
     // A delta carrying new chunks (a split of [MinKey, 100) into [MinKey, 50) and [50, 100))
-    // followed by an invalidate: the drain applies the delta, then the invalidate forces a fresh
-    // recovery round and discards the in-progress result.
+    // followed by an invalidate: the drain applies the delta, then the invalidate aborts this
+    // synchronizer.
     auto lowVersion = chunks.back().getVersion();
     lowVersion.incMajor();
     auto highVersion = lowVersion;
     highVersion.incMajor();
     auto frontSplit = splitChunk(chunks.front(), 50, lowVersion, highVersion);
     const auto baseTs = lastWrittenTimestamp();
-    recoverer.onOplogEntry(baseTs + 1, makeDeltaEntry(frontSplit));
-    recoverer.onOplogEntry(baseTs + 2,
-                           InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
+    synchronizer.onOplogEntry(baseTs + 1, makeDeltaEntry(frontSplit));
+    synchronizer.onOplogEntry(baseTs + 2,
+                              InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
 
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
-    ASSERT_FALSE(collMetadata);
+    ASSERT_FALSE(synchronizer.drainAndApply(operationContext()));
 
-    // The next round re-reads disk and is unaffected by the discarded delta.
-    roundId = recoverer.start(operationContext(), getExecutor());
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    // New instance for the next round — same pattern as production recovery loop.
+    CollectionMetadataSynchronizer nextSynchronizer{kTestNss, CancellationToken::uncancelable()};
+    nextSynchronizer.start(operationContext(), getExecutor());
+    ASSERT_OK(nextSynchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = nextSynchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
 }
 
 // A delta older than the recovered version is ignored and leaves the metadata unchanged.
-TEST_F(RecovererFixture, CacheRecovererSkipsStaleDelta) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerSkipsStaleDelta) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
-    auto roundId = recoverer.start(operationContext(), getExecutor());
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.start(operationContext(), getExecutor());
 
     // A delta whose version is below the recovered placement version is already reflected in the
     // recovered base, so it is idempotently ignored and leaves the routing table untouched.
-    recoverer.onOplogEntry(lastWrittenTimestamp() + 1, makeDeltaEntry({chunks.front()}));
+    synchronizer.onOplogEntry(lastWrittenTimestamp() + 1, makeDeltaEntry({chunks.front()}));
 
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
@@ -456,14 +428,14 @@ TEST_F(RecovererFixture, CacheRecovererSkipsStaleDelta) {
 }
 
 // A delta with a timestamp before the recovery snapshot is dropped instead of being queued.
-TEST_F(RecovererFixture, CacheRecovererDropsDeltaBeforeRecoveryTimestamp) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerDropsDeltaBeforeRecoveryTimestamp) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
-    auto roundId = recoverer.start(operationContext(), getExecutor());
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.start(operationContext(), getExecutor());
 
     // An entry whose timestamp predates the recovery snapshot is already captured by the disk read,
     // so it must be dropped rather than enqueued.
@@ -471,10 +443,10 @@ TEST_F(RecovererFixture, CacheRecovererDropsDeltaBeforeRecoveryTimestamp) {
     deltaVersion.incMajor();
     auto bumpedChunk = chunks.front();
     bumpedChunk.setVersion(deltaVersion);
-    recoverer.onOplogEntry(Timestamp(1, 0), makeDeltaEntry({bumpedChunk}));
+    synchronizer.onOplogEntry(Timestamp(1, 0), makeDeltaEntry({bumpedChunk}));
 
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
 
     ASSERT_TRUE(collMetadata);
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
@@ -489,33 +461,68 @@ TEST_F(RecovererFixture, CacheRecovererDropsDeltaBeforeRecoveryTimestamp) {
                   chunks.front().getVersion());
 }
 
-TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskWithConcurrentOplogEntries) {
+// Snapshot reads at T include writes committed at T, so an entry stamped with the recovery
+// timestamp is already on disk and must not be replayed.
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerDropsEntriesAtRecoveryTimestamp) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.start(operationContext(), getExecutor());
+
+    const auto recoveryTs = lastWrittenTimestamp();
+
+    auto deltaVersion = chunks.back().getVersion();
+    deltaVersion.incMajor();
+    auto bumpedChunk = chunks.front();
+    bumpedChunk.setVersion(deltaVersion);
+    synchronizer.onOplogEntry(recoveryTs, makeDeltaEntry({bumpedChunk}));
+    synchronizer.onOplogEntry(recoveryTs,
+                              InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
+
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
+    auto collMetadata = synchronizer.drainAndApply(operationContext());
+
+    // Both boundary entries were dropped: drain succeeds (invalidate not applied) and the disk
+    // placement version is unchanged (delta not applied).
+    ASSERT_TRUE(collMetadata);
+    ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
+    assertChunkAt(*collMetadata,
+                  shardKey(50),
+                  chunks.front().getMin(),
+                  chunks.front().getMax(),
+                  kShard,
+                  chunks.front().getVersion());
+}
+
+TEST_F(MetadataSynchronizerFixture,
+       MetadataSynchronizerCanRecoverFromDiskWithConcurrentOplogEntries) {
+    OperationContext* opCtx = operationContext();
+    int numChunks = 20;
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
+    seedShardCatalogOnDisk(opCtx, collType, chunks);
 
     auto collMetadata = [&]() {
-        auto roundId = recoverer.start(operationContext(), getExecutor());
-        ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+        CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+        synchronizer.start(operationContext(), getExecutor());
+        ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
         auto recoveryTimestamp =
             repl::ReplicationCoordinator::get(operationContext())->getMyLastWrittenOpTime();
-        // We now add an oplog entry that invalidates the previous recovery.
-        recoverer.onOplogEntry(
+        synchronizer.onOplogEntry(
             recoveryTimestamp.getTimestamp() + 1,
             InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
-        auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
-        // This should've encountered an invalidate entry which triggers a new round of wait +
-        // drain.
-        ASSERT_FALSE(collMetadata);
-        roundId = recoverer.start(operationContext(), getExecutor());
-        ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-        collMetadata = recoverer.drainAndApply(operationContext(), roundId);
-        // Recovery should've happened by now and returned the final state.
-        ASSERT_TRUE(collMetadata);
-        return collMetadata;
+        // Invalidate aborts this synchronizer; caller must construct a new one.
+        ASSERT_FALSE(synchronizer.drainAndApply(operationContext()));
+
+        CollectionMetadataSynchronizer nextSynchronizer{kTestNss,
+                                                        CancellationToken::uncancelable()};
+        nextSynchronizer.start(operationContext(), getExecutor());
+        ASSERT_OK(nextSynchronizer.getMetadataFuture().getNoThrow(operationContext()));
+        auto result = nextSynchronizer.drainAndApply(operationContext());
+        ASSERT_TRUE(result);
+        return result;
     }();
 
     const auto shardVersionExpected = chunks.back().getVersion();
@@ -523,7 +530,7 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskWithConcurrentOplogEntr
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), shardVersionExpected);
 }
 
-TEST_F(RecovererFixture, CacheRecovererBubblesUpCachePressureErrors) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerBubblesUpCachePressureErrors) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
@@ -531,15 +538,15 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpCachePressureErrors) {
 
     FailPointEnableBlock intermittentFailure{"WTWriteConflictExceptionForReads"};
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    auto roundId = recoverer.start(operationContext(), getExecutor());
-    auto status = recoverer.waitForInitialPass(operationContext(), roundId);
+    synchronizer.start(operationContext(), getExecutor());
+    auto status = synchronizer.getMetadataFuture().getNoThrow(operationContext());
     ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.code(), ErrorCodes::WriteConflict);
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::WriteConflict);
 }
 
-TEST_F(RecovererFixture, CacheRecovererBubblesUpDiskReadingFailure) {
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerBubblesUpDiskReadingFailure) {
     OperationContext* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
@@ -552,13 +559,13 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpDiskReadingFailure) {
     }
 
     {
-        CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+        CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
         // The CollectionType is parsed via an IDL parser. So it should throw an IDL failure.
-        auto roundId = recoverer.start(operationContext(), getExecutor());
-        auto status = recoverer.waitForInitialPass(operationContext(), roundId);
+        synchronizer.start(operationContext(), getExecutor());
+        auto status = synchronizer.getMetadataFuture().getNoThrow(operationContext());
         ASSERT_NOT_OK(status);
-        ASSERT_EQ(status.code(), ErrorCodes::IDLFailedToParse);
+        ASSERT_EQ(status.getStatus().code(), ErrorCodes::IDLFailedToParse);
     }
 
     int numChunks = 20;
@@ -576,41 +583,49 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpDiskReadingFailure) {
                   BSON("uuid" << collType.getUuid() << "lastmod" << "Invalid value"));
 
     {
-        CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+        CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
         // The ChunkType uses a custom parser that returns a different family of errors compared to
         // the CollectionType. Let's make sure that's the case.
-        auto roundId = recoverer.start(operationContext(), getExecutor());
-        auto status = recoverer.waitForInitialPass(operationContext(), roundId);
+        synchronizer.start(operationContext(), getExecutor());
+        auto status = synchronizer.getMetadataFuture().getNoThrow(operationContext());
         ASSERT_NOT_OK(status);
-        ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
+        ASSERT_EQ(status.getStatus().code(), ErrorCodes::NoSuchKey);
     }
 }
 
-TEST_F(RecovererFixture, CacheRecovererFailsDueToDifferentRoundId) {
+TEST_F(MetadataSynchronizerFixture, OplogEntriesBeforeRecoveryTimestampAreIgnored) {
+    OperationContext* opCtx = operationContext();
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 1, kShard);
+    seedShardCatalogOnDisk(opCtx, collType, chunks);
+
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.onOplogEntry(Timestamp(1, 0),
+                              InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
+
+    synchronizer.start(opCtx, getExecutor());
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(opCtx));
+    auto collMetadata = synchronizer.drainAndApply(opCtx);
+    ASSERT_TRUE(collMetadata);
+    ASSERT_TRUE(collMetadata->isSharded());
+    ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
+}
+
+TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerDrainFailsAfterInvalidate) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    auto roundId = recoverer.start(operationContext(), getExecutor());
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
-    // We now add an oplog entry that invalidates the previous recovery.
+    synchronizer.start(operationContext(), getExecutor());
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(operationContext()));
     auto recoveryTimestamp =
         repl::ReplicationCoordinator::get(operationContext())->getMyLastWrittenOpTime();
-    recoverer.onOplogEntry(recoveryTimestamp.getTimestamp() + 1,
-                           InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
-    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
-    // This should've encountered an invalidate entry which triggers a new round of wait +
-    // drain.
-    ASSERT_FALSE(collMetadata);
-
-    // If a separate thread calls with the previous round then it should fail.
-    ASSERT_EQ(recoverer.waitForInitialPass(operationContext(), roundId).code(),
-              ErrorCodes::AtomicityFailure);
-    ASSERT_FALSE(recoverer.drainAndApply(operationContext(), roundId));
+    synchronizer.onOplogEntry(recoveryTimestamp.getTimestamp() + 1,
+                              InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
+    ASSERT_FALSE(synchronizer.drainAndApply(operationContext()));
 }
 
 }  // namespace mongo

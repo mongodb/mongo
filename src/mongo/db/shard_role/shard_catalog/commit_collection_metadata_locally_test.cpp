@@ -13,8 +13,8 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata_synchronizer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
@@ -1818,31 +1818,38 @@ TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionClearsCSR) {
     ASSERT_FALSE(metadata) << "CSR should have no metadata after drop";
 }
 
-TEST_F(CommitCollectionMetadataLocallyTest, CommitNotifiesInFlightRecoverer) {
+TEST_F(CommitCollectionMetadataLocallyTest, CommitNotifiesInFlightMetadataSynchronizer) {
     auto [collType, chunks] = makeCollectionMetadata(2);
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
 
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
 
-    // Simulate a recovery round that has already read from disk and is waiting to drain.
-    auto recoverer = std::make_shared<CollectionCacheRecoverer>(
-        kTestNss, CancellationToken::uncancelable(), CollectionMetadata::UNTRACKED());
+    // Simulate an in-flight recovery round so the drop's invalidate is delivered to it.
+    // Use the sync disk-read path so this fixture does not need its own executor pool.
+    const auto originalTestingSnapshotBehaviorInIsolation = gTestingSnapshotBehaviorInIsolation;
+    ON_BLOCK_EXIT(
+        [&] { gTestingSnapshotBehaviorInIsolation = originalTestingSnapshotBehaviorInIsolation; });
+    gTestingSnapshotBehaviorInIsolation = true;
+
+    auto synchronizer = std::make_shared<CollectionMetadataSynchronizer>(
+        kTestNss, CancellationToken::uncancelable());
     {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
-        scopedCsr->setCollectionRecoverer(recoverer);
+        scopedCsr->setMetadataSynchronizer(synchronizer);
     }
-    auto roundId = recoverer->start(operationContext(), nullptr);
+    synchronizer->start(operationContext(), nullptr /* executor */);
+    ASSERT_OK(synchronizer->getMetadataFuture().getNoThrow(operationContext()));
 
-    // Drop the collection. This should notify the recoverer about the drop.
+    // Drop the collection. This should notify the synchronizer about the drop.
     shard_catalog_commit::commitDropCollectionLocally(
         operationContext(), kTestNss, collType.getUuid());
 
-    // The recoverer should force a new recovery instead of returning the metadata before the drop.
-    ASSERT_FALSE(recoverer->drainAndApply(operationContext(), roundId));
+    // The synchronizer should abort instead of returning metadata from before the drop.
+    ASSERT_FALSE(synchronizer->drainAndApply(operationContext()));
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest,
-       CommitCollectionMetadataRestartsInFlightRecovererWithLatestDiskState) {
+       CommitCollectionMetadataRestartsInFlightSynchronizerWithLatestDiskState) {
     const auto originalTestingSnapshotBehaviorInIsolation = gTestingSnapshotBehaviorInIsolation;
     ON_BLOCK_EXIT(
         [&] { gTestingSnapshotBehaviorInIsolation = originalTestingSnapshotBehaviorInIsolation; });
@@ -1851,18 +1858,18 @@ TEST_F(CommitCollectionMetadataLocallyTest,
     auto [collType, chunks] = makeCollectionMetadata(2);
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
 
-    // Persist the first catalog view locally. The recoverer below reads this view before the commit
-    // replaces it with the newer global-catalog view.
+    // Persist the first catalog view locally. The synchronizer below reads this view before the
+    // commit replaces it with the newer global-catalog view.
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
 
-    auto recoverer =
-        std::make_shared<CollectionCacheRecoverer>(kTestNss, CancellationToken::uncancelable());
+    auto synchronizer = std::make_shared<CollectionMetadataSynchronizer>(
+        kTestNss, CancellationToken::uncancelable());
     {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
-        scopedCsr->setCollectionRecoverer(recoverer);
+        scopedCsr->setMetadataSynchronizer(synchronizer);
     }
-    auto roundId = recoverer->start(operationContext(), nullptr);
-    ASSERT_OK(recoverer->waitForInitialPass(operationContext(), roundId));
+    synchronizer->start(operationContext(), nullptr /* executor */);
+    ASSERT_OK(synchronizer->getMetadataFuture().getNoThrow(operationContext()));
 
     // Bump the shard version by splitting one chunk and call commitCollectionMetadataLocally()
     // accordingly.
@@ -1871,13 +1878,20 @@ TEST_F(CommitCollectionMetadataLocallyTest,
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
 
     // The previous recovery should have been invalidated.
-    ASSERT_FALSE(recoverer->drainAndApply(operationContext(), roundId));
+    ASSERT_FALSE(synchronizer->drainAndApply(operationContext()));
 
-    // Next recovery trigger will install the new metadata.
-    roundId = recoverer->start(operationContext(), nullptr);
-    ASSERT_OK(recoverer->waitForInitialPass(operationContext(), roundId));
+    // Next recovery trigger (new single-shot instance) will install the new metadata.
+    synchronizer = std::make_shared<CollectionMetadataSynchronizer>(
+        kTestNss, CancellationToken::uncancelable());
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
+        scopedCsr->setMetadataSynchronizer(nullptr);
+        scopedCsr->setMetadataSynchronizer(synchronizer);
+    }
+    synchronizer->start(operationContext(), nullptr /* executor */);
+    ASSERT_OK(synchronizer->getMetadataFuture().getNoThrow(operationContext()));
 
-    auto recoveredMetadata = recoverer->drainAndApply(operationContext(), roundId);
+    auto recoveredMetadata = synchronizer->drainAndApply(operationContext());
     ASSERT_TRUE(recoveredMetadata);
     ASSERT_EQ(recoveredMetadata->getShardPlacementVersion(), updatedChunks.back().getVersion());
 }

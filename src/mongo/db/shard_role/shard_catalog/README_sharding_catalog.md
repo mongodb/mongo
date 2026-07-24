@@ -198,12 +198,15 @@ In the authoritative model the in-memory caches are coherent with the durable st
   `c` entries (see [oplog entries](#oplog-c-entries-for-cache-coherency)). It is available
   immediately on step-up and after replication rollback.
 - **CSS** is left `kUnknown` on startup or replication rollback and resolved **lazily** on first
-  access via
-  [`onShardVersionMismatch`](../../versioning_protocol/README_versioning_protocols.md#authoritative-shard-versioning-protocol).
+  access via authoritative
+  [`onShardVersionMismatch`](README_shard_catalog_recovery.md#collection-metadata-recovery)
+  (algorithms, threads, and actors are documented in
+  [Shard Catalog Recovery](README_shard_catalog_recovery.md); the router-facing protocol is in
+  [Authoritative Shard Versioning Protocol](../../versioning_protocol/README_versioning_protocols.md#authoritative-shard-versioning-protocol)).
   Recovery reads `config.shard.catalog.{collections,chunks}` through the
-  [`CollectionCacheRecoverer`](collection_cache_recoverer.h), draining any concurrent oplog deltas.
-  This deliberately avoids a long, resource-holding reconstruction at startup and avoids reading at
-  a non-stable snapshot.
+  [`CollectionMetadataSynchronizer`](collection_metadata_synchronizer.h), draining any concurrent
+  oplog deltas. This deliberately avoids a long, resource-holding reconstruction at startup and
+  avoids reading at a non-stable snapshot.
 
 #### Oplog `c` entries for cache coherency
 

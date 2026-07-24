@@ -352,9 +352,10 @@ void DatabaseShardingRuntime::clearDbInfo_DEPRECATED(OperationContext* opCtx,
 }
 
 void DatabaseShardingRuntime::setDbMetadataRefreshFuture_DEPRECATED(
-    SharedSemiFuture<void> future, CancellationSource cancellationSource) {
+    SharedSemiFuture<void> future,
+    ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition) {
     invariant(!_dbMetadataRefresh);
-    _dbMetadataRefresh.emplace(std::move(future), std::move(cancellationSource));
+    _dbMetadataRefresh.emplace(std::move(future), std::move(recovererTrackerAcquisition));
 }
 
 boost::optional<SharedSemiFuture<void>> DatabaseShardingRuntime::getMetadataRefreshFuture() const {
@@ -368,7 +369,7 @@ void DatabaseShardingRuntime::resetDbMetadataRefreshFuture_DEPRECATED() {
 
 void DatabaseShardingRuntime::_cancelDbMetadataRefresh_DEPRECATED() {
     if (_dbMetadataRefresh) {
-        _dbMetadataRefresh->cancellationSource.cancel();
+        _dbMetadataRefresh->recovererTrackerAcquisition.cancel();
     }
 }
 

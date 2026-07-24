@@ -13,12 +13,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata_synchronizer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_recoverer_tracker.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/waiter_list.h"
@@ -267,8 +268,9 @@ public:
      *
      * To invoke this method, the criticalSectionSignal must not be hold by a different thread.
      */
-    void setPlacementVersionRecoverRefreshFuture(SharedSemiFuture<void> future,
-                                                 CancellationSource cancellationSource);
+    void setPlacementVersionRecoverRefreshFuture(
+        SharedSemiFuture<void> future,
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition);
 
     /**
      * If there an ongoing placement version recover/refresh, it returns the shared semifuture to be
@@ -302,8 +304,20 @@ public:
     SharedSemiFuture<void> registerWaiterForChunkVersion(OperationContext* opCtx,
                                                          const ShardVersion& expectedVersion) const;
 
-    void setCollectionRecoverer(std::shared_ptr<CollectionCacheRecoverer> recoverer);
-    std::shared_ptr<CollectionCacheRecoverer> getCollectionCacheRecoverer() const;
+    void setMetadataSynchronizer(std::shared_ptr<CollectionMetadataSynchronizer> synchronizer);
+    std::shared_ptr<CollectionMetadataSynchronizer> getMetadataSynchronizer() const;
+
+    /**
+     * True when authoritative disk recovery found an empty shard catalog for this collection.
+     * While set, further recovery must serialize with the database primary critical section to
+     * classify the collection as untracked or unowned.
+     */
+    bool needsDbPrimaryClassification() const {
+        return _needsDbPrimaryClassification;
+    }
+    void setNeedsDbPrimaryClassification(bool needs) {
+        _needsDbPrimaryClassification = needs;
+    }
 
     bool allowChunkOperations() const;
     void setAllowChunkOperations(bool allowChunkOperations);
@@ -313,15 +327,17 @@ private:
 
     struct PlacementVersionRecoverOrRefresh {
     public:
-        PlacementVersionRecoverOrRefresh(SharedSemiFuture<void> future,
-                                         CancellationSource cancellationSource)
-            : future(std::move(future)), cancellationSource(std::move(cancellationSource)) {};
+        PlacementVersionRecoverOrRefresh(
+            SharedSemiFuture<void> future,
+            ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition)
+            : future(std::move(future)),
+              recovererTrackerAcquisition(std::move(recovererTrackerAcquisition)) {}
 
         // Tracks ongoing placement version recover/refresh.
         SharedSemiFuture<void> future;
 
-        // Cancellation source to cancel the ongoing recover/refresh placement version.
-        CancellationSource cancellationSource;
+        // Keeps the recovery registered with ShardCatalogRecovererTracker until completion.
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition;
     };
 
     /**
@@ -392,8 +408,8 @@ private:
     // Used for testing to check the number of times a new MetadataManager has been installed.
     std::uint64_t _numMetadataManagerChanges{0};
 
-    // Tracks ongoing placement version recover/refresh. Eventually set to the semifuture to wait on
-    // and a CancellationSource to cancel it
+    // Tracks ongoing placement version recover/refresh. Holds the future to wait on and the tracker
+    // acquisition used to cancel it.
     boost::optional<PlacementVersionRecoverOrRefresh> _placementVersionInRecoverOrRefresh;
 
     // List of waiters currently waiting for the CSS/CSR to have the required placement version.
@@ -403,7 +419,12 @@ private:
 
     // Tracks the fact that concurrent recovery of the collection's sharding metadata is taking
     // place by a concurrent thread handling a shard version mismatch
-    std::shared_ptr<CollectionCacheRecoverer> _collectionRecoverer;
+    std::shared_ptr<CollectionMetadataSynchronizer> _metadataSynchronizer;
+
+    // True when authoritative disk recovery found an empty shard catalog for this collection.
+    // While set, further recovery must serialize with the database primary critical section to
+    // classify the collection as untracked or unowned.
+    bool _needsDbPrimaryClassification{false};
 
     bool _allowChunkOperations{true};
 };

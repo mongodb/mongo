@@ -176,65 +176,18 @@ Incremental refreshes will happen whenever there has been a
 
 ## Authoritative Shard Versioning Protocol
 
-A shard is the
-[authoritative source](../shard_role/shard_catalog/README_sharding_catalog.md#authoritative-containers)
-for the metadata it owns and durably persists it in its
-[shard-local catalog](../shard_role/shard_catalog/README_sharding_catalog.md#shard-local-authoritative-catalog)
-(`config.shard.catalog.*`). Routers behave exactly as described above — they attach a
-`databaseVersion`/`shardVersion` to every request and retry on `StaleConfig` /
-`StaleDbRoutingVersion`. This section describes how a shard resolves a version mismatch: by
-recovering its filtering metadata from its own durable local catalog.
+Under the
+[authoritative shards](../shard_role/shard_catalog/README_sharding_catalog.md#authoritative-containers)
+model, a shard is the durable source of truth for the metadata it owns (`config.shard.catalog.*`).
+**Routers are unchanged:** they still attach `databaseVersion` / `shardVersion` and retry on
+`StaleConfig` / `StaleDbRoutingVersion` as described above.
 
-This behaviour is enabled by the `featureFlagAuthoritativeShardsCRUD` /
-`featureFlagAuthoritativeShardsDDL` feature flags.
+What changes is how the **shard** resolves a mismatch: it recovers filtering metadata from its local
+catalog instead of refreshing from the CSRS. That behaviour is gated by
+`featureFlagAuthoritativeShardsCRUD` / `featureFlagAuthoritativeShardsDDL`.
 
-### Collection shard version mismatch
+How recovery works (algorithms, threads, actors, collection vs database paths):
 
-When a shard receives a `shardVersion` that does not match its own, the handler
-([`FilteringMetadataCache::_onShardVersionMismatchAuthoritative`](../shard_role/shard_catalog/shard_filtering_metadata_refresh.cpp))
-performs the following actions, all using only local state:
-
-1. **Join in-flight work and short-circuit.** If the metadata is already known and already satisfies
-   the received version (after waiting for any ongoing critical section or recovery), there is
-   nothing to do.
-2. **Recover from disk.** Recover the collection's metadata from the durable shard catalog
-   (`config.shard.catalog.{collections,chunks}`) using the
-   [`CollectionCacheRecoverer`](../shard_role/shard_catalog/collection_cache_recoverer.h), which
-   reads the on-disk state at a stable timestamp and drains any concurrent oplog deltas so the CSS
-   reflects the current durable state. A request with no specific version is just a forced disk
-   recovery and stops here.
-3. **Compare comparable versions.** If the router's and the shard's versions are comparable (both
-   tracked or both untracked), the partial ordering decides whether the shard is now up to date or
-   the router is stale; in either case the caller returns to its retry loop.
-4. **Resolve non-comparable versions via the oplog timeline.** If the versions are not comparable
-   (e.g. one tracked, one untracked), the shard cannot order them from the version tuple alone. It
-   waits until either its version matches the router's (via oplog application) or it has replicated
-   up to the router's `configTime` with majority read concern. `configTime` is an upper bound
-   because all DDL critical sections that could change the shard version have been applied by then;
-   if the versions still don't match, the router is stale. On a primary this wait is an instant
-   no-op.
-
-A stale router is thus corrected entirely from the shard's local durable catalog.
-
-### Database version mismatch
-
-`databaseVersion` mismatches are handled analogously
-([`FilteringMetadataCache::onDbVersionMismatch`](../shard_role/shard_catalog/shard_filtering_metadata_refresh.cpp)):
-the
-[DSS](../shard_role/shard_catalog/README_sharding_catalog.md#shard-side-caches-filtering-ownership)
-is authoritative and backed by `config.shard.catalog.databases`, so the shard resolves the mismatch
-from its local state.
-
-### Caches and recovery
-
-The in-memory filtering caches are kept coherent with the durable shard-local catalog through oplog
-`c` entries and are
-[recoverable from disk](../shard_role/shard_catalog/README_sharding_catalog.md#cache-recoverability):
-the DSS is reconstructed from `config.shard.catalog.databases` on startup and after replication
-rollback, while the CSS is left `kUnknown` and resolved lazily on first access through the handler
-described above.
-
-For the persisted collections, in-memory caches, oplog `c` entries and service commands involved,
-see the
-[catalog containers](../shard_role/shard_catalog/README_sharding_catalog.md#catalog-containers)
-section of the Sharding Catalog document.
+- [Shard Catalog Recovery](../shard_role/shard_catalog/README_shard_catalog_recovery.md)
+- Durable containers and cache coherency:
+  [Sharding Catalog — Cache recoverability](../shard_role/shard_catalog/README_sharding_catalog.md#cache-recoverability)

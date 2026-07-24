@@ -259,10 +259,9 @@ withRetryOnTransientTxnError(
     if (isAuthoritativeShardsCRUDEnabled) {
         const recoveryStatsAfter = getCollectionShardingMetadataRecoveryStats(st.shard0);
 
-        // Authoritative recovery runs in the operation that won the race to create the recoverer.
-        assert.eq(
-            recoveryStatsBefore.countRecoverersCreated + 1,
-            recoveryStatsAfter.countRecoverersCreated,
+        assert.gt(
+            recoveryStatsAfter.countMetadataSynchronizersCreated,
+            recoveryStatsBefore.countMetadataSynchronizersCreated,
             {recoveryStatsBefore, recoveryStatsAfter},
         );
     } else {

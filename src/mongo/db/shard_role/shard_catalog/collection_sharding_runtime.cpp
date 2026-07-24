@@ -303,7 +303,7 @@ void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContex
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 
     if (_placementVersionInRecoverOrRefresh) {
-        _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
+        _placementVersionInRecoverOrRefresh->recovererTrackerAcquisition.cancel();
     }
 }
 
@@ -406,8 +406,16 @@ void CollectionShardingRuntime::setCollectionMetadata(OperationContext* opCtx,
 void CollectionShardingRuntime::clearCollectionMetadata(OperationContext* opCtx,
                                                         bool collIsDropped) {
     if (_placementVersionInRecoverOrRefresh) {
-        _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
+        _placementVersionInRecoverOrRefresh->recovererTrackerAcquisition.cancel();
     }
+
+    // Drop any in-flight synchronizer immediately so op observers stop enqueueing into a recovery
+    // round that has already been canceled.
+    _metadataSynchronizer.reset();
+
+    // Metadata is gone; clear needsDbPrimaryClassification so a later recover does not wait on
+    // the database primary critical section based on stale empty-catalog state.
+    _needsDbPrimaryClassification = false;
 
     _shardVersionWaiters.cancelWaiters(Status{ErrorCodes::CallbackCanceled,
                                               "Filtering metadata got cleared, cancelling callback "
@@ -725,9 +733,11 @@ void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) cons
 }
 
 void CollectionShardingRuntime::setPlacementVersionRecoverRefreshFuture(
-    SharedSemiFuture<void> future, CancellationSource cancellationSource) {
+    SharedSemiFuture<void> future,
+    ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition) {
     invariant(!_placementVersionInRecoverOrRefresh);
-    _placementVersionInRecoverOrRefresh.emplace(std::move(future), std::move(cancellationSource));
+    _placementVersionInRecoverOrRefresh.emplace(std::move(future),
+                                                std::move(recovererTrackerAcquisition));
 }
 
 boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getMetadataRefreshFuture()
@@ -740,17 +750,18 @@ boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getMetadataRe
 void CollectionShardingRuntime::resetPlacementVersionRecoverRefreshFuture() {
     invariant(_placementVersionInRecoverOrRefresh);
     _placementVersionInRecoverOrRefresh = boost::none;
+    _metadataSynchronizer.reset();
 }
 
-void CollectionShardingRuntime::setCollectionRecoverer(
-    std::shared_ptr<CollectionCacheRecoverer> recoverer) {
-    invariant(!(_collectionRecoverer && recoverer));
-    _collectionRecoverer = std::move(recoverer);
+void CollectionShardingRuntime::setMetadataSynchronizer(
+    std::shared_ptr<CollectionMetadataSynchronizer> synchronizer) {
+    invariant(!(_metadataSynchronizer && synchronizer));
+    _metadataSynchronizer = std::move(synchronizer);
 }
 
-std::shared_ptr<CollectionCacheRecoverer> CollectionShardingRuntime::getCollectionCacheRecoverer()
+std::shared_ptr<CollectionMetadataSynchronizer> CollectionShardingRuntime::getMetadataSynchronizer()
     const {
-    return _collectionRecoverer;
+    return _metadataSynchronizer;
 }
 
 SharedSemiFuture<void> CollectionShardingRuntime::registerWaiterForChunkVersion(

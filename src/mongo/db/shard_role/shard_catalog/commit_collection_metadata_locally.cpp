@@ -1027,10 +1027,10 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx,
     // consistent view of the data) or none (and thus fail the read):
     // * Dropping the collection entry first means that either the disk recovery sees all previous
     //   metadata or nothing.
-    // * The invalidate is done first in order to inform concurrent recoverers that the data they
-    //   read is no longer valid.
+    // * The invalidate is done first in order to inform concurrent metadata synchronizers that the
+    //   data they read is no longer valid.
     // * And finally the last clear ensures that if any recovery succeeded before the invalidate got
-    //   received by the recoverer then it will leave the CSR in the cleared state for future
+    //   received by the synchronizer then it will leave the CSR in the cleared state for future
     //   readers.
     //
     // This is exclusively a problem for PIT readers on shards that no longer own any chunk and

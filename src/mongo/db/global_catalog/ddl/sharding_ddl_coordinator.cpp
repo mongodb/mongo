@@ -161,7 +161,7 @@ ExecutorFuture<void> ShardingDDLCoordinatorMixin::_acquireDDLLockAsync(
                               logv2::DynamicAttributes{
                                   logv2::DynamicAttributes(self.getCoordinatorLogAttrs()),
                                   "resource"_attr = toStringForLogging(resource),
-                                  "mode"_attr = modeName(lockMode),
+                                  "lockMode"_attr = modeName(lockMode),
                                   "error"_attr = redact(status)});
             }
             // Coordinators can't generally be rolled back so in case we recovered a coordinator
