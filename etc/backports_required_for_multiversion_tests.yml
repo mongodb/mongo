@@ -98,6 +98,8 @@ last-continuous:
       ticket: SERVER-95352
     - test_file: jstests/core/timeseries/write/timeseries_bypass_document_validation_raw_buckets.js
       ticket: SERVER-121714
+    - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
+      ticket: SERVER-127661
     - test_file: jstests/fle2/implicit_ecoc_creation.js
       ticket: SERVER-126384
     - test_file: jstests/noPassthrough/ddl/clear_jumbo.js
@@ -515,6 +517,8 @@ last-lts:
       ticket: SERVER-93099
     - test_file: jstests/core/txns/multi_statement_transaction_abort.js
       ticket: SERVER-84081
+    - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
+      ticket: SERVER-127661
     - test_file: jstests/core/txns/rename_collection_not_blocked_by_txn.js
       ticket: SERVER-106706
     - test_file: jstests/core/write/bypass_empty_ts_replacement.js
