@@ -858,7 +858,6 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                         const std::vector<ChunkType>& chunksInGlobalCatalog,
                                         const CollectionType& collectionInDurableShardCatalog,
                                         const std::vector<ChunkType>& chunksInDurableShardCatalog,
-                                        bool useStrictChunkValidation,
                                         RSNodeMode rsMode,
                                         std::vector<MetadataInconsistencyItem>& inconsistencies) {
 
@@ -873,13 +872,15 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
         return;
     }
 
+    // At this point of this validation authoritativeShardsCRUD is always enabled, so we
+    // enable strict chunk validation.
     validateShardCatalogEntries(collectionInDurableShardCatalog.asShardCatalogType(),
                                 chunksInDurableShardCatalog,
                                 collectionInGlobalCatalog,
                                 chunksInGlobalCatalog,
                                 shardId,
                                 kDurableShardCatalogSourceScope,
-                                useStrictChunkValidation,
+                                true /* useStrictChunkValidation */,
                                 rsMode,
                                 inconsistencies);
 }
@@ -1162,9 +1163,8 @@ void checkCollectionMetadataInShardCatalog(
                                            chunksInGlobalCatalog,
                                            *durableCollection,
                                            *durableChunks,
-                                           authoritativeShardsCRUD.wasEnabled(),
                                            rsMode,
-                                           inconsistencies);
+                                           authShardsInconsistencies);
         return;
     }
 
@@ -1233,9 +1233,8 @@ void checkCollectionMetadataInShardCatalog(
                                        chunksInGlobalCatalog,
                                        *durableCollection,
                                        *durableChunks,
-                                       authoritativeShardsCRUD.wasEnabled(),
                                        rsMode,
-                                       inconsistencies);
+                                       authShardsInconsistencies);
 }
 
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
