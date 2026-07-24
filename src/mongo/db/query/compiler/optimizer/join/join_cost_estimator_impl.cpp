@@ -375,6 +375,12 @@ SortedSparseIO estimateSortedSparseIO(double numPagesAccessedColl,
             "estimateSortedSparseIO() expected numPagesInStorageEngineCache > 0",
             numPagesInStorageEngineCache > 0);
 
+    // Guard against the case where the collection is empty, which would result in a division by 0
+    // in the sorted-sparse IO calculation below.
+    if (numPagesAccessedColl == 0) {
+        return {.numSeqIOs = 0.0, .numRandIOs = 0.0};
+    }
+
     // M-L charges one random I/O per group (probe or distinct key); the remaining
     // (numPagesAccessedColl - numLogicalPageRequests) accesses within each group follow RID order
     // and are sorted-sparse: cheaper than random access, but costlier than a purely sequential

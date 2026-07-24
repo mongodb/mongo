@@ -409,4 +409,10 @@ TEST(SortedSparseIOTest, LargerCacheOverflowChargesMoreRandom) {
     ASSERT_DOUBLE_EQ(27, result.numRandIOs);
 }
 
+TEST(SortedSparseIOTest, ZeroPagesAccessedReturnsZero) {
+    auto result = estimateSortedSparseIO(0, 10, MackertLohmanCase::kReturnedDocsFitCache, 64);
+    ASSERT_EQ(0, result.numSeqIOs);
+    ASSERT_EQ(0, result.numRandIOs);
+}
+
 }  // namespace mongo::join_ordering
