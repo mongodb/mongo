@@ -358,13 +358,6 @@ void updateShardCatalogCache(OperationContext* opCtx,
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     scopedCsr->setCollectionMetadata(opCtx, std::move(ownedMetadata));
-
-    // Update allowChunkOperations and write an oplog 'c' entry to send the new allowChunkOperations
-    // value to secondaries, since its value could have potentially changed.
-    // TODO (SERVER-130426) Remove these lines
-    scopedCsr->setAllowChunkOperations(coll.getAllowChunkOperations());
-    setAllowChunkOperationsOnSecondaries(
-        opCtx, nss, coll.getUuid(), coll.getAllowChunkOperations());
 }
 
 void updateCollectionMetadata(OperationContext* opCtx,
@@ -696,6 +689,15 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         }
     };
 
+    auto setAllowChunkOperations = [&](const NamespaceString& nss, const CollectionType& coll) {
+        const bool allowChunkOperations = coll.getAllowChunkOperations();
+        {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+            scopedCsr->setAllowChunkOperations(allowChunkOperations);
+        }
+        setAllowChunkOperationsOnSecondaries(opCtx, nss, coll.getUuid(), allowChunkOperations);
+    };
+
     // Fetches the target collection's entry from the CSRS. If it's untracked, the rename left
     // nothing to persist in the local shard catalog: log it, clear the target's in-memory state
     // (the durable collection entry was already deleted above), and return boost::none so the
@@ -738,6 +740,7 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
             return;
         }
         commitCollectionMetadataLocally(opCtx, toNss, isDbPrimaryShard);
+        setAllowChunkOperations(toNss, *coll);
         return;
     }
 
@@ -781,6 +784,10 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         {.rewritePersistedChunks = false,
          .notifyMode =
              CommitCollectionMetadataOptions::NotifyMode::kInvalidateThenReinstallOnPrimary});
+
+    // The invalidate above used forDroppedCollection=false (the target survives the rename), so it
+    // left the in-memory allowChunkOperations flag untouched. Re-sync it.
+    setAllowChunkOperations(toNss, newEntry);
 
     // The old chunks will now get cleaned up outside of the critical section if the rename actually
     // replaced an existing sharded collection.
