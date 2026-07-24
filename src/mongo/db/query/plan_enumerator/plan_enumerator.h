@@ -54,38 +54,38 @@ struct PlanEnumeratorParams {
     bool enumerateOrChildrenLockstep = false;
 
     // Not owned here.
-    MatchExpression* root;
+    MatchExpression* root = nullptr;
 
     // Not owned here.
-    const std::vector<IndexEntry>* indices;
+    const std::vector<IndexEntry>* indices = nullptr;
 
     // How many plans are we willing to ouput from an OR? We currently consider
     // all possibly OR plans, which means the product of the number of possibilities
     // for each clause of the OR. This could grow disastrously large.
-    size_t maxSolutionsPerOr;
+    size_t maxSolutionsPerOr = 0;
 
     // How many intersect plans are we willing to output from an AND?  Given that we pursue an
     // all-pairs approach, we could wind up creating a lot of enumeration possibilities for
     // certain inputs.
-    size_t maxIntersectPerAnd;
+    size_t maxIntersectPerAnd = 0;
 
     // Whether to disable OR-pushdown optimization. OR-pushdown assumes that the expression has been
     // simplified: for example, that single-child $or nodes are unwrapped. To avoid this, when
     // the 'disableMatchExpressionOptimization' failpoint is set, we also disable OR-pushdown.
-    bool disableOrPushdown;
+    bool disableOrPushdown = false;
 
-    const projection_ast::Projection* projection;
-    const boost::optional<SortPattern>* sort;
+    const projection_ast::Projection* projection = nullptr;
+    const boost::optional<SortPattern>* sort = nullptr;
     BSONObj shardKey;
 
     // Whether or not this is a distinct query.
-    bool distinct;
+    bool distinct = false;
 
     // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
-    bool shouldPruneDistinct;
+    bool shouldPruneDistinct = false;
 
     // Whether to prune memo entries that use duplicate indexes.
-    bool enableIndexPruning;
+    bool enableIndexPruning = false;
 };
 
 /**
