@@ -338,14 +338,17 @@ mongo_cc_library(
     name = "repl_server_parameters",
     srcs = [
         "oplog_application_steady_state.cpp",
+        "replication_network_compression.cpp",
         ":repl_server_parameters_gen",
     ],
     hdrs = [
         "oplog_application_steady_state.h",
+        "replication_network_compression.h",
     ],
     deps = [
         "//src/mongo/client:read_preference",
         "//src/mongo/db:server_base",
+        "//src/mongo/transport:message_compressor",
     ],
 )
 
@@ -1134,6 +1137,7 @@ mongo_cc_library(
         ":oplog",
         ":primary_only_service",
         ":repl_coordinator_interface",
+        ":repl_server_parameters",
         ":repl_settings",
         ":replica_set_messages",
         ":replication_auth",
@@ -1874,6 +1878,7 @@ mongo_cc_unit_test(
         "read_concern_args_test.cpp",
         "repl_client_info_test.cpp",
         "repl_set_write_concern_mode_definitions_test.cpp",
+        "replication_network_compression_test.cpp",
         "replication_process_test.cpp",
         "reporter_test.cpp",
         "scatter_gather_test.cpp",
@@ -1956,6 +1961,7 @@ mongo_cc_unit_test(
         "//src/mongo/executor:network_interface_thread_pool",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
         "//src/mongo/rpc:command_status",
+        "//src/mongo/transport:message_compressor",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
         "//src/mongo/unittest:task_executor_proxy",

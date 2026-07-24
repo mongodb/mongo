@@ -34,6 +34,7 @@
 #include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/service_context.h"
@@ -483,6 +484,11 @@ Status OplogFetcher::_connect() {
         if (_isShuttingDown()) {
             return Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down");
         }
+        // Oplog fetching is replication data-plane traffic, so apply the replication compression
+        // policy before connect()/ensureConnection(), where DBClientConnection sends hello and
+        // negotiates compression. Reapplying is safe across reconnects because it resets this
+        // manager's per-session state.
+        applyReplicationNetworkCompressionToManager(_conn->getCompressorManager());
         connectStatus = [&] {
             try {
                 if (!connectStatus.isOK()) {

@@ -32,6 +32,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/split_horizon/split_horizon.h"
 #include "mongo/db/server_options.h"
@@ -61,6 +62,7 @@
 #include "mongo/transport/backpressure_connection_metrics.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -269,6 +271,13 @@ public:
                 result);
         }
 
+        // replication-data-plane view of network compression. Same shape as
+        // serverStatus().network.compression, but the byte counters include only traffic on
+        // replication-marked connections (oplog fetcher, initial-sync cloner, rollback remote oplog
+        // reader, and this node's oplog responses to its secondaries). Reported as a subset view:
+        // the same bytes are still present in network.compression.
+        appendReplicationMessageCompressionStats(&result);
+
         return result.obj();
     }
 };
@@ -431,17 +440,51 @@ public:
             connectionTagsToSet |= Client::kKeepOpen;
         }
 
+        auto client = opCtx->getClient();
+        const auto internalClient = cmd.getInternalClient();
+        const bool isInternalClient = internalClient.has_value();
+
         // Negotiate compressors before logging metadata so we can include the result in the log
         // line.
         auto result = replyBuilder->getBodyBuilder();
         if (opCtx->getClient()->session()) {
-            MessageCompressorManager::forSession(opCtx->getClient()->session())
-                .serverNegotiate(cmd.getCompression(), &result);
+            // Choose the server-side compressor candidate set per connection. Replication
+            // data-plane clients send replicationCompressionClient so their sync-source connection
+            // can use the replication compression policy; all other connections use net.compression.
+            // The marker is only a negotiation hint: replication data access still requires normal
+            // internal authentication.
+            const bool isReplicationCompressionClient =
+                isInternalClient && cmd.getReplicationCompressionClient().value_or(false);
+            boost::optional<std::vector<std::string>> replCompressorAllowList;
+            if (isReplicationCompressionClient) {
+                auto setting = repl::getReplicationNetworkCompressionSetting();
+                if (setting.disabled) {
+                    // Force uncompressed for the replication connection regardless of
+                    // net.compression.
+                    replCompressorAllowList.emplace();
+                } else if (!setting.inheritProcessDefault) {
+                    replCompressorAllowList.emplace(std::move(setting.allowList));
+                }
+                // inheritProcessDefault: leave disengaged so serverNegotiate() uses the net set
+                // (the replication connection inherits net.compression.compressors).
+            }
+            auto& mgr = MessageCompressorManager::forSession(opCtx->getClient()->session());
+            // Count server-side compressed bytes for replication-marked connections under
+            // serverStatus().repl.compression. This is accounting-only; the inbound server-side
+            // manager does not emit client hello markers.
+            //
+            // The replicationCompressionClient marker is only present on the initial data-plane
+            // handshake hello. A replication connection's later hellos (topology monitoring /
+            // awaitable isMaster) do NOT carry the marker, so an unconditional assignment here would
+            // reset the flag to false on the very next monitoring hello and the sync source would
+            // stop attributing its oplog-response compression to repl.compression. The connection's
+            // role is fixed for its lifetime, so make the flag STICKY: only ever set it true, never
+            // clear it from a subsequent non-marker hello.
+            if (isReplicationCompressionClient) {
+                mgr.countAsReplicationCompressionTrafficForThisSession(true);
+            }
+            mgr.serverNegotiate(cmd.getCompression(), &result, replCompressorAllowList);
         }
-
-        auto client = opCtx->getClient();
-        const auto internalClient = cmd.getInternalClient();
-        const bool isInternalClient = internalClient.has_value();
 
         bool isInitialHandshake = false;
         if (ClientMetadata::tryFinalize(client)) {

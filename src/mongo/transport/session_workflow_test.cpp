@@ -88,6 +88,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -288,6 +289,14 @@ public:
         _session->getTransportLayerCb = [this] {
             return _transportLayer;
         };
+    }
+
+    void permitSnappyCompressionForCurrentSession() {
+        BSONObjBuilder out;
+        std::vector<std::string_view> clientCompressors{"snappy"};
+        std::vector<std::string> serverCompressors{"snappy"};
+        MessageCompressorManager::forSession(_session)
+            .serverNegotiate(clientCompressors, &out, serverCompressors);
     }
 
     /** Waits for the current Session and SessionWorkflow to end. */
@@ -1050,6 +1059,7 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
 TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
     enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
 
+    permitSnappyCompressionForCurrentSession();
     startSession();
     auto msg = makeOpMsg();
     setMoreToCome(msg);
@@ -1060,6 +1070,7 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
     expect<Event::sepEndSession>();
 
     initializeNewSession();
+    permitSnappyCompressionForCurrentSession();
     startSession();
     expect<Event::sessionSourceMessage>(msg);
     expect<Event::sessionSourceMessage>(kClosedSessionError);
@@ -1714,6 +1725,7 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
 
     unittest::ServerParameterGuard maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
 
+    permitSnappyCompressionForCurrentSession();
     startSession();
 
     const size_t bufferSize = MsgData::MsgDataHeaderSize + CompressionHeader::size();
@@ -1731,6 +1743,37 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
 
     expect<Event::sessionSourceMessage>(StatusWith{Message(buffer)});
 
+    expect<Event::sepEndSession>();
+    joinSessions();
+}
+
+// A client that sends OP_COMPRESSED before the server has negotiated compression (no permit list
+// engaged for this session) must have the frame rejected and the connection ended - not crash the
+// server. This guards the pre-negotiation boundary: an unnegotiated connection must not fall back
+// to the process-wide registry (net union replication) to decompress arbitrary frames.
+TEST_F(SessionWorkflowTest, CompressedMessageBeforeNegotiationIsRejected) {
+    auto& registry = MessageCompressorRegistry::get();
+    const auto& compressorNames = registry.getCompressorNames();
+    if (std::ranges::find(compressorNames, "snappy") == compressorNames.end()) {
+        registry.setSupportedCompressors({"snappy"});
+        registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+        uassertStatusOK(registry.finalizeSupportedCompressors());
+    }
+
+    // Deliberately do NOT call permitSnappyCompressionForCurrentSession(): this session never ran
+    // serverNegotiate(), so it has no compressor permit list.
+    startSession();
+
+    // Build a real snappy-compressed OP_COMPRESSED frame with a throwaway, un-negotiated manager
+    // (its permit list is unengaged, so it can produce any registered algorithm - exactly what an
+    // unnegotiated peer could put on the wire).
+    MessageCompressorManager producer{};
+    const auto snappyId = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+    auto compressed = uassertStatusOK(producer.compressMessage(makeOpMsg(), &snappyId));
+
+    // The workflow sources the compressed frame, rejects it during decompression because no
+    // negotiation has occurred, and ends the session instead of crashing.
+    expect<Event::sessionSourceMessage>(StatusWith{compressed});
     expect<Event::sepEndSession>();
     joinSessions();
 }

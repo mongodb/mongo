@@ -582,11 +582,19 @@ public:
     void decompressRequest() {
         if (_in.operation() != dbCompressed)
             return;
+        auto& mgr = compressorMgr();
+        if (!mgr.hasCompressorPermitListForThisSession()) {
+            // Reject OP_COMPRESSED before hello establishes this connection's compressor permit
+            // list. The process-wide registry may include replication-only compressors, so
+            // compression negotiation is the boundary for accepting compressed frames.
+            uasserted(ErrorCodes::BadValue,
+                      "Compressed messages are not accepted before compression negotiation");
+        }
         MessageCompressorId cid;
         _in = isPreAuth(_swf->client())
-            ? uassertStatusOK(compressorMgr().decompressMessage(
-                  _in, &cid, gPreAuthMaximumMessageSizeBytes.loadRelaxed()))
-            : uassertStatusOK(compressorMgr().decompressMessage(_in, &cid));
+            ? uassertStatusOK(
+                  mgr.decompressMessage(_in, &cid, gPreAuthMaximumMessageSizeBytes.loadRelaxed()))
+            : uassertStatusOK(mgr.decompressMessage(_in, &cid));
         _compressorId = cid;
         MessageHooks::onMessageReceived(*_swf->session(), _in);
     }
