@@ -3,6 +3,8 @@
 // the cursor establishing command.
 //
 // @tags: [
+//   # Uses a $where with a JavaScript predicate, which requires server-side scripting.
+//   requires_scripting,
 // ]
 TestData.disableImplicitSessions = true;
 

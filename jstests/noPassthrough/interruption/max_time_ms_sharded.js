@@ -2,6 +2,8 @@
 // time to shards, and that mongos correctly times out max time sharded getmore operations (which
 // are run in parallel on shards).
 // @tags: [
+//   # Uses mapReduce and $where with server-side JS, which requires server-side scripting.
+//   requires_scripting,
 //   requires_replication,
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";

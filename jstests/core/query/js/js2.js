@@ -1,5 +1,7 @@
 // @tags: [
-//   requires_non_retryable_writes
+//   requires_non_retryable_writes,
+//   # Uses $where with a JS predicate executed server-side, which requires server-side scripting.
+//   requires_scripting,
 //]
 
 let t = db.jstests_js2;

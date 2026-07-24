@@ -1,5 +1,7 @@
 // Tests readConcern level metrics in the serverStatus output.
 // @tags: [
+//   # Runs mapReduce with JS map/reduce functions, which requires server-side scripting.
+//   requires_scripting,
 //   requires_majority_read_concern,
 //   requires_persistence,
 //   uses_transactions,

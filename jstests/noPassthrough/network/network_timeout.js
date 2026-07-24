@@ -4,6 +4,8 @@
  * cluster `find` will use a higher level API that will retry on retryable error codes.
  *
  * @tags: [
+ *   # Uses $where with server-side JS, which requires server-side scripting.
+ *   requires_scripting,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

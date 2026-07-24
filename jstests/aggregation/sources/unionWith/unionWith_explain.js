@@ -3,6 +3,8 @@
  * pipeline. The assertions in this test assume that the optimizer for $unionWith queries is
  * the same as the optimizer for the "normal" pipeline.
  * @tags: [
+ *   # Builds a $function expression (lang: "js"), which requires server-side scripting.
+ *   requires_scripting,
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */

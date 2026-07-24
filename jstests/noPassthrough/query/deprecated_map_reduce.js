@@ -4,6 +4,11 @@
 // We want to make sure that the deprecation warning message is only logged once despite
 // the multiple invocations in an effort to not clutter the dev's console.
 // More specifically, we expect to only log 1/127 of mapReduce() events.
+//
+// @tags: [
+//   # Runs mapReduce with JS map/reduce functions, which requires server-side scripting.
+//   requires_scripting,
+// ]
 
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

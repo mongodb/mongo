@@ -10,6 +10,9 @@
  * This workload serves as a regression test for SERVER-6757, SERVER-15087,
  * and SERVER-15842.
  * @tags: [
+ *   # Submits mapReduce with JS mapper/reducer/finalize functions, which requires server-side
+ *   # scripting.
+ *   requires_scripting,
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
  *   # TODO (SERVER-95150): Re-enable this test in multi-stmt-txn suites.

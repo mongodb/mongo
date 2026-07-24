@@ -4,6 +4,8 @@
  *
  * @tags: [
  *   requires_fcv_82,
+ *   # Uses a $accumulator with JavaScript, which requires server-side scripting.
+ *   requires_scripting,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

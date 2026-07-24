@@ -15,3 +15,14 @@ export function isMozjsWasm(targetDb) {
 export function isTsan(targetDb) {
     return targetDb.getServerBuildInfo().isThreadSanitizerActive();
 }
+
+/**
+ * Returns true if the connected server has a server-side JavaScript engine.
+ *
+ * Server-side JS is compiled out of some builds (e.g. ppc64le links scripting_none) and can be
+ * turned off at runtime with --noscripting. In both cases the {features:1} command omits its
+ * "js" subdocument, which is what this checks.
+ */
+export function isServerSideJavaScriptEnabled(conn) {
+    return assert.commandWorked(conn.adminCommand({features: 1})).js !== undefined;
+}

@@ -1,5 +1,10 @@
 // This test validates that map/reduce runs intermediate reduce steps in order to keep the
 // in-memory state small. See SERVER-12949 for more details.
+//
+// @tags: [
+//   # Uses mapReduce, which requires server-side scripting.
+//   requires_scripting,
+// ]
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

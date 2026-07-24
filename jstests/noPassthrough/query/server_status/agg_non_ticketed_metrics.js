@@ -12,6 +12,11 @@
  * engine here so the assertions below hold regardless of which engine a given variant defaults to;
  * a couple of tests below override this to trySbeEngine to verify the SBE-specific behavior
  * directly.
+ *
+ * @tags: [
+ *   # Uses a $accumulator with lang: "js", which requires server-side scripting.
+ *   requires_scripting,
+ * ]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

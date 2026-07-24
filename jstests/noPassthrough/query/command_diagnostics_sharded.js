@@ -2,7 +2,11 @@
  * Test that tassert during CRUD command execution on mongos will log diagnostics about the query.
  *
  * This test expects collections to persist across a restart.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   # Runs mapReduce with JS map/reduce functions, which requires server-side scripting.
+ *   requires_scripting,
+ * ]
  */
 import {
     assertOnDiagnosticLogContents,

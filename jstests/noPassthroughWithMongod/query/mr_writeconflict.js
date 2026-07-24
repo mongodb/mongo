@@ -1,4 +1,9 @@
 // SERVER-16262: Write-conflict during map-reduce operations
+//
+// @tags: [
+//   # Uses mapReduce, which requires server-side scripting.
+//   requires_scripting,
+// ]
 
 import {Thread} from "jstests/libs/parallelTester.js";
 

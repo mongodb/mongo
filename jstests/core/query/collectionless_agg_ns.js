@@ -1,6 +1,8 @@
 /**
  * Tests commands run against the $cmd.aggregate namespace.
  * @tags: [
+ *   # Runs mapReduce with JS map/reduce functions, which requires server-side scripting.
+ *   requires_scripting,
  *   uses_explain,
  *   # Some of these commands produce "cannot run within a multi-document transaction"
  *   does_not_support_transactions,

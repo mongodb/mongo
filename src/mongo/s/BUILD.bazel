@@ -574,7 +574,7 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }) + select({
-        "//bazel/config:server_js_enabled": [
+        "//bazel/config:server_js_engine_allowed": [
             "//src/mongo/scripting:scripting_server",
         ],
         "//conditions:default": ["//src/mongo/scripting:scripting_none"],

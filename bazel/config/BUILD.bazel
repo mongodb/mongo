@@ -3036,6 +3036,19 @@ config_setting(
     },
 )
 
+# Whether mongod/mongos may depend on a server-side JS engine. Server-side scripting is never
+# compiled into ppc64le binaries (the JS engine must be absent from released PPC builds regardless
+# of the server_js flag), so a build links scripting_server only when server_js is enabled AND the
+# target is not ppc64le. Keying this on the platform means any ppc64le build links scripting_none,
+# not just the Evergreen variants that remember to pass --server_js=False.
+selects.config_setting_group(
+    name = "server_js_engine_allowed",
+    match_all = [
+        ":server_js_enabled",
+        ":not_ppc",
+    ],
+)
+
 # --------------------------------------
 # xray
 # --------------------------------------

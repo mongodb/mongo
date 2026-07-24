@@ -5,6 +5,8 @@
  * healthy rather than being torn down.
  *
  * @tags: [
+ *   # Uses $where with server-side JS to create a slow op, which requires server-side scripting.
+ *   requires_scripting,
  *   requires_sharding,
  *   requires_fcv_81,
  * ]

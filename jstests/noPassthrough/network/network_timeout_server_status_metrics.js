@@ -1,5 +1,7 @@
 /**
  * @tags: [
+ *   # Uses $where with server-side JS, which requires server-side scripting.
+ *   requires_scripting,
  *   requires_fcv_63,
  * ]
  *

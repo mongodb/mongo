@@ -1,5 +1,10 @@
 /**
  * Tests the explain command with the maxTimeMS option.
+ *
+ * @tags: [
+ *   # Explains mapReduce with JS map/reduce functions, which requires server-side scripting.
+ *   requires_scripting,
+ * ]
  */
 import {runWithFailpoint} from "jstests/libs/query/command_diagnostic_utils.js";
 

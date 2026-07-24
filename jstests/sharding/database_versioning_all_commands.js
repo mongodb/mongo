@@ -33,6 +33,7 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isServerSideJavaScriptEnabled} from "jstests/libs/js_engine_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     commandsAddedToMongodSinceLastLTS,
@@ -1585,6 +1586,19 @@ const doTest = (
     }
 
     const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+
+    // mapReduce with JS map/reduce functions needs a server-side JS engine, which is absent on some
+    // builds (e.g. ppc64le links scripting_none). Skip just that command there so the rest of the
+    // coverage still runs, rather than tagging out the whole test.
+    if (
+        testCases.mapReduce &&
+        testCases.mapReduce.run &&
+        !isServerSideJavaScriptEnabled(connection)
+    ) {
+        testCases.mapReduce = {
+            skip: "mapReduce uses server-side JS, which is unavailable on this build (e.g. PPC)",
+        };
+    }
 
     commandsRemovedSinceLastLTS.forEach(function (cmd) {
         testCases[cmd] = {

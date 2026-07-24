@@ -1,5 +1,9 @@
 // SERVER-6591: Localhost authentication exception doesn't work right on sharded cluster
-// @tags: [requires_os_access]
+// @tags: [
+//   requires_os_access,
+//   # Authorized section runs mapReduce, which requires server-side scripting.
+//   requires_scripting,
+// ]
 // This test is to ensure that localhost authentication works correctly against a replica set
 // whether they are hosted with "localhost" or a hostname.
 

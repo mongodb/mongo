@@ -14,6 +14,7 @@
  * ]
  */
 
+import {isServerSideJavaScriptEnabled} from "jstests/libs/js_engine_util.js";
 import {StandbyClusterTestFixture} from "jstests/noPassthrough/libs/sharded_cluster_topology/standby_cluster_test_fixture.js";
 
 const dbName = "testDb";
@@ -481,6 +482,10 @@ function runStandbyAllCommandsTest({configShard}) {
     });
     assert.neq(null, mongos, "mongoS failed to start against standby config server");
 
+    // mapReduce with JS map/reduce functions needs a server-side JS engine, which is absent on some
+    // builds (e.g. ppc64le links scripting_none). Skip just that command there.
+    const jsEnabled = isServerSideJavaScriptEnabled(mongos);
+
     const listCommandsRes = assert.commandWorked(mongos.adminCommand({listCommands: 1}));
     const serverCommands = Object.keys(listCommandsRes.commands).sort();
 
@@ -493,6 +498,11 @@ function runStandbyAllCommandsTest({configShard}) {
 
         if (!test) {
             missing.push(cmdName);
+            continue;
+        }
+
+        if (!jsEnabled && cmdName === "mapReduce") {
+            jsTest.log.info(`Skipping ${cmdName}: server-side JS is unavailable on this build`);
             continue;
         }
 

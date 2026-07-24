@@ -6687,6 +6687,7 @@ export const authCommandsLib = {
         },
         {
             testname: "mapReduce_readonly",
+            skipTest: (conn) => !isServerSideJavaScriptEnabled(conn),
             command: {
                 mapreduce: "x",
                 map: function () {
@@ -6721,6 +6722,7 @@ export const authCommandsLib = {
         },
         {
             testname: "mapReduce_write",
+            skipTest: (conn) => !isServerSideJavaScriptEnabled(conn),
             command: {
                 mapreduce: "x",
                 map: function () {
@@ -10694,6 +10696,19 @@ function isFeatureEnabled(conn, ...features) {
         adminDb.logout();
     }
     return features.every((key) => res[key]?.value);
+}
+
+// Returns true if the server was built with a server-side JavaScript engine. The `features`
+// command only reports its `js` sub-document when a global script engine is present, so its
+// absence identifies a scripting_none build (e.g. PPC, where server-side JS is compiled out).
+function isServerSideJavaScriptEnabled(conn) {
+    const adminDb = conn.getDB(adminDbName);
+    const authed = adminDb.auth("admin", "password");
+    const res = assert.commandWorked(adminDb.runCommand({features: 1}));
+    if (authed) {
+        adminDb.logout();
+    }
+    return res.js !== undefined;
 }
 
 function isForceClassicEngine(conn) {

@@ -74,6 +74,7 @@
  *      If true, do not run this command on a standalone mongod.
  */
 
+import {isServerSideJavaScriptEnabled} from "jstests/libs/js_engine_util.js";
 import {commandsRemovedFromMongodSinceLastLTS} from "jstests/sharding/libs/last_lts_mongod_commands.js";
 import {commandsRemovedFromMongosSinceLastLTS} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
@@ -587,6 +588,9 @@ let viewsCommandTests = {
             out: "out",
         },
         expectFailure: true,
+        // Needs a server-side JS engine, which is absent on some builds (e.g. ppc64le links
+        // scripting_none). Skip just this command there.
+        skipNoScripting: true,
     },
     mergeAllChunksOnShard: {skip: isUnrelated},
     mergeChunks: {
@@ -927,6 +931,11 @@ for (let command of commands) {
 
         if (subtest.skipStandalone && !isMongos) {
             print("Skipping " + command + ": not applicable to mongoD");
+            continue;
+        }
+
+        if (subtest.skipNoScripting && !isServerSideJavaScriptEnabled(db)) {
+            print("Skipping " + command + ": server-side JS is unavailable on this build");
             continue;
         }
 
