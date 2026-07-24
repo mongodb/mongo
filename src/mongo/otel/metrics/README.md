@@ -169,12 +169,14 @@ information.
 
 ## Metric Attributes (Labels)
 
-**Metric attributes are not currently supported.** The OpenTelemetry standard supports attaching
-key-value attributes (also known as labels or tags) to metrics, enabling queries like
-`query_count{database="admin"}`. However, this API intentionally does not expose attributes because
-the default attribute implementation has performance implications. Please reach out to the
-Networking and Observability team if you'd like this feature prioritized
-([SERVER-117025](https://jira.mongodb.org/browse/SERVER-117025)).
+The OpenTelemetry standard supports attaching key-value attributes (also known as labels or tags) to
+metrics, enabling queries like `query_count{database="admin"}`.
+
+**Metric attribute values are required to be known at metric creation time.** This reduces the
+impact of attributes on performance, and helps prevent issues around PII in attributes, which is
+currently disallowed. We may support non-compile-time attributes in the future, please reach out to
+the Networking and Observability team if you'd like this feature prioritized
+([SERVER-121629](https://jira.mongodb.org/browse/SERVER-121629)).
 
 ## Performance Considerations
 
