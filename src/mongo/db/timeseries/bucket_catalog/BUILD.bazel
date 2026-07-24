@@ -76,10 +76,12 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:raw_data_operation",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries:timeseries_test_fixture",
+        "//src/mongo/s:common_s",
     ],
 )
 
