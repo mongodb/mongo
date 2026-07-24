@@ -95,6 +95,10 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         shard0 = st.shard0;
         shard1 = st.shard1;
         configPrimary = st.configRS.getPrimary();
+        // Add a shardName="config" so configPrimary can be passed to assertShardCatalogMatchesGlobal.
+        configPrimary.shardName = configPrimary
+            .getDB("admin")
+            .system.version.findOne({_id: "shardIdentity"}).shardName;
 
         assert.commandWorked(
             mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
@@ -424,6 +428,7 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         // primary; each data shard must carry the authoritative metadata exactly when it owns chunks.
         assertShardCatalogMatchesGlobal(shard1, sessionsNs, {isDbPrimary: false});
         assertShardCatalogMatchesGlobal(shard0, sessionsNs, {isDbPrimary: false});
+        assertShardCatalogMatchesGlobal(configPrimary, sessionsNs, {isDbPrimary: true});
 
         // A correct upgrade must leave no shard catalog inconsistencies for the collection.
         const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
