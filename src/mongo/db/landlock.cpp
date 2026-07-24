@@ -51,6 +51,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
@@ -306,6 +307,24 @@ std::vector<std::string_view> fsAccessRightNames(uint64_t mask) {
     }
     return names;
 }
+
+// Back the "landlock" serverStatus section (see LandlockServerStatusSection):
+// whether the sandbox option is enabled, the Landlock ABI version probed from
+// the running kernel (0 when the kernel lacks Landlock or has it disabled),
+// both reported even when the sandbox option is off, whether the sandbox is
+// actually enforced ("active"), and the filesystem access-right masks the
+// enforced ruleset handles and had to degrade (meaningful only while active).
+//
+// Deliberately not atomic: written once, from the single-threaded
+// EnableLandlockSandbox startup initializer, before any thread that could read
+// them (command threads serving serverStatus) is spawned -- thread creation
+// establishes the necessary happens-before. Must become atomic if enforcement
+// ever moves out of single-threaded startup.
+bool gLandlockEnabled = false;
+int gLandlockAbi = 0;
+bool gLandlockActive = false;
+uint64_t gLandlockHandledFsAccess = 0;
+uint64_t gLandlockDegradedFsAccess = 0;
 
 }  // namespace
 
@@ -640,6 +659,10 @@ void initializeLandlock() {
         return;
     }
 
+    gLandlockActive = true;
+    gLandlockHandledFsAccess = ruleset.handledFsAccess();
+    gLandlockDegradedFsAccess = ruleset.degradedFsAccess();
+
     // The sandbox is now permanently in force. The handled arrays list only the
     // rights the running kernel actually restricts; rights that were requested
     // but unavailable on this ABI appear in degradedRights. Network and scope
@@ -674,6 +697,9 @@ MONGO_INITIALIZER_GENERAL(EnableLandlockSandbox,
     if (params.count("security.landlock.enabled")) {
         enabled = params["security.landlock.enabled"].as<bool>();
     }
+    gLandlockEnabled = enabled;
+    const auto swAbi = landlockAbiVersion();
+    gLandlockAbi = swAbi.isOK() ? static_cast<int>(swAbi.getValue()) : 0;
     if (!enabled) {
         LOGV2(13118814, "Skipping Landlock initialization: sandboxing is not enabled");
         return;
@@ -681,6 +707,46 @@ MONGO_INITIALIZER_GENERAL(EnableLandlockSandbox,
 
     initializeLandlock();
 }
+
+// Read-only diagnostic for monitoring and tests:
+//
+//   enabled:              the security.landlock.enabled option
+//   active:               whether the sandbox is actually enforced
+//   abiVersion:           Landlock ABI probed from the running kernel (0 when
+//                         the kernel lacks Landlock or has it disabled),
+//                         reported even when the sandbox option is off
+//   handledAccessRights:  rights the enforced ruleset denies by default,
+//                         per rule type ("fs"); present only when active
+//   degradedAccessRights: requested rights this kernel's ABI cannot restrict,
+//                         per rule type ("fs"); present only when active
+class LandlockServerStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext*, const BSONElement&) const override {
+        BSONObjBuilder builder;
+        builder.append("enabled", gLandlockEnabled);
+        builder.append("active", gLandlockActive);
+        builder.append("abiVersion", gLandlockAbi);
+        if (gLandlockActive) {
+            {
+                BSONObjBuilder handled(builder.subobjStart("handledAccessRights"));
+                handled.append("fs", fsAccessRightNames(gLandlockHandledFsAccess));
+            }
+            {
+                BSONObjBuilder degraded(builder.subobjStart("degradedAccessRights"));
+                degraded.append("fs", fsAccessRightNames(gLandlockDegradedFsAccess));
+            }
+        }
+        return builder.obj();
+    }
+};
+auto& landlockServerStatusSection =
+    *ServerStatusSectionBuilder<LandlockServerStatusSection>("landlock").forShard().forRouter();
 
 }  // namespace
 }  // namespace mongo
