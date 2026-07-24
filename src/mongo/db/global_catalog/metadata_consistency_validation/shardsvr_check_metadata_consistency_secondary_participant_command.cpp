@@ -56,6 +56,10 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
