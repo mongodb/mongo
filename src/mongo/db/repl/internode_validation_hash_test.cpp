@@ -182,6 +182,30 @@ DEATH_TEST_F(VerifyValidationHashDeathTest,
     std::ignore = applyGroupedInsertsSteadyState(ops);
 }
 
+TEST_F(VerifyValidationHashTest, DeleteMatchingHashAppliesCleanly) {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    const int64_t hash = computeDocValidationHash(doc);
+    OplogEntry op = makeDeleteOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, hash);
+    ASSERT_OK(runOpSteadyState(op));
+
+    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+}
+
+DEATH_TEST_F(VerifyValidationHashDeathTest, DeleteMismatchedHashFasserts, "12851600") {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    const int64_t wrongHash = computeDocValidationHash(doc) ^ 0x1;
+    OplogEntry op = makeDeleteOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, wrongHash);
+    std::ignore = runOpSteadyState(op);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

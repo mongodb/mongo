@@ -1636,8 +1636,12 @@ void verifyValidationHash(OperationContext* opCtx,
     // actually stored.
     const BSONObj& oplogObject = op.getObject();
     const BSONObj storedDocument = collection->docFor(opCtx, recordId).value().getOwned();
-    boost::optional<BSONObj> fieldLevelDiff =
-        doc_diff::computeInlineDiff(oplogObject, storedDocument);
+    // For deletes, the primary only writes the document's _id to the oplog, so we cannot compute a
+    // field-level diff. For inserts, we can compute a field-level diff between the
+    // oplog object and the stored document.
+    boost::optional<BSONObj> fieldLevelDiff = op.getOpType() == OpTypeEnum::kDelete
+        ? boost::none
+        : doc_diff::computeInlineDiff(oplogObject, storedDocument);
 
     const HostAndPort nodeId = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
 
@@ -2096,6 +2100,9 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
         return deleteObject(opCtx, coll, request);
     }
 
+    if (shouldVerifyValidationHash(opCtx, collPtr, mode, op)) {
+        verifyValidationHash(opCtx, collPtr, rid, preImage.value(), op);
+    }
 
     // Perform the delete.
     WriteUnitOfWork wuow{opCtx};
