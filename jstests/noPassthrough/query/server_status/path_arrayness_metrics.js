@@ -8,6 +8,7 @@
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 function getCounters(db) {
@@ -174,6 +175,18 @@ describe("pathArrayness metrics", function () {
     });
 
     it("increments leadingFilterSimplified for a $match + $lookup + $unwind on indexed non-array paths", function () {
+        if (
+            !FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindLocalIxscanFetch") ||
+            !FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindHashJoin") ||
+            !FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice")
+        ) {
+            jsTest.log.info(
+                "Skipping: featureFlagSbeEqLookupUnwindLocalIxscanFetch, " +
+                    "featureFlagSbeEqLookupUnwindHashJoin, or " +
+                    "featureFlagGetExecutorDeferredEngineChoice is not enabled.",
+            );
+            return;
+        }
         const before = getCounters(db);
         const explainResult = coll.explain().aggregate([
             {$match: {x: 1, z: 1}},
