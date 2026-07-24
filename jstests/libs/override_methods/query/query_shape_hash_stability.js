@@ -118,6 +118,18 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
             return;
         }
 
+        // A v2 change stream on a view or timeseries collection returns ok and fails only on
+        // getMore, so the original command can succeed while explain fails with these codes.
+        const isChangeStream =
+            getInnerCommand(explainCmd).pipeline?.[0]?.$changeStream !== undefined;
+        const changeStreamErrorCodes = [
+            ErrorCodes.CommandNotSupportedOnView,
+            ErrorCodes.CommandNotSupported,
+        ];
+        if (isChangeStream && changeStreamErrorCodes.includes(ex.code)) {
+            return;
+        }
+
         throw ex;
     }
 
