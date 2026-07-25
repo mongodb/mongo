@@ -153,11 +153,7 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
     auto pipeline =
         Pipeline::parseFromLiteParsed(lpp, expCtx, nullptr, false, true /* useStubInterface */);
 
-    // The serialized BSON will be soon re-parsed when we restart the agg path with the resolved
-    // pipeline. We set the serializeForReparse flag so search stages emit user-form rather than the
-    // full IDL form (which would trip the LiteParse-layer internal-field check).
-    query_shape::SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true,
-                                               .serializeForReparse = true};
+    query_shape::SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
     return {pipeline->serializeToBson(wireOpts), std::move(lpp)};
 }
 

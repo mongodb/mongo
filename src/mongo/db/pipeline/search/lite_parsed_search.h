@@ -4,7 +4,6 @@
 #pragma once
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
@@ -55,16 +54,6 @@ public:
 
     bool requiresAuthzChecks() const override {
         return true;
-    }
-
-    void validate(const OperationContext* opCtx) const override {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << this->getParseTimeName() << " value must be an object. Found: "
-                              << typeName(this->_originalBson.type()),
-                this->_originalBson.type() == BSONType::object);
-
-        search_helpers::validateInternalSearchFieldsNotSetByUser(
-            opCtx, this->_originalBson.embeddedObject());
     }
 
     // All search stages are unsupported on timeseries collections.
