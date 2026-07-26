@@ -66,7 +66,7 @@ static const double kCircOfEarthInMeters = 2 * M_PI * kRadiusOfEarthInMeters;
 static const double kMaxEarthDistanceInMeters = kCircOfEarthInMeters / 2;
 static const double kMetersPerDegreeAtEquator = kCircOfEarthInMeters / 360;
 
-static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSetMember* member) {
+double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSetMember* member) {
     //
     // Generic GeoNear distance computation
     // Distances are computed by projecting the stored geometry into the query CRS, and
@@ -87,7 +87,11 @@ static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSet
 
     // Compute the minimum distance of all the geometries in the document
     double minDistance = -1;
-    Value minDistanceMetadata;
+    // Track only the winning geometry by pointer during the loop. The point-metadata Value is
+    // built once after the loop, and only when it is actually requested (addPointMeta). This
+    // avoids an owned per-document Value construction on the hot path when includeLocs is not
+    // requested.
+    const StoredGeometry* minDistanceStored = nullptr;
     for (auto it = geometries.begin(); it != geometries.end(); ++it) {
         StoredGeometry& stored = **it;
 
@@ -107,7 +111,7 @@ static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSet
 
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
-            minDistanceMetadata = Value{stored.element};
+            minDistanceStored = &stored;
         }
     }
 
@@ -128,7 +132,7 @@ static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSet
     }
 
     if (nearParams.addPointMeta) {
-        member->metadata().setGeoNearPoint(minDistanceMetadata);
+        member->metadata().setGeoNearPoint(Value{minDistanceStored->element});
     }
 
     return minDistance;

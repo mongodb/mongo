@@ -49,6 +49,15 @@ struct GeoNearParams {
 };
 
 /**
+ * Computes the minimum distance from the near query centroid to any of the geometries stored in
+ * the given working set member's document. Sets the geoNearDistance and geoNearPoint metadata on
+ * the member as requested by 'nearParams'. Returns -1 if no distance could be computed.
+ *
+ * Exposed for unit testing.
+ */
+double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSetMember* member);
+
+/**
  * Implementation of GeoNear on top of a 2D index
  */
 class GeoNear2DStage final : public NearStage {
