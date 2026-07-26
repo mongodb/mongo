@@ -7,28 +7,35 @@
 
 jsTestLog("Running with retry on 'NoProgressMade' error override for CRUD operations");
 
+// Multi-document helpers throw a BulkWriteError; single-document helpers can throw a single
+// WriteError (or a WriteConcernError, which we don't retry here).
+function isRetryableNoProgressMade(e) {
+    if (e instanceof BulkWriteError && e.hasWriteErrors()) {
+        return e.getWriteErrors().some((writeErr) => writeErr.code === ErrorCodes.NoProgressMade);
+    }
+    if (e instanceof WriteError) {
+        return e.code === ErrorCodes.NoProgressMade;
+    }
+    return false;
+}
+
 function retryOnNoProgressMade(originalFunc, context, args) {
-    let result = "";
+    let result;
 
     assert.soon(() => {
         try {
             result = originalFunc.apply(context, args);
             return true;
         } catch (e) {
-            if (e instanceof BulkWriteError && e.hasWriteErrors()) {
-                for (let writeErr of e.getWriteErrors()) {
-                    if (writeErr.code == ErrorCodes.NoProgressMade) {
-                        print(
-                            `No progress made while inserting documents. Received error ${tojson(
-                                writeErr.code,
-                            )}, Retrying.`,
-                        );
-                        return false;
-                    }
-                }
-            } else {
-                throw e;
+            if (isRetryableNoProgressMade(e)) {
+                print(
+                    `No progress made while running CRUD operation. Received error ${tojson(
+                        ErrorCodes.NoProgressMade,
+                    )}, retrying.`,
+                );
+                return false;
             }
+            throw e;
         }
     });
     return result;
