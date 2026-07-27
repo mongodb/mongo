@@ -10161,6 +10161,43 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
     }
 }
 
+// Regression test for a discrepancy between the materializing decompress path and the min/max
+// (CompareCollector / MinMaxCollector) path. After interleaved mode ends, the interleaved
+// decompressor calls setLast<BSONElement>(BSONElement()) to mark the last value missing, so that
+// the trailing simple8b blocks are handled by decompressAllMissing() instead of
+// decompressAllLiteral() (which asserts that post-literal delta blocks only contain skip or 0).
+// The min/max collectors previously hardcoded isLastMissing() to false and ignored setLast(), so
+// they took the decompressAllLiteral() branch and threw uassert 8609800 on inputs that the
+// iterator and block-based APIs accepted. This uncaught throw crashed the
+// bsoncolumn_decompress_fuzzer.
+//
+// The bytes below are a fuzzer-found reproducer. We only assert that the min/max expressions no
+// longer throw (the crash being regressed); we do not compare returned values, because these bytes
+// decode to elements the expectedMinMax() test helper cannot canonicalize.
+TEST_F(BSONColumnTest, MinMaxInterleavedTrailingBlocksDoNotThrow) {
+    const uint8_t bytes[] = {
+        0xf0, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x07, 0x00,
+        0xff, 0x27, 0x00, 0x12, 0x00, 0x00, 0x80, 0x81, 0x81, 0x81, 0xff, 0x00, 0x80, 0x67, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xfc, 0xff, 0x00, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff, 0x81, 0x25, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0x81, 0x81, 0x81, 0xff, 0xff, 0xff, 0xff, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0xff, 0xff, 0xff, 0xff, 0x0b, 0x00, 0x00, 0xff, 0x00, 0x00, 0xff, 0x00, 0x00};
+    const char* data = reinterpret_cast<const char*>(bytes);
+    const size_t size = sizeof(bytes);
+
+    // The reproducer is a valid BSONColumn that ends with an interleaved section followed by
+    // trailing simple8b blocks, which is the shape that exercises the isLastMissing() branch.
+    ASSERT_OK(validateBSONColumn(data, size));
+
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
+
+    // Prior to the fix these calls threw uassert 8609800 ("Post literal delta blocks should only
+    // contain skip or 0") and aborted the fuzzer. They must now succeed without throwing.
+    ASSERT_DOES_NOT_THROW(min<BSONElementMaterializer>(data, size, allocator));
+    ASSERT_DOES_NOT_THROW(max<BSONElementMaterializer>(data, size, allocator));
+    ASSERT_DOES_NOT_THROW(minmax<BSONElementMaterializer>(data, size, allocator));
+}
+
 TEST(DenseTest, EmptyColumn) {
     BSONColumnBuilder<> cb;
     auto bin = cb.finalize();
