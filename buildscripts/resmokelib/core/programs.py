@@ -8,6 +8,7 @@ import json
 import os
 import os.path
 import re
+import shutil
 import stat
 from subprocess import check_output
 from typing import Any, Optional
@@ -58,11 +59,9 @@ def get_binary_version_output(binary_path):
     env_vars = os.environ.copy()
     env_vars["PATH"] = os.pathsep.join(get_path_env_var(env_vars=env_vars))
 
-    binary = binary_path
-    # Ensure that executable files that don't already have an extension on Windows have a
-    # ".exe" extension, matching the behavior in core/process.py.
-    if utils.is_windows() and not os.path.splitext(binary)[1]:
-        binary += ".exe"
+    # Resolve the binary against the augmented PATH that includes multiversion
+    # and the install directories, in the case where `binary_path` is simply `mongod`.
+    binary = shutil.which(binary_path, path=env_vars["PATH"]) or binary_path
 
     return check_output([binary, "--version"], env=env_vars).decode("utf-8")
 
