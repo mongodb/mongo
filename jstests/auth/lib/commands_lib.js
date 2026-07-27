@@ -228,6 +228,12 @@ let roles_all = {
     __system: 1,
 };
 
+let elevatedUserRolesRuntimeConstants = {
+    localNow: new Date(),
+    clusterTime: Timestamp(1, 1),
+    userRoles: [{_id: "admin.root", role: "root", db: "admin"}],
+};
+
 // Common test cases for the aggregation stages that perform transformation only.
 let testcases_transformationOnly = [
     {
@@ -5752,6 +5758,119 @@ export const authCommandsLib = {
                             actions: ["find", "update"],
                         },
                     ],
+                },
+            ],
+        },
+        // A forged value for 'runtimeConstants.userRoles' must be rejected for every external client, no
+        // matter how privileged.
+        {
+            testname: "find_runtime_constants_user_roles",
+            command: {find: "foo", filter: {}, runtimeConstants: elevatedUserRolesRuntimeConstants},
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_all,
+                    privileges: [],
+                    // Error codes are different for mongod vs mongos.
+                    expectFailWithErrorCodes: [12843300, 51202],
+                },
+            ],
+        },
+        {
+            testname: "update_runtime_constants_user_roles",
+            command: {
+                update: "foo",
+                updates: [{q: {}, u: {$set: {a: 1}}}],
+                runtimeConstants: elevatedUserRolesRuntimeConstants,
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_all,
+                    privileges: [],
+                    // Error codes are different for mongod vs mongos.
+                    expectFailWithErrorCodes: [12843300, 51195],
+                },
+            ],
+        },
+        {
+            testname: "delete_runtime_constants_user_roles",
+            command: {
+                delete: "foo",
+                deletes: [{q: {}, limit: 1}],
+                runtimeConstants: elevatedUserRolesRuntimeConstants,
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_all,
+                    privileges: [],
+                    expectFailWithErrorCodes: [12843300],
+                },
+            ],
+        },
+        {
+            testname: "findAndModify_runtime_constants_user_roles",
+            command: {
+                findAndModify: "x",
+                query: {},
+                update: {$inc: {n: 1}},
+                runtimeConstants: elevatedUserRolesRuntimeConstants,
+            },
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_all,
+                    privileges: [],
+                    expectFailWithErrorCodes: [12843300],
+                },
+            ],
+        },
+        {
+            testname: "findAndModify_runtime_constants_user_roles_sharded",
+            command: {
+                findAndModify: "x",
+                query: {},
+                update: {$inc: {n: 1}},
+                runtimeConstants: elevatedUserRolesRuntimeConstants,
+            },
+            skipUnlessSharded: true,
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        readWrite: 1,
+                        readWriteAnyDatabase: 1,
+                        dbOwner: 1,
+                        root: 1,
+                        __system: 1,
+                    },
+                    privileges: [
+                        {resource: {db: firstDbName, collection: "x"}, actions: ["find", "update"]},
+                    ],
+                    // Error code depends on whether UWE is active.
+                    expectFailWithErrorCodes: [51196, 11423300],
+                },
+            ],
+        },
+        {
+            testname: "aggregate_runtime_constants_user_roles",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$match: {}}],
+                cursor: {},
+                runtimeConstants: elevatedUserRolesRuntimeConstants,
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_read,
+                    privileges: [
+                        {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    ],
+                    // Error codes are different for mongod vs mongos.
+                    expectFailWithErrorCodes: [463840, 51143],
                 },
             ],
         },

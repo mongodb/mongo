@@ -327,6 +327,8 @@ public:
                 CommandHelpers::ensureValidCollectionName(request().getNamespaceOrUUID().nss());
             }
             assertInternalParamsAreSetByInternalClients(opCtx->getClient(), request());
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
             uassert(ErrorCodes::FailedToParse,
                     "Use of forcedPlanSolutionHash not permitted.",
                     !request().getForcedPlanSolutionHash() ||

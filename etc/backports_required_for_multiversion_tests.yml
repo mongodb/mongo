@@ -106,6 +106,8 @@ last-continuous:
       ticket: SERVER-125661
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
       ticket: SERVER-131540
+    - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+      ticket: SERVER-128433
     - test_file: jstests/noPassthrough/read_write_concern/read_pref.js
       ticket: SERVER-128221
     - test_file: jstests/noPassthrough/read_write_concern/read_preference_metrics_mongos.js
@@ -569,6 +571,8 @@ last-lts:
       ticket: SERVER-110058
     - test_file: jstests/noPassthrough/query/out_merge/out_timeseries_cleans_up_bucket_collections.js
       ticket: SERVER-93149
+    - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+      ticket: SERVER-128433
     - test_file: jstests/noPassthrough/read_write_concern/read_pref.js
       ticket: SERVER-128221
     - test_file: jstests/noPassthrough/read_write_concern/read_preference_metrics_mongos.js
