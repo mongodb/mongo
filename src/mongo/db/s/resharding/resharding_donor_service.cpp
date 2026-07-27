@@ -507,6 +507,18 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                         *onReleaseCriticalSectionAction,
                         false /*throwIfReasonDiffers*/);
 
+                // If for any reason the operation got aborted while the critical section is held
+                // and the release in resharding::withCriticalSectionForTempCollection fails then we
+                // force a release of the critical section for the temp collection here.
+                ShardingRecoveryService::get(opCtx.get())
+                    ->releaseRecoverableCriticalSection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _critSecReason,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                        *onReleaseCriticalSectionAction,
+                        false /*throwIfReasonDiffers*/);
+
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                     resharding::getCurrentTime());
 
@@ -994,18 +1006,30 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         // Allow bypassing user write blocking. The check has already been performed on the
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
-        resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
 
-        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
-            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-            shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
-                opCtx.get(),
-                _metadata.getTempReshardingNss(),
-                _metadata.getReshardingUUID(),
-                _metadata.getSourceNss(),
-                _metadata.getSourceUUID(),
-                _metadata.getPrimaryShardId() == ShardingState::get(opCtx.get())->shardId());
-        }
+        const bool mustClearCollectionMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
+        resharding::withCriticalSectionForTempCollection(
+            opCtx.get(),
+            _metadata.getTempReshardingNss(),
+            _critSecReason,
+            mustClearCollectionMetadata,
+            [&] {
+                resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(),
+                                                                                  _metadata);
+
+                if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+                    ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _metadata.getReshardingUUID(),
+                        _metadata.getSourceNss(),
+                        _metadata.getSourceUUID(),
+                        _metadata.getPrimaryShardId() ==
+                            ShardingState::get(opCtx.get())->shardId());
+                }
+            });
     } else {
         auto opCtx = _makeOperationContext(factory);
         // Allow bypassing user write blocking. The check has already been performed on the
@@ -1019,10 +1043,15 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
             ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             shard_catalog_commit_for_resharding::commitDropCollection(
                 opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
-            // Make sure to also clear out the state of the temporary resharding as it now no longer
-            // exists since it got renamed to the final namespace.
-            shard_catalog_commit_for_resharding::commitDropCollection(
-                opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
+            resharding::withCriticalSectionForTempCollection(
+                opCtx.get(), _metadata.getTempReshardingNss(), _critSecReason, false, [&] {
+                    // Make sure to also clear out the state of the temporary resharding as it now
+                    // no longer exists since it got renamed to the final namespace.
+                    shard_catalog_commit_for_resharding::commitDropCollection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _metadata.getReshardingUUID());
+                });
         }
     }
 

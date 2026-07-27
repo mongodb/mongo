@@ -15,6 +15,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
@@ -51,6 +52,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -666,6 +668,51 @@ bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetada
 boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
                                                  const CollectionPtr& collection,
                                                  const boost::optional<BSONObj>& shardKeyPattern);
+
+template <typename F>
+auto withCriticalSectionForTempCollection(OperationContext* opCtx,
+                                          const NamespaceString& tempNss,
+                                          const BSONObj& critSecReason,
+                                          bool mustClearCollectionMetadata,
+                                          F&& f) {
+    ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx,
+        tempNss,
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        mustClearCollectionMetadata);
+    ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx,
+        tempNss,
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+    auto customAction =
+        [&]() -> std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> {
+        if (mustClearCollectionMetadata) {
+            return std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+        } else {
+            return std::make_unique<ShardingRecoveryService::NoCustomAction>();
+        }
+    }();
+    if constexpr (std::is_same_v<void, std::invoke_result_t<F&>>) {
+        std::forward<F>(f)();
+        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+            opCtx,
+            tempNss,
+            critSecReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            *customAction);
+    } else {
+        auto result = std::forward<F>(f)();
+        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+            opCtx,
+            tempNss,
+            critSecReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            *customAction);
+        return result;
+    }
+}
 
 }  // namespace resharding
 }  // namespace mongo
