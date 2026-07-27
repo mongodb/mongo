@@ -512,6 +512,7 @@ function verifyContinuous(env, watchMode) {
     verifyForMode(env, watchMode, {
         readers: [{suffix: "cont", configOverrides: {}}],
         createTestCases: (m) => [new SingleReaderVerificationTestCase(m.cont)],
+        extraVerifierConfig: {shardConnections: getShardConnections(env.fsmSt)},
     });
 }
 
@@ -546,6 +547,7 @@ function verifyV1V2(env, watchMode) {
             {suffix: "v2", configOverrides: {version: "v2"}},
         ],
         createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.v1, m.v2)],
+        extraVerifierConfig: {shardConnections: getShardConnections(env.fsmSt)},
     });
 }
 
@@ -562,6 +564,7 @@ function verifyFetchAndResume(env, watchMode) {
             },
         ],
         createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.cont, m.foar)],
+        extraVerifierConfig: {shardConnections: getShardConnections(env.fsmSt)},
     });
 }
 
@@ -579,6 +582,7 @@ function verifyStrictVsIgnoreRemovedShards(env, watchMode) {
             {suffix: "irs", configOverrides: {version: "v2", ignoreRemovedShards: true}},
         ],
         createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.strict, m.irs)],
+        extraVerifierConfig: {shardConnections: getShardConnections(env.fsmSt)},
     });
 }
 

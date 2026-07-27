@@ -23,6 +23,7 @@
  * It reads events from the Connector storage and validates them against matchers.
  */
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
+import {formatEventTypeAndNs} from "jstests/libs/util/change_stream/change_stream_matcher.js";
 import {
     ChangeStreamReader,
     ChangeStreamReadingMode,
@@ -32,11 +33,11 @@ import {
  * Format a change event record for debugging output.
  * @param {Object} rec - Event record containing changeEvent
  * @param {number} i - Index in the event list
- * @returns {string} Formatted string like "[0] insert @ 123,1"
+ * @returns {string} Formatted string like "[0] insert(test_cs.test_coll_fsm) @ 123,1"
  */
 function formatEventSummary(rec, i) {
     const e = rec.changeEvent;
-    return `[${i}] ${e.operationType} @ ${e.clusterTime.t},${e.clusterTime.i}`;
+    return `[${i}] ${formatEventTypeAndNs(e.operationType, e.ns)} @ ${e.clusterTime.t},${e.clusterTime.i}`;
 }
 
 /**
@@ -239,39 +240,148 @@ class VerifierContext {
 }
 
 /**
- * Assert that the matcher consumed all expected events, with detailed diagnostics on failure.
- * Logs the FSM command trace and reports the first mismatch point.
+ * Query config.placementHistory since this reader's startAtClusterTime, to check on failure
+ * whether the shard-targeting mismatch traces back to wrong/missing placement data rather than a
+ * downstream cursor-management defect. Bounded by time rather than namespace: a namespace filter
+ * would have to be reconstructed from the command trace, which for cluster-wide watch mode means
+ * every writer's database (including db-level-only entries like movePrimary/dropDatabase, which
+ * key on the bare db name, not a writer's 'db.coll' trace entry) -- easy to under-cover. Time
+ * bounding also naturally excludes stale entries from an earlier test case in the same suite run.
  */
-function assertMatcherDone(matcher, events, ctx, readerInstanceName) {
-    if (matcher.isDone()) {
+function dumpPlacementHistory(conn, startAtClusterTime, readerInstanceName) {
+    const history = conn
+        .getDB("config")
+        .placementHistory.find({timestamp: {$gte: startAtClusterTime}})
+        .sort({timestamp: 1})
+        .toArray();
+    jsTest.log.info("Placement history at failure time", {
+        instanceName: readerInstanceName,
+        since: startAtClusterTime,
+        count: history.length,
+        history,
+    });
+}
+
+/**
+ * Query every shard's own oplog directly for noop notification entries (reshardCollection,
+ * namespacePlacementChanged, shardCollection, movePrimary, etc.) since this reader's
+ * startAtClusterTime. This is ground truth from the source, independent of anything the
+ * change-stream pipeline or ARM/merge layer did with it -- settles whether a "missing" event was
+ * ever written at all, versus written but never surfaced to the client. Bounded by time for the
+ * same reason as dumpPlacementHistory(). No-ops if shardConnections wasn't provided.
+ */
+function dumpRawOplogSinceStart(ctx, startAtClusterTime, readerInstanceName) {
+    if (!ctx.shardConnections || ctx.shardConnections.length === 0) {
+        return;
+    }
+    const entriesByShard = ctx.shardConnections.map((shardConn) => {
+        const shardId = assert.commandWorked(
+            shardConn.getDB("admin").adminCommand({replSetGetStatus: 1}),
+        ).set;
+        const entries = shardConn
+            .getDB("local")
+            .oplog.rs.find({op: "n", ts: {$gte: startAtClusterTime}})
+            .sort({ts: 1})
+            .toArray();
+        return {shardId, count: entries.length, entries};
+    });
+
+    jsTest.log.info("Raw oplog noop entries at failure time", {
+        instanceName: readerInstanceName,
+        since: startAtClusterTime,
+        entriesByShard,
+    });
+}
+
+/**
+ * Run both on-failure diagnostic dumps for a reader. Each dump is independently guarded: a dump
+ * failing (e.g. a connection already torn down late in a failing FSM run) must never replace the
+ * real assertion failure it was meant to help explain, and one dump failing must not prevent the
+ * other from running.
+ */
+function dumpOplogAndPlacementHistory(conn, ctx, readerInstanceName) {
+    const cfg = ctx.changeStreamReaderConfigs[readerInstanceName];
+    if (!cfg || !cfg.startAtClusterTime) {
+        return;
+    }
+    for (const dump of [
+        () => dumpPlacementHistory(conn, cfg.startAtClusterTime, readerInstanceName),
+        () => dumpRawOplogSinceStart(ctx, cfg.startAtClusterTime, readerInstanceName),
+    ]) {
+        try {
+            dump();
+        } catch (e) {
+            jsTest.log.info("On-failure diagnostic dump itself failed", {
+                instanceName: readerInstanceName,
+                error: e.toString(),
+            });
+        }
+    }
+}
+
+/**
+ * Assert that the matcher consumed all expected events, with detailed diagnostics on failure.
+ * Logs the FSM command trace and reports a per-stream matched/stuck breakdown.
+ */
+function assertMatcherDone(conn, matcher, events, ctx, readerInstanceName) {
+    // isDone() alone isn't sufficient: matches() always returns false once a stream is done, so
+    // a trailing unexpected event makes the calling events.every() loop stop early without ever
+    // advancing past it. Require every actual event to have been consumed too, or a stray/extra
+    // event after the expected sequence completes would silently pass.
+    if (matcher.isDone() && matcher.getMatchedCount() === events.length) {
         return;
     }
 
-    const mismatch = matcher.getFirstMismatch();
-    const commandTrace = ctx.getCommandTrace(readerInstanceName);
-    const actualTypes = events.map((rec) => rec.changeEvent.operationType);
-    const expectedGroups = matcher.getExpectedOperationTypes();
-
-    const totalExpected = expectedGroups.reduce((s, g) => s + g.length, 0);
-    const expectedLines = expectedGroups
-        .map((g, i) => `  stream ${i}(${g.length}): [${g.join(", ")}]`)
+    // getMatchedCount() sums across all sub-streams, which hides *which* stream is actually
+    // short. Break it down per sub-stream instead -- a stream that's done isn't the problem.
+    const perStreamBreakdown = matcher.getPerStreamBreakdown();
+    const perStreamLines = perStreamBreakdown
+        .map(
+            (s, i) =>
+                `stream ${i}: ${s.matched}/${s.total} matched${s.done ? "" : ` (stuck, waiting for ${s.nextExpected})`}`,
+        )
         .join("\n");
-    const actualInline = `[${actualTypes.join(", ")}]`;
 
+    const expectedEventSummariesPerStream = matcher.getExpectedEventSummaries();
+    const expectedTotal = expectedEventSummariesPerStream.reduce(
+        (acc, expectedEvents) => acc + expectedEvents.length,
+        0,
+    );
+    const expectedEventsPerStream = expectedEventSummariesPerStream
+        .map((summary, i) => `stream ${i}(${summary.length}): [${summary.join(", ")}]`)
+        .join("\n");
+
+    const actualEvents = events.map((rec) =>
+        formatEventTypeAndNs(rec.changeEvent.operationType, rec.changeEvent.ns),
+    );
+    const actualMismatchedEvent = actualEvents[matcher.getMatchedCount()];
+
+    const commandTrace = ctx.getCommandTrace(readerInstanceName);
     jsTest.log.info("FSM command trace (on mismatch)", {
         instanceName: readerInstanceName,
         commandsCount: commandTrace.length,
         commands: commandTrace,
     });
 
+    dumpOplogAndPlacementHistory(conn, ctx, readerInstanceName);
+
+    const headline = matcher.isDone()
+        ? `All ${expectedTotal} expected events matched, but ${events.length - matcher.getMatchedCount()} extra unexpected event(s) arrived afterward`
+        : `Matched ${matcher.getMatchedCount()} of ${expectedTotal} across ${perStreamBreakdown.length} stream(s)`;
+
     assert(
         false,
-        (mismatch
-            ? `Event mismatch at index ${mismatch.index}: expected '${mismatch.expected}', got '${mismatch.actual}'`
-            : `Matched ${matcher.getMatchedCount()} of ${totalExpected}`) +
-            `\nexpected(${totalExpected}):\n${expectedLines}` +
-            `\nactual(${actualTypes.length}): ${actualInline}` +
+        headline +
+            `\nper-stream breakdown:\n${perStreamLines}` +
+            `\nexpected(${expectedTotal}):\n${expectedEventsPerStream}` +
+            `\nactual(${actualEvents.length}): [${actualEvents.join(", ")}]` +
             `\nGrep logs for "FSM command trace (on mismatch)" to see the full command sequence.`,
+        {
+            perStreamBreakdown,
+            expectedEventsPerStream: expectedEventSummariesPerStream,
+            actualEvents,
+            actualMismatchedEvent,
+        },
     );
 }
 
@@ -303,17 +413,24 @@ class SequentialPairwiseFetchingTestCase {
      * @param {VerifierContext} ctx - Verifier context
      */
     run(conn, ctx) {
-        const controlEvents = ctx.getChangeEvents(conn, this._controlInstanceName);
-        const experimentEvents = ctx.getChangeEvents(conn, this._experimentInstanceName);
-
-        // Verify both readers' events match the expectations defined by the mutation generator.
-        for (const [instanceName, events] of [
-            [this._controlInstanceName, controlEvents],
-            [this._experimentInstanceName, experimentEvents],
-        ]) {
-            const matcher = ctx.getChangeStreamMatcher(instanceName);
-            events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
-            assertMatcherDone(matcher, events, ctx, instanceName);
+        // Check both instances independently, even if one stalls/throws, so a hang on one side
+        // (e.g. a lost event) doesn't prevent us from seeing whether the other side succeeded.
+        const errors = [];
+        for (const instanceName of [this._controlInstanceName, this._experimentInstanceName]) {
+            try {
+                const events = ctx.getChangeEvents(conn, instanceName);
+                const matcher = ctx.getChangeStreamMatcher(instanceName);
+                events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
+                assertMatcherDone(conn, matcher, events, ctx, instanceName);
+            } catch (e) {
+                errors.push(e);
+            }
+        }
+        if (errors.length > 0) {
+            throw new Error(
+                `SequentialPairwiseFetchingTestCase encountered ${errors.length} error(s):\n` +
+                    errors.map((e) => e.toString()).join("\n"),
+            );
         }
     }
 }
@@ -355,7 +472,7 @@ class SingleReaderVerificationTestCase {
             // every() short-circuits on the first mismatch (matches() returns false), so
             // the matcher stops advancing and records the failure point.
             events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
-            assertMatcherDone(matcher, events, ctx, this._readerInstanceName);
+            assertMatcherDone(conn, matcher, events, ctx, this._readerInstanceName);
         }
     }
 }
@@ -496,7 +613,7 @@ class PrefixReadTestCase {
             });
         } else {
             events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
-            assertMatcherDone(matcher, events, ctx, this._readerInstanceName);
+            assertMatcherDone(conn, matcher, events, ctx, this._readerInstanceName);
         }
     }
 }

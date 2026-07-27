@@ -4,6 +4,16 @@
  */
 
 /**
+ * Format "operationType(ns)" for debugging output. Namespace is included since a mismatch.
+ * @param {string} operationType
+ * @param {Object} [ns] - {db, coll}
+ */
+function formatEventTypeAndNs(operationType, ns) {
+    const nsStr = ns ? (ns.coll ? `${ns.db}.${ns.coll}` : ns.db) : "?";
+    return `${operationType}(${nsStr})`;
+}
+
+/**
  * SingleChangeStreamMatcher - Matches events from a single change stream in strict order.
  */
 class SingleChangeStreamMatcher {
@@ -13,28 +23,17 @@ class SingleChangeStreamMatcher {
     constructor(eventMatchers) {
         this.matchers = eventMatchers;
         this.index = 0;
-        this.mismatch = null;
         this.skipped = [];
     }
 
     matches(event, cursorClosed) {
-        if (this.index >= this.matchers.length) {
-            this.mismatch = {
-                index: this.index,
-                expected: "<end of expected>",
-                actual: event.operationType,
-            };
-            return false;
-        }
-        if (this.matchers[this.index].matches(event, cursorClosed)) {
+        if (
+            this.index < this.matchers.length &&
+            this.matchers[this.index].matches(event, cursorClosed)
+        ) {
             this.index++;
             return true;
         }
-        this.mismatch = {
-            index: this.index,
-            expected: this.matchers[this.index].event.operationType,
-            actual: event.operationType,
-        };
         return false;
     }
 
@@ -64,26 +63,44 @@ class SingleChangeStreamMatcher {
         return this.index === this.matchers.length;
     }
 
-    assertDone() {
-        assert(
-            this.isDone(),
-            this.mismatch
-                ? `Event mismatch at index ${this.mismatch.index}: ` +
-                      `expected '${this.mismatch.expected}', got '${this.mismatch.actual}'`
-                : `Matched ${this.index} of ${this.matchers.length}`,
-        );
-    }
-
-    getFirstMismatch() {
-        return this.mismatch;
-    }
-
     getMatchedCount() {
         return this.index;
     }
 
-    getExpectedOperationTypes() {
-        return [this.matchers.map((m) => m.event.operationType)];
+    /**
+     * Expected events as "operationType(ns)" strings, for debugging output. Namespace is
+     * included since a composite (multi-collection) matcher's streams are otherwise
+     * indistinguishable from their operation-type sequences alone.
+     */
+    getExpectedEventSummaries() {
+        return [this.matchers.map((m) => formatEventTypeAndNs(m.event.operationType, m.event.ns))];
+    }
+
+    /**
+     * This stream's own matched/total/done state, plus the last event it consumed and the next
+     * one it's waiting for, for debugging output.
+     */
+    getPerStreamBreakdown() {
+        return [
+            {
+                matched: this.index,
+                total: this.matchers.length,
+                done: this.isDone(),
+                lastMatched:
+                    this.index > 0
+                        ? formatEventTypeAndNs(
+                              this.matchers[this.index - 1].event.operationType,
+                              this.matchers[this.index - 1].event.ns,
+                          )
+                        : null,
+                nextExpected: this.isDone()
+                    ? null
+                    : formatEventTypeAndNs(
+                          this.matchers[this.index].event.operationType,
+                          this.matchers[this.index].event.ns,
+                      ),
+            },
+        ];
     }
 }
 
@@ -120,43 +137,17 @@ class MultipleChangeStreamMatcher {
         return this.matchers.every((matcher) => matcher.isDone());
     }
 
-    /**
-     * Assert that all streams have matched all their expected events.
-     */
-    assertDone() {
-        this.matchers.forEach((matcher, idx) => {
-            assert(
-                matcher.isDone(),
-                `Stream ${idx} not done. Matched ${matcher.index} of ${matcher.matchers.length}`,
-            );
-        });
-    }
-
-    getFirstMismatch() {
-        for (const matcher of this.matchers) {
-            // A matcher's 'mismatch' field is overwritten on every declined match() attempt,
-            // including benign ones where the event legitimately belonged to a sibling stream
-            // (matches() is tried on every matcher in order via .some() for every event). A
-            // finished matcher's stale mismatch from earlier in the run is not a real problem;
-            // only report from matchers that are actually stuck.
-            if (matcher.isDone()) {
-                continue;
-            }
-            const m = matcher.getFirstMismatch();
-            if (m) {
-                return m;
-            }
-        }
-        return null;
-    }
-
     getMatchedCount() {
         return this.matchers.reduce((sum, m) => sum + m.getMatchedCount(), 0);
     }
 
-    getExpectedOperationTypes() {
-        return this.matchers.flatMap((m) => m.getExpectedOperationTypes());
+    getExpectedEventSummaries() {
+        return this.matchers.flatMap((m) => m.getExpectedEventSummaries());
+    }
+
+    getPerStreamBreakdown() {
+        return this.matchers.flatMap((m) => m.getPerStreamBreakdown());
     }
 }
 
-export {SingleChangeStreamMatcher, MultipleChangeStreamMatcher};
+export {SingleChangeStreamMatcher, MultipleChangeStreamMatcher, formatEventTypeAndNs};
