@@ -212,6 +212,7 @@ common --flag_alias=dtlto=//bazel/config:dtlto
 common --flag_alias=all_headers=//bazel/config:all_headers
 common --flag_alias=evg=//bazel/config:evg
 common --flag_alias=extensions_signature_verification_secure=//bazel/config:extensions_signature_verification_secure
+common --flag_alias=use_rbe_sysroot=//bazel/config:use_rbe_sysroot
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.
@@ -610,6 +611,16 @@ common:local --remote_cache_compression=false
 common:local --grpc_keepalive_time=0s
 common:local --legacy_important_outputs
 common:local --jobs=auto
+# On Amazon Linux 2023, extract and use the RBE container filesystem as a
+# sysroot so that local builds use the same system headers and libraries as
+# remote execution.
+# The repo_env triggers the sysroot_dump repository rule to extract the container;
+# the config flag tells the toolchain to pass --sysroot to the compiler/linker.
+# On every other host (non-Linux, non-AL2023 distros, s390x/ppc64le) the
+# sysroot_dump repo rule is a no-op, SYSROOT_ENABLED is False, and the
+# toolchain template ignores the config flag and builds without a sysroot.
+common:local --repo_env=USE_RBE_SYSROOT=1
+common:local --//bazel/config:use_rbe_sysroot=True
 
 # Disable remote execution but keep remote cache enabled
 --config=no-remote-exec
