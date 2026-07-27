@@ -15,6 +15,7 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("//bazel/install_rules:bolt.bzl", "bolt_optimize")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
+load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
 load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:py_info.bzl", "PyInfo")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_shared_library")
@@ -1003,47 +1004,12 @@ def idl_generator_impl(ctx):
     )
 
     # Collect deps from python modules and set up PYTHONPATH so the
-    # toolchain can find them at action-execution time.
-    #
-    # `PyInfo.imports` is repo-relative (e.g. "rules_pycross~~lock_repos~pypi/
-    # _lock/pymongo@4.12.0/site-packages") — a runfiles short-path. To
-    # convert that into an exec-tree path we need to prepend the exec bindir
-    # + "/external/". The naïve approach (`$(BINDIR)/external/<import>`)
-    # resolves $(BINDIR) to the current rule's *target* bindir, but this
-    # attr uses `cfg = "exec"`, so the actual files live under the *exec*
-    # bindir (`bazel-out/<host>-opt-exec-ST-.../bin`). Derive the correct
-    # prefix from a real transitive source's path — all files in an
-    # exec-configured PyInfo share the same `bazel-out/.../bin/external/`
-    # ancestor.
+    # toolchain can find them at action-execution time. `py_deps` is
+    # `cfg = "exec"`; see py_exec_import_paths for why the exec bindir
+    # prefix must be derived rather than taken from $(BINDIR).
     py_depsets = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.py_deps]
 
-    _EXTERNAL_MARKER = "/external/"
-    _exec_external_prefix = None
-    for py_depset in py_depsets:
-        for f in py_depset.to_list():
-            idx = f.path.find(_EXTERNAL_MARKER)
-            if idx >= 0:
-                _exec_external_prefix = f.path[:idx + len(_EXTERNAL_MARKER)]
-                break
-        if _exec_external_prefix:
-            break
-
-    python_path = []
-    for py_dep in ctx.attr.py_deps:
-        for path in py_dep[PyInfo].imports.to_list():
-            if _exec_external_prefix:
-                candidate = _exec_external_prefix + path
-            else:
-                # Fallback for the unlikely case of no transitive_sources
-                # (e.g. a py_dep with only imports metadata). Use target
-                # bindir; this matches pre-`cfg=exec` behavior.
-                candidate = ctx.expand_make_variables(
-                    "python_library_imports",
-                    "$(BINDIR)/external/" + path,
-                    ctx.var,
-                )
-            if candidate not in python_path:
-                python_path.append(candidate)
+    python_path = py_exec_import_paths(ctx, ctx.attr.py_deps)
 
     inputs = depset(transitive = [
         ctx.attr.src.files,

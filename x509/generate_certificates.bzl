@@ -1,16 +1,18 @@
 load("@rules_python//python:py_info.bzl", "PyInfo")
 load("//bazel/uv:defs.bzl", "dependency")
+load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
 load("//bazel/config:render_template.bzl", "render_template")
 
 def _generate_certificates(ctx):
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     python_libs = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.py_libs]
 
-    python_path = []
-    for py_dep in ctx.attr.py_libs:
-        for path in py_dep[PyInfo].imports.to_list():
-            if path not in python_path:
-                python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
+    # py_libs is `cfg = "exec"`: this action runs the exec-platform
+    # interpreter as a build tool, so its wheels must be selected for the
+    # exec platform too. Under cross-compilation (e.g. macos-cross on a
+    # linux remote worker), target-config wheels are for the wrong OS —
+    # cryptography's native _rust.abi3.so fails with "invalid ELF header".
+    python_path = py_exec_import_paths(ctx, ctx.attr.py_libs)
 
     # Write the cert definitions to a temporary file, which mkcert.py will read from.
     certfile = ctx.actions.declare_file("." + ctx.label.name + ".certs.json")
@@ -88,6 +90,7 @@ generate_certificates = rule(
             default = "$(location //x509:mkcert.py)",
         ),
         "py_libs": attr.label_list(
+            cfg = "exec",
             default = [
                 dependency(
                     "ecdsa",

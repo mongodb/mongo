@@ -1,6 +1,7 @@
 """Resmoke suite test infrastructure for Bazel."""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_python//python:py_info.bzl", "PyInfo")
@@ -103,10 +104,11 @@ def _resmoke_config_impl(ctx):
         test_list_file = ctx.actions.declare_file(base_name + ".txt")
 
         python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
-        python_path = []
-        for path in ctx.attr.generator[PyInfo].imports.to_list():
-            if path not in python_path:
-                python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
+
+        # generator is `cfg = "exec"`: the config-generation action runs the
+        # exec-platform interpreter, so its deps' wheels must be exec-config
+        # too. See py_exec_import_paths for the path derivation.
+        python_path = py_exec_import_paths(ctx, [ctx.attr.generator])
         generator_deps = [ctx.attr.generator[PyInfo].transitive_sources]
 
         if ctx.attr.test_root_granularity == "directory":
@@ -156,6 +158,7 @@ resmoke_config = rule(
         "generator": attr.label(
             doc = "The config generator to use.",
             default = "//bazel/resmoke:resmoke_config_generator",
+            cfg = "exec",
         ),
         "srcs": attr.label_list(allow_files = True, doc = "Tests to write as the 'roots' of the selector"),
         "test_root_granularity": attr.string(
