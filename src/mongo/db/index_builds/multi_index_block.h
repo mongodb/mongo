@@ -381,7 +381,13 @@ private:
                                      const BSONObj& doc,
                                      unsigned long long iteration) const;
 
-    Status _insert(
+    /**
+     * Inserts documents to be indexed from the collection scan into the bulk builder, to insert the
+     * relevant index keys into the external sorter.
+     * Returns the insert status along with the number of times the document was inserted into index
+     * bulk builders.
+     */
+    StatusWith<int64_t> _insert(
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const BSONObj& wholeDocument,

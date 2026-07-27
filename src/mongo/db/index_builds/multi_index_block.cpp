@@ -96,15 +96,12 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSpillBeforeStatePersisted);
 
 namespace {
 
-auto& bulkDocsScannedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+auto& docsScannedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildDocsScanned,
     "Total number of documents scanned during collection scan",
     otel::metrics::MetricUnit::kOperations);
 
-auto& bulkKeysGeneratedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
-    otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan,
-    "Total number of keys generated from collection scan",
-    otel::metrics::MetricUnit::kOperations);
+constexpr int32_t kMetricUpdateIntervalDocCount = 1000;
 
 constexpr int64_t indexBuildMetadataKey = 1;
 
@@ -961,6 +958,11 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     const auto onSuppressedError = makeOnSuppressedErrorFn(
         collection.getCollectionPtr(), saveCursorBeforeWrite, restoreCursorAfterWrite);
 
+    int64_t docsScanned{0};
+    int64_t docsScannedSinceUpdate{0};
+    int64_t docsIndexedFromScan{0};
+    ON_BLOCK_EXIT([&] { docsScannedCounter.add(docsScannedSinceUpdate); });
+
     RecordId loc;
     PlanExecutor::ExecState state;
     while (PlanExecutor::ADVANCED == (state = _exec->getNext(&_objToIndex, &loc)) ||
@@ -971,18 +973,22 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
             continue;
         }
 
-        bulkDocsScannedCounter.add(1);
-
-        {
-            // We use the number of records to track progress, so it should be fine to read from
-            // latest and get a potentially slightly incorrect value here. Without this block, we
-            // trip an assertion because we are performing a nested acquisition where the outer
-            // acquisition is a write acquisition and uses kNoTimestamp whereas the inner
-            // acquisition is a read and would require kLastApplied.
-            AllowReadFromLatestOnSecondaryBlock_UNSAFE allowReadFromLatest(opCtx);
-            std::unique_lock<Client> lk(*opCtx->getClient());
-            progress->get(lk)->setTotalWhileRunning(
-                collection.getCollectionPtr()->numRecords(opCtx));
+        docsScanned++;
+        docsScannedSinceUpdate++;
+        if (docsScannedSinceUpdate >= kMetricUpdateIntervalDocCount) {
+            docsScannedCounter.add(docsScannedSinceUpdate);
+            docsScannedSinceUpdate = 0;
+            {
+                // We use the number of records to track progress, so it should be fine to read from
+                // latest and get a potentially slightly incorrect value here. Without this block,
+                // we trip an assertion because we are performing a nested acquisition where the
+                // outer acquisition is a write acquisition and uses kNoTimestamp whereas the inner
+                // acquisition is a read and would require kLastApplied.
+                AllowReadFromLatestOnSecondaryBlock_UNSAFE allowReadFromLatest(opCtx);
+                std::unique_lock<Client> lk(*opCtx->getClient());
+                progress->get(lk)->setTotalWhileRunning(
+                    collection.getCollectionPtr()->numRecords(opCtx));
+            }
         }
 
         uassertStatusOK(
@@ -999,12 +1005,12 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         // If kRelaxConstraints, shouldRelaxConstraints will simply be ignored and all errors
         // suppressed. If kRelaxContraintsCallback, shouldRelaxConstraints is used to determine
         // whether the error is suppressed or an exception is thrown.
-        uassertStatusOK(_insert(opCtx,
-                                collection.getCollectionPtr(),
-                                _objToIndex,
-                                loc,
-                                onSuppressedError,
-                                shouldRelaxConstraints));
+        docsIndexedFromScan += uassertStatusOK(_insert(opCtx,
+                                                       collection.getCollectionPtr(),
+                                                       _objToIndex,
+                                                       loc,
+                                                       onSuppressedError,
+                                                       shouldRelaxConstraints));
 
         _failPointHangDuringBuild(opCtx,
                                   &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
@@ -1019,6 +1025,15 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
             progress->get(lk)->hit();
         }
     }
+
+    LOGV2(13224800,
+          "Index build: inserted keys from filtered documents into per-index sorters",
+          logAttrs(collection.getCollectionPtr()->ns()),
+          logAttrs(collection.getCollectionPtr()->uuid()),
+          "buildUUID"_attr = _buildUUID,
+          "numDocsScanned"_attr = docsScanned,
+          "numDocsIndexed"_attr = docsIndexedFromScan,
+          "numIndexesToBuild"_attr = _indexes.size());
 }
 
 Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(
@@ -1030,10 +1045,10 @@ Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(
     const std::function<void()>& restoreCursorAfterWrite) {
     const auto onSuppressedError =
         makeOnSuppressedErrorFn(collection, saveCursorBeforeWrite, restoreCursorAfterWrite);
-    return _insert(opCtx, collection, doc, loc, onSuppressedError);
+    return _insert(opCtx, collection, doc, loc, onSuppressedError).getStatus();
 }
 
-Status MultiIndexBlock::_insert(
+StatusWith<int64_t> MultiIndexBlock::_insert(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const BSONObj& doc,
@@ -1079,6 +1094,7 @@ Status MultiIndexBlock::_insert(
     // on-spill callback runs, it can see the most up-to-date position.
     _lastRecordIdInserted = loc;
 
+    int64_t idxBuilderInserts{0};
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].lastSpilledRecordId && loc <= *_indexes[i].lastSpilledRecordId) {
             // This record was already inserted for this index.
@@ -1102,7 +1118,7 @@ Status MultiIndexBlock::_insert(
                                                  _indexes[i].options,
                                                  onSuppressedError,
                                                  shouldRelaxConstraints);
-            bulkKeysGeneratedCounter.add(1);
+            idxBuilderInserts++;
         } catch (...) {
             return exceptionToStatus();
         }
@@ -1111,7 +1127,7 @@ Status MultiIndexBlock::_insert(
             return idxStatus;
     }
 
-    return Status::OK();
+    return idxBuilderInserts;
 }
 
 Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,

@@ -124,6 +124,8 @@ auto& keysInsertedCounter = otel::metrics::MetricsService::instance().createInt6
     "Total number of keys inserted to indexes from collection scan",
     otel::metrics::MetricUnit::kEvents);
 
+constexpr int32_t kMetricUpdateIntervalKeyCount = 1000;
+
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
  * multikey, and returns false otherwise. This function returns false if the 'multikeyPaths'
@@ -934,7 +936,11 @@ private:
         const SortOptions& opts,
         const boost::optional<std::vector<SorterRange>>& ranges = boost::none) const;
 
-    void _addKeyForCommit(OperationContext* opCtx,
+    /**
+     * Inserts key into the index. Returns true if successfully inserted, or false on a KeyExists
+     * error.
+     */
+    bool _addKeyForCommit(OperationContext* opCtx,
                           RecoveryUnit& ru,
                           const CollectionPtr& coll,
                           const key_string::View& key);
@@ -1197,26 +1203,38 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
     std::vector<key_string::Value> batch;
     size_t bytesInBatch = 0;
     int64_t nKeys = 0;
+    int64_t keysCounted = 0;
 
     auto commitBatch = [&]() {
         if (batch.empty()) {
             return;
         }
-        writeConflictRetry(opCtx, "addingKey", _ns, [&] {
+        auto keysInserted = writeConflictRetry(opCtx, "addingKey", _ns, [&] {
             WriteUnitOfWork wunit(opCtx);
+            int64_t keysAdded{0};
             for (auto&& key : batch) {
-                _addKeyForCommit(opCtx, ru, *collection, key);
+                if (_addKeyForCommit(opCtx, ru, *collection, key)) {
+                    keysAdded++;
+                }
             }
             wunit.commit();
+            return keysAdded;
         });
-        nKeys += batch.size();
+        nKeys += keysInserted;
+        keysCounted += keysInserted;
         batch.clear();
         bytesInBatch = 0;
+        if (keysCounted >= kMetricUpdateIntervalKeyCount) {
+            keysInsertedCounter.add(keysCounted);
+            keysCounted = 0;
+        }
         if (nKeys >= onNKeysLoadedFnInterval) {
             onNKeysLoaded();
             nKeys = 0;
         }
     };
+
+    ON_BLOCK_EXIT([&] { keysInsertedCounter.add(keysCounted); });
 
     while (it && it->more()) {
         opCtx->checkForInterrupt();
@@ -1355,7 +1373,7 @@ void BulkBuilderImpl::releaseSorter() {
     _sorter.reset();
 }
 
-void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
+bool BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
                                        RecoveryUnit& ru,
                                        const CollectionPtr& coll,
                                        const key_string::View& key) {
@@ -1368,22 +1386,21 @@ void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
                                               _nonexistentKeyGuarantee);
         if (status == ErrorCodes::KeyExists) {
             // The key was already inserted by a previous bulk builder on this same container.
-            return;
+            return false;
         } else if (!_nonexistentKeyGuarantee && status.isOK()) {
             // We've reached the end of any keys previously inserted. From this point forward, we
             // can assume that the keys we're inserting do not already exist in the container.
             _nonexistentKeyGuarantee.emplace();
         }
         uassertStatusOK(status);
-        keysInsertedCounter.add(1);
-        return;
+        return true;
     }
 
     if (!_builder) {
         _builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, ru);
     }
     _builder->addKey(ru, key);
-    keysInsertedCounter.add(1);
+    return true;
 }
 
 std::unique_ptr<BulkBuilderImpl::Sorter> BulkBuilderImpl::_makeSorter(
