@@ -291,9 +291,9 @@ private:
     void _stopMigrations(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Helper to re-enable chunk migrations on abort.
+     * Re-enables chunk migrations on the source namespace during teardown.
      */
-    void _resumeMigrations(OperationContext* opCtx, boost::optional<Status> abortReason);
+    void _resumeMigrations(OperationContext* opCtx);
 
     /**
      * Runs resharding up through preparing to persist the decision.
@@ -535,12 +535,13 @@ private:
         resharding::PhaseTransitionFn phaseTransitionFn);
 
     /**
-     * Updates the entry for this resharding operation in config.reshardingOperations to the
-     * quiesced state, or removes it if quiesce isn't being done.  Removes the resharding fields
-     * from the catalog entries.
+     * Tears down the resharding coordinator: re-enables migrations, releases the internal session,
+     * then removes or quiesces the coordinator document and resharding fields. The whole sequence
+     * is retried until it succeeds or the coordinator steps down.
      */
-    void _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-        OperationContext* opCtx, boost::optional<Status> abortReason = boost::none);
+    ExecutorFuture<void> _cleanupCoordinator(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        boost::optional<Status> abortReason = boost::none);
 
     /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation

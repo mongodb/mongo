@@ -373,20 +373,16 @@ void ReshardingCoordinator::_stopMigrations(
     pauseAfterStoppingActiveMigrations.pauseWhileSet();
 }
 
-void ReshardingCoordinator::_resumeMigrations(OperationContext* opCtx,
-                                              boost::optional<Status> abortReason) {
+void ReshardingCoordinator::_resumeMigrations(OperationContext* opCtx) {
     // moveCollection applies to unsplittable collections that are not subject to migrations.
     auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
     if (resharding::isMoveCollection(provenance)) {
         return;
     }
 
-    auto collectionUUID =
-        abortReason ? _coordinatorDoc.getSourceUUID() : _coordinatorDoc.getReshardingUUID();
     _reshardingCoordinatorExternalState->resumeMigrations(
         opCtx,
         _coordinatorDoc.getSourceNss(),
-        collectionUUID,
         _coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
         [&] { return _getNewSession(opCtx); });
 }
@@ -981,31 +977,17 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorOnly(
         return ExecutorFuture<void>(**executor, status);
     }
 
-    return resharding::WithAutomaticRetry([this, executor, status] {
-               auto opCtx = _makeOperationContext();
+    return ExecutorFuture<void>(**executor)
+        .then([this, executor, status] {
+            // Notify metrics as the operation is now complete for external observers.
+            markCompleted(status, _metrics.get());
 
-               // Notify metrics as the operation is now complete for external observers.
-               markCompleted(status, _metrics.get());
-
-               // The temporary collection and its corresponding entries were never created. Only
-               // the coordinator document and reshardingFields require cleanup.
-               _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(opCtx.get(), status);
-               return status;
-           })
-        .onTransientError([this](const Status& retryStatus) {
-            _metrics->onCoordinatorRetry("_onAbortCoordinatorOnly");
-            LOGV2(5093706,
-                  "Resharding coordinator encountered transient error while aborting",
-                  "error"_attr = retryStatus);
+            // The temporary collection and its corresponding entries were never created. Only
+            // the coordinator document and reshardingFields require cleanup.
+            return _cleanupCoordinator(executor, status);
         })
-        .onUnrecoverableError([](const Status& retryStatus) {
-            LOGV2(10494616,
-                  "Resharding coordinator encountered unrecoverable error while aborting",
-                  "error"_attr = retryStatus);
-        })
-        .runOn(**executor, _ctHolder->getStepdownToken())
         // Return back original status.
-        .then([status] { return status; });
+        .onCompletion([status](Status /*cleanupStatus*/) { return status; });
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
@@ -2265,7 +2247,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
 
             // Notify metrics as the operation is now complete for external observers.
             markCompleted(abortReason ? *abortReason : Status::OK(), _metrics.get());
-            _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(opCtx.get(), abortReason);
+            return _cleanupCoordinator(executor, abortReason);
         });
 }
 
@@ -2303,20 +2285,34 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     _installCoordinatorDocFromCatalog();
 }
 
-void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-    OperationContext* opCtx, boost::optional<Status> abortReason) {
-    _resumeMigrations(opCtx, abortReason);
-    _releaseSession(opCtx);
+ExecutorFuture<void> ReshardingCoordinator::_cleanupCoordinator(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    boost::optional<Status> abortReason) {
+    const auto& stepdownToken = _ctHolder->getStepdownToken();
 
-    auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-        opCtx,
-        _metrics.get(),
-        resharding::tryGetCoordinatorDoc(opCtx, _coordinatorDoc.getReshardingUUID())
-            .value_or(_coordinatorDoc),
-        abortReason);
-
-    // Update in-memory coordinator doc.
-    installCoordinatorDocOnStateTransition(opCtx, updatedCoordinatorDoc);
+    return resharding::runUntilSuccessOrStepdown(
+        [this, abortReason] {
+            auto opCtx = _makeOperationContext();
+            _resumeMigrations(opCtx.get());
+            _releaseSession(opCtx.get());
+            auto updatedCoordinatorDoc =
+                resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+                    opCtx.get(),
+                    _metrics.get(),
+                    resharding::tryGetCoordinatorDoc(opCtx.get(),
+                                                     _coordinatorDoc.getReshardingUUID())
+                        .value_or(_coordinatorDoc),
+                    abortReason);
+            installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
+        },
+        **executor,
+        stepdownToken,
+        [this](const Status& retryStatus) {
+            _metrics->onCoordinatorRetry("_cleanupCoordinator");
+            LOGV2(13162902,
+                  "Resharding coordinator encountered error during cleanup, retrying",
+                  "error"_attr = retryStatus);
+        });
 }
 
 #endif  // RESHARDING_COORDINATOR_PART_3

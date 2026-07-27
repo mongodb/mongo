@@ -11,8 +11,10 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
@@ -108,6 +110,30 @@ ExecutorFuture<void> cancelWhenAnyErrorThenQuiesce(
     const std::vector<SharedSemiFuture<void>>& futures,
     ExecutorPtr executor,
     CancellationSource cancelSource);
+
+/**
+ * Runs the callable until it succeeds or the stepdown token is canceled. Retries on any error with
+ * exponential backoff between attempts, invoking 'onRetry' (if provided) with the failure status
+ * before each retry.
+ */
+template <typename SleepableExecutor>
+ExecutorFuture<void> runUntilSuccessOrStepdown(unique_function<void()> callable,
+                                               SleepableExecutor executor,
+                                               const CancellationToken& stepdownToken,
+                                               unique_function<void(const Status&)> onRetry = {}) {
+    static const Backoff kUntilSuccessOrStepdownBackoff(Seconds(1), Milliseconds::max());
+
+    return AsyncTry([callable = std::move(callable)] { callable(); })
+        .until([stepdownToken, onRetry = std::move(onRetry)](Status status) {
+            const bool done = status.isOK() || stepdownToken.isCanceled();
+            if (!done && onRetry) {
+                onRetry(status);
+            }
+            return done;
+        })
+        .withBackoffBetweenIterations(kUntilSuccessOrStepdownBackoff)
+        .on(std::move(executor), CancellationToken::uncancelable());
+}
 
 }  // namespace resharding
 }  // namespace mongo

@@ -4,12 +4,10 @@
 #include "mongo/db/s/resharding/resharding_future_util.h"
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/time_support.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
 
 namespace mongo::resharding {
 

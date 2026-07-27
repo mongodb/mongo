@@ -744,11 +744,14 @@ void ReshardingCoordinatorExternalStateImpl::stopMigrations(
 void ReshardingCoordinatorExternalStateImpl::resumeMigrations(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const UUID& expectedCollectionUUID,
     ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
     std::function<OperationSessionInfo()> osiGenerator) {
-    sharding_ddl_util::resumeMigrations(
-        opCtx, nss, expectedCollectionUUID, osiGenerator, convert(authoritativeMetadataLevel));
+    // Re-enable chunk operations on the source namespace, regardless of the collection's UUID.
+    sharding_ddl_util::resumeMigrations(opCtx,
+                                        nss,
+                                        boost::none /* expectedCollectionUUID */,
+                                        osiGenerator,
+                                        convert(authoritativeMetadataLevel));
 }
 
 std::unique_ptr<CausalityBarrier> ReshardingCoordinatorExternalStateImpl::buildCausalityBarrier(
