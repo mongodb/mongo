@@ -115,7 +115,9 @@ bazel_evergreen_shutils::extract_config_flags() {
 
 # Adds --config=public-release if this is a release-ish build.
 bazel_evergreen_shutils::maybe_release_flag() {
-  if [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
+  if [[ -n "${MONGO_VERSION_OVERRIDE:-}" ]]; then
+    echo "--config=public-release"
+  elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
     echo "" # non-release
   else
     echo "--config=public-release"
