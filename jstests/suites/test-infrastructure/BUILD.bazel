@@ -52,6 +52,11 @@ resmoke_suite_test(
         "ci-default",
         "incompatible_with_bazel_remote_test",  # Makes many assumptions about paths that are incompatible with sandboxing.
     ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",

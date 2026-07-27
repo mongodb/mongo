@@ -346,7 +346,7 @@ class LintRunner:
                 self.bazel_bin,
                 "query",
                 "attr('tags','resmoke_suite_test',//...)",
-                "--output=xml",
+                "--output=build",
                 "--keep_going",
             ],
             capture_output=True,
@@ -374,19 +374,19 @@ class LintRunner:
             return
 
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".xml", delete=False, encoding="utf-8"
-        ) as tags_file:
-            tags_file.write(query.stdout)
-            tags_path = tags_file.name
+            mode="w", suffix=".build", delete=False, encoding="utf-8"
+        ) as info_file:
+            info_file.write(query.stdout)
+            info_path = info_file.name
 
         try:
             # The checker has no preview mode; under --dry-run just run the (read-only) check.
-            args = [f"--target-tags-xml={tags_path}"]
+            args = [f"--target-info-build={info_path}"]
             if fix and not dry_run:
                 args.append("--fix")
             self.run_bazel("//buildscripts:lint_resmoke_suite_tests", args)
         finally:
-            os.unlink(tags_path)
+            os.unlink(info_path)
 
     def refresh_module_lockfile(
         self,

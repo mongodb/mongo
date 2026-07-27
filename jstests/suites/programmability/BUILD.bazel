@@ -76,6 +76,10 @@ resmoke_suite_test(
         "ci-default",
         "jscore",
     ],
+    target_compatible_with = select({
+        "//bazel/config:system_allocator_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",

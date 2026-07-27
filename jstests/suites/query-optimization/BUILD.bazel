@@ -211,6 +211,7 @@ resmoke_suite_test(
     tags = [
         "aggregation",
         "ci-default",
+        "incompatible_debug_mode",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -228,7 +229,10 @@ resmoke_suite_test(
     name = "core_repeat_queries_always_replan",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_repeat_queries_always_replan.yml",
     shard_count = 8,
-    tags = ["ci-default"],
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+    ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
         "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
@@ -363,6 +367,7 @@ resmoke_suite_test(
     tags = [
         "aggfuzzer",
         "ci-release-critical",
+        "incompatible_development_variant",
         "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",
@@ -403,6 +408,7 @@ resmoke_suite_test(
     tags = [
         "aggfuzzer",
         "ci-release-critical",
+        "incompatible_development_variant",
         "incompatible_with_bazel_remote_test",
         "optimization",
         "random_name",
@@ -425,6 +431,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],
@@ -445,6 +452,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],
@@ -465,6 +473,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],
@@ -485,6 +494,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],
@@ -505,6 +515,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_tester_manual_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Tests fail with "Permission denied": Failed to open file
         "requires_all_feature_flags",
     ],

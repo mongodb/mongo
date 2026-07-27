@@ -125,6 +125,7 @@ resmoke_suite_test(
         "ci-release-critical",
         "common",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "read_concern_maj",
         "resources:cpu:2",
@@ -157,6 +158,7 @@ resmoke_suite_test(
     shard_count = 40,
     tags = [
         "ci-release-critical",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
@@ -200,6 +202,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
+        "incompatible_debug_mode",
         "large",
         "replica_sets",
         "resources:cpu:2",
@@ -420,6 +423,7 @@ resmoke_suite_test(
     shard_count = 20,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "replica_sets",
         "san",
     ],
@@ -435,6 +439,7 @@ resmoke_suite_test(
     shard_count = 20,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "replica_sets",
         "san",
     ],
@@ -450,6 +455,7 @@ resmoke_suite_test(
     shard_count = 8,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "non_live_record",
         "non_maj_read",
         "replica_sets",
@@ -466,6 +472,7 @@ resmoke_suite_test(
     shard_count = 8,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "non_maj_read",
         "replica_sets",
     ],
@@ -481,6 +488,7 @@ resmoke_suite_test(
     shard_count = 8,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "non_maj_read",
         "replica_sets",
     ],
@@ -496,6 +504,7 @@ resmoke_suite_test(
     shard_count = 8,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "non_maj_read",
         "replica_sets",
     ],
@@ -533,6 +542,7 @@ resmoke_suite_test(
     shard_count = 8,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "non_maj_read",
         "replica_sets",
     ],
@@ -548,6 +558,7 @@ resmoke_suite_test(
     shard_count = 20,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "replica_sets",
         "san",
         "uninitialized_fcv",
@@ -659,6 +670,8 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
+        "incompatible_inmemory",
         "initsync",
         "large",
         "requires_replicated_fast_count_recovery",
@@ -684,6 +697,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "resources:cpu:2",
         "sharded",
@@ -702,6 +716,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "kill_terminate",
         "resources:cpu:2",
         "sharded",
@@ -721,6 +736,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "fcbis",
+        "incompatible_debug_mode",
         "large",
         "replica_sets",
     ],
@@ -736,6 +752,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "large",
         "replica_sets",
         "requires_replicated_fast_count_recovery",
@@ -753,6 +770,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "large",
         "replica_sets",
         "san",
@@ -769,6 +787,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "large",
         "replica_sets",
     ],
@@ -864,6 +883,7 @@ resmoke_suite_test(
     shard_count = 8,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "non_live_record",
         "non_maj_read",
         "replica_sets",
@@ -881,6 +901,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "ignore_on_code_coverage",
+        "incompatible_debug_mode",
         "non_live_record",
         "replica_sets",
         "san",
@@ -916,6 +937,7 @@ resmoke_suite_test(
         "ci-default",
         "concurrency",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "resources:cpu:2",
         "suggested_excluding_required__for_devprod_mitigation_only",
@@ -950,6 +972,7 @@ resmoke_suite_test(
         "ci-default",
         "concurrency",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "incompatible_with_bazel_remote_test",
         "resources:cpu:2",
@@ -986,6 +1009,7 @@ resmoke_suite_test(
         "ci-default",
         "concurrency",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "resources:cpu:2",
     ],
@@ -1018,6 +1042,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "resources:cpu:2",
         "suggested_excluding_required__for_devprod_mitigation_only",
@@ -1049,6 +1074,7 @@ resmoke_suite_test(
         "ci-default",
         "concurrency",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "linux_only",
         "suggested_excluding_required__for_devprod_mitigation_only",
@@ -1136,6 +1162,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "sharded",
     ],
     deps = [
@@ -1152,6 +1179,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "kill_terminate",
         "requires_replicated_fast_count_recovery",
         "resources:cpu:2",
@@ -1211,6 +1239,7 @@ resmoke_suite_test(
         "auth",
         "ci-release-critical",
         "common",
+        "incompatible_debug_mode",
         "replica_sets",
         "san",
         "suggested_excluding_required__for_devprod_mitigation_only",
@@ -1239,6 +1268,7 @@ resmoke_suite_test(
     resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
     tags = [
         "ci-default",
+        "incompatible_disaggregated_storage",
         "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",
@@ -1301,6 +1331,7 @@ resmoke_suite_test(
     resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
     tags = [
         "ci-default",
+        "incompatible_disaggregated_storage",
         "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",

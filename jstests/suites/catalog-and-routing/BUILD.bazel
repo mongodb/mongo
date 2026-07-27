@@ -24,6 +24,7 @@ resmoke_suite_test(
         "ci-release-critical",
         "common",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "read_concern_maj",
         "resources:cpu:2",
@@ -106,6 +107,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
+        "incompatible_debug_mode",
         "large",
         "replica_sets",
         "resources:cpu:2",
@@ -185,6 +187,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "non_live_record",
         "resources:cpu:2",
         "sharded",
@@ -203,6 +206,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "non_live_record",
         "resources:cpu:2",
         "sharded",
@@ -221,6 +225,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "no_debug_mode",
         "non_live_record",
         "resources:cpu:2",
@@ -548,6 +553,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "resources:cpu:2",
         "sharded",
@@ -566,6 +572,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "resources:cpu:2",
         "sharded",
@@ -606,6 +613,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "requires_replicated_fast_count_recovery",
         "resources:cpu:2",
@@ -640,6 +648,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
@@ -731,6 +740,7 @@ resmoke_suite_test(
         "cluster_scalability_only",
         "common",
         "concurrency",
+        "incompatible_debug_mode",
         "read_concern_maj",
         "resources:cpu:2",
         "sharded",
@@ -758,6 +768,7 @@ resmoke_suite_test(
         "cluster_scalability_only",
         "common",
         "concurrency",
+        "incompatible_debug_mode",
         "read_concern_maj",
         "resources:cpu:2",
         "sharded",

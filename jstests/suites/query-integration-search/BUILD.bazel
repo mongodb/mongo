@@ -335,6 +335,7 @@ resmoke_suite_test(
         "sharding",
     ],
     target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -358,6 +359,7 @@ resmoke_suite_test(
         "mongot_e2e_tests",
     ],
     target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -381,6 +383,7 @@ resmoke_suite_test(
         "sharding",
     ],
     target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -405,6 +408,7 @@ resmoke_suite_test(
         "sharding",
     ],
     target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -429,6 +433,7 @@ resmoke_suite_test(
         "sharding",
     ],
     target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -452,6 +457,7 @@ resmoke_suite_test(
         "mongot_e2e_tests",
     ],
     target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -552,6 +558,8 @@ resmoke_suite_test(
         "aggfuzzer",
         "ci-release-critical",
         "common",
+        "incompatible_debug_mode",
+        "incompatible_development_variant",
         "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",

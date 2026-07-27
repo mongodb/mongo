@@ -144,6 +144,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],

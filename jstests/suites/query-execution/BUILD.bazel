@@ -1179,6 +1179,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "resources:cpu:2",
     ],
     target_compatible_with = select({
@@ -1484,6 +1485,7 @@ resmoke_suite_test(
     shard_count = 5,
     tags = [
         "common",
+        "incompatible_debug_mode",
         "jstestfuzz",
         "non_deterministic",
         "random_name",
@@ -1652,6 +1654,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Timeouts of accurate_percentiles_continuous.js, accurate_percentiles_discrete.js after 16 minutes.
         "resources:cpu:2",
     ],
@@ -1776,6 +1779,7 @@ resmoke_suite_test(
         "blockprocessing",
         "ci-release-critical",
         "common",
+        "incompatible_development_variant",
         "incompatible_with_bazel_remote_test",
         "no_debug_mode",
         "random_name",
@@ -1818,6 +1822,8 @@ resmoke_suite_test(
         "aggfuzzer",
         "ci-release-critical",
         "common",
+        "incompatible_debug_mode",
+        "incompatible_development_variant",
         "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",
@@ -1842,6 +1848,7 @@ resmoke_suite_test(
         "ci-default",
         "compute_mode",
         "concurrency",
+        "incompatible_debug_mode",
         "no_passthrough",
     ],
     deps = [
@@ -1855,6 +1862,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],
@@ -1875,6 +1883,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],
@@ -1895,6 +1904,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],
@@ -1915,6 +1925,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/query_correctness_query_shape_hash_stability_generated_test.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
         "requires_all_feature_flags",
     ],

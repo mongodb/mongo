@@ -32,6 +32,10 @@ resmoke_suite_test(
         "resources:cpu:2",
         "sharding",
     ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/db/modules/enterprise/src/fle:mongocryptd",

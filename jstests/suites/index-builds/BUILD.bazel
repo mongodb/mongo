@@ -45,6 +45,7 @@ resmoke_suite_test(
         "ci-release-critical",
         "common",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "primary_driven_index_builds",
         "read_concern_maj",
@@ -163,6 +164,7 @@ resmoke_suite_test(
     shard_count = 4,
     tags = [
         "ci-release-critical",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # TODO(SERVER-123233) index_build_maximum_memory_usage.js checks default memory limits, but inconsistently handles cgroup memory limits that are used by remote executors.
         "primary_driven_index_builds",
         "requires_execution_on_windows_patch_build",
@@ -185,6 +187,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_primary_driven_index_builds.yml",
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "primary_driven_index_builds",
         "replica_sets",
     ],
