@@ -282,6 +282,9 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
         checkpointer->notifyOplogWrite(totalLength);
     }
 
+    // Truncate markers may be absent while the async thread is generating markers (e.g., during
+    // step-up or after startup). During that window this per-insert marker accounting below is
+    // skipped, so inserts that occur then would not be accounted for.
     if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
         // records[nRecords - 1] is the record in the oplog with the highest recordId.
         auto wall = [&] {

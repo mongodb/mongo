@@ -362,7 +362,9 @@ void OplogCapMaintainerThread::run() {
                                                     rss::consensus::IntentRegistry::Intent::Read});
                 const auto& oplog = oplogRead->getCollection();
                 if (oplog) {
-                    // Initial marker creation.
+                    // Initial marker creation. Note that while this thread scans/samples the
+                    // record store, concurrent oplog inserts are unaccounted for. The effect is a
+                    // bounded undercount and we truncate slightly later than expected.
                     auto oplogTruncateMarkers =
                         _createInitialMarkers(_uniqueCtx->get(), *oplog->getRecordStore());
                     invariant(oplogTruncateMarkers);
