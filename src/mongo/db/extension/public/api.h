@@ -960,6 +960,17 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
                                               const MongoExtensionByteView* metricNames,
                                               uint64_t numMetricNames,
                                               MongoExtensionByteBuf** result);
+
+    /**
+     * Limits the number of documents pulled from this source for the current batch.
+     *
+     * By default, the host retrieves documents individually. This method enables
+     * batching, allowing the host to retrieve 'batchSize' documents at once. Call
+     * this with a 'batchSize' greater than 0 before returning the first document
+     * of each new batch.
+     */
+    MongoExtensionStatus* (*set_batch_size)(const MongoExtensionQueryExecutionContext* ctx,
+                                            uint64_t batchSize);
 } MongoExtensionQueryExecutionContextVTable;
 
 ////////////////////////////////////////////////////////////////

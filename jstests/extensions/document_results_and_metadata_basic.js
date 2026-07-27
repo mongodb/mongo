@@ -100,6 +100,42 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
         assert.sameMembers(result, expected, {result, nShards});
     });
 
+    it("returns all 500 docs across dynamic exchange batches", function () {
+        const numDocs = 500;
+        const result = coll.aggregate([{$extensionMultiStream: {numDocs}}]).toArray();
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            _id: i,
+            score: numDocs - i,
+            name: `doc_${i}`,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
+    it("$limit through a batched exchange returns exactly N docs", function () {
+        const result = coll
+            .aggregate([{$extensionMultiStream: {numDocs: 200}}, {$limit: 10}])
+            .toArray();
+        assert.eq(result.length, 10, {result});
+    });
+
+    it("returns all docs when document stream exceeds the Exchange buffer", function () {
+        const numDocs = 40;
+        const docPad = 512 * 1024;
+        const result = coll.aggregate([{$extensionMultiStream: {numDocs, docPad}}]).toArray();
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            _id: i,
+            score: numDocs - i,
+            name: `doc_${i}`,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(
+            result.map((d) => ({_id: d._id, score: d.score, name: d.name})),
+            expected,
+            {nShards},
+        );
+    });
+
     it("preserves user-owned _streamType field in output documents", function () {
         const result = coll
             .aggregate([{$extensionMultiStream: {numDocs: 3, addStreamTypeField: true}}])

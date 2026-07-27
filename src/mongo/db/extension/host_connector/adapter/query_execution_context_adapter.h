@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/dynamic_batch_size.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
@@ -42,8 +43,11 @@ public:
  */
 class QueryExecutionContextAdapter final : public ::MongoExtensionQueryExecutionContext {
 public:
-    QueryExecutionContextAdapter(std::unique_ptr<QueryExecutionContextBase> ctx)
-        : ::MongoExtensionQueryExecutionContext{&VTABLE}, _ctx(std::move(ctx)) {
+    QueryExecutionContextAdapter(std::unique_ptr<QueryExecutionContextBase> ctx,
+                                 exec::agg::DynamicBatchSize* dynamicBatchSize = nullptr)
+        : ::MongoExtensionQueryExecutionContext{&VTABLE},
+          _ctx(std::move(ctx)),
+          _dynamicBatchSize(dynamicBatchSize) {
         tassert(11417100, "Provided QueryExecutionContextBase is null", _ctx != nullptr);
     }
 
@@ -76,13 +80,18 @@ private:
                                                     uint64_t numMetricNames,
                                                     MongoExtensionByteBuf** result) noexcept;
 
+    static MongoExtensionStatus* _extSetBatchSize(const MongoExtensionQueryExecutionContext* ctx,
+                                                  uint64_t batchSize) noexcept;
+
     static constexpr ::MongoExtensionQueryExecutionContextVTable VTABLE = {
         .check_for_interrupt = &_extCheckForInterrupt,
         .get_metrics = &_extGetMetrics,
         .get_deadline_timestamp_ms = &_extGetDeadlineTimestampMs,
-        .get_host_metrics = &_extGetHostMetrics};
+        .get_host_metrics = &_extGetHostMetrics,
+        .set_batch_size = &_extSetBatchSize};
 
     std::unique_ptr<QueryExecutionContextBase> _ctx;
+    exec::agg::DynamicBatchSize* _dynamicBatchSize{nullptr};
 };
 
 }  // namespace mongo::extension::host_connector

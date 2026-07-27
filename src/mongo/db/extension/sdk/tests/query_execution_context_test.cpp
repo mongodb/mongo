@@ -4,6 +4,7 @@
 #include "mongo/db/extension/host/query_execution_context.h"
 
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/agg/dynamic_batch_size.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
@@ -173,6 +174,47 @@ DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetHostMetrics, "12199
     vtable.get_host_metrics = nullptr;
     sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
 };
+
+DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidSetBatchSize, "13150703") {
+    auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
+    vtable.set_batch_size = nullptr;
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+};
+
+TEST_F(QueryExecutionContextTestFixture, ThrowsErrorWhenBatchSizeSetToZero) {
+    extension::sdk::HostServicesAPI::setHostServices(
+        &extension::host_connector::HostServicesAdapter::get());
+    exec::agg::DynamicBatchSize dbs;
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), &dbs);
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    ASSERT_THROWS_CODE(handle->setBatchSize(0), DBException, 13150704);
+}
+
+TEST_F(QueryExecutionContextTestFixture, AdapterRejectsZeroBatchSize) {
+    extension::sdk::HostServicesAPI::setHostServices(
+        &extension::host_connector::HostServicesAdapter::get());
+    exec::agg::DynamicBatchSize dbs;
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), &dbs);
+
+    auto* status = adapter.vtable->set_batch_size(&adapter, 0);
+    ASSERT(status);
+    ASSERT_EQ(status->vtable->get_code(status), 13150706);
+    status->vtable->destroy(status);
+}
+
+TEST_F(QueryExecutionContextTestFixture, SetBatchSizeWithoutDynamicBatchSizeThrows) {
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    ASSERT_THROWS_CODE(handle->setBatchSize(1), DBException, 13150705);
+}
 
 }  // namespace
 }  // namespace mongo::extension

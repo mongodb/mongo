@@ -46,6 +46,8 @@ public:
      */
     BSONObj getHostMetrics(const std::vector<std::string_view>& metricNames) const;
 
+    void setBatchSize(uint64_t batchSize) const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         sdk_tassert(11098300,
                     "QueryExecutionContext' 'check_for_interrupt' is null",
@@ -59,6 +61,9 @@ public:
         sdk_tassert(12199900,
                     "QueryExecutionContext' 'get_host_metrics' is null",
                     vtable.get_host_metrics != nullptr);
+        sdk_tassert(13150703,
+                    "QueryExecutionContext' 'set_batch_size' is null",
+                    vtable.set_batch_size != nullptr);
     };
 };
 

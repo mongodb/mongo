@@ -26,6 +26,14 @@ public:
     Document getExplainOutput(const query_shape::SerializationOptions& opts =
                                   query_shape::SerializationOptions{}) const override;
 
+    bool supportsDynamicBatchSize() const override {
+        return true;
+    }
+
+    void setDynamicBatchSize(DynamicBatchSize* dbs) override {
+        _dynamicBatchSize = dbs;
+    }
+
 private:
     void setSource(Stage* source) override;
     GetNextResult doGetNext() final;
@@ -33,6 +41,7 @@ private:
     extension::ExecAggStageHandle _execAggStageHandle{nullptr};
     extension::ExecAggStageHandle _sourceAggStageHandle{nullptr};
     extension::ExtensionGetNextResult _lastGetNextResult;
+    DynamicBatchSize* _dynamicBatchSize{nullptr};
 };
 }  // namespace agg
 }  // namespace exec
