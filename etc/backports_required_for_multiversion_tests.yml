@@ -657,6 +657,8 @@ last-continuous:
     ticket: SERVER-95627
   - test_file: jstests/replsets/initial_sync_survives_restart.js
     ticket: SERVER-88447
+  - test_file: jstests/core/ddl/clone_collection_as_capped.js
+    ticket: SERVER-105343
   - test_file: jstests/core/ddl/collation_convert_to_capped.js
     ticket: SERVER-85772
   - test_file: jstests/core/ddl/convert_to_capped.js
@@ -1692,6 +1694,8 @@ last-lts:
     ticket: SERVER-95627
   - test_file: jstests/replsets/initial_sync_survives_restart.js
     ticket: SERVER-88447
+  - test_file: jstests/core/ddl/clone_collection_as_capped.js
+    ticket: SERVER-105343
   - test_file: jstests/core/ddl/collation_convert_to_capped.js
     ticket: SERVER-85772
   - test_file: jstests/core/ddl/convert_to_capped.js
