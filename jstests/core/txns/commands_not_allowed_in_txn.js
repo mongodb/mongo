@@ -1,6 +1,9 @@
 // Test commands that are not allowed in multi-document transactions.
 //
 // @tags: [
+//   # The control step runs mapReduce with JS map/reduce functions outside a transaction, which
+//   # requires server-side scripting (absent on PPC).
+//   requires_scripting,
 //   # The test runs commands that are not allowed with security token: applyOps, endSession,
 //   # mapReduce.
 //   not_allowed_with_signed_security_token,

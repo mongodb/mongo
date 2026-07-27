@@ -11,6 +11,11 @@
  *
  * This file also tests the operations that have long-duration ticket acquisitions (so called
  * delinquent) are reporting the delinquent stats correctly.
+ *
+ * @tags: [
+ *   # Uses $where with server-side JS to create a slow op, which requires server-side scripting.
+ *   requires_scripting,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

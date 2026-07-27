@@ -1,6 +1,11 @@
 /**
  * Ensures that the data managed by Top is removed for the source namespace when renaming the
  * collection.
+ *
+ * @tags: [
+ *   # Uses mapReduce, which requires server-side scripting.
+ *   requires_scripting,
+ * ]
  */
 import {getTop} from "jstests/libs/stats.js";
 

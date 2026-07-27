@@ -1,5 +1,10 @@
 /**
  * Test that tassert during CRUD command execution will log diagnostics about the query.
+ *
+ * @tags: [
+ *   # Runs mapReduce with JS map/reduce functions, which requires server-side scripting.
+ *   requires_scripting,
+ * ]
  */
 import {
     assertOnDiagnosticLogContents,
