@@ -49,6 +49,7 @@ __wt_session_breakpoint
 __wt_strcat
 __wt_stream_set_no_buffer
 __wt_try_readlock
+__wt_update_list_print
 __wt_verbose_category_string
 populate_thread
 wiredtiger_calc_modify

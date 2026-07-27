@@ -34,6 +34,7 @@ typedef struct {
     bool dump_layout, dump_tree_shape;
     bool dump_pages;
     bool read_corrupt;
+    bool skip_per_key_hs;
 
     /* Whether to read from the history store, and if so, which checkpoint. */
     bool skip_hs;
@@ -101,6 +102,9 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
     WT_RET(__wt_config_gets(session, cfg, "read_corrupt", &cval));
     vs->read_corrupt = cval.val != 0;
     vs->verify_err = 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "skip_per_key_hs", &cval));
+    vs->skip_per_key_hs = cval.val != 0;
 
     WT_RET(__wt_config_gets(session, cfg, "stable_timestamp", &cval));
     vs->stable_timestamp = WT_TS_NONE; /* Ignored unless a value has been set */
@@ -1378,18 +1382,21 @@ static int
 __verify_key_hs(WT_SESSION_IMPL *session, WT_ITEM *tmp1, wt_timestamp_t newer_start_ts,
   wt_timestamp_t newer_stop_ts, WT_VSTUFF *vs)
 {
-    WT_BTREE *btree;
     WT_CURSOR *hs_cursor;
     WT_DECL_RET;
     WT_TIME_WINDOW *tw;
     wt_timestamp_t older_start_ts;
     uint64_t hs_counter;
-    uint32_t hs_btree_id;
     int cmp;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
-    btree = S2BT(session);
-    hs_btree_id = btree->id;
+    WT_BTREE *btree = S2BT(session);
+    uint32_t hs_btree_id = btree->id;
+
+    if (vs->skip_per_key_hs)
+        return (0);
+
+    WT_STAT_CONN_INCR(session, session_table_verify_hs_keys_checked);
 
     /* Read the HS at the same checkpoint as the data store, so the two views are consistent. */
     WT_ASSERT(session, session->hs_checkpoint == NULL);

@@ -1968,6 +1968,10 @@ methods = {
         A mode that allows verify to continue reading after encountering a checksum error. It
         will skip past the corrupt block and continue with the verification process''',
         type='boolean'),
+    Config('skip_per_key_hs', 'false', r'''
+        Skip an expensive per-key check for whether data store and history timestamps make sense
+        when considered together''',
+        type='boolean'),
     Config('stable_timestamp', 'false', r'''
         Ensure that no data has a start timestamp after the stable timestamp, to be run after
         rollback_to_stable.''',

@@ -2890,6 +2890,7 @@ static const char *const __stats_connection_desc[] = {
   "session: table truncate failed calls",
   "session: table truncate successful calls",
   "session: table verify failed calls",
+  "session: table verify number of keys checked against the history store",
   "session: table verify successful calls",
   "thread-state: active filesystem fsync calls",
   "thread-state: active filesystem read calls",
@@ -3971,6 +3972,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing session_table_truncate_fail */
     /* not clearing session_table_truncate_success */
     /* not clearing session_table_verify_fail */
+    /* not clearing session_table_verify_hs_keys_checked */
     /* not clearing session_table_verify_success */
     /* not clearing thread_fsync_active */
     /* not clearing thread_read_active */
@@ -5290,6 +5292,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->session_table_truncate_fail += WT_STAT_CONN_READ(from, session_table_truncate_fail);
     to->session_table_truncate_success += WT_STAT_CONN_READ(from, session_table_truncate_success);
     to->session_table_verify_fail += WT_STAT_CONN_READ(from, session_table_verify_fail);
+    to->session_table_verify_hs_keys_checked +=
+      WT_STAT_CONN_READ(from, session_table_verify_hs_keys_checked);
     to->session_table_verify_success += WT_STAT_CONN_READ(from, session_table_verify_success);
     to->thread_fsync_active += WT_STAT_CONN_READ(from, thread_fsync_active);
     to->thread_read_active += WT_STAT_CONN_READ(from, thread_read_active);

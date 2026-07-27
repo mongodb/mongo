@@ -1351,6 +1351,7 @@ struct __wt_connection_stats {
     int64_t session_table_truncate_fail;
     int64_t session_table_truncate_success;
     int64_t session_table_verify_fail;
+    int64_t session_table_verify_hs_keys_checked;
     int64_t session_table_verify_success;
     int64_t thread_fsync_active;
     int64_t thread_read_active;
