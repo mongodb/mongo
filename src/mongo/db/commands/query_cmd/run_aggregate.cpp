@@ -1666,15 +1666,12 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
     return executeResolvedAggregate(*aggExState, *aggCatalogState, result);
 }
 
-// Schedules `flag` to be disabled on the next retry iteration and clears any partially-built
-// command reply from the failed attempt.
-void disableIfrFlagAndResetResult(
+// Schedules `flag` to be disabled on the next retry iteration.
+void disableIfrFlag(
     IncrementalRolloutFeatureFlag* flag,
-    stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries,
-    rpc::ReplyBuilderInterface& result) {
+    stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
     tassert(13130502, "IFR retry referenced an unknown feature flag", flag);
     ifrFlagsToDisableOnRetries.insert(flag);
-    result.reset();
 }
 
 }  // namespace
@@ -1696,6 +1693,10 @@ Status runAggregate(
     std::unique_ptr<LiteParsedPipeline> updatedLiteParsed;
     auto body =
         [&](stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
+            // Discard any partially-built reply from a previous (failed) attempt so every retry
+            // starts from a clean reply, regardless of which error triggered it.
+            result->reset();
+
             // Track potentially multiple IFR flags. For example, consider the following case:
             // 1. runAggregate with IFR Flag A enabled
             // 2. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag A
@@ -1762,15 +1763,14 @@ Status runAggregate(
             if (aggregation_request_helper::hasMergeCursors(request)) {
                 throw ex;
             }
-            disableIfrFlagAndResetResult(
-                IncrementalRolloutFeatureFlag::findByName(
-                    ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
-                ifrFlagsToDisableOnRetries,
-                *result);
+            disableIfrFlag(IncrementalRolloutFeatureFlag::findByName(
+                               ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
+                           ifrFlagsToDisableOnRetries);
         };
 
     // Retry on CollectionBecameView if the namespace concurrently transitioned from collection to
-    // view during aggregation planning.
+    // view during aggregation planning. The reply builder is reset at the top of `body` on every
+    // attempt, so no per-handler reset is needed here.
     return retryOnWithState("runAggregate",
                             std::move(initialFlagsToDisable),
                             kDefaultMaxRetries,
