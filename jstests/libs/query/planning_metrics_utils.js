@@ -15,6 +15,41 @@ export function sumHistogramBucketCounts(histogram) {
     return sum;
 }
 
+/**
+ * Returns the bounds of a histogram.
+ */
+export function histogramPowBounds(sz, base, rate) {
+    const bounds = [];
+    for (let i = 0; i < sz; i++, base *= rate) {
+        bounds.push(base);
+    }
+    return bounds;
+}
+
+/**
+ * Verifies a histogram is a well formed array of {lowerBound, count} buckets.
+ */
+export function assertHistogramBoundaries(histogram, expectedBounds) {
+    assert(Array.isArray(histogram), "histogram should be an array", {histogram});
+    assert.eq(
+        histogram.length,
+        expectedBounds.length + 1,
+        "histogram should have one bucket per bound plus the underflow bucket",
+        {histogram},
+    );
+    assert.eq(Number(histogram[0].lowerBound), 0, "first bucket lowerBound should be 0", {
+        histogram,
+    });
+    for (let i = 0; i < expectedBounds.length; i++) {
+        assert.eq(
+            Number(histogram[i + 1].lowerBound),
+            expectedBounds[i],
+            `bucket ${i + 1} lowerBound should match expected edge`,
+            {histogram, expectedBounds},
+        );
+    }
+}
+
 export function getCBRMetrics(db) {
     return db.serverStatus().metrics.query.cbr;
 }
@@ -25,6 +60,18 @@ export function getMultiPlannerMetrics(db) {
 
 export function getPlanningMetrics(db) {
     return db.serverStatus().metrics.query.planning;
+}
+
+export function getAnalyzeMetrics(db) {
+    return db.serverStatus().metrics.query.analyze.sample;
+}
+
+export function getPersistentSampleMetrics(db) {
+    return db.serverStatus().metrics.query.sampling.persistentSample;
+}
+
+export function getAnalyzeCommandMetrics(db) {
+    return db.serverStatus().metrics.commands.analyze;
 }
 
 export function assertCBRDidNotRun(cbrBefore, cbrAfter) {

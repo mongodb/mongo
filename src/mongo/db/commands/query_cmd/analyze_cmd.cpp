@@ -13,6 +13,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
@@ -42,6 +44,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -62,6 +65,22 @@
 #include <boost/optional/optional.hpp>
 namespace mongo {
 namespace {
+
+// Total docs persisted across all analyze runs.
+auto& analyzeDocsPersisted = *MetricBuilder<Counter64>{"query.analyze.sample.docsPersisted"};
+
+// Sampling technique breakdown for how the sample was generated.
+auto& analyzeByMethodRandom = *MetricBuilder<Counter64>{"query.analyze.sample.byMethod.random"};
+auto& analyzeByMethodChunk = *MetricBuilder<Counter64>{"query.analyze.sample.byMethod.chunk"};
+auto& analyzeByMethodFullCollScan =
+    *MetricBuilder<Counter64>{"query.analyze.sample.byMethod.fullCollScan"};
+
+// Latency of analyze's sample-mode path.
+auto& analyzeMicros = *MetricBuilder<DurationCounter64<Microseconds>>{"commands.analyze.micros"};
+// Histogram produces a vector bounds from 0.256 ms to 268000 ms (268 s)
+auto& analyzeMicrosHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"commands.analyze.histograms.micros"}.bind(
+        HistogramServerStatusMetric::pow(11, 256, 4));
 
 StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                                                        std::string_view collection,
@@ -128,6 +147,9 @@ void runSampleMode(OperationContext* opCtx,
                    boost::optional<int> sampleSizeOpt,
                    boost::optional<SamplingCEMethodEnum> requestedSamplingMethodOpt,
                    boost::optional<int> numChunksOpt) {
+    auto* tickSource = opCtx->getServiceContext()->getTickSource();
+    auto startTicks = tickSource->getTicks();
+
     uassert(
         ErrorCodes::CommandNotSupported,
         "The analyze command with sampling mode requires featureFlagPersistentStats to be enabled",
@@ -145,6 +167,8 @@ void runSampleMode(OperationContext* opCtx,
     boost::optional<UUID> collUUID;
     BSONArrayBuilder docsArr;
     size_t sampleSize;
+    // Tracks the actual number of docs persisted for server status metric on successful upsert.
+    size_t docsPersistedCount = 0;
 
     {
         // Acquire the collection to read metadata and run the sampling estimator. The acquisition
@@ -205,6 +229,7 @@ void runSampleMode(OperationContext* opCtx,
         for (const auto& doc : sample) {
             docsArr.append(doc);
         }
+        docsPersistedCount = sample.size();
 
         // Store the sampling method that was actually used (which may differ from
         // requestedSamplingMethod when test-only knobs like internalQuerySamplingBySequentialScan
@@ -275,6 +300,27 @@ void runSampleMode(OperationContext* opCtx,
                       updateResult);
 
     uassertStatusOK(getStatusFromCommandResult(updateResult));
+    auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
+    analyzeMicros.increment(durationMicros);
+    analyzeMicrosHistogram.increment(durationCount<Microseconds>(durationMicros));
+
+    analyzeDocsPersisted.incrementRelaxed(docsPersistedCount);
+    switch (actualSamplingMethod.value()) {
+        case ce::SamplingTechniqueEnum::kChunk:
+            analyzeByMethodChunk.incrementRelaxed();
+            break;
+        case ce::SamplingTechniqueEnum::kFullCollScan:
+            analyzeByMethodFullCollScan.incrementRelaxed();
+            break;
+        case ce::SamplingTechniqueEnum::kRandom:
+            analyzeByMethodRandom.incrementRelaxed();
+            break;
+        case ce::SamplingTechniqueEnum::kSeqScan:
+        case ce::SamplingTechniqueEnum::kStrides:
+            // Since kSeqScan and kStrides are test-only sampling techniques we do
+            // not keep track/update in server metrics since count will always be 0.
+            break;
+    }
 }
 
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {

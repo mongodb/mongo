@@ -5,6 +5,8 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -19,6 +21,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
@@ -33,9 +36,11 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 
 #include <cmath>
@@ -1088,6 +1093,25 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
+namespace {
+// Hit = found and used a persisted sample. Miss = fell back to on-the-fly sampling.
+auto& persistentSampleHits = *MetricBuilder<Counter64>{"query.sampling.persistentSample.hits"};
+auto& persistentSampleMisses = *MetricBuilder<Counter64>{"query.sampling.persistentSample.misses"};
+
+// Latency of attempting to load a persistent sample
+auto& persistentSampleLoadMicros =
+    *MetricBuilder<DurationCounter64<Microseconds>>{"query.sampling.persistentSample.loadMicros"};
+// Histogram produces a vector bounds from 0.256 ms to 268000 ms (268 s)
+auto& persistentSampleLoadMicrosHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{
+        "query.sampling.persistentSample.histograms.loadMicros"}
+         .bind(HistogramServerStatusMetric::pow(11, 256, 4));
+
+// Docs loaded on a hit.
+auto& persistentSampleDocsLoaded =
+    *MetricBuilder<Counter64>{"query.sampling.persistentSample.docsLoaded"};
+}  // namespace
+
 Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingTechniqueEnum method) {
     if (!feature_flags::gFeatureFlagPersistentStats.isEnabled(
             VersionContext::getDecoration(_opCtx),
@@ -1106,10 +1130,19 @@ Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingTechniqueEnum meth
     const boost::optional<int> numChunks =
         (method == SamplingTechniqueEnum::kChunk) ? _numChunks : boost::none;
 
+    auto* tickSource = _opCtx->getServiceContext()->getTickSource();
+    auto startTicks = tickSource->getTicks();
+
     PersistentSampleLoader loader;
     auto parsed =
         loader.tryLoad(_opCtx, _nss.dbName(), collection->uuid(), method, _sampleSize, numChunks);
+
+    auto loadMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
+    persistentSampleLoadMicros.increment(loadMicros);
+    persistentSampleLoadMicrosHistogram.increment(durationCount<Microseconds>(loadMicros));
+
     if (!parsed.isOK()) {
+        persistentSampleMisses.incrementRelaxed();
         return parsed.getStatus();
     }
 
@@ -1118,6 +1151,9 @@ Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingTechniqueEnum meth
     _uniqueDocCount = boost::none;
     _wasSamplePersisted = true;
     _sampleCreatedAt = parsed.getValue().getCreatedAt();
+
+    persistentSampleHits.incrementRelaxed();
+    persistentSampleDocsLoaded.incrementRelaxed(_sampleSize);
     return Status::OK();
 }
 
