@@ -257,7 +257,8 @@ __page_free_delta_leaf_merge_state(
  * __time_window_clear_obsolete --
  *     Clear a globally visible start from a value's time window to avoid writing obsolete values to
  *     the cell. A globally visible stop is not handled here: the caller drops the whole cell in
- *     that case, so it is never packed.
+ *     that case, so it is never packed, and never clearing a stop means we cannot leave a live
+ *     start above a zeroed stop.
  */
 static WT_INLINE void
 __time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
@@ -358,12 +359,14 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
 
         /*
          * Build the disk image. A key whose stop is globally visible is a globally visible delete
-         * that no reader can see, so skip it entirely rather than materializing an obsolete cell.
-         * Dropping it only lowers the page's aggregate, so it stays covered by the parent, and it
-         * removes the obsolete stop that would otherwise have to be normalized.
+         * that no reader can see, so skip materializing it. Only a real value cell carries a stop:
+         * an empty-value cell has no value cell and, by construction, an empty time window (a live
+         * zero-length value), so it is never a delete and its unpack_value time window is not its
+         * own -- never test it for a stop.
          */
         if (cmp < 0) {
-            if (!__wt_txn_tw_stop_visible_all(session, &base_state.unpack_value->tw)) {
+            if (base_state.empty_value_cell ||
+              !__wt_txn_tw_stop_visible_all(session, &base_state.unpack_value->tw)) {
                 __time_window_clear_obsolete(session, &base_state.unpack_value->tw);
                 /* Pack row-leaf base key/value. */
                 WT_ERR(__wt_cell_pack_leaf_kv(session, base_state.empty_value_cell,

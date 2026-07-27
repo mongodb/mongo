@@ -1095,7 +1095,7 @@ __wt_dhandle_update_write_gens(WT_SESSION_IMPL *session)
          * transaction ids of the pages will be reset when loaded from disk to memory.
          */
         btree->write_gen = btree->base_write_gen = btree->run_write_gen =
-          WT_MAX(btree->write_gen, conn->base_write_gen);
+          WT_MAX(btree->write_gen, __wt_atomic_load_uint64_relaxed(&conn->base_write_gen));
 
         /*
          * Clear out any transaction IDs that might have been already loaded and cached, as they are

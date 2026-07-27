@@ -205,9 +205,9 @@ class test_hs21(wttest.WiredTigerTestCase):
         for idx, (initial_run_write_gen, ds) in enumerate(active_files):
             # Check that the most recent transaction has the correct data.
             self.check(self.session, value2, ds.uri, self.nrows, 100)
-            # FIXME-WT-17763: The run_write_gen shouldn't change in disagg mode either.
-            if not self.runningHook('disagg'):
-                # Get the current run_write_gen and ensure it hasn't changed since being closed.
-                file_uri = 'file:%s.%d.wt' % (self.file_name, idx)
-                run_write_gen = self.parse_run_write_gen(file_uri)
-                self.assertEqual(initial_run_write_gen, run_write_gen)
+            # Get the current run_write_gen and ensure it hasn't changed since being closed.
+            file_uri = 'file:%s.%d.wt' % (self.file_name, idx)
+            if self.key_format == 'S' and self.runningHook('disagg'):
+                file_uri += '_stable'
+            run_write_gen = self.parse_run_write_gen(file_uri)
+            self.assertEqual(initial_run_write_gen, run_write_gen)

@@ -548,23 +548,28 @@ __clayered_can_advance_stable(WTI_CURSOR_LAYERED *clayered, uint64_t conn_lsn, b
         return (false);
 
     /*
-     * First, layered cursors are sometimes paired with read timestamps. When using read
-     timestamps,
-     * it's always safe to update cursors, even during iterations. That's because the view at a
-     * timestamp is always consistent, the history store covers that.
+     * Don't advance while parked on the stable cursor, even under a read timestamp. A newer
+     * checkpoint may no longer hold the parked key once the leader's oldest timestamp has moved
+     * past the key's removal; reopening onto it loses the position and can skip stable keys, and
+     * the history store can't recover the value because the read is now older than that
+     * checkpoint's oldest timestamp. Check this before the read-timestamp fast path below.
+     *
+     * FIXME-WT-17968: This check is only needed here because a follower can adopt a checkpoint
+     * whose oldest timestamp exceeds a pinned reader's read timestamp. Once that is prevented, move
+     * the check back inside the no-read-timestamp branch below.
+     */
+    if (F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) &&
+      clayered->current_cursor == clayered->stable_cursor)
+        return (false);
+
+    /*
+     * With a read timestamp set and the parked-on-stable case excluded above, it's safe to advance
+     * even during iteration: a timestamped read stays consistent across the checkpoint change.
      */
     txn_shared = WT_SESSION_TXN_SHARED(session);
     if (txn_shared != NULL && txn_shared->read_timestamp != WT_TS_NONE)
         return (true);
     else {
-        /*
-         * Layered cursor is positioned on the stable cursor. Changing it may lose the layered
-         * cursor position.
-         */
-        if (F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) &&
-          clayered->current_cursor == clayered->stable_cursor)
-            return (false);
-
         /* if this is an iteration, we won't reopen the cursor, we're done. */
         if (iteration)
             return (false);

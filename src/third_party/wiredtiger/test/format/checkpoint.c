@@ -85,7 +85,8 @@ checkpoint(void *arg)
     if (g.disagg_storage_config)
         named_checkpoints = false;
 
-    for (secs = mmrand(&g.extra_rnd, 1, 10); !g.workers_finished && !g.checkpoint_quit;) {
+    for (secs = mmrand(&g.extra_rnd, 1, 10);
+      !g.workers_finished && !__wt_atomic_load_bool_v_relaxed(&g.checkpoint_quit);) {
         if (secs > 0) {
             __wt_sleep(1, 0);
             --secs;

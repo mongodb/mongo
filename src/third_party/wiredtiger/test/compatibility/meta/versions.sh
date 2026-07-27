@@ -30,21 +30,21 @@
 
 # Currently this is a temporary setup for python testsuite
 # This will be merged with the following variables in the future
-export SUITE_RELEASE_BRANCHES="develop mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
+export SUITE_RELEASE_BRANCHES="develop mongodb-9.0 mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
 
 # This array is used to configure the release branches we'd like to use for testing the importing
 # of files created in previous versions of WiredTiger.
-export IMPORT_RELEASE_BRANCHES="develop mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
+export IMPORT_RELEASE_BRANCHES="develop mongodb-9.0 mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
 
-export NEWER_RELEASE_BRANCHES="develop mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
+export NEWER_RELEASE_BRANCHES="develop mongodb-9.0 mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
 
 # This array is used to configure the release branches we'd like to run patch version
 # upgrade/downgrade test.
-export PATCH_VERSION_UPGRADE_DOWNGRADE_RELEASE_BRANCHES="mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
+export PATCH_VERSION_UPGRADE_DOWNGRADE_RELEASE_BRANCHES="mongodb-9.0 mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
 
 # This array is used to configure the release branches we'd like to run test checkpoint
 # upgrade/downgrade test.
-export TEST_CHECKPOINT_RELEASE_BRANCHES="develop mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
+export TEST_CHECKPOINT_RELEASE_BRANCHES="develop mongodb-9.0 mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
 
 # This array is used to configure the release branches we'd like to run upgrade to latest test.
-export UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES="mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
+export UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES="mongodb-9.0 mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"

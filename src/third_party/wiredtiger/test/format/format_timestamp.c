@@ -221,7 +221,7 @@ timestamp(void *arg)
      * rollback errors, and we don't have the luxury of giving up on an operation that has rolled
      * back.
      */
-    while (!g.workers_finished && !g.timestamp_quit) {
+    while (!g.workers_finished && !__wt_atomic_load_bool_v_relaxed(&g.timestamp_quit)) {
         if (!GV(RUNS_PREDICTABLE_REPLAY)) {
             /*
              * Under precise checkpoint, eviction can only write pages whose updates are at or below

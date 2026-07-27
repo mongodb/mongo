@@ -686,8 +686,12 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     /* Fast-truncate only happens to leaf pages. */
     WT_ASSERT(session, page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_COL_VAR);
 
-    /* Empty pages should get skipped before reaching this point. */
-    WT_ASSERT(session, page->entries > 0);
+    /*
+     * A leaf page can be empty only when it was rebuilt from a base image and deltas: that merge
+     * drops every key whose stop is globally visible, which can leave no entries. Instantiating
+     * such a page is a no-op (there are no rows to tombstone). Any other empty page is unexpected.
+     */
+    WT_ASSERT(session, page->entries > 0 || WT_DELTA_LEAF_ENABLED(session));
 
     WT_STAT_CONN_DSRC_INCR(session, cache_read_deleted);
 

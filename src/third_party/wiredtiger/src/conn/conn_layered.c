@@ -1030,6 +1030,32 @@ __disagg_step_up(WT_SESSION_IMPL *session)
     WT_STAT_CONN_SET(session, disagg_role_leader, 1);
 
     /*
+     * If the newest picked-up checkpoint predates the write generation high-water mark in the
+     * checkpoint metadata (an upgrade), derive the base write generation by scanning the local
+     * metadata. No data has been written this run and the trees reopen for the new role below, so
+     * the scanned generations all belong to earlier runs.
+     */
+    if (conn->disaggregated_storage.base_write_gen_missing) {
+        WT_ERR(__wt_meta_correct_base_write_gen(session));
+        conn->disaggregated_storage.base_write_gen_missing = false;
+    }
+
+    /*
+     * Lift the base write generation past every generation this node has persisted. Picking up a
+     * checkpoint adopts the aggregate another leader recorded, but a checkpoint this node wrote
+     * itself is never picked up, so without this its own previous-reign generations stay above the
+     * base and their transaction ids -- meaningless after the role change -- would be read as
+     * current. Trees reopened for the new role then recognize their checkpoints as cross-run and
+     * reset. Safe under the checkpoint lock held here.
+     */
+    __wt_atomic_store_uint64_relaxed(&conn->base_write_gen,
+      WT_MAX(__wt_atomic_load_uint64_relaxed(&conn->base_write_gen),
+        __wt_atomic_load_uint64_relaxed(&conn->max_write_gen) + 1));
+    __wt_atomic_store_uint64_relaxed(&conn->max_write_gen,
+      WT_MAX(__wt_atomic_load_uint64_relaxed(&conn->max_write_gen),
+        __wt_atomic_load_uint64_relaxed(&conn->base_write_gen)));
+
+    /*
      * Abandon the current checkpoint if it is incomplete, and begin a new one. We need to do this
      * before draining the ingest tables, so that the updates to the stable tables will be correctly
      * included in the new checkpoint.
@@ -1367,6 +1393,21 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
                   "Did not find any complete checkpoint to pick up at startup");
             WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_begin_checkpoint(session));
             WT_ERR_MSG_CHK(session, ret, "Failed to begin a new checkpoint");
+        }
+
+        /*
+         * If the picked-up checkpoint predates the write generation high-water mark in the
+         * checkpoint metadata (an upgrade), a leader derives the base write generation by scanning
+         * the local metadata. This runs at startup, before any data is written and before any tree
+         * opens for the role, so the scanned generations all belong to earlier runs and the base
+         * write generation correctly marks the boundary above their transaction ids.
+         */
+        if (leader && conn->disaggregated_storage.base_write_gen_missing) {
+            WT_ERR(__wt_meta_correct_base_write_gen(session));
+            __wt_atomic_store_uint64_relaxed(&conn->max_write_gen,
+              WT_MAX(__wt_atomic_load_uint64_relaxed(&conn->max_write_gen),
+                __wt_atomic_load_uint64_relaxed(&conn->base_write_gen)));
+            conn->disaggregated_storage.base_write_gen_missing = false;
         }
 
         WT_ERR(__wt_config_gets(session, cfg, "page_delta.internal_page_delta", &cval));

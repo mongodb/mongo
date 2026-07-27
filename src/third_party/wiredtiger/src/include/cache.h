@@ -199,6 +199,36 @@ struct __wt_cache {
 };
 
 /*
+ * On disaggregated storage each cache byte counter has an ingest and a stable variant that we
+ * mirror based on the btree's role. These macros update the base counter and the right variant in
+ * one place. The field argument is the base member name, and we build the variant names by token
+ * pasting, so all three members need to follow the base/_ingest/_stable naming.
+ */
+#define WT_CACHE_INCR(is_disagg, btree, cache, field, size)                             \
+    do {                                                                                \
+        (void)__wt_atomic_add_uint64_relaxed(&(cache)->field, (size));                  \
+        if (is_disagg) {                                                                \
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))                               \
+                (void)__wt_atomic_add_uint64_relaxed(&(cache)->field##_ingest, (size)); \
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))                            \
+                (void)__wt_atomic_add_uint64_relaxed(&(cache)->field##_stable, (size)); \
+        }                                                                               \
+    } while (0)
+
+#define WT_CACHE_DECR(session, is_disagg, btree, cache, field, size)                        \
+    do {                                                                                    \
+        __wt_cache_decr_check_uint64(session, &(cache)->field, (size), "WT_CACHE." #field); \
+        if (is_disagg) {                                                                    \
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))                                   \
+                __wt_cache_decr_check_uint64(                                               \
+                  session, &(cache)->field##_ingest, (size), "WT_CACHE." #field "_ingest"); \
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))                                \
+                __wt_cache_decr_check_uint64(                                               \
+                  session, &(cache)->field##_stable, (size), "WT_CACHE." #field "_stable"); \
+        }                                                                                   \
+    } while (0)
+
+/*
  * WT_CACHE_POOL --
  *	A structure that represents a shared cache.
  */

@@ -845,9 +845,11 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
         "timestamp=%" PRIx64 ",\n"
         "oldest_timestamp=%" PRIx64 ",\n"
         "schema_epoch=%" PRIx64 ",\n"
-        "largest_file_id=%" PRIu32,
+        "largest_file_id=%" PRIu32 ",\n"
+        "max_write_gen=%" PRIu64,
         WT_DISAGG_CHECKPOINT_TURTLE_VERSION, WT_DISAGG_CHECKPOINT_TURTLE_COMPATIBLE_VERSION,
-        checkpoint_root_copy, checkpoint_timestamp, oldest_timestamp, schema_epoch, max_table_id));
+        checkpoint_root_copy, checkpoint_timestamp, oldest_timestamp, schema_epoch, max_table_id,
+        __wt_atomic_load_uint64_relaxed(&conn->max_write_gen)));
 
     /* Append key provider metadata, if available. */
     WT_ERR(__disagg_append_crypt_meta(session, metadata_buf));
@@ -1035,6 +1037,14 @@ __disagg_parse_meta(WT_SESSION_IMPL *session, const WT_ITEM *meta_buf, WT_DISAGG
 
             if (cfg_value.len > 0)
                 metadata->largest_file_id = (uint32_t)cfg_value.val;
+        } else if (WT_CONFIG_LIT_MATCH("max_write_gen", cfg_key)) {
+            WT_ASSERT_ALWAYS(session, metadata->max_write_gen == 0,
+              "Duplicate max write generation entry in disaggregated storage metadata: "
+              "metadata->max_write_gen=%" PRIu64,
+              metadata->max_write_gen);
+
+            if (cfg_value.len > 0)
+                metadata->max_write_gen = (uint64_t)cfg_value.val;
         } else if (WT_CONFIG_LIT_MATCH("key_provider", cfg_key)) {
             WT_ASSERT_ALWAYS(session, metadata->key_provider == NULL,
               "Duplicate key_provider entry in disaggregated storage metadata");

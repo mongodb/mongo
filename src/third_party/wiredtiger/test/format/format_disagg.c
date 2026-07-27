@@ -267,7 +267,7 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
      * notification could land stable at the wrong boundary.
      */
     if (g.checkpoint_config == CHECKPOINT_ON) {
-        g.checkpoint_quit = true;
+        __wt_atomic_store_bool_v_relaxed(&g.checkpoint_quit, true);
         testutil_check(__wt_thread_join(NULL, checkpoint_tid));
     }
 
@@ -276,7 +276,7 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
      * after we pin it below.
      */
     if (g.transaction_timestamps_config) {
-        g.timestamp_quit = true;
+        __wt_atomic_store_bool_v_relaxed(&g.timestamp_quit, true);
         testutil_check(__wt_thread_join(NULL, timestamp_tid));
     }
 
@@ -320,8 +320,8 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
      * so that disagg_switch_roles() can use it for the step-down checkpoint after operations()
      * returns.
      */
-    g.checkpoint_quit = false;
-    g.timestamp_quit = false;
+    __wt_atomic_store_bool_v_relaxed(&g.checkpoint_quit, false);
+    __wt_atomic_store_bool_v_relaxed(&g.timestamp_quit, false);
 
     wt_wrap_close_session(session);
 }

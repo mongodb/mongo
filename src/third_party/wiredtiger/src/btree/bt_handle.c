@@ -810,16 +810,33 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * for every subsequent open, we want to reuse it. This so that we're still able to read
      * transaction ids from the previous time a btree was open in the same run.
      */
-    btree->write_gen = WT_MAX(ckpt->write_gen + 1, conn->base_write_gen);
+    btree->write_gen =
+      WT_MAX(ckpt->write_gen + 1, __wt_atomic_load_uint64_relaxed(&conn->base_write_gen));
     WT_ASSERT(session, ckpt->write_gen >= ckpt->run_write_gen);
 
     /*
-     *  If this is the first time opening the tree this run.
-     *  FIXME-WT-17763: The runtime write generation should not always be updated in disagg mode,
-     *  the proper conditional is more narrow and needs to be implemented here.
+     * Reset the runtime write generation when the checkpoint's transaction ids are not usable in
+     * this run: an imported tree, or a checkpoint whose generations precede this run's base write
+     * generation. A stable tree opened at a specific checkpoint by name (a
+     * "...wt_stable/checkpoint" URI) also resets: it is a follower's view of a checkpoint another
+     * node wrote, and the ids are meaningless in this node's id space. A leader's live tree keeps
+     * its own ids, so a checkpoint it reopens in the same run stays readable.
+     *
+     * For a checkpoint that carries the write generation high-water mark, the run_write_gen <
+     * base_write_gen comparison usually makes the WT_URI_IS_STABLE_CHECKPOINT clause below
+     * redundant: the follower lifts its base write generation past the mark at pickup, so the
+     * mark's checkpoint has run_write_gen < base_write_gen. The WT_URI_IS_STABLE_CHECKPOINT clause
+     * is still required for two cases the comparison does not cover. A checkpoint written before
+     * the mark existed (an old-format or cross-version checkpoint) has no mark to adopt, and the
+     * follower cannot scan to derive a base (that is leader-only), so its base stays low and the
+     * comparison does not fire. And at the very first generations the base and a checkpoint's
+     * run_write_gen can both still be at their initial value, where the strict comparison also does
+     * not fire. In both cases the WT_URI_IS_STABLE_CHECKPOINT clause is what treats the foreign
+     * checkpoint's ids as cross-run.
      */
-    if (F_ISSET(session, WT_SESSION_IMPORT) || ckpt->run_write_gen < conn->base_write_gen ||
-      F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+    if (F_ISSET(session, WT_SESSION_IMPORT) ||
+      ckpt->run_write_gen < __wt_atomic_load_uint64_relaxed(&conn->base_write_gen) ||
+      (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && WT_URI_IS_STABLE_CHECKPOINT(btree->dhandle->name)))
         btree->run_write_gen = btree->write_gen;
     else
         btree->run_write_gen = ckpt->run_write_gen;

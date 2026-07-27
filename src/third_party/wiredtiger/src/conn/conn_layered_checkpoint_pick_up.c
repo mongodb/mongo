@@ -993,6 +993,33 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
       metadata.schema_epoch, __wt_timestamp_to_string(metadata.schema_epoch, ts_string[2]),
       metadata.largest_file_id, (int)metadata.checkpoint_len, metadata.checkpoint);
 
+    /*
+     * Adopt the high-water mark of write generations the checkpoint's writer (the leader) recorded,
+     * so that if this node later steps up its base write generation already sits past the former
+     * leader's generations and a checkpoint it then reopens is recognized as belonging to an
+     * earlier generation range. A follower reads foreign checkpoints correctly regardless of this
+     * value because it resets their ids on open by role; a checkpoint written before the high-water
+     * mark was recorded (an upgrade) carries no aggregate to adopt, so remember that a node
+     * becoming leader must derive the base write generation from its local metadata instead.
+     *
+     * Concurrency: we hold the checkpoint lock, the only writer of the base write generation once
+     * followers are active; the base write generation is monotonic.
+     */
+    if (metadata.max_write_gen != 0) {
+        WT_ASSERT_ALWAYS(session,
+          __wt_atomic_load_uint64_relaxed(&conn->base_write_gen) <=
+            __wt_atomic_load_uint64_relaxed(&conn->max_write_gen),
+          "base_write_gen exceeds max_write_gen");
+        __wt_atomic_store_uint64_relaxed(&conn->base_write_gen,
+          WT_MAX(
+            __wt_atomic_load_uint64_relaxed(&conn->base_write_gen), metadata.max_write_gen + 1));
+        __wt_atomic_store_uint64_relaxed(&conn->max_write_gen,
+          WT_MAX(__wt_atomic_load_uint64_relaxed(&conn->max_write_gen),
+            __wt_atomic_load_uint64_relaxed(&conn->base_write_gen)));
+        conn->disaggregated_storage.base_write_gen_missing = false;
+    } else
+        conn->disaggregated_storage.base_write_gen_missing = true;
+
     /* Load crypt key data with the key provider extension, if any. */
     WT_ERR(__wti_disagg_load_crypt_key(session, &metadata));
 

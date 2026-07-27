@@ -165,6 +165,7 @@ typedef struct __wt_disagg_metadata {
     wt_timestamp_t oldest_timestamp;     /* Oldest timestamp */
     wt_timestamp_t schema_epoch;         /* Disaggregated schema epoch at the time of checkpoint */
     uint32_t largest_file_id;            /* High water mark of allocated file IDs */
+    uint64_t max_write_gen; /* Largest write generation used when the checkpoint was written */
 
     const char *key_provider; /* Key provider metadata string */
     size_t key_provider_len;  /* Length of key provider metadata string */

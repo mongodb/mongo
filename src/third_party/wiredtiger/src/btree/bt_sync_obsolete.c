@@ -640,7 +640,7 @@ __checkpoint_cleanup_eligibility(WT_SESSION_IMPL *session, const char *uri, cons
      * counters upon restart. Transaction IDs from a previous run can be detected using the write
      * generation number.
      */
-    if (write_gen < S2C(session)->base_write_gen)
+    if (write_gen < __wt_atomic_load_uint64_relaxed(&S2C(session)->base_write_gen))
         newest_txn = WT_TXN_NONE;
 
     /*

@@ -617,27 +617,13 @@ functions:
             echo "Checking out branch $branch ..."
             git checkout $branch
 
-            # Java API is removed in newer branches via WT-6675.
-            if [ $branch == "mongodb-4.2" ]; then
-              pushd build_posix
-              bash reconf
-              ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-java --enable-python --enable-strict
-              (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
-              (cd lang/java && make ../../../lang/java/wiredtiger_wrap.c)
-            elif [ $branch == "mongodb-5.0" ] || [ $branch == "mongodb-4.4" ]; then
-              pushd build_posix
-              bash reconf
-              ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-python --enable-strict
-              (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
-            else
-              . test/evergreen/find_cmake.sh
-              if [ -d cmake_build ]; then rm -r cmake_build; fi
-              mkdir -p cmake_build
-              pushd cmake_build
-              # Adding -DENABLE_PYTHON=1 -DENABLE_STRICT=1 as 6.0 does not default these like develop.
-              $CMAKE -DCMAKE_C_FLAGS="-DMIGHT_NOT_RUN -Wno-error" -DENABLE_PYTHON=1 -DENABLE_STRICT=1 ../.
-              make -C lang/python -j ${num_jobs}
-            fi
+            . test/evergreen/find_cmake.sh
+            if [ -d cmake_build ]; then rm -r cmake_build; fi
+            mkdir -p cmake_build
+            pushd cmake_build
+            # Adding -DENABLE_PYTHON=1 -DENABLE_STRICT=1 as 6.0 does not default these like develop.
+            $CMAKE -DCMAKE_C_FLAGS="-DMIGHT_NOT_RUN -Wno-error" -DENABLE_PYTHON=1 -DENABLE_STRICT=1 ../.
+            make -C lang/python -j ${num_jobs}
             # Pop to root project directory.
             popd
             # Generate WiredTiger documentation.

@@ -33,17 +33,16 @@ from wtscenario import make_scenarios
 
 # test_layered_delta17.py
 #
-# Reconstructing a leaf page from its base image and deltas drops every key whose
-# stop is globally visible. When all of a page's keys are dropped, the merge
-# produces a leaf image with no entries: check the reader tolerates that empty
-# reconstructed page.
+# Rebuilding a disaggregated leaf page from its base image and deltas drops every
+# key whose stop is globally visible. When all of a page's keys are dropped the
+# merge produces a leaf image with no entries; check the reader, verify, and
+# checkpoint all tolerate that empty reconstructed page (rather than tripping the
+# mutually-exclusive empty-value page flags during verification).
 @disagg_test_class
 class test_layered_delta17(wttest.WiredTigerTestCase):
-    test_name = __qualname__
-    uri = f"layered:{test_name}"
-
-    conn_base_config = 'statistics=(all),transaction_sync=(enabled,method=fsync),' \
-                     + 'page_delta=(delta_pct=100,leaf_page_delta=true),precise_checkpoint=true,'
+    uri = "table:test_layered_delta17"
+    conn_base_config = ('statistics=(all),transaction_sync=(enabled,method=fsync),'
+                        'page_delta=(delta_pct=100,leaf_page_delta=true),precise_checkpoint=true,')
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
@@ -52,8 +51,9 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.conn_base_config + 'disaggregated=(role="leader")'
 
-    def session_create_config(self):
-        return 'key_format=S,value_format=S'
+    def rstat(self, key):
+        with wttest.open_cursor(self.session, "statistics:" + self.uri) as c:
+            return c[key][2]
 
     def evict(self, key):
         # Force the page holding key out of cache so the next access rebuilds it
@@ -68,13 +68,12 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
         s.close()
 
     def test_empty_reconstructed_page(self):
-        self.session.create(self.uri, self.session_create_config())
+        self.session.create(self.uri, "key_format=S,value_format=S,block_manager=disagg")
         value = "a" * 20
 
         # Populate the leaf, delete every key, and checkpoint with the oldest
-        # timestamp still behind the delete. The tombstones are not yet globally
-        # visible, so they are retained and written into the leaf's base image
-        # (rather than the page being collapsed away).
+        # timestamp still behind the delete. The tombstones are retained and
+        # written into the leaf's base image.
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
             self.session.begin_transaction()
@@ -91,15 +90,15 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
 
         # Add and then remove a throwaway key, checkpointing each change so the
         # page carries leaf deltas on top of the tombstone-bearing base image:
-        # reconstructing it now has to run the base+delta merge. The throwaway
-        # key nets out to nothing, and the oldest timestamp is still behind every
+        # reconstructing it now has to run the base+delta merge. The throwaway key
+        # nets out to nothing, and the oldest timestamp is still behind every
         # delete so nothing is dropped at write time.
         self.session.begin_transaction()
         cursor['zzz'] = value
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(12)}')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(12))
         self.session.checkpoint()
-        self.assertGreaterEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 1)
+        self.assertGreaterEqual(self.rstat(stat.dsrc.rec_page_delta_leaf), 1)
         self.session.begin_transaction()
         cursor.set_key('zzz')
         cursor.remove()
@@ -109,10 +108,10 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
         self.evict(str(0))
 
         # Make every delete globally visible, then read the page back. The read
-        # rebuilds it from the base image and deltas; every key's stop is now
-        # globally visible, so the merge drops them all and produces an empty leaf.
-        self.conn.set_timestamp(f'oldest_timestamp={self.timestamp_str(20)},'
-                                f'stable_timestamp={self.timestamp_str(20)}')
+        # rebuilds it from the base image and deltas; every key is dropped and the
+        # merge yields an empty leaf.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20) +
+                                ',stable_timestamp=' + self.timestamp_str(20))
 
         cursor.close()
         cursor = self.session.open_cursor(self.uri, None, None)
