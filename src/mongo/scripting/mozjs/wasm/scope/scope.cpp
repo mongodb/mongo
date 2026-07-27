@@ -537,7 +537,7 @@ void WasmtimeImplScope::unregisterOperation() {
     auto* opCtx = _opCtx.exchange(nullptr, std::memory_order_acq_rel);
     if (opCtx) {
         if (auto* engine = getGlobalScriptEngine()) {
-            static_cast<WasmtimeScriptEngine*>(engine)->unregisterOperation(opCtx);
+            static_cast<WasmtimeScriptEngine*>(engine)->unregisterOperation(opCtx, this);
         }
     }
 }
