@@ -26,6 +26,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/storage_options.h"
@@ -178,6 +179,9 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
     const auto catalogRecordStoreOpts = RecordStore::Options{};
     if (!catalogExists) {
         WriteUnitOfWork uow(opCtx);
+        // The catalog is created before we have timestamping available, so when using schema epochs
+        // we need to explicitly use the minimum epoch.
+        shard_role_details::getRecoveryUnit(opCtx)->setSchemaEpoch(1);
 
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         LOGV2(11503104, "Creating MDB catalog as it did not already exist");
