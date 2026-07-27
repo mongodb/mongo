@@ -61,13 +61,13 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
         internalQueryStatsErrorsAreCommandFatal: true
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
         internalQueryStatsErrorsAreCommandFatal: true
     num_rs_nodes_per_shard: 1

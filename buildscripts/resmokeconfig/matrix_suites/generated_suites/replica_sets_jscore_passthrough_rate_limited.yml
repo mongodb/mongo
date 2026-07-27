@@ -65,7 +65,7 @@ executor:
           ,\n            \"Resmoke-Hook\",\n            \"ReplCoordExtern\",\n   \
           \         \"Rollback\"]}\n"
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
     num_nodes: 2
   hooks:

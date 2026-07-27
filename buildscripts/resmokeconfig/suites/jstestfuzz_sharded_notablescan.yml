@@ -43,7 +43,7 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
         internalQueryStatsErrorsAreCommandFatal: true
       verbose: ""
@@ -53,7 +53,7 @@ executor:
         enableTestCommands: 1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
         internalQueryStatsErrorsAreCommandFatal: true
         notablescan: true

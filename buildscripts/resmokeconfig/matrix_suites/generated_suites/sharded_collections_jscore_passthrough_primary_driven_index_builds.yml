@@ -26,7 +26,7 @@ executor:
         featureFlagRecordIdsReplicated: 1
         featureFlagResumablePrimaryDrivenIndexBuilds: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
@@ -36,7 +36,7 @@ executor:
         featureFlagRecordIdsReplicated: 1
         featureFlagResumablePrimaryDrivenIndexBuilds: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 3
     num_shards: 2

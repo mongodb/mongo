@@ -49,7 +49,7 @@ executor:
         enableElectionHandoff: 0
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
         logComponentVerbosity:
           replication:
