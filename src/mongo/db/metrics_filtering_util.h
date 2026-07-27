@@ -20,12 +20,17 @@ namespace metrics_filtering_util {
 /**
  * A trie for matching dotted paths. Each node corresponds to one segment of a path.
  * For example, path "a.b.c" has three segments, and the trie has three nested nodes.
+ * Array segments like "a.$[]" indicate traversal through all elements of an array
+ * field "a".
  */
 struct PathMatcherNode {
     StringMap<std::unique_ptr<PathMatcherNode>> children;
     // Set to true if the path ending at this node is a complete registered path (as opposed
     // to just being a prefix of one or more registered paths).
     bool isExactMatch = false;
+    // Set to true if this segment represents array traversal (e.g., "a.$[]" in path "a.$[].x").
+    // When true, the matcher expects to traverse into array elements.
+    bool isArrayPath = false;
 };
 
 /*

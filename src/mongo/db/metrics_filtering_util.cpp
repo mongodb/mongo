@@ -42,6 +42,47 @@ PathMatcherNode buildPathMatcher(const std::vector<std::string>& paths) {
                           fmt::format("Invalid path '{}': empty path segment", path));
             }
 
+            // Check for array path syntax.
+            if (segment == "$[]") {
+                if (node == &root) {
+                    uasserted(ErrorCodes::BadValue,
+                              fmt::format("Invalid path '{}': array segment '.$[]' must follow a "
+                                          "field name (e.g., 'a.$[].fieldName')",
+                                          path));
+                }
+                if (!hasNextSegment) {
+                    uasserted(
+                        ErrorCodes::BadValue,
+                        fmt::format("Invalid path '{}': array segment '.$[]' must have a field "
+                                    "to extract (e.g., 'a.$[].fieldName')",
+                                    path));
+                }
+                // Check if the next segment is also $[], which would be consecutive arrays.
+                std::string_view nextSegment;
+                std::string_view nextRemainder;
+                if (str::splitOn(remainder, '.', nextSegment, nextRemainder) &&
+                    nextSegment == "$[]") {
+                    uasserted(
+                        ErrorCodes::BadValue,
+                        fmt::format("Invalid path '{}': consecutive array segments '.$[].$[]' "
+                                    "are not supported",
+                                    path));
+                }
+                // Mark the current node as having array traversal.
+                node->isArrayPath = true;
+                suffix = remainder;
+                continue;
+            }
+
+            // Check for invalid bracket syntax.
+            if (segment.find('[') != std::string::npos || segment.find(']') != std::string::npos) {
+                uasserted(ErrorCodes::BadValue,
+                          fmt::format("Invalid path '{}': unsupported bracket syntax '{}'. "
+                                      "Only '.$[]' is supported for array traversal.",
+                                      path,
+                                      segment));
+            }
+
             auto& child_ptr = node->children[std::string(segment)];
             if (!child_ptr) {
                 child_ptr = std::make_unique<PathMatcherNode>();
@@ -74,6 +115,29 @@ void appendPaths(BSONObjBuilder& builder, const BSONObj& obj, const PathMatcherN
         if (child.isExactMatch) {
             // This field matches an allowlist path, include it as-is.
             builder.append(elem);
+        } else if (child.isArrayPath) {
+            // This field should be traversed as an array.
+            if (elem.type() == BSONType::array) {
+                BSONArrayBuilder arrayBuilder;
+                for (BSONElement arrayElem : elem.Obj()) {
+                    if (arrayElem.type() == BSONType::object) {
+                        BSONObjBuilder elementBuilder;
+                        appendPaths(elementBuilder, arrayElem.Obj(), child);
+                        BSONObj extractedElement = elementBuilder.obj();
+                        // Only append non-empty extracted elements.
+                        if (!extractedElement.isEmpty()) {
+                            arrayBuilder.append(extractedElement);
+                        }
+                    }
+                    // Skip non-object array elements.
+                }
+                BSONArray resultArray = arrayBuilder.arr();
+                // Only append the array field if it contains elements.
+                if (!resultArray.isEmpty()) {
+                    builder.append(elem.fieldNameStringData(), resultArray);
+                }
+            }
+            // If field is not an array, skip it (don't try to traverse as object).
         } else if (!child.children.empty() && elem.type() == BSONType::object) {
             // This field has an allowlist path that traverses deeper through it, recurse into it.
             BSONObjBuilder nested;

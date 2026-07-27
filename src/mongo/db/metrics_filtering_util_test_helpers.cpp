@@ -15,6 +15,14 @@ bool pathIsExactMatch(const PathMatcherNode& matcher, std::string_view path) {
 
     while (!suffix.empty()) {
         str::splitOn(suffix, '.', segment, remainder);
+
+        if (segment == "$[]") {
+            ASSERT(node->isArrayPath)
+                << "path '" << path << "' has array marker but node is not array";
+            suffix = remainder;
+            continue;
+        }
+
         auto it = node->children.find(std::string(segment));
         ASSERT(it != node->children.end())
             << "path '" << path << "' missing segment '" << segment << "'";
