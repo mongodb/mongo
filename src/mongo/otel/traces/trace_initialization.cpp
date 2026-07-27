@@ -4,6 +4,7 @@
 #include "mongo/otel/traces/trace_initialization.h"
 
 #include "mongo/logv2/log.h"
+#include "mongo/otel/traces/trace_settings.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/otel/traces/tracer_provider_service_factory.h"
@@ -42,6 +43,12 @@ void validateOptions() {
 
 Status initialize(std::string name) {
     validateOptions();
+
+    if (gOpenTelemetryHttpEndpoint.empty() && !getTracingHttpExportHeaders().empty()) {
+        LOGV2_WARNING(12877900,
+                      "openTelemetryTracingHttpExportHeaders is set but will be ignored because "
+                      "the HTTP exporter is not configured");
+    }
 
     if (!gOpenTelemetryHttpEndpoint.empty()) {
         auto swTracerProviderService =

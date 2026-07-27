@@ -1,13 +1,13 @@
 #! /usr/bin/env python3
-"""Mock OTLP HTTP metrics endpoint that records request headers."""
+"""Mock OTLP HTTP endpoint that records request paths and headers."""
 
 import argparse
 import http.server
 import json
 
 
-class OtelMetricsHttpHandler(http.server.BaseHTTPRequestHandler):
-    """Accept OTLP metrics export requests and append request metadata to a file."""
+class OtelHttpHandler(http.server.BaseHTTPRequestHandler):
+    """Accept OTLP export requests and append request metadata to a file."""
 
     protocol_version = "HTTP/1.1"
 
@@ -34,14 +34,14 @@ class OtelMetricsHttpHandler(http.server.BaseHTTPRequestHandler):
 
 def run(port, output_file):
     http.server.HTTPServer.protocol_version = "HTTP/1.1"
-    httpd = http.server.HTTPServer(("127.0.0.1", port), OtelMetricsHttpHandler)
+    httpd = http.server.HTTPServer(("127.0.0.1", port), OtelHttpHandler)
     httpd.output_file = output_file
-    print(f"Mock OTLP Metrics HTTP Server Listening on port {port}", flush=True)
+    print(f"Mock OTLP HTTP Server Listening on port {port}", flush=True)
     httpd.serve_forever()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MongoDB mock OTLP metrics HTTP endpoint.")
+    parser = argparse.ArgumentParser(description="MongoDB mock OTLP HTTP endpoint.")
     parser.add_argument("-p", "--port", type=int, required=True, help="Port to listen on")
     parser.add_argument(
         "-o",

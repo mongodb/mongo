@@ -5,12 +5,15 @@
 
 #ifdef MONGO_CONFIG_OTEL
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
+#include "mongo/otel/metrics/metrics_settings.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 #include <chrono>
 #include <vector>
@@ -341,6 +344,26 @@ TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
     ASSERT_NOT_EQUALS(provider.get(), nullptr);
 
     shutdown();
+}
+
+TEST_F(OtelMetricsInitializationTest, HeadersWithoutHttpExporterLogsWarning) {
+    // Configure HTTP export headers while only the file exporter is enabled. The headers cannot be
+    // sent without the HTTP exporter, so initialization must log a warning.
+    unittest::ServerParameterGuard directoryParam{"openTelemetryMetricsDirectory", getMetricsDir()};
+
+    OpenTelemetryMetricsHttpExportHeaders headersParam{"openTelemetryMetricsHttpExportHeaders",
+                                                       ServerParameterType::kStartupOnly};
+    auto setHeaders = [&](BSONObj doc) {
+        auto storage = BSON("v" << doc);
+        return headersParam.set(storage.firstElement(), /*tenantId=*/boost::none);
+    };
+    ASSERT_OK(setHeaders(BSON("Authorization" << "Bearer ignored-token")));
+    ON_BLOCK_EXIT([&] { invariant(setHeaders(BSONObj{})); });
+
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(initialize());
+    logs.stop();
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12745900)), 1);
 }
 
 TEST_F(OtelMetricsInitializationTest, TimeoutGreaterThanIntervalFails) {
