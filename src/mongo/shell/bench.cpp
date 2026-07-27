@@ -3,12 +3,6 @@
 
 #include "mongo/shell/bench.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -43,6 +37,13 @@
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -4,8 +4,6 @@
 
 #include "mongo/db/repl/reporter.h"
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/executor/remote_command_request.h"
@@ -14,6 +12,9 @@
 #include "mongo/util/assert_util.h"
 
 #include <mutex>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

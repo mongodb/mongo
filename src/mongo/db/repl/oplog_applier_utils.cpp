@@ -16,7 +16,6 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/profile_settings.h"
-#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"

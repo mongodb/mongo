@@ -3,9 +3,6 @@
 
 #include "mongo/s/query_analysis_sampler.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -42,6 +39,10 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

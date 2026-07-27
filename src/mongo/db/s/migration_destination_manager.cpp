@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/migration_destination_manager.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -44,7 +42,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/s/migration_batch_fetcher.h"
-#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -112,6 +109,11 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 

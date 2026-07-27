@@ -4,14 +4,6 @@
 #pragma once
 
 
-#include <cstddef>
-#include <cstdint>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -44,6 +36,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <iterator>
 #include <memory>
@@ -52,6 +46,12 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

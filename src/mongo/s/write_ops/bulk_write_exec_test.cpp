@@ -1,15 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/commands/query_cmd/bulk_write_parser.h"
-#include "mongo/db/error_labels.h"
-#include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/write_ops/bulk_write_exec.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -24,7 +17,9 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
+#include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
@@ -42,11 +37,11 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/bulk_write_exec.h"
 #include "mongo/s/write_ops/fle.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -63,6 +58,12 @@
 #include <string>
 #include <tuple>
 #include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

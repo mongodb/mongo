@@ -1,14 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/write_op.h"
+#include "mongo/s/write_ops/batch_write_op.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -23,10 +17,12 @@
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -37,6 +33,11 @@
 #include <numeric>
 #include <string>
 #include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 namespace mongo {

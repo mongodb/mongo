@@ -3,13 +3,6 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/key_extractors.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/sequenced_index.hpp>
-#include <boost/multi_index_container.hpp>
-// IWYU pragma: no_include "boost/multi_index/detail/adl_swap.hpp"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/clock_source.h"
@@ -22,7 +15,14 @@
 #include <limits>
 #include <mutex>
 
+#include <absl/hash/hash.h>
+#include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/indexed_by.hpp>
+#include <boost/multi_index/key_extractors.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index_container.hpp>
+// IWYU pragma: no_include "boost/multi_index/detail/adl_swap.hpp"
 
 namespace mongo::logv2 {
 

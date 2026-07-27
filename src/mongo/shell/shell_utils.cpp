@@ -73,7 +73,6 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
-#include <mutex>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

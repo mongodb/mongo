@@ -15,7 +15,6 @@
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"

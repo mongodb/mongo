@@ -3,13 +3,6 @@
 
 #include "mongo/db/global_catalog/chunk_manager.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -29,6 +22,14 @@
 #include <iterator>
 #include <string_view>
 #include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

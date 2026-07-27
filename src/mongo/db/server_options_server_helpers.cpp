@@ -4,18 +4,6 @@
 
 #include "mongo/db/server_options_server_helpers.h"
 
-#include <boost/algorithm/string/constants.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/core/addressof.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/function/function_base.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-#include <boost/type_index/type_index_facade.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -42,6 +30,19 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+
+#include <boost/algorithm/string/constants.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/core/addressof.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/type_index/type_index_facade.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

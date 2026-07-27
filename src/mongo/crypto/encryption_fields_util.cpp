@@ -3,13 +3,13 @@
 
 #include "mongo/crypto/encryption_fields_util.h"
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <algorithm>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 

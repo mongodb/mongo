@@ -12,7 +12,6 @@
 #include <new>
 #include <streambuf>
 
-// IWYU pragma: no_include "bits/types/siginfo_t.h"
 
 #ifdef __linux__
 #include <string_view>
@@ -36,7 +35,7 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
-#include <mutex>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

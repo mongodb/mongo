@@ -3,12 +3,6 @@
 
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/read_preference.h"
@@ -35,6 +29,13 @@
 
 #include <mutex>
 #include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

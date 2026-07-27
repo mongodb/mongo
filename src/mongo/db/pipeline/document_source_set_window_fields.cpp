@@ -1,9 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/container/small_vector.hpp>
-#include <boost/optional.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types.h"
@@ -14,7 +13,6 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
@@ -41,9 +39,12 @@
 #include <algorithm>
 #include <iterator>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 using boost::intrusive_ptr;
 using boost::optional;

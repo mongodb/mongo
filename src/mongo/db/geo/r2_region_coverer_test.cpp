@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <cmath>
-#include <cstddef>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/geo/r2_region_coverer.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -13,7 +12,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
@@ -22,11 +20,14 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstddef>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
 #include <random>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

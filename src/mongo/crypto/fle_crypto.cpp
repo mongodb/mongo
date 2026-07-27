@@ -3,28 +3,6 @@
 
 #include "mongo/crypto/fle_crypto.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/cstdint.hpp>
-#include <boost/exception/exception.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/multiprecision/cpp_int/bitwise.hpp>
-#include <boost/multiprecision/cpp_int/comparison.hpp>
-#include <boost/multiprecision/cpp_int/divide.hpp>
-#include <boost/multiprecision/cpp_int/limits.hpp>
-#include <boost/multiprecision/cpp_int/literals.hpp>
-#include <boost/multiprecision/cpp_int/multiply.hpp>
-#include <boost/optional.hpp>
-// IWYU pragma: no_include "boost/multiprecision/detail/default_ops.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/integer_ops.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/no_et_ops.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/number_base.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/number_compare.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/multiprecision/number.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -40,6 +18,23 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_int/bitwise.hpp>
+#include <boost/multiprecision/cpp_int/comparison.hpp>
+#include <boost/multiprecision/cpp_int/divide.hpp>
+#include <boost/multiprecision/cpp_int/limits.hpp>
+#include <boost/multiprecision/cpp_int/literals.hpp>
+#include <boost/multiprecision/cpp_int/multiply.hpp>
+#include <boost/multiprecision/number.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 extern "C" {
 #include <mc-fle2-payload-iev-private-v2.h>
@@ -96,6 +91,12 @@ extern "C" {
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+// IWYU pragma: no_include "boost/multiprecision/detail/default_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/integer_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/no_et_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/number_base.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/number_compare.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

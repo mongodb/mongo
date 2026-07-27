@@ -1,14 +1,13 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/global_catalog/ddl/sessions_collection_sharded.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/global_catalog/ddl/sessions_collection_sharded.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -27,6 +26,9 @@
 #include <memory>
 #include <system_error>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

@@ -3,7 +3,6 @@
 
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -14,6 +13,7 @@
 #include <algorithm>
 #include <iterator>
 #include <utility>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

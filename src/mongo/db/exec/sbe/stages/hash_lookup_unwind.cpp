@@ -3,7 +3,6 @@
 
 #include "mongo/db/exec/sbe/stages/hash_lookup_unwind.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -12,6 +11,7 @@
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo::sbe {
 using namespace std::literals::string_view_literals;

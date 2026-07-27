@@ -7,16 +7,6 @@
 
 #pragma once
 
-#include <concepts>
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <string_view>
-#include <utility>
-#include <vector>
-
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -26,6 +16,15 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/util/modules.h"
+
+#include <concepts>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string_view>
+#include <utility>
+#include <vector>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 namespace mongo::sbe {
 

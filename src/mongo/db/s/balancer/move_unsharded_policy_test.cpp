@@ -1,13 +1,11 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/balancer/move_unsharded_policy.h"
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
-#include "mongo/db/s/balancer/move_unsharded_policy.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -18,6 +16,10 @@
 #include <ostream>
 #include <set>
 #include <string>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

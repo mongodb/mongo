@@ -1,10 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/migration_destination_manager.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -14,7 +12,6 @@
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
-#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
@@ -29,6 +26,11 @@
 #include "mongo/util/str.h"
 
 #include <system_error>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

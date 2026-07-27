@@ -2,22 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <chrono>
-#include <compare>
-#include <cstddef>
-#include <memory>
-#include <new>
-#include <thread>
-#include <utility>
+#include "mongo/transport/service_executor.h"
 
-#include <asio.hpp>  // IWYU pragma: keep
-
-#include <boost/smart_ptr.hpp>
-
-// IWYU pragma: no_include "asio/impl/dispatch.hpp"
-// IWYU pragma: no_include "asio/impl/io_context.hpp"
-// IWYU pragma: no_include "asio/impl/post.hpp"
-// IWYU pragma: no_include "asio/impl/system_executor.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
@@ -25,7 +11,6 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -45,9 +30,24 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
+#include <chrono>
+#include <compare>
+#include <cstddef>
+#include <memory>
+#include <new>
+#include <thread>
+#include <utility>
+
+#include <asio.hpp>  // IWYU pragma: keep
+
 #include <asio/io_context.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "asio/impl/dispatch.hpp"
+// IWYU pragma: no_include "asio/impl/io_context.hpp"
+// IWYU pragma: no_include "asio/impl/post.hpp"
+// IWYU pragma: no_include "asio/impl/system_executor.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

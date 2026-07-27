@@ -4,11 +4,6 @@
 #include "mongo/db/exec/classic/distinct_scan.h"
 
 #include "mongo/db/exec/classic/orphan_chunk_skipper.h"
-
-#include <memory>
-#include <vector>
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -22,7 +17,11 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 
+#include <memory>
+#include <vector>
+
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

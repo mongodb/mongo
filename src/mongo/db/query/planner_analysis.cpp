@@ -4,15 +4,6 @@
 
 #include "mongo/db/query/planner_analysis.h"
 
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <cstring>
-
-#include <s2cellid.h>
-
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -52,9 +43,18 @@
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
+#include <cstring>
 #include <set>
 #include <string_view>
 #include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

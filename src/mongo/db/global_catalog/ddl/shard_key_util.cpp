@@ -3,12 +3,8 @@
 
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
 
-#include "mongo/base/error_extra_info.h"
-
-#include <absl/container/node_hash_map.h>
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -59,8 +55,11 @@
 #include <list>
 #include <string_view>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

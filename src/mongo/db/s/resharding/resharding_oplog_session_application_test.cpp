@@ -2,12 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -33,7 +29,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -64,6 +59,13 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

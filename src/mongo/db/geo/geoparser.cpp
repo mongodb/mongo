@@ -4,7 +4,23 @@
 
 #include "mongo/db/geo/geoparser.h"
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
+#include "mongo/db/geo/big_polygon.h"
+#include "mongo/db/geo/shapes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+
+#include <cmath>
 #include <cstddef>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include <s1angle.h>
 #include <s1interval.h>
@@ -20,22 +36,6 @@
 #include <util/math/vector3-inl.h>
 #include <util/math/vector3.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/clonable_ptr.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/dotted_path/dotted_path_support.h"
-#include "mongo/db/geo/big_polygon.h"
-#include "mongo/db/geo/shapes.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
-
-#include <cmath>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <string_view>
-#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kGeo
 

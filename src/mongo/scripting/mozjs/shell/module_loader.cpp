@@ -1,22 +1,12 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <js/JSON.h>
-#include <js/Modules.h>
-#include <js/SourceText.h>
-#include <js/StableStringChars.h>
-// IWYU pragma: no_include "boost/system/detail/errc.hpp"
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include "mongo/scripting/mozjs/shell/module_loader.h"
+
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/mongo_path_util.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/scripting/mozjs/shell/internal_module_registry.h"
-#include "mongo/scripting/mozjs/shell/module_loader.h"
 #include "mongo/util/file.h"
 
 #include <algorithm>
@@ -27,6 +17,11 @@
 #include <jsapi.h>
 #include <jscustomallocator.h>
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <js/CallArgs.h>
@@ -35,12 +30,16 @@
 #include <js/Context.h>
 #include <js/ErrorReport.h>
 #include <js/GlobalObject.h>
+#include <js/JSON.h>
 #include <js/MapAndSet.h>
+#include <js/Modules.h>
 #include <js/Object.h>
 #include <js/PropertyAndElement.h>
 #include <js/PropertyDescriptor.h>
 #include <js/RootingAPI.h>
 #include <js/ScriptPrivate.h>
+#include <js/SourceText.h>
+#include <js/StableStringChars.h>
 #include <js/String.h>
 #include <js/TypeDecls.h>
 #include <js/Utility.h>
@@ -48,6 +47,8 @@
 #include <mozilla/Range.h>
 #include <mozilla/RangedPtr.h>
 #include <mozilla/UniquePtr.h>
+// IWYU pragma: no_include "boost/system/detail/errc.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

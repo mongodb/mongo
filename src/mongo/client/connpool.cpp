@@ -4,10 +4,8 @@
 // _ todo: reconnect?
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/client/connpool.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -16,7 +14,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -42,9 +39,14 @@
 #include <string>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
 #if __has_feature(address_sanitizer)
 #include <sanitizer/lsan_interface.h>
 #endif
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/repl/sync_source_feedback.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -13,7 +13,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/reporter.h"
-#include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -24,6 +23,9 @@
 
 #include <algorithm>
 #include <mutex>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

@@ -3,6 +3,24 @@
 
 #include "mongo/logv2/file_rotate_sink.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/logv2/attribute_storage.h"
+#include "mongo/logv2/json_formatter.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/logv2/shared_access_fstream.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/demangle.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/quick_exit.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
+
 #include <algorithm>
 #include <exception>
 #include <fstream>  // IWYU pragma: keep
@@ -24,30 +42,12 @@
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <fmt/format.h>
-// IWYU pragma: no_include "boost/system/detail/errc.hpp"
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
-#include "mongo/logv2/attribute_storage.h"
-#include "mongo/logv2/json_formatter.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_tag.h"
-#include "mongo/logv2/log_truncation.h"
-#include "mongo/logv2/shared_access_fstream.h"  // IWYU pragma: keep
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/demangle.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/time_support.h"
 
 #ifdef _WIN32
 #include "mongo/logv2/log_util.h"
 #endif
+// IWYU pragma: no_include "boost/system/detail/errc.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 namespace mongo::logv2 {
 namespace {

@@ -1,8 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -28,6 +26,9 @@
 #include <string>
 #include <system_error>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

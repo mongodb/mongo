@@ -3,14 +3,6 @@
 
 #include "mongo/db/pipeline/document_source_lookup.h"
 
-#include <algorithm>
-#include <array>
-#include <string_view>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -54,6 +46,15 @@
 #include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <array>
+#include <string_view>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

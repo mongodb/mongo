@@ -3,7 +3,6 @@
 
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 
-// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_checks.h"
@@ -39,6 +38,7 @@
 #include <type_traits>
 
 #include <boost/none.hpp>
+// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

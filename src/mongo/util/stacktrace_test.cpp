@@ -5,11 +5,8 @@
 // IWYU pragma: no_include "bits/types/__sigset_t.h"
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 // IWYU pragma: no_include "bits/types/stack_t.h"
-#include <fmt/format.h>
-#include <fmt/printf.h>  // IWYU pragma: keep
-#include <fmt/ranges.h>  // IWYU pragma: keep
-// IWYU pragma: no_include "syscall.h"
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/util/stacktrace.h"
+
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/json.h"
@@ -22,7 +19,6 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_test_helpers.h"
 
 #include <algorithm>
@@ -44,9 +40,15 @@
 #include <thread>
 #include <vector>
 
+#include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
+#include <fmt/ranges.h>  // IWYU pragma: keep
+
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "syscall.h"
+// IWYU pragma: no_include "cxxabi.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

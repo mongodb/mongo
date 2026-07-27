@@ -1,14 +1,13 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/filesystem/path.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/ftdc/controller.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
-#include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/ftdc_controller_gen.h"
 #include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/operation_context.h"
@@ -28,6 +27,9 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <boost/filesystem/path.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

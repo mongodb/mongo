@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -19,6 +17,9 @@
 #include <memory>
 #include <string_view>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo::sbe {
 /**

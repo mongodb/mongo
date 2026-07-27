@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/sharding_environment/cluster_identity_loader.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -14,7 +13,6 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -29,6 +27,10 @@
 #include <memory>
 #include <system_error>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -1,10 +1,9 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/type_traits.h"
-#include "mongo/base/data_range.h"
 #include "mongo/bson/bsonelement.h"
+
+#include "mongo/base/data_range.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -17,6 +16,9 @@
 #include <limits>
 #include <ostream>
 #include <string_view>
+
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/type_traits.h"
 
 namespace mongo {
 namespace {

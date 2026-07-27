@@ -71,7 +71,6 @@
 #include "mongo/db/topology/cluster_parameters/set_cluster_parameter_invocation.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/topology/remove_shard_draining_progress_gen.h"
-#include "mongo/db/topology/topology_change_helpers.h"
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_critical_section_document_gen.h"
 #include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"

@@ -1,11 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -32,7 +27,11 @@
 #include <string>
 #include <vector>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

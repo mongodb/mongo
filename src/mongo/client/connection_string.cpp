@@ -1,18 +1,20 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/client/connection_string.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/client/connection_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <set>
 #include <string_view>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

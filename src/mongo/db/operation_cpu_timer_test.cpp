@@ -4,7 +4,6 @@
 
 #include "mongo/db/operation_cpu_timer.h"
 
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -22,6 +21,7 @@
 #include <mutex>
 #include <ratio>
 #include <string>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

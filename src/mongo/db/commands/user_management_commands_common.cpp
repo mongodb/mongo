@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <absl/container/node_hash_map.h>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/commands/user_management_commands_common.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -18,7 +15,6 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/umc_info_command_arg.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/database_name_util.h"
 #include "mongo/db/multitenancy.h"
@@ -33,6 +29,12 @@
 #include <memory>
 #include <string_view>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 namespace auth {

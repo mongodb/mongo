@@ -3,7 +3,6 @@
 
 #include "mongo/db/exec/classic/spool.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -19,6 +18,7 @@
 
 #include <cstddef>
 #include <utility>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace {
 // Helper to allocate a new working set member to hold the RecordId, set the output parameter, and

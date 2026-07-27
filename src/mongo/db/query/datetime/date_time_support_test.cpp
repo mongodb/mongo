@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+
 #include "mongo/unittest/unittest.h"
 
 #include <initializer_list>
@@ -12,6 +11,9 @@
 #include <string>
 
 #include <timelib.h>
+
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 namespace {

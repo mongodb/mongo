@@ -3,23 +3,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/collection_impl.h"
 
-#include <mutex>
-#include <string_view>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -90,6 +73,23 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/string_map.h"
+
+#include <mutex>
+#include <string_view>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -3,12 +3,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -50,6 +44,13 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace [[MONGO_MOD_PUBLIC]] async_rpc {

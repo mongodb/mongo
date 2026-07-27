@@ -50,10 +50,6 @@
 #include <yaml-cpp/node/node.h>
 #include <yaml-cpp/node/parse.h>
 #include <yaml-cpp/yaml.h>  // IWYU pragma: keep
-// IWYU pragma: no_include "boost/program_options/detail/parsers.hpp"
-// IWYU pragma: no_include "ext/alloc_traits.h"
-// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
-// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
 
 #ifdef _WIN32
 #include <io.h>
@@ -90,6 +86,10 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "boost/program_options/detail/parsers.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -1,20 +1,15 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <cstdlib>
-#include <ctime>
-
-#include <boost/random/exponential_distribution.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/random/uniform_real_distribution.hpp>
-#include <boost/random/weibull_distribution.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
+
+#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -23,6 +18,12 @@
 #include <random>
 #include <string>
 #include <utility>
+
+#include <boost/random/exponential_distribution.hpp>
+#include <boost/random/normal_distribution.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
+#include <boost/random/weibull_distribution.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

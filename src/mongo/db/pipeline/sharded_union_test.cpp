@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/none.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -65,6 +62,10 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

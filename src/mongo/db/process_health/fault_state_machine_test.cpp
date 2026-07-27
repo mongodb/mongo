@@ -1,9 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -30,6 +27,10 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

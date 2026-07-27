@@ -4,7 +4,6 @@
 #include "mongo/db/exec/classic/distinct_scan.h"
 
 #include "mongo/client/index_spec.h"
-#include "mongo/db/exec/classic/distinct_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/query_shard_server_test_fixture.h"
 #include "mongo/db/global_catalog/type_chunk.h"

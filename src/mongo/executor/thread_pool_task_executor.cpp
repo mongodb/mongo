@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -15,7 +12,6 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
@@ -30,6 +26,12 @@
 
 #include <mutex>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 

@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/util/concurrency/thread_pool.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/logv2/log.h"
@@ -15,7 +13,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 
 #include <algorithm>
@@ -28,6 +25,11 @@
 #include <sstream>
 #include <thread>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

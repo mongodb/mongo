@@ -11,7 +11,6 @@
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cmdline_utils/censor_cmdline_test.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"

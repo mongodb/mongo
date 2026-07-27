@@ -11,7 +11,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/accumulator_multi.h"

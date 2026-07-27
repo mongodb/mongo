@@ -111,6 +111,14 @@
 #include <strings.h>
 #endif
 
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/shell/linenoise.h"
+#include "mongo/shell/linenoise_utf8.h"
+#include "mongo/shell/mk_wcwidth.h"
+#include "mongo/util/errno_util.h"
+
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
@@ -122,19 +130,11 @@
 #include <vector>
 
 #include <fcntl.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-
-#include "mongo/base/data_view.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/shell/linenoise.h"
-#include "mongo/shell/linenoise_utf8.h"
-#include "mongo/shell/mk_wcwidth.h"
-#include "mongo/util/errno_util.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 using std::string;
 using std::vector;

@@ -13,7 +13,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 #include <fmt/format.h>
 
 #ifndef _WIN32
@@ -60,6 +59,7 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

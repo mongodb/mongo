@@ -3,7 +3,6 @@
 
 #include "mongo/transport/service_executor_synchronous.h"
 
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
@@ -19,6 +18,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

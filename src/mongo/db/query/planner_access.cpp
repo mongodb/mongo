@@ -3,24 +3,12 @@
 
 #include "mongo/db/query/planner_access.h"
 
-#include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/matcher/expression_type.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/util/assert_util.h"
-
-#include <memory>
-
-#include <s2cellid.h>
-
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_query.h"
@@ -34,7 +22,9 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
@@ -78,6 +68,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

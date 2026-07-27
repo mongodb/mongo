@@ -3,7 +3,6 @@
 
 #include "mongo/executor/pinned_connection_task_executor.h"
 
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/client/async_client.h"
@@ -24,6 +23,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo::executor {
 /**

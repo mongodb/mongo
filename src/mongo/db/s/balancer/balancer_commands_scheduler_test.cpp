@@ -1,10 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/balancer/balancer_commands_scheduler.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -18,7 +16,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/type_shard.h"
-#include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
@@ -39,6 +36,11 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

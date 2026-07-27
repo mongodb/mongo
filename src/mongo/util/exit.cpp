@@ -2,21 +2,23 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/util/exit.h"
+
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 
 #include <mutex>
 #include <stack>
 #include <thread>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -16,7 +16,6 @@
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
 #include "mongo/db/exec/sbe/stages/multi_range_clustered_scan_stage.h"
 #include "mongo/db/exec/sbe/stages/random_scan.h"
-#include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/platform/compiler.h"

@@ -1,14 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/compare.hpp>
-#include <boost/algorithm/string/find_iterator.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/range/algorithm/count.hpp>
-// IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
-// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
+#include "mongo/client/mongo_uri.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -16,7 +10,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/client/mongo_uri.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/utility.h"
@@ -37,17 +30,25 @@
 #include <type_traits>
 #include <utility>
 
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/compare.hpp>
+#include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/finder.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/core/addressof.hpp>
 #include <boost/function/function_base.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/range/algorithm/count.hpp>
 #include <boost/range/const_iterator.hpp>
 #include <boost/range/iterator_range_core.hpp>
 #include <boost/type_index/type_index_facade.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
+// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
 
 using namespace std::literals::string_literals;
 

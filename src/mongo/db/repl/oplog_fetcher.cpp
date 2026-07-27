@@ -4,13 +4,6 @@
 
 #include "mongo/db/repl/oplog_fetcher.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -58,6 +51,14 @@
 #include <algorithm>
 #include <mutex>
 #include <string_view>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

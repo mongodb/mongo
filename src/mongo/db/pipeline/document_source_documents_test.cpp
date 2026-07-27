@@ -5,7 +5,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/unittest/unittest.h"

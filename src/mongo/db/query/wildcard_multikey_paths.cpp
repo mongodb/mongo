@@ -1,14 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <cstddef>
-#include <iterator>
-#include <memory>
-#include <string_view>
-#include <utility>
+#include "mongo/db/query/wildcard_multikey_paths.h"
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -26,7 +20,6 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
-#include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
@@ -42,7 +35,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <string_view>
+#include <utility>
+
+#include <boost/container/small_vector.hpp>
 #include <boost/none.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 /**
  * A wildcard index contains an unbounded set of multikey paths, therefore, it was decided to store

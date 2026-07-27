@@ -1,6 +1,22 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/bson/bsonobjbuilder.h"
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
+
 #include <initializer_list>
 #include <limits>
 #include <list>
@@ -13,23 +29,8 @@
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/static_assert.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/shared_buffer.h"
-
 #include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 namespace {

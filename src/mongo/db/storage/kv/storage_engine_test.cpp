@@ -28,7 +28,6 @@
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"

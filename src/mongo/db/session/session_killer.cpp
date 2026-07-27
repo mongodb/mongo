@@ -1,24 +1,26 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/session/session_killer.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/db/session/session_killer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 #include <iterator>
 #include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 

@@ -3,12 +3,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -23,10 +17,16 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

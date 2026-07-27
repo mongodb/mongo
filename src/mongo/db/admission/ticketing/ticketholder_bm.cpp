@@ -1,11 +1,10 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <benchmark/benchmark.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
+
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
-#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
@@ -19,6 +18,9 @@
 #include <map>
 #include <memory>
 #include <mutex>
+
+#include <benchmark/benchmark.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

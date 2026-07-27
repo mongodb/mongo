@@ -3,11 +3,6 @@
 
 #include "mongo/client/sdam/topology_description.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/type_traits/decay.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
@@ -23,6 +18,12 @@
 #include <iterator>
 #include <memory>
 #include <ostream>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/type_traits/decay.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

@@ -3,10 +3,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
@@ -21,6 +17,11 @@
 
 #include <string>
 #include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 /**

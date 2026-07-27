@@ -3,13 +3,6 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +42,14 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

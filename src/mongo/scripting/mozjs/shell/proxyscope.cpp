@@ -1,14 +1,13 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/none.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/scripting/mozjs/shell/proxyscope.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
-#include "mongo/scripting/mozjs/shell/proxyscope.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/functional.h"
@@ -19,6 +18,9 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+
+#include <boost/none.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace mozjs {

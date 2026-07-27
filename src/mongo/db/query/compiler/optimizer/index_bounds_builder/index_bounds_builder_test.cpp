@@ -1,8 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <s2cellid.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
@@ -15,6 +13,9 @@
 
 #include <limits>
 #include <memory>
+
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace {
 

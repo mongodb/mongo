@@ -1,6 +1,14 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/transport/message_compressor_registry.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/transport/message_compressor_noop.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <memory>
 #include <ostream>
@@ -10,18 +18,11 @@
 #include <absl/container/flat_hash_map.h>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-// IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
-#include "mongo/transport/message_compressor_noop.h"
-#include "mongo/transport/message_compressor_registry.h"
-#include "mongo/util/assert_util.h"
-
 #include <boost/core/addressof.hpp>
 #include <boost/function/function_base.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/type_index/type_index_facade.hpp>
+// IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

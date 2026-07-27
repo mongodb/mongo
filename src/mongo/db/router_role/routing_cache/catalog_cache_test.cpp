@@ -20,7 +20,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader_mock.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"

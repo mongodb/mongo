@@ -2,19 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <cstdint>
+#include "mongo/db/validate/key_string_index_consistency.h"
 
-#include <absl/container/node_hash_map.h>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
-#include <boost/move/algo/move.hpp>
-// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -39,7 +28,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -52,8 +40,21 @@
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/algo/move.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

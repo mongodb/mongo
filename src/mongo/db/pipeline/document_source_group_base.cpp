@@ -3,10 +3,8 @@
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/pipeline/document_source_group_base.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -17,7 +15,6 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_group_base.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -35,6 +32,11 @@
 #include <cstddef>
 #include <memory>
 #include <string_view>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

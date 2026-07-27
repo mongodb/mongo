@@ -3,9 +3,21 @@
 
 #include "mongo/db/exec/agg/sample_from_random_cursor_stage.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #include <cstdlib>
 #include <string>
@@ -15,19 +27,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "boost/math/special_functions/detail/erf_inv.hpp"
 // IWYU pragma: no_include "boost/math/special_functions/detail/lanczos_sse2.hpp"
-
-#include "mongo/db/client.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

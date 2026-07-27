@@ -1,11 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/util/duration.h"
+#include "mongo/db/sharding_environment/client/shard_remote.h"
 
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -15,7 +12,6 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/sharding_environment/client/shard.h"
-#include "mongo/db/sharding_environment/client/shard_remote.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/network_test_env.h"
@@ -23,6 +19,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 #include <cmath>
 #include <cstddef>
@@ -30,6 +27,10 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

@@ -1,10 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <cstddef>
+#include "mongo/db/repl/repl_set_config_checks.h"
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -16,7 +14,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_config_gen.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -28,9 +25,13 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <iterator>
 #include <set>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

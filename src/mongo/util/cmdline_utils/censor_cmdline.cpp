@@ -3,7 +3,6 @@
 
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -21,6 +20,7 @@
 #include <cstring>
 #include <set>
 #include <string>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 namespace cmdline_utils {

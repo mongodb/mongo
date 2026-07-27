@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -49,6 +45,11 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

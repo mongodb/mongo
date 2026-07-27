@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
@@ -16,7 +13,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -53,6 +49,12 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

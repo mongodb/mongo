@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -25,6 +23,9 @@
 #include <memory>
 #include <string_view>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

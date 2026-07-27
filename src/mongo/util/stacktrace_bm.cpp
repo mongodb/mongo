@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
+#include "mongo/util/stacktrace.h"
+
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/platform/compiler.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -9,15 +14,10 @@
 
 #include <benchmark/benchmark.h>
 
-// IWYU pragma: no_include "libunwind-x86_64.h"
-
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/platform/compiler.h"
-#include "mongo/util/stacktrace.h"
-
 #if defined(MONGO_CONFIG_USE_LIBUNWIND)
 #include <libunwind.h>  // IWYU pragma: keep
 #endif
+// IWYU pragma: no_include "libunwind-x86_64.h"
 
 
 namespace mongo {

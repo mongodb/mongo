@@ -2,12 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <cstdint>
-#include <cstring>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -65,6 +59,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
+#include <cstdint>
+#include <cstring>
 #include <iosfwd>
 #include <memory>
 #include <set>
@@ -72,6 +68,10 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

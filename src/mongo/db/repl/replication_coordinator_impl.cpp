@@ -3,17 +3,6 @@
 
 #include "mongo/db/repl/replication_coordinator_impl.h"
 
-#include <ctime>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -119,6 +108,7 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <ctime>
 #include <functional>
 #include <iterator>
 #include <mutex>
@@ -126,6 +116,16 @@
 #include <string_view>
 #include <type_traits>
 #include <variant>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

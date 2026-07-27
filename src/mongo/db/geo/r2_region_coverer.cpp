@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/core/checked_delete.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/std_fwd.hpp"
 #include "mongo/db/geo/r2_region_coverer.h"
+
 #include "mongo/db/geo/shapes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -18,8 +17,10 @@
 #include <s2cellid.h>
 #include <s2edgeindex.h>
 
+#include <boost/core/checked_delete.hpp>
 #include <boost/smart_ptr/scoped_ptr.hpp>
 #include <util/math/vector3-inl.h>
+// IWYU pragma: no_include "boost/intrusive/detail/std_fwd.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -3,18 +3,17 @@
 
 #include "mongo/db/query/index_tag.h"
 
-
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <limits>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <limits>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 

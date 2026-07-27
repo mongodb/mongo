@@ -2,15 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/optional.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -23,7 +16,6 @@
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/index_multikey_helpers.h"
-#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -34,6 +26,15 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

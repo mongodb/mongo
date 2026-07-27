@@ -1,8 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/bson/json.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/document.h"
@@ -10,6 +8,9 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 
 namespace mongo {

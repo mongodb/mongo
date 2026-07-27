@@ -7,19 +7,6 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
-#include <algorithm>
-#include <memory>
-#include <set>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <absl/strings/str_split.h>
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -39,7 +26,20 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <absl/strings/str_split.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 using namespace mongo;
 

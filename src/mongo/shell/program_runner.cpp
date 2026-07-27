@@ -18,16 +18,13 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
-#include <boost/filesystem/operations.hpp>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream_buffer.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <boost/core/typeinfo.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/iostreams/categories.hpp>
-// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
-// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
+#include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/imbue.hpp>
+#include <boost/iostreams/stream_buffer.hpp>
 #include <fmt/format.h>
 
 #ifdef _WIN32
@@ -56,6 +53,9 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

@@ -3,14 +3,6 @@
 
 #pragma once
 
-#include "mongo/util/modules.h"
-
-#include <cstddef>
-#include <cstdint>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -34,14 +26,21 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 class QuerySolution;

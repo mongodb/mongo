@@ -2,20 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
-#include <algorithm>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -30,6 +16,19 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 /**
  * Contains a set of functions for shallow estimating the size of allocated on the heap objects

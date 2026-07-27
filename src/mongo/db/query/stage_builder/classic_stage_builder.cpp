@@ -2,13 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <memory>
-#include <utility>
-#include <vector>
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -44,7 +39,6 @@
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -54,6 +48,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

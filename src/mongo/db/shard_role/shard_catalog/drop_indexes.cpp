@@ -3,12 +3,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/drop_indexes.h"
 
-#include <boost/algorithm/string/join.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -59,6 +53,13 @@
 #include <cstdint>
 #include <memory>
 #include <string_view>
+
+#include <boost/algorithm/string/join.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

@@ -4,10 +4,6 @@
 
 #include "mongo/db/repl/hello/topology_version_observer.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
@@ -20,6 +16,11 @@
 #include <mutex>
 #include <type_traits>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

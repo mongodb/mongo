@@ -1,18 +1,14 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/dbclient_mockcursor.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
@@ -23,6 +19,12 @@
 
 #include <mutex>
 #include <string_view>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 using mongo::BSONObj;
 

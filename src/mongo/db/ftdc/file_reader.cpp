@@ -1,6 +1,18 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/ftdc/file_reader.h"
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/ftdc/util.h"
+#include "mongo/rpc/object_check.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
+
 #include <cstdint>
 #include <cstring>
 #include <fstream>  // IWYU pragma: keep
@@ -11,17 +23,6 @@
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/db/ftdc/file_reader.h"
-#include "mongo/db/ftdc/util.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 

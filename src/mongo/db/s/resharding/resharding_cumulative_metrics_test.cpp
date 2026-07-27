@@ -5,7 +5,6 @@
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

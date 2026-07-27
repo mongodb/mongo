@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 #include "mongo/client/sdam/topology_manager.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -23,6 +22,7 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

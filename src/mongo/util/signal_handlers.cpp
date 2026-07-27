@@ -4,8 +4,6 @@
 
 #include "mongo/util/signal_handlers.h"
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "bits/types/siginfo_t.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
@@ -31,6 +29,9 @@
 #include <ctime>
 #include <memory>
 #include <random>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

@@ -4,14 +4,6 @@
 
 #include "mongo/db/s/balancer/balancer.h"
 
-#include <absl/container/node_hash_set.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/none_t.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -96,6 +88,15 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

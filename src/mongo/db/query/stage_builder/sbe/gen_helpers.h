@@ -3,10 +3,6 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
@@ -38,6 +34,11 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 namespace mongo::projection_ast {
 class Projection;

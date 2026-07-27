@@ -1,15 +1,11 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/container/flat_map.hpp>
-#include <boost/container/static_vector.hpp>
-#include <boost/container/vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
+#include "mongo/db/update/document_diff_serialization.h"
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -19,9 +15,14 @@
 #include <string_view>
 #include <type_traits>
 
+#include <boost/container/flat_map.hpp>
+#include <boost/container/static_vector.hpp>
+#include <boost/container/vector.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
 
 namespace mongo {
 namespace diff_tree {

@@ -4,8 +4,6 @@
 #include "mongo/platform/process_id.h"
 
 
-// IWYU pragma: no_include "syscall.h"
-
 #ifndef _WIN32
 #include <pthread.h>  // IWYU pragma: keep
 #endif
@@ -23,6 +21,7 @@
 
 #include <limits>
 #include <sstream>  // IWYU pragma: keep
+// IWYU pragma: no_include "syscall.h"
 
 namespace mongo {
 

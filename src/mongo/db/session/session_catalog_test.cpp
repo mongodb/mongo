@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
-#include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/session_catalog_test.h"
+
+#include "mongo/db/session/kill_sessions.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -23,6 +20,11 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

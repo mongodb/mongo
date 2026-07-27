@@ -5,7 +5,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/change_streams/data_to_shards_allocation_query_service_impl.h"
 #include "mongo/s/change_streams/historical_placement_fetcher_impl.h"
 #include "mongo/util/assert_util.h"
 

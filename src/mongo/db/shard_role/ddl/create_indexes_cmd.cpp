@@ -1,15 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <algorithm>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <vector>
-
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -77,9 +68,18 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
+#include "mongo/util/ctype.h"
+
+#include "mongo/base/static_assert.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cstddef>
 #include <string>
 
 #include <fmt/format.h>
 // IWYU pragma: no_include <ctype.h>
-
-#include "mongo/base/static_assert.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/ctype.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

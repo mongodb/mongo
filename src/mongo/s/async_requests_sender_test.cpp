@@ -1,9 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/s/async_requests_sender.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -20,7 +19,6 @@
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/traces_test_util.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -29,6 +27,9 @@
 #include <system_error>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

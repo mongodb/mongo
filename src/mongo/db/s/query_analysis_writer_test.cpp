@@ -3,14 +3,6 @@
 
 #include "mongo/db/s/query_analysis_writer.h"
 
-#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
-#include "mongo/db/admission/execution_control/ticketing_system.h"
-#include "mongo/db/admission/ticketing/ticketholder.h"
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -19,6 +11,9 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/ticketing_system.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/find_command.h"
@@ -47,6 +42,11 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

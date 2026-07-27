@@ -36,7 +36,6 @@
 
 #include <functional>
 #include <future>  // IWYU pragma: keep
-#include <future>
 #include <initializer_list>
 #include <memory>
 #include <mutex>

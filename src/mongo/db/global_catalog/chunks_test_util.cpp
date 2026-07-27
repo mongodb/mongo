@@ -4,7 +4,6 @@
 
 #include "mongo/db/global_catalog/chunks_test_util.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/logv2/log.h"
@@ -17,6 +16,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <utility>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

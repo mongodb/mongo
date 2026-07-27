@@ -1,11 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/cstdint.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/commands/query_cmd/bulk_write.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -19,7 +16,6 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/query_cmd/bulk_write.h"
 #include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
@@ -125,6 +121,12 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

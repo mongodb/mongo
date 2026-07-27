@@ -6,6 +6,22 @@
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
+#include "mongo/base/parse_number.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/future.h"
+#include "mongo/util/stacktrace_details.h"
+#include "mongo/util/stacktrace_somap.h"
+
 #include <atomic>
 #include <cerrno>
 #include <csignal>
@@ -29,24 +45,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <fmt/format.h>
-// IWYU pragma: no_include <syscall.h>
-// IWYU pragma: no_include "bits/types/siginfo_t.h"
-
-#include "mongo/base/parse_number.h"
-#include "mongo/base/static_assert.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/json.h"
-#include "mongo/bson/oid.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/future.h"
-#include "mongo/util/stacktrace_details.h"
-#include "mongo/util/stacktrace_somap.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -655,3 +653,5 @@ void markAsStackTraceProcessingThread() {
 
 }  // namespace mongo
 #endif  // !defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+// IWYU pragma: no_include <syscall.h>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"

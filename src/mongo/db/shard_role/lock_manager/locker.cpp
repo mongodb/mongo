@@ -10,7 +10,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager.h"
-#include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/lock_manager/resource_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"

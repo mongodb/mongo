@@ -3,20 +3,18 @@
 
 #include "mongo/db/index/wildcard_validation.h"
 
-#include <algorithm>
-#include <cstddef>
-#include <string_view>
-#include <utility>
-#include <vector>
-
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <string_view>
+#include <utility>
+#include <vector>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 namespace {

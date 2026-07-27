@@ -1,9 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -12,11 +11,14 @@
 #include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 
 #include <initializer_list>
 #include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 namespace {

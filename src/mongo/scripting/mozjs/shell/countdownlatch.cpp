@@ -1,18 +1,10 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <jsapi.h>
+#include "mongo/scripting/mozjs/shell/countdownlatch.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <js/CallArgs.h>
-#include <js/PropertySpec.h>
-#include <js/RootingAPI.h>
-#include <js/TypeDecls.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/shell/countdownlatch.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -23,6 +15,16 @@
 #include <memory>
 #include <mutex>
 #include <utility>
+
+#include <jsapi.h>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace mozjs {

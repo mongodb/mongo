@@ -6,14 +6,13 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/exit_code.h"
 
-#include <mutex>
+#include <mutex>  // IWYU pragma: keep
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
 // NOTE: Header only dependencies are OK in this library.
-#include <mutex>  // IWYU pragma: keep
 
 #if !defined(__has_include)
 #define __has_include(x) 0

@@ -3,7 +3,6 @@
 
 #include "mongo/s/write_ops/bulk_write_exec.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -54,6 +53,7 @@
 
 #include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

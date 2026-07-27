@@ -1,15 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <algorithm>
-#include <iterator>
-#include <memory>
-#include <set>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -23,6 +14,14 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <set>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo::projection_executor {
 namespace {

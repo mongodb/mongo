@@ -2,19 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <algorithm>
-#include <iterator>
-#include <set>
-#include <type_traits>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include <unistd.h>
+#include "mongo/db/process_health/fault_manager.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -22,7 +10,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet_impl.h"
-#include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/network_interface.h"
@@ -38,8 +25,21 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+#include <iterator>
 #include <mutex>
+#include <set>
 #include <string_view>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include <unistd.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 

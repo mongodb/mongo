@@ -6,6 +6,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
 
 #include <set>
 #include <string>

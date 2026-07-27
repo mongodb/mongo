@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <boost/smart_ptr.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include "mongo/db/pipeline/document_source_bucket_auto.h"
+
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator_for_bucket_auto.h"
-#include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
@@ -19,7 +18,9 @@
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

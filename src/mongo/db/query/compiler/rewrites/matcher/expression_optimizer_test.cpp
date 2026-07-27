@@ -18,7 +18,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
-#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_tag.h"

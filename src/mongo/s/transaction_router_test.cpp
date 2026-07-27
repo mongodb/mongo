@@ -2,17 +2,12 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/s/transaction_router.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
@@ -40,7 +35,6 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/router_transactions_metrics.h"
 #include "mongo/s/session_catalog_router.h"
-#include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -62,6 +56,13 @@
 #include <set>
 #include <tuple>
 #include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

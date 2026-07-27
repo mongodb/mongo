@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/migration_chunk_cloner_source.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -38,7 +35,6 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -97,6 +93,12 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

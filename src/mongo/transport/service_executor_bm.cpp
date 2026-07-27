@@ -1,12 +1,11 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <benchmark/benchmark.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/transport/service_executor.h"
+
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/log_test.h"
@@ -17,6 +16,9 @@
 #include <memory>
 #include <mutex>
 #include <utility>
+
+#include <benchmark/benchmark.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kTest
 

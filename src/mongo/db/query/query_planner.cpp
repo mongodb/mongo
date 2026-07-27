@@ -2,15 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <cstring>
+#include "mongo/db/query/query_planner.h"
 
-#include <s2cellid.h>
-
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -61,7 +54,6 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/search/mongot_cursor.h"
@@ -70,11 +62,20 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <cstring>
 #include <deque>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

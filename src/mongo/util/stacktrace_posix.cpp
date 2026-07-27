@@ -5,8 +5,17 @@
 #include <dlfcn.h>
 #endif
 
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/stacktrace_somap.h"
+
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -20,18 +29,8 @@
 #include <vector>
 
 #include <cxxabi.h>
-// IWYU pragma: no_include "libunwind-x86_64.h"
 
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/logv2/log.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/stacktrace_somap.h"
+#include <fmt/format.h>
 
 #define MONGO_STACKTRACE_BACKEND_NONE 0
 #define MONGO_STACKTRACE_BACKEND_LIBUNWIND 1
@@ -58,6 +57,8 @@
 #elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO
 #include <execinfo.h>
 #endif
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "libunwind-x86_64.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -2,13 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <memory>
-#include <set>
-#include <string_view>
+#include "mongo/db/fts/fts_index_format.h"
 
-#include <fmt/format.h>
-
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -16,15 +11,20 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <memory>
+#include <set>
+#include <string_view>
+
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

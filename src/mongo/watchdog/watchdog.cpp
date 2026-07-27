@@ -14,10 +14,8 @@
 
 #include <boost/align.hpp>  // IWYU pragma: keep
 #include <boost/align/align_up.hpp>
-// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -46,6 +44,8 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

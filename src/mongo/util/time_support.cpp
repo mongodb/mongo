@@ -1,13 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <algorithm>
+#include "mongo/util/time_support.h"
 
-#include <boost/move/utility_core.hpp>
-#include <fmt/compile.h>
-#include <fmt/format.h>
-#include <sys/types.h>
-// IWYU pragma: no_include "bits/types/struct_tm.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/parse_number.h"
@@ -17,13 +12,18 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <thread>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/compile.h>
+#include <fmt/format.h>
+#include <sys/types.h>
 
 #if defined(_WIN32)
 #include "mongo/util/system_tick_source.h"
@@ -47,6 +47,7 @@
  */
 #define PCRE2_CODE_UNIT_WIDTH 8  // Select 8-bit PCRE2 library.
 #include <pcre2.h>
+// IWYU pragma: no_include "bits/types/struct_tm.h"
 
 namespace mongo {
 

@@ -3,12 +3,8 @@
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 
-#include <set>
+#include "mongo/db/query/planner_wildcard_helpers.h"
 
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-
-// IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -17,12 +13,15 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <set>
 #include <string_view>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 
 namespace mongo::wildcard_planning {

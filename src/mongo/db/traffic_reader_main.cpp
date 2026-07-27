@@ -1,11 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <fcntl.h>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/program_options/value_semantic.hpp>
-// IWYU pragma: no_include "boost/program_options/detail/parsers.hpp"
 #include <cerrno>
 #include <cstring>
 #include <fstream>  // IWYU pragma: keep
@@ -13,8 +8,12 @@
 #include <string>
 #include <vector>
 
+#include <fcntl.h>
+
+#include <boost/filesystem/operations.hpp>
 #include <boost/program_options/errors.hpp>
 #include <boost/program_options/options_description.hpp>
+#include <boost/program_options/value_semantic.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <boost/type_index/type_index_facade.hpp>
 
@@ -31,6 +30,7 @@
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
 #include <boost/program_options.hpp>  // IWYU pragma: keep
+// IWYU pragma: no_include "boost/program_options/detail/parsers.hpp"
 
 using namespace mongo;
 

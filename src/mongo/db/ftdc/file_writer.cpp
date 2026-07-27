@@ -1,6 +1,16 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/ftdc/file_writer.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/ftdc/compressor.h"
+#include "mongo/db/ftdc/config.h"
+#include "mongo/db/ftdc/util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
+
 #include <fstream>  // IWYU pragma: keep
 #include <string>
 #include <tuple>
@@ -9,18 +19,8 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/ftdc/compressor.h"
-#include "mongo/db/ftdc/config.h"
-#include "mongo/db/ftdc/file_writer.h"
-#include "mongo/db/ftdc/util.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/str.h"
-
 #include <fmt/format.h>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 namespace mongo {
 

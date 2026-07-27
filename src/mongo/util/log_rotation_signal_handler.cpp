@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include "mongo/util/signal_handlers.h"
-
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "bits/types/siginfo_t.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -22,6 +18,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/signal_handlers.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/signal_win32.h"  // IWYU pragma: keep
 #include "mongo/util/stacktrace.h"
@@ -33,6 +30,9 @@
 #include <memory>
 #include <random>
 #include <thread>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

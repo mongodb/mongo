@@ -2,15 +2,12 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/repl/initial_sync/database_cloner.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/namespace_string_util.h"
-#include "mongo/db/repl/initial_sync/database_cloner.h"
 #include "mongo/db/repl/initial_sync/database_cloner_gen.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/service_context.h"
@@ -28,6 +25,10 @@
 
 #include <mutex>
 #include <string_view>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 

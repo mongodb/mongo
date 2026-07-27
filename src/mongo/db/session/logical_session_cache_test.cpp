@@ -1,11 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/session/logical_session_cache.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -13,7 +10,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/service_liaison_mock.h"
-#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_cache_impl.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -33,6 +29,12 @@
 #include <ostream>
 #include <string>
 #include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 namespace {

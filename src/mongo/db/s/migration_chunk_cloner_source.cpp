@@ -3,13 +3,6 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/strings/string_view.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -75,6 +68,14 @@
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/strings/string_view.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

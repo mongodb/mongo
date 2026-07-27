@@ -3,9 +3,6 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-#include <boost/optional.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/container_size_helper.h"
@@ -23,8 +20,11 @@
 #include <type_traits>
 #include <vector>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 

@@ -4,11 +4,6 @@
 #pragma once
 
 
-#include "mongo/util/modules.h"
-
-#include <boost/container/small_vector.hpp>
-#include <boost/smart_ptr.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -30,6 +25,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
@@ -40,8 +36,11 @@
 #include <string_view>
 #include <utility>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo::projection_executor {
 /**

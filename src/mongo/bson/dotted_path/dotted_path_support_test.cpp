@@ -1,20 +1,21 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <cstddef>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <vector>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 
 
 namespace mongo {

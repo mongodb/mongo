@@ -3,19 +3,6 @@
 
 #include "mongo/crypto/encryption_fields_validation.h"
 
-#include <cmath>
-#include <cstdint>
-#include <limits>
-#include <string_view>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/container/small_vector.hpp>
-#include <boost/cstdint.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
@@ -27,10 +14,22 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 

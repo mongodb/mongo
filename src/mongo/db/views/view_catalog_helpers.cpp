@@ -3,13 +3,6 @@
 
 #include "mongo/db/views/view_catalog_helpers.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/basic_types_gen.h"
@@ -46,6 +39,14 @@
 #include <list>
 #include <utility>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 namespace view_catalog_helpers {

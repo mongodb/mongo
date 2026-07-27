@@ -3,7 +3,6 @@
 
 #include "mongo/db/global_catalog/chunk.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
@@ -15,6 +14,7 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

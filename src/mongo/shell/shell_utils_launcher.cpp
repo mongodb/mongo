@@ -20,14 +20,11 @@
 #include <utility>
 #include <vector>
 
-#include <fmt/format.h>
-
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/iterator/iterator_facade.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <fmt/format.h>
 
 #ifdef _WIN32
 #include <io.h>
@@ -67,6 +64,8 @@
 #include "mongo/util/text.h"          // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

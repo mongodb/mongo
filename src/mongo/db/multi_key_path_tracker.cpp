@@ -2,12 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
-// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 #include "mongo/db/multi_key_path_tracker.h"
+
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
@@ -17,8 +13,13 @@
 #include <iterator>
 #include <sstream>
 
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 
 namespace mongo {
 

@@ -4,20 +4,6 @@
 
 #include "mongo/db/exec/classic/geo_near.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdlib>
-#include <limits>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
-
-#include <s2regionintersection.h>  // For s2 search
-
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/classic/fetch.h"
@@ -39,6 +25,16 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <limits>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include <r1interval.h>
 #include <s1angle.h>
 #include <s2.h>
@@ -48,6 +44,8 @@
 #include <s2cellunion.h>
 #include <s2latlng.h>
 #include <s2region.h>
+#include <s2regionintersection.h>  // For s2 search
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

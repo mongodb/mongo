@@ -3,14 +3,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/flat_hash_set.h>
-#include <boost/predef/hardware/simd.h>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-// IWYU pragma: no_include "boost/predef/hardware/simd/x86.h"
-// IWYU pragma: no_include "boost/predef/hardware/simd/x86/versions.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
-// IWYU pragma: no_include "emmintrin.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
@@ -53,6 +45,15 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+#include <boost/predef/hardware/simd.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+// IWYU pragma: no_include "boost/predef/hardware/simd/x86.h"
+// IWYU pragma: no_include "boost/predef/hardware/simd/x86/versions.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "emmintrin.h"
 
 // TODO(SERVER-114140): Remove all [[MONGO_MOD_NEEDS_REPLACEMENT]] annotations
 

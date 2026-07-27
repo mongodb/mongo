@@ -3,11 +3,6 @@
 
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -44,6 +39,12 @@
 #include <iterator>
 #include <system_error>
 #include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 

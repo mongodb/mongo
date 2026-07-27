@@ -1,13 +1,9 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/error_codes.h"
 #include "mongo/db/index_builds/active_index_builds.h"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -26,6 +22,12 @@
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

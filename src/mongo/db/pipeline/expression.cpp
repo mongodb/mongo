@@ -1,6 +1,32 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/pipeline/expression.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/exec/expression/evaluate.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_parser_gen.h"
+#include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/util/rank_fusion_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -20,31 +46,6 @@
 #include <fmt/format.h>
 // IWYU pragma: no_include <pstl/glue_algorithm_defs.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/crypto/fle_crypto.h"
-#include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/exec/expression/evaluate.h"
-#include "mongo/db/feature_compatibility_version_documentation.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_parser_gen.h"
-#include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_knob_descriptors_execution.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
-#include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

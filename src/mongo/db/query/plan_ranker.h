@@ -3,10 +3,6 @@
 
 #pragma once
 
-#include "mongo/util/modules.h"
-
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/base/status.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -15,12 +11,16 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <deque>
 #include <memory>
 #include <string>
+
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

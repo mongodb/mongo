@@ -3,12 +3,6 @@
 
 #pragma once
 
-#include <cstddef>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -21,10 +15,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
 #include <memory>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/transport/session_workflow.h"
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_endian.h"
@@ -54,7 +51,6 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/session_manager_common_mock.h"
-#include "mongo/transport/session_workflow.h"
 #include "mongo/transport/session_workflow_p.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/test_fixtures.h"
@@ -88,6 +84,12 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

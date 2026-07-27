@@ -3,9 +3,6 @@
 
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -73,6 +70,10 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 

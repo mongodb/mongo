@@ -3,7 +3,6 @@
 
 #include "mongo/db/repl/oplog_applier_impl.h"
 
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -83,6 +82,7 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

@@ -3,14 +3,6 @@
 
 #include "mongo/bson/column/simple8b.h"
 
-#include <absl/numeric/int128.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/column/simple8b_builder.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/util/builder.h"
@@ -25,6 +17,15 @@
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 using namespace mongo;
 

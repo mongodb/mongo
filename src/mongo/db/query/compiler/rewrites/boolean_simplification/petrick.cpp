@@ -3,12 +3,12 @@
 
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/petrick.h"
 
-#include <algorithm>
-#include <cstddef>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/util/dynamic_bitset.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <utility>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo::boolean_simplification {
 namespace {

@@ -1,20 +1,22 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
+
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
 #include <string_view>
 #include <type_traits>
+
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

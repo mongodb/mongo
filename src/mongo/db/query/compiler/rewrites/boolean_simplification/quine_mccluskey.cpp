@@ -3,8 +3,6 @@
 
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/quine_mccluskey.h"
 
-
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/petrick.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -14,6 +12,7 @@
 #include <iterator>
 
 #include <absl/container/btree_map.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo::boolean_simplification {
 namespace {

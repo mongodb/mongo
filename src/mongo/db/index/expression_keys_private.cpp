@@ -4,7 +4,6 @@
 
 #include "mongo/db/index/expression_keys_private.h"
 
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -26,6 +25,7 @@
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 namespace mongo {

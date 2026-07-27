@@ -1,12 +1,13 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <benchmark/benchmark.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/stdx/condition_variable.h"
 
 #include <condition_variable>
 #include <mutex>
+
+#include <benchmark/benchmark.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 

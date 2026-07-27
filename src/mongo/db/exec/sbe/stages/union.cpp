@@ -3,8 +3,6 @@
 
 #include "mongo/db/exec/sbe/stages/union.h"
 
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -15,6 +13,9 @@
 #include <algorithm>
 #include <string_view>
 #include <utility>
+
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo::sbe {
 using namespace std::literals::string_view_literals;

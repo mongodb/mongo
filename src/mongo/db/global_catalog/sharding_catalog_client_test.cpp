@@ -1,13 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
@@ -18,7 +13,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
@@ -50,6 +44,14 @@
 #include <cstddef>
 #include <memory>
 #include <tuple>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

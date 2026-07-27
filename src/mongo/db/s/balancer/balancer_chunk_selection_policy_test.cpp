@@ -1,9 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -19,7 +18,6 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -46,6 +44,10 @@
 #include <set>
 #include <string>
 #include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

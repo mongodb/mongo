@@ -3,7 +3,6 @@
 
 #include "mongo/db/exec/classic/count_scan.h"
 
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index_names.h"
@@ -17,6 +16,7 @@
 #include <memory>
 
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 

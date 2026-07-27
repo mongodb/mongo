@@ -19,15 +19,13 @@
 #include <fcntl.h>
 
 #include <boost/algorithm/string/constants.hpp>
-#include <boost/algorithm/string/finder.hpp>
-// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
 #include <boost/algorithm/string/find_iterator.hpp>
+#include <boost/algorithm/string/finder.hpp>
 #include <boost/core/addressof.hpp>
 #include <boost/function/function_base.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/range/iterator_range_core.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 #include <boost/type_index/type_index_facade.hpp>
 
 #ifndef _WIN32
@@ -53,6 +51,8 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

@@ -1,16 +1,16 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <memory>
-#include <set>
-
-// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
-
 #include "mongo/db/partitioned.h"
+
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <set>
+// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 
 namespace mongo {
 namespace {

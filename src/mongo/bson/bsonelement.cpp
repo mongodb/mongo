@@ -4,10 +4,6 @@
 
 #include "mongo/bson/bsonelement.h"
 
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/parse_number.h"
@@ -28,6 +24,10 @@
 
 #include <cmath>
 #include <string_view>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

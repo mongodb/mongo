@@ -1,13 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/flat_hash_set.h>
-#include <absl/container/inlined_vector.h>
-#include <boost/container/flat_set.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/index/index_access_method.h"
@@ -21,7 +16,6 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/record_id.h"
@@ -41,6 +35,14 @@
 
 #include <algorithm>
 #include <string_view>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/inlined_vector.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

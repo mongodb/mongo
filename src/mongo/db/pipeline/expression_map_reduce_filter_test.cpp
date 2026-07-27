@@ -1,9 +1,6 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -24,6 +21,10 @@
 #include <climits>
 #include <cmath>
 #include <string_view>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

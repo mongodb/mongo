@@ -4,8 +4,6 @@
 
 #include "mongo/db/repl/bgsync.h"
 
-#include <cstddef>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -49,6 +47,7 @@
 #include "mongo/util/time_support.h"
 
 #include <chrono>
+#include <cstddef>
 #include <exception>
 #include <memory>
 #include <mutex>
@@ -56,6 +55,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

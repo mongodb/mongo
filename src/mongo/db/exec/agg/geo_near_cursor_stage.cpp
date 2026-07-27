@@ -4,7 +4,6 @@
 #include "mongo/db/exec/agg/geo_near_cursor_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/exec/agg/geo_near_cursor_stage.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 

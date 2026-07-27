@@ -2,6 +2,32 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
+#include "mongo/scripting/mozjs/shell/implscope.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/operation_context.h"
+#include "mongo/logv2/constants.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/platform/stack_locator.h"
+#include "mongo/scripting/deadline_monitor.h"
+#include "mongo/scripting/jsexception.h"
+#include "mongo/scripting/mozjs/common/exception.h"
+#include "mongo/scripting/mozjs/common/jsstringwrapper.h"
+#include "mongo/scripting/mozjs/common/objectwrapper.h"
+#include "mongo/scripting/mozjs/common/valuereader.h"
+#include "mongo/scripting/mozjs/common/valuewriter.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <mutex>
+
 #include <jsapi.h>
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
@@ -35,31 +61,6 @@
 #include <js/Value.h>
 #include <js/friend/ErrorMessages.h>
 #include <mozilla/Utf8.h>
-// IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/operation_context.h"
-#include "mongo/logv2/constants.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/platform/stack_locator.h"
-#include "mongo/scripting/deadline_monitor.h"
-#include "mongo/scripting/jsexception.h"
-#include "mongo/scripting/mozjs/common/exception.h"
-#include "mongo/scripting/mozjs/common/jsstringwrapper.h"
-#include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/valuereader.h"
-#include "mongo/scripting/mozjs/common/valuewriter.h"
-#include "mongo/scripting/mozjs/shell/implscope.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <mutex>
 
 #ifdef __linux__
 #include <string_view>
@@ -68,6 +69,7 @@
 
 #include <sys/syscall.h>
 #endif
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -1,9 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
+#include "mongo/db/query/internal_plans.h"
+
 #include "mongo/base/status_with.h"
 #include "mongo/db/exec/classic/batched_delete_stage.h"
 #include "mongo/db/exec/classic/collection_scan.h"
@@ -16,7 +15,6 @@
 #include "mongo/db/exec/classic/upsert_stage.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id_helpers.h"
@@ -29,9 +27,12 @@
 #include <memory>
 #include <utility>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 
 namespace mongo {
 

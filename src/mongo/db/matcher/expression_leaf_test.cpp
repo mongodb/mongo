@@ -3,25 +3,26 @@
 
 /** Unit tests for MatchMatchExpression operator implementations in match_operators.{h,cpp}. */
 
-#include <cmath>
-#include <cstdint>
-#include <limits>
-// IWYU pragma: no_include "ext/type_traits.h"
+#include "mongo/db/matcher/expression_leaf.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/match_expression_test_util.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <cmath>
+#include <cstdint>
+#include <limits>
 #include <memory>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/type_traits.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

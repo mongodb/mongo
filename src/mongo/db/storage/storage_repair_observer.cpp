@@ -4,6 +4,13 @@
 
 #include "mongo/db/storage/storage_repair_observer.h"
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_file_util.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+
 #include <algorithm>
 #include <ostream>
 #include <utility>
@@ -12,13 +19,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_file_util.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -6,31 +6,6 @@
  */
 
 
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-#include <initializer_list>
-#include <limits>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
-
-#include <boost/core/swap.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <fmt/format.h>
-#include <fmt/printf.h>  // IWYU pragma: keep
-// IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
-#include <boost/operators.hpp>
-// IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
-// IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
@@ -52,7 +27,32 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <initializer_list>
+#include <limits>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include <boost/core/swap.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/operators.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ptree_fwd.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
+// IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
+// IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
+// IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -1,11 +1,10 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/repl/multiapplier.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/assert_util.h"
 
@@ -13,6 +12,9 @@
 #include <mutex>
 #include <ostream>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace repl {

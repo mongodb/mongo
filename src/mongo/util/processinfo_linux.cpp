@@ -2,13 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/filesystem/exception.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "bits/types/struct_rusage.h"
 #include "mongo/util/processinfo.h"
 
 #include <algorithm>
@@ -31,7 +24,13 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #ifndef _WIN32
 #include <sched.h>
@@ -69,6 +68,8 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "bits/types/struct_rusage.h"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

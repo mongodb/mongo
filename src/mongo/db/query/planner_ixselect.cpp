@@ -4,10 +4,6 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
-#include <s2cellid.h>
-
-
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -38,6 +34,9 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

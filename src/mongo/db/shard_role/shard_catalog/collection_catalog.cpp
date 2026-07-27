@@ -1,20 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/flat_hash_set.h>
-#include <absl/container/node_hash_map.h>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <immer/detail/hamts/champ_iterator.hpp>
-#include <immer/detail/iterator_facade.hpp>
-#include <immer/detail/rbts/rrbtree_iterator.hpp>
-#include <immer/detail/util.hpp>
-#include <immer/map.hpp>
-#include <immer/map_transient.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -29,7 +17,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/lock_manager/resource_catalog.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_record_store_options.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
@@ -58,6 +45,21 @@
 #include <cstddef>
 #include <mutex>
 #include <shared_mutex>
+
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/node_hash_map.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <immer/detail/hamts/champ_iterator.hpp>
+#include <immer/detail/iterator_facade.hpp>
+#include <immer/detail/rbts/rrbtree_iterator.hpp>
+#include <immer/detail/util.hpp>
+#include <immer/map.hpp>
+#include <immer/map_transient.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -2,17 +2,13 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <boost/container/vector.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/index/sort_key_generator.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/storage/snapshot.h"
@@ -22,6 +18,12 @@
 #include <algorithm>
 #include <string_view>
 #include <utility>
+
+#include <boost/container/vector.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

@@ -1,22 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <algorithm>
-#include <climits>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <iterator>
-#include <limits>
-#include <numeric>
-#include <string>
-#include <string_view>
-#include <tuple>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/printf.h>  // IWYU pragma: keep
-// IWYU pragma: no_include "format.h"
+#include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -42,7 +27,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
@@ -52,6 +36,23 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/summation.h"
+
+#include <algorithm>
+#include <climits>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <numeric>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/printf.h>  // IWYU pragma: keep
+// IWYU pragma: no_include "format.h"
 
 using namespace std::literals::string_view_literals;
 

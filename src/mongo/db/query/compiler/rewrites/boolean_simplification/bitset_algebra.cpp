@@ -3,7 +3,6 @@
 
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
@@ -17,6 +16,7 @@
 #include <memory_resource>
 #endif
 #endif  // __has_include
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #if __cpp_lib_memory_resource >= 201603L
 #define MONGO_QUERY_BITSET_ALGEBRA_HAVE_MEMORY_RESOURCE

@@ -4,11 +4,6 @@
 
 #include "mongo/db/query/plan_enumerator/plan_enumerator.h"
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/none.hpp>
-
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
@@ -28,6 +23,11 @@
 #include <algorithm>
 #include <set>
 #include <string_view>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/none.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -3,14 +3,12 @@
 
 #include "mongo/db/repl/oplog_constraint_violation_logger.h"
 
+#include "mongo/logv2/log.h"
+
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
-
-
 // IWYU pragma: no_include "ext/alloc_traits.h"
-
-#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

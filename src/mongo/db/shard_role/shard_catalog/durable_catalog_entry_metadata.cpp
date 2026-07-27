@@ -3,11 +3,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/durable_catalog_entry_metadata.h"
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -24,6 +19,12 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

@@ -4,11 +4,6 @@
 
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 
-#include <cstddef>
-
-#include <s2cellid.h>
-#include <s2region.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
@@ -39,10 +34,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <memory>
 #include <string_view>
 #include <vector>
+
+#include <s2cellid.h>
+#include <s2region.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

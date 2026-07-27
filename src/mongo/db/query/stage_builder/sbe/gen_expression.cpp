@@ -3,9 +3,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 
-#include <boost/none.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -44,6 +41,10 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 
 namespace mongo::stage_builder {

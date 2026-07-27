@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -42,6 +40,9 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {

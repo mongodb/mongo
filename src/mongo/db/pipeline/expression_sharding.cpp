@@ -1,22 +1,24 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/pipeline/expression_sharding.h"
+
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/expression/evaluate_sharding.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_sharding.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <utility>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

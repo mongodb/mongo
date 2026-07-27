@@ -7,7 +7,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/stages/generic_scan.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/compiler.h"

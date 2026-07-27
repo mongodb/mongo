@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/status_with.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/modules.h"
@@ -16,7 +14,9 @@
 #include <utility>
 #include <vector>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 

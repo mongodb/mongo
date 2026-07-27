@@ -3,11 +3,6 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -23,6 +18,12 @@
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

@@ -2,6 +2,17 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
+#include "mongo/util/procparser.h"
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/log.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/string_map.h"
+
 #include <array>
 #include <cerrno>
 #include <fstream>
@@ -16,16 +27,6 @@
 #include <boost/filesystem/path.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/procparser.h"
-#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -2,15 +2,8 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 
-#include <cstdint>
+#include "mongo/db/commands/fle2_compact.h"
 
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/data_builder.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -25,7 +18,6 @@
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_options_gen.h"
-#include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -46,6 +38,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -55,6 +48,14 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

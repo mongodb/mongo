@@ -3,12 +3,6 @@
 
 #include "mongo/db/index/geo/s2_common.h"
 
-#include <s2.h>
-#include <s2cellid.h>
-#include <s2regioncoverer.h>
-
-#include <util/math/vector3.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/basic_types_gen.h"
@@ -20,6 +14,13 @@
 
 #include <memory>
 #include <ostream>
+
+#include <s2.h>
+#include <s2cellid.h>
+#include <s2regioncoverer.h>
+
+#include <util/math/vector3.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 

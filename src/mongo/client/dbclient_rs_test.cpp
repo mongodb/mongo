@@ -6,14 +6,7 @@
  * the DBClientReplicaSet talks to, so the tests only covers the client side logic.
  */
 
-#include <map>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include "mongo/client/dbclient_rs.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bson_field.h"
@@ -21,7 +14,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/mock_topology_manager.h"
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
@@ -40,6 +32,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 namespace mongo {
 namespace {

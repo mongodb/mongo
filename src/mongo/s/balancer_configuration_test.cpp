@@ -1,8 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/s/balancer_configuration.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -18,7 +18,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/balancer_configuration.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
@@ -30,11 +29,13 @@
 
 #include <boost/date_time/gregorian/greg_date.hpp>
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/date_time/time_duration.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {
