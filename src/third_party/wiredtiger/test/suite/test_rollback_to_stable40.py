@@ -130,6 +130,8 @@ class test_rollback_to_stable40(test_rollback_to_stable_base):
 
         # Simulate a server crash and restart.
         simulate_crash_restart(self, ".", "RESTART")
+        # Recovery may emit a WT_VERB_LOG NOTICE when salvaging a partial log tail.
+        self.ignoreStdoutPatternIfExists('WT_VERB_LOG')
 
         # Verify data is visible and correct.
         cursor = self.session.open_cursor(uri)

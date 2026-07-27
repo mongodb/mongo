@@ -499,9 +499,14 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *s
      * reconciliations ondisk value that we will be comparing against.
      */
     if (vpack != NULL && !vpack->tw.prepare) {
+        /*
+         * The on-disk durable timestamp may be ahead of the chain's previous update when an
+         * obsolete check removes a globally visible tombstone. The resulting ordering is benign.
+         */
         if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw))
             WT_ASSERT_ALWAYS(session,
-              prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
+              __wt_txn_upd_visible_all(session, prev_upd) ||
+                prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
                 prev_upd->start_ts == prev_upd->durable_ts ||
                 prev_upd->durable_ts >= vpack->tw.durable_stop_ts,
               "Stop: Durable timestamps cannot be out of order for prepared updates: "
@@ -512,7 +517,8 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *s
               __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[2]));
         else
             WT_ASSERT_ALWAYS(session,
-              prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
+              __wt_txn_upd_visible_all(session, prev_upd) ||
+                prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
                 prev_upd->start_ts == prev_upd->durable_ts ||
                 prev_upd->durable_ts >= vpack->tw.durable_start_ts,
               "Start: Durable timestamps cannot be out of order for prepared updates: "

@@ -225,7 +225,7 @@ __wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_PAGE *page;
     WT_ROW *rip;
     WT_UPDATE *upd;
-    size_t size, total_size;
+    size_t size;
     uint64_t recno, rle;
     uint32_t i, numtws, tw;
     uint8_t v;
@@ -233,7 +233,6 @@ __wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
     btree = S2BT(session);
     page = ref->page;
     upd = NULL;
-    total_size = 0;
 
     /* We don't handle in-memory prepare resolution here. */
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
@@ -264,7 +263,6 @@ __wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
                 /* Create an update to resolve the prepare. */
                 WT_ERR(__page_inmem_prepare_update_col(
                   session, ref, &cbt, recno, value, &unpack, &upd, &size));
-                total_size += size;
                 upd = NULL;
             }
         }
@@ -287,7 +285,6 @@ __wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
             /* Create an update to resolve the prepare. */
             WT_ERR(__page_inmem_prepare_update_col(
               session, ref, &cbt, recno, value, &unpack, &upd, &size));
-            total_size += size;
             upd = NULL;
         }
     } else {
@@ -305,7 +302,6 @@ __wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
             WT_ASSERT_ALWAYS(session, __wt_cell_type_raw(unpack.cell) != WT_CELL_VALUE_OVFL_RM,
               "Should never read an overflow removed value for a prepared update");
             WT_ERR(__page_inmem_prepare_update(session, value, &unpack, &upd, &size));
-            total_size += size;
 
             /* Search the page and apply the modification. */
             WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
@@ -319,7 +315,6 @@ __wti_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
      * updates to avoid reconciling the page every time.
      */
     __wt_page_modify_clear(session, page);
-    __wt_cache_page_inmem_incr(session, page, total_size);
 
     if (0) {
 err:
