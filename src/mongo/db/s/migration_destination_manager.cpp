@@ -78,6 +78,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -2438,8 +2439,18 @@ bool MigrationDestinationManager::migrationWouldDropPITHistory(OperationContext*
                                                                const ChunkRange& enclosingChunk) {
     // Oldest timestamp the storage engine still retains a snapshot for. A point-in-time read below
     // it is rejected with SnapshotTooOld, so it is the exact lower bound of PIT reachability.
-    const auto oldestTimestamp =
-        opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp();
+    auto oldestTimestamp = opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp();
+
+    const auto overriddenPitWindowToPreserveInSecs =
+        gMigrationRecipientPITHistoryToPreserveInSecs.load();
+    if (MONGO_unlikely(overriddenPitWindowToPreserveInSecs >= 0)) {
+        const auto currTime = VectorClock::get(opCtx)->getTime();
+        const unsigned currTimeSeconds = currTime.clusterTime().asTimestamp().getSecs();
+        const unsigned preserveSecs = static_cast<unsigned>(overriddenPitWindowToPreserveInSecs);
+        const unsigned oldestSecs =
+            (currTimeSeconds > preserveSecs) ? (currTimeSeconds - preserveSecs) : 0U;
+        oldestTimestamp = Timestamp(oldestSecs, 0);
+    }
 
     // A stored chunk drops PIT history when it is owned by another shard, is not fully covered by
     // 'enclosingChunk', and its most recent ownership transition is still reachable by PIT reads.

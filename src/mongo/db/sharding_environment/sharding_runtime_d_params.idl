@@ -100,6 +100,22 @@ server_parameters:
         default: false
         redact: false
 
+    migrationRecipientPITHistoryToPreserveInSecs:
+        description: >-
+            TEST-ONLY. Overrides the point-in-time snapshot history, in seconds, preserved by the
+            chunk migration recipient during testing. Ignored outside of test environments,
+            where minSnapshotHistoryWindowInSeconds is used instead. Has no effect unless testing is
+            enabled. When its value is -1, it's disabled, meaning that minSnapshotHistoryWindowInSeconds
+            prevails.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gMigrationRecipientPITHistoryToPreserveInSecs
+        default: -1
+        validator:
+            gte: -1
+        redact: false
+        test_only: true
+
     migrateCloneInsertionBatchSize:
         description: >-
             The maximum number of documents to insert in a single batch during the cloning step of
