@@ -78,17 +78,14 @@ MongoDB and current git revision that is being built. These values are
 recorded in the SCons `MONGO_VERSION` and `MONGO_GIT_HASH`
 `Environment` variables, respectively. The value of `MONGO_GIT_HASH`
 is just that: the value of the currently checked out git hash. The
-value computed for `MONGO_VERSION` is based on the result of `git
-describe`, which looks for tags matching the release numbering
-scheme. Since `git describe` relies on tags, it is important to ensure
-that you periodically synchronize new tags to your local repository
-with `git fetch` against the upstream server repository.
+value computed for `MONGO_VERSION` comes from the version committed in
+`.bazelrc.target_mongo_version`, which points at the release version
+that this branch is targeting.
 
 While this automated scheme works well for release and CI builds, it
 has unfortunate consequences for developer builds. Since the git hash
 changes on every commit (whether locally authored or pulled from an
-upstream repo), and since by default an abbreviated git hash forms
-part of the result of `git describe`, a build after a commit or a pull
+upstream repo), a build after a commit or a pull
 will see any target that has a direct or indirect dependency on the
 parts of the codebase that care about `MONGO_VERSION` and
 `MONGO_GIT_HASH` as out of date. Notably, you will at minimum need to
@@ -110,11 +107,10 @@ afoul of FCV management, the server build system provides a variables
 file to manage these settings automatically:
 `etc/scons/developer_versions.vars` . By using this file, you will get
 an unchanging `MONGO_GIT_HASH` value of `unknown`, and a
-`MONGO_VERSION` value that is still based on `git describe`, but with
-`--abbrev=0` affixed, which will eliminate the dependency on the SHA
-of the current commit. Note that you will still observe rebuilds if
-you pull a new tag which changes the results of `git describe`, but
-this should be a much less frequent event.
+`MONGO_VERSION` value read from `.bazelrc.target_mongo_version`, which
+eliminates the dependency on the SHA of the current commit. Note that
+you will still observe rebuilds when that file is updated after a
+release, but this should be a much less frequent event.
 
 You can opt into this variable by adding
 `--variables-files=etc/scons/developer_versions.vars` to your SCons

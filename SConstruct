@@ -802,7 +802,7 @@ except IOError as e:
         Exit(1)
 
     version_data = {
-        'version': utils.get_git_describe()[1:],
+        'version': utils.get_target_mongo_version(),
         'githash': utils.get_git_version(),
     }
 

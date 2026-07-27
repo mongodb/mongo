@@ -26,6 +26,7 @@ sys.path.append(mongo_path)
 # pylint: disable=wrong-import-position
 from site_scons.mongo.pip_requirements import verify_requirements, MissingRequirements
 from buildscripts.resmokelib.utils import evergreen_conn
+from buildscripts import utils
 
 
 def check_cwd() -> int:
@@ -103,9 +104,9 @@ def check_git_repos() -> int:
         print(f"Your enterprise repo directory is {enterprise_dir}")
         return 1
 
-    # Check if the git tag is out of date
+    # Check if the target mongo version is out of date
     # https://mongodb.stackenterprise.co/questions/145
-    print("Checking if your mongo repo git tag is up to date...")
+    print("Checking if your mongo repo target version is up to date...")
     releases_page = urllib.request.urlopen(LATEST_RELEASES)
     page_bytes = releases_page.read()
     text = page_bytes.decode("utf-8")
@@ -119,12 +120,14 @@ def check_git_repos() -> int:
     else:
         # Hard coded to the second-to-last version because the last version should be the test version
         target_version = compat_versions[-2]
-        local_version = mongo_repo.git.describe()
-        # get the version info we want out of git describe
+        # FCV generation is driven by the version committed in .bazelrc.target_mongo_version
+        # rather than by git tags, so validate against that file.
+        local_version = utils.get_target_mongo_version(mongo_path)
+        # get the major.minor portion of the version
         trimmed_local_version = re.search("([0-9]+\\.[0-9]+)(\\.[0-9])?", local_version).group(1)
         if trimmed_local_version != target_version:
             print(
-                "ERROR: Your git tag is out of date, run `git config remote.origin.tagOpt '--tags'; git fetch origin master`"
+                "ERROR: Your .bazelrc.target_mongo_version is out of date, run `git pull` to pick up the latest version file"
             )
             return 1
 
