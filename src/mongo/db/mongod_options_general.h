@@ -38,8 +38,7 @@ namespace mongo {
 inline Status validateSecurityAuthorizationSetting(const std::string& value) {
     constexpr auto kEnabled = "enabled"_sd;
     constexpr auto kDisabled = "disabled"_sd;
-
-    if (!kEnabled.equalCaseInsensitive(value) && !kDisabled.equalCaseInsensitive(value)) {
+    if (!(value == kEnabled || value == kDisabled)) {
         return {ErrorCodes::BadValue,
                 "security.authorization expects either 'enabled' or 'disabled'"};
     }

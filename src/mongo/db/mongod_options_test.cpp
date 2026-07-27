@@ -34,6 +34,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/value.h"
 
 namespace mongo {
@@ -176,6 +177,29 @@ TEST_F(MongodOptionsTest, MagicRestoreShardParams) {
     ASSERT_EQ(status.code(), ErrorCodes::BadValue);
     ASSERT_STRING_CONTAINS(status.reason(),
                            "Cannot start magic restore with --shardsvr or --configsvr");
+}
+
+TEST(MongodGeneralOptionsTest, ValidateSecurityAuthorization) {
+    moe::OptionSection options;
+    ASSERT_OK(addMongodOptions(&options));
+    for (auto&& [in, ok] : std::vector<std::pair<std::string, bool>>{
+             {"enabled", 1},
+             {"disabled", 1},
+             {"Enabled", 0},
+             {"ENABLED", 0},
+             {"Disabled", 0},
+             {"DISABLED", 0},
+             {"", 0},
+             {"garbage", 0},
+             {"Garbage", 0},
+             {"GARBAGE", 0},
+         }) {
+        std::string yml = fmt::format(R"(security.authorization: "{}")", in);
+        moe::Environment env;
+        ASSERT_OK(moe::OptionsParser{}.runConfigFile(options, yml, &env));
+        ASSERT_EQ(env.validate(false), ok ? ErrorCodes::OK : ErrorCodes::BadValue)
+            << fmt::format(", in={}", in);
+    }
 }
 
 }  // namespace
