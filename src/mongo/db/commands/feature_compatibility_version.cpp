@@ -955,6 +955,20 @@ Status FeatureCompatibilityVersionParameter::setFromString(std::string_view,
                           << "."};
 }
 
+bool isFcvTransitionInProgress(OperationContext* opCtx) {
+    tassert(
+        13172000,
+        "Expected the FCV region to be held before checking whether an FCV transition is in "
+        "progress",
+        shard_role_details::getLocker(opCtx)->isLockHeldForMode(fcvDocumentLock.getRid(), MODE_IS));
+    bool transitionInProgress = false;
+    serverGlobalParams.featureCompatibility.withAcquiredFCVDocument([&](const auto* fcvDoc) {
+        tassert(13138000, "Expected the FCV document to be present", fcvDoc);
+        transitionInProgress = fcvDoc->getPhase().has_value();
+    });
+    return transitionInProgress;
+}
+
 FixedFCVRegion::FixedFCVRegion(OperationContext* opCtx)
     : _lk([&] {
           invariant(!shard_role_details::getLocker(opCtx)->isLocked());

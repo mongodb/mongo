@@ -26,6 +26,8 @@
 
 namespace mongo {
 
+class FixedFCVRegion;
+
 namespace resharding {
 class CoordinatorCommitMonitor;
 }  // namespace resharding
@@ -165,6 +167,17 @@ public:
         std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
         ServiceContext* serviceContext);
     ~ReshardingCoordinator() override = default;
+
+    /**
+     * Same as PrimaryOnlyService::TypedInstance::getOrCreate, but requires the caller to hold a
+     * FixedFCVRegion for the duration of the call, since the coordinator's creation must not race
+     * with an FCV transition.
+     */
+    static std::shared_ptr<ReshardingCoordinator> getOrCreate(OperationContext* opCtx,
+                                                              repl::PrimaryOnlyService* service,
+                                                              BSONObj initialState,
+                                                              const FixedFCVRegion& fcvRegion,
+                                                              bool checkOptions = true);
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;

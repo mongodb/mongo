@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -469,6 +470,14 @@ public:
 
     void setUp() override {
         ConfigServerTestFixture::setUp();
+
+        // Creating a resharding coordinator checks whether an FCV transition is in progress, which
+        // requires a global FCV document to be set.
+        // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals
+        FeatureCompatibilityVersionDocument fcvDoc;
+        // (Generic FCV reference): Required test only setup.
+        fcvDoc.setVersion(multiversion::GenericFCV::kLatest);
+        serverGlobalParams.mutableFCV.setVersionFromFCVDocument(fcvDoc);
 
         std::vector<ShardType> shards;
         for (const auto& id : getShardIds()) {
