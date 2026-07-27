@@ -145,6 +145,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/agg:pipeline_builder_test.cpp",
         "//src/mongo/db/exec/agg:single_document_transformation_stage_test.cpp",
         "//src/mongo/db/exec/classic:distinct_scan_test.cpp",
+        "//src/mongo/db/exec/classic:geo_near_test.cpp",
         "//src/mongo/db/exec/classic:index_scan_test.cpp",
         "//src/mongo/db/exec/classic:multi_plan_test.cpp",
         "//src/mongo/db/exec/classic:or_test.cpp",
