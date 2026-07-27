@@ -38,6 +38,7 @@ struct FLE2PayloadParams {
     boost::optional<std::int64_t> contention;
     ContentionKind contentionKind = ContentionKind::kConfiguredMax;
     boost::optional<std::int64_t> sparsity;
+    boost::optional<std::int32_t> trimFactor;
     boost::optional<std::int32_t> precision;
     boost::optional<BSONElement> indexMin;
     boost::optional<BSONElement> indexMax;
@@ -66,6 +67,7 @@ inline FLE2PayloadParams toFLE2PayloadParams(const FLE2InsertUpdatePayloadV2& iu
     r.contentionKind = FLE2PayloadParams::ContentionKind::kSampled;
     r.contention = iup.getContentionFactor();
     r.sparsity = iup.getSparsity();
+    r.trimFactor = iup.getTrimFactor();
     r.precision = iup.getPrecision();
     if (iup.getIndexMin()) {
         r.indexMin = iup.getIndexMin()->getElement();

@@ -139,28 +139,6 @@ uint32_t getNumberOfBitsInDomain(const boost::optional<Decimal128>& min,
     }
 }
 
-std::pair<mongo::Value, mongo::Value> getRangeMinMaxDefaults(BSONType fieldType) {
-    switch (fieldType) {
-        case BSONType::numberDouble:
-            return {mongo::Value(std::numeric_limits<double>::lowest()),
-                    mongo::Value(std::numeric_limits<double>::max())};
-        case BSONType::numberDecimal:
-            return {mongo::Value(Decimal128::kLargestNegative),
-                    mongo::Value(Decimal128::kLargestPositive)};
-        case BSONType::numberInt:
-            return {mongo::Value(std::numeric_limits<int>::min()),
-                    mongo::Value(std::numeric_limits<int>::max())};
-        case BSONType::numberLong:
-            return {mongo::Value(std::numeric_limits<long long>::min()),
-                    mongo::Value(std::numeric_limits<long long>::max())};
-        case BSONType::date:
-            return {mongo::Value(Date_t::min()), mongo::Value(Date_t::max())};
-        default:
-            uasserted(7018202, "Range index only supports numeric types and the Date type.");
-    }
-    MONGO_UNREACHABLE;
-}
-
 uint64_t exp2UInt64(uint32_t exp) {
     uassert(9203501, "Exponent out of bounds for uint64", exp < 64);
 
@@ -232,6 +210,28 @@ void validateRangeBoundsInt(T typeInfo, uint32_t sparsity, uint32_t trimFactor) 
 
 }  // namespace
 
+std::pair<mongo::Value, mongo::Value> getRangeMinMaxDefaults(BSONType fieldType) {
+    switch (fieldType) {
+        case BSONType::numberDouble:
+            return {mongo::Value(std::numeric_limits<double>::lowest()),
+                    mongo::Value(std::numeric_limits<double>::max())};
+        case BSONType::numberDecimal:
+            return {mongo::Value(Decimal128::kLargestNegative),
+                    mongo::Value(Decimal128::kLargestPositive)};
+        case BSONType::numberInt:
+            return {mongo::Value(std::numeric_limits<int>::min()),
+                    mongo::Value(std::numeric_limits<int>::max())};
+        case BSONType::numberLong:
+            return {mongo::Value(std::numeric_limits<long long>::min()),
+                    mongo::Value(std::numeric_limits<long long>::max())};
+        case BSONType::date:
+            return {mongo::Value(Date_t::min()), mongo::Value(Date_t::max())};
+        default:
+            uasserted(7018202, "Range index only supports numeric types and the Date type.");
+    }
+    MONGO_UNREACHABLE;
+}
+
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<BSONElement>& min,
                                  const boost::optional<BSONElement>& max,
@@ -258,6 +258,14 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
     }
 }
 
+uint32_t getNumberOfBitsInDomain(BSONType fieldType, const QueryTypeConfig& query) {
+    auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
+    return getNumberOfBitsInDomain(
+        fieldType,
+        query.getMin().value_or(defMin),
+        query.getMax().value_or(defMax),
+        query.getPrecision().map([](int32_t p) { return static_cast<uint32_t>(p); }));
+}
 
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<Value>& min,
@@ -393,8 +401,7 @@ void validateRangeIndex(BSONType fieldType, std::string_view fieldPath, QueryTyp
         auto precision = query.getPrecision().map([](int32_t i) { return (uint32_t)(i); });
 
         auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
-        uint32_t bits = getNumberOfBitsInDomain(
-            fieldType, query.getMin().value_or(defMin), query.getMax().value_or(defMax), precision);
+        uint32_t bits = getNumberOfBitsInDomain(fieldType, query);
 
         // We allow the case where #bits = TF = 0.
         uassert(8574000,

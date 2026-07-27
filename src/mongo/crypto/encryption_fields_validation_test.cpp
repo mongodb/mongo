@@ -141,6 +141,31 @@ TEST(FLEValidationUtils, ValidateTrimFactorRange) {
     ASSERT_NOT_OK(validateRangeIndexTest(128, BSONType::numberDecimal, boost::none, boost::none));
 }
 
+TEST(FLEValidationUtils, GetNumberOfBitsInDomainFromConfig) {
+    auto makeConfig = [](const boost::optional<Value>& min,
+                         const boost::optional<Value>& max,
+                         const boost::optional<int32_t>& precision = boost::none) {
+        QueryTypeConfig config;
+        config.setMin(min);
+        config.setMax(max);
+        config.setPrecision(precision);
+        return config;
+    };
+
+    // Explicit bounds: 2^2 > 3 values needs 2 bits.
+    ASSERT_EQ(2u, getNumberOfBitsInDomain(BSONType::numberInt, makeConfig(Value(0), Value(2))));
+
+    // Unset bounds fall back to the type's full domain (32 bits for int).
+    ASSERT_EQ(32u,
+              getNumberOfBitsInDomain(BSONType::numberInt, makeConfig(boost::none, boost::none)));
+
+    // The config overload agrees with the explicit-defaults overload it wraps.
+    auto [defMin, defMax] = getRangeMinMaxDefaults(BSONType::numberLong);
+    ASSERT_EQ(
+        getNumberOfBitsInDomain(BSONType::numberLong, defMin, defMax, boost::optional<uint32_t>{}),
+        getNumberOfBitsInDomain(BSONType::numberLong, makeConfig(boost::none, boost::none)));
+}
+
 TEST(FLEValidationUtils, ValidateTrimFactorRangeInt32) {
     // Positive: Santiy check
     validateRangeBoundsInt32(1, 100, 1, 1);

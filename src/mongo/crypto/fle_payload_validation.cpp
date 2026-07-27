@@ -3,6 +3,7 @@
 
 #include "mongo/crypto/fle_payload_validation.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/encryption_fields_validation.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -10,6 +11,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <string>
 
 namespace mongo {
@@ -48,6 +50,7 @@ FLE2PayloadParams::FLE2PayloadParams(const ParsedFindEqualityPayload& p) {
 FLE2PayloadParams::FLE2PayloadParams(const ParsedFindRangePayload& p) {
     contentionKind = FLE2PayloadParams::ContentionKind::kConfiguredMax;
     sparsity = p.sparsity.map([](std::int32_t v) { return static_cast<std::int64_t>(v); });
+    trimFactor = p.trimFactor;
     precision = p.precision;
     // Stubs (the no-edges half of a two-sided range) carry no maxCounter.
     if (p.edges) {
@@ -155,8 +158,26 @@ void validatePayloadAgainstQueryTypeConfig(std::string_view fieldPath,
             qtc.getPrecision() && *params.precision == *qtc.getPrecision());
     }
 
-    // TODO (SERVER-127899): validate trimFactor once payload/config trimFactor semantics are
-    // aligned.
+    // trimFactor is only set for range payloads. An omitted one was built against the config, so it
+    // agrees by definition; an explicit one must match the config's effective (default-filled)
+    // value.
+    if (params.trimFactor) {
+        const auto fieldType = typeFromName(field.getBsonType().value());
+        const uint32_t bits = getNumberOfBitsInDomain(fieldType, qtc);
+        // Mirror resolveTrimFactorDefault(). `bits` cannot equal 0 because the range max must be >
+        // the min.
+        dassert(bits > 0);
+        const std::int32_t defaultTrimFactor =
+            std::clamp(kFLERangeTrimFactorDefault, 0, static_cast<int>(bits) - 1);
+        const std::int32_t configTrimFactor = qtc.getTrimFactor().value_or(defaultTrimFactor);
+        const std::int32_t payloadTrimFactor = *params.trimFactor;
+        uassert(12789900,
+                str::stream() << "trimFactor " << payloadTrimFactor << " in payload for field '"
+                              << fieldPath << "' does not match collection's "
+                              << (qtc.getTrimFactor() ? "configured" : "default") << " trimFactor "
+                              << configTrimFactor,
+                payloadTrimFactor == configTrimFactor);
+    }
 
     // Value equality matches the encryption layer's numeric-type normalization (Int/Long/Double
     // with the same value produce the same OST tokens).

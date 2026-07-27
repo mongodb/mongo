@@ -49,6 +49,11 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<BSONElement>& min,
                                  const boost::optional<BSONElement>& max,
                                  const boost::optional<uint32_t>& precision);
+uint32_t getNumberOfBitsInDomain(BSONType fieldType, const QueryTypeConfig& query);
+
+// Returns the {min, max} bounds spanning the full domain of `fieldType`, used to fill in unset
+// range bounds when computing the domain size.
+std::pair<Value, Value> getRangeMinMaxDefaults(BSONType fieldType);
 
 void setRangeDefaults(BSONType fieldType, std::string_view fieldPath, QueryTypeConfig* query);
 

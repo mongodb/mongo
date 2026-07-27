@@ -32,7 +32,8 @@ QueryTypeConfig rangeQtc(int64_t contention,
                          boost::optional<int64_t> sparsity = boost::none,
                          boost::optional<int32_t> precision = boost::none,
                          boost::optional<Value> min = boost::none,
-                         boost::optional<Value> max = boost::none) {
+                         boost::optional<Value> max = boost::none,
+                         boost::optional<int32_t> trimFactor = boost::none) {
     QueryTypeConfig q;
     q.setQueryType(QueryTypeEnum::Range);
     q.setContention(contention);
@@ -40,6 +41,7 @@ QueryTypeConfig rangeQtc(int64_t contention,
     q.setPrecision(precision);
     q.setMin(min);
     q.setMax(max);
+    q.setTrimFactor(trimFactor);
     return q;
 }
 
@@ -57,9 +59,11 @@ QueryTypeConfig textQtc(QueryTypeEnum qt,
     return q;
 }
 
-EncryptedField fieldWith(std::string_view path, QueryTypeConfig qtc) {
+EncryptedField fieldWith(std::string_view path,
+                         QueryTypeConfig qtc,
+                         std::string_view bsonType = "int"sv) {
     EncryptedField ef(UUID::gen(), std::string{path});
-    ef.setBsonType("int"sv);
+    ef.setBsonType(bsonType);
     ef.setQueries(QueriesVariant{std::move(qtc)});
     return ef;
 }
@@ -158,7 +162,11 @@ TEST(FLEPayloadValidation, SparsityDefaultedWhenConfigOmits) {
 }
 
 TEST(FLEPayloadValidation, Precision) {
-    auto field = fieldWith("encrypted", rangeQtc(8, boost::none, /*precision=*/int32_t(2)));
+    auto field = fieldWith(
+        "encrypted",
+        rangeQtc(
+            8, boost::none, /*precision=*/int32_t(2), /*min=*/Value(0.0), /*max=*/Value(100.0)),
+        "double"sv);
     auto good = sampled(QueryTypeEnum::Range);
     good.precision = int32_t(2);
     validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
@@ -166,6 +174,68 @@ TEST(FLEPayloadValidation, Precision) {
     badPrec.precision = int32_t(5);
     ASSERT_THROWS_CODE(
         validatePayloadAgainstQueryTypeConfig("encrypted", field, badPrec), DBException, 9188703);
+}
+
+TEST(FLEPayloadValidation, TrimFactorMatchesConfigured) {
+    auto field = fieldWith("encrypted",
+                           rangeQtc(8,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    /*trimFactor=*/int32_t(3)));
+    auto good = sampled(QueryTypeEnum::Range);
+    good.trimFactor = int32_t(3);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Range);
+    bad.trimFactor = int32_t(4);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12789900);
+
+    // A payload that omits trimFactor was built against the configured value, so it is accepted.
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, sampled(QueryTypeEnum::Range));
+}
+
+TEST(FLEPayloadValidation, TrimFactorDefaultedWhenConfigOmits) {
+    // Neither side sets trimFactor: both resolve to the same domain-derived default and agree.
+    auto field = fieldWith("encrypted", rangeQtc(8));
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, sampled(QueryTypeEnum::Range));
+
+    // An explicit payload trimFactor equal to that resolved default is accepted; a different one is
+    // rejected. The int field with default bounds spans 32 bits, so the default is
+    // clamp(kFLERangeTrimFactorDefault, 0, 31) == kFLERangeTrimFactorDefault.
+    auto good = sampled(QueryTypeEnum::Range);
+    good.trimFactor = int32_t(kFLERangeTrimFactorDefault);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Range);
+    bad.trimFactor = int32_t(kFLERangeTrimFactorDefault + 1);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12789900);
+}
+
+TEST(FLEPayloadValidation, TrimFactorDefaultClampedToSmallDomain) {
+    // Config omits trimFactor, so it resolves to the domain-derived default. The int domain
+    // [0, 3] spans 2 bits, so the default is clamp(kFLERangeTrimFactorDefault, 0, 1) == 1 (the
+    // configured default of 6 gets clamped down to bits - 1). This exercises the clamp path that
+    // a full 32-bit domain leaves as a no-op.
+    auto field = fieldWith("encrypted",
+                           rangeQtc(8,
+                                    boost::none,
+                                    boost::none,
+                                    /*min=*/Value(0),
+                                    /*max=*/Value(3),
+                                    /*trimFactor=*/boost::none));
+
+    auto good = sampled(QueryTypeEnum::Range);
+    good.trimFactor = int32_t(1);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Range);
+    bad.trimFactor = int32_t(kFLERangeTrimFactorDefault);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12789900);
 }
 
 TEST(FLEPayloadValidation, IndexMinMaxMatchAndMismatch) {
