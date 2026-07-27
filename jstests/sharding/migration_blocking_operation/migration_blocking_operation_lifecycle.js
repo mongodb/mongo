@@ -65,7 +65,7 @@ assert(migrationsAreAllowed(db, collName));
 assertCommandReturns(st.rs0.getPrimary(), kBeginCommand, uuid, ErrorCodes.OK);
 assert(!migrationsAreAllowed(db, collName));
 assertCommandReturns(st.rs0.getPrimary(), kEndCommand, uuid, ErrorCodes.OK);
-assert(migrationsAreAllowed(db, collName));
+assert.soon(() => migrationsAreAllowed(db, collName));
 
 replicaSet.stopSet();
 st.stop();

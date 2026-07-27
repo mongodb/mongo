@@ -10,6 +10,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -54,8 +55,7 @@ protected:
         ShardingCoordinatorMetadata metadata(getCoordinatorId());
         metadata.setForwardableOpMetadata(ForwardableOperationMetadata(_opCtx));
         metadata.setDatabaseVersion(kDbVersion);
-        metadata.setAuthoritativeMetadataAccessLevel(
-            AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+        metadata.setAuthoritativeMetadataAccessLevel(AuthoritativeMetadataAccessLevelEnum::kNone);
         return metadata;
     }
 
@@ -189,6 +189,11 @@ protected:
         _instance = getExistingInstance();
         ASSERT_DOES_NOT_THROW(_instance->endOperation(_opCtx, _operations[0]));
     }
+
+    // The original coordinator runs only when the authoritative-shards DDL feature is
+    // disabled; with it enabled the command runs the V2 coordinator instead.
+    unittest::ServerParameterGuard _disableAuthDDL{"featureFlagAuthoritativeShardsDDL", false};
+    unittest::ServerParameterGuard _disableAuthCRUD{"featureFlagAuthoritativeShardsCRUD", false};
 
     std::shared_ptr<MigrationBlockingOperationCoordinator> _instance;
     ServiceContext::UniqueOperationContext _opCtxHolder;
@@ -334,7 +339,7 @@ TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeBeginOpUpdatesIn
         Instance::getOrCreate(_opCtx, _service, createStateDocument().toBSON()));
     ASSERT_DOES_NOT_THROW(beginOperations());
 
-    ASSERT_FALSE(_externalState->migrationsAllowed);
+    ASSERT_FALSE(_externalState->migrationsAreAllowed());
 }
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeBeginOpUpdatesDisk) {
@@ -346,7 +351,7 @@ TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeBeginOpUpdatesDi
         Instance::getOrCreate(_opCtx, _service, createStateDocument().toBSON()));
     ASSERT_DOES_NOT_THROW(beginOperations());
 
-    ASSERT_FALSE(_externalState->migrationsAllowed);
+    ASSERT_FALSE(_externalState->migrationsAreAllowed());
 }
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeBeginOpBlocksMigrations) {
@@ -357,19 +362,19 @@ TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeBeginOpBlocksMig
     _instance = getExistingInstance();
     ASSERT_DOES_NOT_THROW(beginOperations());
 
-    ASSERT_FALSE(_externalState->migrationsAllowed);
+    ASSERT_FALSE(_externalState->migrationsAreAllowed());
 }
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeEndOpUpdatesInMemory) {
     _operations = {UUID::gen()};
     testEndOpFailoverAndRetry(kHangBeforeUpdatingInMemory);
-    ASSERT_TRUE(_externalState->migrationsAllowed);
+    ASSERT_TRUE(_externalState->migrationsAreAllowed());
 }
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeEndOpAllowsMigrations) {
     _operations = {UUID::gen()};
     testEndOpFailoverAndRetry(kHangBeforeAllowingMigrations);
-    ASSERT_TRUE(_externalState->migrationsAllowed);
+    ASSERT_TRUE(_externalState->migrationsAreAllowed());
 }
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeEndOpUpdatesDiskState) {
@@ -381,13 +386,13 @@ TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeEndOpUpdatesDisk
 TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeEndOpFulfillsPromise) {
     _operations = {UUID::gen()};
     testEndOpFailoverAndRetry(kHangBeforeFulfillingPromise);
-    ASSERT_TRUE(_externalState->migrationsAllowed);
+    ASSERT_TRUE(_externalState->migrationsAreAllowed());
 }
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, FailoverBeforeEndOpCleansUpStateDocument) {
     _operations = {UUID::gen()};
     testEndOpFailoverAndRetry(kHangBeforeRemovingCoordinatorDocument);
-    ASSERT_TRUE(_externalState->migrationsAllowed);
+    ASSERT_TRUE(_externalState->migrationsAreAllowed());
 }
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, TestBeginOpRecoveryWithMultipleCalls) {
@@ -398,7 +403,7 @@ TEST_F(MigrationBlockingOperationCoordinatorTest, TestBeginOpRecoveryWithMultipl
     _instance = getExistingInstance();
     ASSERT_DOES_NOT_THROW(_instance->beginOperation(_opCtx, UUID::gen()));
 
-    ASSERT_FALSE(_externalState->migrationsAllowed);
+    ASSERT_FALSE(_externalState->migrationsAreAllowed());
     assertOperationCountOnDisk(2);
 }
 

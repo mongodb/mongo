@@ -5,6 +5,7 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state.h"
 #include "mongo/db/global_catalog/ddl/sharding_test_helpers.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -29,10 +30,19 @@ public:
                          AuthoritativeMetadataAccessLevelEnum authoritativeState) override;
     bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
                                             const NamespaceString& nss) override;
+    std::unique_ptr<CausalityBarrier> makeCausalityBarrier(
+        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken token) override;
+
+    bool migrationsAreAllowed() const {
+        return _migrationsAllowed.load();
+    }
 
     MockCommandResponse allowMigrationsResponse;
     MockCommandResponse migrationsAllowedResponse;
-    bool migrationsAllowed = true;
+    mutable MockCommandResponse assertIsPrimaryShardForDbResponse;
+
+private:
+    AtomicWord<bool> _migrationsAllowed{true};
 };
 
 class ShardingCoordinatorExternalStateFactoryForTest

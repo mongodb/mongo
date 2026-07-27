@@ -6,9 +6,16 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/modules.h"
 
+#include <memory>
+
 namespace mongo {
+
+class CausalityBarrier;
+
 class ShardingCoordinatorExternalState {
 public:
     virtual ~ShardingCoordinatorExternalState() = default;
@@ -26,6 +33,8 @@ public:
                                  AuthoritativeMetadataAccessLevelEnum authoritativeState) = 0;
     virtual bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
                                                     const NamespaceString& nss) = 0;
+    virtual std::unique_ptr<CausalityBarrier> makeCausalityBarrier(
+        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken token) = 0;
 
 private:
 };
@@ -46,6 +55,8 @@ public:
                          AuthoritativeMetadataAccessLevelEnum authoritativeState) override;
     bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
                                             const NamespaceString& nss) override;
+    std::unique_ptr<CausalityBarrier> makeCausalityBarrier(
+        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken token) override;
 };
 
 class ShardingCoordinatorExternalStateFactory {

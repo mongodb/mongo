@@ -26,6 +26,7 @@
 #include "mongo/db/global_catalog/ddl/merge_all_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/merge_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
+#include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator_v2.h"
 #include "mongo/db/global_catalog/ddl/move_primary_coordinator.h"
 #include "mongo/db/global_catalog/ddl/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/global_catalog/ddl/rename_collection_coordinator.h"
@@ -100,6 +101,8 @@ constexpr std::pair<CoordinatorTypeEnum,
          typedInstance<CleanupStructuredEncryptionDataCoordinator>},
         {CoordinatorTypeEnum::kMigrationBlockingOperation,
          typedInstance<MigrationBlockingOperationCoordinator>},
+        {CoordinatorTypeEnum::kMigrationBlockingOperationV2,
+         typedInstance<MigrationBlockingOperationCoordinatorV2>},
         {CoordinatorTypeEnum::kConvertToCapped, typedInstance<ConvertToCappedCoordinator>},
         {CoordinatorTypeEnum::kUntrackUnsplittableCollection,
          typedInstance<UntrackUnsplittableCollectionCoordinator>},

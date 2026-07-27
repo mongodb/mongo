@@ -3,9 +3,11 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_gen.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -52,6 +54,10 @@ public:
             metadata.setDatabaseVersion(request().getDatabaseVersion());
             metadata.setUpdateCommand(request().getCommand());
             metadata.setNss(ns());
+            metadata.setAuthoritativeMetadataAccessLevel(
+                sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             // Determine if the command is an upsert. Each coordinated multi write is sent
             // individually either as an update or a bulk write.
