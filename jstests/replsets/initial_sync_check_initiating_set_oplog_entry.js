@@ -76,6 +76,7 @@ const secondary = rst.add({
         // recovery timestamp is still at the initiating-set entry. This test writes data first (so
         // the stable timestamp has advanced), then verifies the skip resets beginApplyingTimestamp;
         // set a large threshold to force the skip to fire regardless.
+        initialSyncWaitForSyncSourceLastStableRecoveryTs: true,
         initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs: 3600,
     },
 });

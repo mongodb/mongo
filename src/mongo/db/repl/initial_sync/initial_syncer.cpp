@@ -1884,8 +1884,9 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     if (!initialSyncWaitForSyncSourceLastStableRecoveryTs.load()) {
         // Server parameter is toggled off, skip waiting for stable recovery timestamp to advance on
         // sync source.
-        LOGV2_WARNING(
+        LOGV2_DEBUG(
             11318403,
+            2,
             "Skipping waiting for sync source stable recovery timestamp to advance on sync source "
             "because the 'initialSyncWaitForSyncSourceLastStableRecoveryTs' parameter is off",
             "beginFetchingTimestamp"_attr = _initialSyncState->beginFetchingTimestamp,
