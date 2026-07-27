@@ -74,16 +74,19 @@ void dropCollectionLocally(OperationContext* opCtx,
                 logAttrs(nss));
 }
 
+}  // namespace
+
 /*
  * Rename the collection if exists locally, otherwise simply drop the target collection.
  */
-void renameOrDropTarget(OperationContext* opCtx,
-                        const NamespaceString& fromNss,
-                        const NamespaceString& toNss,
-                        const RenameCollectionOptions& options,
-                        const UUID& sourceUUID,
-                        const boost::optional<UUID>& targetUUID,
-                        bool isNonAuthoritative) {
+void RenameParticipantInstance::_renameOrDropTarget(OperationContext* opCtx,
+                                                    const NamespaceString& fromNss,
+                                                    const NamespaceString& toNss,
+                                                    const RenameCollectionOptions& options,
+                                                    const UUID& sourceUUID,
+                                                    const boost::optional<UUID>& targetUUID,
+                                                    bool isNonAuthoritative) {
+    bool targetHasNewUuid = false;
     {
         Lock::DBLock dbLock(opCtx, toNss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, toNss, MODE_IS);
@@ -94,10 +97,16 @@ void renameOrDropTarget(OperationContext* opCtx,
                 // Early return if the rename previously succeeded
                 return;
             }
+            targetHasNewUuid = targetCollPtr->uuid() == options.newTargetCollectionUuid;
+            // If the following assertion throws (highly unlikely), the participant will retry this
+            // phase indefinitely while holding the critical section, blocking CRUD on both
+            // namespaces and hanging the coordinator. Manual intervention is required to unblock
+            // it.
             uassert(5807602,
                     str::stream() << "Target collection " << toNss.toStringForErrorMsg()
-                                  << " UUID does not match the provided UUID.",
-                    !targetUUID || targetCollPtr->uuid() == *targetUUID);
+                                  << " UUID does not match the provided UUID. Expected UUID: "
+                                  << *targetUUID << " Actual UUID: " << targetCollPtr->uuid(),
+                    targetHasNewUuid || !targetUUID || targetCollPtr->uuid() == *targetUUID);
         }
     }
 
@@ -107,9 +116,17 @@ void renameOrDropTarget(OperationContext* opCtx,
         // ensure idempotency by checking sourceUUID
         const auto sourceCollPtr =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss);
+        // Cross-DB rename completed: return early
+        if (targetHasNewUuid && !sourceCollPtr) {
+            return;
+        }
+        // If the following assertion throws (highly unlikely), the participant will retry this
+        // phase indefinitely while holding the critical section, blocking CRUD on both namespaces
+        // and hanging the coordinator. Manual intervention is required to unblock it.
         uassert(ErrorCodes::CommandFailed,
                 str::stream() << "Source Collection " << fromNss.toStringForErrorMsg()
-                              << " UUID does not match provided uuid.",
+                              << " UUID does not match provided uuid. Expected UUID: " << sourceUUID
+                              << " Actual UUID: " << sourceCollPtr->uuid(),
                 !sourceCollPtr || sourceCollPtr->uuid() == sourceUUID);
     }
 
@@ -125,8 +142,6 @@ void renameOrDropTarget(OperationContext* opCtx,
         rangedeletionutil::deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }
 }
-
-}  // namespace
 
 RenameCollectionParticipantService* RenameCollectionParticipantService::getService(
     OperationContext* opCtx) {
@@ -375,13 +390,13 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     return thisShardId != primaryShardId;
                 }();
 
-                renameOrDropTarget(opCtx,
-                                   fromNss,
-                                   toNss,
-                                   options,
-                                   _doc.getSourceUUID(),
-                                   _doc.getTargetUUID(),
-                                   _doc.getClearCollMetadata());
+                _renameOrDropTarget(opCtx,
+                                    fromNss,
+                                    toNss,
+                                    options,
+                                    _doc.getSourceUUID(),
+                                    _doc.getTargetUUID(),
+                                    _doc.getClearCollMetadata());
 
                 rangedeletionutil::restoreRangeDeletionTasksForRename(opCtx, toNss);
             }))

@@ -1102,9 +1102,33 @@ TEST_F(RenameCollectionTest,
                            AssertionException,
                            ErrorCodes::BadValue);
     }
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNss));
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, opts));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
     auto destOptions = _getCollectionOptions(_opCtx.get(), _targetNssDifferentDb);
     ASSERT_EQUALS(destOptions.uuid, *opts.newTargetCollectionUuid);
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseFailsAfterFinalizeAndSourceDrop) {
+    RenameCollectionOptions opts;
+    opts.newTargetCollectionUuid = UUID::gen();
+    opts.dropTarget = true;
+    _createCollection(_opCtx.get(), _sourceNss);
+    _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, "a_1");
+    _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
+    {
+        FailPointEnableBlock failPoint("failRenameAfterFinalizeAndAfterSourceDrop");
+        ASSERT_THROWS_CODE(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, opts),
+                           AssertionException,
+                           13180500);
+    }
+
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
+    auto destOptions = _getCollectionOptions(_opCtx.get(), _targetNssDifferentDb);
+    ASSERT_EQUALS(destOptions.uuid, *opts.newTargetCollectionUuid);
+
+    // Can't attempt a retry here as we don't get any benefit - renameCollection will fail with
+    // source namespace not found
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseRetryAfterRenameSucceeds) {

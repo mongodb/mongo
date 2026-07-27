@@ -91,6 +91,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAcrossDatabasesBeforeFinalize);
 MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeButBeforeSourceDrop);
+MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeAndAfterSourceDrop);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
@@ -1103,8 +1104,16 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     // The source drop is only reached on the data-bearing shard (non-data-bearing shards get
     // NamespaceNotFound before this point), so it is always a user-visible DDL event.
-    return dropCollectionForApplyOps(
+    status = dropCollectionForApplyOps(
         opCtx, source, {}, DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops, false);
+    if (!status.isOK())
+        return status;
+
+    uassert(13180500,
+            "Failing rename due to failpoint after rename and after source drop",
+            !failRenameAfterFinalizeAndAfterSourceDrop.shouldFail());
+
+    return status;
 }
 
 }  // namespace
