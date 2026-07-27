@@ -37,8 +37,7 @@
 namespace mongo {
 
 inline Status validateSecurityAuthorizationSetting(const std::string& value) {
-    if (!(str::equalCaseInsensitive(value, "enabled"_sd) ||
-          str::equalCaseInsensitive(value, "disabled"_sd))) {
+    if (!(value == "enabled"_sd || value == "disabled"_sd)) {
         return {ErrorCodes::BadValue,
                 "security.authorization expects either 'enabled' or 'disabled'"};
     }
