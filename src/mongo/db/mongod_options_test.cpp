@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,37 +27,41 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/mongod_options.h"
 
-#include <string>
+#include "mongo/db/server_options.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
 
-#include "mongo/base/status.h"
+#include <fmt/format.h>
 
 namespace mongo {
+namespace {
 
-inline Status validateSecurityAuthorizationSetting(const std::string& value) {
-    constexpr auto kEnabled = "enabled"_sd;
-    constexpr auto kDisabled = "disabled"_sd;
-
-    if (!(value == kEnabled || value == kDisabled)) {
-        return {ErrorCodes::BadValue,
-                "security.authorization expects either 'enabled' or 'disabled'"};
+TEST(MongodGeneralOptionsTest, ValidateSecurityAuthorization) {
+    moe::OptionSection options;
+    ASSERT_OK(addMongodOptions(&options));
+    for (auto&& [in, ok] : std::vector<std::pair<std::string, bool>>{
+             {"enabled", 1},
+             {"disabled", 1},
+             {"Enabled", 0},
+             {"ENABLED", 0},
+             {"Disabled", 0},
+             {"DISABLED", 0},
+             {"", 0},
+             {"garbage", 0},
+             {"Garbage", 0},
+             {"GARBAGE", 0},
+         }) {
+        std::string yml = fmt::format(R"(security.authorization: "{}")", in);
+        moe::Environment env;
+        ASSERT_OK(moe::OptionsParser{}.runConfigFile(options, yml, &env));
+        ASSERT_EQ(env.validate(false), ok ? ErrorCodes::OK : ErrorCodes::BadValue)
+            << fmt::format(", in={}", in);
     }
-
-    return Status::OK();
 }
 
-inline Status validateOperationProfilingModeSetting(const std::string& value) {
-    constexpr auto kOff = "off"_sd;
-    constexpr auto kSlowOp = "slowOp"_sd;
-    constexpr auto kAll = "all"_sd;
-
-    if (!kOff.equalCaseInsensitive(value) && !kSlowOp.equalCaseInsensitive(value) &&
-        !kAll.equalCaseInsensitive(value)) {
-        return {ErrorCodes::BadValue, "operationProfiling.mode expects 'off', 'slowOp', or 'all'"};
-    }
-
-    return Status::OK();
-}
-
+}  // namespace
 }  // namespace mongo

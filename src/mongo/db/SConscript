@@ -389,6 +389,17 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='mongod_options_test',
+    source=[
+        'mongod_options_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'mongod_options',
+    ],
+)
+
 env.Library(
     target='read_write_concern_provenance',
     source=[
