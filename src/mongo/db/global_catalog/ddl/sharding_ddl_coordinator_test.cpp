@@ -60,8 +60,7 @@ public:
         _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(_executor);
         _service = std::make_unique<ShardingCoordinatorService>(
             getServiceContext(),
-            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>(),
-            [](ServiceContext*) {});
+            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>());
 
         DDLLockManager::get(getServiceContext())->setRecoverable(_service.get());
     }

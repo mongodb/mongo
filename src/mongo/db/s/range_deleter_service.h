@@ -95,8 +95,8 @@ private:
     std::mutex _mutex_DO_NOT_USE_DIRECTLY;
 
 public:
-    void registerRecoveryJob(long long term);
-    void notifyRecoveryJobComplete(long long term);
+    void registerRecoveryJob(long long term, RecoveryJob job);
+    void notifyRecoveryJobComplete(long long term, RecoveryJob job);
 
     enum class TaskPending { kNotPending, kPending };
 

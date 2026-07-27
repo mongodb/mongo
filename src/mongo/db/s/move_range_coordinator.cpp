@@ -13,10 +13,12 @@
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
@@ -580,6 +582,14 @@ MoveRangeCoordinator::_getMigrationCoordinatorDocumentIfExists(OperationContext*
 }
 
 void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
+    auto notifyRecoveryJobComplete = [this, opCtx] {
+        if (_recoveredFromDisk) {
+            const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+            RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(
+                term, RecoveryJob::kMoveRangeCoordinator);
+        }
+    };
+
     if (_migrationAttempt) {
         LOGV2(12795323,
               "MoveRangeCoordinator finalizing migration via the live MigrationSourceManager",
@@ -599,6 +609,7 @@ void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
     if (!doc) {
         // Nothing left to do: finalize() already completed it, or the migration aborted before a
         // coordinator document was ever persisted.
+        notifyRecoveryJobComplete();
         return;
     }
 
@@ -620,6 +631,9 @@ void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
         rangedeletionutil::getShardKeyPatternFromRangeDeletionTask(opCtx, doc->getId()));
 
     const auto cleanupFuture = coordinator.completeMigration(opCtx, false);
+
+    notifyRecoveryJobComplete();
+
     if (cleanupFuture && _request.getWaitForDelete()) {
         const auto cleanupStatus = cleanupFuture->getNoThrow(opCtx);
         if (!cleanupStatus.isOK()) {

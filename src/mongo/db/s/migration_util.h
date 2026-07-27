@@ -203,9 +203,9 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
  * (resumeMigrationCoordinationsOnStepUp), which recovers all standalone coordinators as a single
  * batch and resolves the job once the batch finishes.
  *
- * The second is on behalf of MoveRangeCoordinator recovery, resolved later from
- * ShardingCoordinatorService::_onServiceInitialization() (see
- * notify_range_deleter_after_move_range_recovery.h).
+ * The second is for the MoveRangeCoordinator recovered from disk. The coordinator resolves the
+ * job when it completes, or ShardingCoordinatorService resolves it during rebuild when there is no
+ * MoveRangeCoordinator to recover.
  */
 [[MONGO_MOD_PUBLIC]] void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term);
 

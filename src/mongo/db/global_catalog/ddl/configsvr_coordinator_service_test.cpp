@@ -51,9 +51,7 @@ public:
 
         auto registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
         registry->registerService(std::make_unique<ShardingCoordinatorService>(
-            serviceContext,
-            std::make_unique<ShardingCoordinatorExternalStateFactoryImpl>(),
-            [](ServiceContext*) {}));
+            serviceContext, std::make_unique<ShardingCoordinatorExternalStateFactoryImpl>()));
     }
 
     void tearDown() override {

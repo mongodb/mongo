@@ -101,7 +101,7 @@ void RangeDeleterService::onStartup(OperationContext* opCtx) {
 }
 
 void RangeDeleterService::onStepUpBegin(OperationContext* opCtx, long long term) {
-    registerRecoveryJob(term);
+    registerRecoveryJob(term, RecoveryJob::kRangeDeleter);
 
     auto lock = _acquireMutexUnconditionally();
     _termInitializationPromise.emplace();
@@ -230,7 +230,7 @@ void RangeDeleterService::_launchRangeDeletionRecoveryTask(OperationContext* opC
             LOGV2_INFO(6834802,
                        "Finished resubmitting range deletion tasks",
                        "nRescheduledTasks"_attr = nRescheduledTasks);
-            notifyRecoveryJobComplete(term);
+            notifyRecoveryJobComplete(term, RecoveryJob::kRangeDeleter);
         })
         .getAsync([](auto) {});
 }
@@ -347,11 +347,11 @@ SemiFuture<void> RangeDeleterService::getServiceUpFuture() {
     return _serviceUpPromise->getFuture().semi();
 }
 
-void RangeDeleterService::registerRecoveryJob(long long term) {
-    _recoveryState.registerRecoveryJob(term);
+void RangeDeleterService::registerRecoveryJob(long long term, RecoveryJob job) {
+    _recoveryState.registerRecoveryJob(term, job);
 }
-void RangeDeleterService::notifyRecoveryJobComplete(long long term) {
-    _recoveryState.notifyRecoveryJobComplete(term);
+void RangeDeleterService::notifyRecoveryJobComplete(long long term, RecoveryJob job) {
+    _recoveryState.notifyRecoveryJobComplete(term, job);
 }
 
 SharedSemiFuture<void> RangeDeleterService::registerTask(
