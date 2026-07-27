@@ -66,8 +66,8 @@ inline std::vector<std::pair<double, size_t>>::iterator findTopTiedPlans(
  * and log the bonuses.
  */
 struct TieBreakingScores {
-    TieBreakingScores(bool isPlanTied, double score)
-        : isPlanTied(isPlanTied),
+    explicit TieBreakingScores(double score)
+        : isPlanTied(false),
           score(score),
           docsExaminedBonus(0.0),
           indexPrefixBonus(0.0),
@@ -77,7 +77,7 @@ struct TieBreakingScores {
         return docsExaminedBonus + indexPrefixBonus + distinctScanBonus;
     }
 
-    const bool isPlanTied;
+    bool isPlanTied;
     const double score;
     double docsExaminedBonus;
     double indexPrefixBonus;
@@ -167,16 +167,19 @@ void addTieBreakingHeuristicsBonuses(
     const std::span<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
     const std::vector<size_t>& documentsExamined) {
     auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
-    int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
+    const int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
 
     if (numberOfTiedPlans > 1) {
-        // Initialize 'scores' list. 'candidates' and 'scores' are synchronized, with the i-th score
-        // from 'scores' corresponding to the i-th 'candidate.'
+        // 'scores' is indexed by candidate index (not compacted over surviving plans) so it can be
+        // addressed consistently with 'candidates' and 'documentsExamined'. Failed candidates get a
+        // placeholder entry that is never read.
         std::vector<TieBreakingScores> scores{};
         scores.reserve(candidates.size());
-        for (size_t i = 0; i < scoresAndCandidateIndices.size(); ++i) {
-            scores.emplace_back(/* isPlanTied */ i < static_cast<size_t>(numberOfTiedPlans),
-                                /* score */ scoresAndCandidateIndices[i].first);
+        for (const auto& candidate : candidates) {
+            scores.emplace_back(candidate.solution->score.value_or(0.0));
+        }
+        for (int i = 0; i < numberOfTiedPlans; ++i) {
+            scores[scoresAndCandidateIndices[i].second].isPlanTied = true;
         }
 
         calcDocsExaminedHeuristicBonus(
@@ -187,8 +190,9 @@ void addTieBreakingHeuristicsBonuses(
 
         calcDistinctScanBonus(scoresAndCandidateIndices, numberOfTiedPlans, candidates, scores);
 
-        // Log tie breaking bonuses.
-        for (const auto& score : scores) {
+        // Log tie breaking bonuses for the surviving plans (skips failed-candidate placeholders).
+        for (const auto& scoreAndIndex : scoresAndCandidateIndices) {
+            const auto& score = scores[scoreAndIndex.second];
             LOGV2_DEBUG(
                 8027500, 2, "Tie breaking heuristics", "formula"_attr = [&]() {
                     StringBuilder sb;
@@ -241,7 +245,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     // Used to derive scores and candidate ordering.
     std::vector<std::pair<double, size_t>> scoresAndCandidateIndices;
     std::vector<size_t> failed;
-    std::vector<size_t> documentsExamined;
+    std::vector<size_t> documentsExamined(candidates.size(), std::numeric_limits<size_t>::max());
 
     // Compute score for each tree.  Record the best.
     for (size_t i = 0; i < statTrees.size(); ++i) {
@@ -278,7 +282,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
             // Collect some information about documents examined for tie breaking later.
             PlanSummaryStats stats;
             explainer->getSummaryStats(&stats);
-            documentsExamined.push_back(stats.totalDocsExamined);
+            documentsExamined[i] = stats.totalDocsExamined;
         } else {
             failed.push_back(i);
             LOGV2_DEBUG(20960,
