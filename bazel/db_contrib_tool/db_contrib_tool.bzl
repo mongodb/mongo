@@ -99,6 +99,7 @@ package(default_visibility = [
     "@//:__pkg__",
     "@//bazel/db_contrib_tool:__pkg__",
     "@//bazel/resmoke/multiversion:__pkg__",
+    "@//bazel/resmoke/mongot:__pkg__",
 ])
 load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
 

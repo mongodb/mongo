@@ -222,6 +222,14 @@ class ResmokeShimContext:
             self.links.append(link)
             os.symlink(entry.path, link)
 
+        # If mongot binaries were provided via a mongot_setup, link them where
+        # resmoke's default mongot path (mongot-localdev/mongot) expects them.
+        mongot_dir = os.path.join(base_dir, "bazel", "resmoke", "mongot", "mongot-localdev")
+        mongot_link = os.path.join(working_dir, "mongot-localdev")
+        if os.path.isdir(mongot_dir) and not os.path.exists(mongot_link):
+            self.links.append(mongot_link)
+            os.symlink(mongot_dir, mongot_link)
+
         try:
             output_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
             if output_dir:

@@ -1,0 +1,42 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("//bazel/resmoke/mongot:mongot.bzl", "mongot_setup")
+
+# Visibility is restricted to tests because mongot_setup downloads binaries
+# from external sources at build time. Allowing arbitrary targets to depend
+# on externally-fetched, non-hermetic artifacts would undermine build
+# reproducibility.
+package(default_visibility = [
+    "//buildscripts:__subpackages__",
+    "//jstests:__subpackages__",
+])
+
+# The mongot version to download: "latest" (HEAD of 10gen/mongot) or
+# "release" (the version currently running in production on Atlas).
+string_flag(
+    name = "version",
+    build_setting_default = "latest",
+    values = [
+        "latest",
+        "release",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# URL of a prebuilt mongot-localdev tarball. Set by CI for downstream
+# 10gen/mongot patches, in which case the tarball is downloaded instead of
+# invoking db-contrib-tool.
+string_flag(
+    name = "localdev-url",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "setup_mongot",
+    srcs = ["setup_mongot.sh"],
+    visibility = ["//visibility:private"],
+)
+
+mongot_setup(
+    name = "mongot-localdev",
+)

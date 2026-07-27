@@ -327,9 +327,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "mongot_e2e_sharded_collections",
     config = "//buildscripts/resmokeconfig:suites/mongot_e2e_sharded_collections.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # mongot setup is not done through bazel yet.
         "mongot_e2e_tests",
         "sharding",
     ],
@@ -342,6 +343,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )
@@ -349,10 +351,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "mongot_e2e_single_node",
     config = "//buildscripts/resmokeconfig:suites/mongot_e2e_single_node.yml",
-    shard_count = 2,
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # mongot setup is not done through bazel yet.
         "mongot_e2e_tests",
     ],
     target_compatible_with = select({
@@ -371,10 +373,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "mongot_e2e_single_shard",
     config = "//buildscripts/resmokeconfig:suites/mongot_e2e_single_shard.yml",
-    shard_count = 2,
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # mongot setup is not done through bazel yet.
         "mongot_e2e_tests",
         "sharding",
     ],
@@ -387,6 +389,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )
@@ -394,9 +397,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "mongot_e2e_sharded_cluster",
     config = "//buildscripts/resmokeconfig:suites/mongot_e2e_sharded_cluster.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # mongot setup is not done through bazel yet.
         "mongot_e2e_tests",
         "sharding",
     ],
@@ -409,6 +413,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )
@@ -416,9 +421,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "mongot_community_e2e_sharded_collections",
     config = "//buildscripts/resmokeconfig:suites/mongot_community_e2e_sharded_collections.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # mongot setup is not done through bazel yet.
         "mongot_e2e_tests",
         "sharding",
     ],
@@ -431,6 +437,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )
@@ -438,10 +445,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "mongot_community_e2e_single_node",
     config = "//buildscripts/resmokeconfig:suites/mongot_community_e2e_single_node.yml",
-    shard_count = 2,
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # mongot setup is not done through bazel yet.
         "mongot_e2e_tests",
     ],
     target_compatible_with = select({

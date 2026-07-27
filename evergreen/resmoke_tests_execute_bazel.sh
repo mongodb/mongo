@@ -72,6 +72,20 @@ build_ci_flags() {
         ci_flags+=" --//bazel/resmoke:installed_dist_test"
     fi
 
+    # Thread the mongot expansions to the flags consumed by
+    # //bazel/resmoke/mongot:mongot-localdev for suites that run real mongot.
+    if [[ "$(uname -m)" == aarch64* ]]; then
+        mongot_url="${linux_aarch64_mongot_localdev_binary:-}"
+    else
+        mongot_url="${linux_x86_64_mongot_localdev_binary:-}"
+    fi
+    if [[ -n "$mongot_url" ]]; then
+        # Downstream 10gen/mongot patch: use the patched mongot tarball.
+        ci_flags+=" --//bazel/resmoke/mongot:localdev-url=${mongot_url}"
+    elif [[ "${download_mongot_release:-}" == "true" ]]; then
+        ci_flags+=" --//bazel/resmoke/mongot:version=release"
+    fi
+
     if [ "${should_shuffle}" = true ]; then
         ci_flags+=" --test_arg=--shuffle"
     elif [ "${should_shuffle}" = false ]; then
