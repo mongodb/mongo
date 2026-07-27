@@ -190,9 +190,13 @@ private:
     // Tracks memory for _queue and _visited. _cache is allowed to use the remaining memory limit.
     MemoryUsageTracker _memoryUsageTracker;
 
-    // Pre-built context passed to every startWith expression evaluation. tracker points to a
-    // sub-tracker of _memoryUsageTracker ("expressionEvaluation") when expression memory tracking
-    // is enabled, and is null otherwise. Both fields are stable for the stage's lifetime.
+    // Tracks memory used while evaluating expressions. Reports to the operation-wide
+    // tracker so all stages contribute to the operation memory total.
+    SimpleMemoryUsageTracker _expressionEvaluationMemoryTracker;
+
+    // _expressionEvaluationMemoryTracker when expression memory tracking is enabled, and is null
+    // otherwise. stageName is always set so it can be reported in ExceededMemoryLimit errors.
+    // Both fields are stable for the stage's lifetime.
     EvaluationContext _expressionEvalCtx;
 
     // Only used during the breadth-first search, tracks the set of values on the current frontier.
