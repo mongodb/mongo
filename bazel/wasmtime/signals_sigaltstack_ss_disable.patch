@@ -1,0 +1,26 @@
+--- a/src/runtime/vm/sys/unix/signals.rs
++++ b/src/runtime/vm/sys/unix/signals.rs
+@@ -563,6 +563,23 @@
+     impl Drop for Stack {
+         fn drop(&mut self) {
+             unsafe {
++                // MongoDB patch (wasmtime#13857): deregister the sigaltstack
++                // before deallocating it. Without SS_DISABLE the kernel keeps
++                // a dangling reference to the freed range, and anything that
++                // later inspects the registration on this thread — notably
++                // ASan's thread teardown, which unmaps whatever sigaltstack
++                // is registered — will operate on memory that has since been
++                // reused, unmapping live allocations out from under other
++                // threads.
++                let mut disable: libc::stack_t = mem::zeroed();
++                disable.ss_flags = libc::SS_DISABLE;
++                let r = libc::sigaltstack(&disable, ptr::null_mut());
++                debug_assert_eq!(
++                    r,
++                    0,
++                    "sigaltstack(SS_DISABLE) failed during thread shutdown: {}",
++                    io::Error::last_os_error()
++                );
+                 // Deallocate the stack memory.
+                 let r = rustix::mm::munmap(self.mmap_ptr, self.mmap_size);
+                 debug_assert!(r.is_ok(), "munmap failed during thread shutdown");

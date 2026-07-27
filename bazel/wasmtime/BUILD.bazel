@@ -11,4 +11,5 @@ exports_files([
     "val_bytes_lift_fast_path.patch",
     "val_bytes_wave_fast_path.patch",
     "val_bytes_wast_fast_path.patch",
+    "signals_sigaltstack_ss_disable.patch",
 ])
