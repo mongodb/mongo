@@ -5820,8 +5820,7 @@ public:
 
         for (size_t i = 0; i < remoteShards.size(); i++) {
             ShardType shardType;
-            shardType.setHandle(
-                ShardHandle{ShardId(get<0>(remoteShards[i]).toString()), boost::none});
+            shardType.setName(get<0>(remoteShards[i]).toString());
             shardType.setHost(get<1>(remoteShards[i]).toString());
 
             shards.push_back(shardType);

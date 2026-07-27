@@ -52,7 +52,7 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
         ShardType shard;
-        shard.setHandle(ShardHandle{ShardId(_shardName), boost::none});
+        shard.setName(_shardName);
         shard.setHost(_shardName + ":12");
         setupShards({shard});
 

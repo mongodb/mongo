@@ -167,7 +167,7 @@ void ShardingTestFixtureCommon::addRemoteShards(
 
     for (auto shard : shardInfos) {
         ShardType shardType;
-        shardType.setHandle(ShardHandle(ShardId(std::get<0>(shard).toString()), boost::none));
+        shardType.setName(std::get<0>(shard).toString());
         shardType.setHost(std::get<1>(shard).toString());
         shards.push_back(shardType);
 

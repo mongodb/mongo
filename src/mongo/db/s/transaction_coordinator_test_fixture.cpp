@@ -83,7 +83,7 @@ TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
                 const ConnectionString cs =
                     ConnectionString::forReplicaSet(shardId.toString(), {makeHostAndPort(shardId)});
                 ShardType sType;
-                sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
+                sType.setName(cs.getSetName());
                 sType.setHost(cs.toString());
                 shardTypes.push_back(std::move(sType));
             };

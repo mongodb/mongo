@@ -71,7 +71,7 @@ public:
             ShardType shardType;
             auto host =
                 ConnectionString::forReplicaSet(kTestShardIds[i].toString(), kTestShardHosts[i]);
-            shardType.setHandle(ShardHandle{ShardId(kTestShardIds[i].toString()), boost::none});
+            shardType.setName(kTestShardIds[i].toString());
             shardType.setHost(host.toString());
 
             shards.push_back(shardType);

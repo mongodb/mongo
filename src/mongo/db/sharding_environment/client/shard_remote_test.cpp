@@ -66,7 +66,7 @@ protected:
         for (const auto& shard : kTestShards) {
             ShardType shardType;
             auto host = ConnectionString::forReplicaSet(shard.id.toString(), shard.hosts);
-            shardType.setHandle(ShardHandle{ShardId(shard.id.toString()), boost::none});
+            shardType.setName(shard.id.toString());
             shardType.setHost(host.toString());
             shards.push_back(shardType);
 

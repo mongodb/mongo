@@ -22,7 +22,7 @@ using AddShardToZoneTest = ConfigServerTestFixture;
 
 TEST_F(AddShardToZoneTest, AddSingleZoneToExistingShardShouldSucceed) {
     ShardType shard;
-    shard.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shard.setName("a");
     shard.setHost("a:1234");
 
     setupShards({shard});
@@ -40,7 +40,7 @@ TEST_F(AddShardToZoneTest, AddSingleZoneToExistingShardShouldSucceed) {
 
 TEST_F(AddShardToZoneTest, AddZoneToShardWithSameTagShouldSucceed) {
     ShardType shard;
-    shard.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shard.setName("a");
     shard.setHost("a:1234");
     shard.setTags({"x", "y"});
 
@@ -61,7 +61,7 @@ TEST_F(AddShardToZoneTest, AddZoneToShardWithSameTagShouldSucceed) {
 
 TEST_F(AddShardToZoneTest, AddZoneToShardWithNewTagShouldAppend) {
     ShardType shard;
-    shard.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shard.setName("a");
     shard.setHost("a:1234");
     shard.setTags({"x"});
 
@@ -82,7 +82,7 @@ TEST_F(AddShardToZoneTest, AddZoneToShardWithNewTagShouldAppend) {
 
 TEST_F(AddShardToZoneTest, AddSingleZoneToNonExistingShardShouldFail) {
     ShardType shard;
-    shard.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shard.setName("a");
     shard.setHost("a:1234");
 
     setupShards({shard});

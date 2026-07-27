@@ -788,7 +788,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 
     // The shard doc inserted into the config.shards collection on the config server.
     ShardType expectedShard;
-    expectedShard.setHandle(ShardHandle{ShardId(expectedShardName), boost::none});
+    expectedShard.setName(expectedShardName);
     expectedShard.setHost(connString.toString());
 
     DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
@@ -865,7 +865,7 @@ TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
 
     // The shard doc inserted into the config.shards collection on the config server.
     ShardType expectedShard;
-    expectedShard.setHandle(ShardHandle{ShardId(expectedShardName), boost::none});
+    expectedShard.setName(expectedShardName);
     expectedShard.setHost(connString.toString());
 
     DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
@@ -932,7 +932,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     // The shard doc inserted into the config.shards collection on the config server.
     ShardType expectedShard;
-    expectedShard.setHandle(ShardHandle{ShardId(expectedShardName), boost::none});
+    expectedShard.setName(expectedShardName);
     expectedShard.setHost(fullConnString.toString());
 
     DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
@@ -1020,7 +1020,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
 
     std::string existingShardName = "myShard";
     ShardType existingShard;
-    existingShard.setHandle(ShardHandle{ShardId(existingShardName), boost::none});
+    existingShard.setName(existingShardName);
     existingShard.setHost(shardTarget.toString());
 
     // Make sure the shard already exists.
@@ -1118,7 +1118,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     std::string existingShardName = "myShard";
     ShardType existingShard;
-    existingShard.setHandle(ShardHandle{ShardId(existingShardName), boost::none});
+    existingShard.setName(existingShardName);
     existingShard.setHost(connString.toString());
 
     // Make sure the shard already exists.
@@ -1275,7 +1275,7 @@ TEST_F(AddShardTest, AddShardWithOverlappingHosts) {
 
     std::string existingShardName = "myShard";
     ShardType existingShard;
-    existingShard.setHandle(ShardHandle{ShardId(existingShardName), boost::none});
+    existingShard.setName(existingShardName);
     existingShard.setHost(connString.toString());
 
     // Make sure the shard already exists.

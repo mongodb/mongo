@@ -27,7 +27,7 @@ using RemoveShardFromZoneTest = ConfigServerTestFixture;
 
 TEST_F(RemoveShardFromZoneTest, RemoveZoneThatNoLongerExistsShouldNotError) {
     ShardType shard;
-    shard.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shard.setName("a");
     shard.setHost("a:1234");
 
     setupShards({shard});
@@ -44,12 +44,12 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneThatNoLongerExistsShouldNotError) {
 
 TEST_F(RemoveShardFromZoneTest, RemovingZoneThatIsOnlyReferencedByAnotherShardShouldSucceed) {
     ShardType shardA;
-    shardA.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shardA.setName("a");
     shardA.setHost("a:1234");
     shardA.setTags({"z"});
 
     ShardType shardB;
-    shardB.setHandle(ShardHandle{ShardId("b"), boost::none});
+    shardB.setName("b");
     shardB.setHost("b:1234");
 
     setupShards({shardA, shardB});
@@ -77,12 +77,12 @@ TEST_F(RemoveShardFromZoneTest, RemovingZoneThatIsOnlyReferencedByAnotherShardSh
 
 TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldSucceedWhenNoChunksReferToIt) {
     ShardType shardA;
-    shardA.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shardA.setName("a");
     shardA.setHost("a:1234");
     shardA.setTags({"z"});
 
     ShardType shardB;
-    shardB.setHandle(ShardHandle{ShardId("b"), boost::none});
+    shardB.setName("b");
     shardB.setHost("b:1234");
 
     setupShards({shardA, shardB});
@@ -117,12 +117,12 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldSucceedWhenNoChunks
 
 TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldFailWhenAChunkRefersToIt) {
     ShardType shardA;
-    shardA.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shardA.setName("a");
     shardA.setHost("a:1234");
     shardA.setTags({"y", "z"});
 
     ShardType shardB;
-    shardB.setHandle(ShardHandle{ShardId("b"), boost::none});
+    shardB.setName("b");
     shardB.setHost("b:1234");
 
     setupShards({shardA, shardB});
@@ -159,7 +159,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldFailWhenAChunkRefer
 
 TEST_F(RemoveShardFromZoneTest, RemoveZoneShouldFailIfShardDoesntExist) {
     ShardType shardA;
-    shardA.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shardA.setName("a");
     shardA.setHost("a:1234");
     shardA.setTags({"z"});
 
@@ -181,12 +181,12 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneShouldFailIfShardDoesntExist) {
 
 TEST_F(RemoveShardFromZoneTest, RemoveZoneFromShardShouldOnlyRemoveZoneOnSpecifiedShard) {
     ShardType shardA;
-    shardA.setHandle(ShardHandle{ShardId("a"), boost::none});
+    shardA.setName("a");
     shardA.setHost("a:1234");
     shardA.setTags({"z"});
 
     ShardType shardB;
-    shardB.setHandle(ShardHandle{ShardId("b"), boost::none});
+    shardB.setName("b");
     shardB.setHost("b:1234");
     shardB.setTags({"y", "z"});
 

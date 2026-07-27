@@ -493,7 +493,7 @@ public:
         std::vector<ShardType> shards;
         for (const auto& id : getShardIds()) {
             ShardType s;
-            s.setHandle(ShardHandle{ShardId(id.toString()), boost::none});
+            s.setName(id.toString());
             s.setHost(id.toString() + ":1234");
             shards.push_back(std::move(s));
         }

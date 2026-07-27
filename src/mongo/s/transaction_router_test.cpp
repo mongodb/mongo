@@ -3759,7 +3759,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
     ShardType shardType;
-    shardType.setHandle(ShardHandle{ShardId(shard1.toString()), boost::none});
+    shardType.setName(shard1.toString());
     shardType.setHost(hostAndPort1.toString());
 
     // ShardRegistry will try to perform a reload since it doesn't know about the shard.

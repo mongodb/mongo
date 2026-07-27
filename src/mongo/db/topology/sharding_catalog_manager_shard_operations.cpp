@@ -532,7 +532,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
     ShardType shardType;
-    shardType.setHandle(ShardHandle(ShardId(shardName), boost::none));
+    shardType.setName(shardName);
     shardType.setHost(targeter->connectionString().toString());
     shardType.setTopologyTime(newTopologyTime.asTimestamp());
 

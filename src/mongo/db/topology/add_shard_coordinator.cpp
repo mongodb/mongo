@@ -261,8 +261,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
 
                 ShardType shard;
-                shard.setHandle(
-                    ShardHandle(ShardId(std::string{*_doc.getChosenName()}), _doc.getShardUuid()));
+                shard.setName(std::string{*_doc.getChosenName()});
+                shard.setUuid(_doc.getShardUuid());
                 shard.setHost(targeter.connectionString().toString());
 
                 auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);

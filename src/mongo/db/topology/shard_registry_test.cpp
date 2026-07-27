@@ -26,7 +26,7 @@ protected:
 
     ShardType shardIdToShardType(ShardId id) {
         ShardType shardType;
-        shardType.setHandle(ShardHandle{id, boost::none});
+        shardType.setName(id.toString());
         const auto connString = ConnectionString::forReplicaSet(
             id.toString() + "-replset", {HostAndPort(id.toString(), kDummyPort)});
         shardType.setHost(connString.toString());
