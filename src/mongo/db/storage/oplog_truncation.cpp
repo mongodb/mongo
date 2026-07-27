@@ -157,7 +157,7 @@ Timestamp computeTruncationBound(OperationContext* opCtx) {
                 return replicated_fast_count::ReplicatedFastCountManager::get(
                            opCtx->getServiceContext())
                     .findPersistedTimestampStoreTs(opCtx)
-                    .value_or(Timestamp::max());
+                    .value_or(Timestamp::min());
             });
         return std::min(persistedTs, ts);
     }

@@ -55,6 +55,13 @@ TEST_F(ComputeOplogTruncationBoundTest, ReturnsPinnedOplogTimestamp) {
 }
 
 TEST_F(ComputeOplogTruncationBoundWithReplicatedFastCountTest,
+       ReturnsMinTimestampIfPersistedValidAsOfNotSet) {
+    const Timestamp pinnedOplogTs{1, 5};
+    setPinnedOplogTimestamp(operationContext(), pinnedOplogTs);
+    EXPECT_EQ(oplog_truncation::computeTruncationBound(operationContext()), Timestamp::min());
+}
+
+TEST_F(ComputeOplogTruncationBoundWithReplicatedFastCountTest,
        ReturnsValidAsOfIfLessThanPinnedOplog) {
     const Timestamp pinnedOplogTs{2, 0};
     const Timestamp persistedValidAsOfTs{1, 0};

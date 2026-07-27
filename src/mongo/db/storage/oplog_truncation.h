@@ -55,6 +55,7 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
 /**
  * Returns the upper bound, exclusive, of the timestamp that the oplog can be truncated to.
  *
+ * This function returning Timestamp::min() implies no oplog should be truncated.
  * If replicated fast count is enabled, this will be the minimum of the valid-as-of timestamp
  * persisted in the timestamp store and the storage engine's pinned oplog timestamp. Otherwise, this
  * will be the storage engine's pinned oplog timestamp.
