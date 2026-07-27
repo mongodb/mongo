@@ -8,7 +8,7 @@
  * span fewer windows. The collection holds more documents than the mid-range batch size so that
  * size also crosses multiple windows.
  *
- * @tags: [featureFlagSearchOptimizedIdLookup]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
