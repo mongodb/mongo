@@ -7416,6 +7416,7 @@ tasks:
       binary: bash
       env:
         IS_RELEASE: ${is_release}
+        requester: ${requester}
       args:
         - "./src/evergreen/papertrail_generate_expansions.sh"
   - command: expansions.update
@@ -7538,6 +7539,7 @@ tasks:
       binary: bash
       env:
         IS_RELEASE: ${is_release}
+        requester: ${requester}
       args:
         - "./src/evergreen/papertrail_generate_expansions.sh"
   - command: expansions.update

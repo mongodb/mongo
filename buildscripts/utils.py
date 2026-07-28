@@ -53,12 +53,16 @@ def get_git_version():
     return open(git_ver, "r").read().strip()
 
 
-def get_git_describe():
-    """Return 'git describe --abbrev=7'."""
-    with open(os.devnull, "r+") as devnull:
-        proc = subprocess.Popen("git describe --abbrev=7", stdout=subprocess.PIPE, stderr=devnull,
-                                stdin=devnull, shell=True)
-        return proc.communicate()[0].strip().decode('utf-8')
+def get_target_mongo_version():
+    """Return the version from .bazelrc.target_mongo_version.
+
+    The file contains a line like: common --define=MONGO_VERSION=6.0.26
+    """
+    with open(".bazelrc.target_mongo_version", "r") as version_fh:
+        for line in version_fh:
+            if "MONGO_VERSION=" in line:
+                return line.split("MONGO_VERSION=")[1].strip()
+    raise ValueError("MONGO_VERSION not found in .bazelrc.target_mongo_version")
 
 
 def execsys(args):

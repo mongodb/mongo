@@ -419,8 +419,8 @@ hash of the current commit.
 
 The `MONGO_VERSION` SCons variable controls the value which will be
 interpolated into the build to identify the version of the software
-currently being built. If not overridden, this defaults to the result
-of `git describe`, which will use the local tags to derive a version.
+currently being built. If not overridden, this defaults to the version
+committed in `.bazelrc.target_mongo_version`.
 
 ### Targets and Aliases
 
