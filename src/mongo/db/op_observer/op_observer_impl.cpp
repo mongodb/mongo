@@ -2460,8 +2460,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     auto oplogSlots = _operationLogger->getNextOpTimes(
         opCtx, applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired, opTimeOffset);
 
-    boost::optional<repl::ReplOperation::ImageBundle> noPrePostImage;
-
     if (!gFeatureFlagLargeBatchedOperations.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -2535,12 +2533,17 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
 
+    // Pass null: a batched write never persists a retryable findAndModify image, so there is
+    // nothing to extract here. Where images are stored in the image collection the invariant above
+    // guarantees a batched write carries none; otherwise the image is reconstructed on retry rather
+    // than persisted. The op still carries 'needsRetryImage' so that retry lookup can run. See
+    // find_and_modify_image_lookup_util.cpp.
     (void)batchedOps->logOplogEntries(oplogSlots,
                                       applyOpsOplogSlotAndOperationAssignment,
                                       wallClockTime,
                                       oplogGroupingFormat,
                                       logApplyOpsForBatchedWrite,
-                                      &noPrePostImage);
+                                      /*prePostImageToWriteToImageCollection=*/nullptr);
 
     // Ensure the transactionParticipant properly tracks the namespaces affected by a
     // retryable batched write.

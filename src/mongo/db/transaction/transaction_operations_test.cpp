@@ -1284,6 +1284,76 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPostImage) {
     ASSERT_EQ(imageToWrite->timestamp, writeOpTime.getTimestamp());
 }
 
+// A null 'prePostImageToWriteToImageCollection' makes logOplogEntries() skip retry-image
+// extraction, as on the batched-write path. The operation still carries 'needsRetryImage' but has
+// no inline pre-image, so extracting it would trip an invariant; passing null must skip extraction
+// rather than crash.
+TEST(TransactionOperationsTest, LogOplogEntriesSkipsImageExtractionWithNullImageOutParam) {
+    TransactionOperations ops;
+
+    // The operation needs a retry image but, as on the batched-write path, no pre-image is
+    // recorded.
+    TransactionOperations::TransactionOperation op;
+    op.setOpType(repl::OpTypeEnum::kUpdate);
+    op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+    op.setObject(BSON("$set" << BSON("x" << 1)));
+    op.setObject2(BSON("_id" << 1));
+    op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    ASSERT_OK(ops.addOperation(op));
+
+    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 1U);
+
+    std::vector<OplogSlot> oplogSlots;
+    for (std::size_t i = 0; i < info.numberOfOplogSlotsRequired; ++i) {
+        oplogSlots.push_back(OplogSlot{Timestamp(i + 1, 0), /*term=*/1LL});
+    }
+
+    // Passing null skips extraction and must not crash.
+    ASSERT_EQ(ops.logOplogEntries(oplogSlots,
+                                  info,
+                                  kWallClockTime,
+                                  WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+                                  doNothingLogApplyOpsFn,
+                                  /*prePostImageToWriteToImageCollection=*/nullptr),
+              info.numberOfOplogSlotsRequired);
+}
+
+// The counterpart to the test above: with extraction enabled (the default), an operation flagged
+// for a retry image but without an inline pre-image trips the invariant.
+DEATH_TEST(TransactionOperationsTestDeathTest,
+           LogOplogEntriesExtractingMissingPreImageInvariants,
+           "getPreImage") {
+    TransactionOperations ops;
+
+    TransactionOperations::TransactionOperation op;
+    op.setOpType(repl::OpTypeEnum::kUpdate);
+    op.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+    op.setObject(BSON("$set" << BSON("x" << 1)));
+    op.setObject2(BSON("_id" << 1));
+    op.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    ASSERT_OK(ops.addOperation(op));
+
+    auto info = ops.getApplyOpsInfo(kOplogEntryCountLimit,
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    std::vector<OplogSlot> oplogSlots;
+    for (std::size_t i = 0; i < info.numberOfOplogSlotsRequired; ++i) {
+        oplogSlots.push_back(OplogSlot{Timestamp(i + 1, 0), /*term=*/1LL});
+    }
+
+    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
+    // 'extractPrePostImages' defaults to true, so extraction runs and trips the invariant.
+    ops.logOplogEntries(oplogSlots,
+                        info,
+                        kWallClockTime,
+                        WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+                        doNothingLogApplyOpsFn,
+                        &imageToWrite);
+}
+
 // Refer to small transaction test case in retryable_findAndModify_validation.js.
 TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInSameEntry) {
     TransactionOperations ops;

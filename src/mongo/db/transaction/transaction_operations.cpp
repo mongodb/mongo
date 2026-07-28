@@ -136,7 +136,9 @@ void TransactionOperations::packTransactionStatementsForApplyOps(
         opsArray.append(*operationsIter++);
         const auto& stmtIds = stmt.getStatementIds();
         stmtIdsWritten->insert(stmtIdsWritten->end(), stmtIds.begin(), stmtIds.end());
-        stmt.extractPrePostImageForTransaction(imageToWrite);
+        if (imageToWrite) {
+            stmt.extractPrePostImageForTransaction(imageToWrite);
+        }
     }
     try {
         // If the BSONArrayBuilder exceeds the max BSON size, throw TransactionTooLarge.
@@ -386,12 +388,14 @@ std::size_t TransactionOperations::logOplogEntries(
         boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
 
         const auto nextStmt = stmtsIter + applyOpsEntry.operations.size();
-        TransactionOperations::packTransactionStatementsForApplyOps(stmtsIter,
-                                                                    nextStmt,
-                                                                    applyOpsEntry.operations,
-                                                                    &applyOpsBuilder,
-                                                                    &stmtIdsWritten,
-                                                                    &imageToWrite);
+        // Skip extraction when the caller does not persist images by passing a null 'imageToWrite'.
+        TransactionOperations::packTransactionStatementsForApplyOps(
+            stmtsIter,
+            nextStmt,
+            applyOpsEntry.operations,
+            &applyOpsBuilder,
+            &stmtIdsWritten,
+            prePostImageToWriteToImageCollection ? &imageToWrite : nullptr);
 
         // If we packed the last op, then the next oplog entry we log should be the implicit
         // commit or implicit prepare, i.e. we omit the 'partialTxn' field.

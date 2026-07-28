@@ -125,6 +125,8 @@ public:
      * 'operations'. If any of the statements has a pre-image or post-image that needs to be
      * stored in the image collection, stores it to 'imageToWrite'.
      *
+     * When 'imageToWrite' is null, retryable findAndModify pre/post images are not extracted.
+     *
      * Throws TransactionTooLarge if the size of the resulting oplog entry exceeds the BSON limit.
      * See BSONObjMaxUserSize (currently set to 16 MB).
      *
@@ -246,6 +248,10 @@ public:
      * Throws TransactionTooLarge if the size of any resulting applyOps oplog entry exceeds the
      * BSON limit.
      * See packTransactionStatementsForApplyOps() and BSONObjMaxUserSize (currently set to 16 MB).
+     *
+     * A null 'prePostImageToWriteToImageCollection' means the caller does not persist retryable
+     * findAndModify images, so pre/post image extraction is skipped. See
+     * packTransactionStatementsForApplyOps().
      */
     std::size_t logOplogEntries(const std::vector<OplogSlot>& oplogSlots,
                                 const ApplyOpsInfo& applyOpsOperationAssignment,
