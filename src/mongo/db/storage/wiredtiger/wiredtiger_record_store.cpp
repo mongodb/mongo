@@ -1797,6 +1797,9 @@ RecordId WiredTigerRecordStoreCursorBase::nextIdCommon() {
         if (advanceRet == WT_NOTFOUND) {
             _eof = true;
             _positioned = false;
+            if (_forward) {
+                _cursor->onScanComplete();
+            }
             return {};
         }
         invariantWTOK(advanceRet, c->session);

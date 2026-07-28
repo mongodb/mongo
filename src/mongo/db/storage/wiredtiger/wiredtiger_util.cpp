@@ -386,6 +386,83 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue_DoNotUse(WT_SESSION* sess
     return StatusWith<int64_t>(value);
 }
 
+void WiredTigerUtil::logStorageSizeStats(WiredTigerSession& session, const std::string& tableUri) {
+    // The URI reported in the log line is the on-disk file backing the b-tree, not the table URI.
+    std::string type;
+    std::string fileUri;
+    fetchTypeAndSourceURI(session, tableUri, &type, &fileUri);
+
+    // Read the accumulated summary directly from the on-disk file b-tree the scan traversed.
+    // Reading "statistics:<table>" instead would aggregate the table's column groups and drop these
+    // per-b-tree counters, so the file URI is required here.
+    const std::string statsUri = "statistics:" + fileUri;
+    auto stat = [&](int key) -> int64_t {
+        auto sw = getStatisticsValue(session, statsUri, "statistics=(fast)", key);
+        return sw.isOK() ? sw.getValue() : 0;
+    };
+
+    const int64_t leafPages = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_PAGES);
+    const int64_t internalPages = stat(WT_STAT_DSRC_BTREE_SIZE_INTERNAL_PAGES);
+    const int64_t overflowPages = stat(WT_STAT_DSRC_BTREE_SIZE_OVERFLOW_PAGES);
+    // Pages the scan visited but could not measure because they had no on-disk image (built in
+    // memory and not yet read back from disk). A non-zero value quantifies how much of the tree the
+    // summary above is missing.
+    const int64_t noImagePages = stat(WT_STAT_DSRC_BTREE_SIZE_NO_IMAGE_PAGES);
+    const int64_t leafBytes = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_BYTES);
+    const int64_t internalBytes = stat(WT_STAT_DSRC_BTREE_SIZE_INTERNAL_BYTES);
+    const int64_t overflowBytes = stat(WT_STAT_DSRC_BTREE_SIZE_OVERFLOW_BYTES);
+    const int64_t keyBytes = stat(WT_STAT_DSRC_BTREE_SIZE_KEY_BYTES);
+    const int64_t valueBytes = stat(WT_STAT_DSRC_BTREE_SIZE_VALUE_BYTES);
+    const int64_t keyCount = stat(WT_STAT_DSRC_BTREE_SIZE_KEY_COUNT);
+    const int64_t valueCount = stat(WT_STAT_DSRC_BTREE_SIZE_VALUE_COUNT);
+    const int64_t maxLeafPage = stat(WT_STAT_DSRC_BTREE_MAXLEAFPAGE);
+
+    // The histogram has one bucket per btree_size_leaf_hist_N statistic. Buckets 0..N-2 are
+    // equal-width slices of [0, leaf page max); the final bucket collects pages at or above the
+    // leaf page max, matching WiredTiger's bucketing. Each element is {maxBytes, count} in bucket
+    // order, where 'maxBytes' is the bucket's exclusive upper bound (null for the open-ended final
+    // bucket).
+    static constexpr int kNumHistBuckets = 9;
+    const int histStatKeys[kNumHistBuckets] = {WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_0,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_1,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_2,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_3,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_4,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_5,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_6,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_7,
+                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_8};
+    const int64_t bucketWidth = maxLeafPage / (kNumHistBuckets - 1);
+
+    BSONArrayBuilder histogram;
+    for (int i = 0; i < kNumHistBuckets; ++i) {
+        BSONObjBuilder bucket(histogram.subobjStart());
+        if (i + 1 < kNumHistBuckets) {
+            bucket.append("maxBytes", static_cast<long long>(bucketWidth * (i + 1)));
+        } else {
+            bucket.appendNull("maxBytes");
+        }
+        bucket.append("count", static_cast<long long>(stat(histStatKeys[i])));
+        bucket.done();
+    }
+
+    LOGV2(12951900,
+          "WiredTiger size metrics",
+          "uri"_attr = fileUri,
+          "leafPages"_attr = leafPages,
+          "internalPages"_attr = internalPages,
+          "overflowPages"_attr = overflowPages,
+          "pagesWithoutImage"_attr = noImagePages,
+          "leafBytes"_attr = leafBytes,
+          "internalBytes"_attr = internalBytes,
+          "overflowBytes"_attr = overflowBytes,
+          "keyBytes"_attr = keyBytes,
+          "valueBytes"_attr = valueBytes,
+          "keyCount"_attr = keyCount,
+          "valueCount"_attr = valueCount,
+          "leafPageSizeHistogram"_attr = histogram.arr());
+}
+
 int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& uri) {
     StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);

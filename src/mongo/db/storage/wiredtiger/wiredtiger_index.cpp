@@ -1153,6 +1153,9 @@ protected:
         _lastMoveSkippedKey = false;
 
         if (_eof) {
+            if (_forward && _cursor) {
+                _cursor->onScanComplete();
+            }
             // In the normal case, _id will be updated in updatePosition. Making this reset
             // unconditional affects performance noticeably.
             _id = RecordId();

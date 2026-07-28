@@ -583,7 +583,8 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
                                        const BSONObj& cmdObj,
-                                       bool skipAtClusterTime) {
+                                       bool skipAtClusterTime,
+                                       bool enableSizeStats) {
     const bool background = cmdObj["background"].trueValue();
     const bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
 
@@ -686,6 +687,12 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
 
     // collHash parameter.
     const bool collHash = cmdObj["collHash"].trueValue();
+
+    // Size stats accumulate and log a size summary during a collHash validation. This is
+    // enabled only by the offline startup '--validate' path (fleet validation), never by the
+    // 'validate' command, so customers never see the extra log lines. It is meaningful only for
+    // collHash validation, whose full scan drives the size-summary accumulation.
+    const bool sizeStats = enableSizeStats && collHash;
 
     // hashPrefixes parameter.
     const auto rawHashPrefixes = cmdObj["hashPrefixes"];
@@ -857,7 +864,8 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             getConfigOverrideOrThrow(rawConfigOverride),
             timestamp,
             hashPrefixes,
-            revealHashedIds};
+            revealHashedIds,
+            sizeStats};
 }
 
 Status validate(OperationContext* opCtx,

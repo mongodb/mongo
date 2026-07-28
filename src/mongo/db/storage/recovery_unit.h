@@ -610,6 +610,16 @@ public:
     };
 
     /**
+     * Sets whether cursors subsequently opened on this RecoveryUnit should accumulate a size
+     * summary as they traverse.
+     */
+    virtual void setSizeStatsCursor(bool sizeStatsCursor) {};
+
+    virtual bool getSizeStatsCursor() const {
+        return false;
+    };
+
+    /**
      * Indicates whether the RecoveryUnit has an open snapshot. A snapshot can be opened inside or
      * outside of a WriteUnitOfWork.
      */

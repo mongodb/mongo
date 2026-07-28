@@ -1209,6 +1209,7 @@ WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
     cursorParams.readOnce = wtRu.getReadOnce();
     cursorParams.allowOverwrite = allowOverwrite;
     cursorParams.random = random;
+    cursorParams.sizeStats = wtRu.getSizeStatsCursor();
     return cursorParams;
 }
 

@@ -12,7 +12,8 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      boost::optional<std::string> verifyConfigurationOverride,
                                      boost::optional<Timestamp> readTimestamp,
                                      boost::optional<std::vector<std::string>> hashPrefixes,
-                                     boost::optional<std::vector<std::string>> revealHashedIds)
+                                     boost::optional<std::vector<std::string>> revealHashedIds,
+                                     bool sizeStats)
     : _validateMode(validateMode),
       _repairMode(repairMode),
       _logDiagnostics(logDiagnostics),
@@ -20,6 +21,7 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
       _verifyConfigurationOverride(std::move(verifyConfigurationOverride)),
       _readTimestamp(readTimestamp),
       _hashPrefixes(std::move(hashPrefixes)),
-      _revealHashedIds(std::move(revealHashedIds)) {}
+      _revealHashedIds(std::move(revealHashedIds)),
+      _sizeStats(sizeStats) {}
 
 }  // namespace mongo::collection_validation

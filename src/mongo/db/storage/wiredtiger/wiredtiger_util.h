@@ -243,6 +243,13 @@ public:
                                                            const std::string& config,
                                                            int statisticsKey);
 
+    /**
+     * Reads back the per-b-tree size summary that a debug=(size_stats) cursor accumulated onto the
+     * b-tree backing 'tableUri' as it traversed, and emits it as a single log line. The URI
+     * included in the log line is the on-disk file backing the b-tree not 'tableUri'.
+     */
+    static void logStorageSizeStats(WiredTigerSession& session, const std::string& tableUri);
+
     static int64_t getEphemeralIdentSize(WiredTigerSession& session, const std::string& uri);
 
     static int64_t getIdentSize(WiredTigerSession& session, const std::string& uri);

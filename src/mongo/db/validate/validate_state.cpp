@@ -30,6 +30,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <string_view>
@@ -349,8 +350,27 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
 }
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
-    _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-        opCtx, getCollection()->getRecordStore(), &_dataThrottle);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    // Accumulate a size summary only on the full-scan cursors (the record-store traverse cursor
+    // and each index cursor). Opening a size-stats cursor resets its counters, so the flag is
+    // left off for the seek cursor and every other cursor. Opt-in only; results are logged after
+    // the scans complete.
+    const bool collectSizeStats = isCollHashValidation() && sizeStats();
+
+    {
+        if (collectSizeStats) {
+            ru.setSizeStatsCursor(true);
+        }
+        // Clear on any exit so the flag can't leak onto later cursors on this recovery unit.
+        ScopeGuard resetSizeStats([&] {
+            if (collectSizeStats) {
+                ru.setSizeStatsCursor(false);
+            }
+        });
+        _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+            opCtx, getCollection()->getRecordStore(), &_dataThrottle);
+    }
     _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
         opCtx, getCollection()->getRecordStore(), &_dataThrottle);
 
@@ -362,8 +382,27 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();
         const auto iam = entry->accessMethod()->asSortedData();
-        auto indexCursor =
-            std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
+        std::unique_ptr<SortedDataInterfaceThrottleCursor> indexCursor;
+        {
+            if (collectSizeStats) {
+                ru.setSizeStatsCursor(true);
+            }
+            // Clear on any exit so the flag can't leak onto later cursors on this recovery unit.
+            ScopeGuard resetSizeStats([&] {
+                if (collectSizeStats) {
+                    ru.setSizeStatsCursor(false);
+                }
+            });
+            indexCursor =
+                std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
+        }
+        if (collectSizeStats) {
+            // A direct seek doesn't drive the size-summary accumulation, so probe once from an
+            // unpositioned cursor to measure the parts of the index that the scan's initial seek
+            // would otherwise skip. The scan re-seeks to the start afterwards, so consuming this
+            // key is harmless.
+            indexCursor->nextKeyString(opCtx);
+        }
         _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
         _indexIdents.push_back(entry->getIdent());
     }

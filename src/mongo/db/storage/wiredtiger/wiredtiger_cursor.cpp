@@ -41,12 +41,21 @@ void setKeyOnCursor(WT_CURSOR* c, const std::variant<std::span<const char>, int6
 }  // namespace
 
 WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session)
-    : _tableID(params.tableID), _session(session) {
+    : _tableID(params.tableID), _session(session), _sizeStats(params.sizeStats) {
+    invariant(!(params.sizeStats && params.random),
+              "size_stats is incompatible with a random cursor");
+
+    // Retain the URI only for size_stats cursors; onScanComplete() uses it to read back and log the
+    // accumulated summary. Left unset otherwise.
+    if (_sizeStats) {
+        _uri.emplace(uri);
+    }
+
     // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
     const char* configStr = nullptr;
 
     // If we have uncommon cursor options, use a costlier string builder.
-    if (params.readOnce || params.random) {
+    if (params.readOnce || params.random || params.sizeStats) {
         str::stream builder;
         if (params.readOnce) {
             builder << "read_once=true,";
@@ -54,6 +63,10 @@ WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTig
 
         if (params.random) {
             builder << "next_random,";
+        }
+
+        if (params.sizeStats) {
+            builder << "debug=(size_stats=true),";
         }
 
         // Add this option last as the string does not have a trailing comma.
@@ -72,10 +85,13 @@ WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTig
         }
     }
 
-    // Attempt to retrieve a cursor from the cache.
-    _cursor = _session.getCachedCursor(_tableID, _config);
-    if (_cursor) {
-        return;
+    // A size_stats cursor initializes its size-summary counters on open, bypass the cache.
+    if (!_sizeStats) {
+        // Attempt to retrieve a cursor from the cache.
+        _cursor = _session.getCachedCursor(_tableID, _config);
+        if (_cursor) {
+            return;
+        }
     }
 
     try {
@@ -86,7 +102,30 @@ WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTig
     }
 }
 
+void WiredTigerCursor::onScanComplete() {
+    if (MONGO_likely(!_sizeStats || _sizeStatsLogged)) {
+        return;
+    }
+    _sizeStatsLogged = true;
+    // The forward walk is complete, so the accumulated summary is whole. Read it back and log it.
+    // A size-stats read failure must not fail the surrounding scan (diagnostic-only), so swallow
+    // errors into a warning.
+    try {
+        WiredTigerUtil::logStorageSizeStats(_session, *_uri);
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(12951901,
+                      "Failed to log storage size summary for size_stats cursor",
+                      "uri"_attr = *_uri,
+                      "error"_attr = ex.toStatus());
+    }
+}
+
 WiredTigerCursor::~WiredTigerCursor() {
+    if (_sizeStats) {
+        // Never cache a size_stats cursor: closing it guarantees the next open resets the counters.
+        _session.closeCursor(_cursor);
+        return;
+    }
     _session.releaseCursor(_tableID, _cursor, std::move(_config));
 }
 

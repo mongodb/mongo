@@ -164,6 +164,14 @@ public:
         return _readOnce;
     };
 
+    void setSizeStatsCursor(bool sizeStatsCursor) override {
+        _sizeStatsCursor = sizeStatsCursor;
+    };
+
+    bool getSizeStatsCursor() const override {
+        return _sizeStatsCursor;
+    };
+
     std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall() override;
 
     void ignoreAllMultiTimestampConstraints() override {
@@ -303,6 +311,10 @@ private:
 
     // When 'true', data read from disk should not be kept in the storage engine cache.
     bool _readOnce = false;
+
+    // When 'true', cursors opened on this unit accumulate a per-b-tree size summary as they
+    // traverse (debug=(size_stats)).
+    bool _sizeStatsCursor = false;
 
     bool _readSourcePinned = false;
 

@@ -741,7 +741,7 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
     auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
     auto parsedOptions = !validateOptions.isEmpty()
         ? collection_validation::parseValidateOptions(
-              opCtx, nss, validateOptions, skipAtClusterTime)
+              opCtx, nss, validateOptions, skipAtClusterTime, /*enableSizeStats=*/true)
         : collection_validation::ValidationOptions(
               collection_validation::ValidateMode::kForegroundFull,
               collection_validation::RepairMode::kNone,

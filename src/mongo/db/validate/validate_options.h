@@ -93,7 +93,8 @@ public:
                       boost::optional<std::string> verifyConfigurationOverride = boost::none,
                       boost::optional<Timestamp> readTimestamp = boost::none,
                       boost::optional<std::vector<std::string>> hashPrefixes = boost::none,
-                      boost::optional<std::vector<std::string>> revealHashedIds = boost::none);
+                      boost::optional<std::vector<std::string>> revealHashedIds = boost::none,
+                      bool sizeStats = false);
 
     virtual ~ValidationOptions() = default;
 
@@ -131,6 +132,15 @@ public:
 
     bool isCollHashValidation() const {
         return _validateMode == ValidateMode::kCollectionHash;
+    }
+
+    /**
+     * Returns true iff the caller opted in to accumulating and logging a storage size summary. When
+     * set, the record store and index scans are opened as size-stats cursors which log the size
+     * summary when the scan complete.
+     */
+    bool sizeStats() const {
+        return _sizeStats;
     }
 
     bool isHashDrillDown() const {
@@ -213,6 +223,10 @@ private:
     boost::optional<std::vector<std::string>> _hashPrefixes;
 
     boost::optional<std::vector<std::string>> _revealHashedIds;
+
+    // Opt-in: when true (and running collHash validation), the record store and index scans
+    // accumulate a storage size summary that is read back and logged.
+    bool _sizeStats;
 };
 
 }  // namespace mongo::collection_validation

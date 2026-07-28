@@ -33,11 +33,15 @@ namespace collection_validation {
  * validation.
  * Optionally skips parsing 'atClusterTime' for unreplicated collections, which is desired with
  * modal validation usage.
+ * When 'enableSizeStats' is true and the validation is a collHash validation, a storage size
+ * summary is accumulated and logged. This is reserved for the offline startup '--validate' path
+ * (fleet validation); it is intentionally not exposed as a command option.
  */
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
                                        const BSONObj& cmdObj,
-                                       bool skipAtClusterTime = false);
+                                       bool skipAtClusterTime = false,
+                                       bool enableSizeStats = false);
 
 /**
  * Expects the caller to hold no locks.
