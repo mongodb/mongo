@@ -32,12 +32,6 @@ overrides:
     - task: .*_disagg_override$
       exec_timeout: 210 # 3.5 hours
 
-  amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-sharded-clusters:
-    - task: ^disagg_.*
-      exec_timeout: 210 # 3.5 hours
-    - task: .*_disagg_override$
-      exec_timeout: 210 # 3.5 hours
-
   # We increased the timeout since comparison results speed were slowed down due to resolving
   # Object.entries correctly.
   enterprise-amazon-linux2023-arm64-all-feature-flags-fuzzers:
