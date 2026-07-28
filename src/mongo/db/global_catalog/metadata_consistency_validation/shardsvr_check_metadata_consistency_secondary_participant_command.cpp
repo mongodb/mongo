@@ -49,7 +49,7 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command. Do not call directly.";
+        return "Test-only internal command. Do not call directly.";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -65,12 +65,13 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             tassert(12922000,
-                    fmt::format("{} is a test-only command", Request::kCommandName),
-                    TestingProctor::instance().isEnabled());
+                    fmt::format("Cannot run {} on a node started without --shardsvr",
+                                Request::kCommandName),
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+            ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
 
             const auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
             uassert(ErrorCodes::NotYetInitialized,
@@ -140,7 +141,9 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencySecondaryParticipantCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencySecondaryParticipantCommand)
+    .testOnly()
+    .forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -15,12 +15,14 @@ import {
     setupSharded,
     testDisabledClusterParameters,
 } from "jstests/libs/cluster_server_parameter_utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Verifies that test-only parameters are disabled and excluded when enableTestCommands is false.
 TestData.enableTestCommands = false;
+// Disable the execution of checkMetadataConsistency during the fixture teardown, since it may trigger
+// the invocation of the test-only _shardsvrCheckMetadataConsistencySecondaryParticipant internal command.
+TestData.skipCheckMetadataConsistency = true;
 // If feature flag enabling standalone cluster parameters is enabled, test on standalone.
 const mongo = MongoRunner.runMongod({});
 setupNode(mongo);
