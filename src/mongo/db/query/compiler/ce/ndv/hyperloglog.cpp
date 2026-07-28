@@ -1,7 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/query/compiler/ce/hyperloglog.h"
+#include "mongo/db/query/compiler/ce/ndv/hyperloglog.h"
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -107,9 +107,8 @@ double HyperLogLog::estimate() const {
     tassert(11207606, "HyperLogLog register sum must be positive", invSum > 0);
     const double raw = alpha(_registers.size()) * m * m / invSum;
 
-    // Small range correction: for cardinalities well below the register count the raw estimate is
-    // biased, while the number of still-empty registers is a near-exact predictor (linear
-    // counting, see Flajolet et al. (2007), section 4).
+    // Small range correction: the raw estimate is biased at low cardinalities, where counting
+    // the still-empty registers is near-exact (linear counting, Flajolet et al. 2007, section 4).
     if (raw <= 2.5 * m && counts[0] > 0) {
         return m * std::log(m / counts[0]);
     }

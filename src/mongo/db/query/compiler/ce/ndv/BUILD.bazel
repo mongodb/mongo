@@ -1,0 +1,78 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_fuzztest", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "hyperloglog",
+    srcs = [
+        "hyperloglog.cpp",
+    ],
+    hdrs = [
+        "hyperloglog.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "hyperloglog_test",
+    srcs = [
+        "hyperloglog_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":hyperloglog",
+    ],
+)
+
+mongo_cc_library(
+    name = "ndv_hashing",
+    srcs = [
+        "ndv_hashing.cpp",
+    ],
+    hdrs = [
+        "ndv_hashing.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage/key_string",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ndv_hashing_test",
+    srcs = [
+        "ndv_hashing_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":ndv_hashing",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "ndv_hashing_fuzz_test",
+    srcs = ["ndv_hashing_fuzz_test.cpp"],
+    deps = [
+        ":ndv_hashing",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/bson/bson_mutator",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "ndv_hashing_bm",
+    srcs = ["ndv_hashing_bm.cpp"],
+    tags = ["query_bm"],
+    deps = [
+        ":ndv_hashing",
+    ],
+)

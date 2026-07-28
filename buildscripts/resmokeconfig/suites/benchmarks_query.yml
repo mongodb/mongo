@@ -27,6 +27,7 @@ selector:
     - bazel-bin/**/shapifying_update_bm*
     - bazel-bin/**/shapifying_delete_bm*
     - bazel-bin/**/sbe_builder_bm*
+    - bazel-bin/**/ndv_hashing_bm*
 
 executor:
   config: {}
