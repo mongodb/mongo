@@ -77,6 +77,9 @@ namespace mongo {
         const std::unique_ptr<StageParams>& stageParams,                               \
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {                       \
         auto* typedParams = dynamic_cast<StageParamsClass*>(stageParams.get());        \
+        tassert(13162200,                                                              \
+                "Stage params for " #registrationName " have unexpected type",         \
+                typedParams != nullptr);                                               \
         return DocSourceClass::createFromBson(typedParams->getOriginalBson(), expCtx); \
     }                                                                                  \
     ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, StageParamsClass)
