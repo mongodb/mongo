@@ -140,6 +140,16 @@ class Tests(unittest.TestCase):
 
         assert result == ["test", "//some:test", "//some:test2"]
 
+    def test_benchmark_bin_file(self):
+        def buildozer_output(autocomplete_query):
+            return "//some:some_bm [some_bm.cpp]"
+
+        args = ["wrapper_hook", "run", "+some_bm"]
+
+        result = test_runner_interface(args, False, buildozer_output)
+
+        assert result == ["run", "//some:some_bm"]
+
     def test_bin_source_redundant_mix(self):
         def buildozer_output(autocomplete_query):
             return "//some:test [source1.cpp source2.cpp]"

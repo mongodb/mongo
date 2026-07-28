@@ -48,6 +48,7 @@ def get_buildozer_output(autocomplete_query):
             "print label srcs",
             "//src/...:%mongo_cc_unit_test",
             "//src/...:%mongo_cc_fuzztest",
+            "//src/...:%mongo_cc_benchmark",
         ],
         capture_output=True,
         text=True,
