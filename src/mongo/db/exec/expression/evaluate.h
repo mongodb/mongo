@@ -17,6 +17,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
@@ -40,6 +41,110 @@ inline SimpleMemoryUsageTracker& getMemoryTracker(const Expression& expr,
     }
     return expCtx->getExpressionFallbackTracker();
 }
+
+/**
+ * Granularity at which a per-element evaluation loop (e.g. $concatArrays, $setUnion) should batch
+ * its charges to 'tracker' before calling add()/assertWithinMemoryLimit(). Scales with 'tracker's
+ * remaining budget across its whole base chain (see remainingMemoryUsageBytes()), since the
+ * binding limit is usually an ancestor (the operation-wide tracker), not 'tracker's own.
+ *
+ * Shrinks as usage approaches whichever limit in the chain binds first, down to 0 once some
+ * tracker in the chain is already at or over its limit -- so a caller checks in almost every
+ * element near the limit, and batches coarsely (up to the 1MB cap) far from it.
+ */
+inline int64_t expressionMemoryFlushThresholdBytes(const SimpleMemoryUsageTracker& tracker,
+                                                   OperationContext* opCtx) {
+    constexpr int64_t kDivisor = 256;
+    constexpr int64_t kMinThresholdBytes = 1024;         // 1KB
+    constexpr int64_t kMaxThresholdBytes = 1024 * 1024;  // 1MB
+    int64_t remaining = tracker.remainingMemoryUsageBytes(opCtx);
+    if (remaining <= 0) {
+        return 0;
+    }
+    return std::clamp(remaining / kDivisor, kMinThresholdBytes, kMaxThresholdBytes);
+}
+
+/**
+ * Owns the memory token for an expression evaluator and batches the charges an evaluation loop
+ * makes against the tracker: callers report bytes as they produce them with add(), and the tracker
+ * -- along with its limit check -- is only touched once the accumulated amount crosses the
+ * threshold returned by expressionMemoryFlushThresholdBytes(), which shrinks as usage approaches
+ * whichever limit in the base chain binds first. This keeps the common, far-from-the-limit case off
+ * the per-element path while still failing an over-limit query at nearly the same element the
+ * unbatched code would have.
+ *
+ * Callers must call flush() once they are done adding, so the final partial batch is charged and
+ * checked -- bytes still pending when this object goes out of scope are never charged at all. The
+ * token is released on destruction, exactly as a bare SimpleMemoryUsageToken would be.
+ */
+class BatchedExpressionMemoryCharger {
+public:
+    BatchedExpressionMemoryCharger(const Expression& expr,
+                                   const EvaluationContext& ctx,
+                                   std::string_view opName)
+        : _opCtx(expr.getExpressionContext()->getOperationContext()),
+          _stageName(ctx.stageName),
+          _opName(opName),
+          _tracker(getMemoryTracker(expr, ctx)),
+          _memToken(0, &_tracker),
+          _flushThreshold(expressionMemoryFlushThresholdBytes(_tracker, _opCtx)) {}
+
+    /**
+     * Uses the expression's own operator name. Templated on the concrete expression type because
+     * getOpName() is declared by the subclasses (ExpressionNary and friends), not by Expression.
+     */
+    template <typename ExpressionType>
+    BatchedExpressionMemoryCharger(const ExpressionType& expr, const EvaluationContext& ctx)
+        : BatchedExpressionMemoryCharger(expr, ctx, expr.getOpName()) {}
+
+    /**
+     * Reports 'bytes' of newly used memory, flushing to the tracker if the pending batch has grown
+     * past the current threshold.
+     */
+    void add(int64_t bytes) {
+        _pending += bytes;
+        if (MONGO_unlikely(_pending >= _flushThreshold)) {
+            flush();
+        }
+    }
+
+    /**
+     * Like add(), but for callers that know their cumulative size (e.g. the length of an output
+     * buffer) rather than the growth since the last report.
+     */
+    void setTotal(int64_t totalBytes) {
+        add(totalBytes - (_memToken.getCurrentMemoryUsageBytes() + _pending));
+    }
+
+    /**
+     * Charges any pending bytes to the tracker and asserts that the operation is still within its
+     * memory limit. A no-op when nothing is pending: usage has not moved since the last flush, so
+     * there is nothing to reject. Note this means a zero-byte charge made while the chain is
+     * already over its limit does not throw. The next charge that moves any memory does, and an
+     * evaluator which does not increase the memory again is not using memory worth failing the
+     * query over.
+     */
+    void flush() {
+        if (_pending == 0) {
+            return;
+        }
+        _memToken.add(_pending);
+        _pending = 0;
+        _tracker.assertWithinMemoryLimit(_opCtx, _opName, _stageName);
+        _flushThreshold = expressionMemoryFlushThresholdBytes(_tracker, _opCtx);
+    }
+
+private:
+    OperationContext* _opCtx;
+    std::string_view _stageName;
+    std::string_view _opName;
+    SimpleMemoryUsageTracker& _tracker;
+    SimpleMemoryUsageToken _memToken;
+
+    // Bytes reported by the caller but not yet charged to '_tracker'.
+    int64_t _pending = 0;
+    int64_t _flushThreshold;
+};
 
 /**
  * Calls function 'function' with zero parameters and returns the result. If AssertionException is

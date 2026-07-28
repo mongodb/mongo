@@ -24,8 +24,7 @@ Value evaluate(const ExpressionConcat& expr,
 
     StringBuilder result;
 
-    auto& tracker = getMemoryTracker(expr, ctx);
-    SimpleMemoryUsageToken memToken(0, &tracker);
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
 
     for (size_t i = 0; i < n; ++i) {
         Value val = children[i]->evaluate(root, variables, ctx);
@@ -39,12 +38,10 @@ Value evaluate(const ExpressionConcat& expr,
                 val.getType() == BSONType::string);
 
         std::string_view str = val.getStringData();
-        memToken.add(static_cast<int64_t>(str.size()));
-        tracker.assertWithinMemoryLimit(
-            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
-
         result << str;
+        memCharger.add(static_cast<int64_t>(str.size()));
     }
+    memCharger.flush();
 
     return Value(result.stringData());
 }

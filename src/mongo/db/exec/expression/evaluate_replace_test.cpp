@@ -306,6 +306,78 @@ TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenQueryLimitExcee
     }
 }
 
+TEST(ExpressionEvaluateReplaceTest, ManySmallReplacementsCollectivelyExceedingLimitStillThrow) {
+    // Many small matches, none individually near the limit, must still trip it once accumulated
+    // output growth crosses it.
+    auto [expCtx, expression] =
+        parse("$replaceAll",
+              Document{{"input", std::string(2000, 'a')}, {"find", "a"sv}, {"replacement", "b"sv}});
+
+    const int64_t limit = 512;  // Well under the ~2000 bytes of total output growth.
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    ASSERT_LT(operationTracker.peakTrackedMemoryBytes(), limit + 1024 * 1024);
+}
+
+TEST(ExpressionEvaluateReplaceTest, SingleOversizedReplacementThrowsImmediately) {
+    // A single match whose replacement alone is larger than the whole limit must be caught
+    // immediately.
+    auto [expCtx, expression] =
+        parse("$replaceAll",
+              Document{{"input", "a"sv}, {"find", "a"sv}, {"replacement", std::string(1024, 'x')}});
+
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(ExpressionEvaluateReplaceTest, ManySmallRegexReplacementsCollectivelyExceedLimit) {
+    // Exercises the regex-'find' code path (replaceAllOpRegEx in evaluate_regex.cpp): many small
+    // matches, none individually near the limit, must still trip it once accumulated.
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(2000, 'a')},
+                                               {"find", BSONRegEx("a")},
+                                               {"replacement", "b"sv}});
+
+    const int64_t limit = 512;  // Well under the ~2000 bytes of total output growth.
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    ASSERT_LT(operationTracker.peakTrackedMemoryBytes(), limit + 1024 * 1024);
+}
+
+TEST(ExpressionEvaluateReplaceTest, SingleOversizedRegexReplacementThrowsImmediately) {
+    // Exercises the regex-'find' code path (replaceAllOpRegEx in evaluate_regex.cpp): a single
+    // match whose replacement alone is larger than the whole limit must be caught immediately.
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", "a"sv},
+                                               {"find", BSONRegEx("a")},
+                                               {"replacement", std::string(1024, 'x')}});
+
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
 TEST(ExpressionEvaluateReplaceTest, FallbackTrackerWithinLimitDoesNotThrow) {
     auto [expCtx, expression] = parse("$replaceAll",
                                       Document{{"input", std::string(1000, 'a')},

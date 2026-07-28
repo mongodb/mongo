@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -873,6 +874,42 @@ TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
     }
     ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
     ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
+}
+
+TEST(ExpressionConcatTest, ManySmallOperandsCollectivelyExceedingLimitStillThrow) {
+    // Many small operands, none individually near the limit, must still trip it once their
+    // accumulated size crosses it.
+    auto expCtx = ExpressionContextForTest{};
+    BSONArrayBuilder bab;
+    for (int i = 0; i < 200; ++i) {
+        bab.append(std::string(50, 'x'));
+    }
+    auto expr = parseConcat(&expCtx, BSON("$concat" << bab.arr()));
+
+    const int64_t limit = 512;  // Well under the ~10KB (200 * 50) of total operand data.
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expr->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    ASSERT_LT(operationTracker.peakTrackedMemoryBytes(), limit + 1024 * 1024);
+}
+
+TEST(ExpressionConcatTest, SingleOversizedOperandThrowsImmediately) {
+    // A single operand larger than the whole limit must be caught immediately.
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY(std::string(1024, 'x'))));
+
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expr->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
 }
 
 }  // namespace concat

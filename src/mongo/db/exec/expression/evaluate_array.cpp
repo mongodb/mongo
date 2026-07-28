@@ -48,18 +48,16 @@ Value evaluate(const ExpressionArray& expr,
     std::vector<Value> values;
     values.reserve(children.size());
 
-    auto& tracker = getMemoryTracker(expr, ctx);
-    SimpleMemoryUsageToken memToken(0, &tracker);
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
 
     for (auto&& child : children) {
         Value elemVal = child->evaluate(root, variables, ctx);
         Value& stored =
             values.emplace_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
 
-        memToken.add(static_cast<int64_t>(stored.getApproximateSize()));
-        tracker.assertWithinMemoryLimit(
-            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
+        memCharger.add(static_cast<int64_t>(stored.getApproximateSize()));
     }
+    memCharger.flush();
     return Value(std::move(values));
 }
 
@@ -272,8 +270,7 @@ Value evaluate(const ExpressionConcatArrays& expr,
     const size_t n = children.size();
     std::vector<Value> values;
 
-    auto& tracker = getMemoryTracker(expr, ctx);
-    SimpleMemoryUsageToken memToken(0, &tracker);
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
 
     for (size_t i = 0; i < n; ++i) {
         Value val = children[i]->evaluate(root, variables, ctx);
@@ -291,11 +288,10 @@ Value evaluate(const ExpressionConcatArrays& expr,
         for (const auto& v : subValues) {
             valuesSize += v.getApproximateSize();
         }
-        memToken.add(static_cast<int64_t>(valuesSize));
-        tracker.assertWithinMemoryLimit(
-            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
         values.insert(values.end(), subValues.begin(), subValues.end());
+        memCharger.add(static_cast<int64_t>(valuesSize));
     }
+    memCharger.flush();
     return Value(std::move(values));
 }
 
@@ -468,8 +464,7 @@ Value evaluate(const ExpressionSortArray& expr,
     // Pre-extract sort keys once per element rather than re-extracting inside the comparator on
     // every comparison. Each extraction requires a Value->BSONObj conversion and dotted-path
     // traversal, which dominates sort cost for pattern-based sorts on arrays of objects.
-    auto& tracker = getMemoryTracker(expr, ctx);
-    SimpleMemoryUsageToken memToken(0, &tracker);
+    BatchedExpressionMemoryCharger memCharger(expr, ctx, ExpressionSortArray::kName);
     // Note that we use an ordinary int for the array indexes rather than a size_t here.
     // We get a solid 5% bump in performance with a 32-bit int, which seems worth it
     // given that arrays larger than INT_MAX are too large to fit in a BSON document.
@@ -478,12 +473,11 @@ Value evaluate(const ExpressionSortArray& expr,
     keysAndIdx.reserve(array.size());
     for (int i = 0; i < std::ssize(array); ++i) {
         auto key = cmp.extractSortKey(array[i]);
-        memToken.add(static_cast<int64_t>(key.objsize() + sizeof(int)));
-        tracker.assertWithinMemoryLimit(expr.getExpressionContext()->getOperationContext(),
-                                        ExpressionSortArray::kName,
-                                        ctx.stageName);
+        int64_t keySize = static_cast<int64_t>(key.objsize() + sizeof(int));
         keysAndIdx.emplace_back(std::move(key), i);
+        memCharger.add(keySize);
     }
+    memCharger.flush();
 
     std::sort(keysAndIdx.begin(), keysAndIdx.end(), [&](const auto& a, const auto& b) {
         return a.first.woCompare(b.first, cmp.sortPattern, false, cmp.collator) < 0;
@@ -827,8 +821,7 @@ Value evaluate(const ExpressionSetUnion& expr,
     auto& children = expr.getChildren();
     const size_t n = children.size();
 
-    auto& tracker = getMemoryTracker(expr, ctx);
-    SimpleMemoryUsageToken memToken(0, &tracker);
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
 
     for (size_t i = 0; i < n; i++) {
         const Value newEntries = children[i]->evaluate(root, variables, ctx);
@@ -849,12 +842,11 @@ Value evaluate(const ExpressionSetUnion& expr,
         for (const auto& v : newEntries.getArray()) {
             newEntriesSize += v.getApproximateSize();
         }
-        memToken.add(static_cast<int64_t>(newEntriesSize));
-        tracker.assertWithinMemoryLimit(
-            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
 
+        memCharger.add(static_cast<int64_t>(newEntriesSize));
         unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
     }
+    memCharger.flush();
     return Value(std::vector<Value>(unionedSet.begin(), unionedSet.end()));
 }
 
@@ -1455,8 +1447,7 @@ Value evaluate(const ExpressionZip& expr,
     auto& inputs = expr.getInputs();
     inputValues.reserve(inputs.size());
 
-    auto& tracker = getMemoryTracker(expr, ctx);
-    SimpleMemoryUsageToken memToken(0, &tracker);
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
 
     size_t minArraySize = 0;
     size_t maxArraySize = 0;
@@ -1471,9 +1462,7 @@ Value evaluate(const ExpressionZip& expr,
                               << " found a non-array expression in input: " << evalExpr.toString(),
                 evalExpr.isArray());
 
-        memToken.add(static_cast<int64_t>(evalExpr.getApproximateSize()));
-        tracker.assertWithinMemoryLimit(
-            expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
+        memCharger.add(static_cast<int64_t>(evalExpr.getApproximateSize()));
 
         inputValues.push_back(evalExpr.getArray());
 
@@ -1488,7 +1477,6 @@ Value evaluate(const ExpressionZip& expr,
             maxArraySize = arraySizes.second;
         }
     }
-
     Value evaluatedDefaults(std::vector<Value>(inputs.size(), Value(BSONNULL)));
 
     // If we need default values, evaluate the defaults expression. A nullish result is treated
@@ -1508,9 +1496,7 @@ Value evaluate(const ExpressionZip& expr,
             evaluatedDefaults = evaluated;
         }
     }
-    memToken.add(static_cast<int64_t>(evaluatedDefaults.getApproximateSize()));
-    tracker.assertWithinMemoryLimit(
-        expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
+    memCharger.add(static_cast<int64_t>(evaluatedDefaults.getApproximateSize()));
 
     size_t outputLength = expr.getUseLongestLength() ? maxArraySize : minArraySize;
 
@@ -1526,16 +1512,17 @@ Value evaluate(const ExpressionZip& expr,
     // their ref-count. Inline scalars are bounded by sizeof(Value) per slot.
 
     // outputChild memory usage
-    memToken.add(static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value)));
+    memCharger.add(static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value)));
     // Per-row output memory: one Value slot in the outer vector, one RCVector<Value> heap
     // allocation, and inputs.size() Value slots inside it.
     // Total: outputLength * (sizeof(Value) + sizeof(RCVector<Value>) + inputs.size() *
     // sizeof(Value))
-    memToken.add(static_cast<int64_t>(outputLength) *
-                 (static_cast<int64_t>(sizeof(Value) + sizeof(RCVector<Value>)) +
-                  static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value))));
-    tracker.assertWithinMemoryLimit(
-        expr.getExpressionContext()->getOperationContext(), expr.getOpName(), ctx.stageName);
+    memCharger.add(static_cast<int64_t>(outputLength) *
+                   (static_cast<int64_t>(sizeof(Value) + sizeof(RCVector<Value>)) +
+                    static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value))));
+    // Flush here to make sure all memory has been accounted for before reserving the output
+    // vectors.
+    memCharger.flush();
     output.reserve(outputLength);
     outputChild.reserve(inputs.size());
 

@@ -8,6 +8,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -76,6 +77,22 @@ public:
     bool withinMemoryLimit(OperationContext* opCtx) const {
         return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes.get(opCtx) &&
             (!_base || _base->withinMemoryLimit(opCtx));
+    }
+
+    /**
+     * Returns how many more bytes can be added before this tracker or any ancestor in the base
+     * chain would exceed its own limit -- i.e. the same chain 'withinMemoryLimit()' checks, but
+     * expressed as a byte budget (the minimum headroom across the chain) rather than a boolean.
+     * Can be negative if some ancestor is already over its limit. Useful for sizing a heuristic
+     * (e.g. how much a caller may batch before it must check in with the tracker) without that
+     * heuristic having to know how deep or where in the chain the binding limit actually is.
+     */
+    int64_t remainingMemoryUsageBytes(OperationContext* opCtx) const {
+        int64_t remaining = _maxAllowedMemoryUsageBytes.get(opCtx) - _inUseTrackedMemoryBytes;
+        if (_base) {
+            remaining = std::min(remaining, _base->remainingMemoryUsageBytes(opCtx));
+        }
+        return remaining;
     }
 
     int64_t maxAllowedMemoryUsageBytes(OperationContext* opCtx) const {
