@@ -14,12 +14,12 @@ const collectionConfig = {
     storageEngine: {wiredTiger: {configString: "type=lsm"}},
 };
 const createResult = db.createCollection(collName, collectionConfig);
-assert.commandFailedWithCode(createResult, 6627201);
+assert.commandFailedWithCode(createResult, ErrorCodes.IllegalOperation);
 
 const coll = db.getCollection(collName);
 const createIndexResult = coll.createIndex(
     {field: 1},
     {storageEngine: {wiredTiger: {configString: "type=lsm"}}},
 );
-assert.commandFailedWithCode(createIndexResult, 6627201);
+assert.commandFailedWithCode(createIndexResult, ErrorCodes.IllegalOperation);
 MongoRunner.stopMongod(conn);

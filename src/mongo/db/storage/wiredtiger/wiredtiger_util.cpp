@@ -300,10 +300,6 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
         return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
     }
 
-    if (config.find("type=lsm") != std::string::npos) {
-        return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
-    }
-
     if (gFeatureFlagBanEncryptionOptionsInCollectionCreation
             .isEnabledUseLastLTSFCVWhenUninitialized(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
@@ -326,6 +322,17 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
         errorMsg << ".";
         return status.withReason(errorMsg.stringData());
     }
+
+    // Only allow type=file (the default), which must also be unquoted.
+    WiredTigerConfigParser parser(config);
+    WT_CONFIG_ITEM typeItem;
+    if (parser.get("type", &typeItem) == 0 &&
+        !(typeItem.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID &&
+          std::string_view(typeItem.str, typeItem.len) == "file")) {
+        return {ErrorCodes::IllegalOperation,
+                "Configuration of the WiredTiger 'type' option is not supported."};
+    }
+
     return Status::OK();
 }
 
