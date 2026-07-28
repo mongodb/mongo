@@ -162,8 +162,8 @@ resmoke_suite_test(
         "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
+        "requires_large_host",
         "requires_replicated_fast_count_recovery",
-        "resources:memory:14336",
         "san",
     ],
     target_compatible_with = select({

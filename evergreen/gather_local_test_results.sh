@@ -80,6 +80,23 @@ for i in "${!shard_paths[@]}"; do
         unzip -o -q "${output_zip}" -d "${target_dir}/test.outputs"
     fi
 
+    # Locate the undeclared-outputs manifest. Copy it so it ends up in
+    # results/<prefix>/shard_<N>/shard_<N>_MANIFEST, matching the naming convention used by
+    # fetch_remote_test_results.sh and picked up by the teardown S3 put filter "**/*_MANIFEST".
+    manifest=""
+    for candidate in \
+        "${shard_dir}/test.outputs/outputs_manifest/MANIFEST" \
+        "${shard_dir}/outputs_manifest/MANIFEST"; do
+        if [ -f "${candidate}" ]; then
+            manifest="${candidate}"
+            break
+        fi
+    done
+
+    if [ -n "${manifest}" ]; then
+        cp "${manifest}" "${target_dir}/shard_${shard_num}_MANIFEST"
+    fi
+
     pushd "${target_dir}" >/dev/null
     bazel_test_results::symlink_test_logs
 
@@ -118,6 +135,14 @@ bazel_test_results::display_test_summary shard_names shard_statuses shard_test_c
 bazel_test_results::combine_metrics
 
 bazel_test_results::combine_reports
+
+# combine_reports writes the combined report to ${workdir}/report.json. Unlike the RBE result task
+# group (which attaches it from the workdir root via its own teardown_task), the standalone local
+# task has no teardown and relies on the project post's "attach report", which reads
+# ${report_file|src/report.json}. Copy the report to ${workdir}/src/report.json so post finds it.
+if [ -f "${workdir}/report.json" ]; then
+    cp "${workdir}/report.json" "${workdir}/src/report.json"
+fi
 
 # Check for system-level failures (TIMEOUT or NO_REPORT)
 for status in "${shard_statuses[@]}"; do

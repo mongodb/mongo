@@ -75,6 +75,7 @@ resmoke_suite_test(
         "//jstests/libs:key1",
         "//jstests/libs:test_pem_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:proxy_protocol_server",
         "//jstests/ssl:tls_enumerator",
         "//jstests/ssl/libs",
         "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:all_subpackage_javascript_files",

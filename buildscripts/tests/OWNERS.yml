@@ -6,6 +6,9 @@ filters:
   - "test_bazel_run_resmoke.py":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "test_benchmark_profiler.py":
+    approvers:
+      - 10gen/performance
   - "test_evergreen_task_timeout.py":
     approvers:
       - 10gen/devprod-test-infrastructure
@@ -15,9 +18,9 @@ filters:
   - "test_generate_sbom.py":
     approvers:
       - 10gen/code-review-team-ssdlc
-  - "test_benchmark_profiler.py":
+  - "test_generate_result_tasks.py":
     approvers:
-      - 10gen/performance
+      - 10gen/devprod-test-infrastructure
   - "test_mongolint.py":
     approvers:
       - 10gen/server-programmability

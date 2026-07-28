@@ -52,6 +52,11 @@ exit_for_result_task() {
     if [[ "$ret" -eq 3 ]]; then
         echo 'Some tests failed, the task will be failed after fetching test results.'
         exit 0
+    elif [[ "$ret" -eq 4 ]]; then
+        # No tests ran for this target (e.g. it was skipped on this platform). Mirror the runner
+        # task's tolerance instead of failing the result task. Remove with SERVER-118686.
+        echo 'No tests were run.'
+        exit 0
     else
         exit "$ret"
     fi
@@ -216,6 +221,19 @@ activate_result_tasks() {
     python buildscripts/evergreen_activate_result_tasks.py --expansion-file ../expansions.yml ${extra_args}
 }
 
+# The incompatible_with_bazel_remote_test suites run as standalone tasks on the host. Activate them
+# early from the runner so they run concurrently with the remote bazel test rather than waiting for
+# it to finish. Best-effort: a hiccup here must not abort the runner's remote execution.
+activate_local_tasks_early() {
+    if [ "${generate_burn_in_targets}" = "true" ]; then
+        return
+    fi
+    echo "Activating standalone local-exec tasks early..."
+    python buildscripts/evergreen_activate_result_tasks.py \
+        --expansion-file ../expansions.yml --local-only ||
+        echo "WARNING: failed to activate local-exec tasks early; continuing with remote execution."
+}
+
 main() {
     set -o errexit
     set -o verbose
@@ -236,6 +254,12 @@ main() {
     echo "${ALL_FLAGS}" >.bazel_build_flags
 
     save_invocation
+
+    # Runner only (result tasks set $result_task): kick off the standalone local-exec tasks before
+    # starting the long remote run, so the two proceed in parallel.
+    if [[ -z "$result_task" ]]; then
+        activate_local_tasks_early
+    fi
 
     maybe_generate_burn_in_targets
 

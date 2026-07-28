@@ -52,6 +52,47 @@ def _bazel_binary() -> str:
     return os.environ.get("BAZEL_BINARY", "bazel")
 
 
+# Override passed to local-exec result tasks so they select ONLY the incompatible suites at test
+# time.
+LOCAL_INCOMPATIBLE_FILTER = ",incompatible_with_bazel_remote_test"
+
+# Evergreen task tag on the standalone local-exec tasks, so the resmoke_tests runner can activate
+# them early (and so they are excluded from the late RBE result-task activation).
+LOCAL_TASK_TAG = "resmoke_local_test"
+
+# Bazel-target tag requesting that the task be scheduled on the variant's large distro.
+# The generator reads it and resolves the variant's ${large_distro_name} into the task's run_on.
+REQUIRES_LARGE_HOST_TAG = "requires_large_host"
+
+
+def query_target_tags(targets: list[str]) -> dict[str, list[str]]:
+    """Return the bazel `tags` attribute for each target."""
+    if not targets:
+        return {}
+    target_set = "set(" + " ".join(targets) + ")"
+    result = subprocess.run(
+        [_bazel_binary(), "query", "--keep_going", "--output=streamed_jsonproto", target_set],
+        capture_output=True,
+        text=True,
+    )
+    tags_by_target: dict[str, list[str]] = {}
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rule = json.loads(line).get("rule", {})
+        name = rule.get("name", "").removeprefix("@@").removeprefix("@")
+        if not name:
+            continue
+        tags: list[str] = []
+        for attr in rule.get("attribute", []):
+            if attr.get("name") == "tags":
+                tags = attr.get("stringListValue", [])
+                break
+        tags_by_target[name] = tags
+    return tags_by_target
+
+
 def make_results_task(
     target: str,
     resmoke_disable_rbe: bool = False,
@@ -62,6 +103,9 @@ def make_results_task(
     else:
         results_func = "fetch remote test results"
     execute_params: dict = {"targets": target, "result_task": True}
+    if resmoke_disable_rbe:
+        execute_params["resmoke_disable_rbe"] = "true"
+        execute_params["resmoke_bazel_test_incompatible_filter"] = LOCAL_INCOMPATIBLE_FILTER
     if generate_burn_in_targets:
         execute_params["generate_burn_in_targets"] = True
     commands = [
@@ -75,6 +119,58 @@ def make_results_task(
     if tag:
         task["tags"] = [tag]
 
+    return task
+
+
+def _result_artifact_uploads() -> list:
+    uploads = [
+        ("**/*outputs.zip", "application/zip"),
+        ("**/*_MANIFEST", "text/plain"),
+        ("**/*test.log", "text/plain"),
+    ]
+    return [
+        BuiltInCommand(
+            "s3.put",
+            {
+                "aws_key": "${aws_key_new}",
+                "aws_secret": "${aws_secret}",
+                "local_files_include_filter_prefix": "results",
+                "local_files_include_filter": pattern,
+                "remote_file": "${project}/${build_variant}/${revision}/${task_id}/",
+                "bucket": "mciuploads",
+                "permissions": "private",
+                "visibility": "signed",
+                "preserve_path": "true",
+                "content_type": content_type,
+            },
+        )
+        for pattern, content_type in uploads
+    ]
+
+
+def make_local_results_task(target: str) -> dict:
+    """A standalone task that runs one incompatible_with_bazel_remote_test suite locally."""
+    execute_params = {
+        "targets": target,
+        "result_task": True,
+        "resmoke_disable_rbe": "true",
+        "resmoke_bazel_test_incompatible_filter": LOCAL_INCOMPATIBLE_FILTER,
+    }
+    commands = (
+        _make_setup_group("resmoke_tests", resmoke_disable_rbe=True)
+        + [BuiltInCommand("shell.exec", {"script": "rm -rf build/ results/ report.json"})]
+        + [
+            FunctionCall("execute resmoke tests via bazel", execute_params),
+            FunctionCall("gather local test results", {"test_label": target}),
+        ]
+        + _result_artifact_uploads()
+    )
+    task = Task(target, commands).as_dict()
+    tags = [LOCAL_TASK_TAG]
+    assignment = get_assignment_tag(target)
+    if assignment:
+        tags.append(assignment)
+    task["tags"] = tags
     return task
 
 
@@ -169,51 +265,9 @@ def make_task_group(
                     "display_name": "Bazel invocation for local usage",
                 },
             ),
-            BuiltInCommand(
-                "s3.put",
-                {
-                    "aws_key": "${aws_key_new}",
-                    "aws_secret": "${aws_secret}",
-                    "local_files_include_filter_prefix": "results",
-                    "local_files_include_filter": "**/*outputs.zip",
-                    "remote_file": "${project}/${build_variant}/${revision}/${task_id}/",
-                    "bucket": "mciuploads",
-                    "permissions": "private",
-                    "visibility": "signed",
-                    "preserve_path": "true",
-                    "content_type": "application/zip",
-                },
-            ),
-            BuiltInCommand(
-                "s3.put",
-                {
-                    "aws_key": "${aws_key_new}",
-                    "aws_secret": "${aws_secret}",
-                    "local_files_include_filter_prefix": "results",
-                    "local_files_include_filter": "**/*_MANIFEST",
-                    "remote_file": "${project}/${build_variant}/${revision}/${task_id}/",
-                    "bucket": "mciuploads",
-                    "permissions": "private",
-                    "visibility": "signed",
-                    "preserve_path": "true",
-                    "content_type": "text/plain",
-                },
-            ),
-            BuiltInCommand(
-                "s3.put",
-                {
-                    "aws_key": "${aws_key_new}",
-                    "aws_secret": "${aws_secret}",
-                    "local_files_include_filter_prefix": "results",
-                    "local_files_include_filter": "**/*test.log",
-                    "remote_file": "${project}/${build_variant}/${revision}/${task_id}/",
-                    "bucket": "mciuploads",
-                    "permissions": "private",
-                    "visibility": "signed",
-                    "preserve_path": "true",
-                    "content_type": "text/plain",
-                },
-            ),
+        ]
+        + _result_artifact_uploads()
+        + [
             FunctionCall("generate result task hang analyzer"),
         ],
         teardown_group=[
@@ -313,19 +367,22 @@ def resolve_codeowners() -> dict[str, list[str]]:
 
 
 def expand_evergreen_variables(text: str, expansions: dict) -> str:
-    """Expand Evergreen ${variable} syntax in a string.
+    """Expand Evergreen ${variable} (and ${variable|default}) syntax in a string.
 
     Args:
-        text: String potentially containing ${var} expansions
+        text: String potentially containing ${var} or ${var|default} expansions
         expansions: Dict of expansion values
 
     Returns:
-        String with ${var} replaced by expansion values
+        String with expansions resolved
     """
 
     def replace_var(match):
-        var_name = match.group(1)
-        return str(expansions.get(var_name, ""))
+        name, sep, default = match.group(1).partition("|")
+        value = expansions.get(name)
+        if value is not None and value != "":
+            return str(value)
+        return default if sep else ""
 
     return re.sub(r"\$\{([^}]+)\}", replace_var, text)
 
@@ -357,7 +414,7 @@ def get_variant_expansion(
     return ""
 
 
-def _build_tag_query(tags: list[str], target_pattern: str) -> str:
+def _build_tag_query(tags: list[str], target_pattern: str, local_exec: bool = False) -> str:
     positive_tags = [t for t in tags if not t.startswith("-")]
     negative_tags = [t[1:] for t in tags if t.startswith("-")]
 
@@ -370,16 +427,21 @@ def _build_tag_query(tags: list[str], target_pattern: str) -> str:
             f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', " f"kind('_resmoke_test', {target_pattern}))"
         )
 
-    excluded_parts = [tagged("incompatible_with_bazel_remote_test")]
-    excluded_parts += [tagged(tag) for tag in negative_tags]
-    excluded = " + ".join(excluded_parts)
-
     if len(positive_tags) == 1:
         inclusion = tagged(positive_tags[0])
     else:
         inclusion = f"({' + '.join(tagged(tag) for tag in positive_tags)})"
 
-    return f"{inclusion} - ({excluded})"
+    if local_exec:
+        inclusion = f"{inclusion} ^ {tagged('incompatible_with_bazel_remote_test')}"
+        excluded_parts = [tagged(tag) for tag in negative_tags]
+    else:
+        excluded_parts = [tagged("incompatible_with_bazel_remote_test")]
+        excluded_parts += [tagged(tag) for tag in negative_tags]
+
+    if excluded_parts:
+        return f"{inclusion} - ({' + '.join(excluded_parts)})"
+    return inclusion
 
 
 def _variant_cquery_flags(variant, resmoke_task, expansions) -> tuple[list[str], list[str], str]:
@@ -411,6 +473,7 @@ def query_targets(
     variant,
     resmoke_task,
     expansions,
+    resmoke_disable_rbe: bool = False,
 ) -> list[str]:
     tags, cquery_flags, target_pattern = _variant_cquery_flags(variant, resmoke_task, expansions)
     if not tags:
@@ -419,12 +482,19 @@ def query_targets(
 
     # Phase 1: unconfigured `bazel query` for tag matching. This skips configured
     # analysis, which is what made running `bazel cquery` against //... slow.
-    query_cmd = [_bazel_binary(), "query", "--keep_going", _build_tag_query(tags, target_pattern)]
+    query_cmd = [
+        _bazel_binary(),
+        "query",
+        "--keep_going",
+        _build_tag_query(tags, target_pattern, local_exec=resmoke_disable_rbe),
+    ]
     q_result = subprocess.run(query_cmd, capture_output=True, text=True)
     candidates = [line.strip() for line in q_result.stdout.strip().split("\n") if line.strip()]
 
     if not candidates:
-        if target_pattern == "//...":
+        # An empty local-exec set is normal (a variant may have no remote incompatible suites). Only the RBE
+        # set over //... is expected to be non-empty, so only that case is treated as an error.
+        if target_pattern == "//..." and not resmoke_disable_rbe:
             error_msg = (
                 f"Bazel query failed. No targets found for variant {variant.name}\n"
                 f"Bazel query: {query_cmd[-1]}\n"
@@ -457,7 +527,7 @@ def query_targets(
     targets = [c for c in candidates if c in compatible]
     print(f"Variant {variant.name}: Found {len(targets)} targets total", file=sys.stderr)
 
-    if target_pattern == "//..." and not targets:
+    if target_pattern == "//..." and not targets and not resmoke_disable_rbe:
         error_msg = (
             f"Bazel cquery failed. No targets found for variant {variant.name}\n"
             f"Bazel cquery: {candidate_set}\n"
@@ -468,6 +538,21 @@ def query_targets(
         raise RuntimeError(error_msg)
 
     return targets
+
+
+def resolve_large_host_distro(
+    variant, target: str, tags_by_target: dict[str, list[str]]
+) -> Optional[str]:
+    """Return the large distro a local target must run on for this variant."""
+    if REQUIRES_LARGE_HOST_TAG not in tags_by_target.get(target, []):
+        return None
+    large_distro_name = variant.expansion("large_distro_name")
+    if not large_distro_name:
+        raise RuntimeError(
+            f"Target {target} is tagged '{REQUIRES_LARGE_HOST_TAG}' but variant "
+            f"'{variant.name}' has no 'large_distro_name' expansion to schedule it on."
+        )
+    return large_distro_name
 
 
 def create_task_group_for_variant(variant_name: str, task_name: str, targets: list[str]) -> dict:
@@ -592,7 +677,6 @@ def main(outfile: Annotated[str, typer.Option()]):
     evg_config_path = expansions.get("evergreen_config_file_path") or get_evergreen_config_path(
         project_name
     )
-    resmoke_disable_rbe = expansions.get("resmoke_disable_rbe", "") == "true"
 
     print(f"Parsing Evergreen configuration from {evg_config_path}...", file=sys.stderr)
     # Pre-warm the @cache-decorated resolvers so their bazel-run + YAML costs
@@ -612,51 +696,75 @@ def main(outfile: Annotated[str, typer.Option()]):
                 continue
             variant_tasks.append((variant, resmoke_task))
 
-        with ThreadPoolExecutor(max_workers=max(2, len(variant_tasks))) as pool:
-            targets_per_variant = list(
-                pool.map(lambda vt: query_targets(vt[0], vt[1], expansions), variant_tasks)
+        # Each variant runs BOTH its RBE-compatible suites (remotely, via the resmoke_tests runner)
+        # and its incompatible_with_bazel_remote_test suites (locally on the host). The two sets are
+        # disjoint and queried independently, then emitted as separate result-task groups.
+        def query_both(vt):
+            return (
+                query_targets(vt[0], vt[1], expansions, resmoke_disable_rbe=False),
+                query_targets(vt[0], vt[1], expansions, resmoke_disable_rbe=True),
             )
 
-    targets_all = set()
-    for (variant, _), targets in zip(variant_tasks, targets_per_variant):
-        if not targets:
-            continue
-        targets_all.update(targets)
+        with ThreadPoolExecutor(max_workers=max(2, len(variant_tasks))) as pool:
+            targets_per_variant = list(pool.map(query_both, variant_tasks))
 
-        task_group = make_task_group(
-            "resmoke_tests", variant.name, targets, resmoke_disable_rbe=resmoke_disable_rbe
-        ).as_dict()
-        task_group["tasks"] = targets
-        project["task_groups"].append(task_group)
+    # No-op dependency on the generating task, as a workaround for not being able to set an empty
+    # depends_on (the variant-wide dependency must be overridden per task). Remove with SERVER-119809.
+    gen_dep = {
+        "name": "bazel_result_tasks_gen",
+        "variant": "generate-tasks-for-version",
+        "omit_generated_tasks": True,
+    }
 
-        build_variant = BuildVariant(name=variant.name).as_dict()
-        # Typical variants running resmoke tests set a variant-wide dependency. During conversion,
-        # these are not a dependency for the `resmoke_tests` task or the results tasks added here.
-        # Set an explicitly depends_on in the task group's reference to override it.
-        # The task that generated the task is used as a no-op dependency, as a workaround for not
-        # being able to set an empty depends_on. Remove with SERVER-119809.
-        depends_on = [
-            {
-                "name": "bazel_result_tasks_gen",
-                "variant": "generate-tasks-for-version",
-                "omit_generated_tasks": True,
-            },
-        ]
-        if resmoke_disable_rbe:
-            # archive_dist_test may live on a separate compile variant; resolve it per-variant here
-            # because Evergreen does not expand ${compile_variant} in depends_on.variant.
+    # Fetch the bazel tags for every remote incompatible target in one query, so per-variant task refs
+    # can be scheduled on the variant's large distro when the suite is tagged requires_large_host.
+    local_targets_union: set[str] = set()
+    for _, local_targets in targets_per_variant:
+        local_targets_union.update(local_targets)
+    local_target_tags = query_target_tags(sorted(local_targets_union))
+
+    rbe_targets_all: set[str] = set()
+    local_targets_all: set[str] = set()
+    for (variant, _), (rbe_targets, local_targets) in zip(variant_tasks, targets_per_variant):
+        task_refs = []
+
+        # RBE-compatible suites: a task group whose tasks fetch results from the runner's batched
+        # remote execution (activated late, after the runner produces build_events.json).
+        if rbe_targets:
+            rbe_targets_all.update(rbe_targets)
+            task_group = make_task_group(
+                "resmoke_tests", variant.name, rbe_targets, resmoke_disable_rbe=False
+            ).as_dict()
+            task_group["tasks"] = rbe_targets
+            project["task_groups"].append(task_group)
+            task_refs.append(
+                {"name": task_group["name"], "activate": False, "depends_on": [gen_dep]}
+            )
+
+        # incompatible_with_bazel_remote_test suites: standalone tasks, each runs its suite locally.
+        # The resmoke_tests runner activates them early (see resmoke_tests_execute_bazel.sh). They
+        # depend on archive_dist_test for the dist-test binaries.
+        if local_targets:
+            local_targets_all.update(local_targets)
             compile_variant = variant.expansion("compile_variant") or variant.name
-            depends_on.append({"name": "archive_dist_test", "variant": compile_variant})
-        build_variant["tasks"] = {
-            "name": task_group["name"],
-            "activate": False,
-            "depends_on": depends_on,
-        }
-        project["buildvariants"].append(build_variant)
+            local_dep = {"name": "archive_dist_test", "variant": compile_variant}
+            for target in local_targets:
+                task_ref = {"name": target, "activate": False, "depends_on": [gen_dep, local_dep]}
+                # A suite tagged requires_large_host runs on this variant's large distro. Set run_on on
+                # the task ref (not the shared standalone task) so each variant gets its own distro.
+                large_distro_name = resolve_large_host_distro(variant, target, local_target_tags)
+                if large_distro_name:
+                    task_ref["run_on"] = [large_distro_name]
+                task_refs.append(task_ref)
+
+        if task_refs:
+            build_variant = BuildVariant(name=variant.name).as_dict()
+            build_variant["tasks"] = task_refs
+            project["buildvariants"].append(build_variant)
 
     project["tasks"] = [
-        make_results_task(target, resmoke_disable_rbe=resmoke_disable_rbe) for target in targets_all
-    ]
+        make_results_task(target, resmoke_disable_rbe=False) for target in rbe_targets_all
+    ] + [make_local_results_task(target) for target in local_targets_all]
 
     with open(outfile, "w") as f:
         f.write(json.dumps(project, indent=4))

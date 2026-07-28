@@ -44,6 +44,15 @@ py_test(
 )
 
 py_test(
+    name = "test_generate_result_tasks",
+    srcs = ["test_generate_result_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:generate_result_tasks",
+    ],
+)
+
+py_test(
     name = "test_bazel_plus_test_interface",
     srcs = ["test_bazel_plus_test_interface.py"],
     visibility = ["//visibility:public"],

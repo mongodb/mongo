@@ -759,6 +759,7 @@ py_library(
     srcs = ["evergreen_activate_result_tasks.py"],
     visibility = ["//visibility:public"],
     deps = [
+        "//buildscripts:generate_result_tasks",
         "//buildscripts/util",
         dependency(
             "typer",

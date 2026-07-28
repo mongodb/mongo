@@ -21,6 +21,7 @@ from evergreen.api import (
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from buildscripts.generate_result_tasks import LOCAL_TASK_TAG
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
 
@@ -98,8 +99,19 @@ def get_result_tasks(evg_api, build_id):
     for task in evg_api.tasks_by_build(build_id):
         # Result tasks are bazel targets that start with "//"
         if task.display_name.startswith("//") and "_burn_in_" not in task.display_name:
+            # Standalone local-exec tasks are activated early by the runner, not in the late RBE
+            # activation; skip them here so they are not restarted.
+            if LOCAL_TASK_TAG in (task.tags or []):
+                continue
             tasks.append(task)
     return tasks
+
+
+def get_local_tasks(evg_api, build_id):
+    """The standalone local-exec tasks (tagged LOCAL_TASK_TAG) on a build."""
+    return [
+        task for task in evg_api.tasks_by_build(build_id) if LOCAL_TASK_TAG in (task.tags or [])
+    ]
 
 
 def activate_or_restart_tasks(evg_api, tasks, version_id, build_variant):
@@ -139,16 +151,20 @@ def activate_result_task_group(
     version_id: str,
     evg_api: EvergreenApi,
     build_events_file: Optional[str] = None,
+    local_only: bool = False,
 ) -> None:
     """
-    Activate the result task group for the given variant and task.
+    Activate result tasks for the given variant.
 
     :param build_variant: The build variant name.
     :param task_name: The task name (e.g., "resmoke_tests").
     :param version_id: The Evergreen version ID.
     :param evg_api: Evergreen API client.
-    :param build_events_file: Optional path to build_events.json. When provided, asserts that
-        every executed test has a corresponding Evergreen task; raises RuntimeError otherwise.
+    :param build_events_file: Optional path to build_events.json. When provided (RBE path), asserts
+        that every executed test has a corresponding Evergreen task; raises RuntimeError otherwise.
+    :param local_only: When True, activate only the standalone local-exec tasks (the runner calls
+        this early so they run concurrently with remote execution). When False, activate the RBE
+        result tasks (late, after the runner produces build_events.json).
     """
 
     try:
@@ -163,18 +179,19 @@ def activate_result_task_group(
             )
             return
 
-        result_tasks = get_result_tasks(evg_api, build_id)
+        if local_only:
+            tasks = get_local_tasks(evg_api, build_id)
+        else:
+            tasks = get_result_tasks(evg_api, build_id)
+            if build_events_file:
+                assert_all_tests_have_tasks(tasks, build_events_file)
 
-        if build_events_file:
-            assert_all_tests_have_tasks(result_tasks, build_events_file)
-
-        activate_or_restart_tasks(evg_api, result_tasks, version_id, build_variant)
+        activate_or_restart_tasks(evg_api, tasks, version_id, build_variant)
 
     except Exception:
-        result_task_group_name = f"{task_name}_results_{build_variant}"
         LOGGER.error(
-            "Failed to activate result task group",
-            task_group=result_task_group_name,
+            "Failed to activate result tasks",
+            local_only=local_only,
             build_variant=build_variant,
             version_id=version_id,
             exc_info=True,
@@ -198,10 +215,17 @@ def main(
             "Evergreen task, raising an error if any are missing."
         ),
     ] = None,
+    local_only: Annotated[
+        bool,
+        typer.Option(
+            help="Activate only the standalone local-exec tasks (runner calls this early, before "
+            "remote execution) instead of the RBE result tasks."
+        ),
+    ] = False,
     verbose: Annotated[bool, typer.Option(help="Enable verbose logging.")] = False,
 ) -> None:
     """
-    Activate the result task group for the current build variant and task.
+    Activate result tasks for the current build variant and task.
     """
     enable_logging(verbose)
 
@@ -221,7 +245,9 @@ def main(
 
     evg_api = get_evergreen_api(evergreen_config)
 
-    activate_result_task_group(build_variant, task_name, version_id, evg_api, build_events_file)
+    activate_result_task_group(
+        build_variant, task_name, version_id, evg_api, build_events_file, local_only=local_only
+    )
 
 
 if __name__ == "__main__":
