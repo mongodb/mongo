@@ -4,6 +4,8 @@ import datetime
 import hashlib
 import ipaddress
 import json
+import os
+import sys
 from pathlib import PurePath
 from typing import Any
 
@@ -16,8 +18,6 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.extensions import UnrecognizedExtension
 from cryptography.x509.oid import ObjectIdentifier
 from ecdsa import SigningKey
-import os
-import sys
 
 # Dictionary from common names to OIDs.
 NAME_TO_OID = {v: k for k, v in _OID_NAMES.items()}

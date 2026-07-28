@@ -1,5 +1,7 @@
 load(":generate_certificates.bzl", "generate_certificates")
 load(":main_certs_def.bzl", main_certs_def = "certs_def")
+load("//bazel/uv:defs.bzl", "dependency")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +9,33 @@ generate_certificates(
     name = "generate_main_certificates",
     certs_def = main_certs_def,
     static_inputs = glob(["static/**"]),
+)
+
+filegroup(
+    name = "static_certs",
+    srcs = glob(["static/**"]),
+)
+
+exports_files(
+    glob(["*.json"]),
+)
+
+py_binary(
+    name = "mkcert",
+    srcs = ["mkcert.py"],
+    main = "mkcert.py",
+    deps = [
+        dependency(
+            "cryptography",
+            group = "platform",
+        ),
+        dependency(
+            "ecdsa",
+            group = "testing",
+        ),
+        dependency(
+            "asn1crypto",
+            group = "testing",
+        ),
+    ],
 )

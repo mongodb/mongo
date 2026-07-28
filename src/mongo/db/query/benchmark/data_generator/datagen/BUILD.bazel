@@ -3,36 +3,12 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 package(default_visibility = ["//visibility:public"])
 
 py_library(
-    name = "database_instance",
-    srcs = ["database_instance.py"],
-)
-
-py_library(
-    name = "distribution",
-    srcs = ["distribution.py"],
-)
-
-py_library(
-    name = "random",
-    srcs = ["random.py"],
-)
-
-py_library(
-    name = "serialize",
-    srcs = ["serialize.py"],
-)
-
-py_library(
-    name = "statistics",
-    srcs = ["statistics.py"],
-)
-
-py_library(
-    name = "util",
-    srcs = ["util.py"],
-)
-
-py_library(
-    name = "values",
-    srcs = ["values.py"],
+    name = "datagen",
+    srcs = glob(["*.py"]),
+    imports = [".."],
+    deps = [
+        "@pypi//:faker",
+        "@pypi//:numpy",
+        "@pypi//:pymongo",
+    ],
 )

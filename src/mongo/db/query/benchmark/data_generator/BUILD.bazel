@@ -5,9 +5,18 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "driver",
     srcs = ["driver.py"],
+    imports = ["."],
+    deps = [
+        "//src/mongo/db/query/benchmark/data_generator/datagen",
+        "//src/mongo/db/query/benchmark/data_generator/specs",
+    ],
 )
 
 py_library(
     name = "extract_schema",
     srcs = ["extract_schema.py"],
+    imports = ["."],
+    deps = [
+        "//src/mongo/db/query/benchmark/data_generator/datagen",
+    ],
 )
