@@ -22,7 +22,9 @@ namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] change_stream_pre_image_util {
  * or DSC) and call 'shouldUseReplicatedTruncates()' on it. If this returns
  * true, then replicated truncates will be used. If this does not return true,
  * the feature flag 'gFeatureFlagUseReplicatedTruncatesForDeletions' will be
- * consulted and its value will be returned.
+ * consulted and its value will be returned. The overload taking an
+ * 'fcvSnapshot' evaluates the feature flag against that snapshot; the overload
+ * without one uses the current FCV snapshot.
  */
 bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx);
 bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx,

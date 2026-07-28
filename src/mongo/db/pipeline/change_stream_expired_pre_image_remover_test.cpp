@@ -110,6 +110,31 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
               _preImagesRemover->getJobContext_forTest());
 }
 
+TEST_F(
+    ChangeStreamExpiredPreImageRemoverTest,
+    ExpectReplicatedTruncatesToRemainOnFCVChangeWhenUsingReplicatedTruncatesViaPersistenceProvider) {
+    // When the persistence provider mandates replicated truncates
+    // (e.g. disaggregated storage), an FCV change must not flip the running job to local truncates,
+    // even when the FCV-gated feature flag is disabled. Otherwise the job restarts in a mode the
+    // per-pass guard rejects, so it perpetually self-skips and never removes pre-images.
+    setPersistenceProviderWithFlag(true);
+    setReplicatedTruncatesFeatureFlag(false);
+
+    // Start the job as the primary. It must use replicated truncates.
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
+              _preImagesRemover->getJobContext_forTest());
+
+    // An FCV change must be a no-op here: the persistence provider still mandates replicated
+    // truncates regardless of the feature flag, so the same job keeps running unchanged.
+    // (Generic FCV reference): feature flag test
+    ServerGlobalParams::FCVSnapshot newFcvSnapshot(multiversion::GenericFCV::kLatest);
+    _preImagesRemover->onFCVChange(_opCtx.get(), newFcvSnapshot);
+
+    ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
+              _preImagesRemover->getJobContext_forTest());
+}
+
 TEST_F(ChangeStreamExpiredPreImageRemoverTest,
        ReplicatedTruncatesSetToFalseWhenNotUsingReplicatedTruncates) {
     setPersistenceProviderWithFlag(false);
