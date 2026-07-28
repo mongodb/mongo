@@ -7,6 +7,16 @@
  * entry's timestamp. Writes advance the primary's optime beyond that held value, so that without
  * the skip logic, initial sync would stall waiting for the stable timestamp to catch up.
  * With the skip logic, initial sync should complete successfully.
+ *
+ * @tags: [
+ *   # This test sets initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs
+ *   # to 1 hour, which makes the initial syncing node skip waiting for the sync source's stable
+ *   # recovery timestamp and instead begin applying oplog entries from the initiating-set entry.
+ *   # In the multiversion harness the lower-binary node would then apply oplog entries generated
+ *   # while the sync source was still on the upgraded (latest) FCV, which its binary cannot
+ *   # interpret, causing it to fassert.
+ *   multiversion_incompatible,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
