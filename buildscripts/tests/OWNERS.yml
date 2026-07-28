@@ -18,3 +18,6 @@ filters:
   - "test_benchmark_profiler.py":
     approvers:
       - 10gen/performance
+  - "test_mongolint.py":
+    approvers:
+      - 10gen/server-programmability
