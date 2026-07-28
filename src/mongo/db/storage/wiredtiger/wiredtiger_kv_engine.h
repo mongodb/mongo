@@ -258,26 +258,9 @@ public:
 
     BlindWritePolicy chooseBlindWritePolicy(OperationContext* opCtx) override;
 
-    Status insertIntoIdent(RecoveryUnit& ru,
-                           std::string_view ident,
-                           IdentKey key,
-                           std::span<const char> value,
-                           BlindWritePolicy policy) override;
-
-    Status updateInIdent(RecoveryUnit& ru,
-                         std::string_view ident,
-                         IdentKey key,
-                         std::span<const char> value,
-                         BlindWritePolicy policy) override;
-
-    StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
-                                          std::string_view ident,
-                                          IdentKey key) override;
-
-    Status deleteFromIdent(RecoveryUnit& ru,
-                           std::string_view ident,
-                           IdentKey key,
-                           BlindWritePolicy policy) override;
+    std::unique_ptr<KVEngineDirectCrudCursor> getDirectCursor(RecoveryUnit& ru,
+                                                              std::string_view ident,
+                                                              BlindWritePolicy policy) override;
 
     virtual Status alterMetadata(std::string_view uri, std::string_view config) {
         MONGO_UNREACHABLE;

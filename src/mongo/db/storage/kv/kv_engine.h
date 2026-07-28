@@ -13,10 +13,13 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/shared_buffer.h"
 
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace mongo {
@@ -26,13 +29,14 @@ class OperationContext;
 class RecoveryUnit;
 class SnapshotManager;
 class StorageOplogManager;
+class KVEngineDirectCrudCursor;
 
 /**
  * Whether a write may skip the read-before-write existence check the storage engine would
  * otherwise perform. A "blind" write is safe only when the caller has already validated the
  * operation (e.g. secondary oplog application of an op the primary accepted).
  */
-enum class BlindWritePolicy {
+enum class [[MONGO_MOD_PUBLIC]] BlindWritePolicy {
     // Storage engine performs its usual existence check before writing.
     nonBlind,
     // Skip the existence check; overwrite if a value is already present.
@@ -41,8 +45,6 @@ enum class BlindWritePolicy {
 
 class [[MONGO_MOD_OPEN]] KVEngine {
 public:
-    using IdentKey = std::variant<std::span<const char>, int64_t>;
-
     /**
      * During the startup process, the storage engine is one of the first components to be started
      * up and fully initialized. But that fully initialized storage engine may not be recognized as
@@ -574,57 +576,14 @@ public:
     }
 
     /**
-     * Inserts a key-value pair into the specified 'ident'. Must be called from within a storage
-     * transaction. With `BlindWritePolicy::nonBlind` duplicate keys are rejected. With
-     * `BlindWritePolicy::blind` the duplicate key check is skipped: any existing value at `key` is
-     * silently overwritten.
-     *
-     * Returns OK on success, `DuplicateKey` if the key already exists (nonBlind only), or the
-     * error returned by the underlying storage engine on other failures.
+     * Returns a cursor for performing direct key-value CRUD operations on the specified 'ident'.
+     * All operations performed through the cursor use the given blind-write 'policy'. Must be used
+     * from within a storage transaction on 'ru'.
      */
-    virtual Status insertIntoIdent(RecoveryUnit& ru,
-                                   std::string_view ident,
-                                   IdentKey key,
-                                   std::span<const char> value,
-                                   BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
-
-    /**
-     * Updates the value associated with `key` in the specified 'ident'. Must be called from within
-     * a storage transaction. With `BlindWritePolicy::nonBlind` the key must already exist; missing
-     * keys are rejected with `NoSuchKey`. With `BlindWritePolicy::blind` the key-existence check
-     * is skipped and the operation becomes an upsert: a missing key is inserted, and an existing
-     * value is overwritten.
-     *
-     * Returns OK on success, `NoSuchKey` if the key does not exist (nonBlind only), or the error
-     * returned by the underlying storage engine on other failures.
-     */
-    virtual Status updateInIdent(RecoveryUnit& ru,
-                                 std::string_view ident,
-                                 IdentKey key,
-                                 std::span<const char> value,
-                                 BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
-
-    /**
-     * Retrieves the value associated with 'key' from the specified 'ident'.
-     *
-     * Returns a 'UniqueBuffer' containing the value on success, 'KeyNotFound' if the key does not
-     * exist, or the error returned by the underlying storage engine on other failures.
-     */
-    virtual StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
-                                                  std::string_view ident,
-                                                  IdentKey key) = 0;
-
-    /**
-     * Deletes the key from the specified 'ident'.
-     *
-     * Returns OK on success, 'NoSuchKey' if the key does not exist, or the error returned by the
-     * underlying storage engine on other failures. Must be called from within a storage
-     * transaction.
-     */
-    virtual Status deleteFromIdent(RecoveryUnit& ru,
-                                   std::string_view ident,
-                                   IdentKey key,
-                                   BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
+    virtual std::unique_ptr<KVEngineDirectCrudCursor> getDirectCursor(
+        RecoveryUnit& ru,
+        std::string_view ident,
+        BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
 
     /**
      * See `StorageEngine::dump`
@@ -793,5 +752,57 @@ public:
     getUnclaimedPreparedTransactionsForStartupRecovery(OperationContext* opCtx) const {
         MONGO_UNREACHABLE;
     }
+};
+
+/**
+ * A cursor which exposes low-level CRUD operations to a specific ident in a KV store without going
+ * through the normal collection interface. A direct cursor's lifetime is tied to the storage
+ * transaction which was used to obtain it.
+ */
+class [[MONGO_MOD_OPEN]] KVEngineDirectCrudCursor {
+public:
+    using Key = std::variant<std::span<const char>, int64_t>;
+
+    virtual ~KVEngineDirectCrudCursor() = default;
+
+    /**
+     * Inserts a key-value pair into the cursor's ident. Must be called from within a storage
+     * transaction. With `BlindWritePolicy::nonBlind` duplicate keys are rejected. With
+     * `BlindWritePolicy::blind` the duplicate key check is skipped: any existing value at `key` is
+     * silently overwritten.
+     *
+     * Returns OK on success, `DuplicateKey` if the key already exists (nonBlind only), or the
+     * error returned by the underlying storage engine on other failures.
+     */
+    virtual Status insert(RecoveryUnit& ru, Key key, std::span<const char> value) = 0;
+
+    /**
+     * Updates the value associated with `key` in the cursor's ident. Must be called from within
+     * a storage transaction. With `BlindWritePolicy::nonBlind` the key must already exist; missing
+     * keys are rejected with `NoSuchKey`. With `BlindWritePolicy::blind` the key-existence check
+     * is skipped and the operation becomes an upsert: a missing key is inserted, and an existing
+     * value is overwritten.
+     *
+     * Returns OK on success, `NoSuchKey` if the key does not exist (nonBlind only), or the error
+     * returned by the underlying storage engine on other failures.
+     */
+    virtual Status update(RecoveryUnit& ru, Key key, std::span<const char> value) = 0;
+
+    /**
+     * Retrieves the value associated with 'key' from the cursor's ident.
+     *
+     * Returns a 'UniqueBuffer' containing the value on success, 'NoSuchKey' if the key does not
+     * exist, or the error returned by the underlying storage engine on other failures.
+     */
+    virtual StatusWith<UniqueBuffer> get(Key key) = 0;
+
+    /**
+     * Deletes the key from the cursor's ident.
+     *
+     * Returns OK on success, 'NoSuchKey' if the key does not exist, or the error returned by the
+     * underlying storage engine on other failures. Must be called from within a storage
+     * transaction.
+     */
+    virtual Status remove(RecoveryUnit& ru, Key key) = 0;
 };
 }  // namespace mongo

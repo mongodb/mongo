@@ -5,14 +5,18 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
 
+#include <cstring>
 #include <string_view>
 
 #include <wiredtiger.h>
@@ -25,6 +29,15 @@ namespace mongo {
 namespace {
 using namespace std::literals::string_view_literals;
 static constexpr std::string_view kOverwriteFalse = "overwrite=false"sv;
+
+void setKeyOnCursor(WT_CURSOR* c, const std::variant<std::span<const char>, int64_t>& key) {
+    std::visit(OverloadedVisitor{
+                   [&](const std::span<const char> k) { c->set_key(c, WiredTigerItem{k}.get()); },
+                   [&](int64_t k) {
+                       c->set_key(c, k);
+                   }},
+               key);
+}
 }  // namespace
 
 WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session)
@@ -107,5 +120,68 @@ WiredTigerPrepareCursor::WiredTigerPrepareCursor(WiredTigerSession& session) : _
 
 WiredTigerPrepareCursor::~WiredTigerPrepareCursor() {
     _session.closeCursor(_cursor);
+}
+
+Status WiredTigerDirectCrudCursor::insert(RecoveryUnit& ru, Key key, std::span<const char> value) {
+    invariant(ru.inUnitOfWork());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+    c->set_value(c, WiredTigerItem{value}.get());
+
+    int rc = WT_OP_CHECK(wiredTigerCursorInsert(wtRu, c));
+    return wtRCToStatus(rc, _cursor->session);
+}
+
+Status WiredTigerDirectCrudCursor::update(RecoveryUnit& ru, Key key, std::span<const char> value) {
+    invariant(ru.inUnitOfWork());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+    c->set_value(c, WiredTigerItem{value}.get());
+
+    int rc = WT_OP_CHECK(wiredTigerCursorUpdate(wtRu, c));
+    if (rc == WT_NOTFOUND)
+        return Status(ErrorCodes::NoSuchKey, "No such key exists in ident");
+    return wtRCToStatus(rc, _cursor->session);
+}
+
+StatusWith<UniqueBuffer> WiredTigerDirectCrudCursor::get(Key key) {
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+
+    int rc = WT_OP_CHECK(c->search(c));
+    if (rc == WT_NOTFOUND)
+        return Status(ErrorCodes::NoSuchKey, "No such key exists in ident");
+    if (auto status = wtRCToStatus(rc, _cursor->session); !status.isOK())
+        return status;
+
+    WiredTigerItem v;
+    rc = c->get_value(c, v.get());
+    if (auto status = wtRCToStatus(rc, _cursor->session); !status.isOK())
+        return status;
+
+    UniqueBuffer out = UniqueBuffer::allocate(v.size());
+    std::copy(v.data(), v.data() + v.size(), out.get());
+    return out;
+}
+
+Status WiredTigerDirectCrudCursor::remove(RecoveryUnit& ru, Key key) {
+    invariant(ru.inUnitOfWork());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+
+    int rc = WT_OP_CHECK(wiredTigerCursorRemove(wtRu, c));
+    if (rc == WT_NOTFOUND)
+        return Status(ErrorCodes::NoSuchKey, "No such key exists in ident");
+    return wtRCToStatus(rc, _cursor->session);
 }
 }  // namespace mongo

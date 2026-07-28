@@ -3,11 +3,14 @@
 
 #pragma once
 
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_managed_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/shared_buffer.h"
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -120,5 +123,25 @@ public:
 private:
     WT_CURSOR* _cursor = nullptr;  // Owned
     WiredTigerSession& _session;
+};
+
+/**
+ * A WiredTiger implementation of KVEngineDirectCrudCursor, wrapping a single reusable
+ * WiredTigerCursor for direct key-value CRUD operations on an ident.
+ */
+class WiredTigerDirectCrudCursor : public KVEngineDirectCrudCursor {
+public:
+    WiredTigerDirectCrudCursor(WiredTigerCursor::Params params,
+                               std::string_view uri,
+                               WiredTigerSession& session)
+        : _cursor(params, uri, session) {}
+
+    Status insert(RecoveryUnit& ru, Key key, std::span<const char> value) override;
+    Status update(RecoveryUnit& ru, Key key, std::span<const char> value) override;
+    StatusWith<UniqueBuffer> get(Key key) override;
+    Status remove(RecoveryUnit& ru, Key key) override;
+
+private:
+    WiredTigerCursor _cursor;
 };
 }  // namespace mongo

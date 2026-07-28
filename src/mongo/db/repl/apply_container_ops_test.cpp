@@ -14,7 +14,6 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -30,15 +29,15 @@ namespace {
 StatusWith<UniqueBuffer> _get(OperationContext* opCtx,
                               std::string_view ident,
                               std::span<const char> key) {
-    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-    return storage_engine_direct_crud::get(*storageEngine, *ru, ident, key);
+    auto* kvEngine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    return kvEngine->getDirectCursor(ru, ident)->get(key);
 }
 
 StatusWith<UniqueBuffer> _get(OperationContext* opCtx, std::string_view ident, int64_t key) {
-    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-    return storage_engine_direct_crud::get(*storageEngine, *ru, ident, key);
+    auto* kvEngine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    return kvEngine->getDirectCursor(ru, ident)->get(key);
 }
 
 /**

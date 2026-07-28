@@ -19,6 +19,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/fail_point.h"

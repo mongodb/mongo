@@ -28,7 +28,6 @@
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
@@ -36,7 +35,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
@@ -52,7 +50,6 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <string>
 #include <string_view>
@@ -74,6 +71,19 @@ using namespace std::literals::string_view_literals;
 
 void callbackMock() {}
 
+std::span<const char> toSpan(const StatusWith<UniqueBuffer>& buffer) {
+    ASSERT_OK(buffer);
+    return {buffer.getValue().get(), buffer.getValue().capacity()};
+}
+
+void assertBufferEqualsSpan(std::span<const char> expected,
+                            const StatusWith<UniqueBuffer>& actual) {
+    ASSERT_OK(actual);
+    auto& buffer = actual.getValue();
+    ASSERT_TRUE(std::equal(
+        expected.begin(), expected.end(), buffer.get(), buffer.get() + buffer.capacity()));
+}
+
 TEST_F(StorageEngineTest, DirectWritesInsertTest) {
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
@@ -90,26 +100,18 @@ TEST_F(StorageEngineTest, DirectWritesInsertTest) {
     const auto intIdent = intRs->getIdent();
     const auto strIdent = strRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     // Perform direct writes.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value));
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value));
         txn.commit();
     }
 
-    // Verify results.
-    auto intOut = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
-    auto strOut = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
-
-    ASSERT_OK(intOut);
-    ASSERT_OK(strOut);
-    EXPECT_EQ(value.size(), intOut.getValue().capacity());
-    EXPECT_EQ(value.size(), strOut.getValue().capacity());
-    EXPECT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
-    EXPECT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, intIdent)->get(intKey));
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, strIdent)->get(strKey));
 }
 
 TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
@@ -128,45 +130,65 @@ TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
     const auto intIdent = intRs->getIdent();
     const auto strIdent = strRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     // Initial insertions.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value));
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value));
         txn.commit();
     }
 
-    // Verify initial insertions.
-    auto intOut = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
-    auto strOut = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
-
-    ASSERT_OK(intOut);
-    ASSERT_OK(strOut);
-    EXPECT_EQ(value.size(), intOut.getValue().capacity());
-    EXPECT_EQ(value.size(), strOut.getValue().capacity());
-    EXPECT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
-    EXPECT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
-
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, intIdent)->get(intKey));
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, strIdent)->get(strKey));
 
     // Perform deletes.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, intKey));
-        ASSERT_OK(storage_engine_direct_crud::remove(*_storageEngine, *ru, strIdent, strKey));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->remove(*ru, intKey));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->remove(*ru, strKey));
         txn.commit();
     }
 
     // Check for successful deletes.
-    auto s1 = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
-    ASSERT_NOT_OK(s1);
-    EXPECT_EQ(ErrorCodes::NoSuchKey, s1.getStatus().code());
-    auto s2 = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
-    ASSERT_NOT_OK(s2);
-    EXPECT_EQ(ErrorCodes::NoSuchKey, s2.getStatus().code());
+    EXPECT_EQ(ErrorCodes::NoSuchKey, engine->getDirectCursor(*ru, intIdent)->get(intKey));
+    EXPECT_EQ(ErrorCodes::NoSuchKey, engine->getDirectCursor(*ru, strIdent)->get(strKey));
 }
 
+TEST_F(StorageEngineTest, DirectWritesUpdateTest) {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const int64_t intKey{1};
+    const std::span<const char> strKey{"key"sv};
+    const std::span<const char> value{"test"sv};
+
+    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
+    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    ASSERT(intRs.get());
+    ASSERT(strRs.get());
+
+    auto* engine = _storageEngine->getEngine();
+
+    auto intCursor = engine->getDirectCursor(*ru, intRs->getIdent());
+    auto strCursor = engine->getDirectCursor(*ru, strRs->getIdent());
+
+    StorageWriteTransaction txn(*ru);
+    ASSERT_OK(intCursor->insert(*ru, intKey, value));
+    ASSERT_OK(strCursor->insert(*ru, strKey, value));
+
+    assertBufferEqualsSpan(value, intCursor->get(intKey));
+    assertBufferEqualsSpan(value, strCursor->get(strKey));
+
+    auto value2 = "test2"sv;
+
+    ASSERT_OK(intCursor->update(*ru, intKey, value2));
+    ASSERT_OK(strCursor->update(*ru, strKey, value2));
+
+    assertBufferEqualsSpan(value2, intCursor->get(intKey));
+    assertBufferEqualsSpan(value2, strCursor->get(strKey));
+}
 
 TEST_F(StorageEngineTest, DirectWritesFailures) {
     auto opCtx = cc().makeOperationContext();
@@ -187,13 +209,13 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     const auto intIdent = intRs->getIdent();
     const auto strIdent = strRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     // Initial insertions.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value1));
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value1));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value1));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value1));
         txn.commit();
     }
 
@@ -201,12 +223,10 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     // Duplicate key insertion will return DuplicateKey.
     {
         StorageWriteTransaction txn(*ru);
-        auto s1 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value1);
+        auto s1 = engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value1);
         ASSERT_NOT_OK(s1);
         EXPECT_EQ(ErrorCodes::KeyExists, s1.code());
-        auto s2 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value1);
+        auto s2 = engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value1);
         ASSERT_NOT_OK(s2);
         EXPECT_EQ(ErrorCodes::KeyExists, s2.code());
     }
@@ -215,12 +235,10 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     // Duplicate keys with different values will also return DuplicateKey.
     {
         StorageWriteTransaction txn(*ru);
-        auto s1 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value2);
+        auto s1 = engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value2);
         ASSERT_NOT_OK(s1);
         EXPECT_EQ(ErrorCodes::KeyExists, s1.code());
-        auto s2 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value2);
+        auto s2 = engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value2);
         ASSERT_NOT_OK(s2);
         EXPECT_EQ(ErrorCodes::KeyExists, s2.code());
     }
@@ -228,16 +246,55 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     // Deleting non-existent keys will return NoSuchKey.
     {
         StorageWriteTransaction txn(*ru);
-        auto s1 =
-            storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, nonExistentIntKey);
+        auto s1 = engine->getDirectCursor(*ru, intIdent)->remove(*ru, nonExistentIntKey);
         ASSERT_NOT_OK(s1);
         EXPECT_EQ(ErrorCodes::NoSuchKey, s1.code());
 
-        auto s2 =
-            storage_engine_direct_crud::remove(*_storageEngine, *ru, strIdent, nonExistentStrKey);
+        auto s2 = engine->getDirectCursor(*ru, strIdent)->remove(*ru, nonExistentStrKey);
         ASSERT_NOT_OK(s2);
         EXPECT_EQ(ErrorCodes::NoSuchKey, s2.code());
     }
+}
+
+TEST_F(StorageEngineTest, DirectWritesNullAndEmpty) {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    auto rs = makeTemporary(opCtx.get());
+    ASSERT(rs.get());
+    const auto ident = rs->getIdent();
+
+    auto* engine = _storageEngine->getEngine();
+
+    const int64_t emptyKey = 1;
+    const int64_t nullKey = 2;
+    const int64_t nonexistentKey = 3;
+
+    {
+        StorageWriteTransaction txn(*ru);
+        auto cursor = engine->getDirectCursor(*ru, ident);
+        ASSERT_OK(cursor->insert(*ru, 1, std::span("", 0)));
+        ASSERT_OK(cursor->insert(*ru, 2, std::span<const char>()));
+        txn.commit();
+    }
+
+    auto cursor = engine->getDirectCursor(*ru, ident);
+
+    auto empty = cursor->get(emptyKey);
+    ASSERT_OK(empty);
+    EXPECT_EQ(0, empty.getValue().capacity());
+    // UniqueBuffer(0) allocates kHolderSize bytes and thus is non-null even if malloc(0) would
+    // return null
+    EXPECT_NE(nullptr, empty.getValue().get());
+
+    auto null = cursor->get(nullKey);
+    ASSERT_OK(null);
+    EXPECT_EQ(0, null.getValue().capacity());
+    // WiredTiger does not support storing null as a distinct thing from an empty buffer
+    EXPECT_NE(nullptr, null.getValue().get());
+
+    auto nonexistent = cursor->get(nonexistentKey);
+    EXPECT_EQ(ErrorCodes::NoSuchKey, nonexistent);
 }
 
 using StorageEngineTestDeathTest = StorageEngineTest;
@@ -247,23 +304,18 @@ DEATH_TEST_F(StorageEngineTestDeathTest,
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 
-    const char* key = "key";
-    const char* valueToStore = "test";
     const int64_t intKey{1};
-    const std::span<const char> value{valueToStore, std::strlen(valueToStore)};
-    const std::span<const char> strKey{key, std::strlen(key)};
+    const std::span<const char> value = "test"sv;
 
-    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
-    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    auto intRs = makeTemporary(opCtx.get());  // KeyFormat::Long
     ASSERT(intRs.get());
-    ASSERT(strRs.get());
 
     const auto intIdent = intRs->getIdent();
 
     // This should fail an invariant from missing a storage transaction.
     {
         auto status =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value);
+            _storageEngine->getEngine()->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value);
     }
 }
 
@@ -273,30 +325,26 @@ DEATH_TEST_F(StorageEngineTestDeathTest,
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 
-    const char* key = "key";
-    const char* valueToStore = "test";
     const int64_t intKey{1};
-    const std::span<const char> value{valueToStore, std::strlen(valueToStore)};
-    const std::span<const char> strKey{key, std::strlen(key)};
+    const std::span<const char> value = "test"sv;
 
-    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
-    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    auto intRs = makeTemporary(opCtx.get());  // KeyFormat::Long
     ASSERT(intRs.get());
-    ASSERT(strRs.get());
 
     const auto intIdent = intRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     {
         StorageWriteTransaction txn(*ru);
-        auto status =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value);
+        auto status = engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value);
         ASSERT_OK(status);
         txn.commit();
     }
 
     // This should fail an invariant from missing a storage transaction.
     {
-        auto status = storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, intKey);
+        auto status = engine->getDirectCursor(*ru, intIdent)->remove(*ru, intKey);
     }
 }
 

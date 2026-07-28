@@ -25,7 +25,6 @@
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
@@ -48,7 +47,6 @@
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
@@ -104,21 +102,17 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
-#include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/opcounters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
@@ -3307,6 +3301,24 @@ Status applyContainerOperations(OperationContext* opCtx,
         }
     }
 
+    auto getCursor = [&,
+                      cursor = std::unique_ptr<KVEngineDirectCrudCursor>{},
+                      prevPolicy = BlindWritePolicy::nonBlind,
+                      prevIdent = ""sv](std::string_view ident) mutable {
+        // Sample the blind-write policy from the engine. On a primary, the engine returns
+        // nonBlind unconditionally, so primary writes always perform the storage-engine
+        // existence check. On a standby applying an op the primary already validated, the
+        // engine samples blind with probability gWiredTigerBlindWriteRatio (default 0.999),
+        // skipping the read-before-write on layered tables.
+        const auto policy = engine->getEngine()->chooseBlindWritePolicy(opCtx);
+        if (!cursor || policy != prevPolicy || ident != prevIdent) {
+            cursor = engine->getEngine()->getDirectCursor(*ru, ident, policy);
+            prevPolicy = policy;
+            prevIdent = ident;
+        }
+        return cursor.get();
+    };
+
     for (const auto& op : ops) {
         uassert(12337301,
                 str::stream() << "applyContainerOperations requires container ops, found "
@@ -3319,15 +3331,9 @@ Status applyContainerOperations(OperationContext* opCtx,
                 op->getTimestamp() == timestamp);
 
         const auto ident = *op->getContainer();
+        auto cursor = getCursor(ident);
         const BSONObj o = op->getObject();
         Status s = Status::OK();
-
-        // Sample the blind-write policy from the engine. On a primary, the engine returns
-        // nonBlind unconditionally, so primary writes always perform the storage-engine
-        // existence check. On a standby applying an op the primary already validated, the
-        // engine samples blind with probability gWiredTigerBlindWriteRatio (default 0.999),
-        // skipping the read-before-write on layered tables.
-        const auto policy = engine->getEngine()->chooseBlindWritePolicy(opCtx);
 
         auto* opObserver = opCtx->getServiceContext()->getOpObserver();
 
@@ -3350,8 +3356,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                             for (size_t i = 0; i < keys.size(); i++) {
                                 auto k = keys[i];
                                 auto v = values[i];
-                                auto status = storage_engine_direct_crud::insert(
-                                    *engine, *ru, ident, k, v, policy);
+                                auto status = cursor->insert(*ru, k, v);
                                 if (!status.isOK()) {
                                     return status;
                                 }
@@ -3361,14 +3366,15 @@ Status applyContainerOperations(OperationContext* opCtx,
                         }
 
                         const auto valSpan = maybeVal.value_or(ContainerVal{}).data();
-                        auto status = storage_engine_direct_crud::insert(
-                            *engine, *ru, ident, keys, valSpan, policy);
-                        if (status.isOK()) {
-                            for (const auto& k : keys) {
-                                opObserver->onContainerInsert(opCtx, ident, k, valSpan);
+                        for (auto key : keys) {
+                            if (auto status = cursor->insert(*ru, key, valSpan); !status.isOK()) {
+                                return status;
                             }
                         }
-                        return status;
+                        for (const auto& k : keys) {
+                            opObserver->onContainerInsert(opCtx, ident, k, valSpan);
+                        }
+                        return Status::OK();
                     },
                     [&](int64_t key) -> Status {
                         if (maybeVal && maybeVal->isArrayVal()) {
@@ -3377,8 +3383,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                             const auto values = maybeVal->getArrayVal();
                             int64_t i = 0;
                             for (const auto& v : values) {
-                                auto status = storage_engine_direct_crud::insert(
-                                    *engine, *ru, ident, key + i, v, policy);
+                                auto status = cursor->insert(*ru, key + i, v);
                                 if (!status.isOK()) {
                                     return status;
                                 }
@@ -3389,8 +3394,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                         }
                         // Single int-keyed insert. 'v' is optional; an absent value is empty.
                         const auto valSpan = maybeVal.value_or(ContainerVal{}).data();
-                        auto status = storage_engine_direct_crud::insert(
-                            *engine, *ru, ident, key, valSpan, policy);
+                        auto status = cursor->insert(*ru, key, valSpan);
                         if (status.isOK()) {
                             opObserver->onContainerInsert(opCtx, ident, key, valSpan);
                         }
@@ -3399,8 +3403,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                     [&](std::span<const char> key) -> Status {
                         // Single bytes-keyed insert. 'v' is optional; an absent value is empty.
                         const auto valSpan = maybeVal.value_or(ContainerVal{}).data();
-                        auto status = storage_engine_direct_crud::insert(
-                            *engine, *ru, ident, key, valSpan, policy);
+                        auto status = cursor->insert(*ru, key, valSpan);
                         if (status.isOK()) {
                             opObserver->onContainerInsert(opCtx, ident, key, valSpan);
                         }
@@ -3419,8 +3422,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                 s = parsed.getKey().visit(OverloadedVisitor{
                     [&](const std::vector<std::span<const char>>&) -> Status { MONGO_UNREACHABLE; },
                     [&](auto key) -> Status {
-                        auto status = storage_engine_direct_crud::update(
-                            *engine, *ru, ident, key, valSpan, policy);
+                        auto status = cursor->update(*ru, key, valSpan);
                         if (status.isOK()) {
                             opObserver->onContainerUpdate(opCtx, ident, key, valSpan);
                         }
@@ -3435,18 +3437,18 @@ Status applyContainerOperations(OperationContext* opCtx,
                 s = parsed.getKey().visit(OverloadedVisitor{
                     [&](std::vector<std::span<const char>> keys) -> Status {
                         // Bytes-keyed range delete (SERVER-130645): an array of keys to remove.
-                        auto status =
-                            storage_engine_direct_crud::remove(*engine, *ru, ident, keys, policy);
-                        if (status.isOK()) {
-                            for (const auto& k : keys) {
-                                opObserver->onContainerDelete(opCtx, ident, k);
+                        for (auto key : keys) {
+                            if (auto status = cursor->remove(*ru, key); !status.isOK()) {
+                                return status;
                             }
                         }
-                        return status;
+                        for (const auto& k : keys) {
+                            opObserver->onContainerDelete(opCtx, ident, k);
+                        }
+                        return Status::OK();
                     },
                     [&](auto key) -> Status {
-                        auto status =
-                            storage_engine_direct_crud::remove(*engine, *ru, ident, key, policy);
+                        auto status = cursor->remove(*ru, key);
                         if (status.isOK()) {
                             opObserver->onContainerDelete(opCtx, ident, key);
                         }

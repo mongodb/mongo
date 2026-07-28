@@ -930,7 +930,6 @@ mongo_cc_library(
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
         "//src/mongo/db/storage:checkpointer",
-        "//src/mongo/db/storage:storage_engine_direct_crud",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/transaction",

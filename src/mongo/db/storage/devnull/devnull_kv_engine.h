@@ -218,33 +218,10 @@ public:
 
     void dump() const override {}
 
-    Status insertIntoIdent(RecoveryUnit& ru,
-                           std::string_view ident,
-                           IdentKey key,
-                           std::span<const char> value,
-                           BlindWritePolicy policy) override {
-        return Status::OK();
-    }
-
-    Status updateInIdent(RecoveryUnit& ru,
-                         std::string_view ident,
-                         IdentKey key,
-                         std::span<const char> value,
-                         BlindWritePolicy policy) override {
-        return Status::OK();
-    }
-
-    StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
-                                          std::string_view ident,
-                                          IdentKey key) override {
-        return Status::OK();
-    }
-
-    Status deleteFromIdent(RecoveryUnit& ru,
-                           std::string_view ident,
-                           IdentKey key,
-                           BlindWritePolicy policy) override {
-        return Status::OK();
+    std::unique_ptr<KVEngineDirectCrudCursor> getDirectCursor(RecoveryUnit& ru,
+                                                              std::string_view ident,
+                                                              BlindWritePolicy policy) override {
+        return nullptr;
     }
 
     // This sets the results of the backup cursor for unit tests.
