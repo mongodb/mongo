@@ -343,10 +343,14 @@ idl_generator(
 mongo_cc_library(
     name = "landlock",
     srcs = ["landlock.cpp"],
+    hdrs = ["landlock.h"],
     deps = [
         ":server_base",
+        ":serverinit",
         "//src/mongo:base",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util/net:ssl_options",
         "//src/mongo/util/options_parser",
     ],
 )

@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-// Landlock self-sandboxing for mongod and mongos (Linux only).
-//
-// Landlock is a Linux LSM that lets an unprivileged process irreversibly drop
-// its own ambient filesystem rights. When enabled via --landlock
-// (security.landlock.enabled), the server declares the set of path hierarchies it
-// legitimately needs at startup (e.g. dbPath read-write, system libraries
-// read-only) and the kernel denies every other filesystem access for the
-// lifetime of the process and its descendants.
+// The Landlock sandbox implementation (Linux only): the kernel-facing plumbing
+// behind landlock.h, together with the server's own filesystem policy and the
+// startup initializer that enforces it. See landlock.h for what the sandbox is
+// and how the ruleset API is meant to be used.
 //
 // The Landlock uAPI (struct layouts, access-right bits, syscall numbers) is
 // defined locally in this file rather than by including <linux/landlock.h>:
@@ -46,20 +42,27 @@
 
 #if defined(__linux__)
 
+#include "mongo/db/landlock.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/initialize_server_global_state_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -69,6 +72,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -232,20 +237,27 @@ StatusWith<long> landlockAbiVersion() {
 
 constexpr uint64_t kAccessRead = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
 
-constexpr uint64_t kAccessMutate = LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_REMOVE_DIR |
-    LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_MAKE_CHAR | LANDLOCK_ACCESS_FS_MAKE_DIR |
-    LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_MAKE_SOCK | LANDLOCK_ACCESS_FS_MAKE_FIFO |
-    LANDLOCK_ACCESS_FS_MAKE_BLOCK | LANDLOCK_ACCESS_FS_MAKE_SYM | LANDLOCK_ACCESS_FS_REFER |
-    LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_IOCTL_DEV;
+constexpr uint64_t kAccessMutate = LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE |
+    LANDLOCK_ACCESS_FS_REMOVE_DIR | LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_MAKE_CHAR |
+    LANDLOCK_ACCESS_FS_MAKE_DIR | LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_MAKE_SOCK |
+    LANDLOCK_ACCESS_FS_MAKE_FIFO | LANDLOCK_ACCESS_FS_MAKE_BLOCK | LANDLOCK_ACCESS_FS_MAKE_SYM;
 
 constexpr uint64_t kAccessReadWrite = kAccessRead | kAccessMutate;
 
-// Everything the ruleset handles (denies by default), including EXECUTE.
-// EXECUTE is handled but deliberately never grantable (see addPathRule):
-// mongod and mongos never execute(2) files, so under the sandbox nothing may --
-// note Landlock's EXECUTE only gates execve()-style execution, not mmap'ing
-// libraries, so dlopen() needs only READ_FILE and still works.
-constexpr uint64_t kAccessFsAll = kAccessRead | kAccessMutate | LANDLOCK_ACCESS_FS_EXECUTE;
+// Everything the ruleset handles (denies by default). Deliberately broader
+// than any grantable mask, so three rights stay denied everywhere for the
+// life of the process:
+//  - EXECUTE: mongod and mongos never execve(2) files (config-file __exec
+//    expansion runs during option parsing, before the sandbox engages). Note
+//    Landlock's EXECUTE only gates execve()-style execution, not mmap'ing
+//    libraries, so dlopen() needs only READ_FILE and still works.
+//  - REFER: the server never renames or links files across directories; the
+//    renames it does perform (log rotation, WiredTiger's turtle file, FTDC's
+//    interim file) all stay within one directory, which REFER does not gate.
+//  - IOCTL_DEV: the server needs no device ioctls; the ioctls it does issue
+//    are on sockets and pipes, which are not filesystem device files.
+constexpr uint64_t kAccessFsAll = kAccessReadWrite | LANDLOCK_ACCESS_FS_EXECUTE |
+    LANDLOCK_ACCESS_FS_REFER | LANDLOCK_ACCESS_FS_IOCTL_DEV;
 
 // Rights that make sense on a non-directory. The kernel rejects (EINVAL) a
 // path-beneath rule granting directory-shaped rights on a file, so rules for
@@ -328,272 +340,364 @@ uint64_t gLandlockDegradedFsAccess = 0;
 
 }  // namespace
 
-/**
- * A single filesystem grant: every filesystem object beneath `path` may be
- * accessed with the rights in `accessMask`. Rules are inert descriptions; they
- * take effect when passed to LandlockRuleset::addPathRule().
- *
- * Only constructible through the named factories, so every grantable access
- * profile is a vetted constant rather than an ad-hoc bit mask. Rules carry no
- * ABI knowledge (they may be built before any ruleset exists); rights the
- * running kernel does not support are dropped when the rule is added to a
- * ruleset, which is the only place that can know the ABI.
- */
-class LandlockFilesystemRule {
-public:
-    /** Read files and list directories beneath `path`. */
-    static LandlockFilesystemRule readOnly(std::string path) {
-        return {std::move(path), kAccessRead};
+LandlockFilesystemRule LandlockFilesystemRule::readOnly(std::string path) {
+    return {std::move(path), kAccessRead};
+}
+
+LandlockFilesystemRule LandlockFilesystemRule::readWrite(std::string path) {
+    return {std::move(path), kAccessReadWrite};
+}
+
+LandlockRuleset::~LandlockRuleset() {
+    close(_rulesetFd);
+}
+
+StatusWith<std::unique_ptr<LandlockRuleset>> LandlockRuleset::create() {
+    uint64_t requestedFsAccess = kAccessFsAll;
+    uassert(13118813,
+            "A Landlock ruleset must be asked to handle at least one filesystem access right",
+            requestedFsAccess != 0);
+
+    auto swAbi = landlockAbiVersion();
+    if (!swAbi.isOK()) {
+        return swAbi.getStatus();
     }
+    const long abi = swAbi.getValue();
 
-    /** Full read and mutate rights, for data hierarchies. */
-    static LandlockFilesystemRule readWrite(std::string path) {
-        return {std::move(path), kAccessReadWrite};
+    LandlockRulesetAttr attr;
+    // Every rule added later is intersected with this handled set (see
+    // addPathRule): the kernel rejects (EINVAL) a rule granting a right the
+    // ruleset does not handle, e.g. IOCTL_DEV in a rule when this mask
+    // dropped it because the running ABI predates it.
+    attr.handledAccessFs = requestedFsAccess & supportedFsAccess(abi);
+    if (attr.handledAccessFs == 0) {
+        LOGV2_WARNING(13118801,
+                      "Landlock: none of the requested access rights are supported by the "
+                      "running kernel's ABI",
+                      "abiVersion"_attr = abi,
+                      "requestedRights"_attr = fsAccessRightNames(requestedFsAccess));
+        return Status(
+            ErrorCodes::InvalidOptions,
+            "None of the requested Landlock filesystem access rights are supported by this "
+            "kernel");
     }
-
-    const std::string& path() const {
-        return _path;
-    }
-
-    uint64_t accessMask() const {
-        return _accessMask;
-    }
-
-private:
-    LandlockFilesystemRule(std::string path, uint64_t accessMask)
-        : _path(std::move(path)), _accessMask(accessMask) {}
-
-    std::string _path;
-    uint64_t _accessMask;
-};
-
-/**
- * Owns one Landlock ruleset file descriptor and wraps the three Landlock
- * syscalls: landlock_create_ruleset() (in create()), landlock_add_rule() (in
- * addPathRule()) and landlock_restrict_self() (in restrictSelf()).
- *
- * Filesystem-only for now: the ruleset handles no network or scope
- * restrictions (see LandlockRulesetAttr).
- *
- * ABI resolution happens here: create() probes the running kernel's Landlock
- * ABI version and the ruleset handles the intersection of the requested rights
- * and what that ABI supports; rules are likewise masked down when added.
- *
- * Neither copyable nor movable, so exactly one owner of the ruleset fd can
- * exist. Intended use is a single instance during startup: create(), add every
- * rule, then call restrictSelf() once -- after which the policy is permanent
- * for the process and its descendants. Calling addPathRule() after
- * restrictSelf() is a programming error and process-fatal: the kernel takes a
- * snapshot of the ruleset at enforcement time, so a late rule would appear to
- * succeed while silently never applying to this process.
- */
-class LandlockRuleset {
-    // Passkey idiom: construction goes through create() only, but the
-    // constructor must be public so std::make_unique can call it.
-    struct Passkey {
-        explicit Passkey() = default;
-    };
-
-public:
-    LandlockRuleset(
-        Passkey, int rulesetFd, int abi, uint64_t requestedFsAccess, uint64_t handledFsAccess)
-        : _rulesetFd(rulesetFd),
-          _abi(abi),
-          _requestedFsAccess(requestedFsAccess),
-          _handledFsAccess(handledFsAccess) {}
-
-    /**
-     * Probes the Landlock ABI and creates a ruleset handling `requestedFsAccess`
-     * masked to the probed ABI. Fails with a descriptive Status when the kernel
-     * lacks or has disabled Landlock.
-     */
-    static StatusWith<std::unique_ptr<LandlockRuleset>> create(
-        uint64_t requestedFsAccess = kAccessFsAll) {
-        uassert(13118813,
-                "A Landlock ruleset must be asked to handle at least one filesystem access right",
-                requestedFsAccess != 0);
-
-        auto swAbi = landlockAbiVersion();
-        if (!swAbi.isOK()) {
-            return swAbi.getStatus();
-        }
-        const long abi = swAbi.getValue();
-
-        LandlockRulesetAttr attr;
-        // Every rule added later is intersected with this handled set (see
-        // addPathRule): the kernel rejects (EINVAL) a rule granting a right the
-        // ruleset does not handle, e.g. IOCTL_DEV in a rule when this mask
-        // dropped it because the running ABI predates it.
-        attr.handledAccessFs = requestedFsAccess & supportedFsAccess(abi);
-        if (attr.handledAccessFs == 0) {
-            LOGV2_WARNING(13118801,
-                          "Landlock: none of the requested access rights are supported by the "
-                          "running kernel's ABI",
-                          "abiVersion"_attr = abi,
-                          "requestedRights"_attr = fsAccessRightNames(requestedFsAccess));
-            return Status(
-                ErrorCodes::InvalidOptions,
-                "None of the requested Landlock filesystem access rights are supported by this "
-                "kernel");
-        }
-        // Feature detection: rights we want to handle that this kernel's ABI
-        // does not know about are dropped from the ruleset and therefore stay
-        // unrestricted.
-        if (const uint64_t degraded = requestedFsAccess & ~attr.handledAccessFs; degraded != 0) {
-            LOGV2(13118800,
-                  "Landlock: some requested access rights are not supported by the running "
-                  "kernel's ABI and will not be restricted",
-                  "abiVersion"_attr = abi,
-                  "degradedRights"_attr = fsAccessRightNames(degraded));
-        }
-        LOGV2(13118802,
-              "Landlock: access rights the ruleset will handle (denied by default)",
+    // Feature detection: rights we want to handle that this kernel's ABI
+    // does not know about are dropped from the ruleset and therefore stay
+    // unrestricted.
+    if (const uint64_t degraded = requestedFsAccess & ~attr.handledAccessFs; degraded != 0) {
+        LOGV2(13118800,
+              "Landlock: some requested access rights are not supported by the running "
+              "kernel's ABI and will not be restricted",
               "abiVersion"_attr = abi,
-              "handledRights"_attr = fsAccessRightNames(attr.handledAccessFs));
-
-        const int rulesetFd = static_cast<int>(landlockCreateRuleset(&attr, sizeof(attr), 0));
-        if (rulesetFd < 0) {
-            LOGV2_FATAL(13118803,
-                        "Failed to create Landlock ruleset",
-                        "error"_attr = errorMessage(lastSystemError()));
-        }
-        return std::make_unique<LandlockRuleset>(
-            Passkey{}, rulesetFd, static_cast<int>(abi), requestedFsAccess, attr.handledAccessFs);
+              "degradedRights"_attr = fsAccessRightNames(degraded));
     }
+    LOGV2(13118802,
+          "Landlock: access rights the ruleset will handle (denied by default)",
+          "abiVersion"_attr = abi,
+          "handledRights"_attr = fsAccessRightNames(attr.handledAccessFs));
 
-    ~LandlockRuleset() {
-        close(_rulesetFd);
+    const int rulesetFd = static_cast<int>(landlockCreateRuleset(&attr, sizeof(attr), 0));
+    if (rulesetFd < 0) {
+        LOGV2_FATAL(13118803,
+                    "Failed to create Landlock ruleset",
+                    "error"_attr = errorMessage(lastSystemError()));
     }
+    return std::make_unique<LandlockRuleset>(
+        Passkey{}, rulesetFd, static_cast<int>(abi), requestedFsAccess, attr.handledAccessFs);
+}
 
-    LandlockRuleset(const LandlockRuleset&) = delete;
-    LandlockRuleset& operator=(const LandlockRuleset&) = delete;
-    LandlockRuleset(LandlockRuleset&&) = delete;
-    LandlockRuleset& operator=(LandlockRuleset&&) = delete;
+Status LandlockRuleset::addPathRule(const LandlockFilesystemRule& rule) {
+    invariant(!_restricted,
+              str::stream() << "Attempted to add a Landlock rule for '" << rule.path()
+                            << "' after restrictSelf(); rules added after enforcement "
+                               "silently never apply");
 
-    int abiVersion() const {
-        return _abi;
-    }
-
-    /** The rights this ruleset denies by default (requested masked to the ABI). */
-    uint64_t handledFsAccess() const {
-        return _handledFsAccess;
-    }
-
-    /** Requested rights the running kernel's ABI cannot restrict. */
-    uint64_t degradedFsAccess() const {
-        return _requestedFsAccess & ~_handledFsAccess;
-    }
-
-    /**
-     * Grants the rule's access mask (intersected with the rights this ruleset
-     * handles, and with file-compatible rights when the path is not a
-     * directory) beneath the rule's path.
-     *
-     * A path that does not exist returns OK without adding anything: the
-     * policy lists every path the server could need, and hierarchies absent on
-     * this system (or files not created yet, which must instead be covered by
-     * a rule on their parent directory) simply get no grant.
-     *
-     * Must not be called once restrictSelf() has been called (process-fatal).
-     */
-    Status addPathRule(const LandlockFilesystemRule& rule) {
-        invariant(!_restricted,
-                  str::stream() << "Attempted to add a Landlock rule for '" << rule.path()
-                                << "' after restrictSelf(); rules added after enforcement "
-                                   "silently never apply");
-
-        // O_PATH: a location handle is all a rule needs; no read access to the
-        // object itself is required.
-        const int pathFd = open(rule.path().c_str(), O_PATH | O_CLOEXEC);
-        if (pathFd < 0) {
-            const auto ec = lastSystemError();
-            if (ec == std::errc::no_such_file_or_directory) {
-                LOGV2(13118804,
-                      "Landlock: skipping rule for nonexistent path",
-                      "path"_attr = rule.path());
-                return Status::OK();
-            }
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Failed to open '" << rule.path()
-                                        << "' for a Landlock rule: " << errorMessage(ec));
-        }
-        ScopeGuard closePathFd([&] { close(pathFd); });
-
-        struct stat statbuf;
-        if (fstat(pathFd, &statbuf) != 0) {
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream()
-                              << "Failed to stat '" << rule.path()
-                              << "' for a Landlock rule: " << errorMessage(lastSystemError()));
-        }
-
-        LandlockPathBeneathAttr attr;
-        // EXECUTE is stripped from every grant: the server never executes files,
-        // so no rule may re-allow execution anywhere (it stays denied by default,
-        // since the ruleset handles it -- see kAccessFsAll).
-        attr.allowedAccess = rule.accessMask() & _handledFsAccess & ~LANDLOCK_ACCESS_FS_EXECUTE;
-        if (!S_ISDIR(statbuf.st_mode)) {
-            attr.allowedAccess &= kAccessFileCompatible;
-        }
-        // An empty access set is rejected by the kernel (ENOMSG); it means every
-        // requested right was masked out above, so there is nothing to grant.
-        if (attr.allowedAccess == 0) {
+    // O_PATH: a location handle is all a rule needs; no read access to the
+    // object itself is required.
+    const int pathFd = open(rule.path().c_str(), O_PATH | O_CLOEXEC);
+    if (pathFd < 0) {
+        const auto ec = lastSystemError();
+        if (ec == std::errc::no_such_file_or_directory) {
+            LOGV2(13118804,
+                  "Landlock: skipping rule for nonexistent path",
+                  "path"_attr = rule.path());
             return Status::OK();
         }
-        attr.parentFd = pathFd;
+        return Status(ErrorCodes::OperationFailed,
+                      str::stream() << "Failed to open '" << rule.path()
+                                    << "' for a Landlock rule: " << errorMessage(ec));
+    }
+    ScopeGuard closePathFd([&] { close(pathFd); });
 
-        if (landlockAddRule(_rulesetFd, kRulePathBeneath, &attr, 0) != 0) {
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Failed to add Landlock rule for '" << rule.path()
-                                        << "': " << errorMessage(lastSystemError()));
-        }
-
-        LOGV2(13118805,
-              "Landlock filepath rule applied",
-              "ruleType"_attr = "path_beneath",
-              "path"_attr = rule.path(),
-              "allowedAccess"_attr = fsAccessRightNames(attr.allowedAccess));
-        return Status::OK();
+    struct stat statbuf;
+    if (fstat(pathFd, &statbuf) != 0) {
+        return Status(ErrorCodes::OperationFailed,
+                      str::stream()
+                          << "Failed to stat '" << rule.path()
+                          << "' for a Landlock rule: " << errorMessage(lastSystemError()));
     }
 
-    /**
-     * The point of no return: enforces the ruleset on the current process,
-     * permanently and inherited across fork()/execve(). Call once, after every
-     * rule has been added; from this call on, addPathRule() is forbidden.
-     */
-    Status restrictSelf() {
-        // Finalize the ruleset even if enforcement fails below: addPathRule()
-        // treats any call after this one as a programming error.
-        _restricted = true;
-
-        // Required so an unprivileged process may restrict itself.
-        if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Failed to set PR_SET_NO_NEW_PRIVS: "
-                                        << errorMessage(lastSystemError()));
-        }
-
-        // Ask the kernel to audit-log denials in exec'd descendants too. On
-        // ABI < 7 any nonzero flag fails with EINVAL, so it is only passed when
-        // supported.
-        const uint32_t flags = _abi >= 7 ? LANDLOCK_RESTRICT_SELF_LOG_NEW_EXEC_ON : 0;
-        if (landlockRestrictSelf(_rulesetFd, flags) != 0) {
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Failed to enforce Landlock ruleset: "
-                                        << errorMessage(lastSystemError()));
-        }
+    LandlockPathBeneathAttr attr;
+    // EXECUTE is stripped from every grant: the server never executes files,
+    // so no rule may re-allow execution anywhere (it stays denied by default,
+    // since the ruleset handles it -- see kAccessFsAll).
+    attr.allowedAccess = rule.accessMask() & _handledFsAccess & ~LANDLOCK_ACCESS_FS_EXECUTE;
+    if (!S_ISDIR(statbuf.st_mode)) {
+        attr.allowedAccess &= kAccessFileCompatible;
+    }
+    // An empty access set is rejected by the kernel (ENOMSG); it means every
+    // requested right was masked out above, so there is nothing to grant.
+    if (attr.allowedAccess == 0) {
         return Status::OK();
     }
+    attr.parentFd = pathFd;
 
-private:
-    const int _rulesetFd;
-    const int _abi;
-    const uint64_t _requestedFsAccess;
-    const uint64_t _handledFsAccess;
-    bool _restricted = false;
-};
+    if (landlockAddRule(_rulesetFd, kRulePathBeneath, &attr, 0) != 0) {
+        return Status(ErrorCodes::OperationFailed,
+                      str::stream() << "Failed to add Landlock rule for '" << rule.path()
+                                    << "': " << errorMessage(lastSystemError()));
+    }
+
+    LOGV2(13118805,
+          "Landlock filepath rule applied",
+          "ruleType"_attr = "path_beneath",
+          "path"_attr = rule.path(),
+          "allowedAccess"_attr = fsAccessRightNames(attr.allowedAccess));
+    return Status::OK();
+}
+
+Status LandlockRuleset::restrictSelf() {
+    invariant(!_restricted,
+              "Attempted to call restrictSelf() twice; the Landlock policy is already "
+              "permanent for this process");
+
+    // Finalize the ruleset even if enforcement fails below: addPathRule()
+    // treats any call after this one as a programming error.
+    _restricted = true;
+
+    // Required so an unprivileged process may restrict itself.
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
+        return Status(ErrorCodes::OperationFailed,
+                      str::stream() << "Failed to set PR_SET_NO_NEW_PRIVS: "
+                                    << errorMessage(lastSystemError()));
+    }
+
+    // Ask the kernel to audit-log denials in exec'd descendants too. On
+    // ABI < 7 any nonzero flag fails with EINVAL, so it is only passed when
+    // supported.
+    const uint32_t flags = _abi >= 7 ? LANDLOCK_RESTRICT_SELF_LOG_NEW_EXEC_ON : 0;
+    if (landlockRestrictSelf(_rulesetFd, flags) != 0) {
+        return Status(ErrorCodes::OperationFailed,
+                      str::stream() << "Failed to enforce Landlock ruleset: "
+                                    << errorMessage(lastSystemError()));
+    }
+    return Status::OK();
+}
 
 namespace {
+
+// Resolves a configured path the way Landlock will see it, in two steps that
+// the helpers below must always take together.
+//
+// First absolute: config paths may be relative, but with --fork the process has
+// chdir("/")'d by the time this runs, so the base is the saved startup cwd,
+// exactly like the log-file machinery does. Then canonical, so symlinks, "."
+// and ".." are resolved -- a rule binds to the inode the path resolves to, so
+// this is the path the grant actually lands on. It matters most for the callers
+// that take parent_path(): absolute() does no normalization, so a trailing
+// slash or a ".." component would otherwise silently yield the wrong parent
+// directory. Trailing components need not exist ("weakly"), which is required
+// here because the log and pid files are only created later.
+//
+// The lexical form is computed first because it doubles as the fallback.
+// Canonicalization touches the filesystem and, unlike absolute(), can fail: an
+// intermediate directory this process cannot traverse, a symlink loop. That
+// must not be fatal -- nothing catches an exception on the way out of the
+// policy, and initializeLandlock() is documented to leave the process
+// unsandboxed rather than die -- so a failure degrades to the un-normalized
+// path, leaving symlink resolution to the kernel, which resolves it when the
+// rule is added anyway.
+boost::filesystem::path canonicalStartupPath(const std::string& path) {
+    const auto absolutePath = boost::filesystem::absolute(path, serverGlobalParams.cwd);
+    boost::system::error_code ec;
+    const auto canonicalPath = boost::filesystem::weakly_canonical(absolutePath, ec);
+    return ec ? absolutePath : canonicalPath;
+}
+
+// A configured path resolved for a rule (see canonicalStartupPath). Empty stays
+// empty (option not in use).
+std::string resolvedConfigPath(const std::string& path) {
+    if (path.empty()) {
+        return {};
+    }
+    return canonicalStartupPath(path).string();
+}
+
+// The parent directory of a configured file path, for files the server
+// creates, replaces or re-reads after the sandbox engages (log file, pid
+// file, rotated credentials). A rule cannot be attached to a file that does
+// not exist yet, and Landlock rules bind to the inode, so a grant on the file
+// itself would go stale on the first rename-and-recreate rotation; a grant on
+// the directory covers the entry regardless of which inode backs it (Landlock
+// checks at open(2) time). Empty stays empty (option not in use).
+std::string configParentDir(const std::string& path) {
+    if (path.empty()) {
+        return {};
+    }
+    return canonicalStartupPath(path).parent_path().string();
+}
+
+// A configured directory the server creates itself when missing (e.g. an FTDC
+// directory override). A rule needs an existing filesystem object to bind to,
+// so when the directory does not exist yet the grant goes on its parent
+// instead, which also permits the creation. One level only: if the parent is
+// missing too, the rule is skipped (see addPathRule) and the operator must
+// grant an existing ancestor via additional path rules rather than this
+// policy silently widening towards "/". Empty stays empty.
+std::string configDirCreatedIfMissing(const std::string& path) {
+    if (path.empty()) {
+        return {};
+    }
+    const auto resolved = canonicalStartupPath(path);
+    return (boost::filesystem::exists(resolved) ? resolved : resolved.parent_path()).string();
+}
+
+// The value of a setParameter given at startup, or empty when not set. Server
+// parameters live with their owning subsystem; reading the parsed option
+// instead keeps this policy free of link dependencies on those subsystems.
+std::string setParameterStartupValue(const std::string& name) {
+    const auto& params = optionenvironment::startupOptionsParsed;
+    if (!params.count("setParameter")) {
+        return {};
+    }
+    const auto parameters = params["setParameter"].as<std::map<std::string, std::string>>();
+    const auto it = parameters.find(name);
+    return it != parameters.end() ? it->second : std::string{};
+}
+
+// A string-valued startup option that only some binaries register (e.g. the
+// enterprise audit log path), read from the parsed options so this file needs
+// no link dependency on the module that owns it. Unregistered or unset gives
+// empty.
+std::string startupOptionValue(const std::string& key) {
+    const auto& params = optionenvironment::startupOptionsParsed;
+    return params.count(key) ? params[key].as<std::string>() : std::string{};
+}
+
+/**
+ * The filesystem policy for mongod and mongos: every hierarchy the server
+ * needs, as narrowly as feasible. An entry with an empty path describes a
+ * feature not in use under the current configuration and grants nothing;
+ * likewise a path absent on this system is skipped when added (see
+ * addPathRule). Paths the server merely probes for optional metadata (e.g.
+ * /etc/lsb-release for OS info) are deliberately unlisted: those reads fail
+ * gracefully.
+ */
+std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
+    // mongos never touches the storage layer; every other flavor of server
+    // (including a mongod embedding a router) needs its data directory.
+    const bool isRouterOnly =
+        serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer);
+
+    return {
+        // Shared libraries and hosted binaries, notably glibc NSS modules
+        // dlopen()'d lazily for name resolution. Landlock's EXECUTE right only
+        // gates execve()-style execution, not mmap'ing a library, so read-only
+        // suffices for dlopen() (EXECUTE is never granted; see addPathRule).
+        LandlockFilesystemRule::readOnly("/usr"),
+        LandlockFilesystemRule::readOnly("/lib"),
+        LandlockFilesystemRule::readOnly("/lib64"),
+
+        // System configuration: library loading, name resolution (DNS matters
+        // for replica set and sharded topologies), user/group lookups, TLS
+        // trust stores, timezones. The whole directory rather than the handful
+        // of files actually read, because files like resolv.conf are replaced
+        // by rename (DHCP) and a per-file grant would go stale with the inode.
+        // Reads that DAC forbids (e.g. /etc/shadow) remain forbidden; Landlock
+        // only ever subtracts rights.
+        LandlockFilesystemRule::readOnly("/etc"),
+
+        // Where /etc/resolv.conf is a symlink into the resolver daemon's
+        // runtime directory (systemd-resolved, resolvconf), the /etc grant
+        // does not cover it: Landlock checks the resolved target, not the
+        // symlink. Without this, DNS fails and replica-set self-identification
+        // ("no host maps to this node") breaks. Absent directories are skipped.
+        LandlockFilesystemRule::readOnly("/run/systemd/resolve"),
+        LandlockFilesystemRule::readOnly("/run/resolvconf"),
+
+        // Kernel and process introspection: FTDC and ProcessInfo read widely
+        // under /proc (cpuinfo, meminfo, diskstats, self/*) and /sys (memory,
+        // NUMA, THP and block device state).
+        LandlockFilesystemRule::readOnly("/proc"),
+        LandlockFilesystemRule::readOnly("/sys"),
+
+        // glibc's pthread_setname_np() writes the thread name to
+        // /proc/self/task/<tid>/comm for every thread spawned after the
+        // sandbox engages. readWrite over-describes what is wanted (WRITE_FILE),
+        // but the surplus rights are inert here: procfs itself rejects
+        // creation, removal and truncation. Writes to sensitive pseudo-files
+        // elsewhere under /proc (e.g. /proc/sys) stay denied.
+        LandlockFilesystemRule::readWrite("/proc/self/task"),
+
+        // /dev/null is opened read-write by various subsystems at runtime;
+        // /dev/urandom backs SecureRandom when getrandom(2) is unavailable.
+        LandlockFilesystemRule::readWrite("/dev/null"),
+        LandlockFilesystemRule::readOnly("/dev/urandom"),
+
+        // In case there is a call to tmpfile() somewhere
+        LandlockFilesystemRule::readWrite("/tmp"),
+
+        // The data directory: WiredTiger's files, the lock file, and FTDC's
+        // diagnostic.data live beneath it.
+        LandlockFilesystemRule::readWrite(
+            isRouterOnly ? "" : resolvedConfigPath(storageGlobalParams.dbpath)),
+
+        // The directory the UNIX domain socket (mongodb-<port>.sock) is
+        // created in and unlinked from; net.unixDomainSocket.pathPrefix,
+        // default /tmp.
+        LandlockFilesystemRule::readWrite(
+            serverGlobalParams.noUnixSocket ? "" : resolvedConfigPath(serverGlobalParams.socket)),
+
+        // Proxy-protocol ingress (net.proxyPort) creates and unlinks its own
+        // UNIX domain sockets under this prefix directory.
+        LandlockFilesystemRule::readWrite(resolvedConfigPath(serverGlobalParams.proxySocketPrefix)),
+
+        // FTDC's directory defaults beneath dbpath (mongod) or beside the log
+        // file (mongos), both covered by other rules; an explicit override
+        // needs its own grant. FTDC creates the directory when missing.
+        LandlockFilesystemRule::readWrite(configDirCreatedIfMissing(
+            setParameterStartupValue("diagnosticDataCollectionDirectoryPath"))),
+
+        // The enterprise audit log (auditLog.path) is created and
+        // rename-rotated after the sandbox engages, so its parent directory
+        // gets the grant; only enterprise binaries register the option.
+        LandlockFilesystemRule::readWrite(configParentDir(startupOptionValue("auditLog.path"))),
+
+        // The time zone database (processManagement.timeZoneInfo) is loaded
+        // during startup, after the sandbox engages.
+        LandlockFilesystemRule::readOnly(resolvedConfigPath(serverGlobalParams.timeZoneInfoPath)),
+
+        // Log, pid and (test-only) backtrace files are created, rewritten and
+        // rotated after the sandbox engages, so their parent directories get
+        // the grant; the files themselves may not exist yet. This also covers
+        // mongos's FTDC directory, which defaults to a sibling of the log
+        // file.
+        LandlockFilesystemRule::readWrite(configParentDir(serverGlobalParams.logpath)),
+        LandlockFilesystemRule::readWrite(configParentDir(serverGlobalParams.pidFile)),
+        LandlockFilesystemRule::readWrite(
+            configParentDir(initialize_server_global_state::gBacktraceLogFile)),
+
+        // Credential files are re-read on rotation, which conventionally
+        // replaces them by rename, so the containing directory gets the grant
+        // (same inode rationale as configParentDir).
+        LandlockFilesystemRule::readOnly(configParentDir(serverGlobalParams.keyFile)),
+        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslPEMKeyFile)),
+        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslClusterFile)),
+        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslCAFile)),
+        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslClusterCAFile)),
+        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslCRLFile)),
+    };
+}
 
 /**
  * Builds the server's ruleset and enforces it. Best-effort by design: on any
@@ -611,30 +715,17 @@ void initializeLandlock() {
     }
     auto& ruleset = *swRuleset.getValue();
 
-    // TODO: SERVER-130423 Populate the filesystem path policy: every hierarchy
-    // the server needs (data directory read-write, log/pid file parent
-    // directories, system libraries, /proc, ...), which is still under
-    // investigation. Grants are described with the LandlockFilesystemRule
-    // factories, e.g.
-    //     rules.push_back(LandlockFilesystemRule::readWrite(storageGlobalParams.dbpath));
-    std::vector<LandlockFilesystemRule> rules;
+    const auto rules = sandboxFilesystemRules();
 
-    // Enforcing with no rules would deny every filesystem access and the server
-    // could not run, so the sandbox stays disengaged until a policy is defined.
-    if (rules.empty()) {
-        LOGV2(13118807,
-              "Landlock filesystem path policy is not defined yet; continuing without "
-              "filesystem sandboxing",
-              "abiVersion"_attr = ruleset.abiVersion());
-        return;
-    }
-
-    LOGV2(13118808,
-          "Applying Landlock filesystem sandbox",
-          "abiVersion"_attr = ruleset.abiVersion(),
-          "ruleCount"_attr = rules.size());
+    LOGV2(
+        13118808, "Applying Landlock filesystem sandbox", "abiVersion"_attr = ruleset.abiVersion());
 
     for (const auto& rule : rules) {
+        // An empty path marks a feature not in use under the current
+        // configuration (no UNIX socket, no TLS, ...); nothing to grant.
+        if (rule.path().empty()) {
+            continue;
+        }
         if (Status status = ruleset.addPathRule(rule); !status.isOK()) {
             LOGV2_WARNING(13118809,
                           "Failed to add Landlock rule; continuing without filesystem sandboxing",
@@ -652,11 +743,10 @@ void initializeLandlock() {
     }
 
     if (Status status = ruleset.restrictSelf(); !status.isOK()) {
-        LOGV2_WARNING(13118811,
-                      "Failed to enforce Landlock ruleset; continuing without filesystem "
-                      "sandboxing",
-                      "error"_attr = status);
-        return;
+        LOGV2_FATAL(13118811,
+                    "Failed to enforce Landlock ruleset; continuing without filesystem "
+                    "sandboxing",
+                    "error"_attr = status);
     }
 
     gLandlockActive = true;
