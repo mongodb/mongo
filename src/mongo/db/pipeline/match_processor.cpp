@@ -59,7 +59,8 @@ bool MatchProcessor::process(const Document& input, const EvaluationContext& ctx
             BSONObj::LargeSizeTrait,
             /* PathsHaveUniqueFirstFields */ false>(input, _dependencies.fields);
     }();
-    return exec::matcher::matchesBSON(_expression.get(), toMatch, /*details*/ nullptr, ctx);
+    _matchableDoc.reset(std::move(toMatch));
+    return exec::matcher::matches(_expression.get(), &_matchableDoc, /*details*/ nullptr, ctx);
 }
 
 bool MatchProcessor::dependenciesHaveUniqueFirstFields(const OrderedPathSet& paths) {
