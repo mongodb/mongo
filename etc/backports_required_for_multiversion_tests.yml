@@ -43,6 +43,8 @@ last-patch:
       ticket: SERVER-127051
     - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
       ticket: SERVER-121084
+    - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
+      ticket: SERVER-127661
     - test_file: jstests/fle2/implicit_ecoc_creation.js
       ticket: SERVER-126384
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
