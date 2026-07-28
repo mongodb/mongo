@@ -77,4 +77,40 @@ TEST(PlanRankerTest, NoFetchBonus) {
     ASSERT_GT(goodScore, badScore);
 }
 
+plan_ranker::CandidatePlan makeCollScanCandidate() {
+    auto solution = std::make_unique<QuerySolution>();
+    solution->setRoot(std::make_unique<FetchNode>(std::make_unique<CollectionScanNode>()));
+    return plan_ranker::CandidatePlan{
+        .solution = std::move(solution), .root = nullptr, .data = nullptr};
+}
+
+// Regression test: when a candidate plan fails during the multi-plan trial period, the surviving
+// plans retain their original candidate indices, which may exceed the number of surviving plans.
+// The tie-breaking heuristics must index the 'scores' and 'documentsExamined' vectors by candidate
+// index rather than by a compacted survivor position; otherwise an out-of-bounds read occurs.
+TEST(PlanRankerTest, TieBreakingWithFailedCandidateDoesNotReadOutOfBounds) {
+    // Three candidate plans. Candidate 0 "failed" during the trial period and therefore does not
+    // appear in 'scoresAndCandidateIndices'. Candidates 1 and 2 survived and tie in score.
+    std::vector<plan_ranker::CandidatePlan> candidates;
+    candidates.push_back(makeCollScanCandidate());
+    candidates.push_back(makeCollScanCandidate());
+    candidates.push_back(makeCollScanCandidate());
+
+    // Surviving plans, sorted by score (tied), keyed by their original candidate index (1 and 2).
+    std::vector<std::pair<double, size_t>> scoresAndCandidateIndices{{10.0, 1}, {10.0, 2}};
+
+    // 'documentsExamined' is indexed by candidate index. Candidate 1 examined fewer documents than
+    // candidate 2, so it should receive the docs-examined tie-breaking bonus.
+    std::vector<size_t> documentsExamined{0, 5, 10};
+
+    plan_ranker::addTieBreakingHeuristicsBonuses(
+        scoresAndCandidateIndices, candidates, documentsExamined);
+
+    // Candidate 1 (fewer docs examined) must now outscore candidate 2. Before the fix this either
+    // crashed on debug/ASAN builds (out-of-bounds vector access) or applied the bonus to the wrong
+    // plan on release builds.
+    ASSERT_EQ(1, scoresAndCandidateIndices[0].second);
+    ASSERT_EQ(2, scoresAndCandidateIndices[1].second);
+    ASSERT_GT(scoresAndCandidateIndices[0].first, scoresAndCandidateIndices[1].first);
+}
 };  // namespace
