@@ -86,5 +86,62 @@ class TestTestDiscoverySubCommand(unittest.TestCase):
         self.assertNotIn("---", output.getvalue())
 
 
+class TestSuiteConfigSubCommand(unittest.TestCase):
+    def test_execute_should_emit_one_config_document_per_suite(self):
+        import io
+        from contextlib import redirect_stdout
+
+        import yaml
+
+        def mock_suite(name):
+            suite = MagicMock(spec_set=Suite)
+            suite.get_name.return_value = name
+            suite.get_config.return_value = {"test_kind": "js_test", "suite": name}
+            return suite
+
+        subcommand = under_test.SuiteConfigSubcommand(["suite_a", "suite_b"])
+        subcommand.suite_config = MagicMock()
+        subcommand.suite_config.get_suite.side_effect = lambda name: mock_suite(name)
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            subcommand.execute()
+
+        docs = list(yaml.safe_load_all(output.getvalue()))
+        self.assertEqual(
+            docs,
+            [
+                {"suite_name": "suite_a", "config": {"test_kind": "js_test", "suite": "suite_a"}},
+                {"suite_name": "suite_b", "config": {"test_kind": "js_test", "suite": "suite_b"}},
+            ],
+        )
+
+    def test_execute_with_single_suite_emits_raw_config(self):
+        import io
+        from contextlib import redirect_stdout
+
+        import yaml
+
+        suite = MagicMock(spec_set=Suite)
+        suite.get_name.return_value = "suite_a"
+        suite.get_config.return_value = {"test_kind": "js_test", "suite": "suite_a"}
+
+        subcommand = under_test.SuiteConfigSubcommand(["suite_a"])
+        subcommand.suite_config = MagicMock()
+        subcommand.suite_config.get_suite.return_value = suite
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            subcommand.execute()
+
+        # The historical single-suite output is the raw config as a single YAML document,
+        # with no suite_name wrapper.
+        self.assertEqual(
+            list(yaml.safe_load_all(output.getvalue())),
+            [{"test_kind": "js_test", "suite": "suite_a"}],
+        )
+        self.assertNotIn("---", output.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

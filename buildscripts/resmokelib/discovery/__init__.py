@@ -76,19 +76,29 @@ class TestDiscoverySubcommand(Subcommand):
 class SuiteConfigSubcommand(Subcommand):
     """Subcommand for discovering configuration of a suite."""
 
-    def __init__(self, suite_name: str) -> None:
+    def __init__(self, suite_names: list[str]) -> None:
         """
         Initialize the subcommand.
 
-        :param suite_name: Suite to discover.
+        :param suite_names: Suites to discover.
         """
-        self.suite_name = suite_name
+        self.suite_names = suite_names
         self.suite_config = suitesconfig
 
     def execute(self):
         """Execute the subcommand."""
-        suite = self.suite_config.get_suite(self.suite_name)
-        print(yaml.safe_dump(suite.get_config()))
+        suites = [self.suite_config.get_suite(suite_name) for suite_name in self.suite_names]
+
+        # A single suite keeps the historical single-document output: the raw suite config.
+        # Multiple suites are emitted as a multi-document YAML stream in the order they were
+        # requested, each wrapped with its suite_name so callers can validate ordering.
+        if len(suites) == 1:
+            print(yaml.safe_dump(suites[0].get_config()))
+        else:
+            configs = [
+                {"suite_name": suite.get_name(), "config": suite.get_config()} for suite in suites
+            ]
+            print(yaml.safe_dump_all(configs))
 
 
 class DiscoveryPlugin(PluginInterface):
@@ -135,7 +145,17 @@ class DiscoveryPlugin(PluginInterface):
         parser = subparsers.add_parser(
             SUITECONFIG_SUBCOMMAND, help="Display configuration of a test suite."
         )
-        parser.add_argument("--suite", metavar="SUITE", help="Suite to run against.")
+        parser.add_argument(
+            "--suite",
+            metavar="SUITE",
+            action="append",
+            required=True,
+            help=(
+                "Suite to run against. May be repeated to discover several suite configs in one"
+                " invocation; the output is then a multi-document YAML stream with one document"
+                " per suite, in the requested order."
+            ),
+        )
 
     def parse(
         self,
