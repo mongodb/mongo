@@ -68,6 +68,7 @@ include:
   - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
   - filename: etc/evergreen_yml_components/variants/misc/misc.yml
   - filename: etc/evergreen_yml_components/variants/misc/misc_master_branch_only.yml
+  - filename: etc/evergreen_yml_components/variants/misc/legacy_js_engine.yml
 
   - filename: etc/evergreen_yml_components/variants/amazon/test_dev.yml
   - filename: etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml

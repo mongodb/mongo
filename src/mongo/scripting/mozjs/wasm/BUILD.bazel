@@ -205,6 +205,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -273,6 +275,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -299,6 +303,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -324,6 +330,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -349,6 +357,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -374,6 +384,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -398,6 +410,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -425,6 +439,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
@@ -475,6 +491,8 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
+        # WASM-designated tests must not run under the legacy MozJS engine build.
+        "//bazel/config:js_engine_use_legacy": ["@platforms//:incompatible"],
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),

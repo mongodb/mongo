@@ -177,18 +177,23 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     tags = ["mongo_unittest_sixth_group"],
-    target_compatible_with = select({
-        "//bazel/config:js_engine_use_legacy": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
     deps = [
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/scripting/mozjs/shell:mozjs_shell",
     ],
 )
 
+# Tests the legacy (native, in-process) MozJS engine linked directly via :scripting.
+# The legacy engine ships in the mongo shell in ALL builds — including the default
+# js_engine=wasm build — so this target must stay on the default waterfall and must not
+# be gated on js_engine_use_legacy.
 mongo_cc_unit_test(
-    name = "scripting_mozjs_test",
+    name = "scripting_legacy_mozjs_test",
+    srcs = [
+        "//src/mongo/scripting/mozjs:jscustomallocator_test.cpp",
+        "//src/mongo/scripting/mozjs/shell:asan_handles_test.cpp",
+        "//src/mongo/scripting/mozjs/shell:implscope_test.cpp",
+    ],
     copts = select({
         "@platforms//os:windows": [
             # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
@@ -202,19 +207,52 @@ mongo_cc_unit_test(
         "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
         "//conditions:default": [],
     }),
-    srcs_select = [{
-        "//bazel/config:js_engine_use_legacy": [
-            "//src/mongo/scripting/mozjs:jscustomallocator_test.cpp",
-            "//src/mongo/scripting/mozjs/shell:asan_handles_test.cpp",
-            "//src/mongo/scripting/mozjs/shell:implscope_test.cpp",
-            "//src/mongo/scripting/mozjs/shell:module_loader_test.cpp",
-        ],
-    }],
     tags = ["mongo_unittest_eighth_group"],
     target_compatible_with = select({
         "//bazel/config:js_engine_none": ["@platforms//:incompatible"],
-        "//bazel/config:js_engine_wasm_supported": ["@platforms//:incompatible"],
         "//conditions:default": [],
+    }),
+    deps = [
+        ":bson_template_evaluator",
+        ":scripting",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+# Tests the legacy MozJS engine as selected by the server's engine configuration
+# (--//bazel/config:js_engine=mozjs), i.e. the same tests as scripting_legacy_mozjs_test
+# but linked through the flag-selected :scripting_server wiring, plus the module loader
+# (a legacy-only feature). Runs only on the legacy-js-engine build variant.
+mongo_cc_unit_test(
+    name = "scripting_legacy_mozjs_config_test",
+    srcs = [
+        "//src/mongo/scripting/mozjs:jscustomallocator_test.cpp",
+        "//src/mongo/scripting/mozjs/shell:asan_handles_test.cpp",
+        "//src/mongo/scripting/mozjs/shell:implscope_test.cpp",
+        # module_loader_test is a legacy-only MozJS feature (ES module loading is
+        # unsupported under the WASM engine), so it runs only in this target.
+        "//src/mongo/scripting/mozjs/shell:module_loader_test.cpp",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
+        "//conditions:default": [],
+    }),
+    tags = ["mongo_unittest_first_group"],
+    # Compiled against the flag-selected engine (:scripting_server), so this only
+    # builds/runs under --//bazel/config:js_engine=mozjs. Exercises the legacy engine
+    # wiring (scripting_server.cpp / config_engine_gen) that the WASM waterfall never builds.
+    target_compatible_with = select({
+        "//bazel/config:js_engine_use_legacy": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
         ":bson_template_evaluator",
