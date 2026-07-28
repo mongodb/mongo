@@ -5,6 +5,8 @@
  *   requires_2_or_more_shards,
  *   # Avoid implicitly sharding the test collection.
  *   assumes_no_implicit_collection_creation_on_get_collection,
+ *   # moveRange commands assume a stable shard list.
+ *   assumes_stable_shard_list,
  *   # "Refusing to run a test that issues an aggregation command with
  *   # explain because it may return incomplete results if interrupted by a stepdown."
  *   does_not_support_stepdowns,
