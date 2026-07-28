@@ -544,11 +544,11 @@ getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,
                                                                             const ShardId& shardId);
 
 /**
- * Rejects movePrimary when the donor operates in authoritative-write mode but the recipient
- * shard's FCV does not enable authoritative DDL. This prevents stale authoritative shard-catalog
- * entries during a mixed-FCV upgrade window.
+ * Rejects movePrimary when the donor or receiver is in an FCV transition (upgrade/downgrade). This
+ * simplifies the set of considerations to have when running movePrimary since it could lead to
+ * correctness issues. For more details see SERVER-132179.
  */
-[[MONGO_MOD_PRIVATE]] void assertRecipientSupportsAuthoritativeMetadataForMovePrimary(
+[[MONGO_MOD_PRIVATE]] void assertShardsAreNotInFCVTransitionsForMovePrimary(
     OperationContext* opCtx,
     const ShardId& recipientShardId,
     AuthoritativeMetadataAccessLevelEnum donorAccessLevel);

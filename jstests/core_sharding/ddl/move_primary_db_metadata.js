@@ -37,7 +37,16 @@ assert.eq(originalPrimary, db.getDatabasePrimaryShardId());
 
 {
     const newPrimary = getRandomShardName(db, /*exclude=*/ originalPrimary);
-    assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: newPrimary}));
+    const res = db.adminCommand({movePrimary: db.getName(), to: newPrimary});
+    // TODO SERVER-98118: Remove this exclusion since we've banned movePrimary during 9.0 FCV transitions.
+    if (!TestData.isRunningFCVUpgradeDowngradeSuite) {
+        assert.commandWorked(res);
+    } else {
+        assert.commandWorkedOrFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
+        if (res.code === ErrorCodes.ConflictingOperationInProgress) {
+            quit();
+        }
+    }
 
     const newMetadata = getDbMetadata(db);
 

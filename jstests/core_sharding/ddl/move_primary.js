@@ -38,13 +38,31 @@ assert.eq(N, coll.countDocuments({}));
 let otherShard = getRandomShardName(db, /* exclude = */ initPrimaryShard);
 
 jsTestLog("Move primary to another shard and check content.");
-assert.commandWorked(testDB.adminCommand({movePrimary: testDB.getName(), to: otherShard}));
+let res = testDB.adminCommand({movePrimary: testDB.getName(), to: otherShard});
+// TODO SERVER-98118: Remove this exclusion since we've banned movePrimary during 9.0 FCV transitions.
+if (!TestData.isRunningFCVUpgradeDowngradeSuite) {
+    assert.commandWorked(res);
+} else {
+    assert.commandWorkedOrFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
+    if (res.code === ErrorCodes.ConflictingOperationInProgress) {
+        quit();
+    }
+}
 doInserts(N);
 assert.eq(2 * N, coll.countDocuments({}));
 assert.eq(otherShard, testDB.getDatabasePrimaryShardId());
 
 jsTestLog("Move primary to the original shard and check content.");
-assert.commandWorked(testDB.adminCommand({movePrimary: testDB.getName(), to: initPrimaryShard}));
+res = testDB.adminCommand({movePrimary: testDB.getName(), to: initPrimaryShard});
+// TODO SERVER-98118: Remove this exclusion since we've banned movePrimary during 9.0 FCV transitions.
+if (!TestData.isRunningFCVUpgradeDowngradeSuite) {
+    assert.commandWorked(res);
+} else {
+    assert.commandWorkedOrFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
+    if (res.code === ErrorCodes.ConflictingOperationInProgress) {
+        quit();
+    }
+}
 doInserts(N);
 assert.eq(3 * N, coll.countDocuments({}));
 assert.eq(initPrimaryShard, testDB.getDatabasePrimaryShardId());

@@ -1193,24 +1193,31 @@ multiversion::FeatureCompatibilityVersion getShardFCV(OperationContext* opCtx,
     return uassertStatusOK(FeatureCompatibilityVersionParser::parse(response.docs.front()));
 }
 
-void assertRecipientSupportsAuthoritativeMetadataForMovePrimary(
+void assertShardsAreNotInFCVTransitionsForMovePrimary(
     OperationContext* opCtx,
     const ShardId& recipientShardId,
     AuthoritativeMetadataAccessLevelEnum donorAccessLevel) {
-    if (donorAccessLevel < AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-        return;
-    }
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Cannot start a movePrimary operation while donor shard is modifying its FCV to either "
+            "upgrade or downgrade",
+            donorAccessLevel != AuthoritativeMetadataAccessLevelEnum::kWritesAllowed);
 
     const auto recipientFCV = getShardFCV(opCtx, recipientShardId);
+    bool ddlAuthoritative = feature_flags::gAuthoritativeShardsDDL.isEnabledOnVersion(recipientFCV);
+    bool crudAuthoritative =
+        feature_flags::gAuthoritativeShardsCRUD.isEnabledOnVersion(recipientFCV);
     uassert(
         ErrorCodes::ConflictingOperationInProgress,
         fmt::format(
-            "Cannot run movePrimary with authoritative metadata while recipient shard {} is not "
-            "authoritative-DDL-capable (recipient FCV is {}). Wait for "
-            "setFeatureCompatibilityVersion to complete on all shards.",
+            "Cannot start movePrimary while recipient shard {} is in an FCV transition (FCV: {}). "
+            "Wait for setFeatureCompatibilityVersion to complete on all shards.",
             recipientShardId.toString(),
             multiversion::toString(recipientFCV)),
-        feature_flags::gAuthoritativeShardsDDL.isEnabledOnVersion(recipientFCV));
+        (donorAccessLevel == AuthoritativeMetadataAccessLevelEnum::kNone && !ddlAuthoritative &&
+         !crudAuthoritative) ||
+            (donorAccessLevel == AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed &&
+             ddlAuthoritative && crudAuthoritative));
 }
 
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(

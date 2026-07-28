@@ -156,25 +156,6 @@ private:
                                      const CancellationToken& token);
 
     /**
-     * Fetches database metadata from the global catalog and installs it in the shard catalog. This
-     * operation is necessary when the FCV is transitioning to 9.0 to prevent potential races with
-     * _shardsvrCloneAuthoritativeMetadata during the upgrade phase.
-     *
-     * TODO (SERVER-98118): Remove this method once v9.0 become last-lts.
-     */
-    void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx) const;
-
-    /**
-     * Makes the database's tracked collections authoritative on their data-owning shards, to handle
-     * the case where the per-shard authoritative metadata cloning DDL races with this movePrimary.
-     * TODO (SERVER-98118): Remove this method once v9.0 becomes last-lts.
-     */
-    void cloneAuthoritativeCollectionsMetadata(
-        OperationContext* opCtx,
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& token);
-
-    /**
      * Blocks write operations on the database, causing them to fail with the
      * `MovePrimaryInProgress` error.
      */
