@@ -14,6 +14,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -41,7 +42,7 @@ public:
     /**
      * Instantiates a new shard connection management object for the specified shard.
      */
-    ShardRemote(const ShardHandle& handle,
+    ShardRemote(const ShardId& id,
                 const ConnectionString& connString,
                 std::unique_ptr<RemoteCommandTargeter> targeter,
                 std::shared_ptr<ShardSharedStateCache::State> sharedState);

@@ -84,13 +84,11 @@ BSONObj appendMaxTimeToCmdObj(Milliseconds maxTimeMSOverride, const BSONObj& cmd
 
 }  // unnamed namespace
 
-ShardRemote::ShardRemote(const ShardHandle& handle,
+ShardRemote::ShardRemote(const ShardId& id,
                          const ConnectionString& connString,
                          std::unique_ptr<RemoteCommandTargeter> targeter,
                          std::shared_ptr<ShardSharedStateCache::State> sharedState)
-    : Shard(handle, std::move(sharedState)),
-      _connString(connString),
-      _targeter(std::move(targeter)) {}
+    : Shard(id, std::move(sharedState)), _connString(connString), _targeter(std::move(targeter)) {}
 
 ShardRemote::~ShardRemote() = default;
 

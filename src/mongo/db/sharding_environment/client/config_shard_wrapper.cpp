@@ -14,7 +14,7 @@
 namespace mongo {
 
 ConfigShardWrapper::ConfigShardWrapper(std::shared_ptr<Shard> configShard)
-    : Shard(configShard->getHandle(), configShard->getSharedState()),
+    : Shard(configShard->getId(), configShard->getSharedState()),
       _configShard(std::move(configShard)) {
     invariant(_configShard->isConfig());
 }

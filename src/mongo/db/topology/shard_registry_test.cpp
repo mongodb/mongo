@@ -157,7 +157,7 @@ protected:
 
     auto makeTimeWithLookup(std::function<Timestamp(void)>&& lookupFn) {
         auto [_, time] = ShardRegistry::Time::makeWithLookup([fn = std::move(lookupFn)]() {
-            return std::pair{ShardRegistryData::ShardHandleToConnectionStringMap{}, fn()};
+            return std::pair{ShardRegistryData::ShardIdToConnectionStringMap{}, fn()};
         });
         return time;
     }

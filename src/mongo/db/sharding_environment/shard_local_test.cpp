@@ -56,7 +56,7 @@ protected:
         _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
         auto& shardSharedStateCache = ShardSharedStateCache::get(_opCtx.get());
         _shardLocal = std::make_unique<ShardLocal>(
-            ShardHandle(ShardId::kConfigServerId, UUID::gen()),
+            ShardId::kConfigServerId,
             shardSharedStateCache.getShardState(ShardId::kConfigServerId));
         repl::ReplSettings replSettings;
         replSettings.setReplSetString("mySet/node1:12345");

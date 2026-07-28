@@ -32,6 +32,7 @@
 #include "mongo/db/sharding_environment/client/shard_factory.h"
 #include "mongo/db/sharding_environment/client/shard_remote.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_local.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/storage/snapshot_manager.h"
@@ -117,25 +118,23 @@ std::unique_ptr<ShardRegistry> ShardingMongoDTestFixture::makeShardRegistry(
     _targeterFactory = targeterFactoryPtr;
     auto service = getServiceContext();
 
-    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr,
-                                                service](const ShardHandle& handle,
-                                                         const ConnectionString& connStr) {
-        auto& shardSharedStateCache = ShardSharedStateCache::get(service);
-        return std::make_unique<ShardRemote>(handle,
-                                             connStr,
-                                             targeterFactoryPtr->create(connStr),
-                                             shardSharedStateCache.getShardState(handle.name()));
-    };
+    ShardFactory::BuilderCallable setBuilder =
+        [targeterFactoryPtr, service](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(service);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
-    ShardFactory::BuilderCallable standaloneBuilder = [targeterFactoryPtr,
-                                                       service](const ShardHandle& handle,
-                                                                const ConnectionString& connStr) {
-        auto& shardSharedStateCache = ShardSharedStateCache::get(service);
-        return std::make_unique<ShardRemote>(handle,
-                                             connStr,
-                                             targeterFactoryPtr->create(connStr),
-                                             shardSharedStateCache.getShardState(handle.name()));
-    };
+    ShardFactory::BuilderCallable standaloneBuilder =
+        [targeterFactoryPtr, service](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(service);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::ConnectionType::kReplicaSet, std::move(setBuilder)},
@@ -143,11 +142,11 @@ std::unique_ptr<ShardRegistry> ShardingMongoDTestFixture::makeShardRegistry(
 
     // Only config servers use ShardLocal for now.
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        ShardFactory::BuilderCallable localBuilder = [service](const ShardHandle& handle,
+        ShardFactory::BuilderCallable localBuilder = [service](const ShardId& shardId,
                                                                const ConnectionString& connStr) {
             auto& shardSharedStateCache = ShardSharedStateCache::get(service);
-            return std::make_unique<ShardLocal>(handle,
-                                                shardSharedStateCache.getShardState(handle.name()));
+            return std::make_unique<ShardLocal>(shardId,
+                                                shardSharedStateCache.getShardState(shardId));
         };
         buildersMap.insert(
             std::pair<ConnectionString::ConnectionType, ShardFactory::BuilderCallable>(

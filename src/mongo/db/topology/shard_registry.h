@@ -51,9 +51,8 @@ namespace shard_registry_stats {
 class [[MONGO_MOD_PRIVATE]] ShardRegistryData {
 public:
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
-    using ShardUUIDMap = stdx::unordered_map<UUID, std::shared_ptr<Shard>, UUID::Hash>;
-    using ShardHandleToConnectionStringMap =
-        stdx::unordered_map<ShardHandle, ConnectionString, ShardHandle::HashByName>;
+    using ShardIdToConnectionStringMap =
+        stdx::unordered_map<ShardId, ConnectionString, ShardId::Hasher>;
 
     /**
      * Creates a basic ShardRegistryData, that only contains the config shard.  Needed during
@@ -66,7 +65,7 @@ public:
      * Builds a ShardRegistryData from a map of shardId -> connectionString.
      * Creates Shard instances (and their RSMs) for each entry.
      */
-    static ShardRegistryData buildFromShardDocs(const ShardHandleToConnectionStringMap& shardDocs,
+    static ShardRegistryData buildFromShardDocs(const ShardIdToConnectionStringMap& shardDocs,
                                                 ShardFactory* shardFactory);
 
     /**
@@ -144,9 +143,6 @@ private:
      * Puts the given shard object into the lookup maps.
      */
     void _addShard(std::shared_ptr<Shard>);
-
-    // Map of ShardUUID -> Shard
-    ShardUUIDMap _shardUUIDLookup;
 
     // Map of shardName -> Shard
     ShardMap _shardIdLookup;
@@ -444,9 +440,9 @@ private:
          * Create a Time which will cause merging of force reload requests that have been made
          * before 'lookupFn' is evaluated, and contain the topologyTime returned by 'lookupFn'.
          */
-        using LookupFn = std::function<
-            std::pair<ShardRegistryData::ShardHandleToConnectionStringMap, Timestamp>()>;
-        static std::pair<ShardRegistryData::ShardHandleToConnectionStringMap, Time> makeWithLookup(
+        using LookupFn =
+            std::function<std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Timestamp>()>;
+        static std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Time> makeWithLookup(
             LookupFn&& lookupFn);
 
         /**
@@ -553,10 +549,9 @@ private:
      * Tears down RSMs and fires removal hooks for shards that are present in cachedData
      * but absent from the fetched shardDocs.
      */
-    void _tearDownRemovedShards(
-        OperationContext* opCtx,
-        const Cache::ValueHandle& cachedData,
-        const ShardRegistryData::ShardHandleToConnectionStringMap& shardDocs);
+    void _tearDownRemovedShards(OperationContext* opCtx,
+                                const Cache::ValueHandle& cachedData,
+                                const ShardRegistryData::ShardIdToConnectionStringMap& shardDocs);
 
     void _initializeCacheIfNecessary() const;
 

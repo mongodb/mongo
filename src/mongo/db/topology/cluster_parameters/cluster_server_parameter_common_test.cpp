@@ -33,7 +33,7 @@ public:
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
         auto& shardSharedStateCache = ShardSharedStateCache::get(getServiceContext());
         _shardLocal = std::make_unique<ShardLocal>(
-            ShardHandle(ShardId::kConfigServerId, UUID::gen()),
+            ShardId::kConfigServerId,
             shardSharedStateCache.getShardState(ShardId::kConfigServerId));
     }
 
