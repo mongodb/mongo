@@ -33,7 +33,13 @@
 
 #include <utility>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/connection_pool_controllers.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -120,6 +126,50 @@ ServiceContext::ConstructorActionRegisterer searchExecutorsCAR{
         getExecutorHolder(service).mongotExecutor.reset();
         getExecutorHolder(service).searchIndexMgmtExecutor.reset();
     }};
+
+// TODO (SERVER-126178): Remove this server status section and add to connPoolStats.
+class SearchTaskExecutorServerStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
+        BSONObjBuilder bob;
+        auto* svc = opCtx->getServiceContext();
+
+        auto appendStats = [&](StringData key,
+                               const StatusWith<std::shared_ptr<TaskExecutor>>& sw) {
+            if (!sw.isOK())
+                return;
+            auto& exec = sw.getValue();
+            BSONObjBuilder sub = bob.subobjStart(key);
+            {
+                BSONObjBuilder diagnosticInfo = sub.subobjStart("diagnosticInfo");
+                exec->appendDiagnosticBSON(&diagnosticInfo);
+            }
+            {
+                BSONObjBuilder networkInterface = sub.subobjStart("networkInterface");
+                exec->appendNetworkInterfaceStats(networkInterface);
+            }
+            {
+                BSONObjBuilder connectionPool = sub.subobjStart("connectionPool");
+                executor::ConnectionPoolStats poolStats{};
+                exec->appendConnectionStats(&poolStats);
+                poolStats.appendToBSON(connectionPool);
+            }
+        };
+
+        appendStats("mongot", getMongotTaskExecutor(svc));
+        appendStats("searchIndex", getSearchIndexManagementTaskExecutor(svc));
+        return bob.obj();
+    }
+};
+
+const auto& searchTaskExecutorSection =
+    *ServerStatusSectionBuilder<SearchTaskExecutorServerStatusSection>("searchTaskExecutorMetrics");
 
 }  // namespace
 
