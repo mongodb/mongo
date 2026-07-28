@@ -7,6 +7,7 @@
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {skipTestIfSizeBasedOplogTruncationDisabled} from "jstests/libs/oplog_truncation_util.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -21,6 +22,10 @@ const rst = new ReplSetTest({
 });
 rst.startSet();
 rst.initiate();
+
+// This test relies on marker-based oplog truncation, which may be disabled in disagg.
+// TODO(SERVER-123977) remove this once this feature flag is enabled by default
+skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
 const primary = rst.getPrimary();
 const db = primary.getDB("test");

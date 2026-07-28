@@ -7,45 +7,41 @@
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-
-// Checks if a set of entries all exist or all do not exist in the oplog
-// if allExist == true, I want to check that all entries exist in oplog
-// if allExist == false, I want to check all entries do not exist in oplog
-function entryInOplog(allExist, entries, oplog) {
-    const cursor = oplog.find({ns: "test.markers"});
-    while (cursor.hasNext()) {
-        const entry = cursor.next();
-        jsTest.log.info("Checking " + tojson(entry));
-        entries.forEach((id) => {
-            if (id == entry.o["_id"]) {
-                return false;
-            }
-        });
-    }
-    return true;
-}
+import {skipTestIfSizeBasedOplogTruncationDisabled} from "jstests/libs/oplog_truncation_util.js";
 
 // Constants for replica set and test configuration
 const oplogSizeMB = 1; // Small oplog size in MB
 const longString = "a".repeat(450 * 1024); // Large document size (~500KB)
 let nextId = 0; // Tracks the next `_id` for inserts
 
+// setParameter args to reuse across startups
+const setParameter = {
+    logComponentVerbosity: tojson({storage: 1}),
+    minOplogTruncationPoints: 2,
+    internalQueryExecYieldPeriodMS: 86400000, // Disable yielding
+
+    // Speed up the wakeup time of the cap maintainer thread
+    oplogTruncationCheckPeriodSeconds: 1,
+};
+
 // Initialize a single-node replica set with a small oplog size
 const rst = new ReplSetTest({
     oplogSize: oplogSizeMB,
     nodes: 1,
-    // Set the syncdelay to 1s to speed up checkpointing.
     nodeOptions: {
+        // Set the syncdelay to 1s to speed up checkpointing (note: this arg has no effect in DSC)
         syncdelay: 1,
-        setParameter: {
-            logComponentVerbosity: tojson({storage: 1}),
-            minOplogTruncationPoints: 2,
-            internalQueryExecYieldPeriodMS: 86400000, // Disable yielding
-        },
+        setParameter: setParameter,
     },
 });
-rst.startSet();
+rst.startSet({
+    oplogMinRetentionHours: 0.000001, // disable time-based retention
+});
 rst.initiate();
+
+// This test relies on marker-based oplog truncation, which may be disabled in disagg.
+// TODO(SERVER-123977) remove this once this feature flag is enabled by default
+skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
 // Insert initial documents
 jsTest.log.info("Inserting initial set of documents into the collection.");
@@ -60,13 +56,18 @@ clearRawMongoProgramOutput();
 
 rst.startSet({
     restart: true,
-    setParameter: {"failpoint.hangDuringOplogSampling": tojson({mode: "alwaysOn"})},
+    setParameter: {
+        "failpoint.hangDuringOplogSampling": tojson({mode: "alwaysOn"}),
+        ...setParameter,
+    },
+    oplogMinRetentionHours: 0.000001, // disable time-based retention
 }); // Restart replica set
+
 const restartedPrimary = rst.getPrimary();
 const restartedPrimaryOplog = restartedPrimary.getDB("local").getCollection("oplog.rs");
 jsTest.log.info("Replica set restarted.");
 
-// // Verify that the oplog cap maintainer thread is paused.
+// Verify that the oplog cap maintainer thread is paused.
 assert.commandWorked(
     restartedPrimary.adminCommand({
         waitForFailPoint: "hangDuringOplogSampling",
@@ -74,6 +75,9 @@ assert.commandWorked(
         maxTimeMS: kDefaultWaitForFailPointTimeout,
     }),
 );
+
+// Verify truncate marker creation resumes post-startup
+checkLog.containsJson(restartedPrimary, 8423403); // Log ID for startup finished
 
 // Test inserts while truncate marker creation process is paused
 jsTest.log.info("Testing oplog truncation logic with new inserts...");
@@ -93,25 +97,28 @@ jsTest.log.info("Second insert timestamp: " + tojson(secondInsertTimestamp));
 
 // Check inserts exists
 assert.soon(() => {
-    let foundCount = 0;
-    const cursor = restartedPrimaryOplog.find({ns: "test.markers"});
-    while (cursor.hasNext()) {
-        const entry = cursor.next();
-        jsTest.log.info("Checking " + tojson(entry));
-        largeDocIDs.forEach((id) => {
-            if (id == entry.o["_id"]) {
-                foundCount++;
-            }
-        });
-    }
+    const foundCount = restartedPrimaryOplog
+        .find({ns: "test.markers"}, {"o._id": 1})
+        .toArray()
+        .filter((e) => largeDocIDs.includes(e.o._id)).length;
     return foundCount == 2;
 });
+
+// Insert some more docs to get over sampling threshold
+// Record count must be at least
+// (kRandomSamplesPerMarker=10 * kMinSampleRatioForRandCursor=20 * minOplogTruncationPoints=2) = 400
+for (let i = 0; i < 400; i++) {
+    coll.insert({_id: nextId++});
+}
+jsTest.log.info("Inserted up to id: ", nextId - 1);
 
 // Take a checkpoint
 restartedPrimary.getDB("admin").runCommand({fsync: 1});
 
-// Verify truncate marker creation resumes post-startup
-checkLog.containsJson(restartedPrimary, 8423403); // Log ID for startup finished
+// Assert no marker generation method is chosen while the thread is paused
+let method = assert.commandWorked(restartedPrimary.adminCommand({serverStatus: 1})).oplogTruncation
+    .processingMethod;
+assert.eq(method, undefined);
 
 // Resume oplog truncate marker creation
 jsTest.log.info("Resuming oplog truncate marker creation.");
@@ -119,10 +126,20 @@ assert.commandWorked(
     restartedPrimary.adminCommand({configureFailPoint: "hangDuringOplogSampling", mode: "off"}),
 );
 
+// Verify sampling is selected as the marker generation method
+assert.soon(() => {
+    method = assert.commandWorked(restartedPrimary.adminCommand({serverStatus: 1})).oplogTruncation
+        .processingMethod;
+    return method !== undefined;
+}, "Oplog truncation marker generation method was never chosen");
+assert.eq(method, "sampling");
+jsTest.log.info("Sampling selected as the marker generation method!");
+
 // Verify truncate markers are created and logged
 checkLog.containsJson(restartedPrimary, 22382); // Log ID: Oplog truncate markers calculated
 
 // Insert additional records to trigger truncation
+jsTest.log.info("Inserting records to trigger truncation");
 for (let i = 0; i < 50; i++) {
     coll.insert({_id: nextId++, longString: longString});
 }
@@ -130,23 +147,15 @@ for (let i = 0; i < 50; i++) {
 restartedPrimary.getDB("admin").runCommand({fsync: 1});
 
 // Wait for truncation to occur
-// Verify large documents inserted during intial sampling are eventually truncated from the oplog
+// Verify large documents inserted during initial sampling are eventually truncated from the oplog
+jsTest.log.info("Waiting for truncation to occur");
 assert.soon(() => {
     try {
-        const cursor = restartedPrimaryOplog.find({ns: "test.markers"});
-        while (cursor.hasNext()) {
-            const entry = cursor.next();
-            jsTest.log.info("Checking " + tojson(entry));
-
-            const foundId = largeDocIDs.some((id) => {
-                return id == entry.o["_id"];
-            });
-
-            if (foundId) {
-                return false;
-            }
-        }
-        return true;
+        const foundLargeDoc = restartedPrimaryOplog
+            .find({ns: "test.markers"}, {"o._id": 1})
+            .toArray()
+            .some((e) => largeDocIDs.includes(e.o._id));
+        return !foundLargeDoc;
     } catch (e) {
         if (e.code !== ErrorCodes.CappedPositionLost) {
             throw e;

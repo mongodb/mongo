@@ -242,7 +242,8 @@ export function runOplogSyncAggAssertMinOplogTest(config) {
     rst.startSet({oplogSize: 1, oplogMinRetentionHours: 0.000001});
     rst.initiate();
 
-    // This test relies on size-based oplog truncation, which may be disabled in disagg.
+    // This test relies on marker-based oplog truncation, which may be disabled in disagg.
+    // TODO(SERVER-123977) remove this once this feature flag is enabled by default
     skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
     jsTest.log("Inserting documents to generate oplog entries");

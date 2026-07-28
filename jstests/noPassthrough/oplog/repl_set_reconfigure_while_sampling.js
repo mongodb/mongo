@@ -4,6 +4,7 @@
  * @tags: [requires_replication, requires_persistence]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {skipTestIfSizeBasedOplogTruncationDisabled} from "jstests/libs/oplog_truncation_util.js";
 
 function samplingIsIncomplete(primary) {
     const status = primary.getDB("local").serverStatus();
@@ -27,6 +28,10 @@ const rst = new ReplSetTest({
 });
 rst.startSet();
 rst.initiate();
+
+// This test relies on marker-based oplog truncation, which may be disabled in disagg.
+// TODO(SERVER-123977) remove this once this feature flag is enabled by default
+skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
 // Insert initial documents.
 jsTest.log.info("Inserting initial set of documents into the collection.");

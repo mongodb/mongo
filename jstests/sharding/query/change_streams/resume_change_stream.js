@@ -24,6 +24,8 @@ const st = new ShardingTest({
     },
 });
 
+// This test relies on marker-based oplog truncation, which may be disabled in disagg.
+// TODO(SERVER-123977) remove this once this feature flag is enabled by default
 skipTestIfSizeBasedOplogTruncationDisabled(st.rs0.getPrimary(), () => st.stop());
 
 const mongosDB = st.s0.getDB(jsTestName());
