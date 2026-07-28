@@ -49,3 +49,9 @@ structs:
             ct:
                 type: safeInt64
                 description: "Cumulative document count delta for this collection across all operations in the transaction."
+            h:
+                type: safeInt64
+                optional: true
+                description:
+                    "Cumulative document hash delta for this collection across the transaction's
+                    operations."

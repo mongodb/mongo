@@ -2654,11 +2654,15 @@ TEST_F(OplogEntryTest, SizeMetadataSingleOpAbsentSzRoundTrip) {
 }
 
 TEST_F(OplogEntryTest, SizeMetadataMultiOpRoundTrip) {
+    const int64_t expectedHash = 0x0011223344556677LL;
+
     MultiOpSizeMetadata expectedMeta1;
     expectedMeta1.setUuid(UUID::gen());
     expectedMeta1.setSz(100);
     expectedMeta1.setCt(3);
+    expectedMeta1.setH(expectedHash);
 
+    // 'h' is optional; leave it unset on the second entry.
     MultiOpSizeMetadata expectedMeta2;
     expectedMeta2.setUuid(UUID::gen());
     expectedMeta2.setSz(200);
@@ -2690,10 +2694,13 @@ TEST_F(OplogEntryTest, SizeMetadataMultiOpRoundTrip) {
     EXPECT_EQ(expectedMeta1.getUuid(), (*parsedMultiOpSizeMetadata)[0].getUuid());
     EXPECT_EQ(expectedMeta1.getSz(), (*parsedMultiOpSizeMetadata)[0].getSz());
     EXPECT_EQ(expectedMeta1.getCt(), (*parsedMultiOpSizeMetadata)[0].getCt());
+    ASSERT_TRUE((*parsedMultiOpSizeMetadata)[0].getH().has_value());
+    EXPECT_EQ(expectedHash, *(*parsedMultiOpSizeMetadata)[0].getH());
 
     EXPECT_EQ(expectedMeta2.getUuid(), (*parsedMultiOpSizeMetadata)[1].getUuid());
     EXPECT_EQ(expectedMeta2.getSz(), (*parsedMultiOpSizeMetadata)[1].getSz());
     EXPECT_EQ(expectedMeta2.getCt(), (*parsedMultiOpSizeMetadata)[1].getCt());
+    EXPECT_FALSE((*parsedMultiOpSizeMetadata)[1].getH().has_value());
 }
 
 TEST_F(OplogEntryTest, SizeMetadataMultiOpEmptyArray) {
