@@ -801,8 +801,14 @@ def sort_items(items):
     ret = []
     while len(ret) != len(items):
         for cert in items:
+            # Skip certs that were already emitted on a previous pass. Without
+            # this, any config which does not resolve in a single pass causes
+            # ret to grow without bound and the loop never terminates.
+            if cert['name'] in processed_names:
+                continue
+
             # only concern ourselves with prependents in this config file.
-            unmet_prependents = [name for name in cert.get('append_certs', []) if (name in all_names) and (not name in processed_names)]
+            unmet_prependents = [name for name in cert.get('append_cert', []) if (name in all_names) and (not name in processed_names)]
 
             # Self-signed, signed by someone in ret already, or signed externally
             issuer = cert.get('Issuer')
