@@ -176,7 +176,10 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
     // the token bucket effectively empty for the whole time IRRL is enabled.
     function enableIRRLOnAllShards() {
         shardPrimaries.forEach((node) =>
-            enableZeroBurstRateLimiter(node, kExemptions, {setRefreshRateFailpoint: true}),
+            enableZeroBurstRateLimiter(node, kExemptions, {
+                setRefreshRateFailpoint: true,
+                useKeyFileAuth: true,
+            }),
         );
     }
 

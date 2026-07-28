@@ -109,6 +109,8 @@ public:
 
     bool isConnected() override;
 
+    bool waitForPeerDisconnectUntil(Date_t deadline) override;
+
     Status validateProxyUnixSocketPeerPermissions() override;
 
 

@@ -1,0 +1,41 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    mod_visibility: public
+    cpp_namespace: "mongo::admission"
+    cpp_includes:
+        - "mongo/db/admission/egress_response_rate_limiter.h"
+        - "mongo/db/server_options.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+server_parameters:
+    egressResponseRateLimiterRatePerSec:
+        description: >-
+            The number of egress responses permitted per second. The egress response rate limiter
+            is always engaged for user/application rejection replies; this rate defaults to the
+            maximum int32 value, making the limiter an effective no-op until a lower rate is set.
+        set_at: [startup, runtime]
+        cpp_varname: gEgressResponseRateLimiterRatePerSec
+        cpp_vartype: Atomic<int32_t>
+        on_update: EgressResponseRateLimiter::onUpdateRatePerSec
+        default:
+            expr: std::numeric_limits<int32_t>::max()
+        validator: {gte: 1}
+        redact: false
+
+    egressResponseRateLimiterBurstCapacitySecs:
+        description: >-
+            Describes how many seconds worth of unutilized rate limit can be stored away to permit
+            additional egress responses during periods where the rate limit is temporarily
+            exceeded. Defaults to the maximum double value (effectively unbounded).
+        set_at: [startup, runtime]
+        cpp_varname: gEgressResponseRateLimiterBurstCapacitySecs
+        cpp_vartype: Atomic<double>
+        on_update: EgressResponseRateLimiter::onUpdateBurstCapacitySecs
+        default:
+            expr: std::numeric_limits<double>::max()
+        validator: {gt: 0}
+        redact: false

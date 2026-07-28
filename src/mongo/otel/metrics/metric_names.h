@@ -240,6 +240,40 @@ public:
         MetricNameMaker::make(
             "serverStatus.otelTracingSampler.externalSpan.rateLimiter.rejectedAdmissions");
 
+    // Egress Response Rate Limiter (Admission Control) Metrics. These mirror the fields that
+    // RateLimiter::appendStats() reports under serverStatus.network.egressResponseRateLimiter.
+    static constexpr MetricName kEgressResponseRateLimiterAttemptedAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.attemptedAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterSuccessfulAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.successfulAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterRejectedAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.rejectedAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterExemptedAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.exemptedAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterAddedToQueue = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.addedToQueue");
+    static constexpr MetricName kEgressResponseRateLimiterRemovedFromQueue = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.removedFromQueue");
+    static constexpr MetricName kEgressResponseRateLimiterInterruptedInQueue =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.interruptedInQueue");
+    static constexpr MetricName kEgressResponseRateLimiterTokensAcquired = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.tokensAcquired");
+    static constexpr MetricName kEgressResponseRateLimiterCurrentQueueDepth = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.currentQueueDepth");
+    static constexpr MetricName kEgressResponseRateLimiterTotalAvailableTokens =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.totalAvailableTokens");
+    static constexpr MetricName kEgressResponseRateLimiterAverageTimeQueuedMicros =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.averageTimeQueuedMicros");
+    static constexpr MetricName kEgressResponseRateLimiterTimeQueuedMicros = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.timeQueuedMicros");
+
     // Query Execution Team Metrics
     static constexpr MetricName kQueryMemoryLoadSheddingOperationsShed =
         MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.operationsShed");

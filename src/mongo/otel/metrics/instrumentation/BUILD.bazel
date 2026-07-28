@@ -324,6 +324,7 @@ mongo_cc_library(
         ":system_mount_metrics",
         ":wiredtiger_metrics",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/admission:egress_response_rate_limiter",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
     ],
 )

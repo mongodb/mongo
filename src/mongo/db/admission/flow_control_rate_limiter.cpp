@@ -22,7 +22,7 @@ FlowControlRateLimiter::FlowControlRateLimiter()
           std::make_unique<admission::RateLimiter>(static_cast<double>(kMaxRate),
                                                    gFlowControlRateLimiterBurstCapacitySecs.load(),
                                                    gFlowControlRateLimiterMaxQueueDepth.load(),
-                                                   "flowControl")) {}
+                                                   std::string(kRateLimiterName))) {}
 
 void FlowControlRateLimiter::updateRate(int targetRateLimit) {
     auto rate = std::max(1, targetRateLimit);

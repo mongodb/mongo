@@ -3,6 +3,7 @@
 
 #include "mongo/otel/metrics/instrumentation/metrics_installer.h"
 
+#include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/otel/metrics/instrumentation/connections_metrics.h"
@@ -33,6 +34,7 @@ void installCommonOtelMetrics(ServiceContext* svcCtx) {
     installMongoDBBuildInfoMetrics();
     installQueryMemoryOtelMetrics(svcCtx);
     admission::IngressRequestRateLimiter::get(svcCtx).installOtelMetrics(svcCtx);
+    admission::EgressResponseRateLimiter::get(svcCtx).installOtelMetrics(svcCtx);
 }
 #endif
 }  // namespace

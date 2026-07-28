@@ -95,7 +95,7 @@ describe("mongos honors a baseBackoffMS from a IRRL rejection", function () {
 
         // Force every request to rejected by the rate limiter and make the mongos-side backoff
         // deterministic (no jitter, known retry knobs).
-        enableZeroBurstRateLimiter(shardPrimary, kSafeInternalExemptions);
+        enableZeroBurstRateLimiter(shardPrimary, kSafeInternalExemptions, {useKeyFileAuth: true});
         assert.commandWorked(
             exemptConn.adminCommand({
                 configureFailPoint: "returnMaxBackoffDelay",

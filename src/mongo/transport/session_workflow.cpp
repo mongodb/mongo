@@ -11,6 +11,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/client.h"
@@ -48,6 +49,7 @@
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/session_workflow_p.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
@@ -504,6 +506,13 @@ private:
     /** Writes the completed work response to the Session. */
     void _sendResponse();
 
+    /**
+     * Throttles the egress of an IngressRequestRateLimiter rejection reply for user/application
+     * connections, using the SessionManager's shutdown-cancellable Interruptible. No-op unless
+     * the current work item is a rate-limit rejection and the limiter is enabled and applicable.
+     */
+    void _maybeThrottleEgressResponse();
+
     void _onLoopError(Status error);
 
     void _cleanupSession(const Status& status);
@@ -552,6 +561,18 @@ public:
 
     bool isExhaust() const {
         return _isExhaust;
+    }
+
+    /**
+     * True when the work was rejected by the IngressRequestRateLimiter. Used by the egress response
+     * rate-limiter gate in _sendResponse to decide whether to pace the reply.
+     */
+    bool isRateLimitRejection() const {
+        return _isRateLimitRejection;
+    }
+
+    void markRateLimitRejection() {
+        _isRateLimitRejection = true;
     }
 
     void initOperation() {
@@ -661,6 +682,7 @@ private:
     Impl* _swf;
     Message _in;
     bool _isExhaust = false;
+    bool _isRateLimitRejection = false;
     ServiceContext::UniqueOperationContext _opCtx;
     boost::optional<MessageCompressorId> _compressorId;
     boost::optional<Message> _out;
@@ -703,9 +725,26 @@ std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::_receive
     }
 }
 
+void SessionWorkflow::Impl::_maybeThrottleEgressResponse() {
+    if (MONGO_likely(!_work->isRateLimitRejection())) {
+        return;
+    }
+    auto* sm = session()->getTransportLayer()->getSessionManager();
+    if (!sm) {
+        return;
+    }
+    DisconnectShutdownAwareInterruptible interruptible{
+        sm->getShutdownToken(), session().get(), _serviceContext->getPreciseClockSource()};
+    admission::EgressResponseRateLimiter::get(_serviceContext)
+        .throttle(&interruptible, _serviceContext->getPreciseClockSource())
+        .ignore();
+}
+
 void SessionWorkflow::Impl::_sendResponse() {
     if (!_work->hasOut())
         return;
+
+    _maybeThrottleEgressResponse();
 
     try {
         sessionWorkflowDelayOrFailSendMessage.execute([this](auto&& data) {
@@ -887,6 +926,7 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
                                         _work->in().size());
 
     if (const auto admitted = _rateLimit(); !admitted) {
+        _work->markRateLimitRejection();
         return makeDbResponseErrorForRateLimiting(_work->in());
     }
 

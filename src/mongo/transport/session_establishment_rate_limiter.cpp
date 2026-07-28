@@ -44,7 +44,7 @@ SessionEstablishmentRateLimiter::SessionEstablishmentRateLimiter()
     : _rateLimiter(gIngressConnectionEstablishmentRatePerSec.load(),
                    gIngressConnectionEstablishmentBurstCapacitySecs.load(),
                    gIngressConnectionEstablishmentMaxQueueDepth.load(),
-                   "SessionEstablishmentRateLimiter") {}
+                   std::string(kRateLimiterName)) {}
 
 SessionEstablishmentRateLimiter* SessionEstablishmentRateLimiter::get(ServiceContext& svcCtx,
                                                                       TransportProtocol protocol) {

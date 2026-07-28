@@ -8,6 +8,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {RateLimiterKind} from "jstests/libs/admission/rate_limiter.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {
     getLimiterStats,
@@ -32,7 +33,9 @@ const maxIncomingConnections = 1000;
 const testRateLimiterStats = (conn) => {
     // Start maxQueueSize + 3 threads that will all try to connect to the server. The rate limiter
     // should allow maxQueueSize connections to be queued, and the rest should be rejected.
-    let connDelayFailPoint = configureFailPoint(conn, "hangInRateLimiter");
+    let connDelayFailPoint = configureFailPoint(conn, "hangInRateLimiter", {
+        limiter: RateLimiterKind.SessionEstablishmentRateLimiter,
+    });
     const extraConns = 3;
     const threads = [];
     for (let i = 0; i < maxQueueSize + extraConns; i++) {

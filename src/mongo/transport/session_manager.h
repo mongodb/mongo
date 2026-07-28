@@ -11,6 +11,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_establishment_rate_limiter.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -79,6 +80,13 @@ public:
      */
     virtual SessionEstablishmentRateLimiter& getSessionEstablishmentRateLimiter() {
         return _sessionEstablishmentRateLimiter;
+    }
+
+    /**
+     * Returns a CancellationToken that is canceled when this SessionManager shuts down.
+     */
+    virtual CancellationToken getShutdownToken() {
+        return CancellationToken::uncancelable();
     }
 
     // Stats

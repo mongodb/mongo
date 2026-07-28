@@ -7,8 +7,10 @@
 #include "mongo/db/client.h"
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/session_manager.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/net/cidr.h"
 
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -67,6 +69,8 @@ public:
         return false;
     }
 
+    CancellationToken getShutdownToken() override;
+
 protected:
     /** Generate a unique thread name for this session. */
     virtual std::string getClientThreadName(const Session&) const = 0;
@@ -113,6 +117,7 @@ protected:
 
     // External observer which may receive client connect/disconnect events.
     std::vector<std::shared_ptr<ClientTransportObserver>> _observers;
+    CancellationSource _shutdownSource;
 };
 
 /**

@@ -22,6 +22,7 @@
 #include "mongo/transport/session_manager_common_gen.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_options_gen.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/processinfo.h"
@@ -278,6 +279,10 @@ SessionManagerCommon::SessionManagerCommon(
 
 SessionManagerCommon::~SessionManagerCommon() = default;
 
+CancellationToken SessionManagerCommon::getShutdownToken() {
+    return _shutdownSource.token();
+}
+
 void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
     invariant(session->isIngress());
@@ -338,6 +343,11 @@ void SessionManagerCommon::endAllSessionsNoTagMask() {
 }
 
 bool SessionManagerCommon::shutdown(Milliseconds timeout) {
+    // Cancel the shutdown token before draining sessions. Any egress-response rate-limiter waiter
+    // parked on a session thread polls this token and returns InterruptedAtShutdown within one poll
+    // slice, so the egress path never blocks shutdown for longer than that slice.
+    _shutdownSource.cancel();
+
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
     static constexpr bool kSanitizerBuild = true;
 #else

@@ -172,6 +172,21 @@ public:
     virtual bool isConnected() = 0;
 
     /**
+     * Blocks the calling thread until the remote peer has closed its end of the connection or until
+     * `deadline` is reached.
+     *
+     * Returns `true` if the peer has disconnected (or the underlying socket is in an error state),
+     * `false` if `deadline` expired without observing a disconnect.
+     *
+     * This method performs a blocking `poll()` on the session's socket and therefore must not be
+     * called concurrently with `sourceMessage()`/`sinkMessage()`/`waitForData()` on the same
+     * session.
+     */
+    virtual bool waitForPeerDisconnectUntil(Date_t deadline) {
+        return false;
+    }
+
+    /**
      * Returns true if this session was connected through an L4 load balancer.
      */
     bool isLoadBalancerPeer() const {

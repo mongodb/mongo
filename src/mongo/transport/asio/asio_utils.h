@@ -26,6 +26,13 @@
 
 namespace mongo::transport {
 
+// POLLRDHUP (peer half-closed) is Linux-specific. On platforms that don't define it (e.g. Windows,
+// older BSDs), define it to 0 so callers can request it in a poll mask without #ifdef noise; the
+// kernel simply never reports it there and POLLHUP carries the signal instead.
+#ifndef POLLRDHUP
+#define POLLRDHUP 0
+#endif
+
 /**
  * Generic wrapper for making an ASIO socket get_option or set_option call
  * having a payload of type `T`, which is usually just `int` so it's the default.

@@ -176,6 +176,32 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "egress_response_rate_limiter_gen",
+    src = "egress_response_rate_limiter.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "egress_response_rate_limiter",
+    srcs = [
+        "egress_response_rate_limiter.cpp",
+        ":egress_response_rate_limiter_gen",
+    ],
+    hdrs = [
+        "egress_response_rate_limiter.h",
+    ],
+    deps = [
+        ":rate_limiter",
+        ":rate_limiter_otel_metrics_recorder",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
 mongo_cc_library(
     name = "flow_control_rate_limiter",
     srcs = [
@@ -291,6 +317,20 @@ mongo_cc_unit_test(
         ":rate_limiter",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "egress_response_rate_limiter_test",
+    srcs = [
+        "egress_response_rate_limiter_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":egress_response_rate_limiter",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/unittest",
     ],
 )
 

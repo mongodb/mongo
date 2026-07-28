@@ -335,6 +335,46 @@ The following `serverStatus` metrics are emitted by the `IngressRequestRateLimit
   requests.
 - `totalAvailableTokens`: the current capacity of the underlying token bucket.
 
+# Egress Response Rate Limiting
+
+The `EgressResponseRateLimiter` paces the egress (response-send) path. It is a thin wrapper around
+[`admission::RateLimiter`](rate_limiter.h), stored as a `ServiceContext` decoration, mirroring the
+[`IngressRequestRateLimiter`](ingress_request_rate_limiter.h) pattern.
+
+It engages for every `SystemOverloaded` rejection reply produced by the `IngressRequestRateLimiter`
+(the engagement gate lives in the `SessionWorkflow` egress hook). IRRL is the single authority on
+which ops get rejected. It already exempts unauthenticated, priority-port, and IP/app-list traffic,
+so anything that reaches the egress limiter has been deemed rejectable by IRRL and is throttled
+uniformly. The queue is unbounded: a caller is never denied; `throttle()` always returns (the
+returned `Status` is informational).
+
+The wait is driven by a lightweight, per-session `Interruptible`
+(`DisconnectShutdownAwareInterruptible`, declared in `src/mongo/transport/session_workflow_p.h`)
+rather than a full `OperationContext`, so the rejection path does not pay for constructing an opCtx
+per response. The interruptible composes two cancellation conditions in a single sliced wait loop:
+
+- **Shutdown**: it polls a `CancellationToken` obtained from
+  `session()->getTransportLayer()->getSessionManager()->getShutdownToken()`, which is canceled from
+  the `SessionManager`'s `shutdown()` path. The token is a lock-free atomic poll, not a kernel wait,
+  so it is checked at each slice boundary. A parked egress waiter is released within one slice of
+  shutdown, so the egress path never blocks shutdown for longer than that slice.
+- **Client disconnect**: each slice is a single blocking `poll(2)` for `POLLRDHUP|POLLHUP` on the
+  session's socket, via `Session::waitForPeerDisconnectUntil()`. Since the rejection path has no
+  `OperationContext`, it cannot rely on `OperationContext::markKillOnClientDisconnect()` to be woken
+  when the client gives up. Without this wait a tarpitted reply would park its worker thread and FD
+  for the full nap time even after the client closed the socket. Because the slice is a kernel
+  `poll()`, the worker is woken within one scheduler tick of the client's FIN/RST arriving rather
+  than only noticing at the next poll-slice boundary.
+
+On shutdown the wait returns `ErrorCodes::InterruptedAtShutdown`; on peer disconnect it returns
+`ErrorCodes::ClientDisconnect`, which the rate limiter surfaces as `InterruptedInQueue` and uses to
+return the borrowed token.
+
+Policy is driven externally via `setParameter` (e.g. mongotune):
+`egressResponseRateLimiterRatePerSec`, `egressResponseRateLimiterBurstCapacitySecs`. The limiter is
+always engaged for IRRL rejection replies; it has no on/off toggle, and defaults to the maximum
+int32 rate (an effective no-op) until a lower rate is set.
+
 # Data-Node Ingress Admission Control
 
 ### Quick Overview

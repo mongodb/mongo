@@ -46,6 +46,8 @@ auto doWithoutLock(BasicLockableAdapter m, Callable&& callable) {
  */
 class [[MONGO_MOD_OPEN]] Interruptible {
 public:
+    virtual ~Interruptible() = default;
+
     /**
      * Returns true if currently waiting for a condition/interrupt.
      * This function relies on waitForConditionOrInterrupt to properly set _isWaiting.

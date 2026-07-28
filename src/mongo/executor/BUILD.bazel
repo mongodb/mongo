@@ -535,6 +535,7 @@ mongo_cc_integration_test(
         "//src/mongo/executor:network_interface_thread_pool",
         "//src/mongo/executor:pinned_connection_task_executor",
         "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:transport_layer_common",
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",

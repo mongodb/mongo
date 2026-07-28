@@ -14,6 +14,7 @@
 #include "mongo/util/versioned_value.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo::transport {
 /**
@@ -35,6 +36,8 @@ namespace mongo::transport {
  */
 class [[MONGO_MOD_PUBLIC]] SessionEstablishmentRateLimiter {
 public:
+    static constexpr std::string_view kRateLimiterName = "SessionEstablishmentRateLimiter";
+
     SessionEstablishmentRateLimiter();
 
     virtual ~SessionEstablishmentRateLimiter() = default;

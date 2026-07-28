@@ -3,6 +3,8 @@
 
 #include "mongo/db/admission/rate_limiter.h"
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
@@ -211,6 +213,10 @@ RateLimiter::DeferredToken::~DeferredToken() {
 }
 
 Status RateLimiter::DeferredToken::get(OperationContext* opCtx) && {
+    return std::move(*this).get(opCtx, opCtx->getServiceContext()->getPreciseClockSource());
+}
+
+Status RateLimiter::DeferredToken::get(Interruptible* interruptible, ClockSource* clockSrc) && {
     invariant(_impl);
 
     if (isReady()) {
@@ -238,14 +244,14 @@ Status RateLimiter::DeferredToken::get(OperationContext* opCtx) && {
         return Status::OK();
     }
 
-    Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + adjustedNapTime;
+    Date_t deadline = clockSrc->now() + adjustedNapTime;
     try {
         LOGV2_DEBUG(10550200,
                     4,
                     "Going to sleep waiting for token acquisition",
                     "rateLimiterName"_attr = impl->name,
                     "napTimeMillis"_attr = adjustedNapTime.toString());
-        opCtx->sleepUntil(deadline);
+        interruptible->sleepUntil(deadline);
     } catch (const DBException& e) {
         impl->getMetricsRecorder()->record(InterruptedInQueue{});
         LOGV2_DEBUG(10440800,
@@ -307,7 +313,16 @@ RateLimiter::RateLimiter(double refreshRatePerSec,
 RateLimiter::~RateLimiter() = default;
 
 boost::optional<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numTokensToConsume) {
-    const bool hangInLimiter = hangInRateLimiter.shouldFail();
+    // This failpoint is shared by every RateLimiter wrapper (ingress request, egress response,
+    // session establishment, etc). To keep a test that forces queueing on one limiter from parking
+    // every other limiter, callers MUST scope it by providing a limiter name when enabling the
+    // failpoint.
+    const bool hangInLimiter =
+        hangInRateLimiter.shouldFail([&name = _impl->name](const BSONObj& data) {
+            const auto el = data.getField("limiter");
+            return !el.eoo() && el.str() == name.c_str();
+        });
+
     const auto maxQueueDepth = _impl->maxQueueDepth.loadRelaxed();
     if (!hangInLimiter && (maxQueueDepth <= 0 || _impl->queued.load() >= maxQueueDepth)) {
         // Queueing unavailable (disabled or currently full): use try-acquire semantics.

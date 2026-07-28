@@ -630,7 +630,7 @@ describe("bulkWrite IRRL error propagation (budget exhaustion + subset rejection
         // immediately. exemptConn itself is exempt at the mongos boundary, but mongos forwards
         // each shard's sub-batch under an internal (non-exempt) appName, so the forwarded write to
         // shard0 is genuinely rejected by its own real admission control -- not a failpoint.
-        enableZeroBurstRateLimiter(shard0, kSafeInternalExemptions);
+        enableZeroBurstRateLimiter(shard0, kSafeInternalExemptions, {useKeyFileAuth: true});
 
         try {
             const statsBefore = getShardStats(exemptConn, shard0Name);

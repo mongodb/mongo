@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
@@ -49,6 +50,8 @@ public:
             appendIngressRequestRateLimiterStats(&b, opCtx->getServiceContext());
         }
 
+        appendEgressResponseRateLimiterStats(&b, opCtx->getServiceContext());
+
         auto svcCtx = opCtx->getServiceContext();
 
         {
@@ -68,6 +71,11 @@ public:
         const auto& ingressRequestRateLimiter = admission::IngressRequestRateLimiter::get(service);
         ingressRequestRateLimiter.appendStats(&ingressRequestRateLimiterBuilder);
         ingressRequestRateLimiterBuilder.done();
+    }
+
+    void appendEgressResponseRateLimiterStats(BSONObjBuilder* b, ServiceContext* service) const {
+        BSONObjBuilder sub(b->subobjStart("egressResponseRateLimiter"));
+        admission::EgressResponseRateLimiter::get(service).appendStats(&sub);
     }
 };
 auto& network = *ServerStatusSectionBuilder<Network>("network");

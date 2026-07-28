@@ -43,6 +43,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_status_core",
+        "//src/mongo/db/admission:egress_response_rate_limiter",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/stats:counters",
         "//src/mongo/otel/metrics:otel_metrics_service",

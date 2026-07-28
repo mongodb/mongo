@@ -409,6 +409,34 @@ bool CommonAsioSession::isConnected() {
     return false;
 }
 
+bool CommonAsioSession::waitForPeerDisconnectUntil(Date_t deadline) {
+    invariant(
+        _blockingMode == sync,
+        "waitForPeerDisconnectUntil is only safe on a sync-mode session where the asio reactor "
+        "is not touching the socket");
+
+    if (!getSocket().is_open()) {
+        return true;
+    }
+
+    const auto remaining = deadline - Date_t::now();
+    if (remaining.count() <= 0) {
+        return false;
+    }
+
+    auto swPollEvents = pollASIOSocket(getSocket(), POLLRDHUP | POLLHUP, remaining);
+    if (!swPollEvents.isOK()) {
+        // A NetworkTimeout means the poll timed out without observing a disconnect, so the peer is
+        // still connected. Any other error indicates the socket itself is broken which we treat as
+        // a disconnect.
+        return swPollEvents != ErrorCodes::NetworkTimeout;
+    }
+    // The poll returned an event before the deadline. We only asked for POLLRDHUP|POLLHUP (plus the
+    // always-reported POLLERR/POLLNVAL), so any event here means the peer is gone or the socket
+    // is in error.
+    return true;
+}
+
 #ifdef MONGO_CONFIG_SSL
 
 const std::shared_ptr<SSLManagerInterface>& CommonAsioSession::getSSLManager() const {
