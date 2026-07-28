@@ -64,7 +64,10 @@ public:
         tassert(11974310, "Expected a non-null query solution for non-idhack queries", solution);
 
         // TODO SERVER-130428 remove `internalQueryEnablePlanShapeAnalysis`
-        if (internalQueryEnablePlanShapeAnalysis.load()) {
+        // Only collect plan shape stats for the top-level query. For example we do not collect
+        // the metrics for the foreign side of a $lookup.
+        const bool inTopLevelQuery = _cq->getExpCtxRaw()->getSubPipelineDepth() == 0;
+        if (internalQueryEnablePlanShapeAnalysis.load() && inTopLevelQuery) {
             auto& opDebug = CurOp::get(_opCtx)->debug();
             // Gate on shouldRequestRemoteMetrics, which checks if metrics are requested by
             // mongos or if the local query stats key exists.
