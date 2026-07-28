@@ -577,12 +577,12 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
     return {newObj, docWasModified};
 }
 
-std::pair<UpdateResult, int> parseAndTransformOplogUpdate(OperationContext* opCtx,
-                                                          const CollectionAcquisition& coll,
-                                                          const Snapshotted<BSONObj>& oldObj,
-                                                          const UpdateRequest& request,
-                                                          const RecordId& rid,
-                                                          const SeekableRecordCursor* cursor) {
+std::pair<UpdateResult, BSONObj> parseAndTransformOplogUpdate(OperationContext* opCtx,
+                                                              const CollectionAcquisition& coll,
+                                                              const Snapshotted<BSONObj>& oldObj,
+                                                              const UpdateRequest& request,
+                                                              const RecordId& rid,
+                                                              const SeekableRecordCursor* cursor) {
     // TODO SERVER-118695 Support upsert requests
     tassert(7834901, "This helper cannot be used to serve upsert requests.", !request.isUpsert());
     tassert(7834900,
@@ -639,7 +639,7 @@ std::pair<UpdateResult, int> parseAndTransformOplogUpdate(OperationContext* opCt
         ur.requestedDocImage = oldObj.value().getOwned();
     }
 
-    return {ur, newObj.objsize()};
+    return {ur, newObj};
 }
 
 }  // namespace update

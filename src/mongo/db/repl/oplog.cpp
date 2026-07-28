@@ -1622,39 +1622,38 @@ boost::optional<int64_t> getValidationHash(const OplogEntry& op) {
     return singleOpMeta->getH();
 }
 
-// Recomputes the post-image hash of an inserted document and fasserts on mismatch. 'doc' is the
-// object carried on the oplog entry (the primary's intended content) that this node just inserted
-// at 'recordId'; 'op' carries the primary's per-document hash in its size metadata.
+// Compares 'actualHash', recomputed by this non-primary, against the hash the primary recorded on
+// 'op', and fasserts on mismatch. 'diagnosticDoc' is used only to compute the field-level diff. It
+// is the post-image for inserts, and the pre-image for deletes and updates.
 void verifyValidationHash(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const RecordId& recordId,
-                          const BSONObj& doc,
+                          const BSONObj& diagnosticDoc,
+                          int64_t actualHash,
                           const OplogEntry& op) {
-    const int64_t actualHash = computeDocValidationHash(doc);
     const boost::optional<int64_t> expectedHash = getValidationHash(op);
-    if (expectedHash.value() == actualHash) {
+    invariant(expectedHash);
+    if (*expectedHash == actualHash) {
         return;
     }
 
-    // Read back the document we just persisted to compare the oplog object against what this node
-    // actually stored.
+    // Read back the document we just persisted to compare against what this node actually stored.
     const BSONObj& oplogObject = op.getObject();
     const BSONObj storedDocument = collection->docFor(opCtx, recordId).value().getOwned();
-    // For deletes, the primary only writes the document's _id to the oplog, so we cannot compute a
-    // field-level diff. For inserts, we can compute a field-level diff between the
-    // oplog object and the stored document.
+    // For deletes the document has not been removed yet, so 'diagnosticDoc' is the stored document
+    // and a diff would always be empty.
     boost::optional<BSONObj> fieldLevelDiff = op.getOpType() == OpTypeEnum::kDelete
         ? boost::none
-        : doc_diff::computeInlineDiff(oplogObject, storedDocument);
+        : doc_diff::computeInlineDiff(diagnosticDoc, storedDocument);
 
     const HostAndPort nodeId = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
 
     LOGV2_FATAL(12851600,
                 "Document validation hash mismatch",
-                "expectedHash"_attr = expectedHash.value(),
+                "expectedHash"_attr = *expectedHash,
                 "actualHash"_attr = actualHash,
                 "ns"_attr = op.getNss().toStringForErrorMsg(),
-                "id"_attr = redact(oplogObject["_id"].wrap()),
+                "id"_attr = redact(op.getIdElement().wrap()),
                 "recordId"_attr = recordId,
                 "timestamp"_attr = op.getTimestamp().toString(),
                 "opType"_attr = idl::serialize(op.getOpType()),
@@ -1935,8 +1934,15 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
     // Save the preImage size for delta size change verification.
     const int preImageSize = obj.value().objsize();
 
-    auto [result, postDocImageSize] =
+    auto [result, postImage] =
         update::parseAndTransformOplogUpdate(opCtx, coll, obj, request, rid, cursor.get());
+
+    // The update only reads 'obj', so it is still the pre-image here.
+    if (shouldVerifyValidationHash(opCtx, collPtr, mode, op)) {
+        const BSONObj& preImage = obj.value();
+        verifyValidationHash(
+            opCtx, collPtr, rid, preImage, computeUpdateValidationHash(preImage, postImage), op);
+    }
 
     // On secondaries, verify that the size delta recorded in the oplog matches the actual size
     // change produced by the update. A mismatch indicates data inconsistency.
@@ -1947,7 +1953,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
             if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value());
                 singleOpMeta && singleOpMeta->getSz().has_value()) {
                 const int oplogSz = *singleOpMeta->getSz();
-                const int actualDelta = postDocImageSize - preImageSize;
+                const int actualDelta = postImage.objsize() - preImageSize;
                 if (actualDelta != oplogSz) {
                     logOplogConstraintViolation(
                         opCtx,
@@ -2105,7 +2111,8 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
     }
 
     if (shouldVerifyValidationHash(opCtx, collPtr, mode, op)) {
-        verifyValidationHash(opCtx, collPtr, rid, preImage.value(), op);
+        verifyValidationHash(
+            opCtx, collPtr, rid, preImage.value(), computeDocValidationHash(preImage.value()), op);
     }
 
     // Perform the delete.
@@ -2537,10 +2544,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
                     for (size_t i = 0; i < insertObjs.size(); i++) {
                         if (getValidationHash(*insertOps[i]).has_value()) {
+                            const BSONObj& doc = insertObjs[i].doc;
                             verifyValidationHash(opCtx,
                                                  collection,
                                                  insertObjs[i].replicatedRecordId,
-                                                 insertObjs[i].doc,
+                                                 doc,
+                                                 computeDocValidationHash(doc),
                                                  *insertOps[i]);
                         }
                     }
@@ -2648,8 +2657,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                     if (status.isOK()) {
                         if (shouldVerifyValidationHash(opCtx, collection, mode, op)) {
-                            verifyValidationHash(
-                                opCtx, collection, insertStmt.replicatedRecordId, o, op);
+                            verifyValidationHash(opCtx,
+                                                 collection,
+                                                 insertStmt.replicatedRecordId,
+                                                 o,
+                                                 computeDocValidationHash(o),
+                                                 op);
                         }
                         wuow.commit();
                     } else if (status == ErrorCodes::DuplicateKey) {
