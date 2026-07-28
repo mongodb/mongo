@@ -78,9 +78,17 @@ public:
                 11158501, "Should always find at least one element at path in document", it.more());
 
             const auto elt = it.next();
-            tassert(11158502,
-                    "Encountered unexpected array in NDV computation",
-                    elt.element().type() != BSONType::array);
+            // This function is used for index scan nodes with non-multikey indices.
+            // If we see a document with an array-valued field, it must have been inserted
+            // after planning.
+            if (elt.element().type() == BSONType::array) {
+                uasserted(
+                    ErrorCodes::QueryPlanKilled,
+                    str::stream()
+                        << "query plan killed :: non-array path became multikey during yield: "
+                           "path="
+                        << field.path.fullPath());
+            }
             if (elt.element().eoo() && !field.isExprEq) {
                 // Use $eq equality semantics, which consider null & missing to be equal.
                 projectedFieldValues.push_back(kNullElt);
