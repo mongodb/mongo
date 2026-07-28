@@ -37,7 +37,7 @@ TEST(DatabaseType, Basic) {
 
     const auto db = DatabaseType::parse(dbObj, IDLParserContext("DatabaseType"));
     ASSERT_EQUALS(db.getDbName(), DatabaseName::createDatabaseName_forTest(boost::none, "mydb"));
-    ASSERT_EQUALS(db.getPrimary(), "shard");
+    ASSERT_EQUALS(db.getPrimary(), ShardId{"shard"});
     ASSERT_EQUALS(db.getVersion().getUuid(), uuid);
     ASSERT_EQUALS(db.getVersion().getLastMod(), 0);
 }

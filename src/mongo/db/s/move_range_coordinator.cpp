@@ -24,7 +24,6 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/write_concern_options.h"
@@ -424,8 +423,8 @@ std::vector<BSONObj> MoveRangeCoordinator::_commitToGlobalCatalog(OperationConte
     // changed chunks.
     CommitMoveRangeRequest request(
         nss(),
-        ShardRef(_request.getFromShard().toString()),
-        ShardRef(_request.getToShard().toString()),
+        _request.getFromShard(),
+        _request.getToShard(),
         MigratedChunkType(doc->getPreMigrationChunkVersion(), range.getMin(), range.getMax()),
         *_doc.getDonorShardVersionPreMigration());
 

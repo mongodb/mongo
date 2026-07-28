@@ -147,7 +147,7 @@ commands:
         reply_type: ConfigSvrCommitMergeChunksResponse
         fields:
             shard:
-                type: shard_ref
+                type: shard_id
                 description: "Shard that owns the chunks being merged."
             chunkRange:
                 type: chunk_range

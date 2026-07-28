@@ -35,7 +35,7 @@ commands:
         reply_type: ConfigSvrCommitSplitChunkResponse
         fields:
             shard:
-                type: shard_ref
+                type: shard_id
                 description: "Shard that owns the chunk being split."
             range:
                 type: chunk_range

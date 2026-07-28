@@ -85,11 +85,11 @@ commands:
         reply_type: ConfigSvrCommitMoveRangeResponse
         fields:
             fromShard:
-                type: shard_ref
+                type: shard_id
                 description: "Donor shard name."
 
             toShard:
-                type: shard_ref
+                type: shard_id
                 description: "Recipient shard name."
 
             migratedChunk:

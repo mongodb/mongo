@@ -149,8 +149,8 @@ public:
                                           nss,
                                           migratedChunk,
                                           request().getDonorShardVersionPreMigration(),
-                                          ShardId(request().getFromShard().toString()),
-                                          ShardId(request().getToShard().toString())));
+                                          request().getFromShard(),
+                                          request().getToShard()));
             }
 
             // The commit ran on a separate opCtx, so make a dummy write here to advance the

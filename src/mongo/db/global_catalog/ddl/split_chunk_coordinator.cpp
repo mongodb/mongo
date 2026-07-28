@@ -16,7 +16,6 @@
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -177,7 +176,7 @@ std::vector<BSONObj> commitToGlobalCatalog(OperationContext* opCtx,
                                            OperationSessionInfo session) {
     ConfigSvrCommitSplitChunkRequest request(nss);
     request.setDbName(DatabaseName::kAdmin);
-    request.setShard(ShardRef(shardId.toString()));
+    request.setShard(shardId);
     request.setRange(chunkRange);
     request.setSplitPoints(splitKeys);
     request.setShardVersionPreSplit(shardVersionPreSplit);

@@ -14,7 +14,6 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -137,7 +136,7 @@ std::vector<BSONObj> commitToGlobalCatalog(OperationContext* opCtx,
                                            OperationSessionInfo session) {
     ConfigSvrCommitMergeChunksRequest request(nss);
     request.setDbName(DatabaseName::kAdmin);
-    request.setShard(ShardRef(shardId.toString()));
+    request.setShard(shardId);
     request.setChunkRange(chunkRange);
     request.setShardVersionPreMerge(shardVersionPreMerge);
     generic_argument_util::setMajorityWriteConcern(request);
