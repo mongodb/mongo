@@ -8,20 +8,29 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {
     getQueryStats,
     resetQueryStatsStore,
     withQueryStatsEnabled,
 } from "jstests/libs/query/query_stats_utils.js";
-import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeStatus,
+    isDeferredGetExecutorEnabled,
+    kSbeRestricted,
+} from "jstests/libs/query/sbe_util.js";
 
 function runPlanShapeCounterTest(coll) {
+    const deferredEngineChoiceEnabled = isDeferredGetExecutorEnabled(coll.getDB());
+    const sbeStatus = checkSbeStatus(coll.getDB());
+
     // Plan shape counters are only populated on the deferred engine-selection path.
-    if (!isDeferredGetExecutorEnabled(coll.getDB())) {
-        jsTest.log.info(
-            "Skipping plan shape counter test because featureFlagGetExecutorDeferredEngineChoice " +
-                "is disabled.",
-        );
+    // This test also asserts on the execution engine used.
+    if (!deferredEngineChoiceEnabled || sbeStatus !== kSbeRestricted) {
+        jsTest.log.info("Skipping plan shape counter test", {
+            deferredEngineChoiceEnabled,
+            sbeStatus,
+        });
         return;
     }
 
@@ -30,8 +39,8 @@ function runPlanShapeCounterTest(coll) {
 
     assert.commandWorked(coll.insert([{a: 1}, {a: 2}, {a: 3}]));
 
-    function getPlanShapeCounters() {
-        const stats = getQueryStats(statsConn, {collName: coll.getName()});
+    function getPlanShapeCounters(collName = coll.getName()) {
+        const stats = getQueryStats(statsConn, {collName});
         assert.eq(1, stats.length, "expected exactly one query stats entry", {stats});
         const metrics = stats[0].metrics;
         const queryPlanner = metrics.hasOwnProperty("queryPlanner")
@@ -52,7 +61,7 @@ function runPlanShapeCounterTest(coll) {
         );
     }
 
-    function assertCounters(expected) {
+    function assertCounters(expected, collName = coll.getName()) {
         if (expected !== undefined) {
             if (expected.patterns) {
                 expected.patterns = convertObjToNumberLong(expected.patterns);
@@ -64,7 +73,7 @@ function runPlanShapeCounterTest(coll) {
                 expected.accessPaths = convertObjToNumberLong(expected.accessPaths);
             }
         }
-        assert.eq(expected, getPlanShapeCounters());
+        assert.eq(expected, getPlanShapeCounters(collName));
     }
 
     // An _id-based point query is answered by the express/idhack fast path, which matches no
@@ -281,6 +290,134 @@ function runPlanShapeCounterTest(coll) {
             nodes: {ixscanNoFilter: 1, returnKey: 1},
             accessPaths: {coveredIxscan: 1, btreeIxscan: 1, boundsPoint: 1},
         });
+    }
+
+    // Some queries ($lookup, $graphLookup, etc) access multiple collections. The expected
+    // behavior is to only increment the counters for the local plan.
+
+    // The $lookup cases below use their own local collection, which stays unsharded in both
+    // fixtures. A sharded local collection would keep the $lookup on the merging node instead of
+    // planning it on a shard, so neither the SBE lowering nor the classic inner-side planning that
+    // these cases exercise would happen.
+    const localColl = coll.getDB().lookupLocal;
+    const foreignColl = coll.getDB().lookupForeign;
+    assert(localColl.drop());
+    assert(foreignColl.drop());
+    assert.commandWorked(localColl.insert([{a: 1}, {a: 2}, {a: 3}]));
+    assert.commandWorked(foreignColl.insert([{b: 1}, {b: 2}, {b: 3}]));
+    assert.commandWorked(localColl.createIndex({z: 1}));
+
+    // When $lookup is executed in SBE, plan shape counters should only be incremented for the local side.
+    // There is no index on the foreign collection, so it's forced to do a collection scan. We'll use an
+    // index scan on the local side so we can make sure the local side is being incremented, not the
+    // foreign side.
+    const localSideCollscanMetrics = {
+        patterns: {ixscanFetch: 1},
+        nodes: {ixscanNoFilter: 1, fetchNoFilter: 1},
+        accessPaths: {ixscanFetch: 1, btreeIxscan: 1, boundsPoint: 1},
+    };
+    {
+        const pipeline = [
+            {$match: {z: 1}},
+            {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "b", as: "c"}},
+        ];
+        const explain = localColl.explain().aggregate(pipeline);
+        assert.eq("sbe", getEngine(explain), explain);
+
+        // Assert the foreign side uses a collscan.
+        const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
+        assert.eq(eqLookupNodes.length, 1, explain);
+        assert.eq(eqLookupNodes[0].inputStages[1].stage, "COLLSCAN", explain);
+        assert.eq(eqLookupNodes[0].inputStages[1].nss, foreignColl.getFullName(), explain);
+
+        reset();
+        localColl.aggregate(pipeline).toArray();
+        assertCounters(
+            {
+                patterns: localSideCollscanMetrics.patterns,
+                nodes: {...localSideCollscanMetrics.nodes, eqLookupNoUnwind: 1},
+                accessPaths: localSideCollscanMetrics.accessPaths,
+            },
+            localColl.getName(),
+        );
+    }
+
+    // When $lookup is executed in classic, plan shape counters should only be incremented for the local side.
+    {
+        const pipeline = [
+            {$match: {z: 1}},
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    as: "c",
+                    let: {localA: "$a"},
+                    pipeline: [{$match: {$expr: {$eq: ["$b", "$$localA"]}}}, {$sort: {b: 1}}],
+                },
+            },
+        ];
+        const explain = localColl.explain().aggregate(pipeline);
+        assert.eq("classic", getEngine(explain), explain);
+
+        reset();
+        localColl.aggregate(pipeline).toArray();
+        assertCounters(localSideCollscanMetrics, localColl.getName());
+    }
+
+    // A $lookup nested inside the sub-pipeline of another $lookup. Neither level of foreign-side
+    // planning should be counted.
+    {
+        reset();
+        const pipeline = [
+            {$match: {z: 1}},
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    as: "c",
+                    pipeline: [{$lookup: {from: foreignColl.getName(), as: "d", pipeline: []}}],
+                },
+            },
+        ];
+        localColl.aggregate(pipeline).toArray();
+        assertCounters(localSideCollscanMetrics, localColl.getName());
+    }
+
+    // $unionWith should only increment plan shape counters for the local side.
+    {
+        reset();
+        const pipeline = [{$match: {z: 1}}, {$unionWith: {coll: foreignColl.getName()}}];
+        localColl.aggregate(pipeline).toArray();
+        assertCounters(localSideCollscanMetrics, localColl.getName());
+    }
+
+    // Same for a $unionWith with a non-trivial sub-pipeline.
+    {
+        reset();
+        const pipeline = [
+            {$match: {z: 1}},
+            {$unionWith: {coll: foreignColl.getName(), pipeline: [{$sort: {b: 1}}]}},
+        ];
+        localColl.aggregate(pipeline).toArray();
+        assertCounters(localSideCollscanMetrics, localColl.getName());
+    }
+
+    // $graphLookup executes its recursive lookups against the foreign collection, only the local
+    // side should be counted.
+    {
+        reset();
+        const pipeline = [
+            {$match: {z: 1}},
+            {
+                $graphLookup: {
+                    from: foreignColl.getName(),
+                    startWith: "$a",
+                    connectFromField: "b",
+                    connectToField: "b",
+                    as: "c",
+                },
+            },
+        ];
+        localColl.aggregate(pipeline).toArray();
+        assertCounters(localSideCollscanMetrics, localColl.getName());
     }
 }
 
