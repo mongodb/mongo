@@ -70,6 +70,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
     def setup_leader_with_table(self):
         """Seed the shared storage with a checkpoint at schema epoch 20 containing uri."""
+        self.set_stable_epoch(1)
         self.session.create(self.uri, self.table_config)
         self.publish(self.uri, 20)
         self.set_stable_epoch(20)
@@ -82,6 +83,8 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         conn_follow, session_follow = self.open_follower()
         conn_follow.reconfigure('disaggregated=(strict_checkpoint_metadata=true)')
+        # Enter epoch world on the follower so it can publish its own schema operations.
+        self.set_stable_epoch(1, conn_follow)
         return conn_follow, session_follow
 
     def leader_checkpoint_at_epoch(self, epoch, stable_ts):

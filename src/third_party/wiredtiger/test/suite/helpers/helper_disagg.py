@@ -840,6 +840,12 @@ class DisaggSchemaEpochMixin:
         session = conn.open_session('')
         return conn, session
 
+    def open_follower_epoch(self, epoch=1):
+        """Open a follower already in epoch world (stable schema epoch set), ready to publish."""
+        conn, session = self.open_follower()
+        self.set_stable_epoch(epoch, conn)
+        return conn, session
+
 class DisaggSizeTestMixin:
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True

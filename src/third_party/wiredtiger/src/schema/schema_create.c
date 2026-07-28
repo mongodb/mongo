@@ -387,7 +387,13 @@ __create_file(
      * read/used by underlying functions.
      *
      * Turn off bulk-load for imported files.
+     *
+     * Mark the session so the btree layer can tell this open is a genuine create rather than a
+     * reopen. Import brings in existing data and is not a from-scratch create. The flag is cleared
+     * at the end of the function so it never leaks into a later open on this reused session.
      */
+    if (!import)
+        F_SET(session, WT_SESSION_CREATE_BTREE);
     WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 
     if (session->import_list == NULL && import)
@@ -399,6 +405,7 @@ __create_file(
         WT_ERR(__wt_session_release_dhandle(session));
 
 err:
+    F_CLR(session, WT_SESSION_CREATE_BTREE);
     F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
     __wt_scr_free(session, &buf);
     __wt_scr_free(session, &val);

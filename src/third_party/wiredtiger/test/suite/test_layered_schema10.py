@@ -95,7 +95,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """A table created and published on a follower is accessible after a role swap."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -133,7 +133,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """A table created then dropped on a follower must not exist after a role swap."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -162,7 +162,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -202,7 +202,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """Tables published at different epochs are flushed to shared metadata independently."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         session_follow.create(self.uri2, self.table_config)
@@ -247,7 +247,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.set_stable_epoch(15)
         self.leader_checkpoint(2)
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         # Drop uri on the follower and publish the drop at epoch 25.
         # The REMOVE queue entry captures the current metadata values before deletion.
@@ -366,7 +366,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)

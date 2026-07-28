@@ -186,7 +186,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     size_t root_addr_size;
     uint8_t root_addr[WT_ADDR_MAX_COOKIE];
     const char *dhandle_name, *checkpoint;
-    bool creation, forced_salvage, has_ckpt;
+    bool forced_salvage, has_ckpt, empty_ckpt;
 
     btree = S2BT(session);
     dhandle = session->dhandle;
@@ -245,8 +245,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
      * Bulk-load is only permitted on newly created files, not any empty file -- see the checkpoint
      * code for a discussion.
      */
-    creation = ckpt.raw.size == 0;
-    if (!creation && F_ISSET(btree, WT_BTREE_BULK))
+    empty_ckpt = ckpt.raw.size == 0;
+    if (!empty_ckpt && F_ISSET(btree, WT_BTREE_BULK))
         WT_ERR_MSG(session, EINVAL, "bulk-load is only supported on newly created objects");
 
     /* Handle salvage configuration. */
@@ -300,8 +300,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
          */
         WT_ERR(bm->checkpoint_load(bm, session, ckpt.raw.data, ckpt.raw.size, root_addr,
           &root_addr_size, F_ISSET(btree, WT_BTREE_READONLY)));
-        if (creation || root_addr_size == 0)
-            WT_ERR(__btree_tree_open_empty(session, creation));
+        if (empty_ckpt || root_addr_size == 0)
+            WT_ERR(__btree_tree_open_empty(session, empty_ckpt));
         else {
             WT_ERR(__wti_btree_tree_open(session, root_addr, root_addr_size));
 
@@ -625,8 +625,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * If we use schema epochs in disaggregated storage, the btree starts in memory, so that we
      * cannot write any pages until the table is published - not even an empty root page.
      */
-    awaits_publish = ckpt->raw.size == 0 && F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
-      !WT_IS_URI_HS(btree->dhandle->name) && !WT_IS_URI_METADATA(btree->dhandle->name) &&
+    awaits_publish = F_ISSET(session, WT_SESSION_CREATE_BTREE) &&
+      F_ISSET(btree, WT_BTREE_DISAGGREGATED) && !WT_IS_URI_HS(btree->dhandle->name) &&
+      !WT_IS_URI_METADATA(btree->dhandle->name) &&
       (__wt_get_stable_disaggregated_schema_epoch(session) != WT_SCHEMA_EPOCH_NONE);
 
     if (awaits_publish)
@@ -993,7 +994,7 @@ err:
  *     Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, bool empty_ckpt)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -1009,7 +1010,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
      * Newly created objects can be used for cursor inserts or for bulk loads; set a flag that's
      * cleared when a row is inserted into the tree.
      */
-    if (creation)
+    if (empty_ckpt)
         btree->original = 1;
 
     /*

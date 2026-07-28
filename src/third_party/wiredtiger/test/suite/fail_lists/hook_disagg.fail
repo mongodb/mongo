@@ -18,7 +18,8 @@ test_durable_ts03.py
 test_empty.py
 test_encrypt06.py
 test_env01.py
-test_hs24.py    # FIXME: WT-18046
+test_hs01.py    # FIXME: WT-18183
+test_hs24.py    # FIXME: WT-18183
 test_log03.py
 test_metadata_cursor01.py
 test_metadata_cursor04.py

@@ -298,7 +298,7 @@ functions:
         ${PREPARE_PATH}
         virtualenv -p python3.13 venv
         source venv/bin/activate
-        buildscripts/poetry_sync.sh
+        buildscripts/uv_sync.sh
 
         # Without this variable the bazel execution might be stalled for many hours.
         # This is because evergreen is using a go Cmd.Wait and waiting for some file descriptors

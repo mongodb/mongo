@@ -41,7 +41,10 @@ __schema_publish_disagg_schema_epoch(
     locked = true;
 
     stable_schema_epoch = __wt_get_stable_disaggregated_schema_epoch(session);
-    if (stable_schema_epoch != WT_SCHEMA_EPOCH_NONE && schema_epoch <= stable_schema_epoch)
+    if (stable_schema_epoch == WT_SCHEMA_EPOCH_NONE)
+        WT_ERR_PANIC(
+          session, EINVAL, "publish requires the stable disaggregated schema epoch to be set");
+    if (schema_epoch <= stable_schema_epoch)
         WT_ERR_MSG(session, EINVAL,
           "Cannot publish with a schema epoch that is older than the stable disaggregated schema "
           "epoch %" PRIu64 " %s",

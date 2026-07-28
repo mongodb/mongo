@@ -371,6 +371,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         published; one checkpoint after drop-publish removes the table.
         """
         # Create and publish the table so that it gets included in the checkpoint.
+        self.set_stable_epoch(1)
         self.session.create(self.uri, 'key_format=i,value_format=S')
         self.publish(self.uri, 10)
         self.set_stable_epoch(10)
@@ -428,10 +429,11 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         Calling publish with a non-table URI returns EINVAL.
         """
+        self.set_stable_epoch(1)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.publish(
                 f'file:{self.test_name}_err_uri',
-                'disaggregated=(schema_epoch=1)'),
+                'disaggregated=(schema_epoch=10)'),
             '/only supported for table: and layered:/')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
                                 ',oldest_timestamp=' + self.timestamp_str(1))
@@ -625,6 +627,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         Test the publish statistics.
         """
+        self.set_stable_epoch(1)
         self.session.create(self.uri, 'key_format=i,value_format=S')
 
         # No schema_epoch in config: no-op, returns success.
