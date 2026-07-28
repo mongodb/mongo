@@ -9,6 +9,7 @@
 #include "mongo/util/observable_mutex.h"
 
 #include <set>
+#include <string_view>
 
 namespace mongo {
 
@@ -17,6 +18,8 @@ enum class [[MONGO_MOD_PUBLIC]] RecoveryJob {
     kLegacyMigration,
     kMoveRangeCoordinator,
 };
+
+constexpr std::string_view toString(RecoveryJob job);
 
 class RangeDeletionRecoveryTracker {
 public:

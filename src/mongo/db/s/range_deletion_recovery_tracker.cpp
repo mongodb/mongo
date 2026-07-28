@@ -41,7 +41,9 @@ void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term, RecoveryJob jo
     tassert(11420101,
             "Recovery job already completed",
             !state->recoveryCompletePromise.getFuture().isReady());
-    tassert(11420102, "Recovery job already registered", state->recoveryJobs.insert(job).second);
+    state->recoveryJobs.insert(job);
+
+    LOGV2_INFO(13226801, "Recovery job registered", "job"_attr = toString(job), "term"_attr = term);
 }
 
 void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term, RecoveryJob job) {
@@ -54,6 +56,8 @@ void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term, Recovery
     if (state->recoveryJobs.erase(job) && state->recoveryJobs.empty()) {
         ensurePromiseSet(state->recoveryCompletePromise, Outcome::kComplete);
     }
+
+    LOGV2_INFO(13226802, "Recovery job complete", "job"_attr = toString(job), "term"_attr = term);
 }
 
 void RangeDeletionRecoveryTracker::notifyEndOfTerm(Term term) {
@@ -116,6 +120,18 @@ void RangeDeletionRecoveryTracker::ensurePromiseSet(SharedPromise<Outcome>& prom
         return;
     }
     promise.emplaceValue(outcome);
+}
+
+constexpr std::string_view toString(RecoveryJob job) {
+    switch (job) {
+        case RecoveryJob::kLegacyMigration:
+            return "LegacyMigration";
+        case RecoveryJob::kMoveRangeCoordinator:
+            return "MoveRangeCoordinator";
+        case RecoveryJob::kRangeDeleter:
+            return "RangeDeleter";
+    }
+    return "Unknown";
 }
 
 }  // namespace mongo
