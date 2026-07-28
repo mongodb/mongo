@@ -39,8 +39,10 @@ public:
 
     /**
      * Returns whether serverStatus metrics filtering is required for the given client.
+     * The value of forceFiltered is ignored if metrics filtering is not enabled or supported.
      */
-    virtual bool requiresServerStatusFiltering(OperationContext* opCtx) const = 0;
+    virtual bool requiresServerStatusFiltering(OperationContext* opCtx,
+                                               bool forcedFiltered) const = 0;
 
     /**
      * Returns a reference to the allowlist paths for serverStatus filtering. Throws

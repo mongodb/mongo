@@ -17,7 +17,7 @@ class OperationContext;
  */
 class MetricsPolicyManagerDefault : public MetricsPolicyManager {
 public:
-    bool requiresServerStatusFiltering(OperationContext* opCtx) const override;
+    bool requiresServerStatusFiltering(OperationContext*, bool) const override;
 
     const std::vector<std::string>& getServerStatusAllowlistPaths() const override;
 

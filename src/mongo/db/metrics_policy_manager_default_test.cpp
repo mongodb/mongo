@@ -16,7 +16,7 @@ TEST_F(MetricsPolicyManagerDefaultTest, IsAutoRegisteredOnServiceContextCreation
     // so it should be available on any ServiceContext.
     auto svcCtx = ServiceContext::make();
     auto& manager = MetricsPolicyManager::get(svcCtx.get());
-    ASSERT_FALSE(manager.requiresServerStatusFiltering(/*opCtx=*/nullptr));
+    ASSERT_FALSE(manager.requiresServerStatusFiltering(/*opCtx=*/nullptr, /*forceFiltered=*/false));
 }
 
 //
@@ -25,7 +25,8 @@ TEST_F(MetricsPolicyManagerDefaultTest, IsAutoRegisteredOnServiceContextCreation
 
 TEST_F(MetricsPolicyManagerDefaultTest, DoesNotRequireServerStatusFiltering) {
     auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_FALSE(manager->requiresServerStatusFiltering(/*opCtx=*/nullptr));
+    ASSERT_FALSE(
+        manager->requiresServerStatusFiltering(/*opCtx=*/nullptr, /*forceFiltered=*/false));
 }
 
 TEST_F(MetricsPolicyManagerDefaultTest, GetServerStatusAllowlistPathsThrowsIllegalOperation) {

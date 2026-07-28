@@ -634,6 +634,7 @@ mongo_cc_library(
         "//src/mongo/db:metrics_policy_manager_default",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands/query_cmd:update_metrics",

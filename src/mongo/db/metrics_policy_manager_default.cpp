@@ -15,7 +15,7 @@ ServiceContext::ConstructorActionRegisterer registerMetricsPolicyManager{
 
 }  // namespace
 
-bool MetricsPolicyManagerDefault::requiresServerStatusFiltering(OperationContext* opCtx) const {
+bool MetricsPolicyManagerDefault::requiresServerStatusFiltering(OperationContext*, bool) const {
     return false;
 }
 
