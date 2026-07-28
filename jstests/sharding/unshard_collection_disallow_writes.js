@@ -42,7 +42,7 @@ reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0
             documents: [{_id: 1, oldKey: -10}],
             maxTimeMS: 5000,
         });
-        assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+        assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
         jsTestLog("Attempting update");
         res = sourceCollection.runCommand({
@@ -50,7 +50,7 @@ reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0
             updates: [{q: {_id: 0}, u: {$set: {yak: 15}}}],
             maxTimeMS: 5000,
         });
-        assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+        assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
         jsTestLog("Attempting delete");
         res = sourceCollection.runCommand({
@@ -58,7 +58,7 @@ reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0
             deletes: [{q: {_id: 0, oldKey: -20}, limit: 1}],
             maxTimeMS: 5000,
         });
-        assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+        assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
         jsTestLog("Attempting createIndex");
         res = sourceCollection.runCommand({

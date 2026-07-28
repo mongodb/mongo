@@ -58,7 +58,7 @@ reshardingTest.withReshardingInBackground(
                 documents: [{data: 3, ts: new Date(), metaTest: {x: -2, y: -2}}],
                 maxTimeMS: 3000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
             res = getTimeseriesCollForRawOps(db, coll).runCommand({
                 insert: getTimeseriesCollForRawOps(db, coll).getName(),
@@ -66,7 +66,7 @@ reshardingTest.withReshardingInBackground(
                 maxTimeMS: 3000,
                 ...getRawOperationSpec(db),
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
             jsTestLog("Attempting update");
             res = coll.runCommand({

@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -912,6 +913,35 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
                                                }}),
         ExceptionFor<ErrorCodes::StaleConfig>,
         validateException);
+}
+
+TEST_F(ShardRoleTest, IntentAcquisitionErrorsHavePrecedenceOverShardVersionChecks) {
+    ASSERT_TRUE(gFeatureFlagIntentRegistration.isEnabled());
+
+    // The intentionally incorrect placement concern would throw StaleConfig if acquisition were
+    // allowed to reach the sharding metadata check.
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+
+    auto shutdownClient = getServiceContext()->getService()->makeClient("ShutdownClient");
+    auto shutdownOpCtx = shutdownClient->makeOperationContext();
+    auto shutdownTransition =
+        rss::consensus::IntentRegistry::get(getServiceContext())
+            .killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::Shutdown,
+                                       shutdownOpCtx.get(),
+                                       nullptr,
+                                       10 /* timeout_sec */);
+    auto shutdownGuard = shutdownTransition.get();
+
+    ASSERT_THROWS_CODE(acquireCollection(operationContext(),
+                                         {
+                                             nssShardedCollection1,
+                                             placementConcern,
+                                             repl::ReadConcernArgs(),
+                                             AcquisitionPrerequisites::kWrite,
+                                         },
+                                         MODE_IX),
+                       DBException,
+                       ErrorCodes::InterruptedAtShutdown);
 }
 
 TEST_F(ShardRoleTest, AcquireShardedCollWhenShardDoesNotKnowThePlacementVersionThrows) {

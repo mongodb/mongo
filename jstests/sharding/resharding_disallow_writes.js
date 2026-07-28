@@ -48,7 +48,7 @@ reshardingTest.withReshardingInBackground(
                 documents: [{_id: 1, oldKey: -10, newKey: 10}],
                 maxTimeMS: 5000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
             jsTestLog("Attempting update");
             res = sourceCollection.runCommand({
@@ -56,7 +56,7 @@ reshardingTest.withReshardingInBackground(
                 updates: [{q: {_id: 0}, u: {$set: {newKey: 15}}}],
                 maxTimeMS: 5000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
             jsTestLog("Attempting delete");
             res = sourceCollection.runCommand({
@@ -64,7 +64,7 @@ reshardingTest.withReshardingInBackground(
                 deletes: [{q: {_id: 0, oldKey: -20}, limit: 1}],
                 maxTimeMS: 5000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.code ?? res.writeErrors?.[0].code));
 
             jsTestLog("Attempting createIndex");
             res = sourceCollection.runCommand({

@@ -2063,11 +2063,8 @@ void ExecCommandDatabase::_commandExec() {
     if (auto writeError = OperationShardingState::get(opCtx).resetShardingOperationFailedStatus()) {
         try {
             shard_role_loop::handleStaleError(opCtx, *writeError, shardRetryCtx);
-        } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
-            ex.addContext("interruption while recovering sharding metadata upon write error");
-            throw;
         } catch (const DBException&) {
-            // Ignore other exceptions. We don't want to destroy the top-level command status.
+            // Ignore exceptions. We don't want to destroy the top-level command status.
         }
     }
 }

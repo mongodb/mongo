@@ -23,7 +23,11 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
@@ -37,10 +41,15 @@
 
 #include <memory>
 
+#include <gmock/gmock.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::admission {
 namespace {
+
+using ::testing::_;
+using ::testing::Invoke;
 
 MONGO_REGISTER_COMMAND(TestCmdProcessInternalCommand).testOnly().forShard();
 MONGO_REGISTER_COMMAND(TestCmdProcessInternalSucceedCommand).testOnly().forShard();
@@ -59,6 +68,35 @@ public:
     }
 };
 MONGO_REGISTER_COMMAND(TestCmdShardIngressSubject).testOnly().forShard();
+
+// Mocks the shard's response to a StaleConfig error found while recovering sharding metadata on
+// the write path, so tests can simulate e.g. the recovery being interrupted by a concurrent
+// shutdown or stepdown.
+class StaleShardVersionExceptionHandlerMock final : public StaleShardCollectionMetadataHandler {
+public:
+    MOCK_METHOD(boost::optional<ChunkVersion>,
+                handleStaleShardVersionException,
+                (OperationContext*, const StaleConfigInfo&),
+                (const, override));
+};
+
+class CollectionShardingStateFactoryMock : public CollectionShardingStateFactory {
+public:
+    explicit CollectionShardingStateFactoryMock(
+        std::shared_ptr<StaleShardCollectionMetadataHandler> staleShardExceptionHandler)
+        : _staleShardExceptionHandler(std::move(staleShardExceptionHandler)) {}
+
+    std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
+        MONGO_UNREACHABLE;
+    }
+
+    const StaleShardCollectionMetadataHandler& getStaleShardExceptionHandler() const override {
+        return *_staleShardExceptionHandler;
+    }
+
+private:
+    std::shared_ptr<StaleShardCollectionMetadataHandler> _staleShardExceptionHandler;
+};
 
 void installWriteThrottler(ServiceContext* service) {
     WriteThrottler::set(service, std::make_unique<WriteThrottler>(service->getTickSource()));
@@ -959,6 +997,37 @@ TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSWithNoParentDeadline) {
 }
 TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter) {
     testNestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter();
+}
+
+TEST_F(ServiceEntryPointShardServerTest,
+       WriteErrorSurvivesInterruptionDuringShardingMetadataRecovery) {
+    auto staleShardVersionHandlerMock = std::make_shared<StaleShardVersionExceptionHandlerMock>();
+    EXPECT_CALL(*staleShardVersionHandlerMock, handleStaleShardVersionException(_, _))
+        .WillOnce(
+            Invoke([](OperationContext*, const StaleConfigInfo&) -> boost::optional<ChunkVersion> {
+                uasserted(ErrorCodes::InterruptedDueToReplStateChange,
+                          "simulated interruption while recovering sharding metadata");
+            }));
+    CollectionShardingStateFactory::set(
+        getServiceContext(),
+        std::make_unique<CollectionShardingStateFactoryMock>(staleShardVersionHandlerMock));
+
+    auto opCtx = makeOperationContext();
+
+    // Simulate a write command that reported an individual write's StaleConfig error via the
+    // sharding operation state, to be handled once the command invocation returns.
+    const auto generation = CollectionGeneration(OID::gen(), Timestamp(1, 0));
+    OperationShardingState::get(opCtx.get())
+        .setShardingOperationFailedStatus(Status(
+            StaleConfigInfo(NamespaceString::createNamespaceString_forTest("testDb", "testColl"),
+                            ShardVersionFactory::make(ChunkVersion(generation, {1, 0})),
+                            boost::none,
+                            ShardId("shard0000")),
+            "simulated stale config write error"));
+
+    // Even though recovering the write's StaleConfig error is interrupted, the command's own
+    // (successful) response must not be overwritten with a top-level error.
+    runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, NestedMaxTimeMSChildTightensParentDeadline) {
