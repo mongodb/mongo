@@ -170,7 +170,7 @@ patch_aliases:
     variant_tags: ["required"]
     task: ".*"
   - alias: query
-    variant: "^(.*query-patch-only|amazon-linux2023-arm64-static-compile)$"
+    variant: "^(.*query-patch-only|amazon-linux2023-arm64-static-compile|enterprise-amazon-linux2-arm64-all-feature-flags-sbe-full)$"
     task: ".*"
   - alias: query-quick
     variant: "^(.*query-quick-patch-only|linux-x86-dynamic-compile)$"
