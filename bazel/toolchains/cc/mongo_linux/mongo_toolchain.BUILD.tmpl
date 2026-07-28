@@ -10,7 +10,6 @@ load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
     "COMMON_LINK_FLAGS",
     "GCC_INCLUDE_DIRS",
 )
-load("@rbe_sysroot//:sysroot_info.bzl", "SYSROOT_ENABLED", "SYSROOT_PATH")
 load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
     "FEATURES_ATTR_NAMES",
@@ -200,30 +199,6 @@ MOLD_BIN_DIR = "./external/mongo_toolchain_{version}/" + MOLD_MAP["{arch}"]["bin
 
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS]
 
-# When the RBE sysroot is enabled, Bazel needs to know about both the original
-# absolute include paths (used in -isystem flags) and their sysroot-resolved
-# counterparts (where headers are actually found). Including both in
-# cxx_builtin_include_directories lets Bazel validate either form.
-SYSROOT_BUILTIN_INCLUDE_DIRECTORIES = (
-    COMMON_BUILTIN_INCLUDE_DIRECTORIES +
-    ["%sysroot%" + d for d in COMMON_BUILTIN_INCLUDE_DIRECTORIES if d.startswith("/")]
-)
-
-# SYSROOT_ENABLED is False when the sysroot dump repository rule skipped the
-# extraction (non-Linux, unsupported arch/distro — only Amazon Linux 2023
-# hosts are supported — or USE_RBE_SYSROOT unset). In that case the
-# use_rbe_sysroot flag must be a no-op, so fall back to the plain
-# no-sysroot configuration unconditionally.
-BUILTIN_SYSROOT = select({
-    "@//bazel/config:use_rbe_sysroot_enabled": SYSROOT_PATH,
-    "//conditions:default": "",
-}) if SYSROOT_ENABLED else ""
-
-EFFECTIVE_BUILTIN_INCLUDE_DIRS = select({
-    "@//bazel/config:use_rbe_sysroot_enabled": SYSROOT_BUILTIN_INCLUDE_DIRECTORIES,
-    "//conditions:default": COMMON_BUILTIN_INCLUDE_DIRECTORIES,
-}) if SYSROOT_ENABLED else COMMON_BUILTIN_INCLUDE_DIRECTORIES
-
 # Helper target for the toolchain (see below):
 filegroup(
     name = "all_files",
@@ -246,10 +221,7 @@ filegroup(
     }) + select ({
         "@//bazel/config:ubsan_enabled": ["@//etc:ubsan_denylist_h"],
         "@//conditions:default": [],
-    }) + (select ({
-        "@//bazel/config:use_rbe_sysroot_enabled": ["@rbe_sysroot//:sysroot_files"],
-        "@//conditions:default": [],
-    }) if SYSROOT_ENABLED else [])
+    })
 )
 
 feature_attrs = get_common_features_attrs()
@@ -263,8 +235,7 @@ mongo_linux_cc_toolchain_config(
     mold_bin_dir = MOLD_BIN_DIR,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
-    builtin_sysroot = BUILTIN_SYSROOT,
-    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
+    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     extra_ldflags = LINK_FLAGS,
     includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     tool_paths = {
@@ -327,8 +298,7 @@ mongo_linux_cc_toolchain_config(
     mold_bin_dir = MOLD_BIN_DIR,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
-    builtin_sysroot = BUILTIN_SYSROOT,
-    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
+    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     extra_ldflags = LINK_FLAGS,
     # Note that CLANG_INCLUDE_DIRS needs to be searched after the common ones, otherwise some files
     # will have include_next chains going backwards from the intended order.

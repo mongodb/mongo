@@ -4,30 +4,6 @@ load("//bazel/config:configs.bzl", "sdkroot_provider")
 load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
 load("//bazel:utils.bzl", "write_target")
 
-def _strip_sysroot_flags(flags):
-    """Remove --sysroot and sysroot-debug-prefix-map flags.
-
-    When building locally with an RBE sysroot, the toolchain adds --sysroot
-    and -fdebug-prefix-map flags that are not present in RBE builds. Strip
-    them so the embedded build-info strings are identical either way.
-    """
-    result = []
-    skip_next = False
-    for flag in flags:
-        if skip_next:
-            skip_next = False
-            continue
-        if flag == "--sysroot":
-            # --sysroot <value> is two separate entries
-            skip_next = True
-            continue
-        if flag.startswith("--sysroot=") or flag.startswith("--sysroot "):
-            continue
-        if flag.startswith("-fdebug-prefix-map=") and flag.endswith("=/"):
-            continue
-        result.append(flag)
-    return result
-
 def generate_config_header_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
     input = ctx.attr.template.files.to_list()[0].path
@@ -69,11 +45,6 @@ def generate_config_header_impl(ctx):
         action_name = ACTION_NAMES.cpp_link_executable,
         variables = compile_variables,
     )
-
-    # Strip sysroot-related flags so that the embedded build info is
-    # identical regardless of whether a local RBE sysroot is used.
-    compiler_flags = _strip_sysroot_flags(compiler_flags)
-    link_flags = _strip_sysroot_flags(link_flags)
     env_flags = cc_common.get_environment_variables(
         feature_configuration = feature_configuration,
         action_name = ACTION_NAMES.cpp_compile,

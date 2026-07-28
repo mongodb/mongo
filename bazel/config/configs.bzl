@@ -564,19 +564,6 @@ remote_test_build = rule(
 )
 
 # =========
-# use_rbe_sysroot
-# =========
-use_rbe_sysroot_provider = provider(
-    doc = """Use extracted RBE container filesystem as sysroot for local builds.""",
-    fields = ["enabled"],
-)
-
-use_rbe_sysroot = rule(
-    implementation = lambda ctx: use_rbe_sysroot_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
-)
-
-# =========
 # dwarf_version
 # =========
 dwarf_version_values = ["4", "5"]

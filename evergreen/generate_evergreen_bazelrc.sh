@@ -64,17 +64,6 @@ if [[ "${evergreen_remote_exec}" != "on" ]]; then
     echo "common --remote_executor=" >>.bazelrc.evergreen
     echo "common --modify_execution_info=.*=+no-remote-exec" >>.bazelrc.evergreen
     echo "common --jobs=auto" >>.bazelrc.evergreen
-
-    # The RBE container sysroot dump is only enabled on Amazon Linux 2023
-    # hosts: libs2n aggressively loads the highest openssl symbols available
-    # at build time, which breaks at runtime on older minor versions of other
-    # distros. The sysroot_dump repo rule no-ops on other distros anyway, so
-    # skip the flags entirely elsewhere.
-    # os-release values may be quoted or unquoted depending on the image.
-    if grep -qsE '^ID="?amzn"?$' /etc/os-release && grep -qsE '^VERSION_ID="?2023"?$' /etc/os-release; then
-        echo "common --repo_env=USE_RBE_SYSROOT=1" >>.bazelrc.evergreen
-        echo "common --//bazel/config:use_rbe_sysroot=True" >>.bazelrc.evergreen
-    fi
 fi
 
 uri="https://spruce.mongodb.com/task/${task_id:?}?execution=${execution:?}"

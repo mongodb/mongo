@@ -1,7 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchains")
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchains")
-load("//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl", "setup_sysroot_dump")
 
 http_archive(
     name = "aspect_rules_lint",
@@ -24,8 +23,6 @@ http_file(
         "https://mdb-build-public.s3.us-east-1.amazonaws.com/windows_libclang/libclang.dll",
     ] * 5,
 )
-
-setup_sysroot_dump()
 
 http_archive(
     name = "windows_sasl",
