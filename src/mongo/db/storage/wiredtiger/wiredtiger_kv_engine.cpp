@@ -2323,6 +2323,9 @@ void WiredTigerKVEngine::promoteToLeader() {
 void WiredTigerKVEngine::demoteToFollower() {
     static constexpr char followerConfig[] = "disaggregated=(role=\"follower\")";
     invariantWTOK(_conn->reconfigure(_conn, followerConfig), nullptr);
+    // Stepping down to follower clears WiredTiger's own step-down timestamp; keep our cached copy
+    // (returned by getStepDownTimestamp()) in sync so a later leader term starts with none set.
+    _stepDownTimestamp.store(0);
 }
 
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
