@@ -15,6 +15,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -29,6 +30,32 @@ protected:
     BSONObj compressBucket(const BSONObj& bucket) {
         return *timeseries::compressBucket(bucket, /*timeFieldName*/ "time"sv, /*nss*/ {}, false)
                     .compressedBucket;
+    }
+
+    // Compresses 'bucket' and then forces 'control.count' to 'count'. Compression always writes a
+    // 'control.count' matching the actual number of measurements, so this is the only way to build
+    // a compressed bucket whose count disagrees with its data columns.
+    BSONObj compressBucketWithExplicitCount(const BSONObj& bucket, int32_t count) {
+        const auto compressed = compressBucket(bucket);
+
+        BSONObjBuilder builder;
+        for (auto&& elem : compressed) {
+            if (elem.fieldNameStringData() != timeseries::kBucketControlFieldName) {
+                builder.append(elem);
+                continue;
+            }
+
+            BSONObjBuilder control(builder.subobjStart(timeseries::kBucketControlFieldName));
+            for (auto&& controlField : elem.Obj()) {
+                if (controlField.fieldNameStringData() !=
+                    timeseries::kBucketControlCountFieldName) {
+                    control.append(controlField);
+                }
+            }
+            control.append(timeseries::kBucketControlCountFieldName, count);
+        }
+
+        return builder.obj();
     }
 
     std::tuple<std::unique_ptr<PlanStage>, value::SlotVector /*outSlots*/> makeBlockToRow(
@@ -435,7 +462,9 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingField_Yield) {
 // Note that this data has the 'control.count' field. It facilitates testing the case where we
 // extract the number of measurements in a bucket directly from it when the bucket is compressed.
 // To make sure that we are not relying on the 'time' field to figure out the number of measurements
-// in a bucket, we have set the 'time' field to 4 elements array which is actually invalid data.
+// in a bucket, we have set the 'time' field to 4 elements array which is actually invalid data. The
+// tests below compress this bucket with 'compressBucketWithExplicitCount()' to keep the count at 3,
+// since compression on its own rewrites the count to match the 4 time elements.
 //
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
 // they are mandatory fields. This data is not valid timeseries data.
@@ -465,19 +494,21 @@ const auto expectedDataForBucketWithOneMissingFieldAndCount = std::vector{
 };
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingFieldAndCount) {
-    runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithOneMissingFieldAndCount)),
-                        cellPathsForBucketWithOneMissingFieldAndCount,
-                        tsOptionsForBucketWithOneMissingFieldAndCount,
-                        expectedDataForBucketWithOneMissingFieldAndCount);
+    runUnpackBucketTest(
+        BSON_ARRAY(compressBucketWithExplicitCount(bucketWithOneMissingFieldAndCount, 3)),
+        cellPathsForBucketWithOneMissingFieldAndCount,
+        tsOptionsForBucketWithOneMissingFieldAndCount,
+        expectedDataForBucketWithOneMissingFieldAndCount);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingFieldAndCount_Yield) {
     // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
-    runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithOneMissingFieldAndCount)),
-                        cellPathsForBucketWithOneMissingFieldAndCount,
-                        tsOptionsForBucketWithOneMissingFieldAndCount,
-                        expectedDataForBucketWithOneMissingFieldAndCount,
-                        /*yieldAfter*/ 1);
+    runUnpackBucketTest(
+        BSON_ARRAY(compressBucketWithExplicitCount(bucketWithOneMissingFieldAndCount, 3)),
+        cellPathsForBucketWithOneMissingFieldAndCount,
+        tsOptionsForBucketWithOneMissingFieldAndCount,
+        expectedDataForBucketWithOneMissingFieldAndCount,
+        /*yieldAfter*/ 1);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though

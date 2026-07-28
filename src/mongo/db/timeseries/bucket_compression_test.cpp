@@ -141,6 +141,42 @@ TEST(TimeseriesBucketCompression, RoundtripWithDuplicateIndexFieldNames) {
     }
 }
 
+TEST(TimeseriesBucketCompression, IgnoresExistingControlCountOnUncompressedBucket) {
+    // An uncompressed bucket has no legal 'control.count', but a direct bucket write that bypasses
+    // the strict bucket validator can stuff a value in there. Compression must discard it and
+    // derive the count from the measurements, rather than inheriting or duplicating it.
+    BSONObjBuilder bucketBuilder;
+    for (const auto& elem : sampleBucket) {
+        if (elem.fieldNameStringData() != timeseries::kBucketControlFieldName) {
+            bucketBuilder.append(elem);
+            continue;
+        }
+        BSONObjBuilder controlBuilder(
+            bucketBuilder.subobjStart(timeseries::kBucketControlFieldName));
+        controlBuilder.appendElements(elem.Obj());
+        controlBuilder.append(timeseries::kBucketControlCountFieldName, 999);
+    }
+
+    auto compressed =
+        timeseries::compressBucket(bucketBuilder.obj(),
+                                   "t"sv,
+                                   NamespaceString::createNamespaceString_forTest("test.foo"),
+                                   true);
+    ASSERT_TRUE(compressed.compressedBucket.has_value());
+
+    // Exactly one 'count' field, holding the number of measurements actually in the bucket.
+    const BSONObj control =
+        compressed.compressedBucket->getObjectField(timeseries::kBucketControlFieldName);
+    size_t numCountFields = 0;
+    for (const auto& controlField : control) {
+        if (controlField.fieldNameStringData() == timeseries::kBucketControlCountFieldName) {
+            ++numCountFields;
+        }
+    }
+    EXPECT_EQ(1, numCountFields);
+    EXPECT_EQ(5, control[timeseries::kBucketControlCountFieldName].Int());
+}
+
 TEST(TimeseriesBucketCompression, CannotDecompressUncompressedBucket) {
     auto decompressed = timeseries::decompressBucket(sampleBucket);
     EXPECT_FALSE(decompressed.has_value());

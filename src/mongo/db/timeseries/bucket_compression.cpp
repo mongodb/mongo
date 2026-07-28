@@ -170,14 +170,19 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
     {
         BSONObjBuilder control(builder.subobjStart(kBucketControlFieldName));
 
-        // Set the version to indicate that the bucket was compressed. Leave other control fields
-        // unchanged.
+        // Make 2 changes to control block:
+        // 1) Set the version to indicate that the bucket was compressed and sorted above.
+        // 2) Throw out an existing count if it was written by a user directly.
         bool versionSet = false;
         for (const auto& controlField : controlElement.Obj()) {
             if (controlField.fieldNameStringData() == kBucketControlVersionFieldName) {
                 control.append(kBucketControlVersionFieldName,
                                kTimeseriesControlCompressedSortedVersion);
                 versionSet = true;
+            } else if (MONGO_unlikely(controlField.fieldNameStringData() ==
+                                      kBucketControlCountFieldName)) {
+                // Ignore an invalid control.count that shouldn't exist on a v1 bucket.
+                // Write a correct value further down in this function.
             } else {
                 control.append(controlField);
             }
