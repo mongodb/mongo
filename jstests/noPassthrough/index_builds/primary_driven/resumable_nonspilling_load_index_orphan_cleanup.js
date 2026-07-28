@@ -12,9 +12,16 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {PrimaryDrivenResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/primary_driven.js";
 
 const rst = new ReplSetTest({
-    nodes: 2,
+    // Ensure both nodes are electable (priority 1) so the failover can always step up the
+    // secondary. Suites that don't support graceful stepdown fail over by killing the primary, and
+    // a priority-0 secondary could never win the resulting election.
+    nodes: [{rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}],
+    // Use a large oplog so the killed-and-restarted old primary can't become too stale to find a
+    // sync source.
+    oplogSize: 1024,
     nodeOptions: {
         setParameter: {
             primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: 10,
@@ -29,7 +36,6 @@ rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const secondary = rst.getSecondaries()[0];
 
 const adminDB = primary.getDB("admin");
 if (
@@ -66,7 +72,7 @@ const loadFp = configureFailPoint(primary, "hangIndexBuildDuringBulkLoadPhase", 
     iteration: NumberLong(pauseIteration),
 });
 
-jsTest.log.info("Starting the index build (will be interrupted by stepdown)");
+jsTest.log.info("Starting the index build (will be interrupted by the failover)");
 const awaitBuild = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, {}, [
     ErrorCodes.InterruptedDueToReplStateChange,
     ErrorCodes.IndexBuildAborted,
@@ -85,19 +91,21 @@ assert.commandWorked(
 );
 rst.awaitReplication();
 
-jsTest.log.info("Stepping up the secondary; the new primary resumes (and re-scans) the build");
-// Step up before releasing the fail point: the state change interrupts the old primary's build
+jsTest.log.info("Failing over to the secondary; the new primary resumes (and re-scans) the build");
+// Fail over before releasing the fail point: the state change interrupts the old primary's build
 // thread at the pause point, whereas releasing the fail point first would let the build run to
-// completion on the old primary before we ever step up.
-rst.stepUp(secondary);
+// completion on the old primary before we ever fail over.
+const newPrimary = PrimaryDrivenResumableIndexBuildTest.failover(rst);
 try {
     awaitBuild();
 } catch (e) {
-    jsTest.log.info("index build shell exited (expected after stepdown)", {error: e});
+    jsTest.log.info("index build shell exited (expected after the failover)", {error: e});
 }
-loadFp.off();
-
-const newPrimary = rst.getPrimary();
+if (!TestData.doesNotSupportGracefulStepdown) {
+    // When graceful stepdown isn't supported the failover kills and restarts the old primary, so
+    // the fail point is already gone (and this connection's server was replaced).
+    loadFp.off();
+}
 
 jsTest.log.info("Waiting for the resumed index build to complete on the new primary");
 assert.soonNoExcept(
