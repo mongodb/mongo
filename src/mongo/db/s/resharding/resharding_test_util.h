@@ -10,8 +10,8 @@
 namespace mongo {
 namespace resharding_test_util {
 
-const Milliseconds kAssertSoonTimeout{5 * 60};
-const Milliseconds kAssertSoonInterval{5};
+const Milliseconds kAssertSoonTimeout{5 * 60 * 1000};
+const Milliseconds kAssertSoonInterval{500};
 
 /*
  * Calls the 'pred' function at repeated intervals until either 'pred' returns true
