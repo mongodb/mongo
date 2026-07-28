@@ -12,8 +12,8 @@ DEFAULT_GCC_PGO_DATA_CHECKSUM = "29b9d919abdccb4a2eeb38670e0489312792700559eb728
 DEFAULT_BOLT_DATA_URL_ARM64 = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_065c02b56f788f57bdc6f724a9292fa2dba210d2_aarch64_clang_thinlto_pgo_bolt_9.0.0-alpha0-patch-6a68222429359500079c0c3d.fdata"
 DEFAULT_BOLT_DATA_CHECKSUM_ARM64 = "f5f8341de0285639bb4b8bc4f3502df050317331da8744b43c0d295ff021e8ba"
 
-DEFAULT_BOLT_DATA_URL_X86_64 = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_065c02b56f788f57bdc6f724a9292fa2dba210d2_x86_64_clang_thinlto_pgo_bolt_9.0.0-alpha0-patch-6a68208f72bc5f00075da51c.fdata"
-DEFAULT_BOLT_DATA_CHECKSUM_X86_64 = "7638467ad5d7af5695b01618888da840d8e5783ae02e0b229bbd2b68465a96a3"
+DEFAULT_BOLT_DATA_URL_X86_64 = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_8fe1b46b22a3ffaffb78431ec242920092193cf6_x86_64_clang_thinlto_pgo_bolt_9.0.0-alpha0-patch-6a68ab80df1e7f00072f3f90.fdata"
+DEFAULT_BOLT_DATA_CHECKSUM_X86_64 = "15e68d81c438af47c6681e44653c3853a0627ec338d21bdadf50483c4cef61ab"
 
 # CSPGO is a pre-merged profdata combining stage-1 PGO data with stage-2 context-sensitive
 # data. Populate these once a profile has been generated and uploaded. This is currently
