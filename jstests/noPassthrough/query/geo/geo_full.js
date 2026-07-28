@@ -1,3 +1,9 @@
+/**
+ * @tags: [
+ *   # TODO SERVER-132344: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
+ * ]
+ */
 //
 // Integration test of the geo code
 //

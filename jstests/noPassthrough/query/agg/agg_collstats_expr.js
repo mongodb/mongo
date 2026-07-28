@@ -4,6 +4,8 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
+ *   # TODO SERVER-132346: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

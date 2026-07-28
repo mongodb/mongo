@@ -28,6 +28,8 @@
  *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
+ *   # TODO SERVER-132343: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

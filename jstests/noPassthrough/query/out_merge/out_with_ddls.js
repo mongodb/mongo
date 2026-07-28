@@ -2,6 +2,11 @@
  * Test the behavior of aggregation containing $out with a concurrent DDL operation. When concurrent
  * DDL operation happens, the observed behavior should either be $out failing, or the same result as
  * if the 2 operations were not interleaved.
+ *
+ * @tags: [
+ *   # TODO SERVER-132345: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
+ * ]
  */
 
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";

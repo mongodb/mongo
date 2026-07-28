@@ -6,6 +6,8 @@
  *   requires_sharding,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
+ *   # TODO SERVER-132343: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

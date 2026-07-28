@@ -16,6 +16,8 @@
  * @tags: [
  *   # Uses a $accumulator with lang: "js", which requires server-side scripting.
  *   requires_scripting,
+ *   # TODO SERVER-132347: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 

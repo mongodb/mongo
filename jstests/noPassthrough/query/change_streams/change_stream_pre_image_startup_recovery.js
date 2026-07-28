@@ -20,6 +20,8 @@
  * @tags: [
  *   requires_replication,
  *   requires_persistence,
+ *   # TODO SERVER-132343: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 
