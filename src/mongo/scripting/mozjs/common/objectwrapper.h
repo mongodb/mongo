@@ -226,7 +226,7 @@ public:
 
         boost::optional<BSONObjBuilder> subbob;
         BSONObj* originalBSON = nullptr;
-        bool altered;
+        bool altered = false;
     };
 
     /**
