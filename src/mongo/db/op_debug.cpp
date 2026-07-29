@@ -11,6 +11,7 @@
 #include "mongo/db/curop_bson_helpers.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_settings/query_settings.h"
@@ -136,19 +137,6 @@ void addSpillingStats(const absl::flat_hash_map<PlanSummaryStats::SpillingStage,
                       const AppendCallback& appendCallback) {
     for (const auto& [stage, stats] : spillingStatsPerStage) {
         addSingleSpillingStats(stage, stats, sortTotalDataSizeBytes, appendCallback);
-    }
-}
-
-std::string_view getPlanRankerMethodName(PlanRankerMethod method) {
-    switch (method) {
-        case PlanRankerMethod::kMultiPlanner:
-            return "mp"sv;
-        case PlanRankerMethod::kCostBasedRanker:
-            return "cbr"sv;
-        case PlanRankerMethod::kNone:
-            return "none"sv;
-        default:
-            MONGO_UNREACHABLE;
     }
 }
 }  // namespace

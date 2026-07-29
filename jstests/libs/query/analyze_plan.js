@@ -218,22 +218,55 @@ export const PlanRankerReason = {
     kCbrCheaperThanMp: "cbrCheaperThanMp",
 };
 
+export function getRankerChoice(explain) {
+    const queryPlanner = getQueryPlanner(explain);
+    const rankerChoice = queryPlanner.rankerChoice;
+    assert(rankerChoice, "missing queryPlanner.rankerChoice", {explain});
+    return rankerChoice;
+}
+
 /**
- * Asserts that the winning plan in 'explain' was produced by 'chosenRanker' for 'reason'.
+ * Asserts that the winning plan in 'explain' was produced by 'chosenRanker'.
  *
- * Today the only observable signal is whether the winning plan carries a cost estimate (the
- * 'costEstimate' field): CBR (kCostBased) costs the plan, while the multi-planner (kMultiPlanning)
- * and the single-plan path (kNone) do not.
+ * Optionally takes 'reason', which is validated against 'PlanRankerReason', but it is not yet
+ * asserted against the explain output because the explain format does not surface it.
  *
- * 'reason' must be passed and is validated against 'PlanRankerReason', but it is not yet asserted
- * against the explain output because the explain format does not surface it.
- * TODO SERVER-130875: assert 'chosenRanker' and 'reason' directly against the v3 explain output.
+ * TODO SERVER-130875: assert 'reason' directly against the v3 explain output.
  */
-export function assertChosenRanker(explain, {chosenRanker, reason}) {
+export function assertChosenRanker(explain, chosenRanker, reason = undefined) {
     assert(Object.values(ChosenRanker).includes(chosenRanker), "Unknown chosenRanker", {
         chosenRanker,
     });
-    assert(Object.values(PlanRankerReason).includes(reason), "Unknown reason", {reason});
+    if (reason !== undefined) {
+        assert(Object.values(PlanRankerReason).includes(reason), "Unknown reason", {reason});
+    }
+
+    const queryPlanner = getQueryPlanner(explain);
+    if (isV3QueryPlanner(queryPlanner)) {
+        assert(queryPlanner.hasOwnProperty("rankerChoice"), "Expected rankerChoice in V3 explain", {
+            queryPlanner,
+        });
+
+        const rankerChoice = queryPlanner.rankerChoice;
+        assert(
+            rankerChoice.hasOwnProperty("chosenRanker"),
+            "Expected chosenRanker in rankerChoice",
+            {rankerChoice},
+        );
+        assert(
+            rankerChoice.chosenRanker === chosenRanker,
+            'Unexpected chosenRanker in rankerChoice, expected: "' +
+                chosenRanker +
+                '", got: "' +
+                rankerChoice.chosenRanker +
+                '"',
+            {rankerChoice},
+        );
+
+        // TODO SERVER-132230 Assert on the reason for chosen ranker.
+        // TODO SERVER-132104 Assert on the requested ranker.
+        return;
+    }
 
     const winningPlan = getWinningPlanFromExplain(explain);
     const isCosted = isPlanCosted(winningPlan);

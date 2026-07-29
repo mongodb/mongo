@@ -15,6 +15,7 @@
  * explainVersion "3".
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {assertChosenRanker, ChosenRanker} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
@@ -157,7 +158,9 @@ describe("V3 queryPlanner.plans array", function () {
 
     it("pure multi-planning: trial groups and score-descending order", function () {
         setPlanRankerConfig(db, {internalQueryPlanRanker: "multiPlanning"});
-        const plans = getPlans(explainFind(matchingFilter));
+        const explain = explainFind(matchingFilter);
+        assertChosenRanker(explain, ChosenRanker.kMultiPlanning);
+        const plans = getPlans(explain);
         assert.gte(plans.length, 2, "expected multiple candidate plans", {plans});
         const scores = [];
         for (const plan of plans) {
@@ -176,7 +179,9 @@ describe("V3 queryPlanner.plans array", function () {
 
     it("strict CBR (sampling): costBased groups and cost-ascending order", function () {
         setPlanRankerConfig(db, {internalQueryPlanRanker: "costBased"});
-        const plans = getPlans(explainFind(matchingFilter));
+        const explain = explainFind(matchingFilter);
+        assertChosenRanker(explain, ChosenRanker.kCostBased);
+        const plans = getPlans(explain);
         assert.gte(plans.length, 2, "expected multiple candidate plans", {plans});
         const costs = [];
         for (const plan of plans) {
@@ -201,7 +206,9 @@ describe("V3 queryPlanner.plans array", function () {
             internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "heuristicCE",
         });
-        const plans = getPlans(explainFind(matchingFilter));
+        const explain = explainFind(matchingFilter);
+        assertChosenRanker(explain, ChosenRanker.kCostBased);
+        const plans = getPlans(explain);
         assert.gte(plans.length, 2, "expected multiple candidate plans", {plans});
         for (const plan of plans) {
             assertWellFormedPlan(plan);
@@ -217,7 +224,9 @@ describe("V3 queryPlanner.plans array", function () {
     it("mixed (default), multi-planner wins: trial groups, score-descending order", function () {
         setPlanRankerConfig(db); // Defaults: mixed ranking, sampling CE.
         // The trial produces results, so the multi-planner decides before CBR runs.
-        const plans = getPlans(explainFind(matchingFilter));
+        const explain = explainFind(matchingFilter);
+        assertChosenRanker(explain, ChosenRanker.kMultiPlanning);
+        const plans = getPlans(explain);
         assert.gte(plans.length, 2, "expected multiple candidate plans", {plans});
         const scores = [];
         for (const plan of plans) {
@@ -235,6 +244,7 @@ describe("V3 queryPlanner.plans array", function () {
         // The deciding ranker affects ordering only, never visibility: everything computed is
         // shown.
         const explain = explainFind(cbrWinFilter);
+        assertChosenRanker(explain, ChosenRanker.kCostBased);
         const plans = getPlans(explain);
         // Each logical plan appears exactly once: the multi-planner's capped-trial tree and the
         // cost-based ranker's costed record of the same solution are merged into a single entry
@@ -255,7 +265,9 @@ describe("V3 queryPlanner.plans array", function () {
 
     it("featureFlagCostBasedRanker off behaves as pure multi-planning", function () {
         setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
-        const plans = getPlans(explainFind(matchingFilter));
+        const explain = explainFind(matchingFilter);
+        assertChosenRanker(explain, ChosenRanker.kMultiPlanning);
+        const plans = getPlans(explain);
         assert.gte(plans.length, 2, "expected multiple candidate plans", {plans});
         for (const plan of plans) {
             assertWellFormedPlan(plan);
@@ -266,7 +278,10 @@ describe("V3 queryPlanner.plans array", function () {
 
     it("single plan: one well-formed entry, no ranking statistics", function () {
         setPlanRankerConfig(db); // Defaults.
-        const plans = getPlans(explainFind({nonexistent: 1}));
+        const explain = explainFind({nonexistent: 1});
+        // A single candidate solution: no ranking took place, so the chosen ranker is "none".
+        assertChosenRanker(explain, ChosenRanker.kNone);
+        const plans = getPlans(explain);
         assert.eq(plans.length, 1, "expected a single plan", {plans});
         assertWellFormedPlan(plans[0]);
         assert(!hasMultiPlanGroup(plans[0]), "unexpected multiPlan group", {plans});

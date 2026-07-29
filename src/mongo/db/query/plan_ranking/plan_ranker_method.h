@@ -3,6 +3,10 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -16,5 +20,18 @@ enum class PlanRankerMethod {
     kMultiPlanner,
     kCostBasedRanker,
 };
+
+inline std::string_view getPlanRankerMethodName(PlanRankerMethod method) {
+    switch (method) {
+        case PlanRankerMethod::kNone:
+            return "none";
+        case PlanRankerMethod::kMultiPlanner:
+            return "multiPlanning";
+        case PlanRankerMethod::kCostBasedRanker:
+            return "costBased";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 
 }  // namespace mongo

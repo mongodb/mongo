@@ -177,8 +177,19 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     microsHistogram.increment(durationCount<Microseconds>(durationMicros));
     microsTotal.increment(durationMicros);
 
-    if (planRankingResult.isOK() && planRankingResult.getValue().needsWorksMeasuredForPlanCache) {
-        CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
+    if (planRankingResult.isOK()) {
+        auto& result = planRankingResult.getValue();
+        if (result.needsWorksMeasuredForPlanCache) {
+            // CBR chose a single winning plan.
+            CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
+        } else if (result.solutions.size() > 1) {
+            // CBR could not estimate all plans (e.g. an inestimable node such as RETURN_KEY) and
+            // returned multiple solutions to be ranked by the multi-planner downstream. Record that
+            // MP, not CBR, decides the winner. Mirrors MPPlanRankingStrategy, which sets this at
+            // ranking time; the classic runtime MultiPlanner does not set it itself.
+            // TODO SERVER-132079 Stop sourcing plan selection method from OpDebug.
+            CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+        }
     }
 
     return planRankingResult;

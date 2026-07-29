@@ -117,10 +117,11 @@ function testNoResultsQueryIsPlannedWithCBR() {
     const rejectedPlans = getRejectedPlans(explain);
     // MP produced no results within its trial budget, so CBR was engaged to rank the plans.
     if (isExecutionSplitInShards(explain)) {
-        assertChosenRanker(explain, {
-            chosenRanker: ChosenRanker.kCostBased,
-            reason: PlanRankerReason.kNoMultiplanningResults,
-        });
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kCostBased,
+            PlanRankerReason.kNoMultiplanningResults,
+        );
         const numShards = getNumShardsFromExplain(explain);
         // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
         assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
@@ -137,20 +138,22 @@ function testNoResultsQueryIsPlannedWithCBR() {
     } else if (hasV1Index(winningPlan)) {
         // v1 indexes are inestimable by CBR, so it fell back to MP: 1 from MP + 2 from CBR, all
         // not costed.
-        assertChosenRanker(explain, {
-            chosenRanker: ChosenRanker.kMultiPlanning,
-            reason: PlanRankerReason.kNoMultiplanningResults,
-        });
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kMultiPlanning,
+            PlanRankerReason.kNoMultiplanningResults,
+        );
         assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
         for (const plan of rejectedPlans) {
             assertPlanNotCosted(plan);
         }
     } else {
         // CBR chose the winning plan — it should be costed.
-        assertChosenRanker(explain, {
-            chosenRanker: ChosenRanker.kCostBased,
-            reason: PlanRankerReason.kNoMultiplanningResults,
-        });
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kCostBased,
+            PlanRankerReason.kNoMultiplanningResults,
+        );
         // 2 rejected plans: 1 from MP (not costed) + 1 from CBR (costed).
         assert.eq(rejectedPlans.length, 2, toJsonForLog(explain));
         assertPlanNotCosted(rejectedPlans[0]);
@@ -165,10 +168,7 @@ function testResultsQueryIsPlannedWithMultiPlanner() {
         return;
     }
     // MP found results, so CBR was not invoked and MP picked the winner.
-    assertChosenRanker(explain, {
-        chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitOrResult,
-    });
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExitOrResult);
     // 1 rejected plan per shard (the MP loser).
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
@@ -186,10 +186,7 @@ function testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking() {
     jsTest.log.info("Running testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking");
     const explain = coll.find({c: 1}).explain("allPlansExecution");
     // Only one candidate plan, so no ranking was needed.
-    assertChosenRanker(explain, {
-        chosenRanker: ChosenRanker.kNone,
-        reason: PlanRankerReason.kSinglePlan,
-    });
+    assertChosenRanker(explain, ChosenRanker.kNone, PlanRankerReason.kSinglePlan);
     const rejectedPlans = getRejectedPlans(explain);
     assert.eq(rejectedPlans.length, 0, toJsonForLog(explain));
 }
@@ -201,10 +198,7 @@ function testEOFIsPlannedWithMultiPlanner() {
         return;
     }
     // MP early-exited (EOF), so it picked the winner without engaging CBR.
-    assertChosenRanker(explain, {
-        chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitOrResult,
-    });
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExitOrResult);
     // 1 rejected plan per shard (the MP loser).
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
@@ -230,10 +224,7 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         }
         // No MP results, so CBR was engaged, but every plan is inestimable due to RETURN_KEY, so
         // CBR fell back to MP.
-        assertChosenRanker(explain, {
-            chosenRanker: ChosenRanker.kMultiPlanning,
-            reason: PlanRankerReason.kInestimableNode,
-        });
+        assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kInestimableNode);
         const rejectedPlans = getRejectedPlans(explain);
         if (isExecutionSplitInShards(explain)) {
             const numShards = getNumShardsFromExplain(explain);
@@ -261,10 +252,11 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         const rejectedPlans = getRejectedPlans(explain);
         // MP produced no results within its trial budget, so CBR was engaged to rank the plans.
         if (isExecutionSplitInShards(explain)) {
-            assertChosenRanker(explain, {
-                chosenRanker: ChosenRanker.kCostBased,
-                reason: PlanRankerReason.kNoMultiplanningResults,
-            });
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kCostBased,
+                PlanRankerReason.kNoMultiplanningResults,
+            );
             const numShards = getNumShardsFromExplain(explain);
             // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
             assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
@@ -281,20 +273,22 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         } else if (hasV1Index(winningPlan)) {
             // v1 indexes are inestimable by CBR, so it fell back to MP: 1 from MP + 2 from CBR,
             // all not costed.
-            assertChosenRanker(explain, {
-                chosenRanker: ChosenRanker.kMultiPlanning,
-                reason: PlanRankerReason.kNoMultiplanningResults,
-            });
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kMultiPlanning,
+                PlanRankerReason.kNoMultiplanningResults,
+            );
             assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
             for (const plan of rejectedPlans) {
                 assertPlanNotCosted(plan);
             }
         } else {
             // CBR chose the winning plan — it should be costed.
-            assertChosenRanker(explain, {
-                chosenRanker: ChosenRanker.kCostBased,
-                reason: PlanRankerReason.kNoMultiplanningResults,
-            });
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kCostBased,
+                PlanRankerReason.kNoMultiplanningResults,
+            );
             assertPlanCosted(winningPlan);
             // 2 rejected plans: 1 from MP (not costed) + 1 from CBR (costed).
             assert.eq(rejectedPlans.length, 2, toJsonForLog(explain));

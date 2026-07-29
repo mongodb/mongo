@@ -113,8 +113,8 @@ function checkRanker({
         cursor = cursor.returnKey();
     }
     jsTest.log.info(`Testing case: ${qID}`, {chosenRanker, reason});
-    const explain = assert.commandWorked(cursor.explain("allPlansExecution"));
-    assertChosenRanker(explain, {chosenRanker, reason});
+    const explain = assert.commandWorked(cursor.explain("plannerStats"));
+    assertChosenRanker(explain, chosenRanker, reason);
 }
 
 populateCollection("100", 100, nFields, compoundIndexes);
@@ -233,14 +233,15 @@ try {
     };
     const queryWithCBRInestimableNodesSort = {"_id": 1};
 
-    checkRanker({
-        qID: "2.1",
-        cName: "20k",
-        query: queryWithCBRInestimableNodes,
-        order: queryWithCBRInestimableNodesSort,
-        chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kSinglePlan,
-    });
+    // TODO SERVER-131818 Enable once CBR/V3 support rooted $or.
+    // checkRanker({
+    //     qID: "2.1",
+    //     cName: "20k",
+    //     query: queryWithCBRInestimableNodes,
+    //     order: queryWithCBRInestimableNodesSort,
+    //     chosenRanker: ChosenRanker.kMultiPlanning,
+    //     reason: PlanRankerReason.kSinglePlan,
+    // });
 
     // When case 2 falls back to MP, the remaining trials must run so the plan is cached with a
     // sufficient number of works (not just the brief estimation phase works).
@@ -554,6 +555,23 @@ try {
             }),
         );
     }
+
+    // The feature flag remains enabled, but the query knob forces the multi-planner, so CBR is
+    // never engaged and MP ranks the query.
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "multiPlanning",
+        }),
+    );
+    checkRanker({
+        qID: "7.4 - query-knob-multiplanning",
+        cName: "20k",
+        query: configMultiPlanQuery,
+        chosenRanker: ChosenRanker.kMultiPlanning,
+        reason: PlanRankerReason.kQueryKnob,
+    });
 } finally {
     // Restore the CBR parameters this test changed. We restore them directly (rather than via
     // setCBRConfig) to avoid touching internalSamplingSizeOverride, which this test never modifies.

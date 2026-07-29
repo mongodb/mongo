@@ -823,10 +823,10 @@ TEST(CurOpTest, PlanRankerMethodAppendedToProfilerOutput) {
     ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "none");
 
     curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "mp");
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "multiPlanning");
 
     curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
-    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "cbr");
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "costBased");
 }
 
 TEST(CurOpTest, PlanRankerMethodInSlowQueryLogReport) {
@@ -865,10 +865,10 @@ TEST(CurOpTest, PlanRankerMethodInSlowQueryLogReport) {
     ASSERT_EQ(getPlanRankerAttr().value_or(""), "none");
 
     curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-    ASSERT_EQ(getPlanRankerAttr().value_or(""), "mp");
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "multiPlanning");
 
     curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
-    ASSERT_EQ(getPlanRankerAttr().value_or(""), "cbr");
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "costBased");
 }
 
 TEST(CurOpTest, PlanRankerMethodInProfileFilterAppendStaged) {
@@ -901,10 +901,10 @@ TEST(CurOpTest, PlanRankerMethodInProfileFilterAppendStaged) {
     ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "none");
 
     curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "mp");
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "multiPlanning");
 
     curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
-    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "cbr");
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "costBased");
 }
 
 TEST(CurOpTest, ShouldUpdateMemoryStats) {

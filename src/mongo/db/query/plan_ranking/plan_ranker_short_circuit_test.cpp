@@ -1,11 +1,13 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/curop.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional/optional.hpp>
@@ -136,6 +138,59 @@ TEST_F(PlanRankerTest, SingleSolutionWithExplainIsCosted) {
     // The strategy ran rather than being short circuited, so it produced costing estimates.
     ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
     ASSERT_FALSE(status.getValue().maybeExplainData->estimates.empty());
+}
+
+// When CBR cannot estimate every plan (here because returnKey introduces an inestimable RETURN_KEY
+// node in each candidate) it returns all the solutions to be ranked downstream by the
+// multi-planner. In that case CBR did not decide the winner, so the operation must record
+// kMultiPlanner - previously nothing set planRankerMethod on this path and it was left at kNone.
+TEST_F(PlanRankerTest, InestimableReturnKeyRecordsMultiPlanner) {
+    createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
+    createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
+    insertNDocuments(10);
+    auto colls = getCollsAccessor();
+
+    unittest::ServerParameterGuard ceModeGuard{"internalQueryCBRCEMode", "heuristicCE"};
+
+    // 'a > 0' and 'b > 0' give two competing index scans, each wrapped in a RETURN_KEY node.
+    auto [cq, plannerData] =
+        createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0), [](auto& findCmd) {
+            findCmd.setReturnKey(true);
+        });
+    plannerData.plannerParams = makePlannerParams(/* cbrEnabled */ true);
+    plannerData.plannerParams->mainCollectionInfo.collStats =
+        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(10), kNss);
+
+    auto status = rankPlans(*cq, std::move(plannerData), /* isClassic */ true);
+    ASSERT_OK(status.getStatus());
+    // CBR could not choose a single winner, so both solutions are handed off to the multi-planner.
+    ASSERT_EQ(status.getValue().solutions.size(), 2);
+    ASSERT_FALSE(status.getValue().needsWorksMeasuredForPlanCache);
+    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
+              PlanRankerMethod::kMultiPlanner);
+}
+
+// When CBR can estimate all plans and choose a single winner, the operation records itself as
+// cost-based ranked - the counterpart to the inestimable fallback above.
+TEST_F(PlanRankerTest, EstimablePlansRecordCostBasedRanker) {
+    createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
+    createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
+    insertNDocuments(10);
+    auto colls = getCollsAccessor();
+
+    unittest::ServerParameterGuard ceModeGuard{"internalQueryCBRCEMode", "heuristicCE"};
+
+    auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0));
+    plannerData.plannerParams = makePlannerParams(/* cbrEnabled */ true);
+    plannerData.plannerParams->mainCollectionInfo.collStats =
+        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(10), kNss);
+
+    auto status = rankPlans(*cq, std::move(plannerData), /* isClassic */ true);
+    ASSERT_OK(status.getStatus());
+    ASSERT_EQ(status.getValue().solutions.size(), 1);
+    ASSERT_TRUE(status.getValue().needsWorksMeasuredForPlanCache);
+    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
+              PlanRankerMethod::kCostBasedRanker);
 }
 
 }  // namespace

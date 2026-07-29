@@ -348,6 +348,19 @@ BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
 }
 
 /**
+ * Appends the 'rankerChoice' object to 'out', which contains details the ranker that decided the
+ * winning plan, the reason for this choice, and the ranker that was requested.
+ */
+void appendPlanRankerChoice(const PlanRankerMethod decidingPlanRanker, BSONObjBuilder& out) {
+    BSONObjBuilder planRankerBob(out.subobjStart("rankerChoice"));
+
+    planRankerBob.append("requestedRanker", "");
+    planRankerBob.append("chosenRanker", getPlanRankerMethodName(decidingPlanRanker));
+    planRankerBob.append("reason", "");
+    planRankerBob.doneFast();
+}
+
+/**
  * The V3 analogue of generatePlannerInfo(): produces the version 3 "queryPlanner" section for the
  * stats-rich V3 verbosities (plannerStats, execStats) - the version-independent general block
  * followed by one uniform "plans" array of per-plan objects (winner first, then the remaining
@@ -411,6 +424,9 @@ void generatePlannerInfoV3(PlanExecutor* exec,
 
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
     appendQueryPlannerCommonInfo(exec, plannerContext, extraInfo, serializationContext, plannerBob);
+
+    // Append the rankerChoice sub-object including details around the chosen ranker and reasoning.
+    appendPlanRankerChoice(decidingPlanRanker, plannerBob);
 
     BSONArrayBuilder plansBob(plannerBob.subarrayStart("plans"));
     for (auto&& entry : entries) {

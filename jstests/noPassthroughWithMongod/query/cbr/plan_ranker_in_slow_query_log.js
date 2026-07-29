@@ -1,6 +1,7 @@
 /**
  * Tests that the slow query log and the profiler report which plan ranker ("planRanker") selected
- * the winning plan: "cbr" when the cost-based ranker chose it, and "mp" when the multi-planner did.
+ * the winning plan: "costBased" when the cost-based ranker chose it, and "multiPlanning" when the
+ * multi-planner did.
  *
  * @tags: [
  *   requires_fcv_90,
@@ -75,16 +76,24 @@ describe("planRanker in slow query log and profiler", function () {
             internalQueryCBRCEMode: "samplingCE",
         });
         const {fromLog, fromProfiler} = runAndGetPlanRanker("planRankerMarkerCbr");
-        assert.eq(fromLog, "cbr", "slow query log should report planRanker: cbr");
-        assert.eq(fromProfiler, "cbr", "profiler should report planRanker: cbr");
+        assert.eq(fromLog, "costBased", "slow query log should report planRanker: costBased");
+        assert.eq(fromProfiler, "costBased", "profiler should report planRanker: costBased");
     });
 
     it("reports 'mp' when the multi-planner chooses the winning plan", function () {
         // Disabling CBR forces the multi-planner to select the winning plan at runtime.
         setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
         const {fromLog, fromProfiler} = runAndGetPlanRanker("planRankerMarkerMp");
-        assert.eq(fromLog, "mp", "slow query log should report planRanker: mp");
-        assert.eq(fromProfiler, "mp", "profiler should report planRanker: mp");
+        assert.eq(
+            fromLog,
+            "multiPlanning",
+            "slow query log should report planRanker: multiPlanning",
+        );
+        assert.eq(
+            fromProfiler,
+            "multiPlanning",
+            "profiler should report planRanker: multiPlanning",
+        );
     });
 
     it("reports 'none' when a cached plan is used (no ranking took place)", function () {
