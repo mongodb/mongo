@@ -229,6 +229,23 @@ public:
 
     void setForServerParameter(bool enabled) override;
 
+    /**
+     * Lowers this flag's minimum-FCV floor to 8.0 so it reports enabled on every currently
+     * supported FCV, as long as the flag is enabled at all.
+     *
+     * UNSAFE: this bypasses the normal FCV gating that guards upgrade/downgrade safety. Only a
+     * deployment that can guarantee the gated feature is safe on every FCV it can run (e.g. because
+     * the feature defines on-disk format or wire protocol that must stay stable across a binary
+     * upgrade while the cluster FCV is pinned below the binary's latest FCV) may call this. Do not
+     * use it to work around ordinary FCV gating.
+     *
+     * TODO SERVER-123600: Remove this once such deployments manage FCV/feature flags differently.
+     */
+    void setEnabledRegardlessOfFCV_UNSAFE() {
+        // An 8.0 floor guarantees the flag is enabled on every FCV a supported cluster can be in.
+        _version = multiversion::FeatureCompatibilityVersion::kVersion_8_0;
+    }
+
 protected:
     /**
      * Returns true if the flag is set to true and enabled for this FCV version.

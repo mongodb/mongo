@@ -962,5 +962,69 @@ TEST_F(IFRContextOpCtxTest, TryGetAfterSetReturnsSameContext) {
     ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), wireCtx);
 }
 
+// A "version: latest" flag is off once the binary's latest FCV is ahead of the (pinned) cluster
+// FCV. Lowering the FCV floor keeps it on regardless of FCV.
+TEST_F(FeatureFlagTest, LoweringFCVFloorKeepsLatestFlagEnabledBelowVersion) {
+    // (Generic FCV reference): feature flag test
+    mongo::FCVGatedFeatureFlag flag{true /* enabled */,
+                                    multiversion::toString(multiversion::GenericFCV::kLatest),
+                                    false /* enableOnTransitionalFCV */};
+
+    ASSERT_FALSE(flag.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+
+    ASSERT_TRUE(flag.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(
+        flag.isEnabledUseLastLTSFCVWhenUninitialized(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(
+        flag.isEnabledUseLatestFCVWhenUninitialized(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(flag.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+    ASSERT_TRUE(flag.isEnabled(kNoVersionContext, kDowngradingFromLatestToLastLTSFCVSnapshot));
+}
+
+// The _enabled guard precedes the version check: lowering the floor on a disabled flag leaves it
+// disabled.
+TEST_F(FeatureFlagTest, LoweringFCVFloorDoesNotEnableDisabledFlag) {
+    mongo::FCVGatedFeatureFlag flag{false /* enabled */, "" /* no version */};
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+    ASSERT_FALSE(flag.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+    ASSERT_FALSE(flag.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+}
+
+// Check that lowering the FCV floor also applies to the isEnabledOnVersion method, which is
+// not otherwise directly tested.
+TEST_F(FeatureFlagTest, LoweringFCVFloorAppliesToIsEnabledOnVersion) {
+    // (Generic FCV reference): feature flag test
+    mongo::FCVGatedFeatureFlag flag{true /* enabled */,
+                                    multiversion::toString(multiversion::GenericFCV::kLatest)};
+    ASSERT_FALSE(flag.isEnabledOnVersion(multiversion::GenericFCV::kLastLTS));
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+    ASSERT_TRUE(flag.isEnabledOnVersion(multiversion::GenericFCV::kLastLTS));
+}
+
+TEST_F(FeatureFlagTest, LoweringFCVFloorMakesTransitionChecksConsistent) {
+    // (Generic FCV reference): feature flag test
+    mongo::FCVGatedFeatureFlag flag{true /* enabled */,
+                                    multiversion::toString(multiversion::GenericFCV::kLatest),
+                                    false /* enableOnTransitionalFCV */};
+
+    // (Generic FCV reference): feature flag test
+    const auto lastLTS = multiversion::GenericFCV::kLastLTS;
+    // (Generic FCV reference): feature flag test
+    const auto latest = multiversion::GenericFCV::kLatest;
+
+    // Before lowering the floor, a downgrade from latest to lastLTS flips the flag off.
+    ASSERT_TRUE(flag.isDisabledOnTargetFCVButEnabledOnOriginalFCV(lastLTS, latest));
+    ASSERT_TRUE(flag.isEnabledOnTargetFCVButDisabledOnOriginalFCV(latest, lastLTS));
+
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+
+    // After lowering the floor, the flag is enabled on both FCVs, so neither transition check
+    // fires.
+    ASSERT_FALSE(flag.isDisabledOnTargetFCVButEnabledOnOriginalFCV(lastLTS, latest));
+    ASSERT_FALSE(flag.isEnabledOnTargetFCVButDisabledOnOriginalFCV(latest, lastLTS));
+}
+
 }  // namespace
 }  // namespace mongo
