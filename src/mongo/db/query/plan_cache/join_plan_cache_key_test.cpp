@@ -429,7 +429,8 @@ TEST_F(JoinPlanCacheKeyAggModelTest, DifferentSyntacticJoinOrderResultsInDiffere
             *pipeline, {"a", "b"}, {{"foreign_coll", {"a"}}, {"foreign_coll2", {"b"}}});
 
         ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-        auto swModel = AggJoinModel::constructJoinModel(*pipeline, kBuildParams);
+        OpDebug::JoinOptimizationMetrics metrics;  // This is unused.
+        auto swModel = AggJoinModel::constructJoinModel(*pipeline, kBuildParams, metrics);
         ASSERT_OK(swModel);
 
         const auto& graph = swModel.getValue().getGraph();

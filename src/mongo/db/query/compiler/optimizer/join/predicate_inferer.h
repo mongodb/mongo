@@ -4,13 +4,9 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_expr.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/op_debug.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
-#include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
 namespace mongo::join_ordering {
 /**
@@ -34,7 +30,8 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     size_t maxNodes,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    OpDebug::JoinOptimizationMetrics& metrics);
 
 /**
  * Builds a new CanonicalQuery over 'nss' whose filter is 'expr', reusing the projection from

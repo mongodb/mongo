@@ -274,7 +274,8 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
 
 bool addJoinPredicates(const std::vector<JoinPredicate>& joinPreds,
                        const std::vector<ResolvedPath>& resolved,
-                       MutableJoinGraph& graph) {
+                       MutableJoinGraph& graph,
+                       OpDebug::JoinOptimizationMetrics& metrics) {
     for (const auto& predicate : joinPreds) {
         auto leftNodeId = resolved[predicate.left].nodeId;
         auto rightNodeId = resolved[predicate.right].nodeId;
@@ -283,6 +284,13 @@ bool addJoinPredicates(const std::vector<JoinPredicate>& joinPreds,
                 leftNodeId != rightNodeId);
         if (!graph.addEdge(leftNodeId, rightNodeId, {predicate})) {
             return false;
+        }
+
+        if (predicate.op == JoinPredicate::Eq) {
+            metrics.numSyntacticEqJoinPredicates++;
+        } else {
+            tassert(13208600, "Expected an $expr edge", predicate.op == JoinPredicate::ExprEq);
+            metrics.numSyntacticExprJoinPredicates++;
         }
     }
     return true;
@@ -320,8 +328,10 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
     return false;
 }
 
-StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeline,
-                                                          AggModelBuildParams buildParams) {
+StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
+    const Pipeline& pipeline,
+    AggModelBuildParams buildParams,
+    OpDebug::JoinOptimizationMetrics& metrics) {
     // Try to create a CanonicalQuery. We begin by cloning the pipeline (this includes
     // sub-pipelines!) to ensure that if we bail out, this stays idempotent.
     // TODO SERVER-111383: We should see if we can make createCanonicalQuery() idempotent instead.
@@ -330,7 +340,14 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     // 'clonedExpCtx' so that bail-outs leave 'expCtx' unchanged.
     auto expCtx = pipeline.getContext();
 
+    // Count number of unique namespaces involved in join graph prefix for metrics collection
+    // purposes. Ensure that we update this metric for any exit path, be it a fallback or a
+    // successful AggJoinModel construction.
+    absl::flat_hash_set<NamespaceString> uniqueNamespaces;
+    ON_BLOCK_EXIT([&]() { metrics.numNamespaces = uniqueNamespaces.size(); });
+
     const auto& nss = expCtx->getNamespaceString();
+    uniqueNamespaces.insert(nss);
     auto clonedExpCtx = makeCopyFromExpressionContext(expCtx, nss);
     auto suffix = pipeline.clone(clonedExpCtx);
 
@@ -418,7 +435,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             }
 
             // Add join predicates to join graph. Bail if we fail to add any of them.
-            if (!addJoinPredicates(preds.joinPredicates, pathResolver.resolvedPaths(), graph)) {
+            if (!addJoinPredicates(
+                    preds.joinPredicates, pathResolver.resolvedPaths(), graph, metrics)) {
                 return Status(ErrorCodes::BadValue, "Graph is too big: too many edges");
             }
 
@@ -429,6 +447,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 prefix->pushBack(std::move(next));
             }
 
+            uniqueNamespaces.insert(lookup->getFromNs());
+
         } else if (auto* match = dynamic_cast<DocumentSourceMatch*>(stage); match) {
             if (graph.numNodes() < 2) {
                 // Bail out if the leading $match can't be absorbed.
@@ -437,7 +457,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
 
             auto result = extractExprPredicates(pathResolver, match);
             bool canMatchBeEliminated = result.expressionIsFullyAbsorbed;
-            if (!addJoinPredicates(result.predicates, pathResolver.resolvedPaths(), graph)) {
+            if (!addJoinPredicates(
+                    result.predicates, pathResolver.resolvedPaths(), graph, metrics)) {
                 // End prefix here- we weren't able to add all edges, but that's ok.
                 break;
             }
@@ -458,6 +479,17 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         }
     }
 
+    // Find out how many $lookups remain in the suffix.
+    for (const auto& stage : suffix->getSources()) {
+        if (dynamic_cast<const DocumentSourceLookUp*>(stage.get())) {
+            metrics.numLookupsInSuffix++;
+        }
+    }
+
+    // Update remaining syntactic statistics.
+    metrics.numJoinGraphNodes = graph.numNodes();
+    metrics.numSyntacticEdges = graph.numEdges();
+
     auto resolvedPaths = pathResolver.releaseResolvedPaths(graph.numNodes());
 
     if (graph.numNodes() < 2) {
@@ -465,17 +497,28 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
-    auto swVec = addImplicitEdgesAndInferPredicates(
-        graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges, clonedExpCtx);
+    auto swVec =
+        addImplicitEdgesAndInferPredicates(graph,
+                                           resolvedPaths,
+                                           buildParams.maxNumberNodesConsideredForImplicitEdges,
+                                           clonedExpCtx,
+                                           metrics);
     if (!swVec.isOK()) {
         return swVec.getStatus();
     }
+
+    // Update remaining inferred statistics.
+    metrics.numInferredEdges = graph.numEdges() - metrics.numSyntacticEdges;
 
     JoinGraph result = JoinGraph(std::move(graph));
     if (!result.isConnected()) {
         return Status(ErrorCodes::InternalErrorNotSupported,
                       "Join graph must be connected as cross-products are not yet supported");
     }
+
+    // Note: we may still bail out after the join model is constructed, but not for reasons related
+    // to the query shape.
+    metrics.joinOptimizable = true;
     return AggJoinModel(std::move(result),
                         std::move(resolvedPaths),
                         std::move(prefix),

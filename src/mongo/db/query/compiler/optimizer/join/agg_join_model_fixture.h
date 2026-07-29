@@ -71,6 +71,9 @@ public:
     const AggModelBuildParams defaultBuildParams{.maxNumberNodesConsideredForImplicitEdges =
                                                      kMaxNumberNodesConsideredForImplicitEdges};
 
+    OpDebug::JoinOptimizationMetrics& getFreshJoinOptMetrics();
+    const OpDebug::JoinOptimizationMetrics& getJoinOptMetrics();
+
 private:
     // Ensure path arrayness is enabled for all tests.
     unittest::ServerParameterGuard queryKnobController{"featureFlagPathArrayness", true};

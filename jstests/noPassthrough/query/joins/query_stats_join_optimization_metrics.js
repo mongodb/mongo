@@ -38,6 +38,42 @@ seed(orders, 100);
 seed(customers, 100);
 seed(items, 100);
 
+// The per-query expected value of each join optimization counter for the pipeline below. The
+// pipeline yields a three-node join graph (orders, customers, items) with two syntactic equality
+// edges (orders.a = customers.a and orders.b = items.b). Because the two joins are on distinct
+// base-collection fields, no transitive implicit edge is inferred.
+const kPerQueryMetrics = {
+    numNamespaces: 3,
+    numLookupsInSuffix: 0,
+    numJoinGraphNodes: 3,
+    numSyntacticEdges: 2,
+    numInferredEdges: 0,
+    numSyntacticExprJoinPredicates: 0,
+    numSyntacticEqJoinPredicates: 2,
+    numInferredEqJoinPredicates: 2,
+    numInferredSingleTablePredicates: 0,
+};
+
+// Asserts every join optimization counter, given the number of times the (identical) query has been
+// aggregated into the query stats entry. Each per-query value is identical across runs, so the
+// aggregated 'sum' is 'value * updateCount' while 'min' and 'max' equal the per-query value.
+function assertJoinMetrics(joinMetrics, updateCount) {
+    assert.eq(joinMetrics.updateCount, updateCount, tojson(joinMetrics));
+    // Every run of this pipeline is join-optimizable.
+    assert.docEq(
+        {"true": NumberLong(updateCount), "false": NumberLong(0)},
+        joinMetrics.joinOptimizable,
+        tojson(joinMetrics),
+    );
+    for (const [name, perQuery] of Object.entries(kPerQueryMetrics)) {
+        const counter = joinMetrics[name];
+        assert(counter, `missing counter '${name}'`, {joinMetrics});
+        assert.eq(counter.sum, perQuery * updateCount, `counter '${name}' sum`, {joinMetrics});
+        assert.eq(counter.max, perQuery, `counter '${name}' max`, {joinMetrics});
+        assert.eq(counter.min, perQuery, `counter '${name}' min`, {joinMetrics});
+    }
+}
+
 // A pipeline with two $lookups yields a three-node join graph with two edges.
 const pipeline = [
     {
@@ -77,7 +113,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 
     const joinMetrics = stats[0].metrics.supplementalMetrics.JoinOptimization;
     assert(joinMetrics);
-    assert.eq(joinMetrics.updateCount, 1, tojson(joinMetrics));
+    assertJoinMetrics(joinMetrics, 1);
 }
 
 // Run the query again!
@@ -90,8 +126,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 
     const joinMetrics = stats[0].metrics.supplementalMetrics.JoinOptimization;
     assert(joinMetrics);
-
-    assert.eq(joinMetrics.updateCount, 2, tojson(joinMetrics));
+    assertJoinMetrics(joinMetrics, 2);
 }
 
 MongoRunner.stopMongod(conn);

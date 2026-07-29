@@ -24,4 +24,18 @@ std::unique_ptr<Pipeline> AggJoinModelFixture::makePipelineOfSize(size_t numJoin
     }
     return makePipeline(std::move(stages), {"A"});
 }
+
+OpDebug::JoinOptimizationMetrics& AggJoinModelFixture::getFreshJoinOptMetrics() {
+    auto& od = CurOp::get(getOpCtx())->debug();
+    // Reset this even if it was previously set.
+    od.joinOptimizationMetrics.emplace();
+    return *od.joinOptimizationMetrics;
+}
+
+const OpDebug::JoinOptimizationMetrics& AggJoinModelFixture::getJoinOptMetrics() {
+    auto& od = CurOp::get(getOpCtx())->debug();
+    ASSERT_TRUE(od.joinOptimizationMetrics);
+    return *od.joinOptimizationMetrics;
+}
+
 }  // namespace mongo::join_ordering

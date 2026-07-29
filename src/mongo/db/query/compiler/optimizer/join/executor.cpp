@@ -370,7 +370,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     return nullptr;
 }
 
-
 }  // namespace
 
 /**
@@ -394,6 +393,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // metrics will be (intentionally!) reset.
     auto& od = CurOp::get(opCtx)->debug();
     od.joinOptimizationMetrics.emplace();
+    auto& metrics = *od.joinOptimizationMetrics;
 
     // Try to build JoinGraph.
     const auto& config = pipeline.getContext()->getQueryKnobConfiguration();
@@ -402,7 +402,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
             JoinGraphBuildParams(config.getMaxNodesInJoinGraph(), config.getMaxEdgesInJoinGraph()),
         .maxNumberNodesConsideredForImplicitEdges =
             static_cast<size_t>(config.getMaxNumberNodesConsideredForImplicitEdges())};
-    auto swModel = AggJoinModel::constructJoinModel(pipeline, buildParams);
+    auto swModel = AggJoinModel::constructJoinModel(pipeline, buildParams, metrics);
     if (!swModel.isOK()) {
         // We failed to apply join-reordering, so we take the regular path.
         const auto status = swModel.getStatus();

@@ -56,8 +56,19 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnSameField) {
     auto pipeline = makePipeline(query, {"B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"a"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -92,8 +103,19 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnDiffField) {
     auto pipeline = makePipeline(query, {"B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -125,8 +147,19 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnDiffField) {
 
     pipeline = makePipeline(query, {"B"});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
     auto& joinModel2 = swJoinModel.getValue();
     auto& joinGraph2 = joinModel2.getGraph();
     ASSERT_EQ(joinGraph2.numNodes(), 2);
@@ -160,8 +193,19 @@ TEST_F(PipelineAnalyzerTest, PropagateSomeButNotAllSTPs) {
     auto pipeline = makePipeline(query, {"B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -216,8 +260,19 @@ TEST_F(PipelineAnalyzerTest, PropagateSTPsThruJoinChain) {
     auto pipeline = makePipeline(query, {"B", "C"});
     markFieldsAsScalar(*pipeline, {"a"sv, "b"sv}, {{"B", {"a"sv, "b"sv}}, {"C", {"a"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 3);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 3);
@@ -329,8 +384,19 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
         {"a"sv, "x"sv},
         {{"B", {"b"sv, "x"sv, "m"sv}}, {"C", {"c"sv, "x"sv, "n"sv}}, {"D", {"d"sv, "o"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 7);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 12);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 4);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 4);
@@ -435,8 +501,19 @@ TEST_F(PipelineAnalyzerTest, DoNotPropagateOrNorNinSingleTablePredicates) {
                        {{"B", {"joinKey1"sv, "joinKey2"sv}}, {"C", {"joinKey2"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 3);
@@ -495,8 +572,19 @@ TEST_F(PipelineAnalyzerTest, PropagateInSingleTablePredicate) {
     auto pipeline = makePipeline(query, {"B"});
     markFieldsAsScalar(*pipeline, {"a"sv, "c"sv}, {{"B", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -553,8 +641,19 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
     auto pipeline = makePipeline(query, {"B", "C"});
     markFieldsAsScalar(*pipeline, {"a"sv, "c"sv}, {{"B", {"b"sv}}, {"C", {"c"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 2);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -636,8 +735,19 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemanticsInAJoinCycle) {
         {"x"sv, "z"sv},
         {{"B", {"x"sv, "y"sv}}, {"C", {"y"sv, "z"sv, "x"sv, "w"sv}}, {"D", {"w"sv, "p"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 5);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 9);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 6);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -685,8 +795,19 @@ TEST_F(PipelineAnalyzerTest,
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // TODO SERVER-116034: Support cross-products.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForeignFields) {
@@ -704,8 +825,19 @@ TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForei
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // TODO SERVER-116034: Support cross-products.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, PipelineEligibleForJoinReorderingSingleLookupUnwind) {
@@ -720,8 +852,19 @@ TEST_F(PipelineAnalyzerTest, PipelineEligibleForJoinReorderingSingleLookupUnwind
     // This pipeline is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
@@ -745,8 +888,19 @@ TEST_F(PipelineAnalyzerTest, LetLocalFieldPrefixedByAsField) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& joinGraph = joinModel.getGraph();
@@ -808,7 +962,8 @@ TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -828,8 +983,19 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -850,8 +1016,19 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& joinGraph = joinModel.getGraph();
@@ -874,8 +1051,19 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterNonPipelineLookup) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -902,8 +1090,19 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterEmptyPipeline) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -949,8 +1148,19 @@ TEST_F(PipelineAnalyzerTest, EmptyPipelineNoJoinPredicateRejected) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // But constructJoinModel rejects the would-be-disconnected graph.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::InternalErrorNotSupported);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, NumericLocalFieldIneligibleJoinPredicate) {
@@ -964,8 +1174,19 @@ TEST_F(PipelineAnalyzerTest, NumericLocalFieldIneligibleJoinPredicate) {
     // Structurally eligible ($lookup + $unwind pair exists) ...
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     // ... but the numeric path component in localField makes the join predicate ineligible.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, NumericForeignFieldIneligibleJoinPredicate) {
@@ -977,8 +1198,19 @@ TEST_F(PipelineAnalyzerTest, NumericForeignFieldIneligibleJoinPredicate) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b.0"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, NumericMidPathComponentIneligibleJoinPredicate) {
@@ -990,8 +1222,19 @@ TEST_F(PipelineAnalyzerTest, NumericMidPathComponentIneligibleJoinPredicate) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a.0.b"sv}, {{"A", {"c"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilter) {
@@ -1010,8 +1253,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilter) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1040,8 +1294,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMultiPredicateMatchOrderingNoAbsorbedFil
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1074,8 +1339,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilterPreservesPipeline
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1111,8 +1387,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineCorrelatedMatchPlusAbsorbedFilter) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1142,8 +1429,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilterMixedBaseAndAsFie
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1174,8 +1472,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMixedCorrelatedAndUncorrelatedPlusAbsorb
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1203,8 +1512,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMultiPredicateMatchPlusAbsorbedFilter) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1236,8 +1556,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNonEqStpPlusNonEqAbsorbedFilter) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1270,8 +1601,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNestedOrPlusAbsorbedFilter) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1301,8 +1643,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNonCorrelatedExprStpPlusAbsorbedFilter) 
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1333,8 +1686,19 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsFieldPipelineForm) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1366,8 +1730,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNonEquijoinExprPlusAbsorbedFilter) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     ASSERT_EQ(swJoinModel.getStatus().code(), ErrorCodes::QueryFeatureNotAllowed);
 }
 
@@ -1384,8 +1759,19 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsField) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1408,8 +1794,19 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesFirstOnAsFieldSecondOnBaseField) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1433,8 +1830,19 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesFirstOnBaseFieldSecondOnAsField) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1458,8 +1866,19 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesSameFieldBothOnAsField) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1484,8 +1903,19 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesEachOnDifferentCollection) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -1513,8 +1943,19 @@ TEST_F(PipelineAnalyzerTest, MatchBetweenTwoLookupUnwinds) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -1538,8 +1979,19 @@ TEST_F(PipelineAnalyzerTest, SingleMatchOnBothBaseAndAsField) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 2);
@@ -1564,8 +2016,19 @@ TEST_F(PipelineAnalyzerTest, SingleMatchOnTwoDifferentAsFields) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -1593,8 +2056,19 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterOnChainedLookup) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -1637,8 +2111,19 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFields) {
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     // But we do here, and shorten the prefix.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     ASSERT_EQ(swJoinModel.getValue().getGraph().numNodes(), 2);
     ASSERT_EQ(swJoinModel.getValue().getGraph().numEdges(), 1);
 }
@@ -1661,8 +2146,19 @@ TEST_F(PipelineAnalyzerTest, LocalFieldExactlyMatchesPriorAsField) {
     auto pipeline = makePipeline(query, {"B", "C"});
     markFieldsAsScalar(*pipeline, {"x"sv, "a"sv}, {{"B", {"y"sv}}, {"C", {"z"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     ASSERT_EQ(swJoinModel.getValue().getGraph().numNodes(), 2);
     ASSERT_EQ(swJoinModel.getValue().getGraph().numEdges(), 1);
 }
@@ -1699,8 +2195,19 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFieldExprSyntax) {
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     // But we do here, and shorten the prefix.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     ASSERT_EQ(swJoinModel.getValue().getGraph().numNodes(), 2);
     ASSERT_EQ(swJoinModel.getValue().getGraph().numEdges(), 1);
 }
@@ -1716,8 +2223,19 @@ TEST_F(PipelineAnalyzerTest, CompatibleAsFields) {
     markFieldsAsScalar(*pipeline, {"x.c"sv}, {{"B", {"c"sv, "d"sv}}, {"C", {"d"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
@@ -1737,8 +2255,19 @@ TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // This should show that our suffix starts at the $group.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -1791,8 +2320,19 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -1827,8 +2367,19 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -1848,8 +2399,19 @@ TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicatesUnmodifiedOk) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -1868,8 +2430,19 @@ TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicateModifiedForJoinBai
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // We can't support a query where a join predicate field is modified in the subpipeline.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, PipelineWithProjectsExprJoinPredicateModifiedForJoinBails) {
@@ -1887,8 +2460,19 @@ TEST_F(PipelineAnalyzerTest, PipelineWithProjectsExprJoinPredicateModifiedForJoi
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // We can't support a query where a join predicate field is modified in the subpipeline.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, PrefixTooComplexForCQPushdownBails) {
@@ -1905,8 +2489,19 @@ TEST_F(PipelineAnalyzerTest, PrefixTooComplexForCQPushdownBails) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, InferredPredicateDoesntDiscardProjections) {
@@ -1925,8 +2520,19 @@ TEST_F(PipelineAnalyzerTest, InferredPredicateDoesntDiscardProjections) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -1946,8 +2552,19 @@ TEST_F(PipelineAnalyzerTest, SubPipelineTooComplexForCQPushdownBails) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 // Tests that a $project stage as the only stage in a subpipeline (no $match) that excludes
@@ -1967,8 +2584,19 @@ TEST_F(PipelineAnalyzerTest, SubpipelineProjectOnlyExcludesNonJoinFieldOk) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -1991,8 +2619,19 @@ TEST_F(PipelineAnalyzerTest, SubpipelineExprJoinProjectNotModifyingJoinFieldOk) 
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2012,8 +2651,19 @@ TEST_F(PipelineAnalyzerTest, PrefixProjectInclusionExcludesJoinFieldBails) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // We bail because the inclusion $project drops field "a" (the localField).
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 // Tests that two joins each having a $project in their subpipeline are correctly handled.
@@ -2038,8 +2688,19 @@ TEST_F(PipelineAnalyzerTest, TwoJoinsEachWithSubpipelineProjectOk) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2085,8 +2746,19 @@ TEST_F(PipelineAnalyzerTest, tooManyNodes) {
         .joinGraphBuildParams =
             JoinGraphBuildParams(/*maxNodes*/ numJoins, /*maxEdges*/ kHardMaxEdgesInJoin),
         .maxNumberNodesConsideredForImplicitEdges = kMaxNumberNodesConsideredForImplicitEdges};
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, buildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, buildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     // One $lookup with absorbed $unwind was left unoptimized.
     ASSERT_EQ(swJoinModel.getValue().getSuffix()->getSources().size(), 1);
 }
@@ -2101,8 +2773,19 @@ TEST_F(PipelineAnalyzerTest, tooManyEdges) {
         .joinGraphBuildParams =
             JoinGraphBuildParams(/*maxNodes*/ kHardMaxNodesInJoin, /*maxEdges*/ numJoins - 1),
         .maxNumberNodesConsideredForImplicitEdges = kMaxNumberNodesConsideredForImplicitEdges};
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, buildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, buildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     // One $lookup with absorbed $unwind was left unoptimized.
     ASSERT_EQ(swJoinModel.getValue().getSuffix()->getSources().size(), 1);
 }
@@ -2137,8 +2820,19 @@ TEST_F(PipelineAnalyzerTest, SingleJoinCompoundPredicate) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2199,8 +2893,19 @@ TEST_F(PipelineAnalyzerTest, CompoundJoinKeyWithLocalForeignSyntax) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2260,8 +2965,19 @@ TEST_F(PipelineAnalyzerTest, DuplicateExprEqAndEqEdges) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2306,8 +3022,19 @@ TEST_F(PipelineAnalyzerTest, ExprOnlyImplicitEdges) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2338,8 +3065,19 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithCorrelatedNonJoinPredicate) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithNonFieldPathVariable) {
@@ -2368,8 +3106,19 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithNonFieldPathVariable) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, NumericLocalFieldExprIneligibleJoinPredicate) {
@@ -2389,8 +3138,19 @@ TEST_F(PipelineAnalyzerTest, NumericLocalFieldExprIneligibleJoinPredicate) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a.0"sv}, {{"A", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, NumericForeignFieldExprIneligibleJoinPredicate) {
@@ -2410,8 +3170,19 @@ TEST_F(PipelineAnalyzerTest, NumericForeignFieldExprIneligibleJoinPredicate) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b.0"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, NumericMidPathExprIneligibleJoinPredicate) {
@@ -2431,8 +3202,19 @@ TEST_F(PipelineAnalyzerTest, NumericMidPathExprIneligibleJoinPredicate) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a.0.b"sv}, {{"A", {"c"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, ImplicitEdgeInferenceSelfEdgeSkipped) {
@@ -2457,8 +3239,19 @@ TEST_F(PipelineAnalyzerTest, ImplicitEdgeInferenceSelfEdgeSkipped) {
     auto pipeline = makePipeline(query, {"base_other"});
     markFieldsAsScalar(*pipeline, {"key"sv, "cor.key.foo"sv}, {{"base_other", {"key"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     const auto& joinGraph = swJoinModel.getValue().getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 2);
     ASSERT_EQ(joinGraph.numEdges(), 1);
@@ -2487,8 +3280,19 @@ TEST_F(PipelineAnalyzerTest, LeadingMatchAfterLimitPushdownBailsOut) {
 
     auto pipeline = makePipeline(query, {"B"});
     markFieldsAsScalar(*pipeline, {"x"sv}, {{"B", {"y"sv}}});
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(PipelineAnalyzerTest, EmbedPathShadowsResolvedPredicatePath) {
@@ -2508,8 +3312,10 @@ TEST_F(PipelineAnalyzerTest, EmbedPathShadowsResolvedPredicatePath) {
         auto pipeline = makePipeline(q, {"B", "C"});
         markFieldsAsScalar(*pipeline, {"a.x", "q"}, {{"B", {"k"}}, {"C", {"r"}}});
         ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
-        auto sw = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+        auto sw = AggJoinModel::constructJoinModel(
+            *pipeline, defaultBuildParams, getFreshJoinOptMetrics());
         ASSERT_OK(sw);
+        ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
         return sw.getValue().getGraph().numNodes();
     };
 

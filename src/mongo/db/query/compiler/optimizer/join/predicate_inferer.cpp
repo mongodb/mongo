@@ -326,7 +326,8 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
                                      const std::vector<ResolvedPath>& resolvedPaths,
                                      MutableJoinGraph& graph,
                                      const FieldPath& sourceFieldName,
-                                     std::vector<BSONObj>& accessPathsBackingBson) {
+                                     std::vector<BSONObj>& accessPathsBackingBson,
+                                     OpDebug::JoinOptimizationMetrics& metrics) {
     for (PathId pathId : equivalenceClass) {
         if (pathId == sourcePathId) {
             // This node produced the STP we're propagating - no work to do, skip.
@@ -378,6 +379,8 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
         // hold onto the original BSONObj.
         accessPathsBackingBson.emplace_back(targetNode.accessPath->getQueryObj());
         targetNode.accessPath = std::move(swCq.getValue());
+
+        metrics.numInferredSingleTablePredicates++;
     }
     return Status::OK();
 }
@@ -432,7 +435,8 @@ StatusWith<std::vector<BSONObj>> inferSingleTablePredicate(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     stdx::unordered_map<size_t, absl::InlinedVector<PathId, 8>> pathSets,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    OpDebug::JoinOptimizationMetrics& metrics) {
     std::vector<BSONObj> accessPathsBackingBson;
 
     for (const auto& [setId, equivalenceClass] : pathSets) {
@@ -446,7 +450,8 @@ StatusWith<std::vector<BSONObj>> inferSingleTablePredicate(
                                                     resolvedPaths,
                                                     graph,
                                                     fieldName,
-                                                    accessPathsBackingBson);
+                                                    accessPathsBackingBson,
+                                                    metrics);
             if (!sw.isOK()) {
                 return sw;
             }
@@ -471,7 +476,8 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     size_t maxNodes,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    OpDebug::JoinOptimizationMetrics& metrics) {
     DisjointSet ds{resolvedPaths.size()};
     for (const auto& edge : graph.edges()) {
         for (const auto& pred : edge.predicates) {
@@ -511,12 +517,13 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
                     // unoptimized.
                     break;
                 }
+                metrics.numInferredEqJoinPredicates++;
             }
             pathSet.push_back(currentPathId);
         }
     }
 
-    return inferSingleTablePredicate(graph, resolvedPaths, pathSets, expCtx);
+    return inferSingleTablePredicate(graph, resolvedPaths, pathSets, expCtx, metrics);
 }
 
 }  // namespace mongo::join_ordering

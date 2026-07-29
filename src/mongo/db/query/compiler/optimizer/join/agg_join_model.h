@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/op_debug.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/util/modules.h"
 
@@ -36,7 +37,8 @@ public:
      * connected component to be used for implicit edge finding.
      */
     static StatusWith<AggJoinModel> constructJoinModel(const Pipeline& pipeline,
-                                                       AggModelBuildParams buildParams);
+                                                       AggModelBuildParams buildParams,
+                                                       OpDebug::JoinOptimizationMetrics& metrics);
 
     AggJoinModel(JoinGraph graph,
                  std::vector<ResolvedPath> resolvedPaths,

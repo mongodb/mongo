@@ -50,8 +50,19 @@ TEST_F(RenamesTest, RenamePrefixLocalForeign) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -83,8 +94,19 @@ TEST_F(RenamesTest, RenamePrefixMultiLocalForeignProjectDups) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -118,8 +140,19 @@ TEST_F(RenamesTest, RenamePrefixMatchExpr) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -152,8 +185,19 @@ TEST_F(RenamesTest, RenameSubpipelineLocalForeign) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -187,8 +231,19 @@ TEST_F(RenamesTest, RenameSubpipelineMatchExpr) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -222,8 +277,19 @@ TEST_F(RenamesTest, RenameSubpipelineMatchExprProjectDups) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -258,8 +324,19 @@ TEST_F(RenamesTest, RenameSubpipelineMatchExprSwapped) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(RenamesTest, TrailingMatchAfterRename) {
@@ -276,8 +353,19 @@ TEST_F(RenamesTest, TrailingMatchAfterRename) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 }
 
 TEST_F(RenamesTest, RenamePrefixTrailingMatch) {
@@ -293,8 +381,19 @@ TEST_F(RenamesTest, RenamePrefixTrailingMatch) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -328,8 +427,19 @@ TEST_F(RenamesTest, RenameSubpipelineTrailingMatch) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -363,8 +473,19 @@ TEST_F(RenamesTest, RenameSubpipelineTrailingMatchProjectDups) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -408,8 +529,19 @@ TEST_F(RenamesTest, RenameAllTypesCycle) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"c"}}, {"C", {"d"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
@@ -469,8 +601,19 @@ TEST_F(RenamesTest, RenameMultipleCycle) {
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b", "x"}}, {"B", {"c"}}, {"C", {"d"}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
 
     auto& joinModel = swJoinModel.getValue();
     const auto& resolvedPaths = joinModel.getResolvedPaths();
