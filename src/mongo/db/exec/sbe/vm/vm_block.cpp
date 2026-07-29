@@ -11,6 +11,7 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <utility>
@@ -1829,13 +1830,13 @@ value::TagValueOwned ByteCode::builtinValueBlockDiv(ArityType arity) {
     return builtinValueBlockArithmeticOperation<static_cast<int>(ArithmeticOp::Division)>(arity);
 }
 
-value::TagValueMaybeOwned ByteCode::blockRoundTrunc(std::string funcName,
+value::TagValueMaybeOwned ByteCode::blockRoundTrunc(std::string_view funcName,
                                                     Decimal128::RoundingMode roundingMode,
                                                     ArityType arity) {
     tassert(11079912, "Unexpected arity value", arity == 1 || arity == 2);
     auto input = viewFromStack(0);
     tassert(8333100,
-            "First argument of " + funcName + " must be block of values.",
+            str::stream() << "First argument of " << funcName << " must be block of values.",
             input.tag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(input.value);
 

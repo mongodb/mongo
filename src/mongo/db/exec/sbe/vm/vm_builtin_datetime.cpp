@@ -772,7 +772,7 @@ bool ByteCode::validateDateAddParameters(TimeUnit* unit, int64_t* amount, TimeZo
     if (!value::isString(unitView.tag)) {
         return false;
     }
-    std::string unitStr{value::getStringView(unitView.tag, unitView.value)};
+    std::string_view unitStr = value::getStringView(unitView.tag, unitView.value);
     if (!isValidTimeUnit(unitStr)) {
         return false;
     }

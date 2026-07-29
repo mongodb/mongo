@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/random_utils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace sbe {
@@ -146,7 +147,7 @@ int32_t ByteCode::convertNumericToInt32(const value::TagValueView v) {
     }
 }
 
-value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
+value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string_view funcName,
                                                       Decimal128::RoundingMode roundingMode,
                                                       int32_t place,
                                                       value::TypeTags numTag,
@@ -184,7 +185,7 @@ value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
             uint32_t flags = 0;
             auto outll = out.toLong(&flags);
             uassert(5155302,
-                    "Invalid conversion to long during " + funcName + ".",
+                    str::stream() << "Invalid conversion to long during " << funcName << ".",
                     !Decimal128::hasFlag(flags, Decimal128::kInvalid));
             if (numTag == value::TypeTags::NumberInt64 ||
                 outll > std::numeric_limits<int32_t>::max()) {
@@ -198,7 +199,7 @@ value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
     }
 }
 
-value::TagValueMaybeOwned ByteCode::scalarRoundTrunc(std::string funcName,
+value::TagValueMaybeOwned ByteCode::scalarRoundTrunc(std::string_view funcName,
                                                      Decimal128::RoundingMode roundingMode,
                                                      ArityType arity) {
     tassert(11080071, "Unexpected arity value", arity == 1 || arity == 2);

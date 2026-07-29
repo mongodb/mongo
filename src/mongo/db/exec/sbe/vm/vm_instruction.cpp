@@ -200,7 +200,7 @@ MONGO_COMPILER_NORETURN void ByteCode::runFailInstruction() {
     tassert(11086800, "Unexpected error message type", value::isString(tagMsg));
 
     ErrorCodes::Error code{static_cast<ErrorCodes::Error>(value::bitcastTo<int64_t>(valCode))};
-    std::string message{value::getStringView(tagMsg, valMsg)};
+    std::string_view message{value::getStringView(tagMsg, valMsg)};
 
     uasserted(code, message);
 }

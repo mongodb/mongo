@@ -456,15 +456,15 @@ private:
     value::TagValueMaybeOwned genericLog10(value::TagValueView operand);
     value::TagValueMaybeOwned genericSqrt(value::TagValueView operand);
     value::TagValueMaybeOwned genericPow(value::TagValueView base, value::TagValueView exponent);
-    value::TagValueMaybeOwned genericRoundTrunc(std::string funcName,
+    value::TagValueMaybeOwned genericRoundTrunc(std::string_view funcName,
                                                 Decimal128::RoundingMode roundingMode,
                                                 int32_t place,
                                                 value::TypeTags numTag,
                                                 value::Value numVal);
-    value::TagValueMaybeOwned scalarRoundTrunc(std::string funcName,
+    value::TagValueMaybeOwned scalarRoundTrunc(std::string_view funcName,
                                                Decimal128::RoundingMode roundingMode,
                                                ArityType arity);
-    value::TagValueMaybeOwned blockRoundTrunc(std::string funcName,
+    value::TagValueMaybeOwned blockRoundTrunc(std::string_view funcName,
                                               Decimal128::RoundingMode roundingMode,
                                               ArityType arity);
     value::TagValueOwned genericNot(value::TypeTags tag, value::Value value);
