@@ -255,7 +255,7 @@ std::vector<ShardType> makeConfigShards() {
     std::vector<ShardType> shards;
     for (size_t i = 0; i < kTestShardIds.size(); i++) {
         ShardType shardType;
-        shardType.setHandle(ShardHandle{ShardId(kTestShardIds[i].toString()), boost::none});
+        shardType.setName(kTestShardIds[i].toString());
         shardType.setHost(kTestShardHosts[i].toString());
         shards.push_back(shardType);
     }

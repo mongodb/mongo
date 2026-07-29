@@ -8,7 +8,6 @@
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -81,15 +80,15 @@ public:
      */
     std::string toString() const;
 
-    const std::string& getName() const;
+    const std::string& getName() const {
+        return _name.get();
+    }
     void setName(const std::string& name);
 
-    const boost::optional<UUID>& getUuid() const;
-
+    const boost::optional<UUID>& getUuid() const {
+        return _uuid;
+    }
     void setUuid(boost::optional<UUID> uuid);
-
-    const ShardHandle& getHandle() const;
-    void setHandle(ShardHandle handle);
 
     const std::string& getHost() const {
         return _host.get();
@@ -119,10 +118,11 @@ public:
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
-    // (M) Handle object embedding the shard name (the _id field of the persisted doc)
-    // and internal UUID.
-    boost::optional<ShardHandle> _handle;
-    // (M)  connection string for the host(s)
+    // (M) shard id
+    boost::optional<std::string> _name;
+    // (O) shard internal UUID
+    boost::optional<UUID> _uuid;
+    // (M) connection string for the host(s)
     boost::optional<std::string> _host;
     // (O) is it draining chunks?
     boost::optional<bool> _draining;

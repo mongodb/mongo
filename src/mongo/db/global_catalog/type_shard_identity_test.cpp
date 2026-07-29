@@ -10,7 +10,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {

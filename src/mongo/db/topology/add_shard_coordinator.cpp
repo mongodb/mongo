@@ -259,7 +259,6 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto shardMembershipLock =
                     shardingCatalogManager.acquireShardMembershipLockForTopologyChange(opCtx);
 
-
                 ShardType shard;
                 shard.setName(std::string{*_doc.getChosenName()});
                 shard.setUuid(_doc.getShardUuid());

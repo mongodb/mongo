@@ -209,11 +209,11 @@ TEST_F(CommitChunkMigrate, RejectMigrationWhenChangedChunksExceedSizeLimit) {
     const auto collTimestamp = Timestamp(42);
 
     ShardType shard0;
-    shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
+    shard0.setName("shard0");
     shard0.setHost("shard0:12");
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
     setupShards({shard0, shard1});
@@ -289,11 +289,11 @@ TEST_F(CommitChunkMigrate, RejectDuringFCVTransitionWithStableOperationFCV) {
     const auto collTimestamp = Timestamp(42);
 
     ShardType shard0;
-    shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
+    shard0.setName("shard0");
     shard0.setHost("shard0:12");
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
     setupShards({shard0, shard1});
@@ -329,11 +329,11 @@ TEST_F(CommitChunkMigrate, RetryCommittedMigrationSucceedsDuringFCVTransition) {
     const auto collTimestamp = Timestamp(42);
 
     ShardType shard0;
-    shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
+    shard0.setName("shard0");
     shard0.setHost("shard0:12");
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
     setupShards({shard0, shard1});

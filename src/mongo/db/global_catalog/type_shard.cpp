@@ -12,8 +12,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
+#include <type_traits>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -43,7 +43,8 @@ ShardType::ShardType(std::string name,
                      boost::optional<UUID> uuid,
                      std::string host,
                      std::vector<std::string> tags)
-    : _handle(ShardHandle(std::move(name), std::move(uuid))),
+    : _name(std::move(name)),
+      _uuid(std::move(uuid)),
       _host(std::move(host)),
       _tags(std::move(tags)) {}
 
@@ -75,7 +76,8 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
             return swUuid.getStatus();
         }
 
-        shard._handle.emplace(std::move(shardName), swUuid.getValue());
+        shard._name = std::move(shardName);
+        shard._uuid = swUuid.getValue();
     }
 
     {
@@ -149,7 +151,7 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
 }
 
 Status ShardType::validate() const {
-    if (!_handle.has_value() || !_handle->name().isValid()) {
+    if (!_name.has_value() || _name->empty()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "missing " << name.name() << " field");
     }
@@ -171,12 +173,10 @@ Status ShardType::validate() const {
 BSONObj ShardType::toBSON() const {
     BSONObjBuilder builder;
 
-    if (_handle) {
+    if (_name)
         builder.append(name(), getName());
-        if (_handle->uuid()) {
-            _handle->uuid()->appendToBuilder(&builder, uuid.name());
-        }
-    }
+    if (_uuid)
+        getUuid().get().appendToBuilder(&builder, uuid());
     if (_host)
         builder.append(host(), getHost());
     if (_draining)
@@ -195,37 +195,12 @@ std::string ShardType::toString() const {
     return toBSON().toString();
 }
 
-const std::string& ShardType::getName() const {
-    invariant(_handle);
-    return _handle->name().toString();
-}
-
 void ShardType::setName(const std::string& name) {
-    if (_handle) {
-        _handle.emplace(name, _handle->uuid());
-    } else {
-        _handle.emplace(name, boost::none);
-    }
-}
-
-const boost::optional<UUID>& ShardType::getUuid() const {
-    invariant(_handle);
-    return _handle->uuid();
+    _name = name;
 }
 
 void ShardType::setUuid(boost::optional<UUID> uuid) {
-    invariant(_handle);
-    ShardHandle newHandle(_handle->name(), std::move(uuid));
-    _handle = std::move(newHandle);
-}
-
-const ShardHandle& ShardType::getHandle() const {
-    invariant(_handle);
-    return *_handle;
-}
-
-void ShardType::setHandle(ShardHandle handle) {
-    _handle = std::move(handle);
+    _uuid = uuid;
 }
 
 void ShardType::setHost(const std::string& host) {
