@@ -10,6 +10,7 @@ load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
     "COMMON_LINK_FLAGS",
     "GCC_INCLUDE_DIRS",
 )
+{sysroot_load}
 load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
     "FEATURES_ATTR_NAMES",
@@ -199,6 +200,8 @@ MOLD_BIN_DIR = "./external/mongo_toolchain_{version}/" + MOLD_MAP["{arch}"]["bin
 
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS]
 
+{sysroot_defs}
+
 # Helper target for the toolchain (see below):
 filegroup(
     name = "all_files",
@@ -221,7 +224,7 @@ filegroup(
     }) + select ({
         "@//bazel/config:ubsan_enabled": ["@//etc:ubsan_denylist_h"],
         "@//conditions:default": [],
-    })
+    }){sysroot_all_files}
 )
 
 feature_attrs = get_common_features_attrs()
@@ -235,7 +238,8 @@ mongo_linux_cc_toolchain_config(
     mold_bin_dir = MOLD_BIN_DIR,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
-    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    builtin_sysroot = BUILTIN_SYSROOT,
+    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
     extra_ldflags = LINK_FLAGS,
     includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     tool_paths = {
@@ -298,7 +302,8 @@ mongo_linux_cc_toolchain_config(
     mold_bin_dir = MOLD_BIN_DIR,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
-    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    builtin_sysroot = BUILTIN_SYSROOT,
+    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
     extra_ldflags = LINK_FLAGS,
     # Note that CLANG_INCLUDE_DIRS needs to be searched after the common ones, otherwise some files
     # will have include_next chains going backwards from the intended order.

@@ -3,11 +3,65 @@
 load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
+load("//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl", "SYSROOT_ENV_VAR", "sysroot_dump_disabled_reason")
 
 SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE = "no_c++_toolchain"
 
+# BUILD file fragments substituted into mongo_toolchain.BUILD.tmpl at fetch
+# time. The enable/disable decision is made here (in the repository rule, via
+# sysroot_dump_disabled_reason) rather than at analysis time so that when the
+# RBE sysroot is disabled — the default everywhere except opted-in Amazon
+# Linux 2023 hosts — the generated BUILD file never references @rbe_sysroot
+# and the toolchain's analysis graph is identical to what it was before
+# sysroot support existed (no extra loads, selects, or config deps).
+_SYSROOT_LOAD_ENABLED = """load("@rbe_sysroot//:sysroot_info.bzl", "SYSROOT_PATH")"""
+
+_SYSROOT_DEFS_ENABLED = """# When the RBE sysroot is enabled, Bazel needs to know about both the original
+# absolute include paths (used in -isystem flags) and their sysroot-resolved
+# counterparts (where headers are actually found). Including both in
+# cxx_builtin_include_directories lets Bazel validate either form.
+SYSROOT_BUILTIN_INCLUDE_DIRECTORIES = (
+    COMMON_BUILTIN_INCLUDE_DIRECTORIES +
+    ["%sysroot%" + d for d in COMMON_BUILTIN_INCLUDE_DIRECTORIES if d.startswith("/")]
+)
+
+BUILTIN_SYSROOT = select({
+    "@//bazel/config:use_rbe_sysroot_enabled": SYSROOT_PATH,
+    "//conditions:default": "",
+})
+
+EFFECTIVE_BUILTIN_INCLUDE_DIRS = select({
+    "@//bazel/config:use_rbe_sysroot_enabled": SYSROOT_BUILTIN_INCLUDE_DIRECTORIES,
+    "//conditions:default": COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+})"""
+
+_SYSROOT_DEFS_DISABLED = """# The RBE sysroot dump is disabled on this host (see sysroot_dump.bzl), so
+# the toolchain uses the plain no-sysroot configuration.
+BUILTIN_SYSROOT = ""
+
+EFFECTIVE_BUILTIN_INCLUDE_DIRS = COMMON_BUILTIN_INCLUDE_DIRECTORIES"""
+
+_SYSROOT_ALL_FILES_ENABLED = """ + select ({
+        "@//bazel/config:use_rbe_sysroot_enabled": ["@rbe_sysroot//:sysroot_files"],
+        "@//conditions:default": [],
+    })"""
+
+def _sysroot_substitutions(ctx):
+    if sysroot_dump_disabled_reason(ctx) == None:
+        return {
+            "{sysroot_load}": _SYSROOT_LOAD_ENABLED,
+            "{sysroot_defs}": _SYSROOT_DEFS_ENABLED,
+            "{sysroot_all_files}": _SYSROOT_ALL_FILES_ENABLED,
+        }
+    return {
+        "{sysroot_load}": "",
+        "{sysroot_defs}": _SYSROOT_DEFS_DISABLED,
+        "{sysroot_all_files}": "",
+    }
+
 def _toolchain_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
+    substitutions.update(_sysroot_substitutions(ctx))
 
     skip_toolchain = ctx.os.environ.get(SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE, None)
     if skip_toolchain:
@@ -59,7 +113,12 @@ def _toolchain_download(ctx):
 
 toolchain_download = repository_rule(
     implementation = _toolchain_download,
-    environ = [SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE],
+    environ = [
+        SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE,
+        # The generated BUILD file's sysroot fragments depend on whether the
+        # RBE sysroot dump is enabled, which is keyed on this variable.
+        SYSROOT_ENV_VAR,
+    ],
     attrs = {
         "os": attr.string(
             values = ["macos", "linux", "windows"],

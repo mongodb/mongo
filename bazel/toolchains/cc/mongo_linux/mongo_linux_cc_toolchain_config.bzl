@@ -1532,6 +1532,24 @@ def _impl(ctx):
         ],
     )
 
+    # When using an RBE sysroot for local builds, map debug paths from the
+    # extracted sysroot back to their absolute container paths so that debug
+    # info is identical to RBE-produced binaries. Only constructed and
+    # registered when a sysroot is configured, so the no-sysroot toolchain
+    # config is identical to what it was before sysroot support existed.
+    sysroot_debug_prefix_map = [feature(
+        name = "sysroot_debug_prefix_map",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-fdebug-prefix-map={}=/".format(ctx.attr.builtin_sysroot),
+                ])],
+            ),
+        ],
+    )] if ctx.attr.builtin_sysroot else []
+
     strip_debug_feature = feature(
         name = "strip_debug",
         enabled = False,
@@ -2163,6 +2181,7 @@ def _impl(ctx):
         debug_types_section_feature,
         no_debug_types_section_feature,
         file_prefix_map,
+    ] + sysroot_debug_prefix_map + [
         strip_debug_feature,
         clang_toolchain_resource_dir_feature,
         shared_archive_gcc_feature,
