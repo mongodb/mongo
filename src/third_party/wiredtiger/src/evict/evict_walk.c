@@ -592,7 +592,7 @@ __wti_evict_push_candidate(
      * Threads can race to queue a page (e.g., an ordinary LRU walk can race with a page being
      * queued for urgent eviction).
      */
-    orig_flags = new_flags = ref->page->flags_atomic;
+    orig_flags = new_flags = __wt_atomic_load_uint16_relaxed(&ref->page->flags_atomic);
     FLD_SET(new_flags, WT_PAGE_EVICT_LRU);
     if (orig_flags == new_flags ||
       !__wt_atomic_cas_uint16(&ref->page->flags_atomic, orig_flags, new_flags)) {

@@ -517,7 +517,7 @@ __wt_evict_page_urgent(WT_SESSION_IMPL *session, WT_REF *ref)
       __wti_evict_push_candidate(session, urgent_queue, evict_entry, ref)) {
         ++urgent_queue->evict_candidates;
         queued = true;
-        FLD_SET(page->flags_atomic, WT_PAGE_EVICT_LRU_URGENT);
+        F_SET_ATOMIC_16(page, WT_PAGE_EVICT_LRU_URGENT);
     }
     __wt_spin_unlock(session, &urgent_queue->evict_lock);
 
