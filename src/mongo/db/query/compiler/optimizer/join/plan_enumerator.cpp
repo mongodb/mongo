@@ -109,6 +109,7 @@ void PlanEnumeratorContext::enumerateINLJPlan(EdgeId edge,
     bool isBestPlan = isBestPlanSoFar(subset, inljCost);
     if (_mode.mode() == PlanEnumerationMode::CHEAPEST && !isBestPlan) {
         // Only build this plan if it is better than what we already have.
+        _joinNodesRejected++;
         return;
     }
 
@@ -134,6 +135,7 @@ void PlanEnumeratorContext::enumerateJoinPlan(JoinMethod method,
     bool isBestPlan = isBestPlanSoFar(subset, joinCost);
     if (_mode.mode() == PlanEnumerationMode::CHEAPEST && !isBestPlan) {
         // Only build this plan if it is better than what we already have.
+        _joinNodesRejected++;
         return;
     }
 
@@ -363,6 +365,11 @@ std::string PlanEnumeratorContext::toString() const {
     const auto numNodes = _ctx.joinGraph.numNodes();
     std::stringstream ss;
     ss << "HJ order pruning enabled: " << _strategy.enableHJOrderPruning << "\n";
+    ss << "numHashJoins: " << getNumHashJoins() << "\n";
+    ss << "numNestedLoopJoins: " << getNumNestedLoopJoins() << "\n";
+    ss << "numIndexedNestedLoopJoins: " << getNumIndexedNestedLoopJoins() << "\n";
+    ss << "numRejectedNodes: " << getNumJoinNodesRejectedByCost() << "\n";
+    ss << "numNodes: " << getNumNodes() << "\n";
     for (size_t level = 0; level < _joinSubsets.size(); level++) {
         ss << "Level " << level << ":\n";
         const auto n = _joinSubsets[level].size();

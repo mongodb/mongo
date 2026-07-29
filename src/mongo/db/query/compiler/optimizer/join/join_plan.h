@@ -216,7 +216,28 @@ public:
                                const JoinGraph& graph,
                                size_t numNodesToPrint = kHardMaxNodesInJoin) const;
 
+    // Number of join nodes of each method enumerated across all plans.
+    int getNumHashJoins() const {
+        return _numHashJoins;
+    }
+    int getNumNestedLoopJoins() const {
+        return _numNestedLoopJoins;
+    }
+    int getNumIndexedNestedLoopJoins() const {
+        return _numIndexedNestedLoopJoins;
+    }
+
+    // Total number of memoized nodes.
+    int getNumNodes() const {
+        return _allJoinPlans.size();
+    }
+
 private:
     std::vector<JoinPlanNode> _allJoinPlans;
+
+    // Metrics.
+    int _numHashJoins = 0;
+    int _numNestedLoopJoins = 0;
+    int _numIndexedNestedLoopJoins = 0;
 };
 }  // namespace mongo::join_ordering

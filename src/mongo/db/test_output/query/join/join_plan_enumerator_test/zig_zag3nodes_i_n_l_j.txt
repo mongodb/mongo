@@ -1,4 +1,9 @@
 HJ order pruning enabled: 0
+numHashJoins: 42
+numNestedLoopJoins: 24
+numIndexedNestedLoopJoins: 24
+numRejectedNodes: 0
+numNodes: 117
 Level 0:
 001, 010, 100
 Level 1:

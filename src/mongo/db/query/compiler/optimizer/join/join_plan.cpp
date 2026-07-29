@@ -57,6 +57,17 @@ JoinPlanNodeId JoinPlanNodeRegistry::registerJoinNode(const JoinSubset& subset,
                                                       JoinPlanNodeId right,
                                                       JoinCostEstimate cost) {
     JoinPlanNodeId id = _allJoinPlans.size();
+    switch (method) {
+        case JoinMethod::HJ:
+            _numHashJoins++;
+            break;
+        case JoinMethod::NLJ:
+            _numNestedLoopJoins++;
+            break;
+        case JoinMethod::INLJ:
+            _numIndexedNestedLoopJoins++;
+            break;
+    }
     _allJoinPlans.emplace_back(JoiningNode{method, left, right, subset.subset, std::move(cost)});
     return id;
 }

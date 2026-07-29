@@ -164,16 +164,31 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
     const JoinReorderingContext& ctx,
     const PlanEnumeratorContext& peCtx,
     const JoiningNode& join,
-    cost_based_ranker::EstimateMap& estimates);
+    cost_based_ranker::EstimateMap& estimates,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
-std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(const JoinReorderingContext& ctx,
-                                                        const PlanEnumeratorContext& peCtx,
-                                                        JoinPlanNodeId nodeId,
-                                                        cost_based_ranker::EstimateMap& estimates) {
+// Increments the winning-plan join method counts in 'metrics' as the plan tree is walked.
+std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(
+    const JoinReorderingContext& ctx,
+    const PlanEnumeratorContext& peCtx,
+    JoinPlanNodeId nodeId,
+    cost_based_ranker::EstimateMap& estimates,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     std::unique_ptr<QuerySolutionNode> qsn;
     std::visit(OverloadedVisitor{
                    [&](const JoiningNode& join) {
-                       qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates);
+                       switch (join.method) {
+                           case JoinMethod::HJ:
+                               metrics.numFinalPlanHashJoins++;
+                               break;
+                           case JoinMethod::NLJ:
+                               metrics.numFinalPlanNestedLoopJoins++;
+                               break;
+                           case JoinMethod::INLJ:
+                               metrics.numFinalPlanIndexedNestedLoopJoins++;
+                               break;
+                       }
+                       qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates, metrics);
                        addEstimatesIfExplain(
                            ctx, peCtx, qsn.get(), join.bitset, join.cost, estimates);
                    },
@@ -254,9 +269,10 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
     const JoinReorderingContext& ctx,
     const PlanEnumeratorContext& peCtx,
     const JoiningNode& join,
-    cost_based_ranker::EstimateMap& estimates) {
-    auto leftChild = buildQSNFromJoinPlan(ctx, peCtx, join.left, estimates);
-    auto rightChild = buildQSNFromJoinPlan(ctx, peCtx, join.right, estimates);
+    cost_based_ranker::EstimateMap& estimates,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
+    auto leftChild = buildQSNFromJoinPlan(ctx, peCtx, join.left, estimates, metrics);
+    auto rightChild = buildQSNFromJoinPlan(ctx, peCtx, join.right, estimates, metrics);
 
     const auto& leftSubset = peCtx.registry().getBitset(join.left);
     const auto& rightSubset = peCtx.registry().getBitset(join.right);
@@ -291,8 +307,10 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
                                       rightEmbedding);
 }
 
-ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
-                                            const PlanEnumeratorContext& peCtx) {
+ReorderedJoinSolution makeReorderedJoinSoln(
+    const JoinReorderingContext& ctx,
+    const PlanEnumeratorContext& peCtx,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     auto bestPlanNodeId = peCtx.getBestFinalPlan();
 
     const auto& registry = peCtx.registry();
@@ -302,12 +320,21 @@ ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
                 "plan"_attr = registry.joinPlanNodeToBSON(
                     bestPlanNodeId, ctx.joinGraph, ctx.joinGraph.numNodes()));
 
-    // Build QSN based on best plan.
+    // Populate enumeration-wide metrics.
+    metrics.numPlansEnumerated = peCtx.getNumFinalSubsetPlans();
+    metrics.numHashJoins = peCtx.getNumHashJoins();
+    metrics.numNestedLoopJoins = peCtx.getNumNestedLoopJoins();
+    metrics.numIndexedNestedLoopJoins = peCtx.getNumIndexedNestedLoopJoins();
+    metrics.numMemoizedNodes = peCtx.getNumNodes();
+    metrics.numJoinNodesRejectedByCost = peCtx.getNumJoinNodesRejectedByCost();
+    metrics.winningPlanCost = registry.getCost(bestPlanNodeId).getTotalCost().toDouble();
+
+    // Build QSN based on best plan. Winning plan metrics updated here.
     auto ret = std::make_unique<QuerySolution>();
     auto baseNodeId = getLeftmostNodeIdOfJoinPlan(ctx, bestPlanNodeId, registry);
 
     cost_based_ranker::EstimateMap estimates;
-    ret->setRoot(buildQSNFromJoinPlan(ctx, peCtx, bestPlanNodeId, estimates));
+    ret->setRoot(buildQSNFromJoinPlan(ctx, peCtx, bestPlanNodeId, estimates, metrics));
     LOGV2_DEBUG(11179803, 5, "QSN for winning plan", "qsn"_attr = ret->toString());
 
     ReorderedJoinSolution out{
@@ -318,9 +345,12 @@ ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
         auto rejectedPlans = peCtx.getRejectedFinalPlans();
         out.rejectedSolns.reserve(rejectedPlans.size());
 
+        // Rejected plans aren't part of the winning plan, so we discard them.
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics rejectedMetrics;
         for (auto&& planNodeId : rejectedPlans) {
             auto solution = std::make_unique<QuerySolution>();
-            solution->setRoot(buildQSNFromJoinPlan(ctx, peCtx, planNodeId, out.estimates));
+            solution->setRoot(
+                buildQSNFromJoinPlan(ctx, peCtx, planNodeId, out.estimates, rejectedMetrics));
             out.rejectedSolns.push_back(
                 {std::move(solution), getLeftmostNodeIdOfJoinPlan(ctx, planNodeId, registry)});
         }
@@ -470,7 +500,8 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
     PlanTreeShape planShape,
     boost::optional<JoinMethod> method,
     bool enableHJOrderPruning,
-    size_t maxRandomHintRetries) {
+    size_t maxRandomHintRetries,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     random_utils::PseudoRandomGenerator rand(seed);
 
     // We always run once, then retry up to 'maxRandomHintTries' times.
@@ -497,7 +528,7 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
         peCtx.enumerateJoinSubsets();
 
         if (peCtx.enumerationSuccessful()) {
-            return makeReorderedJoinSoln(ctx, peCtx);
+            return makeReorderedJoinSoln(ctx, peCtx, metrics);
         }
     }
 
@@ -506,11 +537,13 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
                   "enumeration with the current settings");
 }
 
-StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReorderingContext& ctx,
-                                                            JoinCardinalityEstimator& estimator,
-                                                            JoinCostEstimator& coster,
-                                                            EnumerationStrategy strategy,
-                                                            bool populateCachedJoinPlan) {
+StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(
+    const JoinReorderingContext& ctx,
+    JoinCardinalityEstimator& estimator,
+    JoinCostEstimator& coster,
+    EnumerationStrategy strategy,
+    bool populateCachedJoinPlan,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     PlanEnumeratorContext peCtx(ctx, &estimator, &coster, std::move(strategy));
     peCtx.enumerateJoinSubsets();
     if (!peCtx.enumerationSuccessful()) {
@@ -520,7 +553,7 @@ StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReordering
             "provided enumeration settings");
     }
 
-    auto out = makeReorderedJoinSoln(ctx, peCtx);
+    auto out = makeReorderedJoinSoln(ctx, peCtx, metrics);
     if (populateCachedJoinPlan) {
         out.cachedJoinPlan = toCachedJoinPlan(ctx, peCtx.registry(), peCtx.getBestFinalPlan());
     }

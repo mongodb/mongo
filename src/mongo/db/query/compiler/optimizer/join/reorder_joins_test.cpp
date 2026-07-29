@@ -57,8 +57,16 @@ protected:
         std::set<NodeId> baseNodes;
         for (auto seed : seeds) {
             auto clonedMap = cloneSolnMap(jCtx.singleTableAccess.cbrCqQsns);
-            auto r = constructSolutionWithRandomOrder(
-                jCtx, nullptr, nullptr, seed, planShape, method, false /* No pruning. */, retries);
+            OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;
+            auto r = constructSolutionWithRandomOrder(jCtx,
+                                                      nullptr,
+                                                      nullptr,
+                                                      seed,
+                                                      planShape,
+                                                      method,
+                                                      false /* No pruning. */,
+                                                      retries,
+                                                      metrics);
             // For tests expecting an error, we uassert.
             uassertStatusOK(r.getStatus());
             auto v = std::move(r.getValue());
@@ -992,6 +1000,7 @@ TEST_F(CachedJoinPlanTest, ConstructSolutionBottomUpPopulatesCachedJoinPlan) {
     FakeJoinCardinalityEstimator cardEstimator(jCtx);
     JoinCostEstimatorImpl costEstimator(jCtx, cardEstimator);
 
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;  // Unused for testing.
     auto swResult =
         constructSolutionBottomUp(jCtx,
                                   cardEstimator,
@@ -999,7 +1008,8 @@ TEST_F(CachedJoinPlanTest, ConstructSolutionBottomUpPopulatesCachedJoinPlan) {
                                   EnumerationStrategy{.planShape = PlanTreeShape::ZIG_ZAG,
                                                       .mode = PlanEnumerationMode::CHEAPEST,
                                                       .enableHJOrderPruning = true},
-                                  true);
+                                  true,
+                                  metrics);
 
     ASSERT_OK(swResult.getStatus());
     ASSERT_NE(nullptr, swResult.getValue().cachedJoinPlan);

@@ -428,6 +428,32 @@ public:
         int numInferredEqJoinPredicates = 0;
         // Number of inferred single-table predicates (one per predicate per table).
         int numInferredSingleTablePredicates = 0;
+
+        // Metrics gathered while enumerating join plans. We only populate these fields if we have a
+        // cache miss.
+        struct PlanEnumerationMetrics {
+            // Number of plans considered in the final subset during plan enumeration.
+            int numPlansEnumerated = 0;
+            // Number of hash joins enumerated across all levels.
+            int numHashJoins = 0;
+            // Number of indexed nested loop joins enumerated across all levels.
+            int numIndexedNestedLoopJoins = 0;
+            // Number of nested loop joins enumerated across all levels.
+            int numNestedLoopJoins = 0;
+            // Number of hash joins in the best (winning) plan.
+            int numFinalPlanHashJoins = 0;
+            // Number of indexed nested loop joins in the best (winning) plan.
+            int numFinalPlanIndexedNestedLoopJoins = 0;
+            // Number of nested loop joins in the best (winning) plan.
+            int numFinalPlanNestedLoopJoins = 0;
+            // Number of join nodes considered but rejected due to cost.
+            int numJoinNodesRejectedByCost = 0;
+            // Number of nodes memoized during plan enumeration.
+            int numMemoizedNodes = 0;
+            // Cost of the best (winning) plan.
+            double winningPlanCost = 0.0;
+        };
+        boost::optional<PlanEnumerationMetrics> planEnumerationMetrics = boost::none;
     };
     boost::optional<JoinOptimizationMetrics> joinOptimizationMetrics = boost::none;
 

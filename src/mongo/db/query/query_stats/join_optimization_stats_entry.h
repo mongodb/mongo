@@ -31,6 +31,21 @@ public:
           numInferredEqJoinPredicates(metrics.numInferredEqJoinPredicates),
           numInferredSingleTablePredicates(metrics.numInferredSingleTablePredicates) {
         joinOptimizable.aggregate(metrics.joinOptimizable);
+        if (const auto& pe = metrics.planEnumerationMetrics) {
+            planEnumerationMetrics = PlanEnumerationMetrics{
+                1,
+                AggregatedMetric<int64_t>(pe->numPlansEnumerated),
+                AggregatedMetric<int64_t>(pe->numHashJoins),
+                AggregatedMetric<int64_t>(pe->numIndexedNestedLoopJoins),
+                AggregatedMetric<int64_t>(pe->numNestedLoopJoins),
+                AggregatedMetric<int64_t>(pe->numFinalPlanHashJoins),
+                AggregatedMetric<int64_t>(pe->numFinalPlanIndexedNestedLoopJoins),
+                AggregatedMetric<int64_t>(pe->numFinalPlanNestedLoopJoins),
+                AggregatedMetric<int64_t>(pe->numJoinNodesRejectedByCost),
+                AggregatedMetric<int64_t>(pe->numMemoizedNodes),
+                AggregatedMetric<double>(pe->winningPlanCost),
+            };
+        }
         updateCount++;
     }
 
@@ -55,6 +70,22 @@ public:
     AggregatedMetric<int64_t> numSyntacticEqJoinPredicates;
     AggregatedMetric<int64_t> numInferredEqJoinPredicates;
     AggregatedMetric<int64_t> numInferredSingleTablePredicates;
+
+    struct PlanEnumerationMetrics {
+        // These metrics are only populated when we actually enumerate a plan- so we keep a count.
+        uint64_t numPlanEnumerations = 0;
+        AggregatedMetric<int64_t> numPlansEnumerated;
+        AggregatedMetric<int64_t> numHashJoins;
+        AggregatedMetric<int64_t> numIndexedNestedLoopJoins;
+        AggregatedMetric<int64_t> numNestedLoopJoins;
+        AggregatedMetric<int64_t> numFinalPlanHashJoins;
+        AggregatedMetric<int64_t> numFinalPlanIndexedNestedLoopJoins;
+        AggregatedMetric<int64_t> numFinalPlanNestedLoopJoins;
+        AggregatedMetric<int64_t> numJoinNodesRejectedByCost;
+        AggregatedMetric<int64_t> numMemoizedNodes;
+        AggregatedMetric<double> winningPlanCost;
+    };
+    boost::optional<PlanEnumerationMetrics> planEnumerationMetrics;
 };
 
 }  // namespace mongo::query_stats

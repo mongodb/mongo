@@ -27,6 +27,28 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
     numInferredEqJoinPredicates.appendTo(metricsEntryBuilder, "numInferredEqJoinPredicates");
     numInferredSingleTablePredicates.appendTo(metricsEntryBuilder,
                                               "numInferredSingleTablePredicates");
+    if (planEnumerationMetrics) {
+        metricsEntryBuilder.append(
+            "numPlanEnumerations",
+            static_cast<long long>(planEnumerationMetrics->numPlanEnumerations));
+        planEnumerationMetrics->numPlansEnumerated.appendTo(metricsEntryBuilder,
+                                                            "numPlansEnumerated");
+        planEnumerationMetrics->numHashJoins.appendTo(metricsEntryBuilder, "numHashJoins");
+        planEnumerationMetrics->numIndexedNestedLoopJoins.appendTo(metricsEntryBuilder,
+                                                                   "numIndexedNestedLoopJoins");
+        planEnumerationMetrics->numNestedLoopJoins.appendTo(metricsEntryBuilder,
+                                                            "numNestedLoopJoins");
+        planEnumerationMetrics->numFinalPlanHashJoins.appendTo(metricsEntryBuilder,
+                                                               "numFinalPlanHashJoins");
+        planEnumerationMetrics->numFinalPlanIndexedNestedLoopJoins.appendTo(
+            metricsEntryBuilder, "numFinalPlanIndexedNestedLoopJoins");
+        planEnumerationMetrics->numFinalPlanNestedLoopJoins.appendTo(metricsEntryBuilder,
+                                                                     "numFinalPlanNestedLoopJoins");
+        planEnumerationMetrics->numJoinNodesRejectedByCost.appendTo(metricsEntryBuilder,
+                                                                    "numJoinNodesRejectedByCost");
+        planEnumerationMetrics->numMemoizedNodes.appendTo(metricsEntryBuilder, "numMemoizedNodes");
+        planEnumerationMetrics->winningPlanCost.appendTo(metricsEntryBuilder, "winningPlanCost");
+    }
 }
 
 void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other) {
@@ -44,6 +66,28 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
     numSyntacticEqJoinPredicates.combine(updateVal->numSyntacticEqJoinPredicates);
     numInferredEqJoinPredicates.combine(updateVal->numInferredEqJoinPredicates);
     numInferredSingleTablePredicates.combine(updateVal->numInferredSingleTablePredicates);
+    if (updateVal->planEnumerationMetrics) {
+        const auto& other = *updateVal->planEnumerationMetrics;
+        if (!planEnumerationMetrics) {
+            planEnumerationMetrics = other;
+        } else {
+            planEnumerationMetrics->numPlanEnumerations += other.numPlanEnumerations;
+            planEnumerationMetrics->numPlansEnumerated.combine(other.numPlansEnumerated);
+            planEnumerationMetrics->numHashJoins.combine(other.numHashJoins);
+            planEnumerationMetrics->numIndexedNestedLoopJoins.combine(
+                other.numIndexedNestedLoopJoins);
+            planEnumerationMetrics->numNestedLoopJoins.combine(other.numNestedLoopJoins);
+            planEnumerationMetrics->numFinalPlanHashJoins.combine(other.numFinalPlanHashJoins);
+            planEnumerationMetrics->numFinalPlanIndexedNestedLoopJoins.combine(
+                other.numFinalPlanIndexedNestedLoopJoins);
+            planEnumerationMetrics->numFinalPlanNestedLoopJoins.combine(
+                other.numFinalPlanNestedLoopJoins);
+            planEnumerationMetrics->numJoinNodesRejectedByCost.combine(
+                other.numJoinNodesRejectedByCost);
+            planEnumerationMetrics->numMemoizedNodes.combine(other.numMemoizedNodes);
+            planEnumerationMetrics->winningPlanCost.combine(other.winningPlanCost);
+        }
+    }
     updateCount++;
 }
 

@@ -74,6 +74,28 @@ public:
     }
 
     /**
+     * Metrics accessors.
+     */
+    int getNumHashJoins() const {
+        return _registry.getNumHashJoins();
+    }
+    int getNumNestedLoopJoins() const {
+        return _registry.getNumNestedLoopJoins();
+    }
+    int getNumIndexedNestedLoopJoins() const {
+        return _registry.getNumIndexedNestedLoopJoins();
+    }
+    int getNumNodes() const {
+        return _registry.getNumNodes();
+    }
+    int getNumFinalSubsetPlans() const {
+        return finalSubset().plans.size();
+    }
+    int getNumJoinNodesRejectedByCost() const {
+        return _joinNodesRejected;
+    }
+
+    /**
      * Used for testing & debugging.
      */
     std::string toString() const;
@@ -176,6 +198,9 @@ private:
 
     // Memory management for trees so we can reuse nodes.
     JoinPlanNodeRegistry _registry;
+
+    // Metrics.
+    int _joinNodesRejected = 0;
 };
 
 }  // namespace mongo::join_ordering

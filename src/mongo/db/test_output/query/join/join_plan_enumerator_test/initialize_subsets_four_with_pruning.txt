@@ -1,5 +1,10 @@
 ZIG ZAG, 4 Nodes with pruning
 HJ order pruning enabled: 1
+numHashJoins: 6
+numNestedLoopJoins: 1
+numIndexedNestedLoopJoins: 0
+numRejectedNodes: 14
+numNodes: 11
 Level 0:
 0001, 0010, 0100, 1000
 Level 1:

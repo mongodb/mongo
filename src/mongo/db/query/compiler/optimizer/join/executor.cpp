@@ -462,6 +462,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         LOGV2_DEBUG(11083907, 5, "Join plan cache miss, running optimization");
     }
 
+    // Initialize enumeration metrics if we're here- we don't want to do this on cache hits/
+    // whenever we don't plan.
+    metrics.planEnumerationMetrics.emplace();
+
     // Select access plans for each table in the join.
     SamplingEstimatorMap samplingEstimators =
         makeSamplingEstimators(mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx());
@@ -509,7 +513,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                              costEstimator,
                                              hintedStrat ? std::move(*hintedStrat)
                                                          : getEnumerationStrategy(qkc),
-                                             useJoinPlanCache /* populateCachedJoinPlan */);
+                                             useJoinPlanCache /* populateCachedJoinPlan */,
+                                             *metrics.planEnumerationMetrics);
         }
 
         tassert(12016315,
@@ -524,7 +529,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                 &costEstimator,
                                                 qkc.getRandomJoinOrderSeed(),
                                                 getPlanTreeShape(qkc.getJoinPlanTreeShape()),
-                                                getJoinMethod(qkc.getJoinMethod()));
+                                                getJoinMethod(qkc.getJoinMethod()),
+                                                false /* enableHJOrderPruning */,
+                                                3 /* maxRandomHintRetries */,
+                                                *metrics.planEnumerationMetrics);
     }();
     uassertStatusOK(swReordered.getStatus());
     auto reordered = std::move(swReordered.getValue());
