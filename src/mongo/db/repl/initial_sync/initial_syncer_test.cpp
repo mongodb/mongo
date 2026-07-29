@@ -6068,8 +6068,16 @@ TEST_F(InitialSyncerTest, InitialSyncOtelMetricsIncrementOnFailedInitialSync) {
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::InitialSyncOplogSourceMissing, _lastApplied);
 
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kInitialSyncFailedAttempts), 1);
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kInitialSyncFailures), 1);
+    ASSERT_EQ(capturer.readInt64Counter<std::string_view>(
+                  otel::metrics::MetricNames::kInitialSyncFailedAttempts,
+                  {initial_sync_common_stats::initialSyncKindToStringView(
+                      initial_sync_common_stats::InitialSyncKind::kLogical)}),
+              1);
+    ASSERT_EQ(capturer.readInt64Counter<std::string_view>(
+                  otel::metrics::MetricNames::kInitialSyncFailures,
+                  {initial_sync_common_stats::initialSyncKindToStringView(
+                      initial_sync_common_stats::InitialSyncKind::kLogical)}),
+              1);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncOtelMetricsIncrementOnSuccessfulInitialSync) {
@@ -6117,7 +6125,11 @@ TEST_F(InitialSyncerTest, InitialSyncOtelMetricsIncrementOnSuccessfulInitialSync
     initialSyncer->join();
     ASSERT_OK(_lastApplied.getStatus());
 
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kInitialSyncCompleted), 1);
+    ASSERT_EQ(capturer.readInt64Counter<std::string_view>(
+                  otel::metrics::MetricNames::kInitialSyncCompleted,
+                  {initial_sync_common_stats::initialSyncKindToStringView(
+                      initial_sync_common_stats::InitialSyncKind::kLogical)}),
+              1);
 }
 
 }  // namespace

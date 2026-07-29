@@ -6,27 +6,30 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {
 namespace initial_sync_common_stats {
 
-// The number of initial sync attempts that have failed since server startup. Each instance of
-// InitialSyncer may run multiple attempts to fulfill an initial sync request that is triggered
-// when InitialSyncer::startup() is called.
-extern otel::metrics::Counter<int64_t>& initialSyncFailedAttempts;
+enum class InitialSyncKind { kLogical, kFCBIS };
+[[nodiscard]] static constexpr std::string_view initialSyncKindToStringView(InitialSyncKind kind) {
+    switch (kind) {
+        case InitialSyncKind::kLogical:
+            return "logical"sv;
+        case InitialSyncKind::kFCBIS:
+            return "FCBIS"sv;
+    }
+    MONGO_UNREACHABLE;
+}
 
-// The number of initial sync requests that have been requested and failed. Each instance of
-// InitialSyncer (upon successful startup()) corresponds to a single initial sync request.
-// This value does not include the number of times where a InitialSyncer is created successfully
-// but failed in startup().
-extern otel::metrics::Counter<int64_t>& initialSyncFailures;
+void incrementInitialSyncFailedAttemptMetric(InitialSyncKind kind);
+void incrementInitialSyncFailureMetric(InitialSyncKind kind);
+void incrementInitialSyncCompleteMetric(InitialSyncKind kind);
 
-// The number of initial sync requests that have been requested and completed successfully. Each
-// instance of InitialSyncer corresponds to a single initial sync request.
-extern otel::metrics::Counter<int64_t>& initialSyncCompletes;
+[[nodiscard]] size_t getInitialSyncFailedAttemptCount();
+[[nodiscard]] size_t getInitialSyncFailureCount();
+[[nodiscard]] size_t getInitialSyncCompleteCount();
 
 void LogInitialSyncAttemptStats(const StatusWith<OpTimeAndWallTime>& attemptResult,
                                 bool hasRetries,
