@@ -164,13 +164,14 @@ run_setup() {
 
     setup_bash
 
-    setup_clang_config
     setup_gdb
     setup_pipx
     setup_db_contrib_tool # This step requires `setup_pipx` to have been run.
     setup_uv              # This step requires `setup_pipx` to have been run.
 
     setup_mongo_venv # This step requires `setup_uv` to have been run.
+
+    setup_clang_config # This step requires `setup_mongo_venv` to have been run (bazel wrapper needs venv deps).
 
     echo "Please run 'source ~/.bashrc' to complete setup!"
 }
