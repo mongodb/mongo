@@ -392,28 +392,37 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) try {
-    // FCV is initialized before catalog repair on startup (as index builds may care about FCV),
-    // which means that if we crash during initial sync there may be incomplete foreground index
-    // builds that stop us from loading the index catalog. As a result, we need to perform a
-    // collection scan instead of findById(). The collection also contains sharding configuration so
-    // there can be more than one document, but it should still be a very small number.
-    auto result = repl::StorageInterface::get(opCtx)->findDocuments(
-        opCtx,
-        NamespaceString::kServerConfigurationNamespace,
-        boost::none,
-        repl::StorageInterface::ScanDirection::kForward,
-        {},
-        BoundInclusion::kIncludeStartKeyOnly,
-        std::numeric_limits<size_t>::max());
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-    for (auto&& doc : result.getValue()) {
-        if (doc["_id"].valueStringDataSafe() == multiversion::kParameterName) {
-            return doc;
-        }
-    }
-    return {ErrorCodes::NoSuchKey, "FCV document not found"};
+    // Storage reads can throw WriteConflictException, so retry the FCV document lookup.
+    return writeConflictRetry(opCtx,
+                              "findFeatureCompatibilityVersionDocument",
+                              NamespaceString::kServerConfigurationNamespace,
+                              [&] {
+                                  // FCV is initialized before catalog repair on startup (as index
+                                  // builds may care about FCV), which means that if we crash during
+                                  // initial sync there may be incomplete foreground index builds
+                                  // that stop us from loading the index catalog. As a result, we
+                                  // need to perform a collection scan instead of findById(). The
+                                  // collection also contains sharding configuration so there can
+                                  // be more than one document, but it should still be a very small
+                                  // number.
+                                  auto result = repl::StorageInterface::get(opCtx)->findDocuments(
+                                      opCtx,
+                                      NamespaceString::kServerConfigurationNamespace,
+                                      boost::none,
+                                      repl::StorageInterface::ScanDirection::kForward,
+                                      {},
+                                      BoundInclusion::kIncludeStartKeyOnly,
+                                      std::numeric_limits<size_t>::max());
+                                  uassertStatusOK(result.getStatus());
+
+                                  for (auto&& doc : result.getValue()) {
+                                      if (doc["_id"].valueStringDataSafe() ==
+                                          multiversion::kParameterName) {
+                                          return doc;
+                                      }
+                                  }
+                                  uasserted(ErrorCodes::NoSuchKey, "FCV document not found");
+                              });
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
