@@ -32,6 +32,12 @@
       # legacy mongot_cursor router path (runSearchCommandWithRetries).
       - jstests/with_mongot/e2e/sharding_no_passthrough/sharded_search_network_interruption.js
 
+      # The legacy $search path rejects user-supplied internal routing fields outright (error
+      # 5491300). The search extension does not reject them -- see
+      # search_internal_fields_ignored_by_extension.js -- so this legacy-rejection test cannot pass
+      # when the $search extension is enabled.
+      - jstests/with_mongot/e2e/search_internal_fields_rejected_by_external_client.js
+
 # REPLACES the base suite's list, dropping its in-tree test extensions (see note at top).
 - name: load_extension
   value:

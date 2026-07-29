@@ -140,7 +140,7 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                 !((stage_it != _stageSpecs.begin()) && stage->isHybridSearchStage() &&
                   !isRunningAgainstView_ForHybridSearch()));
 
-        stage->validate();
+        stage->validate(opCtx);
 
         const auto& stageName = (*stage_it)->getParseTimeName();
         const auto& stageApiStrict = (*stage_it)->getApiStrict();

@@ -7,6 +7,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -36,6 +37,22 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const final {
         return std::make_unique<VectorSearchStageParams>(_originalBson);
+    }
+
+    // Override the base LiteParsedSearchStage::validate to check only the 'view' field.
+    // $vectorSearch's user spec has fields (e.g. 'limit') that share names with internal
+    // InternalSearchMongotRemoteSpec fields used by $search/$searchMeta but are user-facing on
+    // this stage. Applying the full internal-field list here would reject legitimate queries.
+    void validate(const OperationContext* opCtx) const final {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << this->getParseTimeName() << " value must be an object. Found: "
+                              << typeName(this->_originalBson.type()),
+                this->_originalBson.type() == BSONType::object);
+        const auto spec = this->_originalBson.embeddedObject();
+        if (spec.hasField(search_helpers::kViewFieldName)) {
+            assertAllowedInternalIfRequired(
+                opCtx, search_helpers::kViewFieldName, AllowedWithClientType::kInternal);
+        }
     }
 
     // $vectorSearch produces $sortKey metadata.

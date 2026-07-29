@@ -1566,6 +1566,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/s/query/exec:router_exec_stage",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
         "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:version_impl",

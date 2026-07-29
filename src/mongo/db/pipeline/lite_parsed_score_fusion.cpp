@@ -51,7 +51,7 @@ std::unique_ptr<LiteParsedScoreFusion> LiteParsedScoreFusion::parse(
                                                    extensionsInHybridSearchEnabled);
 }
 
-void LiteParsedScoreFusion::validate() const {
+void LiteParsedScoreFusion::validate(const OperationContext* opCtx) const {
     static const std::string scorePipelineMsg =
         "All input pipelines to the $scoreFusion stage must begin with one of $search, "
         "$vectorSearch, or have a custom $score in the pipeline.";

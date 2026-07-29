@@ -33,6 +33,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -186,6 +187,22 @@ parseMongotResponseCursors(std::vector<std::unique_ptr<executor::TaskExecutorCur
         }
     }
     return result;
+}
+
+static const std::vector<std::string_view>& getInternalOnlyFieldNames() {
+    static const std::vector<std::string_view> fields = {
+        InternalSearchMongotRemoteSpec::kMongotQueryFieldName,
+        InternalSearchMongotRemoteSpec::kMetadataMergeProtocolVersionFieldName,
+        InternalSearchMongotRemoteSpec::kMergingPipelineFieldName,
+        InternalSearchMongotRemoteSpec::kLimitFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName,
+        InternalSearchMongotRemoteSpec::kSortSpecFieldName,
+        InternalSearchMongotRemoteSpec::kMongotDocsRequestedFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
+        InternalSearchMongotRemoteSpec::kDocsNeededBoundsFieldName,
+        InternalSearchMongotRemoteSpec::kViewFieldName,
+    };
+    return fields;
 }
 }  // namespace
 
@@ -694,20 +711,11 @@ boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec) {
     return boost::none;
 }
 
-void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& spec) {
-    // During $rankFusion parsing, if there's more than 1 mongot input pipeline, a view key will be
-    // injected during the parsing of that mongot stage (ex: $search, $vectorSearch, $searchMeta).
-    // Since $rankFusion passes the serialized version of the parsed pipeline to a
-    // DocumentSource::UnionWith(..) constructor, that serialized pipeline eventually gets reparsed.
-    // Because the view key already exists in the pipeline and the internal client flag is not set,
-    // this internal client error gets thrown.
-
-    // To avoid that, the isHybridSearch flag is only set after the initial parsing of the
-    // user-provided $rankFusion/$scoreFusion pipeline and its value is checked here to avoid
-    // throwing an internal client error.
-    if (spec.hasField(kViewFieldName) && !expCtx->isHybridSearch()) {
-        assertAllowedInternalIfRequired(
-            expCtx->getOperationContext(), kViewFieldName, AllowedWithClientType::kInternal);
+void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec) {
+    for (const auto& name : getInternalOnlyFieldNames()) {
+        if (spec.hasField(name)) {
+            assertAllowedInternalIfRequired(opCtx, name, AllowedWithClientType::kInternal);
+        }
     }
 }
 

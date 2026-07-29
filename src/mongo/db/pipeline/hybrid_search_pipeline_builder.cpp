@@ -13,6 +13,7 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
@@ -91,8 +92,7 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     // Annotate on the ExpressionContext that this is a hybrid search ($rankFusion/$scoreFusion)
     // query: once desugared, the pipeline alone no longer reveals its hybrid-search origin, which
-    // downstream view handling needs to know. The flag also gates an internal-client error; see
-    // search_helper::validateViewNotSetByUser(...).
+    // downstream view handling needs to know so it can reject the query if it is run over a view.
     pExpCtx->setIsHybridSearch();
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
@@ -130,7 +130,12 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
             // to append it to the total desugared output. The input pipeline consists of the
             // same stages returned by 'buildInputPipelineDesugaringStages'.
             auto unionWithPipeline = Pipeline::create(initialStagesInInputPipeline, pExpCtx);
-            std::vector<BSONObj> bsonPipeline = unionWithPipeline->serializeToBson();
+            // Serialize the $unionWith sub-pipeline in user-facing form so that any nested
+            // $search/$searchMeta/$vectorSearch stage re-lite-parses cleanly. Without this,
+            // the serialized form would carry internal routing fields (e.g. mongotQuery), which
+            // would be rejected by the recursive LiteParse field check on external clients.
+            query_shape::SerializationOptions opts{.serializeForReparse = true};
+            std::vector<BSONObj> bsonPipeline = unionWithPipeline->serializeToBson(opts);
 
             // TODO SERVER-121094 This should have been moved into the LiteParsedDesugarer so the
             // check should be redundant.

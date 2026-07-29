@@ -65,6 +65,10 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
         // We've redacted the interesting parts of the stage, return early.
         return innerSpecVal;
     }
+    // Don't emit mergingPipeline on the re-parse path; LiteParse would reject it.
+    if (opts.serializeForReparse) {
+        return innerSpecVal;
+    }
     if ((!opts.isSerializingForExplain() || getExpCtx()->getInRouter()) &&
         _spec.getMetadataMergeProtocolVersion().has_value() && _mergingPipeline) {
         MutableDocument innerSpec{innerSpecVal.getDocument()};
@@ -77,6 +81,12 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
 
 Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     const query_shape::SerializationOptions& opts) const {
+    // For re-parseable output, emit just the user mongotQuery. After planShardedSearch, the
+    // mergingPipeline is set on _spec; emitting the full IDL form would trip the
+    // LiteParse-layer check on re-parse.
+    if (opts.serializeForReparse) {
+        return opts.serializeLiteral(_spec.getMongotQuery());
+    }
     // Though router can generate explain output, it should never make a remote call to the mongot.
     if (!opts.isSerializingForExplain() || getExpCtx()->getInRouter()) {
         if (_spec.getMetadataMergeProtocolVersion().has_value()) {

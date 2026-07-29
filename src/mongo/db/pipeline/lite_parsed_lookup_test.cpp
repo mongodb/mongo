@@ -151,7 +151,7 @@ TEST_F(LiteParsedLookUpTest, RequiredPrivilegesIncludesForeignFind) {
 
 TEST_F(LiteParsedLookUpTest, ValidatePassesForSameDatabaseLookup) {
     auto lp = parse(R"({$lookup: {from: "foreign", as: "a", pipeline: [{$match: {x: 1}}]}})");
-    ASSERT_DOES_NOT_THROW(lp->validate());
+    ASSERT_DOES_NOT_THROW(lp->validate(nullptr));
 }
 
 TEST_F(LiteParsedLookUpTest, ParseRejectsCrossDbByDefault) {
@@ -165,14 +165,14 @@ TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbToConfigCacheChunks) {
     // config.cache.chunks.* is explicitly allowed.
     auto lp = parse(
         R"({$lookup: {from: {db: "config", coll: "cache.chunks.test.foo"}, as: "a", pipeline: []}})");
-    ASSERT_DOES_NOT_THROW(lp->validate());
+    ASSERT_DOES_NOT_THROW(lp->validate(nullptr));
 }
 
 TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbWhenAllowGenericForeignDbLookupSet) {
     LiteParserOptions opts;
     opts.allowGenericForeignDbLookup = true;
     auto lp = parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})", opts);
-    ASSERT_DOES_NOT_THROW(lp->validate());
+    ASSERT_DOES_NOT_THROW(lp->validate(nullptr));
 }
 
 }  // namespace
