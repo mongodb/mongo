@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -17,5 +18,16 @@ py_binary(
     srcs = ["ocsp_mock.py"],
     deps = [
         "//src/third_party/mock_ocsp_responder",
+    ],
+)
+
+py_binary(
+    name = "malformed_staple_server",
+    srcs = ["malformed_staple_server.py"],
+    deps = [
+        dependency(
+            "pyopenssl",
+            group = "testing",
+        ),
     ],
 )

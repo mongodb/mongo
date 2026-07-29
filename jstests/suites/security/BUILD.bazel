@@ -148,6 +148,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/ocsp.yml",
     data = [
         "//jstests/ocsp/lib:all_javascript_files",
+        "//jstests/ocsp/lib:malformed_staple_server",
         "//jstests/ocsp/lib:ocsp_mock",
         "//jstests/ssl/libs",
         "//x509:generate_main_certificates",
