@@ -56,15 +56,29 @@ void aggregateResults(const DBStatsCommand& cmd,
         const BSONObj& b = response.swResponse.getValue().data;
         auto resp = DBStats::parse(b, IDLParserContext{"dbstats"});
 
+        // The following fields are optional because they are filtered out when underlying client is
+        // subject to metrics filtering. However, there is no metrics filtering for internal
+        // clients, i.e. including when a mongos run a metrics command against a shardsvr or
+        // configsvr mongod. So these fields should be present in the response from each shard.
+        uassert(ErrorCodes::InternalError,
+                "Missing required field storageSize in dbStats response",
+                resp.getStorageSize().has_value());
+        uassert(ErrorCodes::InternalError,
+                "Missing required field indexSize in dbStats response",
+                resp.getIndexSize().has_value());
+        uassert(ErrorCodes::InternalError,
+                "Missing required field totalSize in dbStats response",
+                resp.getTotalSize().has_value());
+
         collections += resp.getCollections();
         views += resp.getViews();
         objects += resp.getObjects();
         unscaledDataSize += resp.getAvgObjSize() * resp.getObjects();
         dataSize += resp.getDataSize();
-        storageSize += resp.getStorageSize();
-        totalSize += resp.getTotalSize();
+        storageSize += *resp.getStorageSize();
+        totalSize += *resp.getTotalSize();
         indexes += resp.getIndexes();
-        indexSize += resp.getIndexSize();
+        indexSize += *resp.getIndexSize();
         fsUsedSize += resp.getFsUsedSize().get_value_or(0);
         fsTotalSize += resp.getFsTotalSize().get_value_or(0);
         freeStorageSize += resp.getFreeStorageSize().get_value_or(0);

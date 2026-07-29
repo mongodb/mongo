@@ -64,6 +64,9 @@ public:
                 case MetricsCategoryEnum::collStats: {
                     return {metricsPolicyManager.getCollStatsAllowlistPaths()};
                 }
+                case MetricsCategoryEnum::dbStats: {
+                    return {metricsPolicyManager.getDbStatsAllowlistPaths()};
+                }
             }
 
             uasserted(ErrorCodes::BadValue, "Unsupported metrics category");

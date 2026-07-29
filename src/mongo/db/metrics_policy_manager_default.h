@@ -34,6 +34,12 @@ public:
     const std::vector<std::string>& getCollStatsAllowlistPaths() const override;
 
     const PathMatcherNode& getCollStatsAllowlistMatcher() const override;
+
+    bool requiresDbStatsFiltering(OperationContext* opCtx) const override;
+
+    const std::vector<std::string>& getDbStatsAllowlistPaths() const override;
+
+    const PathMatcherNode& getDbStatsAllowlistMatcher() const override;
 };
 
 }  // namespace mongo

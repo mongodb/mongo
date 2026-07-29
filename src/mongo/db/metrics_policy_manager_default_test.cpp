@@ -83,5 +83,26 @@ TEST_F(MetricsPolicyManagerDefaultTest, GetCollStatsAllowlistMatcherThrowsIllega
         manager->getCollStatsAllowlistMatcher(), DBException, ErrorCodes::IllegalOperation);
 }
 
+//
+// Tests for dbStats.
+//
+
+TEST_F(MetricsPolicyManagerDefaultTest, DoesNotRequireDbStatsFiltering) {
+    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
+    ASSERT_FALSE(manager->requiresDbStatsFiltering(/*opCtx=*/nullptr));
+}
+
+TEST_F(MetricsPolicyManagerDefaultTest, GetDbStatsAllowlistPathsThrowsIllegalOperation) {
+    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
+    ASSERT_THROWS_CODE(
+        manager->getDbStatsAllowlistPaths(), DBException, ErrorCodes::IllegalOperation);
+}
+
+TEST_F(MetricsPolicyManagerDefaultTest, GetDbStatsAllowlistMatcherThrowsIllegalOperation) {
+    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
+    ASSERT_THROWS_CODE(
+        manager->getDbStatsAllowlistMatcher(), DBException, ErrorCodes::IllegalOperation);
+}
+
 }  // namespace
 }  // namespace mongo

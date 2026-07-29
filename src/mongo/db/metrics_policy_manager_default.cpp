@@ -52,4 +52,16 @@ const PathMatcherNode& MetricsPolicyManagerDefault::getCollStatsAllowlistMatcher
     _throwNoAllowlistError();
 }
 
+bool MetricsPolicyManagerDefault::requiresDbStatsFiltering(OperationContext* opCtx) const {
+    return false;
+}
+
+const std::vector<std::string>& MetricsPolicyManagerDefault::getDbStatsAllowlistPaths() const {
+    _throwNoAllowlistError();
+}
+
+const PathMatcherNode& MetricsPolicyManagerDefault::getDbStatsAllowlistMatcher() const {
+    _throwNoAllowlistError();
+}
+
 }  // namespace mongo

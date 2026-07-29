@@ -497,6 +497,16 @@ public:
                 db->getStats(opCtx, &reply, cmd.getFreeStorage(), cmd.getScale());
             }
 
+            // If filtering is required by the metrics policy, filter the reply before returning.
+            auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+            if (metricsPolicyManager.requiresDbStatsFiltering(opCtx)) {
+                BSONObj replyBSON = reply.toBSON();
+                BSONObjBuilder filteredBuilder;
+                const auto& matcher = metricsPolicyManager.getDbStatsAllowlistMatcher();
+                metrics_filtering_util::appendPaths(filteredBuilder, replyBSON, matcher);
+                reply = Reply::parseOwned(filteredBuilder.obj());
+            }
+
             return reply;
         }
     };

@@ -62,6 +62,7 @@ structs:
             storageSize:
                 description: Primary data storage size across all collections.
                 type: safeDouble
+                optional: true
             freeStorageSize:
                 # Only included with {freeStorage: 1}
                 description: Allocated but unused space in the data store.
@@ -73,6 +74,7 @@ structs:
             indexSize:
                 description: Index data storage size across all collections.
                 type: safeDouble
+                optional: true
             indexFreeStorageSize:
                 # Only included with {freeStorage: 1}
                 description: Allocated but unused space in the index store.
@@ -81,6 +83,7 @@ structs:
             totalSize:
                 description: Total data storage size (data + index).
                 type: safeDouble
+                optional: true
             totalFreeStorageSize:
                 # Only included with {freeStorage: 1}
                 description: Allocated but unused space in all stores.
