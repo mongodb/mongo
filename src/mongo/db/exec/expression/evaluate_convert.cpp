@@ -772,6 +772,24 @@ private:
         };
     }
 
+    static void validateFixedSizeBinDataSubtype(BinDataType binDataType, int actualSize) {
+        static_assert(UUID::kNumBytes == 16);
+        if (binDataType == BinDataType::bdtUUID || binDataType == BinDataType::MD5Type) {
+            uassert(13016802,
+                    str::stream() << "$convert to BinData subtype " << static_cast<int>(binDataType)
+                                  << " requires exactly " << UUID::kNumBytes << " bytes",
+                    actualSize == UUID::kNumBytes);
+        }
+    }
+
+    // Single chokepoint for producing BinData results from $convert. Every conversion that
+    // assembles a BinData payload must go through here so fixed-size subtypes (bdtUUID/MD5Type)
+    // can never be emitted with an incorrect length, regardless of the input type.
+    static Value makeBinData(const void* data, int len, BinDataType binDataType) {
+        validateFixedSizeBinDataSubtype(binDataType, len);
+        return Value(BSONBinData(data, len, binDataType));
+    }
+
     static Value parseStringToBinData(ExpressionContext* const expCtx,
                                       Value inputValue,
                                       FormatArg format,
@@ -779,31 +797,27 @@ private:
         auto input = inputValue.getStringData();
         auto binDataType = computeBinDataType(subtypeValue);
 
+        std::string decoded;
         try {
             uassert(4341116,
                     "Only the 'uuid' format is allowed with the UUID subtype",
                     (format == BinDataFormat::kUuid) == (binDataType == BinDataType::newUUID));
 
             switch (format) {
-                case BinDataFormat::kBase64: {
-                    auto decoded = base64::decode(input);
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
-                case BinDataFormat::kBase64Url: {
-                    auto decoded = base64url::decode(input);
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
-                case BinDataFormat::kHex: {
-                    auto decoded = hexblob::decode(input);
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
-                case BinDataFormat::kUtf8: {
+                case BinDataFormat::kBase64:
+                    decoded = base64::decode(input);
+                    break;
+                case BinDataFormat::kBase64Url:
+                    decoded = base64url::decode(input);
+                    break;
+                case BinDataFormat::kHex:
+                    decoded = hexblob::decode(input);
+                    break;
+                case BinDataFormat::kUtf8:
                     uassert(
                         4341119, str::stream() << "Invalid UTF-8: " << input, isValidUTF8(input));
-
-                    auto decoded = std::string{input};
-                    return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
-                }
+                    decoded = std::string{input};
+                    break;
                 case BinDataFormat::kUuid: {
                     auto uuid = uassertStatusOK(UUID::parse(input));
                     return Value(uuid);
@@ -817,6 +831,8 @@ private:
                       str::stream() << "Failed to parse BinData '" << inputValue.getString()
                                     << "' in $convert with no onError value: " << ex.reason());
         }
+
+        return makeBinData(decoded.data(), static_cast<int>(decoded.size()), binDataType);
     }
 
     static Value performConvertToTrue(ExpressionContext* const expCtx, Value inputValue) {
@@ -1071,10 +1087,10 @@ private:
                     "Mismatched padding after serializing array to binData vector",
                     actualPadding == padding);
         }
-        auto thisBinData = BSONBinData(byteArray.data(), byteArray.size(), BinDataType::Vector);
         // Note that the Value internals copy the data inside of the binData vector into a new
         // std::string_view so we do not have to worry about ownership semantics here.
-        return Value(std::move(thisBinData));
+        return makeBinData(
+            byteArray.data(), static_cast<int>(byteArray.size()), BinDataType::Vector);
     }
 
     template <class ReturnType, class SizeClass>
@@ -1156,7 +1172,9 @@ private:
             default:
                 MONGO_UNREACHABLE_TASSERT(9130005);
         }
-        return Value(BSONBinData{valBytes.data(), static_cast<int>(valBytes.size()), binDataType});
+        // sizeof(ValueType) is a compile-time constant (4 or 8 for numeric types) and never
+        // equals 16, so makeBinData always rejects bdtUUID and MD5Type on numeric inputs.
+        return makeBinData(valBytes.data(), static_cast<int>(valBytes.size()), binDataType);
     }
 
     static Value performConvertIntToBinData(ExpressionContext* const expCtx,
@@ -1195,7 +1213,7 @@ private:
 
         auto bsonObj = inputValue.getDocument().toBson();
         auto binDataType = computeBinDataType(subtypeValue);
-        return Value(BSONBinData(bsonObj.objdata(), bsonObj.objsize(), binDataType));
+        return makeBinData(bsonObj.objdata(), bsonObj.objsize(), binDataType);
     }
 
     static bool isValidUserDefinedBinDataType(int typeCode) {
@@ -1215,11 +1233,25 @@ private:
                     str::stream() << "In $convert, numeric value for 'subtype' does not correspond "
                                      "to a BinData type: "
                                   << typeCode,
-                    // Allowed ranges are 0-8 (pre-defined types) and 128-255 (user-defined types).
                     isValidBinDataType(typeCode) || isValidUserDefinedBinDataType(typeCode));
-            uassert(12910300,
-                    "$convert to BinData subtype Column (7) is not allowed",
-                    typeCode != static_cast<int>(BinDataType::Column));
+            struct BannedSubtype {
+                int subtypeCode;
+                int errCode;
+                const char* name;
+            };
+            static constexpr BannedSubtype kBannedSubtypes[] = {
+                {static_cast<int>(BinDataType::ByteArrayDeprecated),
+                 13016800,
+                 "ByteArrayDeprecated (2)"},
+                {static_cast<int>(BinDataType::Encrypt), 13016801, "Encrypt (6)"},
+                {static_cast<int>(BinDataType::Column), 12910300, "Column (7)"},
+            };
+            for (const auto& [subtypeCode, errCode, subtypeName] : kBannedSubtypes) {
+                uassert(errCode,
+                        str::stream()
+                            << "$convert to BinData subtype " << subtypeName << " is not allowed",
+                        typeCode != subtypeCode);
+            }
 
             return static_cast<BinDataType>(typeCode);
         }
