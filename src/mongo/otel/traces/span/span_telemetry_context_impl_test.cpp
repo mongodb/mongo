@@ -78,7 +78,10 @@ TEST_F(SpanTelemetryContextImplTest, ConcurrentSetSpanAndGetSpan) {
     AtomicWord<bool> stop{false};
 
     stdx::thread writer([&] {
-        while (!stop.load()) {
+        // Internally, our span's DataList maintains a shared ptr to the next node.
+        // Cap the writes so that we don't stack overflow on recursive DataList destruction.
+        constexpr int kWriteIterations = 50;
+        for (int i = 0; i < kWriteIterations; ++i) {
             impl.setSpan(makeValidSpan());
         }
     });
