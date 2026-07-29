@@ -118,6 +118,8 @@ void validateIsHybridSearchNotSetByUser(boost::intrusive_ptr<ExpressionContext> 
 /**
  * Validates that a given collection/view namespace is not a timeseries collection for hybrid
  * search.
+ * TODO SERVER-121094 Remove function once 9.0 becomes last LTS and the validation is done inside
+ * '$_internalHybridSearch' lite parsed document source.
  */
 void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx);

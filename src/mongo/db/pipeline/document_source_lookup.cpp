@@ -1452,6 +1452,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
             NamespaceString::makeCollectionlessAggregateNSS(pExpCtx->getNamespaceString().dbName());
     }
 
+    // TODO SERVER-121094 Remove these assertions when featureFlagExtensionsInsideHybridSearch is
+    // removed (this whole code path will be dead code as well)
     if (lookupSpec.getIsHybridSearch() || hybrid_scoring_util::isHybridSearchPipeline(pipeline)) {
         // If there is a hybrid search stage in our pipeline, then we should validate that we
         // are not running on a timeseries collection.
@@ -1461,8 +1463,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         // hybrid search. Therefore, we must validate it here.
         hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(fromNs, pExpCtx);
 
-        // TODO SERVER-121094 Remove this assertion when featureFlagExtensionsInsideHybridSearch is
-        // removed (this whole code path will be dead code as well)
         auto ifrCtx = pExpCtx->getIfrContext();
         bool hybridSearchFlagEnabled = ifrCtx &&
             ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
