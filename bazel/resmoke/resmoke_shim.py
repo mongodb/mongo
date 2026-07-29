@@ -210,6 +210,15 @@ class ResmokeShimContext:
             os.environ["TMP"] = self.tmpdir_symlink
             os.environ["TEMP"] = self.tmpdir_symlink
 
+        # JVM-based test dependencies (mongot) write their perf data to a shared memory file
+        # at /tmp/hsperfdata_<user>/<pid>. HotSpot hardcodes /tmp on Linux, so this ignores the
+        # TMPDIR isolation above. Because each shard runs in its own PID namespace, concurrent
+        # shards produce identical pids and collide on the same file, which makes the JVM emit a
+        # "Cannot use file ... because it is locked by another process" warning on stdout.
+        # Keep perf data in private memory instead so there is no file to contend over.
+        java_tool_options = os.environ.get("JAVA_TOOL_OPTIONS", "")
+        os.environ["JAVA_TOOL_OPTIONS"] = (java_tool_options + " -XX:+PerfDisableSharedMem").strip()
+
         # Bazel will send SIGTERM on a test timeout. If all processes haven't terminated
         # after –-local_termination_grace_seconds (default 15s), Bazel will SIGKILL them instead.
         signal.signal(signal.SIGTERM, self._handle_interrupt)
