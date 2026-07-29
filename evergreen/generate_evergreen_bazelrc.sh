@@ -35,6 +35,21 @@ else
     echo "common --define GIT_COMMIT_HASH=${GIT_REV}" >>.bazelrc.git
 fi
 
+# Size the Bazel server JVM heap as a fraction of the host's physical RAM.
+# Defaults to 0.5 for all Evergreen jobs; individual tasks may override via the
+# bazel_jvm_heap_ram_ratio expansion. This gives the Bazel server enough heap to
+# hold many concurrent, remotely executed actions in memory (most JVMs otherwise
+# default to just 25% of physical RAM). Linux only; /proc/meminfo is unavailable
+# on Windows/macOS.
+bazel_jvm_heap_ram_ratio="${bazel_jvm_heap_ram_ratio:-0.5}"
+if [[ -n "${bazel_jvm_heap_ram_ratio}" ]] && [[ -r /proc/meminfo ]]; then
+    mem_kb=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+    if [[ -n "${mem_kb}" ]]; then
+        xmx_mb=$(awk -v kb="${mem_kb}" -v r="${bazel_jvm_heap_ram_ratio}" 'BEGIN {printf "%d", kb / 1024 * r}')
+        echo "startup --host_jvm_args=-Xmx${xmx_mb}m" >>.bazelrc.evergreen
+    fi
+fi
+
 if [[ "${requester}" == "commit" ]]; then
     mongo_version=$(awk -F'MONGO_VERSION=' '/MONGO_VERSION=/ { split($2, version, /[[:space:]]/); print version[1]; exit }' .bazelrc.target_mongo_version)
     if [[ -z "${mongo_version}" ]]; then
