@@ -67,7 +67,8 @@ private:
     Status _refreshParameters(OperationContext* opCtx);
 
     std::unique_ptr<PeriodicJobAnchor> _job;
-    multiversion::FeatureCompatibilityVersion _lastFcv;
+    multiversion::FeatureCompatibilityVersion _lastFcv =
+        multiversion::FeatureCompatibilityVersion::kInvalid;
     std::mutex _mutex;
 
     std::unique_ptr<SharedPromise<void>> _refreshPromise;
