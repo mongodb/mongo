@@ -141,8 +141,6 @@ private:
  */
 class OwnedValueAccessor final : public AssignableSlotAccessor {
 public:
-    using AssignableSlotAccessor::reset;
-
     OwnedValueAccessor() = default;
 
     OwnedValueAccessor(const OwnedValueAccessor& other) {
@@ -201,20 +199,42 @@ public:
         }
     }
 
+    /*
+     * Note that 'OwnedValueAccessor' _shadows_ the 'reset()' methods instead of inheriting them.
+     * Whereas the parent 'AssignableSlotAccessor' implementations delegate their operation to the
+     * virtual 'reset_raw()' method, these implementations delegate to a non-virtual method
+     * implementing the same logic that 'reset_raw()' does.
+     *
+     * This trick allows calls to 'reset()' through a variable, pointer, or reference with
+     * 'OwnedValueAccessor' type to always skip virtual dispatch, which measurably speeds up
+     * workloads. However, it precludes any class from inheriting this class and overriding its
+     * 'reset_raw()' method. Keep 'OwnedValueAccessor' as a 'final' class to ensure this requirement
+     * is met.
+     */
     void reset() {
-        reset(TypeTags::Nothing, 0);
+        reset(TagValueView::nothing());
     }
 
     void reset(TypeTags tag, Value val) {
-        reset_raw(true, tag, val);
+        resetImpl(true, tag, val);
+    }
+
+    void reset(TagValueView value) {
+        resetImpl(false, value.tag, value.value);
+    }
+
+    void reset(TagValueOwned value) {
+        auto [tag, val] = value.releaseToRaw();
+        resetImpl(true, tag, val);
+    }
+
+    void reset(TagValueMaybeOwned value) {
+        auto [owned, tag, val] = value.releaseToRaw();
+        resetImpl(owned, tag, val);
     }
 
     void reset_raw(bool owned, TypeTags tag, Value val) override {
-        release();
-
-        _tag = tag;
-        _val = val;
-        _owned = owned;
+        resetImpl(owned, tag, val);
     }
 
     void makeOwned() {
@@ -227,6 +247,14 @@ public:
     }
 
 private:
+    void resetImpl(bool owned, TypeTags tag, Value val) {
+        release();
+
+        _tag = tag;
+        _val = val;
+        _owned = owned;
+    }
+
     void release() {
         if (_owned) {
             releaseValue(_tag, _val);
