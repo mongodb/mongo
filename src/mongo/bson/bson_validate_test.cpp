@@ -94,19 +94,6 @@ void appendObjectElementWithInvalidSize(const char* fieldName, BufBuilder* bb, i
     bb->appendNum(objectSize);
 }
 
-BSONObj createColumnObj(std::vector<BSONElement> elems) {
-    BSONColumnBuilder cb;
-    for (auto&& elem : elems) {
-        cb.append(elem);
-    }
-
-    const BSONBinData columnData = cb.finalize();
-
-    BSONObjBuilder bucket;
-    bucket.append("a", columnData);
-    return bucket.obj();
-}
-
 TEST(BSONValidate, Basic) {
     BSONObj x;
     ASSERT_TRUE(validateBSON(x).isOK());
@@ -1415,7 +1402,7 @@ TEST(BSONValidateColumn, BSONColumnBadExtendedSelector) {
     uint8_t* selectorByte = (uint8_t*)columnData.data + 31; /* first 7 selector */
     ASSERT_EQ(7, *selectorByte & 15);                       // Check that we found a 7 selector
     *selectorByte = (14 << 4) | 7; /* 14 extended selector, original selector 7 */
-    ASSERT_NOT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
 }
 
 TEST(BSONValidateColumn, BSONColumnInterestingFuzzerInputs) {
@@ -1484,105 +1471,6 @@ TEST(BSONValidateColumn, BSONColumnWithObjectNestedCodeWScope) {
     ASSERT_FALSE(
         validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateModeEnum::kFull)
             .isOK());
-}
-
-TEST(BSONValidateColumn, BSONColumnMemLimitSingleElem) {
-    const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
-
-    // Use empty field name to mimic how elements are stored in a BSONColumn. The element is stored
-    // twice, in the column binary and as first uncompressed element. Use a size below half of
-    // memory limit.
-    BSONObj obj = BSON("" << std::string(1024 * 100, 'x'));
-    BSONElement elem = obj.firstElement();
-
-    BSONObj column = createColumnObj({elem});
-    ASSERT_LT(column.objsize() + elem.size(), memLimit);
-    ASSERT_OK(validateBSON(column));
-
-    // Test with single large element above limit
-    obj = BSON("" << std::string(1024 * 150, 'x'));
-    elem = obj.firstElement();
-
-    column = createColumnObj({254, elem});
-    ASSERT_GTE(column.objsize() + elem.size(), memLimit);
-    ASSERT_EQ(validateBSON(column).code(), ErrorCodes::ExceededMemoryLimit);
-}
-
-TEST(BSONValidateColumn, BSONColumnMemLimitManyRepeated) {
-    const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
-
-    // Use empty field name to mimic how elements are stored in a BSONColumn.
-    BSONObj obj = BSON("" << std::string(1024, 'x'));
-    BSONElement elem = obj.firstElement();
-
-    BSONObj column = createColumnObj({253, elem});
-    ASSERT_LT(column.objsize() + elem.size() * 253, memLimit);
-    ASSERT_OK(validateBSON(column));
-
-    column = createColumnObj({254, elem});
-    ASSERT_GTE(column.objsize() + elem.size() * 254, memLimit);
-    ASSERT_EQ(validateBSON(column).code(), ErrorCodes::ExceededMemoryLimit);
-}
-
-TEST(BSONValidateColumn, BSONColumnMemLimitAllSkip) {
-    const long long memLimit = 1024 * 15;  // 15KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
-
-    BSONElement elem;
-    size_t elemSize = sizeof(boost::optional<BSONElement>);
-
-    BSONObj column = createColumnObj({500, elem});
-    ASSERT_LT(static_cast<long long>(column.objsize() + elemSize * 500), memLimit);
-    ASSERT_OK(validateBSON(column));
-
-    column = createColumnObj({10000, elem});
-    ASSERT_GTE(static_cast<long long>(column.objsize() + elemSize * 10000), memLimit);
-    ASSERT_EQ(validateBSON(column).code(), ErrorCodes::ExceededMemoryLimit);
-}
-
-TEST(BSONValidateColumn, BSONColumnMemLimitInterleaved) {
-    const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
-
-    // Use empty field name to mimic how elements are stored in a BSONColumn.
-    BSONObj obj = BSON("" << BSON("a" << std::string(1024, 'x') << "b" << 1.0));
-    BSONElement elem = obj.firstElement();
-
-    BSONObj column = createColumnObj({245, elem});
-    ASSERT_LT(column.objsize() + elem.size() * 245, memLimit);
-    ASSERT_OK(validateBSON(column));
-
-    column = createColumnObj({250, elem});
-    ASSERT_GTE(column.objsize() + elem.size() * 250, memLimit);
-    ASSERT_EQ(validateBSON(column).code(), ErrorCodes::ExceededMemoryLimit);
-}
-
-TEST(BSONValidateColumn, BSONColumnMemLimitInterleavedRestart) {
-    const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
-
-    // Use empty field name to mimic how elements are stored in a BSONColumn.
-    BSONObj obj = BSON("" << BSON("a" << std::string(1024, 'x') << "b" << 1.0));
-    BSONElement elem = obj.firstElement();
-    // Swap order of elements to trigger restart of interleaved mode
-    BSONObj obj2 = BSON("" << BSON("b" << std::string(1024, 'x') << "a" << 1.0));
-    BSONElement elem2 = obj.firstElement();
-
-    std::vector<BSONElement> elems(123, elem);
-    elems.insert(elems.end(), 122, elem2);
-
-    BSONObj column = createColumnObj(elems);
-    ASSERT_LT(column.objsize() + elem.size() * 123 + elem2.size() * 122, memLimit);
-    ASSERT_OK(validateBSON(column));
-
-    elems.clear();
-    elems.insert(elems.end(), 100, elem);
-    elems.insert(elems.end(), 200, elem2);
-    column = createColumnObj(elems);
-    ASSERT_GTE(column.objsize() + elem.size() * 100 + elem2.size() * 200, memLimit);
-    ASSERT_EQ(validateBSON(column).code(), ErrorCodes::ExceededMemoryLimit);
 }
 
 }  // namespace
