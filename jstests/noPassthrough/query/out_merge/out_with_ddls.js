@@ -197,7 +197,7 @@ assert.commandWorked(
     }),
 );
 
-assert.commandWorked(
+assert.commandFailed(
     assertSerializedOrError({
         desc: "Concurrent $out and drop target collection",
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
@@ -210,7 +210,7 @@ assert.commandWorked(
             targetColl.insertOne({val: "should get overwritten"});
         },
         ddlFn() {
-            assert(sourceColl.drop());
+            assert(targetColl.drop());
         },
     }),
 );
