@@ -386,8 +386,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
                 expCtx->getNamespaceString().dbName());
         }
         pipeline = unionWithSpec.getPipeline().value_or(std::vector<BSONObj>{});
-        // TODO SERVER-121094 Remove these assertions when featureFlagExtensionsInsideHybridSearch
-        // is removed.
         if (unionWithSpec.getIsHybridSearch() ||
             hybrid_scoring_util::isHybridSearchPipeline(pipeline)) {
             // If there is a hybrid search stage in our pipeline, then we should validate that we

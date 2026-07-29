@@ -396,8 +396,6 @@ void validateIsHybridSearchNotSetByUser(boost::intrusive_ptr<ExpressionContext> 
     }
 }
 
-// TODO SERVER-121094 Remove function once 9.0 becomes last LTS and the validation is done inside
-// '$_internalHybridSearch' lite parsed document source.
 void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto opCtx = expCtx->getOperationContext();
@@ -416,6 +414,7 @@ void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
         // However, in a sharded collections environment, a mongod shard might not know the
         // information about the timeseries collection (if it is owned by another shard). In
         // that case, it is non-trivial to ban the timeseries query.
+        // TODO SERVER-108218 Ban hybrid search inside of subpipelines on time series collections.
         LOGV2(10787902,
               "$rankFusion and $scoreFusion are unsupported on timeseries collections, but not "
               "enough information is available to determine if a subpipeline is running on a "

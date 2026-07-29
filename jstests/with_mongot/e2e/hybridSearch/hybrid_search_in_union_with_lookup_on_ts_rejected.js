@@ -2,7 +2,14 @@
  * Tests hybrid search with both $scoreFusion and $rankFusion get rejected when inside of $unionWith
  * or $lookup subpipelines on timeseries collections.
  *
- * @tags: [ requires_timeseries, featureFlagSearchHybridScoringFull, requires_fcv_82, requires_getmore ]
+ * This test can only run on unsharded collections because we cannot deterministically ban hybrid
+ * search on timeseries collections in the sharded collections case.
+ *
+ * TODO SERVER-108218 Ban hybrid search on sharded collections and remove the
+ * assumes_unsharded_collection tag.
+ *
+ * @tags: [ requires_timeseries, assumes_unsharded_collection, featureFlagSearchHybridScoringFull,
+ * requires_fcv_82 ]
  */
 
 const timeseriesCollName = jsTestName() + "_timeseries";
@@ -27,33 +34,16 @@ let scoreFusionPipeline = [
 ];
 
 function runPipeline(pipeline, collName) {
-    // Run the aggregation and fully drain the resulting cursor. The firstBatch in $unionWith might
-    // not include timeseries documents, and therefore might succeed, since the subpipeline hasn't
-    // been validated yet.
-    const initialResponse = db.runCommand({aggregate: collName, pipeline, cursor: {}});
-    if (!initialResponse.ok) {
-        return initialResponse;
-    }
-    let cursor = initialResponse.cursor;
-    while (cursor.id != 0) {
-        const getMoreResponse = db.runCommand({getMore: cursor.id, collection: collName});
-        if (!getMoreResponse.ok) {
-            return getMoreResponse;
-        }
-        cursor = getMoreResponse.cursor;
-    }
-    return initialResponse;
+    return db.runCommand({aggregate: collName, pipeline, cursor: {}});
 }
 
 (function testHybridSearchRejected() {
     assert.commandFailedWithCode(runPipeline(rankFusionPipeline, timeseriesCollName), [
-        10557301, // shard
-        10557300, // router
+        10557301,
         ErrorCodes.OptionNotSupportedOnView,
     ]);
     assert.commandFailedWithCode(runPipeline(scoreFusionPipeline, timeseriesCollName), [
-        10557301, // shard
-        10557300, // router
+        10557301,
         ErrorCodes.OptionNotSupportedOnView,
     ]);
 })();
@@ -157,7 +147,7 @@ function runPipeline(pipeline, collName) {
     };
     assert.commandFailedWithCode(
         runPipeline([rankFusionUnionWithStage], nonTimeseriesCollName),
-        [10787900, 10787901, 12093200],
+        [10787900, 10787901],
     );
 
     let scoreFusionUnionWithStage = {
@@ -165,7 +155,7 @@ function runPipeline(pipeline, collName) {
     };
     assert.commandFailedWithCode(
         runPipeline([scoreFusionUnionWithStage], nonTimeseriesCollName),
-        [10787900, 10787901, 12093200],
+        [10787900, 10787901],
     );
 })();
 
@@ -178,7 +168,7 @@ function runPipeline(pipeline, collName) {
     };
     assert.commandFailedWithCode(
         runPipeline([nestedRankFusionUnionWithStage], nonTimeseriesCollName),
-        [10787900, 10787901, 12093200],
+        [10787900, 10787901],
     );
 
     let scoreFusionUnionWithStage = {
@@ -189,7 +179,7 @@ function runPipeline(pipeline, collName) {
     };
     assert.commandFailedWithCode(
         runPipeline([nestedScoreFusionUnionWithStage], nonTimeseriesCollName),
-        [10787900, 10787901, 12093200],
+        [10787900, 10787901],
     );
 })();
 
