@@ -14,6 +14,7 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {skipTestIfSizeBasedOplogTruncationDisabled} from "jstests/libs/oplog_truncation_util.js";
 
 const doTest = () => {
     const replSet = new ReplSetTest({
@@ -27,6 +28,11 @@ const doTest = () => {
     replSet.startSet(Object.assign(minRetention, PrepareHelpers.replSetStartSetOptions));
     replSet.initiate();
     const primary = replSet.getPrimary();
+
+    // This test relies on size-based oplog truncation, which may be disabled in disagg.
+    // TODO(SERVER-123977) remove this once this feature flag is enabled by default
+    skipTestIfSizeBasedOplogTruncationDisabled(primary, () => replSet.stopSet());
+
     let oplogEntries = primary.getDB("local").getCollection("oplog.rs");
 
     // ensure that oplog is not initially at capacity
