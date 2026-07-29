@@ -168,7 +168,7 @@ public:
                         opCtx,
                         nss,
                         PlacementConcern{oss.getDbVersion(nss.dbName()), oss.getShardVersion(nss)},
-                        makeLocalValidatorScanFn(opCtx)));
+                        /*localOnly=*/true));
                 }
             }
 

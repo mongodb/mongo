@@ -30,13 +30,11 @@ mongo_cc_library(
         "constraint_validation_level_upgrade.h",
     ],
     deps = [
-        "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands:standalone",
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/shard_role",
         "//src/mongo/rpc",
-        "//src/mongo/s/query/planner:cluster_aggregate",
     ],
 )
 

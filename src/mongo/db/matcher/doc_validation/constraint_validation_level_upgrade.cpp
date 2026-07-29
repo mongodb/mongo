@@ -5,20 +5,16 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/query_cmd/run_aggregate.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/util/str.h"
 
 #include <string_view>
 #include <vector>
-
-#include <boost/none.hpp>
 
 namespace mongo {
 namespace {
@@ -47,42 +43,10 @@ Status makeViolatingValidatorStatus(const BSONObj& validator,
 
 }  // namespace
 
-// TODO SERVER-127395: Replace runAggregate/ClusterAggregate::runAggregate with public API calls
-// (e.g. CommandHelpers::runCommandDirectly) and pass isSharded as a bool instead of a function.
-ValidatorScanFn makeLocalValidatorScanFn(OperationContext* opCtx) {
-    return
-        [opCtx](AggregateCommandRequest& req, const PrivilegeVector& privs) -> StatusWith<BSONObj> {
-            rpc::OpMsgReplyBuilder reply;
-            if (auto s = runAggregate(
-                    opCtx, req, LiteParsedPipeline{req}, req.toBSON(), privs, boost::none, &reply);
-                !s.isOK()) {
-                return s;
-            }
-            auto b = reply.getBodyBuilder();
-            CommandHelpers::appendSimpleCommandStatus(b, true);
-            b.doneFast();
-            return reply.releaseBody();
-        };
-}
-
-ValidatorScanFn makeClusterValidatorScanFn(OperationContext* opCtx) {
-    return [opCtx](AggregateCommandRequest& req,
-                   const PrivilegeVector& privs) -> StatusWith<BSONObj> {
-        auto ns = req.getNamespace();
-        BSONObjBuilder result;
-        if (auto s =
-                ClusterAggregate::runAggregate(opCtx, {ns, ns}, req, privs, boost::none, &result);
-            !s.isOK()) {
-            return s;
-        }
-        return result.obj();
-    };
-}
-
 Status noDocumentsViolatingValidator(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      PlacementConcern placementConcern,
-                                     ValidatorScanFn runAgg) {
+                                     bool localOnly) {
     BSONObj validator;
     {
         auto coll =
@@ -117,27 +81,37 @@ Status noDocumentsViolatingValidator(OperationContext* opCtx,
     AggregateCommandRequest aggRequest(nss, std::move(pipeline));
     aggRequest.setHint(BSON("$natural" << 1));
 
-    PrivilegeVector privs{Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)};
+    // For sharded collections "clusterAggregate" fans out to all shards; otherwise use local
+    // "aggregate". appendElementsRenamed renames the first field and carries over the rest.
+    auto aggBSON = aggRequest.toBSON();
+    BSONObj cmdObj = localOnly
+        ? aggBSON
+        : BSONObjBuilder().appendElementsRenamed(aggBSON, BSON("clusterAggregate" << 1)).obj();
 
-    auto resultOrStatus = runAgg(aggRequest, privs);
-    if (!resultOrStatus.isOK()) {
-        return resultOrStatus.getStatus();
+    auto request =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx), nss.dbName(), cmdObj);
+    auto result = CommandHelpers::runCommandDirectly(opCtx, request);
+
+    auto status = getStatusFromCommandResult(result);
+    if (!status.isOK()) {
+        return status;
     }
 
-    auto cursorResponse = CursorResponse::parseFromBSON(resultOrStatus.getValue(),
-                                                        nullptr,
-                                                        nss.tenantId(),
-                                                        SerializationContext::stateCommandReply());
+    auto cursorResponse = CursorResponse::parseFromBSON(
+        result, nullptr, nss.tenantId(), SerializationContext::stateCommandReply());
     if (!cursorResponse.isOK()) {
         return cursorResponse.getStatus();
     }
-
-    const auto& batch = cursorResponse.getValue().getBatch();
-    if (batch.empty()) {
+    const auto& cursor = cursorResponse.getValue();
+    if (cursor.getCursorId() != 0) {
+        return Status(ErrorCodes::InternalError,
+                      "validator scan cursor was not exhausted after $limit 1");
+    }
+    if (cursor.getBatch().empty()) {
         return Status::OK();
     }
 
-    return makeViolatingValidatorStatus(validator, nss.coll(), batch[0]["_id"]);
+    return makeViolatingValidatorStatus(validator, nss.coll(), cursor.getBatch()[0]["_id"]);
 }
 
 }  // namespace mongo
