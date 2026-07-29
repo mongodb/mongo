@@ -207,6 +207,15 @@ public:
     }
 
     /**
+     * Returns true if this instance was recovered from a coordinator document that had already
+     * reached kQuiesced, i.e. the resharding operation it represents finished on a previous
+     * primary.
+     */
+    bool isRecoveryInQuiesce() const {
+        return _isRecoveryInQuiesce;
+    }
+
+    /**
      * Returns a Future that will be resolved when all work associated with this Instance has
      * completed running.
      */
@@ -776,6 +785,7 @@ private:
     OperationSessionTracker _sessionTracker;
 
     const bool _isRecovery;
+    const bool _isRecoveryInQuiesce;
 };
 
 }  // namespace mongo

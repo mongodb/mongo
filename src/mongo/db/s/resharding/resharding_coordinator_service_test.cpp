@@ -1350,6 +1350,66 @@ TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {
     runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
 }
 
+TEST_F(ReshardingCoordinatorServiceTest, QuiescedInstanceRebuiltOnStepUpDoesNotConflict) {
+    auto opCtx = operationContext();
+
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    // A user-supplied resharding UUID is what enables the quiesce period.
+    reshardingOptions.userReshardingUUID = UUID::gen();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   reshardingOptions);
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    coordinator->abort({resharding::kUserAbortReason, resharding::AbortType::kAbortWithQuiesce});
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kQuiesced);
+
+    stepDown(opCtx);
+    coordinator.reset();
+
+    // Rebuild the quiesced instance on step up and hold it early in its chain of work so that its
+    // completion future is not ready yet.
+    auto pauseBeforeCTHolderInitialization =
+        globalFailPointRegistry().find("pauseBeforeCTHolderInitialization");
+    auto timesEnteredFailPoint = pauseBeforeCTHolderInitialization->setMode(FailPoint::alwaysOn, 0);
+
+    stepUp(opCtx);
+    pauseBeforeCTHolderInitialization->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    auto instanceId =
+        BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << _reshardingUUID);
+    auto quiescedCoordinator = getCoordinator(opCtx, instanceId);
+    ASSERT_TRUE(quiescedCoordinator->isRecoveryInQuiesce());
+    ASSERT_FALSE(quiescedCoordinator->getCompletionFuture().isReady());
+
+    // A resharding operation for a different namespace, with no user-supplied resharding UUID,
+    // must not conflict with the quiesced one.
+    auto newCoordinator =
+        initializeAndGetCoordinator(UUID::gen(),
+                                    NamespaceString::createNamespaceString_forTest("db.moo"),
+                                    NamespaceString::createNamespaceString_forTest(
+                                        "db.system.resharding." + UUID::gen().toString()),
+                                    ShardKeyPattern(BSON("shardKeyV1" << 1)),
+                                    UUID::gen(),
+                                    ShardKeyPattern(BSON("shardKeyV2" << 1)));
+
+    // Request the aborts before releasing it, then wait for completion, otherwise the new
+    // instance can never make progress.
+    newCoordinator->abort({resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
+    quiescedCoordinator->abort(
+        {resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
+    pauseBeforeCTHolderInitialization->setMode(FailPoint::off, 0);
+
+    ASSERT_EQ(newCoordinator->getCompletionFuture().getNoThrow(), resharding::kUserAbortReason);
+    ASSERT_EQ(quiescedCoordinator->getCompletionFuture().getNoThrow(),
+              resharding::kUserAbortReason);
+    quiescedCoordinator->getQuiescePeriodFinishedFuture().wait();
+}
+
 TEST_F(ReshardingCoordinatorServiceTest, SuccessfullyAbortReshardOperationImmediately) {
     auto pauseBeforeCTHolderInitialization =
         globalFailPointRegistry().find("pauseBeforeCTHolderInitialization");

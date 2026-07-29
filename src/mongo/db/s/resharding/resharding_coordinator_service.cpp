@@ -52,11 +52,15 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
     for (const auto& instance : existingInstances) {
         auto typedInstance = checked_cast<const ReshardingCoordinator*>(instance);
         // Instances which have already completed do not conflict with other instances, unless
-        // their user resharding UUIDs are the same.
+        // their user resharding UUIDs are the same. An instance recovered from a kQuiesced document
+        // has also already completed, even though its freshly started chain of work has not
+        // fulfilled its completion promise yet.
         const bool isUserReshardingUUIDSame =
             typedInstance->getMetadata().getUserReshardingUUID() ==
             coordinatorDoc.getUserReshardingUUID();
-        if (!isUserReshardingUUIDSame && typedInstance->getCompletionFuture().isReady()) {
+        const bool hasAlreadyCompleted =
+            typedInstance->isRecoveryInQuiesce() || typedInstance->getCompletionFuture().isReady();
+        if (!isUserReshardingUUIDSame && hasAlreadyCompleted) {
             LOGV2_DEBUG(7760400,
                         1,
                         "Ignoring 'conflict' with completed instance of resharding",
