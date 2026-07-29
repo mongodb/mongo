@@ -423,6 +423,12 @@ public:
      */
     void stopExpressionCounters();
 
+    /**
+     * Increments the memory-intensive expression counter and throws ExceededMemoryLimit if it
+     * exceeds internalQueryMaxMemoryIntensiveExpressions.
+     */
+    void checkAndIncrementMemoryIntensiveExprCount(std::string_view exprName);
+
     bool expressionCountersAreActive() const {
         return static_cast<bool>(_expressionCounters);
     }
@@ -1426,6 +1432,7 @@ protected:
 
 private:
     std::unique_ptr<ExpressionCounters> _expressionCounters;
+    uint32_t _memoryIntensiveExprCount = 0;
 
     // Query-scoped fallback tracker for expression evaluation; see getExpressionFallbackTracker().
     // Created lazily and reused across all documents/expressions in this query.

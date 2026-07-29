@@ -1125,6 +1125,13 @@ public:
         return make_intrusive<ExpressionArray>(expCtx, std::move(children));
     }
 
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount("$array"sv);
+        return ExpressionNaryBase<ExpressionArray>::parse(expCtx, bsonExpr, vps);
+    }
+
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
@@ -1439,6 +1446,13 @@ public:
 
     ExpressionConcatArrays(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionConcatArrays>(expCtx, std::move(children)) {}
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionConcatArrays>::parse(expCtx, bsonExpr, vps);
+    }
 
     Value evaluate(const Document& root,
                    Variables* variables,
@@ -3247,6 +3261,13 @@ public:
     ExpressionRange(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx, std::move(children)) {}
 
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionRange>::parse(expCtx, bsonExpr, vps);
+    }
+
     Value evaluate(const Document& root,
                    Variables* variables,
                    const EvaluationContext& ctx) const final;
@@ -3664,6 +3685,13 @@ public:
             !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
             expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
         }
+    }
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionSetUnion>::parse(expCtx, bsonExpr, vps);
     }
 
     Value evaluate(const Document& root,
