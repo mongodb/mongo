@@ -309,15 +309,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     curOp->beginQueryPlanningTimer();
 
     auto requestAndMsg = [&]() {
-        if (request().getEncryptionInformation()) {
-            {
-                std::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-            }
-
-            if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                return processFLEFindAndModifyExplainMongod(opCtx, request());
-            }
+        if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+            return processFLEFindAndModifyExplainMongod(opCtx, request());
         }
 
         return std::pair{request(), OpMsgRequest()};
@@ -453,14 +446,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     auto [preConditions, isTimeseriesLogicalRequest] =
         timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
             opCtx, req.getNamespace(), request(), /*expectedUUID=*/boost::none);
-    if (req.getEncryptionInformation().has_value()) {
-        {
-            std::lock_guard<Client> lk(*opCtx->getClient());
-            curOp.setShouldOmitDiagnosticInformation(lk, true);
-        }
-        if (!req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
-            return processFLEFindAndModify(opCtx, req);
-        }
+    if (prepareForFLERewrite(opCtx, req.getEncryptionInformation())) {
+        return processFLEFindAndModify(opCtx, req);
     }
 
     auto nsString = req.getNamespace();
@@ -470,8 +457,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     static_cast<const CmdFindAndModify*>(definition())->collectMetrics(req);
 
     auto disableDocumentValidation = req.getBypassDocumentValidation().value_or(false);
-    auto fleCrudProcessed = write_ops_exec::getFleCrudProcessed(
-        opCtx, req.getEncryptionInformation(), nsString.tenantId());
+    auto fleCrudProcessed = write_ops_exec::getFleCrudProcessed(req.getEncryptionInformation());
 
     DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
         opCtx, disableDocumentValidation);

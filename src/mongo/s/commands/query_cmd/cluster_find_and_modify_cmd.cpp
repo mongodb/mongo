@@ -802,8 +802,11 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
         return;
     }
 
-    if (processFLEFindAndModify(opCtx, originalRequest, result) == FLEBatchResult::kProcessed) {
-        return;
+    if (prepareForFLERewrite(opCtx, originalRequest.getEncryptionInformation())) {
+        if (processFLEFindAndModify(opCtx, originalRequest, result) == FLEBatchResult::kProcessed) {
+            return;
+        }
+        // fall through
     }
 
     auto findAndModifyBody = [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
