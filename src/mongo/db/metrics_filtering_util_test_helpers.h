@@ -11,7 +11,6 @@ namespace metrics_filtering_util {
 
 /**
  * Returns whether a path exists in the matcher and is marked as an exact match.
- * Throws an assertion if the path does not exist in the matcher.
  */
 bool pathIsExactMatch(const PathMatcherNode& matcher, std::string_view path);
 

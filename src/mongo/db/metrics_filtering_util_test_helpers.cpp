@@ -3,8 +3,6 @@
 
 #include "mongo/db/metrics_filtering_util_test_helpers.h"
 
-#include "mongo/unittest/unittest.h"
-
 namespace mongo {
 namespace metrics_filtering_util {
 
@@ -17,15 +15,17 @@ bool pathIsExactMatch(const PathMatcherNode& matcher, std::string_view path) {
         str::splitOn(suffix, '.', segment, remainder);
 
         if (segment == "$[]") {
-            ASSERT(node->isArrayPath)
-                << "path '" << path << "' has array marker but node is not array";
+            if (!node->isArrayPath) {
+                return false;
+            }
             suffix = remainder;
             continue;
         }
 
         auto it = node->children.find(std::string(segment));
-        ASSERT(it != node->children.end())
-            << "path '" << path << "' missing segment '" << segment << "'";
+        if (it == node->children.end()) {
+            return false;
+        }
         node = it->second.get();
         suffix = remainder;
     }
