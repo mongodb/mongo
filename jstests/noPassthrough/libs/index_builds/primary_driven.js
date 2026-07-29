@@ -791,6 +791,154 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     }
 
     /**
+     * Drives a resume for a build that has no persisted metadata.
+     *
+     * The build is paused at `hangBeforeBuildingIndex`, at which point it has replicated
+     * `startIndexBuild` but has not yet written any metadata about its state. On step-up, the new
+     * primary synthesizes an "initialized" state and resumes the build from that point.
+     *
+     * @param {ReplSetTest} rst - Must have been constructed via `setUp()`; use `setUp({nodes: 3})`
+     *     for the restart failover modes.
+     * @param {Object} [options]
+     * @param {string} [options.failoverMode=PdibFailoverMode.NO_RESTART] - What to do with the old
+     *     primary after the step-up. See `PdibFailoverMode`.
+     * @param {string} [options.dbName=jsTestName()]
+     * @param {string} [options.collName="coll"]
+     * @param {Object[]} [options.indexSpecs=DEFAULT_INDEX_SPECS] - The three index specs to build in
+     *     a single `createIndexes` call. Must have length 3.
+     * @param {Function} [options.docTemplate=defaultDocTemplate]
+     * @param {number} [options.docCount=DEFAULT_DOC_COUNT]
+     * @param {Object[]} [options.sideWrites] - Writes issued while the build is paused, so the
+     *     resumed build has side-table entries to drain on top of its restarted scan.
+     * @param {Object[]} [options.postIndexBuildInserts=[]]
+     * @param {number} [options.maxIndexBuildMemoryUsageMegabytes=DEFAULT_MAX_INDEX_BUILD_MEM_MB]
+     * @param {number} [options.loadResumeStateWriteIntervalKeys=DEFAULT_LOAD_RESUME_STATE_WRITE_INTERVAL_KEYS]
+     * @returns {void}
+     */
+    static runSynthesizedResumeState(rst, options = {}) {
+        const failoverMode = options.failoverMode || PdibFailoverMode.NO_RESTART;
+        assert(
+            Object.values(PdibFailoverMode).includes(failoverMode),
+            `options.failoverMode=${failoverMode} is not a valid PdibFailoverMode value`,
+        );
+
+        const {
+            dbName,
+            collName,
+            indexSpecs,
+            docTemplate,
+            docCount,
+            sideWrites,
+            postIndexBuildInserts,
+            maxMb,
+            loadIntervalKeys,
+        } = PrimaryDrivenResumableIndexBuildTest._normalizeOptions(options);
+
+        if (
+            !PrimaryDrivenResumableIndexBuildTest._preflight(
+                rst,
+                dbName,
+                "runSynthesizedResumeState",
+            )
+        ) {
+            return;
+        }
+
+        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
+            maxIndexBuildMemoryUsageMegabytes: maxMb,
+            primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
+        });
+
+        const indexNames = Array.from(
+            {length: DEFAULT_INDEX_COUNT},
+            (_, i) => `${DEFAULT_INDEX_NAME}_synthesized_${i}`,
+        );
+
+        // Seed the collection and start the build; it parks at hangBeforeBuildingIndex, which is
+        // before any resume state is written. No per-phase fail point is configured: this scenario
+        // is exactly "fail over before the build's phases begin".
+        const {primary, awaitCreateIndexes, buildUUID, hangBeforeBuildingIndexFp} =
+            PrimaryDrivenResumableIndexBuildTest._seedAndStart(rst, {
+                dbName,
+                collName,
+                docTemplate,
+                docCount,
+                indexSpecs,
+                indexNames,
+                sideWrites,
+            });
+
+        const beforeMetrics = PrimaryDrivenResumableIndexBuildTest._readResumeMetrics(
+            rst._pdibMetricsDir,
+        );
+
+        // Wait for the index build table's creation (and the side writes) to reach the secondary
+        // before the failover: the stepped-up node needs the registry entry and the ident to attempt
+        // a resume at all. The build thread is parked, so nothing new accumulates behind us.
+        rst.awaitReplication();
+
+        jsTest.log.info(
+            "PrimaryDrivenResumableIndexBuildTest: triggering resume with no persisted resume " +
+                `state via failover mode=${failoverMode}`,
+        );
+        const newPrimary = PrimaryDrivenResumableIndexBuildTest._failover(
+            rst,
+            primary,
+            rst.getSecondary(),
+            failoverMode,
+        );
+
+        // Release the old primary's fail point. `hangBeforeBuildingIndex` uses an uninterruptible
+        // pauseWhileSet(), so unlike the per-phase fail points the step-down does not free the build
+        // thread on its own. For restart modes the old mongod was recycled, so the in-memory fail
+        // point (and the handle's connection) is already gone — skip.
+        if (
+            failoverMode === PdibFailoverMode.NO_RESTART &&
+            !TestData.doesNotSupportGracefulStepdown
+        ) {
+            hangBeforeBuildingIndexFp.off();
+        }
+
+        awaitCreateIndexes({checkExitSuccess: false});
+
+        jsTest.log.info(
+            `PrimaryDrivenResumableIndexBuildTest: waiting for build ${buildUUID} to complete on ` +
+                `${newPrimary.host}`,
+        );
+        PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(
+            newPrimary,
+            dbName,
+            collName,
+            indexNames,
+            buildUUID,
+        );
+
+        // The resume state was synthesized from an empty index build table (log 12500501 is only
+        // emitted by synthesizeResumeIndexInfo), and the build restarted at the initialized phase.
+        checkLog.containsJson(newPrimary, 12500501, {
+            buildUUID: function (uuid) {
+                return uuid && uuid.uuid && uuid.uuid["$uuid"] === buildUUID;
+            },
+            phase: RESUME_PHASE_INITIALIZED,
+        });
+        checkLog.containsJson(newPrimary, 12500800, {
+            buildUUID: function (uuid) {
+                return uuid && uuid.uuid && uuid.uuid["$uuid"] === buildUUID;
+            },
+            phase: RESUME_PHASE_INITIALIZED,
+        });
+
+        PrimaryDrivenResumableIndexBuildTest._verifyResumedBuild(rst, {
+            dbName,
+            collName,
+            indexNames,
+            beforeMetrics,
+            expectedPhases: [RESUME_PHASE_INITIALIZED],
+            postIndexBuildInserts,
+        });
+    }
+
+    /**
      * @param {DB} db
      * @returns {boolean} True iff `featureFlagContainerWrites`, `featureFlagPrimaryDrivenIndexBuilds` and
      *     `featureFlagResumablePrimaryDrivenIndexBuilds` are enabled.
