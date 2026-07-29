@@ -16,17 +16,20 @@
  * @tags: [
  *   # Uses a $accumulator with lang: "js", which requires server-side scripting.
  *   requires_scripting,
- *   # TODO SERVER-132347: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const conn = MongoRunner.runMongod({
     setParameter: {
         delinquentAcquisitionIntervalMillis: 10,
         internalQueryFrameworkControl: "forceClassicEngine",
+        // We read all input in one batch so that each aggregation releases its ticket exactly
+        // once. This is fine because the tiny dataset never hits the byte-based batch limit.
+        internalDocumentSourceCursorInitialBatchSize: 0,
     },
 });
 assert.neq(null, conn, "mongod failed to start");
@@ -57,11 +60,8 @@ describe("query.aggregation.nonTicketed serverStatus metrics", function () {
     });
 
     it("running an aggregate with blocking $sort increments the queries counter", function () {
-        // Use the failpoint to guarantee the non-ticketed interval exceeds the 10ms threshold,
-        // making this test deterministic regardless of machine speed. DocumentSourceCursor
-        // can read in multiple batches; using "times: 1" here ensures only the first of those
-        // release/re-acquire cycles is delayed past the threshold, so exactly one non-ticketed
-        // interval is counted.
+        // Use the failpoint to guarantee the non-ticketed interval exceeds the 10ms threshold
+        // regardless of machine speed. Single-batch reads make it the only interval we count.
         assert.commandWorked(
             db.adminCommand({
                 configureFailPoint: "sleepAfterReleasingAggTicket",
@@ -97,6 +97,52 @@ describe("query.aggregation.nonTicketed serverStatus metrics", function () {
             "intervals should increase by 1",
         );
         assert.gt(statsAfter.totalMillis, statsBefore.totalMillis, "totalMillis should increase");
+    });
+
+    it("multiple delayed release cycles in one aggregate count multiple intervals", function () {
+        // With batch size 32 the 100 docs load in three batches, so we get three delayed
+        // releases and three intervals over the threshold.
+        runWithParamsAllNonConfigNodes(
+            db,
+            {internalDocumentSourceCursorInitialBatchSize: 32},
+            () => {
+                const fp = configureFailPoint(db, "sleepAfterReleasingAggTicket", {
+                    waitTimeMillis: 50,
+                });
+
+                const statsBefore = assert.commandWorked(db.adminCommand({serverStatus: 1})).metrics
+                    .query.aggregation.nonTicketed;
+
+                assert.commandWorked(
+                    db.runCommand({
+                        aggregate: coll.getName(),
+                        pipeline: [{$match: {y: {$lt: 100}}}, {$sort: {x: -1}}, {$count: "total"}],
+                        cursor: {},
+                    }),
+                );
+
+                fp.off();
+
+                const statsAfter = assert.commandWorked(db.adminCommand({serverStatus: 1})).metrics
+                    .query.aggregation.nonTicketed;
+
+                assert.eq(
+                    statsAfter.queries,
+                    statsBefore.queries + 1,
+                    "queries should increase by 1",
+                );
+                assert.eq(
+                    statsAfter.intervals,
+                    statsBefore.intervals + 3,
+                    "intervals should increase by 3",
+                );
+                assert.gte(
+                    statsAfter.totalMillis,
+                    statsBefore.totalMillis + 150,
+                    "each of the three intervals should contribute at least the 50ms delay",
+                );
+            },
+        );
     });
 
     it("fully pushed-down SBE aggregation does not increment the non-ticketed counters", function () {
