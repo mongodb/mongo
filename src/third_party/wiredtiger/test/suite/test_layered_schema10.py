@@ -360,6 +360,37 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
+    def test_stepup_no_prior_follower_checkpoint(self):
+        """A table published on a follower is accessible after step-up when the follower has no completed checkpoint."""
+        # Leader checkpoint carries schema_epoch == 0 (no epoch set).
+        self.leader_checkpoint(1)
+
+        conn_follow, session_follow = self.open_follower()
+        # Set the stable epoch on the follower before publishing. The leader checkpoint carries no
+        # epoch, so the follower connection starts without one; publish requires it to be set.
+        self.set_stable_epoch(1, conn_follow)
+
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 20, session_follow)
+        session_follow.close()
+
+        # Follower queue holds CREATE uri at epoch 20. No follower checkpoint has completed.
+        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.swap_roles(conn_follow)
+
+        # After step-up: uri stable constituent created locally.
+        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
+
+        self.checkpoint_and_advance(15, 2, conn_follow)
+        # Stable epoch 15 has not reached the publish epoch so CREATE is still pending.
+        self.assertFalse(self.uri_in_local_metadata(self.conn, self.uri))
+
+        self.checkpoint_and_advance(20, 3, conn_follow)
+        # Stable epoch 20 matches the publish epoch so CREATE is flushed and uri is visible.
+        self.assertTrue(self.uri_in_local_metadata(self.conn, self.uri))
+
+        conn_follow.close('debug=(skip_checkpoint=true)')
+
     def test_epoch_advance_alone_prevents_checkpoint_skip(self):
         """
         A checkpoint must not be skipped when only the stable schema epoch advances.

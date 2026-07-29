@@ -162,18 +162,24 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
 
-    /* If we don't use schema epochs, fall back to the legacy method. */
     stable_schema_epoch =
       __wt_atomic_load_uint64_acquire(&conn->txn_global.last_ckpt_disaggregated_schema_epoch);
-    if (stable_schema_epoch == WT_SCHEMA_EPOCH_NONE)
+
+    /*
+     * Use the legacy method only when this node was never in epoch world. Either a completed epoch
+     * checkpoint or a live stable epoch means epoch-aware recovery is required.
+     */
+    if (stable_schema_epoch == WT_SCHEMA_EPOCH_NONE &&
+      __wt_get_stable_disaggregated_schema_epoch(session) == WT_SCHEMA_EPOCH_NONE)
         return (__layered_create_missing_stable_tables_legacy(session));
 
-    /* Create missing stable tables for new layered tables in the shared metadata queue. */
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
     TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q) {
 
-        /* Assert that older entries have been already pruned. */
-        WT_ASSERT(session, entry->schema_epoch > stable_schema_epoch);
+        /* When the stable epoch is known, entries older than it should have been pruned. */
+        WT_ASSERT(session,
+          entry->schema_epoch > stable_schema_epoch || stable_schema_epoch == WT_SCHEMA_EPOCH_NONE);
 
         if (entry->metadata_op != WT_SHARED_METADATA_CREATE)
             continue;
@@ -433,9 +439,9 @@ __wti_disagg_shared_metadata_queue_prune(WT_SESSION_IMPL *session, wt_timestamp_
     TAILQ_FOREACH_SAFE(entry, &conn->disaggregated_storage.shared_metadata_qh, q, tmp)
     {
         /*
-         * When EPOCH_NONE is passed (legacy step-up path that doesn't use schema epochs), prune
-         * everything unconditionally. The legacy path rebuilds stable constituents directly from
-         * local metadata rather than replaying queue entries, so the queue is no longer needed.
+         * When EPOCH_NONE is passed (a checkpoint that doesn't use schema epochs), prune everything
+         * unconditionally. The legacy path rebuilds stable constituents directly from local
+         * metadata rather than replaying queue entries, so the queue is no longer needed.
          */
         if (cur_schema_epoch != WT_SCHEMA_EPOCH_NONE && entry->schema_epoch > cur_schema_epoch)
             continue;

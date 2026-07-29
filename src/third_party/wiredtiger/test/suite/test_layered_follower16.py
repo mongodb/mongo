@@ -174,7 +174,16 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         if self.txn_mode != 'survive':
             session_follow.begin_transaction()
 
-        opens_stable = not (self.overwrite and self.do_op in (_op_insert, _op_update, _op_remove))
+        # Only the operations that must consult stable open it. An exact search and a write defer
+        # the follower's stable open until the ingest lookup misses, which for these keys happens
+        # only for a non-overwrite insert of a brand-new key; search_near, iteration and largest_key
+        # merge the constituents, so they always open stable.
+        if self.do_op in (_op_search_near, _op_next, _op_prev, _op_largest_key):
+            opens_stable = 1
+        elif self.do_op is _op_insert and not self.overwrite:
+            opens_stable = 1
+        else:
+            opens_stable = 0
 
         # After the checkpoint arrives, repeat the same operation.
         self.do_op(cursor_follow)

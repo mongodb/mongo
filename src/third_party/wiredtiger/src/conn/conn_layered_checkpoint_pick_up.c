@@ -1039,6 +1039,14 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
      * Part 3: Do the bookkeeping.
      */
 
+    /*
+     * A no-epoch checkpoint clears the whole queue. An epoch-world node never picks up a no-epoch
+     * checkpoint, so its live stable epoch is unset here and the queue holds no published entries
+     * to lose.
+     */
+    WT_ASSERT(session,
+      metadata.schema_epoch != WT_SCHEMA_EPOCH_NONE ||
+        __wt_get_stable_disaggregated_schema_epoch(session) == WT_SCHEMA_EPOCH_NONE);
     __wti_disagg_shared_metadata_queue_prune(session, metadata.schema_epoch);
     WT_ERR(__disagg_finalize_checkpoint_meta(session, ckpt_meta, &metadata));
 

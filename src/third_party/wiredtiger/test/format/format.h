@@ -106,7 +106,7 @@
 #define MIN_TIMESTAMP 2 /* Minimum timestamp */
 
 /* Capacity of the static push-mode key rotation history. */
-#define KEY_PUSH_HISTORY_MAX WT_THOUSAND
+#define KEY_PUSH_HISTORY_MAX 10 * WT_THOUSAND
 
 #include "format_config.h"
 extern CONFIG configuration_list[];

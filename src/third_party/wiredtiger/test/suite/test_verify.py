@@ -158,6 +158,30 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.verifyUntilSuccess(self.session, 'table:' + self.tablename)
         self.check_populate(self.tablename)
 
+    # The start message identifies the object by its file URI, which the disagg verify path does not
+    # produce in the same form.
+    @wttest.skip_for_hook("disagg", "Layered verify does not emit a single file URI")
+    def test_verify_api_logs_uri(self):
+        """
+        Test that verify emits an informational message identifying the object being verified. The
+        message is at the info verbosity level, off by default, so enable the verify category.
+        """
+        params = 'key_format=S,value_format=S'
+        self.session.create('table:' + self.tablename, params)
+        self.populate(self.tablename)
+        self.session.checkpoint()
+
+        self.conn.reconfigure('verbose=[verify:0]')
+        try:
+            self.verifyUntilSuccess(self.session, 'table:' + self.tablename)
+        finally:
+            self.conn.reconfigure('verbose=[]')
+
+        output = self.readStdout(50000)
+        self.assertTrue('verify: starting on ' in output and self.tablename in output,
+            'verify did not log the object being verified; stdout: ' + output)
+        self.cleanStdout()
+
     def test_verify_api_75pct_null(self):
         """
         Test verify via API, on a damaged table.
