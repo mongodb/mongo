@@ -42,7 +42,8 @@ void preprocessCommand(OperationContext* opCtx, CommandType& cmd) {
     const auto fcvSnap = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (feature_flags::gFeatureFlagBlockReplicaSetWrites.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx), fcvSnap)) {
-        cmd.setMayBypassReplicaSetWriteBlocking(ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
+        cmd.setMayBypassReplicaSetWritesBlocking(
+            ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
     }
 }
 

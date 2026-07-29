@@ -103,11 +103,11 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
     WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, requestArgs.getMayBypassWriteBlocking());
 
     uassert(12097002,
-            "Client is not properly authorized to propagate mayBypassReplicaSetWriteBlocking",
-            !requestArgs.getMayBypassReplicaSetWriteBlocking() || hasInternalAuthorization());
+            "Client is not properly authorized to propagate mayBypassReplicaSetWritesBlocking",
+            !requestArgs.getMayBypassReplicaSetWritesBlocking() || hasInternalAuthorization());
     // setFromMetadata must still be called to set the default value if it's not set in the request
     ReplicaSetWriteBlockBypass::get(opCtx).setFromMetadata(
-        opCtx, requestArgs.getMayBypassReplicaSetWriteBlocking());
+        opCtx, requestArgs.getMayBypassReplicaSetWritesBlocking());
 
     uassert(9955800,
             "Client is not properly authorized to propagate versionContext",

@@ -288,7 +288,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingDis
     rsBlock->disableReplicaSetDeletionsBlocking();
     auto authSession = AuthorizationSession::get(opCtx->getClient());
     authSession->grantInternalAuthorization();
-    ASSERT(authSession->mayBypassReplicaSetWriteBlocking());
+    ASSERT(authSession->mayBypassReplicaSetWritesBlocking());
 
     ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
@@ -423,7 +423,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
     rsBlock->enableReplicaSetDeletionsBlocking();
     auto authSession = AuthorizationSession::get(opCtx->getClient());
     authSession->grantInternalAuthorization();
-    ASSERT(authSession->mayBypassReplicaSetWriteBlocking());
+    ASSERT(authSession->mayBypassReplicaSetWritesBlocking());
     ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 

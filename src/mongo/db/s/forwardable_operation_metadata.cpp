@@ -68,7 +68,7 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
     const auto fcvSnap = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (feature_flags::gFeatureFlagBlockReplicaSetWrites.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx), fcvSnap)) {
-        setMayBypassReplicaSetWriteBlocking(ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
+        setMayBypassReplicaSetWritesBlocking(ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
     }
 
     setRawData(isRawDataOperation(opCtx));
@@ -104,7 +104,7 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());
 
-    ReplicaSetWriteBlockBypass::get(opCtx).set(getMayBypassReplicaSetWriteBlocking());
+    ReplicaSetWriteBlockBypass::get(opCtx).set(getMayBypassReplicaSetWritesBlocking());
 
     isRawDataOperation(opCtx) = getRawData();
 

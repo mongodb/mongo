@@ -272,9 +272,9 @@ public:
     // resource.
     virtual bool mayBypassWriteBlockingMode() const = 0;
 
-    // Returns true if any user has the privilege to bypass replica set write blocking mode for the
+    // Returns true if any user has the privilege to bypass replica set writes blocking for the
     // cluster resource.
-    virtual bool mayBypassReplicaSetWriteBlocking() const = 0;
+    virtual bool mayBypassReplicaSetWritesBlocking() const = 0;
 
     // Returns true if the authorization session is expired. When this returns true,
     // isAuthenticated() is also expected to return false.

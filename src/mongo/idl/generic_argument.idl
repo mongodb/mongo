@@ -347,10 +347,10 @@ structs:
                 optional: true
                 stability: "internal"
             # Indicates whether write-based commands should be allowed even if the server is blocking
-            # user writes as part of replica set write blocking mode.
+            # user writes as part of replica set writes blocking.
             # Authorization: This field can only be set if the client possesses action type `internal`
-            # or `bypassReplicaSetWriteBlocking` on the `cluster` resource.
-            mayBypassReplicaSetWriteBlocking:
+            # or `bypassReplicaSetWritesBlocking` on the `cluster` resource.
+            mayBypassReplicaSetWritesBlocking:
                 type: bool
                 forward_to_shards: false
                 optional: true

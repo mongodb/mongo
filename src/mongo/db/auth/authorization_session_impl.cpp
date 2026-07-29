@@ -1034,8 +1034,8 @@ bool AuthorizationSessionImpl::mayBypassWriteBlockingMode() const {
     return MONGO_unlikely(_nonTenantClusterActions.contains(ActionType::bypassWriteBlockingMode));
 }
 
-bool AuthorizationSessionImpl::mayBypassReplicaSetWriteBlocking() const {
-    return _nonTenantClusterActions.contains(ActionType::bypassReplicaSetWriteBlocking);
+bool AuthorizationSessionImpl::mayBypassReplicaSetWritesBlocking() const {
+    return _nonTenantClusterActions.contains(ActionType::bypassReplicaSetWritesBlocking);
 }
 
 bool AuthorizationSessionImpl::isExpired() const {

@@ -35,7 +35,7 @@ export const kGenericArgFieldNames = [
     "txnRetryCounter",
     "versionContext",
     "mayBypassWriteBlocking",
-    "mayBypassReplicaSetWriteBlocking",
+    "mayBypassReplicaSetWritesBlocking",
     "expectPrefix",
     "requestGossipRoutingCache",
     "startOrContinueTransaction",
