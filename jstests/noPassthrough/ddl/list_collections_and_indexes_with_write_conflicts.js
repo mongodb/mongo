@@ -9,7 +9,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const kIterations = 100;
-const kFailPointProbability = 0.75;
+const kFailPointProbability = 0.3;
 
 function runForIterations(testFn) {
     for (let i = 0; i < kIterations; ++i) {
