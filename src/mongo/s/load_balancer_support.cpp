@@ -126,10 +126,6 @@ void handleHello(OperationContext* opCtx, BSONObjBuilder* result, bool helloHasL
     perClient.setDidHello();
 }
 
-bool isLoadBalancerPeer(Client* client) {
-    return client->session() ? client->session()->isLoadBalancerPeer() : false;
-}
-
 LogicalSessionId getMruSession(Client* client) {
     return getPerClientState(client).mruLogicalSessionId();
 }

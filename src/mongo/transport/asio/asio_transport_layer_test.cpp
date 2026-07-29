@@ -2140,9 +2140,9 @@ public:
     using OnStartSessionFn = std::function<void(std::shared_ptr<Session>)>;
 
     void startSession(std::shared_ptr<Session> session) override {
+        MockSessionManagerCommon::startSession(session);
         if (_onStartSession)
-            _onStartSession(session);
-        MockSessionManagerCommon::startSession(std::move(session));
+            _onStartSession(std::move(session));
     }
 
     void setOnStartSession(OnStartSessionFn cb) {
