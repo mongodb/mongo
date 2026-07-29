@@ -2604,8 +2604,23 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossS
         const auto& nss = coll.getNss();
         AggregateCommandRequest aggRequest{nss, getRawPipelineStages(nss)};
 
-        std::vector<BSONObj> facetedResult = _runExhaustiveAggregation(
-            opCtx, nss, aggRequest, "Check collection metadata consistency across shards"sv);
+        std::vector<BSONObj> facetedResult;
+        try {
+            facetedResult = _runExhaustiveAggregation(
+                opCtx, nss, aggRequest, "Check collection metadata consistency across shards"sv);
+        } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
+            // Swallow the error and skip the check; this error is expected to be thrown when the
+            // collection UUID mismatch is generated during the execution of the aggregate request
+            // (supposedly, due to data tampering over direct shard connection). Such an
+            // inconsistency will eventually raised on a subsequent invocation of
+            // checkMetadataConsistency.
+            LOGV2_WARNING(
+                13144400,
+                "Skipping cross-shard collection consistency due to collection UUID mismatch",
+                "nss"_attr = nss);
+            continue;
+        }
+
 
         // Even though the last stage of the aggregation is a $facet, the aggregation runner will
         // return an empty vector if aggregation fails due to an inconsistency reported elsewhere.
