@@ -2,6 +2,22 @@ load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_test")
 
 py_test(
+    name = "test_evergreen_retry",
+    srcs = [
+        "__init__.py",
+        "test_evergreen_retry.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_test(
     name = "test_download_utils",
     srcs = [
         "__init__.py",

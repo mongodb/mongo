@@ -9,6 +9,7 @@ py_library(
         "cedar_report.py",
         "cmdutils.py",
         "codeowners_utils.py",
+        "evergreen_retry.py",
         "expansions.py",
         "fileops.py",
         "generate_co_jira_map.py",
@@ -46,6 +47,18 @@ py_library(
         dependency(
             "requests-oauthlib",
             group = "testing",
+        ),
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+        dependency(
+            "urllib3",
+            group = "testing",
+        ),
+        dependency(
+            "requests",
+            group = "core",
         ),
     ],
 )
