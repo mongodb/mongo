@@ -50,10 +50,26 @@ def _generate_certificates(ctx):
 
     outputs = [ctx.actions.declare_file(out) for out in out_set]
 
+    # Isolate certificate generation from unrelated stable workspace status changes. This action
+    # reruns whenever stable status changes, but its output changes only when the year changes.
+    certificate_generation_year = ctx.actions.declare_file("." + ctx.label.name + ".certificate_generation_year")
+    ctx.actions.run(
+        executable = python.interpreter.path,
+        inputs = depset(direct = [ctx.info_file, ctx.file.year_extractor], transitive = [python.files]),
+        outputs = [certificate_generation_year],
+        arguments = [
+            ctx.file.year_extractor.path,
+            ctx.info_file.path,
+            certificate_generation_year.path,
+        ],
+        mnemonic = "ExtractCertificateGenerationYear",
+    )
+
     # Run the Python script to generate the certificates, sending stdout to /dev/null to avoid
     # cluttering the build log.
     args = ctx.actions.args()
     args.add(ctx.expand_location(ctx.attr.main))
+    args.add("--certificate-generation-year-file", certificate_generation_year.path)
     args.add(certfile.path)
     args.add("--mkcrl" if should_gen_crls else "--no-mkcrl")
     args.add("--quiet")
@@ -63,7 +79,7 @@ def _generate_certificates(ctx):
         executable = python.interpreter.path,
         outputs = outputs,
         inputs = depset(
-            direct = [certfile] + ctx.files.static_inputs,
+            direct = [certfile, certificate_generation_year] + ctx.files.static_inputs,
             transitive = [python.files, depset([arg.files.to_list()[0] for arg in ctx.attr.srcs])] + python_libs,
         ),
         arguments = [args],
@@ -88,6 +104,11 @@ generate_certificates = rule(
         "main": attr.string(
             doc = "The main Python file to execute.",
             default = "$(location //x509:mkcert.py)",
+        ),
+        "year_extractor": attr.label(
+            doc = "Extracts the certificate generation year from stable workspace status.",
+            allow_single_file = True,
+            default = Label("//x509:extract_certificate_generation_year.py"),
         ),
         "py_libs": attr.label_list(
             cfg = "exec",

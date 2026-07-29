@@ -10,6 +10,7 @@
 import os
 import pathlib
 import sys
+from datetime import UTC, datetime
 
 # Prepend repository root to path, to avoid shadowing from bazel runfiles.
 REPO_ROOT = str(pathlib.Path(__file__).parent.parent)
@@ -92,6 +93,7 @@ def print_evergreen_expansions():
 def main():
     print_evergreen_expansions()
     print_feature_flag_status()
+    print_stable_key("CURRENT_YEAR", str(datetime.now(UTC).year))
 
 
 if __name__ == "__main__":

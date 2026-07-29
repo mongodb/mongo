@@ -6,15 +6,6 @@
 
 import {getPython3Binary} from "jstests/libs/python.js";
 
-const now = new Date();
-// Note - month is 0-indexed, so 11 is December.
-if (now.getMonth() == 11 && now.getDate() == 31 && now.getHours() == 23) {
-    jsTest.log.warning(
-        "Deterministic certificate generation relies on the current year being constant; skipping test as there is less than an hour until the year changes.",
-    );
-    quit();
-}
-
 // Print the openssl version to help with debugging.
 clearRawMongoProgramOutput();
 assert.eq(runNonMongoProgram("openssl", "version"), 0);
@@ -26,46 +17,59 @@ const basedir = MongoRunner.dataPath + "certs/";
 const genpath = basedir + "generated/";
 mkdir(genpath);
 
-// Run mkcert, and ensure it succeeds and that expected results are generated successfully.
-jsTest.log.info("Running mkcert");
-clearRawMongoProgramOutput();
-let res = runNonMongoProgram(
-    getPython3Binary(),
-    "x509/mkcert.py",
-    main_cert_json_file,
-    "--mkcrl",
-    "-o",
-    genpath,
-);
-jsTest.log.info(rawMongoProgramOutput(".*"));
-assert.eq(res, 0);
+function runMkcert(yearFilePath, outputPath) {
+    clearRawMongoProgramOutput();
+    const exitCode = runNonMongoProgram(
+        getPython3Binary(),
+        "x509/mkcert.py",
+        "--certificate-generation-year-file",
+        yearFilePath,
+        main_cert_json_file,
+        "--mkcrl",
+        "-o",
+        outputPath,
+    );
+    const output = rawMongoProgramOutput(".*");
+    jsTest.log.info("mkcert completed", {exitCode, output});
+    return {exitCode, output};
+}
+
+const yearFile2025 = basedir + "certificate-generation-year-2025.txt";
+const yearFile2026 = basedir + "certificate-generation-year-2026.txt";
+writeFile(yearFile2025, "2025\n");
+writeFile(yearFile2026, "2026\n");
+
+// Generate certificates with a fixed year.
+let result = runMkcert(yearFile2025, genpath);
+assert.eq(result.exitCode, 0, result);
 assert(fileExists(genpath + "ca.pem"));
 assert(fileExists(genpath + "crl.pem"));
 
-// Run mkcert again, to a different path.
+// The same stable year must produce identical output.
 const genpath2 = basedir + "generated2/";
 mkdir(genpath2);
-jsTest.log.info("Running mkcert again");
-res = runNonMongoProgram(
-    getPython3Binary(),
-    "x509/mkcert.py",
-    main_cert_json_file,
-    "--mkcrl",
-    "-o",
-    genpath2,
-);
-assert.eq(res, 0);
+result = runMkcert(yearFile2025, genpath2);
+assert.eq(result.exitCode, 0, result);
 
 // Diff the two generation paths to make sure the contents of the paths are identical.
 jsTest.log.info("Running diff");
 clearRawMongoProgramOutput();
-res = runNonMongoProgram("diff", "-r", genpath, genpath2);
+let res = runNonMongoProgram("diff", "-r", genpath, genpath2);
 assert.eq(res, 0);
 const diffout = rawMongoProgramOutput(".*").trim();
 assert.eq("", diffout, diffout);
 
+// An adjacent stable year must regenerate different certificates.
+const genpath3 = basedir + "generated3/";
+mkdir(genpath3);
+result = runMkcert(yearFile2026, genpath3);
+assert.eq(result.exitCode, 0, result);
+clearRawMongoProgramOutput();
+res = runNonMongoProgram("diff", "-r", genpath, genpath3);
+assert.eq(res, 1, {output: rawMongoProgramOutput(".*")});
+
 // Run mkcert on the apple cert definitions file, which contains pkcs12 certificates, and
-// ensure a .pfx file was generated.
+// ensure a .pfx file can still be generated using the direct command without a year file.
 jsTest.log.info("Running apple certs");
 res = runNonMongoProgram(getPython3Binary(), "x509/mkcert.py", apple_cert_json_file, "-o", genpath);
 assert.eq(res, 0);

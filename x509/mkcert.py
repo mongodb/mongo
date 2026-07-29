@@ -43,7 +43,7 @@ CONFIG = dict[str, Any]
 MAX_VALIDITY_PERIOD_DAYS = 824
 
 # Datetime to specify as the start time for all certs.
-DEFAULT_START_TIME = datetime.datetime(datetime.datetime.now().year, 1, 1)
+DEFAULT_START_TIME = None
 # Allocate serial numbers sequentially; this is the last-used serial.
 LAST_SERIAL_NUMBER = 999
 # Cache the private key objects for static/*key.pem.
@@ -698,6 +698,25 @@ def generate_all_crls():
     )
 
 
+def read_certificate_generation_year(year_file):
+    """Read and validate the year used for deterministic certificate generation."""
+    try:
+        with open(year_file, "r", encoding="utf-8") as f:
+            year = int(f.read().strip())
+        if year < 2:
+            raise ValueError
+        datetime.datetime(year, 1, 1)
+    except OSError as err:
+        raise CertificateGenerationError(
+            f"Unable to read certificate generation year file: {err}"
+        ) from err
+    except (OverflowError, ValueError) as err:
+        raise CertificateGenerationError(
+            "certificate generation year must be an integer between 2 and 9999"
+        ) from err
+    return year
+
+
 def parse_command_line(argv):
     """Parse and return the command line arguments."""
     parser = argparse.ArgumentParser(description="X509 Test Certificate Generator")
@@ -733,6 +752,11 @@ def parse_command_line(argv):
         action=argparse.BooleanOptionalAction,
         help="If set, suppresses all output",
         default=False,
+    )
+    parser.add_argument(
+        "--certificate-generation-year-file",
+        help="File containing the year whose January 1 is used for deterministic generation",
+        type=str,
     )
     parser.add_argument("cert", nargs="*", help="Certificate to generate (blank for all)")
 
@@ -835,11 +859,19 @@ def sort_items(items):
 
 def setup_global_state(parsed_args):
     """Set up various global state based on the commandline arguments."""
-    global CONFIG, CONFIGFILE, OUTPUT_PATH, STATIC_PATH, DRY_RUN
+    global CONFIG, CONFIGFILE, OUTPUT_PATH, STATIC_PATH, DRY_RUN, DEFAULT_START_TIME
     CONFIGFILE = parsed_args.config
     OUTPUT_PATH = PurePath(parsed_args.output)
     STATIC_PATH = PurePath(parsed_args.static_dir)
     DRY_RUN = parsed_args.dry_run
+    certificate_generation_year_file = parsed_args.certificate_generation_year_file
+    if certificate_generation_year_file is None:
+        certificate_generation_year = datetime.datetime.now(datetime.UTC).year
+    else:
+        certificate_generation_year = read_certificate_generation_year(
+            certificate_generation_year_file
+        )
+    DEFAULT_START_TIME = datetime.datetime(certificate_generation_year, 1, 1, tzinfo=datetime.UTC)
     with open(CONFIGFILE, "r", encoding="utf-8") as f:
         CONFIG = json.load(f)
     if parsed_args.quiet:
