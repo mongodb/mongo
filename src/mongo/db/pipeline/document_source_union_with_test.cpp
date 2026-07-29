@@ -56,6 +56,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -232,6 +233,32 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipelineExtraSubobje
     unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), getExpCtx());
     ASSERT(unionWith != nullptr);
     ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+}
+
+TEST_F(DocumentSourceUnionWithTest, RejectsUserSuppliedIsHybridSearch) {
+    // A client with a transport session and no internal tag is an external (user) client. The
+    // ExpressionContext must be built from its OperationContext, since that is what
+    // validateIsHybridSearchNotSetByUser() inspects.
+    auto client = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+    NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+        getExpCtx()->getNamespaceString().dbName(), "coll");
+    auto expCtx =
+        ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(getExpCtx()->getNamespaceString()).build();
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
+
+    for (bool isHybridSearch : {true, false}) {
+        ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
+                               BSON("$unionWith" << BSON(
+                                        "coll" << nsToUnionWith.coll() << "pipeline" << BSONArray()
+                                               << "$_internalIsHybridSearch" << isHybridSearch))
+                                   .firstElement(),
+                               expCtx),
+                           AssertionException,
+                           5491300);
+    }
 }
 
 TEST_F(DocumentSourceUnionWithTest, ParseErrors) {

@@ -44,7 +44,6 @@ function runPipeline(pipeline, collName) {
     ]);
 })();
 
-// TODO SERVER-108117 Enable these tests.
 (function testUnionWithRejectsIsHybridSearchFlagFromUser() {
     let badUnionWithStageWithIsHybridSearchTrue = {
         $unionWith: {
@@ -59,19 +58,18 @@ function runPipeline(pipeline, collName) {
         $unionWith: {
             coll: timeseriesCollName,
             pipeline: [{$sort: {_id: 1}}],
-            as: "out",
             $_internalIsHybridSearch: false,
         },
     };
     assert.commandFailedWithCode(runPipeline([badUnionWithStageWithIsHybridSearchFalse], timeseriesCollName), 5491300);
-});
+})();
 
-// TODO SERVER-108117 Enable these tests.
 (function testLookupRejectsIsHybridSearchFlagFromUser() {
     let badLookupStageWithIsHybridSearchTrue = {
         $lookup: {
             from: timeseriesCollName,
             pipeline: [{$sort: {_id: 1}}],
+            as: "out",
             $_internalIsHybridSearch: true,
         },
     };
@@ -87,7 +85,7 @@ function runPipeline(pipeline, collName) {
         },
     };
     assert.commandFailedWithCode(runPipeline([badLookupStageWithIsHybridSearchFalse], timeseriesCollName), 5491300);
-});
+})();
 
 // Note that hybrid search cannot run against a collectionless $unionWith because a collectionless
 // $unionWith must start with the $documents stage, but hybrid search stages must be the first

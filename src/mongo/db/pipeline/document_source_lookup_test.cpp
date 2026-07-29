@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -131,6 +133,33 @@ TEST_F(DocumentSourceLookUpTest, PreservesParentPipelineLetVariables) {
 
     ASSERT_EQ(varId, lookupStage->getVariablesParseState_forTest().getVariable("foo"));
     ASSERT_VALUE_EQ(Value(123), lookupStage->getVariables_forTest().getValue(varId, Document()));
+}
+
+TEST_F(DocumentSourceLookUpTest, RejectsUserSuppliedIsHybridSearch) {
+    // A client with a transport session and no internal tag is an external (user) client. The
+    // ExpressionContext must be built from its OperationContext, since that is what
+    // validateIsHybridSearchNotSetByUser() inspects.
+    auto client = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    auto expCtx =
+        ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(getExpCtx()->getNamespaceString()).build();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    for (bool isHybridSearch : {true, false}) {
+        ASSERT_THROWS_CODE(
+            DocumentSourceLookUp::createFromBson(
+                BSON("$lookup" << BSON("from" << "coll"
+                                              << "pipeline" << BSONArray() << "as"
+                                              << "out"
+                                              << "$_internalIsHybridSearch" << isHybridSearch))
+                    .firstElement(),
+                expCtx),
+            AssertionException,
+            5491300);
+    }
 }
 
 TEST_F(DocumentSourceLookUpTest, AcceptsPipelineSyntax) {

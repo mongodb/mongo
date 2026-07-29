@@ -282,8 +282,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
                                                     elem.valueStringData());
     } else {
-        // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See
-        // helper hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
+        // The isHybridSearch flag is internal-only: it is set when a desugared hybrid-search
+        // sub-pipeline is serialized across the wire, and re-parsed by internal clients. Reject it
+        // when a user supplies it directly.
+        hybrid_scoring_util::validateIsHybridSearchNotSetByUser(expCtx, elem.embeddedObject());
         auto unionWithSpec =
             UnionWithSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
@@ -477,9 +479,13 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             spec["coll"] = Value(opts.serializeIdentifier(underlyingNss.coll()));
         }
         spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
-        bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
-        if (isHybridSearch) {
-            spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
+        // The isHybridSearch flag is only carried on the shard-dispatch path, never in the explain
+        // serialization: an explain-of-a-view spec can be re-parsed on the (non-internal) router,
+        // where the flag would fail validateIsHybridSearchNotSetByUser (error 5491300). Mirrors the
+        // guard on $lookup's serialization.
+        if (!opts.isSerializingForExplain() &&
+            hybrid_scoring_util::isHybridSearchPipeline(_userPipeline)) {
+            spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(true);
         }
         return Value(DOC(getSourceName() << spec.freezeToValue()));
     }
