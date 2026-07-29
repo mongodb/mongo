@@ -23,7 +23,8 @@ namespace mongo::query_stats {
     X(ForceBonsai)                        \
     X(SBE)                                \
     X(Classic)                            \
-    X(VectorSearch)
+    X(VectorSearch)                       \
+    X(JoinOptimization)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(SupplementalMetricType, SUPPLEMENTAL_METRIC_STATS_TYPE);
 #undef SUPPLEMENTAL_METRIC_STATS_TYPE

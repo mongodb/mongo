@@ -389,6 +389,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                       "Pipeline or collection ineligible for join-reordering");
     }
 
+    // Initialize metrics after we determine that the query shape vaguely looks join-optimizable, as
+    // otherwise we would have these metrics for every aggregation. Note that on retry, these
+    // metrics will be (intentionally!) reset.
+    auto& od = CurOp::get(opCtx)->debug();
+    od.joinOptimizationMetrics.emplace();
+
     // Try to build JoinGraph.
     const auto& config = pipeline.getContext()->getQueryKnobConfiguration();
     AggModelBuildParams buildParams{

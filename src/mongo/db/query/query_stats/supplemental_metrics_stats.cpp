@@ -4,6 +4,7 @@
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/query_stats/join_optimization_stats_entry.h"
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/db/query/query_stats/vector_search_stats_entry.h"
 
@@ -59,6 +60,13 @@ void maybeAddVectorSearchMetrics(
             metrics->limit, metrics->numCandidatesLimitRatio));
     }
 }
+void maybeAddJoinOptimizationMetrics(
+    const OpDebug& opDebug,
+    std::vector<std::unique_ptr<SupplementalStatsEntry>>& supplementalMetrics) {
+    if (const auto& metrics = opDebug.joinOptimizationMetrics) {
+        supplementalMetrics.emplace_back(std::make_unique<JoinOptimizationStatsEntry>(*metrics));
+    }
+}
 }  // namespace
 
 BSONObj SupplementalStatsMap::toBSON() const {
@@ -84,6 +92,7 @@ std::vector<std::unique_ptr<SupplementalStatsEntry>> computeSupplementalQuerySta
     std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics;
     maybeAddOptimizerMetrics(opDebug, supplementalMetrics);
     maybeAddVectorSearchMetrics(opDebug, supplementalMetrics);
+    maybeAddJoinOptimizationMetrics(opDebug, supplementalMetrics);
     return supplementalMetrics;
 }
 

@@ -24,6 +24,7 @@ mongo_cc_library(
     name = "query_stats",
     srcs = [
         "aggregated_metric.cpp",
+        "join_optimization_stats_entry.cpp",
         "optimizer_metrics_stats_entry.cpp",
         "query_stats.cpp",
         "query_stats_entry.cpp",
