@@ -8,6 +8,7 @@ from buildscripts.resmokelib.testing.fixtures import _builder
 from buildscripts.resmokelib.utils.dictionary import merge_dicts
 from buildscripts.resmokelib.utils.history import HistoryDict
 from buildscripts.resmokelib.utils.history import make_historic as _make_historic
+from buildscripts.resmokelib.utils.history import to_plain as _to_plain
 
 
 class FixtureLib:
@@ -105,6 +106,10 @@ class FixtureLib:
     def make_historic(self, obj):
         """Convert a python object into a corresponding Historic to track history."""
         return _make_historic(obj)
+
+    def to_plain(self, obj):
+        """Recursively convert a Historic into plain python objects (e.g. for json.dumps)."""
+        return _to_plain(obj)
 
     def default_if_none(self, *values):
         """Return the first argument that is not 'None'."""
