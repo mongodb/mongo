@@ -431,6 +431,80 @@ TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
                         value::bitcastFrom<const char*>(lookupOutput.objdata()));
 }
 
+// The SBE $lookup hash-join lowering (see gen_lookup.cpp buildKeySetForLocal with
+// convertArrayToSet=false) leaves the outer/probe key as a plain array rather than de-duplicating
+// it into an ArraySet. This test verifies that the HashLookupStage still produces each matching
+// inner document exactly once even when the outer array key contains duplicate values, because
+// LookupHashTableIter de-duplicates the matched buffer indices while probing.
+TEST_F(HashLookupStageTest, DuplicateOuterArrayKeyDedupsMatches) {
+    // Outer document has a single key array with a duplicate value (10 appears twice).
+    const BSONArray outer{fromjson(R"""([
+        [{_id: 1}, [10, 10, 11]]
+    ])""")};
+    // Inner documents: two of them (_id 11 and 13) match the duplicated outer key value 10, and one
+    // (_id 12) matches 11.
+    const BSONArray inner{fromjson(R"""([
+        [{_id: 11}, 10],
+        [{_id: 12}, 11],
+        [{_id: 13}, 10]
+    ])""")};
+
+    auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, inner);
+    auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outer);
+
+    auto ctx = makeCompileCtx();
+
+    value::SlotId lookupStageOutputSlot = generateSlotId();
+    SlotExprPair agg = std::make_pair(
+        lookupStageOutputSlot, makeFunction(EFn::kAddToArray, makeE<EVariable>(innerScanSlots[0])));
+    auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
+                                              std::move(innerScanStage),
+                                              outerScanSlots[1],
+                                              innerScanSlots[1],
+                                              innerScanSlots[0],
+                                              std::move(agg),
+                                              boost::none,
+                                              kEmptyPlanNodeId);
+
+    value::SlotVector lookupSlots;
+    lookupSlots.reserve(2);
+    lookupSlots.push_back(outerScanSlots[0]);
+    lookupSlots.push_back(lookupStageOutputSlot);
+    auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
+
+    std::vector<std::vector<value::TagValueOwned>> actualResults;
+    while (lookupStage->getNext() == PlanState::ADVANCED) {
+        std::vector<value::TagValueOwned> results;
+        results.reserve(resultAccessors.size());
+        for (size_t i = 0; i < resultAccessors.size(); ++i) {
+            results.emplace_back(resultAccessors[i]->getCopyOfValue());
+        }
+        actualResults.emplace_back(std::move(results));
+    }
+
+    lookupStage->close();
+
+    // A single outer document, so a single output row.
+    ASSERT_EQ(actualResults.size(), 1);
+    ASSERT_EQ(actualResults[0].size(), 2);
+
+    // The outer document is passed through unchanged.
+    const BSONObj expectedOuter = fromjson(R"""({_id: 1})""");
+    ASSERT_SBE_VALUE_EQ(actualResults[0][0].tag(),
+                        actualResults[0][0].value(),
+                        value::TypeTags::bsonObject,
+                        value::bitcastFrom<const char*>(expectedOuter.objdata()));
+
+    // Each matching inner document appears exactly once, even though the outer key value 10 is
+    // duplicated. The matches are returned in buffer-index (insertion) order: _id 11, _id 12,
+    // _id 13.
+    const BSONArray expectedMatches{fromjson(R"""([{_id: 11}, {_id: 12}, {_id: 13}])""")};
+    ASSERT_SBE_VALUE_EQ(actualResults[0][1].tag(),
+                        actualResults[0][1].value(),
+                        value::TypeTags::bsonArray,
+                        value::bitcastFrom<const char*>(expectedMatches.objdata()));
+}
+
 TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
     constexpr size_t kStringLength = 64;
     constexpr size_t kStringCount = 26;

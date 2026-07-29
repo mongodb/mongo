@@ -865,6 +865,35 @@ TEST_F(LookupStageBuilderTest, ThreeComponentAsPathDoesNotPerformArrayTraversal)
         "_id", "_id", "one.two.three", {fromjson("{_id: 0, one: {two: {three: [{_id: 0}]}}}")});
 }
 
+// The hash-join path builds the local (probe) key as a plain array rather than an ArraySet, so that
+// array can contain duplicate values. These tests cover that case for a top-level local field and
+// for a dotted local path, and assert that each foreign document is still matched exactly once.
+TEST_F(LookupStageBuilderTest, HashJoin_LocalKeyArrayWithDuplicateValues) {
+    const std::vector<BSONObj> ldocs = {fromjson("{_id: 0, lkey: [1, 1, 2, 1]}")};
+    const std::vector<BSONObj> fdocs = {fromjson("{_id: 0, fkey: 1}"),
+                                        fromjson("{_id: 1, fkey: 2}")};
+
+    const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
+        {ldocs[0], {fdocs[0], fdocs[1]}},
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertMatchedDocuments(EqLookupNode::LookupStrategy::kHashJoin, "lkey", "fkey", expected);
+}
+
+TEST_F(LookupStageBuilderTest, HashJoin_LocalKeyDottedPathWithDuplicateValues) {
+    const std::vector<BSONObj> ldocs = {fromjson("{_id: 0, a: [{b: 1}, {b: 1}, {b: 2}]}")};
+    const std::vector<BSONObj> fdocs = {fromjson("{_id: 0, fkey: 1}"),
+                                        fromjson("{_id: 1, fkey: 2}")};
+
+    const std::vector<std::pair<BSONObj, std::vector<BSONObj>>> expected = {
+        {ldocs[0], {fdocs[0], fdocs[1]}},
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertMatchedDocuments(EqLookupNode::LookupStrategy::kHashJoin, "a.b", "fkey", expected);
+}
+
 class ExecutablePlan {
 public:
     ExecutablePlan(MultipleCollectionAccessor colls,
