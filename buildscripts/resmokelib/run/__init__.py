@@ -3,6 +3,7 @@
 import argparse
 import collections
 import json
+import math
 import os
 import os.path
 import platform
@@ -988,6 +989,19 @@ class TestRunner(Subcommand):
         in buildscripts/tests/resmokelib/run/test_shuffle_tests.py
         """
 
+        # How strongly a long running test is pulled towards the front of the run. The weight of
+        # a test is this factor times sqrt(number of tests) times its standard deviations above
+        # the mean runtime. Scaling this way keeps the ordering from collapsing to a
+        # near-deterministic longest-first sort in large suites, while still placing the longest
+        # tests within the first percent or so of the run. The weight is never scaled by more
+        # than len(tests), so small suites are unchanged.
+        STIFFNESS_FACTOR = 4.0
+
+        # Runtime distributions are long tailed, so a single test can be dozens of standard
+        # deviations above the mean and swamp every other weight. Clamping keeps the handful of
+        # long tests competing with each other for the front of the run.
+        MAX_STDEVS_ABOVE_MEAN = 6.0
+
         def __init__(self, historic_task_data: HistoricTaskData):
             self.runtimes_historic = {}
             for result in historic_task_data.historic_test_results:
@@ -1003,12 +1017,15 @@ class TestRunner(Subcommand):
             if not total:
                 # Zero tests had historic runtime information
                 return TestRunner.RandomShuffle().shuffle(tests)
+            scale = min(len(tests), self.STIFFNESS_FACTOR * math.sqrt(len(tests)))
             arr = []
             for test in tests:
                 if test in self.runtimes_historic:
-                    stdevs_above_mean = (self.runtimes_historic[test] - mean) / stdev
+                    stdevs_above_mean = min(
+                        (self.runtimes_historic[test] - mean) / stdev, self.MAX_STDEVS_ABOVE_MEAN
+                    )
                     weight = max(
-                        stdevs_above_mean * len(tests), 1
+                        stdevs_above_mean * scale, 1
                     )  # max(_, 1) ensures positive, non-zero weight.
                 else:
                     weight = 1
@@ -1030,6 +1047,10 @@ class TestRunner(Subcommand):
                 return None, None, None
             mean = statistics.mean(runtimes)
             stdev = statistics.stdev(runtimes)
+            if not stdev:
+                # Every test with historic data ran for the same amount of time, so there is no
+                # long test to prioritize and no meaningful scale to weight tests against.
+                return None, None, None
             return total, mean, stdev
 
         def weighted_shuffle(self, arr):

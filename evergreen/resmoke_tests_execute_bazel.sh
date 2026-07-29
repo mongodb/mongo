@@ -91,7 +91,9 @@ build_ci_flags() {
         ci_flags+=" --//bazel/resmoke/mongot:version=release"
     fi
 
-    if [ "${should_shuffle}" = true ]; then
+    if [ -n "${shuffle_mode:-}" ]; then
+        ci_flags+=" --test_arg=--shuffleMode=${shuffle_mode}"
+    elif [ "${should_shuffle}" = true ]; then
         ci_flags+=" --test_arg=--shuffle"
     elif [ "${should_shuffle}" = false ]; then
         ci_flags+=" --test_arg=--shuffleMode=off"

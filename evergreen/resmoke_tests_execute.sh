@@ -78,7 +78,9 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
 
     extra_args="$extra_args --jobs=${resmoke_jobs}"
 
-    if [ ${should_shuffle} = true ]; then
+    if [ -n "${shuffle_mode}" ]; then
+        extra_args="$extra_args --shuffleMode=${shuffle_mode}"
+    elif [ ${should_shuffle} = true ]; then
         extra_args="$extra_args --shuffleMode=longest-first"
     elif [ ${should_shuffle} = false ]; then
         extra_args="$extra_args --shuffleMode=off"
