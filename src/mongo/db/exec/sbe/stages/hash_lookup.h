@@ -110,16 +110,7 @@ private:
     // the stage's close() method, so it should also try to shrink its memory footprint.
     void reset(bool fromClose);
 
-    template <typename Container>
-    void accumulateFromValueIndices(const Container* bufferIndices);
-
-    /**
-     * Visits the RecordIndexCollection std::variant to pass the concrete container of indices to
-     * its delegate, accumulateFromValueIndices().
-     */
-    inline void accumulateFromValueIndicesVariant(const RecordIndexCollection variant) {
-        std::visit([this](auto&& bufIdxs) { this->accumulateFromValueIndices(bufIdxs); }, variant);
-    }
+    void accumulateFromValueIndices(const RecordIndexCollection* bufferIndices);
 
     PlanStage* outerChild() const {
         return _children[0].get();

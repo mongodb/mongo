@@ -178,8 +178,7 @@ void HashLookupStage::open(bool reOpen) {
     outerChild()->open(reOpen);
 }  // HashLookupStage::open
 
-template <typename Container>
-void HashLookupStage::accumulateFromValueIndices(const Container* bufferIndices) {
+void HashLookupStage::accumulateFromValueIndices(const RecordIndexCollection* bufferIndices) {
     for (const size_t bufferIdx : *bufferIndices) {
         boost::optional<value::TagValueView> innerMatch = _hashTable.getValueAtIndex(bufferIdx);
         tassert(10801300, "Expected non-empty innerMatch", innerMatch);
@@ -201,7 +200,7 @@ PlanState HashLookupStage::getNext() {
         _hashTable.htIter.reset(_inOuterMatchAccessor->getViewOfValue());
 
         // Accumulate all the matching inner docs for the outer key(s).
-        accumulateFromValueIndicesVariant(_hashTable.htIter.getAllMatchingIndices());
+        accumulateFromValueIndices(_hashTable.htIter.getAllMatchingIndices());
     }
     return trackPlanState(state);
 }  // HashLookupStage::getNext

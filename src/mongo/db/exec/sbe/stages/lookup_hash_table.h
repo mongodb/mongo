@@ -29,7 +29,7 @@ using HashTableType = std::unordered_map<value::FixedSizeRow<1 /*N*/>,  // NOLIN
                                          value::FixedSizeSingleRowHasher,
                                          value::SingleRowFixedSizeRowEq>;
 using BufferType = std::vector<value::FixedSizeRow<1 /*N*/>>;
-using RecordIndexCollection = std::variant<std::vector<size_t>*, std::set<size_t>*>;
+using RecordIndexCollection = std::vector<size_t>;
 
 class LookupHashTable;
 
@@ -59,8 +59,8 @@ public:
      * Clears the iterator's state.
      */
     inline void clear() {
+        // Keep '_hashTableMatchVector's capacity across outer rows to avoid per-row reallocation.
         _hashTableMatchVector.clear();
-        _hashTableMatchSet.clear();
         _hashTableSearched = false;
 
         // Force the iterator to return 'kNoMatchingIndex' until it is reset to a new key.
@@ -71,14 +71,13 @@ public:
     /**
      * Returns all matching indices for the current hash keys.
      */
-    inline RecordIndexCollection getAllMatchingIndices() {
+    inline const RecordIndexCollection* getAllMatchingIndices() {
         if (_outerKeyIsArray) {
             initSearchArray();
-            return &_hashTableMatchSet;
         } else {
             initSearchScalar();
-            return &_hashTableMatchVector;
         }
+        return &_hashTableMatchVector;
     }
 
     /**
@@ -118,14 +117,13 @@ private:
     // Have we looked for the current individual key yet ('_hashTableMatchXyz' members are valid)?
     bool _hashTableSearched = false;
 
-    // If '_outerKeyIsArray' is false, a sorted vector of inner key match buffer indices.
-    std::vector<size_t> _hashTableMatchVector;
-    // If '_outerKeyIsArray' is false, the current position's index into '_hashTableMatchVector'.
+    // A sorted, de-duplicated vector of inner key match buffer indices for the current outer key
+    // (whether the outer key is a scalar or an array). Its capacity is retained across outer rows
+    // to avoid per-row allocation churn.
+    RecordIndexCollection _hashTableMatchVector;
+
+    // The current position's index into '_hashTableMatchVector'.
     size_t _hashTableMatchVectorIdx = 0;
-    // If '_outerKeyIsArray' is true, a sorted set of inner key match buffer indices.
-    std::set<size_t> _hashTableMatchSet;
-    // If '_outerKeyIsArray' is true, the current position in '_hashTableMatchSet'.
-    std::set<size_t>::const_iterator _hashTableMatchSetIter;
 };  // class LookupHashTableIter
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -251,8 +249,8 @@ private:
      */
     value::TagValueMaybeOwned normalizeStringIfCollator(value::TagValueView key) const;
 
-    boost::optional<std::vector<size_t>> readIndicesFromRecordStore(SpillingStore* rs,
-                                                                    value::TagValueView key);
+    boost::optional<RecordIndexCollection> readIndicesFromRecordStore(SpillingStore* rs,
+                                                                      value::TagValueView key);
 
     std::pair<RecordId, key_string::TypeBits> serializeKeyForRecordStore(
         value::TagValueView key) const;
@@ -265,11 +263,11 @@ private:
 
     void spillIndicesToRecordStore(SpillingStore* rs,
                                    value::TagValueView key,
-                                   const std::vector<size_t>& value);
+                                   const RecordIndexCollection& value);
 
     int64_t writeIndicesToRecordStore(SpillingStore* rs,
                                       value::TagValueView key,
-                                      const std::vector<size_t>& value,
+                                      const RecordIndexCollection& value,
                                       bool update);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
