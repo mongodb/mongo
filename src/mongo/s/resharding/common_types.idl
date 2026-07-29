@@ -156,6 +156,10 @@ structs:
                 type: shard_id
                 description: Primary shard id for the given namespace being resharded
                 optional: true
+            startingFCV:
+                type: fcv_string
+                description: "The FCV when the coordinator doc was created."
+                optional: true
 
             authoritativeMetadataAccessLevel:
                 type: ReshardingAuthoritativeMetadataAccessLevel

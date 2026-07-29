@@ -98,9 +98,15 @@ public:
         meta.setPerformVerification(reshardingOptions.performVerification);
         meta.setStartTime(getServiceContext()->getFastClockSource()->now());
 
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        // (Generic FCV reference): A transitional FCV is not a valid value for the startingFCV
+        // field, and resharding is never allowed to start during an FCV transition anyway.
+        if (!fcvSnapshot.isUpgradingOrDowngrading()) {
+            meta.setStartingFCV(fcvSnapshot.getVersion());
+        }
+
         ForwardableOperationMetadata fom;
-        fom.setVersionContext(
-            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        fom.setVersionContext(VersionContext{fcvSnapshot});
         meta.setForwardableOpMetadata(std::move(fom));
 
         std::vector<DonorShardEntry> donorShards;

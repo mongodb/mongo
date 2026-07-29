@@ -601,6 +601,43 @@ TEST_F(ReshardingUtilTest, CreateCoordinatorDocStoresForwardableOpMetadata) {
     ASSERT_TRUE(coordinatorDoc.getForwardableOpMetadata()->getVersionContext()->hasOperationFCV());
 }
 
+TEST_F(ReshardingUtilTest, CreateCoordinatorDocStoresStartingFCV) {
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions.
+    using GenericFCV = multiversion::GenericFCV;
+
+    auto originalFCV = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+
+    ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+    configsvrReshardCollection.setDbName(nss().dbName());
+
+    // (Generic FCV reference): for testing.
+    for (auto fcv : {GenericFCV::kLatest, GenericFCV::kLastLTS, GenericFCV::kLastContinuous}) {
+        serverGlobalParams.mutableFCV.setVersion(fcv);
+
+        ReshardingCoordinatorDocument coordinatorDoc =
+            createReshardingCoordinatorDoc(operationContext(),
+                                           configsvrReshardCollection,
+                                           collEntry,
+                                           primaryShardId(),
+                                           nss(),
+                                           true);
+
+        auto startingFCV = coordinatorDoc.getCommonReshardingMetadata().getStartingFCV();
+        ASSERT_TRUE(startingFCV.has_value());
+        ASSERT_EQ(*startingFCV, fcv);
+        // The snapshotted FCV must be the one isFCVTheSame() later compares against.
+        ASSERT_TRUE(isFCVTheSame(coordinatorDoc.getCommonReshardingMetadata(), fcv));
+    }
+}
+
 TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_Basic) {
     auto replCoord = repl::ReplicationCoordinator::get(operationContext());
 
@@ -1125,6 +1162,84 @@ TEST_F(MakeReshardingOperationContextTest,
             getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(emptyFom));
         ASSERT_EQ(vCtx, VersionContext{GenericFCV::kLastContinuous});
     }
+}
+
+class IsFCVTheSameTest : public unittest::Test {
+protected:
+    CommonReshardingMetadata makeMetadata(
+        boost::optional<multiversion::FeatureCompatibilityVersion> startingFCV) {
+        const NamespaceString sourceNss =
+            NamespaceString::createNamespaceString_forTest("test.foo");
+        const auto sourceUUID = UUID::gen();
+
+        CommonReshardingMetadata metadata{
+            UUID::gen(),
+            sourceNss,
+            sourceUUID,
+            resharding::constructTemporaryReshardingNss(sourceNss, sourceUUID),
+            BSON("newKey" << 1)};
+
+        if (startingFCV) {
+            metadata.setStartingFCV(*startingFCV);
+        }
+
+        return metadata;
+    }
+};
+
+TEST_F(IsFCVTheSameTest, GetStartingFCVString) {
+    // (Generic FCV reference): used for testing.
+    using GenericFCV = multiversion::GenericFCV;
+
+    ASSERT_EQ(getStartingFCVString(makeMetadata(boost::none)), "uninitialized");
+    for (auto fcv : {GenericFCV::kLatest, GenericFCV::kLastLTS, GenericFCV::kLastContinuous}) {
+        ASSERT_EQ(getStartingFCVString(makeMetadata(fcv)), multiversion::toString(fcv));
+    }
+}
+
+TEST_F(IsFCVTheSameTest, MatchesWhenStartingFCVIsSetAndEqual) {
+    // (Generic FCV reference): for testing.
+    using GenericFCV = multiversion::GenericFCV;
+
+    ASSERT_TRUE(isFCVTheSame(makeMetadata(GenericFCV::kLatest), GenericFCV::kLatest));
+    ASSERT_TRUE(isFCVTheSame(makeMetadata(GenericFCV::kLastLTS), GenericFCV::kLastLTS));
+    ASSERT_TRUE(
+        isFCVTheSame(makeMetadata(GenericFCV::kLastContinuous), GenericFCV::kLastContinuous));
+}
+
+TEST_F(IsFCVTheSameTest, DoesNotMatchWhenStartingFCVIsSetAndDifferent) {
+    // (Generic FCV reference): for testing.
+    using GenericFCV = multiversion::GenericFCV;
+
+    ASSERT_FALSE(isFCVTheSame(makeMetadata(GenericFCV::kLastLTS), GenericFCV::kLatest));
+    ASSERT_FALSE(isFCVTheSame(makeMetadata(GenericFCV::kLatest), GenericFCV::kLastLTS));
+    ASSERT_FALSE(isFCVTheSame(makeMetadata(GenericFCV::kLatest), GenericFCV::kLastContinuous));
+    ASSERT_FALSE(isFCVTheSame(makeMetadata(GenericFCV::kLastLTS),
+                              GenericFCV::kUpgradingFromLastLTSToLatest));
+}
+
+// TODO SERVER-132341: should assert on boost::none as it should be present post v9.0.
+TEST_F(IsFCVTheSameTest, UnsetStartingFCVMatchesLastLTSAndLastContinuous) {
+    // (Generic FCV reference): for testing.
+    // A coordinator doc without startingFCV was written by an older binary, so the only FCVs
+    // consistent with it are the pre-upgrade ones.
+    using GenericFCV = multiversion::GenericFCV;
+
+    ASSERT_TRUE(isFCVTheSame(makeMetadata(boost::none), GenericFCV::kLastLTS));
+    ASSERT_TRUE(isFCVTheSame(makeMetadata(boost::none), GenericFCV::kLastContinuous));
+}
+
+TEST_F(IsFCVTheSameTest, UnsetStartingFCVDoesNotMatchLatestOrUpgrading) {
+    // (Generic FCV reference): for testing.
+    using GenericFCV = multiversion::GenericFCV;
+
+    ASSERT_FALSE(isFCVTheSame(makeMetadata(boost::none), GenericFCV::kLatest));
+    ASSERT_FALSE(
+        isFCVTheSame(makeMetadata(boost::none), GenericFCV::kUpgradingFromLastLTSToLatest));
+    ASSERT_FALSE(
+        isFCVTheSame(makeMetadata(boost::none), GenericFCV::kUpgradingFromLastContinuousToLatest));
+    ASSERT_FALSE(
+        isFCVTheSame(makeMetadata(boost::none), GenericFCV::kDowngradingFromLatestToLastLTS));
 }
 
 class ReshardingDonorCloneCountUtilTest : public CatalogTestFixture {

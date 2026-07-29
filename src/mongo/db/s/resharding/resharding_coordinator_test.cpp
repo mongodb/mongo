@@ -172,9 +172,11 @@ protected:
         CommonReshardingMetadata meta(
             _reshardingUUID, _originalNss, UUID::gen(), _tempNss, _newShardKey.toBSON());
 
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        meta.setStartingFCV(fcvSnapshot.getVersion());
+
         ForwardableOperationMetadata fom;
-        fom.setVersionContext(
-            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        fom.setVersionContext(VersionContext{fcvSnapshot});
         meta.setForwardableOpMetadata(std::move(fom));
 
         if (useUserUUID) {

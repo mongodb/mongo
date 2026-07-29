@@ -98,9 +98,11 @@ public:
         meta.setStartTime(getServiceContext()->getFastClockSource()->now());
         meta.setProvenance(GetParam());
 
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        meta.setStartingFCV(fcvSnapshot.getVersion());
+
         ForwardableOperationMetadata fom;
-        fom.setVersionContext(
-            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        fom.setVersionContext(VersionContext{fcvSnapshot});
         meta.setForwardableOpMetadata(std::move(fom));
 
         ReshardingCoordinatorDocument doc(CoordinatorStateEnum::kUnused, donors, recipients);

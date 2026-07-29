@@ -577,7 +577,21 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        [this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
                            return _verifyFinalCollection(executor,
                                                          std::move(coordinatorDocChangedOnDisk));
-                       });
+                       })
+                   .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+                       const auto currentFCV =
+                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                       // TODO SERVER-132341: Convert to tassert.
+                       uassert(
+                           13222300,
+                           fmt::format(
+                               "Feature compatibility version is no longer the same version that "
+                               "resharding started with, startingFCV: {}, currentFCV: {}",
+                               resharding::getStartingFCVString(_metadata),
+                               multiversion::toString(currentFCV.getVersion())),
+                           resharding::isFCVTheSame(_metadata, currentFCV.getVersion()));
+                       return coordinatorDocChangedOnDisk;
+                   });
            })
         .onTransientError([this](const Status& status) {
             _metrics->onCoordinatorRetry("_runUntilReadyToCommit");

@@ -684,6 +684,16 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     // entire operation lifetime, even across FCV transitions. If the opCtx already carries an OFCV,
     // capture that; otherwise fall back to the global snapshot.
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
+    // (Generic FCV reference): upgrading/downgrading FCV is represented as multi field object,
+    // trying to store this will cause an invariant later, so don't try to store it here.
+    // Don't throw here as well as it won't allow new reshardCollection command requests from
+    // joining active resharding. Instead, defer the assertion to
+    // ReshardingCoordinatorService::checkIfConflictsWithOtherInstances.
+    if (!fcv.isUpgradingOrDowngrading()) {
+        commonMetadata.setStartingFCV(fcv.getVersion());
+    }
+
     {
         ForwardableOperationMetadata fom(opCtx);
         if (!fom.getVersionContext() &&
@@ -998,6 +1008,33 @@ bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetada
                                 const FCVGatedFeatureFlag& flag) {
     return flag.isEnabled(getVersionContextOrDefault(fom),
                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+bool isFCVTheSame(const CommonReshardingMetadata& metadata,
+                  const multiversion::FeatureCompatibilityVersion& fcv) {
+    // (Generic FCV reference): the coordinator doc predates the startingFCV field, so it can only
+    // have been created on an older binary, which implies the FCV was not kLatest.
+    using GenericFCV = multiversion::GenericFCV;
+
+    // TODO SERVER-132341: startingFCV should always be present in post v9.0.
+    auto startingFCV = metadata.getStartingFCV();
+    if (!startingFCV) {
+        return fcv == GenericFCV::kLastLTS || fcv == GenericFCV::kLastContinuous;
+    }
+
+    // Note: startingFCV cannot be upgrading/downgrading versions because we disallow them during
+    // the creation of the coordinator document.
+    return *startingFCV == fcv;
+}
+
+std::string getStartingFCVString(const CommonReshardingMetadata& metadata) {
+    auto startingFCV = metadata.getStartingFCV();
+    // TODO SERVER-132341: startingFCV should always be present in post v9.0.
+    if (!startingFCV) {
+        return "uninitialized";
+    }
+
+    return std::string{multiversion::toString(*startingFCV)};
 }
 
 boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
