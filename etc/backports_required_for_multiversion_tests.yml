@@ -58,6 +58,8 @@ last-continuous:
       ticket: SERVER-130168
     - test_file: jstests/aggregation/expressions/percentile_expression_syntax.js
       ticket: SERVER-129617
+    - test_file: jstests/aggregation/expressions/regex_backslash_c.js
+      ticket: SERVER-127985
     - test_file: jstests/aggregation/expressions/subtype.js
       ticket: SERVER-129103
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
@@ -201,6 +203,8 @@ last-lts:
       ticket: SERVER-129617
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
+    - test_file: jstests/aggregation/expressions/regex_backslash_c.js
+      ticket: SERVER-127985
     - test_file: jstests/aggregation/expressions/subtype.js
       ticket: SERVER-129103
     - test_file: jstests/aggregation/expressions/trim.js
