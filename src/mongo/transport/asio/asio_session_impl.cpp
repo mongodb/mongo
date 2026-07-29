@@ -380,7 +380,16 @@ bool CommonAsioSession::isConnected() {
     if (!getSocket().is_open())
         return false;
 
-    auto swPollEvents = pollASIOSocket(getSocket(), POLLIN, Milliseconds{0});
+    unsigned events = POLLIN;
+    unsigned disconnectedEvents = POLLERR | POLLHUP | POLLNVAL;
+#ifdef __linux__
+    // POLLRDHUP reports that the peer has shut down its write side. Without it, data the peer
+    // sent before disconnecting keeps POLLIN set and the peek below succeeding, so a session
+    // with buffered unread data would be reported as connected indefinitely.
+    events |= POLLRDHUP;
+    disconnectedEvents |= POLLRDHUP;
+#endif
+    auto swPollEvents = pollASIOSocket(getSocket(), events, Milliseconds{0});
     if (!swPollEvents.isOK()) {
         if (swPollEvents != ErrorCodes::NetworkTimeout) {
             LOGV2_WARNING(4615609,
@@ -392,6 +401,9 @@ bool CommonAsioSession::isConnected() {
     }
 
     auto revents = swPollEvents.getValue();
+    if (revents & disconnectedEvents) {
+        return false;
+    }
     if (revents & POLLIN) {
         try {
             char testByte;

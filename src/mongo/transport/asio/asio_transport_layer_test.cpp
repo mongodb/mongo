@@ -402,6 +402,39 @@ TEST(AsioTransportLayer, CheckClientWRShutdownWithoutClose) {
     tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
         [&](ConnectionThread& client) { shutdown(client.socket().rawFD(), SHUT_WR); });
 }
+
+/**
+ * isConnected() must report false once the peer has shut down its write side, even when data the
+ * peer sent beforehand is still buffered unread on the socket. Detecting the half-close under
+ * buffered data requires POLLRDHUP, so this holds on Linux only. (SERVER-131398)
+ */
+TEST(AsioTransportLayer, IsConnectedFalseWithBufferedDataAfterClientWRShutdown) {
+    TestFixture tf;
+    Notification<test::SessionThread*> mockSessionCreated;
+    tf.sessionManager().setOnStartSession(
+        [&](test::SessionThread& st) { mockSessionCreated.set(&st); });
+
+    ConnectionThread connectThread(tf.tla().listenerMainPort());
+    connectThread.wait();
+
+    auto session = mockSessionCreated.get()->session();
+    ASSERT_TRUE(session->isConnected());
+
+    // Send a byte that the server never reads, then half-close the client side.
+    const char testByte = 'x';
+    ASSERT_EQ(::send(connectThread.socket().rawFD(), &testByte, sizeof(testByte), 0),
+              static_cast<ssize_t>(sizeof(testByte)));
+    ASSERT_TRUE(session->isConnected());
+
+    ::shutdown(connectThread.socket().rawFD(), SHUT_WR);
+
+    // The FIN is delivered asynchronously even over loopback, so allow some time for it to arrive.
+    const Date_t deadline = Date_t::now() + Seconds{10};
+    while (session->isConnected() && Date_t::now() < deadline) {
+        sleepFor(Milliseconds{10});
+    }
+    ASSERT_FALSE(session->isConnected());
+}
 #endif  // __linux__
 
 TEST(AsioTransportLayer, StopAcceptingSessionsBeforeStart) {
