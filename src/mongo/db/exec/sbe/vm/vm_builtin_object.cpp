@@ -122,41 +122,25 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
-    std::vector<value::TypeTags> typeTags;
-    std::vector<value::Value> values;
-    std::vector<std::string> names;
-
-    size_t tmpVectorLen = arity >> 1;
-    typeTags.reserve(tmpVectorLen);
-    values.reserve(tmpVectorLen);
-    names.reserve(tmpVectorLen);
-
-    for (ArityType idx = 0; idx < arity; idx += 2) {
-        {
-            auto nameView = viewFromStack(idx);
-
-            if (!value::isString(nameView.tag)) {
-                return value::TagValueMaybeOwned::nothing();
-            }
-
-            names.emplace_back(value::getStringView(nameView.tag, nameView.value));
-        }
-        {
-            auto fieldView = viewFromStack(idx + 1);
-            typeTags.push_back(fieldView.tag);
-            values.push_back(fieldView.value);
-        }
-    }
-
+    // Build the object directly from the stack in a single pass.
     value::TagValueOwned result{value::makeNewObject()};
     auto obj = value::getObjectView(result.value());
+    if (arity > 0) {
+        // 'Object::reserve()' normalizes its argument to at least 1, so calling it for an empty
+        // object would allocate rather than leave the object's vectors empty.
+        obj->reserve(arity / 2);
+    }
 
-    if (typeTags.size()) {
-        obj->reserve(typeTags.size());
-        for (size_t idx = 0; idx < typeTags.size(); ++idx) {
-            auto [tagCopy, valCopy] = value::copyValue(typeTags[idx], values[idx]);
-            obj->push_back_raw(names[idx], tagCopy, valCopy);
+    for (ArityType idx = 0; idx < arity; idx += 2) {
+        auto nameView = viewFromStack(idx);
+
+        if (!value::isString(nameView.tag)) {
+            return value::TagValueMaybeOwned::nothing();
         }
+
+        auto fieldView = viewFromStack(idx + 1);
+        obj->push_back(value::getStringView(nameView.tag, nameView.value),
+                       value::copyValue(fieldView.tag, fieldView.value));
     }
 
     return std::move(result);

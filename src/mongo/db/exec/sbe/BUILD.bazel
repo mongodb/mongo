@@ -359,6 +359,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_local_bind_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_mod_expression_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_new_array_from_range_builtin_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_new_obj_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_object_array_conversion_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_prim_binary_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_prim_nary_test.cpp",

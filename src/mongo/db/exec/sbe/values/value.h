@@ -1341,6 +1341,16 @@ public:
         push_back_raw(name, val.first, val.second);
     }
 
+    /**
+     * Appends 'value' under the field name 'name', taking ownership of it. 'name' is copied. A
+     * 'Nothing' value is not appended. Prefer this over 'push_back_raw()', as it encodes the
+     * transfer of ownership in the type system.
+     */
+    void push_back(std::string_view name, TagValueOwned value) {
+        auto [tag, val] = value.releaseToRaw();
+        push_back_raw(name, tag, val);
+    }
+
     TagValueView getField(std::string_view field) {
         for (size_t idx = 0; idx < _typeTags.size(); ++idx) {
             if (_names[idx] == field) {
