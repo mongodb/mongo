@@ -105,6 +105,12 @@ MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 // validation for TTL index 'expireAfterSeconds' will be disabled in certain codepaths.
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexExpireAfterSecondsValidation);
 
+// When the 'skipWildcardIndexProjectionValidation' failpoint is enabled, validation of a compound
+// wildcard index's 'wildcardProjection' will be disabled. This allows tests to create the invalid
+// indexes which older binaries allowed before SERVER-113685.
+// TODO (SERVER-132386): Remove this failpoint once 10.0 becomes last LTS.
+MONGO_FAIL_POINT_DEFINE(skipWildcardIndexProjectionValidation);
+
 const std::set<std::string_view> allowedIdIndexFieldNames = {
     IndexDescriptor::kCollationFieldName,
     IndexDescriptor::kIndexNameFieldName,
@@ -578,7 +584,7 @@ StatusWith<BSONObj> validateIndexSpec(
                                       << "' field can't be an empty object"};
             }
             try {
-                if (key.nFields() > 1) {
+                if (key.nFields() > 1 && !skipWildcardIndexProjectionValidation.shouldFail()) {
                     auto validationStatus =
                         validateWildcardProjection(key, indexSpecElem.embeddedObject());
                     if (!validationStatus.isOK()) {
