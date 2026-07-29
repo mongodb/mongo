@@ -372,17 +372,18 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             repl_config["settings"]["heartbeatTimeoutSecs"] = 1
             repl_config["settings"]["catchUpTimeoutMillis"] = 0
 
+        disagg_enabled = (
+            self.nodes[0]
+            .get_mongod_options()
+            .get("set_parameters", {})
+            .get("disaggregatedStorageEnabled", False)
+        )
+
         if self.use_auto_bootstrap_procedure:
             # Auto-bootstrap already initiates automatically on the first node, but we still need
             # to apply the requested repl_config settings using reconfig.
             self._reconfig_repl_set(client, repl_config)
         else:
-            disagg_enabled = (
-                self.nodes[0]
-                .get_mongod_options()
-                .get("set_parameters", {})
-                .get("disaggregatedStorageEnabled", False)
-            )
             if not disagg_enabled:
                 self.logger.info("Issuing replSetInitiate command: %s", repl_config)
                 self._initiate_repl_set(client, repl_config)
@@ -404,8 +405,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # node joins. A node that initial syncs copies the sync source's last checkpoint; if
             # that checkpoint predates the FCV transition it crashes because it observes an FCV
             # state inconsistent with its binary.
-            fcv_optime = get_last_optime(client, self.fixturelib)
-            self._force_checkpoint_past_optime(client, fcv_optime)
+            #
+            # Skipped on disaggregated storage: `replSetGetStatus` there reports
+            # `lastStableRecoveryTimestamp` as a null Timestamp unconditionally, so the field is
+            # always present but never advances and the wait below would run to its deadline.
+            # TODO(SERVER-119066): Remove when no longer necessary.
+            if not disagg_enabled:
+                fcv_optime = get_last_optime(client, self.fixturelib)
+                self._force_checkpoint_past_optime(client, fcv_optime)
 
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
