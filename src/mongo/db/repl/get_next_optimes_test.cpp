@@ -108,5 +108,24 @@ TEST_F(GetNextOpTimesTest, CantBlockWhileSlotOpen) {
     ASSERT_FALSE(locker->getAssertOnLockAttempt());
 }
 
+TEST_F(GetNextOpTimesTest, OnReserveCallbackFiresOnceWithReservedTimestamp) {
+    int callCount = 0;
+    Timestamp observedTs;
+    {
+        WriteUnitOfWork wuow{_opCtx.get()};
+        auto slots = LocalOplogInfo::get(_opCtx.get())
+                         ->getNextOpTimes(_opCtx.get(), 1, 0, [&](Timestamp reservedTs) {
+                             ++callCount;
+                             observedTs = reservedTs;
+                         });
+        ASSERT_EQUALS(1u, slots.size());
+        // The callback runs exactly once, while the reservation mutex is held, with the reserved
+        // base timestamp.
+        ASSERT_EQUALS(1, callCount);
+        ASSERT_EQUALS(slots[0].getTimestamp(), observedTs);
+        wuow.commit();
+    }
+}
+
 }  // namespace
 }  // namespace mongo

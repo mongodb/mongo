@@ -104,6 +104,13 @@ public:
      */
     void setNewTimestamp(ServiceContext* service, const Timestamp& newTime);
 
+    // Invoked once, while _newOpMutex is held, immediately after the base timestamp for a batch has
+    // been reserved and registered with the storage engine. Lets a caller perform an action that
+    // must be atomically ordered against all other optime reservations (e.g. recording the
+    // step-down timestamp). Receives the reserved base timestamp. Any code executed in this
+    // function must be very fast.
+    using OnReserveOpTimesFn = unique_function<void(Timestamp reservedBaseTs)>;
+
     /**
      * Allocates optimes for new entries in the oplog. Returns the new optimes in a vector along
      * with their terms.
@@ -111,10 +118,15 @@ public:
      * The opTimeOffset is an increment applied to the base opTime when registering the oplog
      * visibility point, allowing the caller to move the visible, hole-free end of the oplog forward
      * by a configurable amount.
+     *
+     * If provided, onReserveWithMutexHeld is invoked with the reserved base timestamp while the
+     * internal reservation mutex (_newOpMutex) is still held, so the action is strictly ordered
+     * against every other reservation.
      */
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx,
                                           std::size_t count,
-                                          std::size_t opTimeOffset = 0);
+                                          std::size_t opTimeOffset = 0,
+                                          OnReserveOpTimesFn onReserveWithMutexHeld = {});
 
     /**
      * Returns a shared reference to the oplog truncate markers to allow the caller to wait

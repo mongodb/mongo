@@ -132,7 +132,8 @@ void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& n
 
 std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
                                                       std::size_t count,
-                                                      std::size_t opTimeOffset) {
+                                                      std::size_t opTimeOffset,
+                                                      OnReserveOpTimesFn onReserveWithMutexHeld) {
     auto& intentRegistry = rss::consensus::IntentRegistry::get(opCtx->getServiceContext());
     if (gFeatureFlagIntentRegistration.isEnabled() && intentRegistry.isPrimaryEnforcementActive() &&
         !intentRegistry.hasWriteIntentDeclared(opCtx) && !repl::alwaysAllowNonLocalWrites(opCtx)) {
@@ -182,6 +183,12 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
         invariant(opTimeOffset < count);
         Timestamp registerTs(ts.asULL() + opTimeOffset);
         fassert(28560, storageEngine->oplogDiskLocRegister(opCtx, _rs, registerTs, orderedCommit));
+
+        // Run any caller-supplied action that must be strictly ordered against every other
+        // reservation, while _newOpMutex is still held (e.g. recording the step-down timestamp).
+        if (onReserveWithMutexHeld) {
+            onReserveWithMutexHeld(ts);
+        }
     }
 
     const auto prevAssertOnLockAttempt =
