@@ -527,15 +527,15 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    SetSchemaEpochOutsideUnitOfWork,
                    "Inactive") {
     // setSchemaEpoch must be called inside a WriteUnitOfWork.
-    ru1->setSchemaEpoch(1);
+    ru1->setSchemaEpoch(KVEngine::kInitialSchemaEpoch + 1);
 }
 
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    SetSchemaEpochTwice,
                    "Schema epoch already set to") {
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
-    ru1->setSchemaEpoch(1);
-    ru1->setSchemaEpoch(2);
+    ru1->setSchemaEpoch(KVEngine::kInitialSchemaEpoch + 1);
+    ru1->setSchemaEpoch(KVEngine::kInitialSchemaEpoch + 2);
 }
 
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
@@ -544,7 +544,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
     ru1->setCommitTimestamp({1, 1});
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
     // setSchemaEpoch is mutually exclusive with having a commit timestamp set.
-    ru1->setSchemaEpoch(1);
+    ru1->setSchemaEpoch(KVEngine::kInitialSchemaEpoch + 1);
 }
 
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
@@ -553,7 +553,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
     ASSERT_OK(ru1->setTimestamp({1, 1}));
     // setSchemaEpoch is mutually exclusive with having a write timestamp set.
-    ru1->setSchemaEpoch(1);
+    ru1->setSchemaEpoch(KVEngine::kInitialSchemaEpoch + 1);
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, RoundUpPreparedTimestamps) {

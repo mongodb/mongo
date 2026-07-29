@@ -191,6 +191,11 @@ public:
 
     void unpinOldestTimestamp(const std::string& requestingServiceName) override {}
 
+    boost::optional<uint64_t> getStableSchemaEpoch() override {
+        return boost::none;
+    }
+    void setStableSchemaEpoch(uint64_t schemaEpoch) override {}
+
     bool underCachePressure(int concurrentOpOuts) override {
         return false;
     }

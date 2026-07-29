@@ -609,6 +609,8 @@ public:
     bool usesSchemaEpochs() const override {
         return _usesSchemaEpochs;
     }
+    boost::optional<uint64_t> getStableSchemaEpoch() override;
+    void setStableSchemaEpoch(uint64_t schemaEpoch) override;
 
     bool supportsReadConcernSnapshot() const final;
 

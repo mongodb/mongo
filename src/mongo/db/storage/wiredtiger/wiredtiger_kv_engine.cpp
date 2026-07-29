@@ -2461,6 +2461,31 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
     }
 }
 
+boost::optional<uint64_t> WiredTigerKVEngine::getStableSchemaEpoch() {
+    if (!gFeatureFlagEnableSchemaEpochs.isEnabled() || !_usesSchemaEpochs) {
+        return boost::none;
+    }
+    const auto schemaEpoch =
+        getWiredTigerGlobalTimestamp(_conn, "get=stable_disaggregated_schema_epoch");
+    // WT uses 0 to represent unset rather than distinguishing the two cases
+    return schemaEpoch > 0 ? boost::make_optional(schemaEpoch) : boost::none;
+}
+
+void WiredTigerKVEngine::setStableSchemaEpoch(uint64_t schemaEpoch) {
+    if (!gFeatureFlagEnableSchemaEpochs.isEnabled() || !_usesSchemaEpochs) {
+        return;
+    }
+
+    // Stable schema epoch cannot move backwards
+    auto prev = getStableSchemaEpoch();
+    invariant(!prev || prev <= schemaEpoch);
+
+    invariantWTOK(
+        _conn->set_timestamp(
+            _conn, fmt::format("stable_disaggregated_schema_epoch={:x}", schemaEpoch).c_str()),
+        nullptr);
+}
+
 Timestamp WiredTigerKVEngine::_calculateHistoryLagFromStableTimestamp(Timestamp stableTimestamp) {
     // The oldest_timestamp should lag behind the stable_timestamp by
     // PersistenceProvider::getMinSnapshotHistoryWindowInSeconds() seconds.

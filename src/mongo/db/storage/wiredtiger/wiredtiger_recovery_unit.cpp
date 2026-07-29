@@ -924,6 +924,7 @@ Timestamp WiredTigerRecoveryUnit::getCommitTimestamp() const {
 }
 
 void WiredTigerRecoveryUnit::setSchemaEpoch(uint64_t schemaEpoch) {
+    invariant(schemaEpoch > KVEngine::kInitialSchemaEpoch);
     invariant(_inUnitOfWork(), toString(_getState()));
     invariant(!_schemaEpoch.has_value(),
               str::stream() << "Schema epoch already set to " << *_schemaEpoch

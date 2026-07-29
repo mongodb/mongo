@@ -5,6 +5,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
@@ -157,6 +158,13 @@ public:
     }
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override {
+        MONGO_UNREACHABLE;
+    }
+
+    boost::optional<uint64_t> getStableSchemaEpoch() override {
+        MONGO_UNREACHABLE;
+    }
+    void setStableSchemaEpoch(uint64_t schemaEpoch) override {
         MONGO_UNREACHABLE;
     }
 

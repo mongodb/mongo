@@ -178,10 +178,13 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
     // This maintains current and earlier behavior of a MongoD.
     const auto catalogRecordStoreOpts = RecordStore::Options{};
     if (!catalogExists) {
-        WriteUnitOfWork uow(opCtx);
-        // The catalog is created before we have timestamping available, so when using schema epochs
-        // we need to explicitly use the minimum epoch.
-        shard_role_details::getRecoveryUnit(opCtx)->setSchemaEpoch(1);
+        StorageWriteTransaction uow(ru);
+        // Normally schema epochs are set based on the timestamp, but we have to create the catalog
+        // before we can begin timestamping operations, so explicitly set the stable epoch to the
+        // initial value and the schema epoch for this write to a sentinel value. Has no effect if
+        // schema epochs are not in use.
+        _engine->setStableSchemaEpoch(KVEngine::kInitialSchemaEpoch);
+        ru.setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
 
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         LOGV2(11503104, "Creating MDB catalog as it did not already exist");
@@ -215,8 +218,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
     _catalog->init(opCtx);
 
     LOGV2(9529902, "Retrieving all idents from storage engine");
-    std::vector<std::string> identsKnownToStorageEngine =
-        _engine->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx));
+    std::vector<std::string> identsKnownToStorageEngine = _engine->getAllIdents(ru);
     std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
 
     std::vector<MDBCatalog::EntryIdentifier> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
@@ -260,8 +262,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                     // collection, we create an new entry for it.
                     WriteUnitOfWork wuow(opCtx);
 
-                    auto keyFormat =
-                        _engine->getKeyFormat(*shard_role_details::getRecoveryUnit(opCtx), ident);
+                    auto keyFormat = _engine->getKeyFormat(ru, ident);
                     // TODO SERVER-105436 investigate usage of isClustered
                     bool isClustered = keyFormat == KeyFormat::String;
                     StatusWith<std::string> statusWithNs =
@@ -396,7 +397,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
         }
     }
 
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    ru.abandonSnapshot();
 }
 
 void StorageEngineImpl::closeMDBCatalog(OperationContext* opCtx) {

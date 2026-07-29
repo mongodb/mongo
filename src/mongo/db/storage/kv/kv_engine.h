@@ -567,6 +567,33 @@ public:
     virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) = 0;
 
     /**
+     * The initial stable schema epoch which must be set on startup prior to creating any tables
+     * when schema epochs are in use.
+     */
+    static constexpr uint64_t kInitialSchemaEpoch = 1;
+
+    /**
+     * Untimestamped writes which create tables must still have a schema epoch when those are in
+     * use. This constant is a value which will be accepted as a schema epoch when untimestamped
+     * writes are allowed, and rejected when they are unsafe.
+     */
+    static constexpr uint64_t kUntimestampedSchemaEpoch = 2;
+
+    /**
+     * Reads the current stable schema epoch from the storage engine, returning none if it has not
+     * been set or if schema epochs are not enabled.
+     */
+    virtual boost::optional<uint64_t> getStableSchemaEpoch() = 0;
+
+    /**
+     * Explicitly sets the stable schema epoch to the specified value. Normally the stable epoch is
+     * derived from the stable timestamp, but during initial setup there is a dependency cycle where
+     * we must create several tables before timestamps are available. Has no effect if schema epochs
+     * are not enabled by the persistence provider.
+     */
+    virtual void setStableSchemaEpoch(uint64_t schemaEpoch) = 0;
+
+    /**
      * Returns the blind-write policy to use for a write on this engine in the given context. The
      * default returns `nonBlind`; engines that support blind writes override to sample based on
      * engine state.
