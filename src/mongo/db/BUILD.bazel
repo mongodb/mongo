@@ -1879,6 +1879,7 @@ mongo_cc_library(
         "//src/mongo/scripting",
         "//src/mongo/scripting:scripting_common",
         "//src/mongo/util:elapsed_tracker",
+        "//src/mongo/util:pcre_params",
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:pcre_wrapper",
         "//src/mongo/util:summation",

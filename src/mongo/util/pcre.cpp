@@ -36,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <array>
@@ -43,6 +44,10 @@
 #include <pcre2.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+namespace mongo {
+bool gCheckRegexMatchUTF8Boundary = true;
+}
 
 namespace mongo::pcre {
 namespace {
@@ -479,8 +484,26 @@ public:
         // 'PCRE2_UNSET' before. When accessing the ovector entries later via
         // 'MatchDataImpl::operator[](size_t)', the accessed ovector entry is compared against
         // PCRE2_UNSET, and an empty 'StringData' value is returned.
-        if (matched < 0)
+        if (matched < 0) {
             _error = toErrc(matched);
+            return;
+        }
+        if (gCheckRegexMatchUTF8Boundary && _input.data() != nullptr) {
+            const char* inputBegin = _input.data();
+            const char* inputEnd = inputBegin + _input.size();
+            const size_t n = captureCount();
+            // The 0th element is the full matched substring; the 'n' that follow are the captures.
+            for (size_t i = 0; i < n + 1; ++i) {
+                StringData group = (*this)[i];
+                if (group.data() == nullptr)
+                    continue;
+                const char* groupEnd = group.data() + group.size();
+                uassert(12407700,
+                        "regex match boundary falls inside a UTF-8 character",
+                        !(!group.empty() && str::isUTF8ContinuationByte(*group.data())) &&
+                            !(groupEnd < inputEnd && str::isUTF8ContinuationByte(*groupEnd)));
+            }
+        }
     }
 
 private:

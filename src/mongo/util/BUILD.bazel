@@ -446,6 +446,22 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "pcre_parameters_gen",
+    src = "pcre_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "pcre_params",
+    srcs = [
+        ":pcre_parameters_gen",
+    ],
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo/db:server_parameter",
+    ],
+)
+
 mongo_cc_library(
     name = "pcre_util",
     srcs = ["pcre_util.cpp"],
@@ -948,6 +964,7 @@ mongo_cc_unit_test(
         ":dns_query",
         ":future_util",
         ":icu",
+        ":pcre_params",
         ":pcre_util",
         ":pcre_wrapper",
         ":periodic_runner_impl",

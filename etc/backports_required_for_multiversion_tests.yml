@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/aggregation/expressions/regex_backslash_c.js
+      ticket: SERVER-127985
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
       ticket: SERVER-130759
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
@@ -256,6 +258,8 @@ last-lts:
       ticket: SERVER-99550
     - test_file: jstests/aggregation/expressions/null_chars_string_input.js
       ticket: SERVER-95687
+    - test_file: jstests/aggregation/expressions/regex_backslash_c.js
+      ticket: SERVER-127985
     - test_file: jstests/core/query/explain/explain_plan_cache.js
       ticket: SERVER-97662
     - test_file: jstests/core/query/json_schema/json_schema.js
