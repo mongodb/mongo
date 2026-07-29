@@ -246,9 +246,6 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     // Pass along 'isChangeStreamQuery' for serverStatus metrics.
     CurOp::get(opCtx)->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
 
-    cursor->_operationUsingCursor = opCtx;
-    cursor->_commandUsingCursor = std::string{commandName};
-
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursor->getSessionId()) {
@@ -258,6 +255,13 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
             return vivifyCursorStatus;
         }
     }
+
+    // Attribute the OperationContext to the cursor only now that every early-return check above
+    // (including the vivify above) has passed. Setting these before those checks would leave the
+    // cursor pinned to an 'opCtx' that is destroyed when the command unwinds on an early return,
+    // producing a dangling pointer that a later killCursors would dereference.
+    cursor->_operationUsingCursor = opCtx;
+    cursor->_commandUsingCursor = std::string{commandName};
 
     LOGV2_DEBUG(8928404, 2, "Pinning cursor", "cursorId"_attr = cursor->cursorid());
     auto pin = ClientCursorPin(opCtx, cursor, this);
