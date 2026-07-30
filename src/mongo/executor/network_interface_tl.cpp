@@ -406,7 +406,6 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
                         2,
                         "Skipping redundant cancellation",
                         "requestId"_attr = request.id,
-                        "request"_attr = redact(request.toString()),
                         "originalReason"_attr = cancelStatus,
                         "redundantReason"_attr = status);
             return;
@@ -417,7 +416,6 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
                     2,
                     "Cancelling command with reason",
                     "requestId"_attr = request.id,
-                    "request"_attr = redact(request.toString()),
                     "reason"_attr = status);
     }
     cancelSource.cancel();
@@ -465,16 +463,14 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
                 return;
             }
 
-            const std::string message = str::stream()
-                << "Request " << request.id << " timed out" << ", deadline was "
-                << deadline.toString() << ", op was " << redact(request.toString());
+            const std::string message = str::stream() << "Request " << request.id << " timed out"
+                                                      << ", deadline was " << deadline.toString();
 
             LOGV2_DEBUG(22595,
                         2,
                         "Request timed out",
                         "requestId"_attr = request.id,
-                        "deadline"_attr = deadline,
-                        "request"_attr = request);
+                        "deadline"_attr = deadline);
             cancel({timeoutCode, message});
         });
 }
@@ -647,7 +643,6 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
                 "Sending remote _killOperations request to cancel command",
                 "target"_attr = cmdStateToKill->request.target,
                 "cancelledRequestId"_attr = cmdStateToKill->request.id,
-                "canelledRequest"_attr = redact(cmdStateToKill->request.toString()),
                 "operationKey"_attr = operationKey);
 
     executor::RemoteCommandRequest killOpRequest(
