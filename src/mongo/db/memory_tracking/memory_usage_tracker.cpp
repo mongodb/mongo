@@ -90,10 +90,6 @@ DeduplicatorReporter::DeduplicatorReporter(std::function<void(int64_t, int64_t)>
     tassert(11114200, "Expected positive value for chunkSize", _chunkSize > 0);
 }
 
-void SimpleMemoryUsageTracker::add(int64_t diff) {
-    addInternal(diff, true /* report */);
-}
-
 void SimpleMemoryUsageTracker::addInternal(int64_t diff, bool report) {
     _inUseTrackedMemoryBytes += diff;
     tassert(6128100,
