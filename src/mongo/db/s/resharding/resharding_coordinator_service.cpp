@@ -37,18 +37,6 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
         initialState,
         IDLParserContext("ReshardingCoordinatorService::checkIfConflictsWithOtherInstances"));
 
-    // Refuse to create a new resharding coordinator while an FCV upgrade/downgrade is in progress.
-    // Otherwise a resharding operation could start after existing reshardings have been drained as
-    // part of the FCV transition and then complete across the FCV change, potentially leaving the
-    // metadata in an inconsistent state.
-    //
-    // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals via the
-    // isFcvTransitionInProgress() function.
-    uassert(ErrorCodes::CommandNotSupported,
-            "Resharding is not supported during FCV changes, please wait for the FCV change to "
-            "complete.",
-            !isFcvTransitionInProgress(opCtx));
-
     for (const auto& instance : existingInstances) {
         auto typedInstance = checked_cast<const ReshardingCoordinator*>(instance);
         // Instances which have already completed do not conflict with other instances, unless
@@ -104,6 +92,18 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
                                 << coordinatorDoc.getReshardingKey().toString()
                                 << userReshardingIdMsg);
     }
+
+    // Refuse to create a new resharding coordinator while an FCV upgrade/downgrade is in progress.
+    // Otherwise a resharding operation could start after existing reshardings have been drained as
+    // part of the FCV transition and then complete across the FCV change, potentially leaving the
+    // metadata in an inconsistent state.
+    //
+    // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals via the
+    // isFcvTransitionInProgress() function.
+    uassert(ErrorCodes::CommandNotSupported,
+            "Resharding is not supported during FCV changes, please wait for the FCV change to "
+            "complete.",
+            !isFcvTransitionInProgress(opCtx));
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
