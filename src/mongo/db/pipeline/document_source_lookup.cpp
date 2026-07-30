@@ -1323,6 +1323,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         const auto argName = argument.fieldNameStringData();
 
         if (argName == kPipelineField) {
+            uassert(132275, "Only one 'pipeline' argument is allowed for $lookup", !hasPipeline);
             pipeline = parsePipelineFromBSON(argument);
             hasPipeline = true;
             continue;

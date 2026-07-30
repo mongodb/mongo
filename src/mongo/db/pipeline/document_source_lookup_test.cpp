@@ -254,6 +254,27 @@ TEST_F(DocumentSourceLookUpTest, RejectLookupWhenDepthLimitIsExceeded) {
         ErrorCodes::MaxSubPipelineDepthExceeded);
 }
 
+TEST_F(DocumentSourceLookUpTest, RejectLookupWithMultiplePipelines) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from"
+                                   << "coll"
+                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                   << "pipeline"
+                                   << BSON_ARRAY(BSON("$documents" << BSON_ARRAY(BSON("x" << 1))))
+                                   << "as"
+                                   << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        132275);
+}
+
 TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs =
