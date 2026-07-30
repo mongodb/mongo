@@ -7,6 +7,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"  // IWYU pragma: keep
 
+#include <algorithm>
 #include <cstdint>
 #include <utility>
 
@@ -72,6 +73,26 @@ void TaskExecutorPool::join_forTest() {
     _fixedExecutor->join();
     for (auto&& exec : _executors) {
         exec->join();
+    }
+}
+
+bool TaskExecutorPool::hasTasks_forTest() const {
+    return _fixedExecutor->hasTasks() ||
+        std::any_of(_executors.begin(), _executors.end(), [](auto&& executor) {
+               return executor->hasTasks();
+           });
+}
+
+void TaskExecutorPool::appendDiagnosticBSON_forTest(BSONObjBuilder* rootBuilder) const {
+    {
+        BSONObjBuilder fixed(rootBuilder->subobjStart("fixedExecutor"));
+        _fixedExecutor->appendDiagnosticBSON(&fixed);
+    }
+
+    BSONArrayBuilder executorListBuilder(rootBuilder->subarrayStart("executors"));
+    for (const auto& executor : _executors) {
+        BSONObjBuilder individualExecutorBuilder(executorListBuilder.subobjStart());
+        executor->appendDiagnosticBSON(&individualExecutorBuilder);
     }
 }
 

@@ -25,6 +25,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 #include <chrono>
 #include <cstddef>
@@ -71,12 +72,37 @@ void ShardingTestFixtureCommon::shutdownExecutorPool() {
     // teardown can use fresh operation contexts.
     getServiceContext()->setKillAllOperations();
 
-    grid->getExecutorPool()->shutdown_forTest();
-    for (auto mockNet : {&_mockNetwork, &_mockNetworkForPool}) {
-        executor::NetworkInterfaceMock::InNetworkGuard(*mockNet)
-            ->drainUnfinishedNetworkOperations();
+    auto executorPool = grid->getExecutorPool();
+    executorPool->shutdown_forTest();
+
+    // Keep running the mock networks until no executor in the pool has a registered callback left.
+    //
+    // A single drain pass is not enough. Threads that are not synchronized with teardown (e.g. the
+    // CursorCleanup pool, which fires killOperations at the sharding executor) can be parked inside
+    // ThreadPoolTaskExecutor::scheduleRemoteCommand between registering their callback and handing
+    // the request to the network. Such a callback is invisible to the network mock, so a one-shot
+    // drain returns having done nothing and the executor join() will end up waiting forever.
+    Timer drainTimer;
+    while (executorPool->hasTasks_forTest()) {
+        for (auto mockNet : {&_mockNetwork, &_mockNetworkForPool}) {
+            executor::NetworkInterfaceMock::InNetworkGuard(*mockNet)
+                ->drainUnfinishedNetworkOperations();
+        }
+
+        if (drainTimer.elapsed() > kExecutorPoolDrainTimeout) {
+            BSONObjBuilder diagnostics;
+            executorPool->appendDiagnosticBSON_forTest(&diagnostics);
+            uasserted(13246100,
+                      fmt::format("Timed out draining the executor pool during teardown; some "
+                                  "callback never completed. Executor diagnostics: {}",
+                                  diagnostics.obj().toString()));
+        }
+
+        // Allow executor to do some work before looping again.
+        sleepmillis(500);
     }
-    grid->getExecutorPool()->join_forTest();
+
+    executorPool->join_forTest();
 
     getServiceContext()->unsetKillAllOperations();
 }

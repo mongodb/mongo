@@ -54,6 +54,22 @@ public:
     [[MONGO_MOD_PUBLIC]] void join_forTest();
 
     /**
+     * Returns true if any executor in the pool still has a registered callback that has not run to
+     * completion, i.e. if join_forTest() would block.
+     *
+     * Intended for teardown in tests that drive a NetworkInterfaceMock: because the mock only
+     * delivers responses while a thread is running its network operations, a test must keep running
+     * them until this returns false before calling join_forTest().
+     */
+    [[MONGO_MOD_PUBLIC]] bool hasTasks_forTest() const;
+
+    /**
+     * Appends each executor's diagnostic BSON under a per-executor field. Intended for reporting
+     * outstanding work when a teardown drain fails to quiesce the pool.
+     */
+    [[MONGO_MOD_PUBLIC]] void appendDiagnosticBSON_forTest(BSONObjBuilder* b) const;
+
+    /**
      * Adds 'executors' and 'fixedExecutor' to the pool. May be called at most once to initialize an
      * empty pool.
      */

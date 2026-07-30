@@ -39,6 +39,13 @@ public:
      */
     static RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt);
 
+    /**
+     * How long shutdownExecutorPool() will keep running the mock networks, waiting for the executor
+     * pool to quiesce, before failing the test. Generous, because expiry means a real defect rather
+     * than a slow machine: the drain only spins while some thread is mid-schedule.
+     */
+    static constexpr Microseconds kExecutorPoolDrainTimeout = Seconds{30};
+
 protected:
     explicit ShardingTestFixtureCommon(
         std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext);

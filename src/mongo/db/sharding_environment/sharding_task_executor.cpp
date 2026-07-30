@@ -258,7 +258,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleExhaustRe
 }
 
 bool ShardingTaskExecutor::hasTasks() {
-    MONGO_UNREACHABLE;
+    return _executor->hasTasks();
 }
 
 void ShardingTaskExecutor::cancel(const CallbackHandle& cbHandle) {
