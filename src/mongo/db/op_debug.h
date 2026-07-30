@@ -429,6 +429,11 @@ public:
         // Number of inferred single-table predicates (one per predicate per table).
         int numInferredSingleTablePredicates = 0;
 
+        // Time taken to extract a join model from the query.
+        int64_t joinModelingTimeMicros = 0;
+        // Time taken to lower the chosen QSN to SBE.
+        int64_t sbeLoweringTimeMicros = 0;
+
         // Metrics gathered while enumerating join plans. We only populate these fields if we have a
         // cache miss.
         struct PlanEnumerationMetrics {
@@ -452,6 +457,17 @@ public:
             int numMemoizedNodes = 0;
             // Cost of the best (winning) plan.
             double winningPlanCost = 0.0;
+
+            // Time spent acquiring samples for CE.
+            int64_t samplingTimeMicros = 0;
+            // Time spent generating single-table access plans in CBR.
+            int64_t cbrPlanningTimeMicros = 0;
+            // Time taken to enumerate plans and pick a winning plan.
+            int64_t planEnumerationTimeMicros = 0;
+            // Time spent evaluating CE for join optimization: up-front edge selectivity estimation
+            // plus the per-subset cardinality estimates computed lazily during enumeration. This
+            // is separate from the CE performed inside CBR.
+            int64_t ceTimeMicros = 0;
         };
         boost::optional<PlanEnumerationMetrics> planEnumerationMetrics = boost::none;
     };

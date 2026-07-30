@@ -50,9 +50,21 @@ public:
      */
     SelectivityEstimate getEdgeSelectivity(EdgeId edge) const;
 
+    /**
+     * Returns the total time spent estimating cardinalities on this estimator: the up-front edge
+     * selectivity estimation done by 'make()' plus every subsequent subset cardinality estimate
+     * that was not served from the memo. Reported by query stats as 'ceTimeMicros'.
+     */
+    int64_t getEstimationTimeMicros() const {
+        return _estimationTimeMicros;
+    }
+
 protected:
     const JoinReorderingContext& _ctx;
     const EdgeSelectivities _edgeSelectivities;
+
+    // Accumulated over the course of subset enumeration. See 'getEstimationTimeMicros()'.
+    int64_t _estimationTimeMicros = 0;
 
     GraphCycleBreaker _cycleBreaker;
 

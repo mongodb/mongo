@@ -7,16 +7,31 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cardinality_estimator.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #include <fmt/format.h>
 
 namespace mongo::join_ordering {
 
+// These sleep for {ms: <millis>} inside the phase they name, so that tests can verify that
+// 'samplingTimeMicros' and 'cbrPlanningTimeMicros' measure those phases.
+MONGO_FAIL_POINT_DEFINE(sleepWhileSamplingForJoinOptimization);
+MONGO_FAIL_POINT_DEFINE(sleepWhileCbrPlanningForJoinOptimization);
+
 SamplingEstimatorMap makeSamplingEstimators(
     const MultipleCollectionAccessor& collections,
     const JoinGraph& graph,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const boost::intrusive_ptr<ExpressionContext>& joinExpCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& joinExpCtx,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
+    Timer samplingTimer;
+    ON_BLOCK_EXIT([&]() { metrics.samplingTimeMicros = samplingTimer.micros(); });
+    sleepWhileSamplingForJoinOptimization.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+
     const auto numNodes = graph.numNodes();
 
     SamplingEstimatorMap samplingEstimators;
@@ -161,7 +176,15 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const JoinGraph& graph,
-    const SamplingEstimatorMap& samplingEstimators) {
+    const SamplingEstimatorMap& samplingEstimators,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
+    // Record the planning time even if we bail out, so that the cost of an unsuccessful attempt is
+    // visible.
+    Timer cbrPlanningTimer;
+    ON_BLOCK_EXIT([&]() { metrics.cbrPlanningTimeMicros = cbrPlanningTimer.micros(); });
+    sleepWhileCbrPlanningForJoinOptimization.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+
     const auto numNodes = graph.numNodes();
     QuerySolutionMap solns;
     cost_based_ranker::EstimateMap estimates;

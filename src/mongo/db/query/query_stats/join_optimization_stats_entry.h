@@ -29,7 +29,9 @@ public:
           numSyntacticExprJoinPredicates(metrics.numSyntacticExprJoinPredicates),
           numSyntacticEqJoinPredicates(metrics.numSyntacticEqJoinPredicates),
           numInferredEqJoinPredicates(metrics.numInferredEqJoinPredicates),
-          numInferredSingleTablePredicates(metrics.numInferredSingleTablePredicates) {
+          numInferredSingleTablePredicates(metrics.numInferredSingleTablePredicates),
+          joinModelingTimeMicros(metrics.joinModelingTimeMicros),
+          sbeLoweringTimeMicros(metrics.sbeLoweringTimeMicros) {
         joinOptimizable.aggregate(metrics.joinOptimizable);
         if (const auto& pe = metrics.planEnumerationMetrics) {
             planEnumerationMetrics = PlanEnumerationMetrics{
@@ -44,6 +46,10 @@ public:
                 AggregatedMetric<int64_t>(pe->numJoinNodesRejectedByCost),
                 AggregatedMetric<int64_t>(pe->numMemoizedNodes),
                 AggregatedMetric<double>(pe->winningPlanCost),
+                AggregatedMetric<int64_t>(pe->samplingTimeMicros),
+                AggregatedMetric<int64_t>(pe->cbrPlanningTimeMicros),
+                AggregatedMetric<int64_t>(pe->planEnumerationTimeMicros),
+                AggregatedMetric<int64_t>(pe->ceTimeMicros),
             };
         }
         updateCount++;
@@ -71,6 +77,11 @@ public:
     AggregatedMetric<int64_t> numInferredEqJoinPredicates;
     AggregatedMetric<int64_t> numInferredSingleTablePredicates;
 
+    // Timing metrics for the phases that run on every join-optimized query. The phases that only
+    // run on a join plan cache miss live in 'PlanEnumerationMetrics' below.
+    AggregatedMetric<int64_t> joinModelingTimeMicros;
+    AggregatedMetric<int64_t> sbeLoweringTimeMicros;
+
     struct PlanEnumerationMetrics {
         // These metrics are only populated when we actually enumerate a plan- so we keep a count.
         uint64_t numPlanEnumerations = 0;
@@ -84,6 +95,10 @@ public:
         AggregatedMetric<int64_t> numJoinNodesRejectedByCost;
         AggregatedMetric<int64_t> numMemoizedNodes;
         AggregatedMetric<double> winningPlanCost;
+        AggregatedMetric<int64_t> samplingTimeMicros;
+        AggregatedMetric<int64_t> cbrPlanningTimeMicros;
+        AggregatedMetric<int64_t> planEnumerationTimeMicros;
+        AggregatedMetric<int64_t> ceTimeMicros;
     };
     boost::optional<PlanEnumerationMetrics> planEnumerationMetrics;
 };

@@ -34,6 +34,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
 
 #include <algorithm>
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -42,6 +44,11 @@ namespace mongo::join_ordering {
 
 MONGO_FAIL_POINT_DEFINE(sleepWhileJoinOptimizing);
 MONGO_FAIL_POINT_DEFINE(hangAfterJoinModelConstruction);
+
+// These sleep for {ms: <millis>} inside the phase they name, so that tests can verify that
+// 'sbeLoweringTimeMicros' and 'planEnumerationTimeMicros' measure those phases.
+MONGO_FAIL_POINT_DEFINE(sleepWhileLoweringJoinPlanToSbe);
+MONGO_FAIL_POINT_DEFINE(sleepWhileEnumeratingJoinPlans);
 
 namespace {
 /**
@@ -297,7 +304,13 @@ lowerToSbePlanStageTree(OperationContext* opCtx,
                         NodeId baseNode,
                         const QuerySolution& soln,
                         const cost_based_ranker::EstimateMap* estimates,
-                        bool prepare) {
+                        bool prepare,
+                        OpDebug::JoinOptimizationMetrics& metrics) {
+    Timer sbeLoweringTimer;
+    ON_BLOCK_EXIT([&]() { metrics.sbeLoweringTimeMicros = sbeLoweringTimer.micros(); });
+    sleepWhileLoweringJoinPlanToSbe.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+
     auto& baseCQ = *graph.accessPathAt(baseNode);
     auto baseNss = baseCQ.nss();
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
@@ -322,7 +335,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     const JoinPlanCacheKey& cacheKey,
     const MultipleCollectionAccessor& mca,
     const AggJoinModel& model,
-    PlanYieldPolicy::YieldPolicy yieldPolicy) {
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    OpDebug::JoinOptimizationMetrics& metrics) {
     auto& cache = JoinPlanCache::get(opCtx->getServiceContext());
     auto hit = cache.lookup(cacheKey);
     // TODO (SERVER-129268): Evict stale entries.
@@ -341,7 +355,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
                                                                            hit->baseNode,
                                                                            *winnerSoln,
                                                                            nullptr /*estimates*/,
-                                                                           true /*prepare*/);
+                                                                           true /*prepare*/,
+                                                                           metrics);
 
         size_t plannerOptions = QueryPlannerParams::DEFAULT;
         if (model.getSuffix() && model.getSuffix()->peekFront()) {
@@ -452,7 +467,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     boost::optional<JoinPlanCacheKey> cacheKey;
     if (useJoinPlanCache) {
         cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
-        auto exec = checkPlanCacheForPlan(opCtx, *cacheKey, mca, model, yieldPolicy);
+        auto exec = checkPlanCacheForPlan(opCtx, *cacheKey, mca, model, yieldPolicy, metrics);
         if (exec) {
             joinPlanCacheHits.increment(1);
             return JoinReorderedExecutorResult{.executor = std::move(exec),
@@ -465,11 +480,15 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // Initialize enumeration metrics if we're here- we don't want to do this on cache hits/
     // whenever we don't plan.
     metrics.planEnumerationMetrics.emplace();
+    auto& peMetrics = *metrics.planEnumerationMetrics;
+
+    // Acquire the samples that CE (both here and in CBR below) will consult.
+    SamplingEstimatorMap samplingEstimators = makeSamplingEstimators(
+        mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx(), peMetrics);
 
     // Select access plans for each table in the join.
-    SamplingEstimatorMap samplingEstimators =
-        makeSamplingEstimators(mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx());
-    auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators);
+    auto swAccessPlans =
+        singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators, peMetrics);
     if (!swAccessPlans.isOK()) {
         return swAccessPlans.getStatus();
     }
@@ -502,6 +521,15 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
 
     StatusWith<ReorderedJoinSolution> swReordered = [&]() {
+        // Time required to generate a QSN by any method- even if we fail to generate a QSN.
+        Timer planEnumerationTimer;
+        ON_BLOCK_EXIT([&] {
+            peMetrics.planEnumerationTimeMicros = planEnumerationTimer.micros();
+            peMetrics.ceTimeMicros = cardEstimator.getEstimationTimeMicros();
+        });
+        sleepWhileEnumeratingJoinPlans.execute(
+            [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+
         if (hintedStrat || qkc.getJoinReorderMode() == JoinReorderModeEnum::kBottomUp) {
             uassert(12016318,
                     "Cannot have hinted & random mode",
@@ -609,7 +637,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                                        reordered.baseNode,
                                                                        *reordered.soln,
                                                                        &reordered.estimates,
-                                                                       true /* prepare */);
+                                                                       true /* prepare */,
+                                                                       metrics);
 
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(11083905,
@@ -634,6 +663,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         for (auto&& rs : reordered.rejectedSolns) {
             auto soln = std::move(rs.first);
             auto baseNode = rs.second;
+            // We don't count time spent on rejected plan lowering for explain.
+            OpDebug::JoinOptimizationMetrics rejectedMetrics;
             auto [stagesAndData, _] = lowerToSbePlanStageTree(opCtx,
                                                               model.getGraph(),
                                                               yieldPolicy,
@@ -641,7 +672,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                               baseNode,
                                                               *soln,
                                                               &reordered.estimates,
-                                                              false /* prepare */);
+                                                              false /* prepare */,
+                                                              rejectedMetrics);
             rejectedPlans.push_back(JoinOptPlan{.soln = std::move(soln),
                                                 .stage = std::move(stagesAndData.first),
                                                 .data = std::move(stagesAndData.second)});

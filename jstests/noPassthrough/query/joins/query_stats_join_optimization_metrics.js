@@ -54,6 +54,12 @@ const kPerQueryMetrics = {
     numInferredSingleTablePredicates: 0,
 };
 
+// Timers recorded on every join-optimization attempt, regardless of whether we hit the join plan
+// cache: we always build the join model and always lower the chosen plan to SBE. Each one covers
+// enough real work (canonical query construction, SBE stage building) to round up to at least one
+// microsecond, so every data point - and therefore 'min' - must be positive.
+const kPerQueryTimers = ["joinModelingTimeMicros", "sbeLoweringTimeMicros"];
+
 // Plan enumeration metrics are only populated on a join plan cache miss, so they only ever reflect
 // the enumeration data points (i.e. the number of cache misses), not the total 'updateCount'.
 const kPerEnumerationMetrics = [
@@ -68,6 +74,27 @@ const kPerEnumerationMetrics = [
     "numJoinNodesRejectedByCost",
     "winningPlanCost",
 ];
+
+// Timers recorded only on the enumeration path, i.e. only on a join plan cache miss. Like the
+// per-query timers, each covers enough work (sampling the collections, running CBR, walking the
+// enumeration lattice) that every recorded data point must be positive.
+const kPerEnumerationTimers = [
+    "samplingTimeMicros",
+    "cbrPlanningTimeMicros",
+    "planEnumerationTimeMicros",
+    "ceTimeMicros",
+];
+
+// Asserts a timing histogram is populated: every data point was positive, so all values >=0, and
+// 'sum' covers 'updateCount' data points each at least as large as 'min' and at most 'max'.
+function assertTimerPopulated(joinMetrics, name, updateCount) {
+    const counter = joinMetrics[name];
+    assert(counter, `missing timer '${name}'`, {joinMetrics});
+    assert.gte(counter.min, 0, `timer '${name}' min`, {joinMetrics});
+    assert.lte(counter.min, counter.max, `timer '${name}' min vs max`, {joinMetrics});
+    assert.gte(counter.sum, counter.min * updateCount, `timer '${name}' sum`, {joinMetrics});
+    assert.lte(counter.sum, counter.max * updateCount, `timer '${name}' sum`, {joinMetrics});
+}
 
 // Asserts every join optimization counter, given the number of times the (identical) query has been
 // aggregated into the query stats entry. Each per-query value is identical across runs, so the
@@ -87,9 +114,15 @@ function assertJoinMetrics(joinMetrics, updateCount, enumerationCount) {
         assert.eq(counter.max, perQuery, `counter '${name}' max`, {joinMetrics});
         assert.eq(counter.min, perQuery, `counter '${name}' min`, {joinMetrics});
     }
+    for (const name of kPerQueryTimers) {
+        assertTimerPopulated(joinMetrics, name, updateCount);
+    }
     // Plan enumeration metrics are only aggregated across the queries that missed the join plan
     // cache and thus ran enumeration. Note: numPlanEnumerations doesn't have a histogram, its just a counter.
     assert.eq(joinMetrics.numPlanEnumerations, enumerationCount, tojson(joinMetrics));
+    for (const name of kPerEnumerationTimers) {
+        assertTimerPopulated(joinMetrics, name, enumerationCount);
+    }
     for (const name of kPerEnumerationMetrics) {
         const counter = joinMetrics[name];
         assert(counter, `missing counter '${name}'`, {joinMetrics});

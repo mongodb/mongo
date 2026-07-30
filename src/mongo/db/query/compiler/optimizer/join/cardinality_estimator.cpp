@@ -8,12 +8,21 @@
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/util/bitset_util.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo::join_ordering {
 
 using namespace cost_based_ranker;
+
+// Sleeps for {ms: <millis>} while computing a cardinality estimate, so that tests can verify that
+// 'ceTimeMicros' measures this phase. Note this fires once per computed estimate, not once per
+// query, since only estimates that are not served from the memo are charged to 'ceTimeMicros'.
+MONGO_FAIL_POINT_DEFINE(sleepWhileEstimatingJoinCardinality);
 
 JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& ctx,
                                                    EdgeSelectivities edgeSelectivities)
@@ -32,8 +41,13 @@ JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& 
 
 JoinCardinalityEstimator JoinCardinalityEstimator::make(
     const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators) {
-    return JoinCardinalityEstimator(
-        ctx, JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators));
+    Timer timer;
+    auto edgeSelectivities =
+        JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators);
+    auto estimator = JoinCardinalityEstimator(ctx, std::move(edgeSelectivities));
+    // Time the up-front edge selectivity estimation.
+    estimator._estimationTimeMicros = timer.micros();
+    return estimator;
 }
 
 EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
@@ -162,6 +176,12 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     if (auto it = _subsetCardinalities.find(nodes); it != _subsetCardinalities.end()) {
         return it->second;
     }
+
+    // Only charge 'ceTimeMicros' for estimates we actually compute, not for memo hits.
+    Timer timer;
+    ON_BLOCK_EXIT([&]() { _estimationTimeMicros += timer.micros(); });
+    sleepWhileEstimatingJoinCardinality.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
 
     // This method assumes that all predicates (join and and single-table) are independent from each
     // other, allowing us to combine them with simple multiplication below.

@@ -71,7 +71,8 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     ASSERT(node2);
 
     JoinGraph graph(std::move(mgraph));
-    auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators);
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;  // Unused for testing.
+    auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators, metrics);
     ASSERT_OK(swRes);
 
     auto& res = swRes.getValue();

@@ -27,6 +27,8 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
     numInferredEqJoinPredicates.appendTo(metricsEntryBuilder, "numInferredEqJoinPredicates");
     numInferredSingleTablePredicates.appendTo(metricsEntryBuilder,
                                               "numInferredSingleTablePredicates");
+    joinModelingTimeMicros.appendTo(metricsEntryBuilder, "joinModelingTimeMicros");
+    sbeLoweringTimeMicros.appendTo(metricsEntryBuilder, "sbeLoweringTimeMicros");
     if (planEnumerationMetrics) {
         metricsEntryBuilder.append(
             "numPlanEnumerations",
@@ -48,6 +50,13 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
                                                                     "numJoinNodesRejectedByCost");
         planEnumerationMetrics->numMemoizedNodes.appendTo(metricsEntryBuilder, "numMemoizedNodes");
         planEnumerationMetrics->winningPlanCost.appendTo(metricsEntryBuilder, "winningPlanCost");
+        planEnumerationMetrics->samplingTimeMicros.appendTo(metricsEntryBuilder,
+                                                            "samplingTimeMicros");
+        planEnumerationMetrics->cbrPlanningTimeMicros.appendTo(metricsEntryBuilder,
+                                                               "cbrPlanningTimeMicros");
+        planEnumerationMetrics->planEnumerationTimeMicros.appendTo(metricsEntryBuilder,
+                                                                   "planEnumerationTimeMicros");
+        planEnumerationMetrics->ceTimeMicros.appendTo(metricsEntryBuilder, "ceTimeMicros");
     }
 }
 
@@ -66,6 +75,8 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
     numSyntacticEqJoinPredicates.combine(updateVal->numSyntacticEqJoinPredicates);
     numInferredEqJoinPredicates.combine(updateVal->numInferredEqJoinPredicates);
     numInferredSingleTablePredicates.combine(updateVal->numInferredSingleTablePredicates);
+    joinModelingTimeMicros.combine(updateVal->joinModelingTimeMicros);
+    sbeLoweringTimeMicros.combine(updateVal->sbeLoweringTimeMicros);
     if (updateVal->planEnumerationMetrics) {
         const auto& other = *updateVal->planEnumerationMetrics;
         if (!planEnumerationMetrics) {
@@ -86,6 +97,11 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
                 other.numJoinNodesRejectedByCost);
             planEnumerationMetrics->numMemoizedNodes.combine(other.numMemoizedNodes);
             planEnumerationMetrics->winningPlanCost.combine(other.winningPlanCost);
+            planEnumerationMetrics->samplingTimeMicros.combine(other.samplingTimeMicros);
+            planEnumerationMetrics->cbrPlanningTimeMicros.combine(other.cbrPlanningTimeMicros);
+            planEnumerationMetrics->planEnumerationTimeMicros.combine(
+                other.planEnumerationTimeMicros);
+            planEnumerationMetrics->ceTimeMicros.combine(other.ceTimeMicros);
         }
     }
     updateCount++;

@@ -26,6 +26,9 @@
 #include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #include <memory>
 #include <string_view>
@@ -34,6 +37,11 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::join_ordering {
+
+// Sleeps for {ms: <millis>} while building the join model, so that tests can verify that
+// 'joinModelingTimeMicros' measures this phase.
+MONGO_FAIL_POINT_DEFINE(sleepWhileBuildingJoinModel);
+
 namespace {
 std::unique_ptr<Pipeline> createEmptyPipeline(
     const boost::intrusive_ptr<ExpressionContext>& sourceExpCtx) {
@@ -342,9 +350,17 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
 
     // Count number of unique namespaces involved in join graph prefix for metrics collection
     // purposes. Ensure that we update this metric for any exit path, be it a fallback or a
-    // successful AggJoinModel construction.
+    // successful AggJoinModel construction. The same goes for the modeling time: we record it even
+    // if model construction fails, so that the cost of an unsuccessful join-optimization attempt is
+    // visible.
     absl::flat_hash_set<NamespaceString> uniqueNamespaces;
-    ON_BLOCK_EXIT([&]() { metrics.numNamespaces = uniqueNamespaces.size(); });
+    Timer joinModelingTimer;
+    ON_BLOCK_EXIT([&]() {
+        metrics.numNamespaces = uniqueNamespaces.size();
+        metrics.joinModelingTimeMicros = joinModelingTimer.micros();
+    });
+    sleepWhileBuildingJoinModel.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
 
     const auto& nss = expCtx->getNamespaceString();
     uniqueNamespaces.insert(nss);

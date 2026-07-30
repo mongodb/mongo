@@ -149,6 +149,8 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
     m1.numSyntacticEqJoinPredicates = 2;
     m1.numInferredEqJoinPredicates = 1;
     m1.numInferredSingleTablePredicates = 1;
+    m1.joinModelingTimeMicros = 100;
+    m1.sbeLoweringTimeMicros = 200;
     // On first hit, we're likely to have a plan enumerated.
     m1.planEnumerationMetrics = OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics{
         .numPlansEnumerated = 6,
@@ -160,7 +162,11 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
         .numFinalPlanNestedLoopJoins = 0,
         .numJoinNodesRejectedByCost = 3,
         .numMemoizedNodes = 4,
-        .winningPlanCost = 12.5};
+        .winningPlanCost = 12.5,
+        .samplingTimeMicros = 300,
+        .cbrPlanningTimeMicros = 400,
+        .planEnumerationTimeMicros = 500,
+        .ceTimeMicros = 250};
     metrics.update(std::make_unique<query_stats::JoinOptimizationStatsEntry>(m1));
 
     BSONObj res1 = metrics.toBSON();
@@ -178,6 +184,8 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "numSyntacticEqJoinPredicates": {"sum": 2, "max": 2, "min": 2, "sumOfSquares": {"$numberDecimal":"4"}},
                 "numInferredEqJoinPredicates": {"sum": 1, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"1"}},
                 "numInferredSingleTablePredicates": {"sum": 1, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"1"}},
+                "joinModelingTimeMicros": {"sum": 100, "max": 100, "min": 100, "sumOfSquares": {"$numberDecimal":"10000"}},
+                "sbeLoweringTimeMicros": {"sum": 200, "max": 200, "min": 200, "sumOfSquares": {"$numberDecimal":"40000"}},
                 "numPlanEnumerations": 1,
                 "numPlansEnumerated": {"sum": 6, "max": 6, "min": 6, "sumOfSquares": {"$numberDecimal":"36"}},
                 "numHashJoins": {"sum": 5, "max": 5, "min": 5, "sumOfSquares": {"$numberDecimal":"25"}},
@@ -188,7 +196,11 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "numFinalPlanNestedLoopJoins": {"sum": 0, "max": 0, "min": 0, "sumOfSquares": {"$numberDecimal":"0"}},
                 "numJoinNodesRejectedByCost": {"sum": 3, "max": 3, "min": 3, "sumOfSquares": {"$numberDecimal":"9"}},
                 "numMemoizedNodes": {"sum": 4, "max": 4, "min": 4, "sumOfSquares": {"$numberDecimal":"16"}},
-                "winningPlanCost": {"sum": 12.5, "max": 12.5, "min": 12.5, "sumOfSquares": {"$numberDecimal":"156.25000000000000000000000000"}}
+                "winningPlanCost": {"sum": 12.5, "max": 12.5, "min": 12.5, "sumOfSquares": {"$numberDecimal":"156.25000000000000000000000000"}},
+                "samplingTimeMicros": {"sum": 300, "max": 300, "min": 300, "sumOfSquares": {"$numberDecimal":"90000"}},
+                "cbrPlanningTimeMicros": {"sum": 400, "max": 400, "min": 400, "sumOfSquares": {"$numberDecimal":"160000"}},
+                "planEnumerationTimeMicros": {"sum": 500, "max": 500, "min": 500, "sumOfSquares": {"$numberDecimal":"250000"}},
+                "ceTimeMicros": {"sum": 250, "max": 250, "min": 250, "sumOfSquares": {"$numberDecimal":"62500"}}
             }
         })",
         res1);
@@ -205,7 +217,11 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
     m2.numSyntacticEqJoinPredicates = 1;
     m2.numInferredEqJoinPredicates = 1;
     m2.numInferredSingleTablePredicates = 0;
-    // On second hit, we're likely to have a cached plan (no enumeration metrics).
+    m2.joinModelingTimeMicros = 50;
+    m2.sbeLoweringTimeMicros = 20;
+    // On second hit, we're likely to have a cached plan (no enumeration metrics). Note that the
+    // timing metrics for the phases we skip are therefore absent rather than zero, so they keep
+    // their own 'numPlanEnumerations' denominator.
     metrics.update(std::make_unique<query_stats::JoinOptimizationStatsEntry>(m2));
 
     BSONObj res2 = metrics.toBSON();
@@ -223,6 +239,8 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "numSyntacticEqJoinPredicates": {"sum": 3, "max": 2, "min": 1, "sumOfSquares": {"$numberDecimal":"5"}},
                 "numInferredEqJoinPredicates": {"sum": 2, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"2"}},
                 "numInferredSingleTablePredicates": {"sum": 1, "max": 1, "min": 0, "sumOfSquares": {"$numberDecimal":"1"}},
+                "joinModelingTimeMicros": {"sum": 150, "max": 100, "min": 50, "sumOfSquares": {"$numberDecimal":"12500"}},
+                "sbeLoweringTimeMicros": {"sum": 220, "max": 200, "min": 20, "sumOfSquares": {"$numberDecimal":"40400"}},
                 "numPlanEnumerations": 1,
                 "numPlansEnumerated": {"sum": 6, "max": 6, "min": 6, "sumOfSquares": {"$numberDecimal":"36"}},
                 "numHashJoins": {"sum": 5, "max": 5, "min": 5, "sumOfSquares": {"$numberDecimal":"25"}},
@@ -233,7 +251,11 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "numFinalPlanNestedLoopJoins": {"sum": 0, "max": 0, "min": 0, "sumOfSquares": {"$numberDecimal":"0"}},
                 "numJoinNodesRejectedByCost": {"sum": 3, "max": 3, "min": 3, "sumOfSquares": {"$numberDecimal":"9"}},
                 "numMemoizedNodes": {"sum": 4, "max": 4, "min": 4, "sumOfSquares": {"$numberDecimal":"16"}},
-                "winningPlanCost": {"sum": 12.5, "max": 12.5, "min": 12.5, "sumOfSquares": {"$numberDecimal":"156.25000000000000000000000000"}}
+                "winningPlanCost": {"sum": 12.5, "max": 12.5, "min": 12.5, "sumOfSquares": {"$numberDecimal":"156.25000000000000000000000000"}},
+                "samplingTimeMicros": {"sum": 300, "max": 300, "min": 300, "sumOfSquares": {"$numberDecimal":"90000"}},
+                "cbrPlanningTimeMicros": {"sum": 400, "max": 400, "min": 400, "sumOfSquares": {"$numberDecimal":"160000"}},
+                "planEnumerationTimeMicros": {"sum": 500, "max": 500, "min": 500, "sumOfSquares": {"$numberDecimal":"250000"}},
+                "ceTimeMicros": {"sum": 250, "max": 250, "min": 250, "sumOfSquares": {"$numberDecimal":"62500"}}
             }
         })",
         res2);
