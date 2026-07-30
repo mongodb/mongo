@@ -610,6 +610,18 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
         if (!gTakeUnstableCheckpointOnShutdown) {
             _consistencyMarkers->clearAppliedThrough(opCtx);
         }
+
+        // _applyOplogOperations advances the stable and oldest timestamps to the
+        // top of the oplog after each applied batch. However, when there is no oplog to replay,
+        // that code path is never triggered and the oldest timestamp is left behind the initial
+        // data timestamp. During initial sync we must still advance them so that the oldest
+        // timestamp is aligned with the initial data timestamp.
+        if (_duringInitialSync) {
+            auto* replCoord = ReplicationCoordinator::get(opCtx);
+            replCoord->getServiceContext()->getStorageEngine()->setStableTimestamp(
+                topOfOplog.getTimestamp(), false /*force*/);
+            replCoord->setOldestTimestamp(topOfOplog.getTimestamp());
+        }
     }
 }
 

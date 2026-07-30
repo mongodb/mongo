@@ -1622,6 +1622,48 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogAsStandaloneForInitialSyncKeepsU
 }
 
 TEST_F(ReplicationRecoveryTest,
+       RecoverFromOplogAsStandaloneForInitialSyncAdvancesOldestTimestampWithNoOplogToApply) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    // The recovery timestamp is at the top of the oplog, so there are no oplog entries to replay
+    // during initial sync recovery. See SERVER-131554.
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(5, 5));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(5, 5), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx, /*duringInitialSync=*/true);
+
+    // The initial data timestamp is set to the top of the oplog, and the oldest timestamp must be
+    // advanced to match it even though no oplog entries were applied. Otherwise the node could
+    // serve reads before the initial data timestamp.
+    ASSERT_EQ(getStorageInterface()->getInitialDataTimestamp(opCtx->getServiceContext()),
+              Timestamp(5, 5));
+    ASSERT_EQ(opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+              Timestamp(5, 5));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoverFromOplogAsStandaloneForInitialSyncAdvancesOldestTimestampAfterOplogReplay) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    // The recovery timestamp is behind the top of the oplog, so oplog entries are replayed. The
+    // oldest timestamp must reach the top of the oplog / initial data timestamp. See SERVER-131554.
+    _setUpOplog(opCtx, getStorageInterface(), {2, 5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx, /*duringInitialSync=*/true);
+    _assertDocsInTestCollection(opCtx, {5});
+
+    ASSERT_EQ(getStorageInterface()->getInitialDataTimestamp(opCtx->getServiceContext()),
+              Timestamp(5, 5));
+    ASSERT_EQ(opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+              Timestamp(5, 5));
+}
+
+TEST_F(ReplicationRecoveryTest,
        RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownRecoversOplog) {
     gTakeUnstableCheckpointOnShutdown = true;
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
