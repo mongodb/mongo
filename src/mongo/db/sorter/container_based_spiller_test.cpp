@@ -1378,66 +1378,10 @@ TEST_F(SortedContainerWriterTest, ReconstructPartiallyExhaustedIterator) {
     EXPECT_FALSE(reconstructed->more());
 }
 
-TEST(ContainerIteratorTest, RecoverCursorAfterAbandoningSnapshot) {
-    auto harnessHelper = newRecordStoreHarnessHelper();
-    auto rs = harnessHelper->newRecordStore("test.container",
-                                            RecordStore::Options{.keyFormat = KeyFormat::Long});
-    auto& container =
-        std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
-
-    auto opCtx = harnessHelper->newOperationContext();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-
-    const std::vector<std::pair<IntWrapper, IntWrapper>> data = {
-        {1, 1},
-        {2, 2},
-        {3, 3},
-        {4, 4},
-        {5, 5},
-    };
-
-    SorterChecksumCalculator checksumCalc{sorter::kLatestChecksumVersion};
-    {
-        StorageWriteTransaction txn(ru);
-        int64_t containerKey = 1;
-        for (auto& [k, v] : data) {
-            BufBuilder buf;
-            k.serializeForSorter(buf);
-            v.serializeForSorter(buf);
-            ASSERT_OK(container.insert(ru,
-                                       containerKey++,
-                                       {buf.buf(), static_cast<size_t>(buf.len())},
-                                       container::ExistingKeyPolicy::reject));
-            checksumCalc.addData(buf.buf(), buf.len());
-        }
-        txn.commit();
-    }
-
-    ContainerIterator<IntWrapper, IntWrapper> iter(container.getCursor(ru),
-                                                   /*start=*/1,
-                                                   /*end=*/static_cast<int64_t>(data.size()) + 1,
-                                                   Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                   checksumCalc.checksum(),
-                                                   sorter::kLatestChecksumVersion);
-
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{1, 1}));
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{2, 2}));
-
-    // Testing that we can recover from this.
-    ru.abandonSnapshot();
-
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{3, 3}));
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{4, 4}));
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{5, 5}));
-    EXPECT_FALSE(iter.more());
-}
-
-class ContainerBasedSpillerWriteConflictTest : public ServiceContextMongoDTest {
+/**
+ * Provides a storage-backed IntegerKeyedContainer.
+ */
+class StorageBackedContainerTest : public ServiceContextMongoDTest {
 public:
     // TODO (SERVER-116165): Remove.
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
@@ -1472,12 +1416,65 @@ protected:
         return *shard_role_details::getRecoveryUnit(_opCtx.get());
     }
 
-    SorterContainerStats stats{nullptr};
-
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<RecordStore> _tempRS;
     IntegerKeyedContainer* _container = nullptr;
+};
+
+TEST_F(StorageBackedContainerTest, RecoverCursorAfterAbandoningSnapshot) {
+    const std::vector<std::pair<IntWrapper, IntWrapper>> data = {
+        {1, 1},
+        {2, 2},
+        {3, 3},
+        {4, 4},
+        {5, 5},
+    };
+
+    SorterChecksumCalculator checksumCalc{sorter::kLatestChecksumVersion};
+    {
+        StorageWriteTransaction txn(ru());
+        int64_t containerKey = 1;
+        for (auto& [k, v] : data) {
+            BufBuilder buf;
+            k.serializeForSorter(buf);
+            v.serializeForSorter(buf);
+            ASSERT_OK(container().insert(ru(),
+                                         containerKey++,
+                                         {buf.buf(), static_cast<size_t>(buf.len())},
+                                         container::ExistingKeyPolicy::reject));
+            checksumCalc.addData(buf.buf(), buf.len());
+        }
+        txn.commit();
+    }
+
+    ContainerIterator<IntWrapper, IntWrapper> iter(container().getCursor(ru()),
+                                                   /*start=*/1,
+                                                   /*end=*/static_cast<int64_t>(data.size()) + 1,
+                                                   Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                   checksumCalc.checksum(),
+                                                   sorter::kLatestChecksumVersion);
+
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{1, 1}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{2, 2}));
+
+    // Testing that we can recover from this.
+    ru().abandonSnapshot();
+
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{3, 3}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{4, 4}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{5, 5}));
+    EXPECT_FALSE(iter.more());
+}
+
+class ContainerBasedSpillerWriteConflictTest : public StorageBackedContainerTest {
+protected:
+    SorterContainerStats stats{nullptr};
 };
 
 // Calls mergeSpills() with a deterministic WCE on the first merged write. Exercises SERVER-126155
