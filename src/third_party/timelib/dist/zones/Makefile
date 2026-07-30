@@ -4,7 +4,7 @@ download:
 	-@rm -f tzdata20*tar.gz
 	-@rm -f tzcode20*tar.gz
 	@echo "Downloading latest Olson TZDB release..."
-	$(eval VERSION := $(shell curl -s -o - https://www.iana.org/time-zones | grep \"version\" | sed 's/.*version">//' | sed 's/<\/span.*//'))
+	$(eval VERSION := $(shell curl -s -o - https://www.iana.org/time-zones | grep -o 'time-zones/releases/[0-9]\{4\}[a-z]*' | head -1 | sed 's|.*/||'))
 	curl -s -o tzdata$(VERSION).tar.gz https://data.iana.org/time-zones/releases/tzdata$(VERSION).tar.gz
 	curl -s -o tzcode$(VERSION).tar.gz https://data.iana.org/time-zones/releases/tzcode$(VERSION).tar.gz
 	@echo " done"
