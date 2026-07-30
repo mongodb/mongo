@@ -17,13 +17,10 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
-
-#include <mutex>
 
 namespace mongo::replicated_fast_count {
 namespace {
@@ -50,9 +47,7 @@ protected:
     }
 
     void tearDown() override {
-        if (_coordinator) {
-            _coordinator->shutdown();
-        }
+        _coordinator.reset();
         CatalogTestFixture::tearDown();
     }
 
@@ -66,90 +61,6 @@ protected:
     CollectionSizeCountTimestampStore _timestampStore;
     std::unique_ptr<SizeCountCheckpointCoordinator> _coordinator;
 };
-
-TEST_F(SizeCountCheckpointCoordinatorTest, StartupAndShutdownAreIdempotent) {
-    _coordinator->startup(getServiceContext());
-    _coordinator->startup(getServiceContext());
-
-    ASSERT_TRUE(_coordinator->isRunning_ForTest());
-
-    _coordinator->shutdown();
-    _coordinator->shutdown();
-
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-}
-
-TEST_F(SizeCountCheckpointCoordinatorTest,
-       ShutdownCanCompleteWhileStartupCallerIsStillPausedAfterPublication) {
-    stdx::thread starter;
-    stdx::thread stopper;
-
-    {
-        FailPointEnableBlock startupPause(
-            "hangAfterSizeCountCheckpointCoordinatorStartupPublishesThreads");
-
-        starter = stdx::thread([&] { _coordinator->startup(getServiceContext()); });
-
-        startupPause->waitForTimesEntered(startupPause.initialTimesEntered() + 1);
-
-        stopper = stdx::thread([&] { _coordinator->shutdown(); });
-
-        // If shutdown incorrectly waited for the startup() caller to return, this join would
-        // deadlock: starter is still blocked at the failpoint above.
-        stopper.join();
-    }  // failpoint releases; starter unblocks and startup() returns
-
-    starter.join();
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-}
-
-TEST_F(SizeCountCheckpointCoordinatorTest, StartupIsNoOpWhileShutdownIsJoiningWorkers) {
-    _coordinator->startup(getServiceContext());
-    ASSERT_TRUE(_coordinator->isRunning_ForTest());
-
-    stdx::thread stopper;
-
-    {
-        FailPointEnableBlock shutdownPause("hangBeforeSizeCountCheckpointCoordinatorShutdownJoins");
-
-        stopper = stdx::thread([&] { _coordinator->shutdown(); });
-
-        shutdownPause->waitForTimesEntered(shutdownPause.initialTimesEntered() + 1);
-
-        // While shutdown is in `kStopping`, confirm startup doesn't create new threads and start
-        // running again.
-        _coordinator->startup(getServiceContext());
-        ASSERT_FALSE(_coordinator->isRunning_ForTest());
-    }
-
-    stopper.join();
-
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-}
-
-TEST_F(SizeCountCheckpointCoordinatorTest, StartupAfterShutdownIsAlwaysRejected) {
-    _coordinator->startup(getServiceContext());
-    ASSERT_TRUE(_coordinator->isRunning_ForTest());
-
-    _coordinator->shutdown();
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-
-    // kShutdown is terminal: startup() must be a no-op even after a clean shutdown.
-    _coordinator->startup(getServiceContext());
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-}
-
-TEST_F(SizeCountCheckpointCoordinatorTest, ShutdownOnNeverStartedCoordinatorSetsTerminalState) {
-    // Verifies the kStopped -> kShutdown path in shutdown(). tearDown() exercises this
-    // implicitly for every non-started test.
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-    _coordinator->shutdown();
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-
-    // Terminal: any subsequent startup() must be rejected.
-    _coordinator->startup(getServiceContext());
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
-}
 
 TEST_F(SizeCountCheckpointCoordinatorTest, MultipleRequestFlushCallsBeforeFlushAreCoalesced) {
     // _flushRequested is a bool: N calls collapse to a single pending flush.
@@ -228,13 +139,13 @@ TEST_F(SizeCountCheckpointCoordinatorTest, FlushFailureIncrementsFlushFailureCou
     _coordinator->startup(getServiceContext());
     _coordinator->requestFlush();
 
-    // Wait until the flush has reached the failpoint, so shutdown() cannot preempt the flush
+    // Wait until the flush has reached the failpoint, so destruction cannot preempt the flush
     // before run()'s catch classifies the failure and increments the metric.
     failFp->waitForTimesEntered(failFp.initialTimesEntered() + 1);
 
-    // shutdown() joins the flush thread; the join cannot return until the thread has run run()'s
-    // catch (incrementing the metric) and exited, so the assertion needs no polling.
-    _coordinator->shutdown();
+    // The destructor joins the flush thread. The join cannot return until the thread has run
+    // run()'s catch (incrementing the metric) and exited, so the assertion needs no polling.
+    _coordinator.reset();
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 1);
 
@@ -249,71 +160,58 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
         auto localCoord = std::make_unique<SizeCountCheckpointCoordinator>(
             _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
         localCoord->startup(getServiceContext());
-        // Destructor calls shutdown() and joins the worker threads.
+        // Destructor joins the worker threads.
     }
     // Reaching here without a hang or crash confirms the destructor joined successfully.
 }
 
-TEST_F(SizeCountCheckpointCoordinatorTest, ShutdownDuringFlushCycleInterruptsAndCompletes) {
+TEST_F(SizeCountCheckpointCoordinatorTest, DestructorDuringFlushCycleInterruptsAndCompletes) {
     OtelMetricsCapturer capturer;
     _coordinator->startup(getServiceContext());
 
-    stdx::thread stopper;
+    stdx::thread destroyer;
     {
         FailPointEnableBlock hangFp("hangAfterReplicatedFastCountSnapshot");
 
         _coordinator->requestFlush();
         hangFp->waitForTimesEntered(hangFp.initialTimesEntered() + 1);
 
-        // Start shutdown while the flush thread is stalled inside _runOneFlushCycle.
-        // shutdown() interrupts the flush thread's opCtx, but the thread cannot unblock
+        // Destroy the coordinator while the flush thread is stalled inside _runOneFlushCycle.
+        // The destructor interrupts the flush thread's opCtx, but the thread cannot unblock
         // until the failpoint is disabled (pauseWhileSet does not check the opCtx).
-        stopper = stdx::thread([&] { _coordinator->shutdown(); });
+        destroyer = stdx::thread([&] { _coordinator.reset(); });
 
         // Scope exit: disables failpoint. The flush thread then observes the interrupted opCtx
         // and surfaces InterruptedDueToReplStateChange, which run() treats as a benign
         // replication-state change (not a flush failure) before exiting the loop.
     }
 
-    stopper.join();
-    ASSERT_FALSE(_coordinator->isRunning_ForTest());
+    destroyer.join();
 
-    // The shutdown interrupt is a replication-state change, not a flush failure.
+    // The destruction interrupt is a replication-state change, not a flush failure.
     if (capturer.canReadMetrics()) {
         ASSERT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 0);
     }
 }
 
-TEST_F(SizeCountCheckpointCoordinatorTest, RepeatedConcurrentStartupShutdownLeavesStoppedState) {
+TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndDestructorNeverDeadlocks) {
     for (int i = 0; i < 50; ++i) {
-        stdx::thread starter([&] { _coordinator->startup(getServiceContext()); });
-
-        stdx::thread stopper([&] { _coordinator->shutdown(); });
-
-        starter.join();
-        stopper.join();
-
-        ASSERT_FALSE(_coordinator->isRunning_ForTest());
-    }
-}
-
-TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndShutdownNeverDeadlocks) {
-    for (int i = 0; i < 50; ++i) {
-        auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
+        auto coordinator = std::make_shared<SizeCountCheckpointCoordinator>(
             _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
         coordinator->startup(getServiceContext());
 
-        stdx::thread flusher([&] {
+        // The flusher thread holds a copy of the shared_ptr to keep the coordinator alive
+        // while it calls requestFlush(). The main thread releases its copy concurrently,
+        // which may trigger the destructor if the flusher has already finished.
+        stdx::thread flusher([coordinator] {
             for (int j = 0; j < 5; ++j) {
                 coordinator->requestFlush();
             }
         });
-        stdx::thread stopper([&] { coordinator->shutdown(); });
+        stdx::thread destroyer([&] { coordinator.reset(); });
 
         flusher.join();
-        stopper.join();
-
-        ASSERT_FALSE(coordinator->isRunning_ForTest());
+        destroyer.join();
     }
 }
 

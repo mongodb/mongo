@@ -18,7 +18,6 @@
 namespace mongo::replicated_fast_count {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterSizeCountCheckpointCoordinatorStartupPublishesThreads);
-MONGO_FAIL_POINT_DEFINE(hangBeforeSizeCountCheckpointCoordinatorShutdownJoins);
 
 SizeCountCheckpointCoordinator::SizeCountCheckpointCoordinator(
     SizeCountStore& sizeCountStore,
@@ -33,20 +32,53 @@ SizeCountCheckpointCoordinator::SizeCountCheckpointCoordinator(
               : massertStatusOK(
                     record_id_helpers::keyForOptime(startCheckpointingAfterTS, KeyFormat::Long));
           return std::make_unique<SizeCountCheckpointBuffer>(oplogUuid, lastBufferedRid);
-      }()),
-      _sizeCountStore(sizeCountStore),
-      _timestampStore(timestampStore) {}
+      }()) {}
 
 SizeCountCheckpointCoordinator::~SizeCountCheckpointCoordinator() {
-    shutdown();
+    stdx::thread tailer;
+    stdx::thread flusher;
+
+    {
+        std::lock_guard lk(_mutex);
+        _shutdownRequested = true;
+
+        tailer = std::move(_tailerThread);
+        flusher = std::move(_flushThread);
+
+        // Interrupt the worker opCtxs before joining. The destructor may run while the caller
+        // holds RSTL_X (e.g. during stepdown via onStepDownHook). The tailer and flush threads may
+        // race past their opCtx interrupt checks and block on RSTL_IS/IX acquisition, which will
+        // never be granted while the caller holds RSTL_X, causing a deadlock. Interrupting the
+        // opCtxs makes any pending lock wait throw immediately so the threads can exit.
+        _opCtxGroup.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
+    }
+
+    // join() throws an exception if it is called on a non-joinable thread. If startup() is not
+    // called before this destructor, these threads are not joinable, and the destructor does
+    // nothing. It is legal to call this destructor without calling startup(), e.g., during testing.
+    if (tailer.joinable() != flusher.joinable()) {
+        LOGV2_FATAL(13037102,
+                    "SizeCountCheckpointOplogTailer thread and SizeCountCheckpointFlusher thread "
+                    "should have same joinable status",
+                    "SizeCountCheckpointOplogTailer"_attr = tailer.joinable(),
+                    "SizeCountCheckpointFlusher"_attr = flusher.joinable());
+    }
+    if (tailer.joinable() && flusher.joinable()) {
+        tailer.join();
+        flusher.join();
+    }
 }
+
 void SizeCountCheckpointCoordinator::startup(ServiceContext* service) {
     {
         std::lock_guard lk(_mutex);
-        if (_started || _shutdownRequested) {
-            return;
-        }
-        _started = true;
+        invariant(!_shutdownRequested);
+        tassert(13037100,
+                "SizeCountCheckpointOplogTailer thread already started",
+                !_tailerThread.joinable());
+        tassert(13037101,
+                "SizeCountCheckpointFlusher thread already started",
+                !_flushThread.joinable());
 
         _tailerThread = stdx::thread([this, service] { _runTailerThread(service); });
         _flushThread = stdx::thread([this, service] { _runFlushThread(service); });
@@ -58,41 +90,9 @@ void SizeCountCheckpointCoordinator::startup(ServiceContext* service) {
     }
 }
 
-void SizeCountCheckpointCoordinator::shutdown() {
-    stdx::thread tailer;
-    stdx::thread flusher;
-
-    {
-        std::lock_guard lk(_mutex);
-        if (_shutdownRequested) {
-            return;
-        }
-        _shutdownRequested = true;
-
-        tailer = std::move(_tailerThread);
-        flusher = std::move(_flushThread);
-
-        // Interrupt the worker opCtxs before joining. shutdown() may be called while the caller
-        // holds RSTL_X (e.g. during stepdown via onStepDownHook). The tailer and flush threads may
-        // race past their opCtx interrupt checks and block on RSTL_IS/IX acquisition, which will
-        // never be granted while the caller holds RSTL_X, causing a deadlock. Interrupting the
-        // opCtxs makes any pending lock wait throw immediately so the threads can exit.
-        _opCtxGroup.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
-    }
-
-    hangBeforeSizeCountCheckpointCoordinatorShutdownJoins.pauseWhileSet();
-
-    if (tailer.joinable()) {
-        tailer.join();
-    }
-    if (flusher.joinable()) {
-        flusher.join();
-    }
-}
-
 bool SizeCountCheckpointCoordinator::isRunning_ForTest() const {
     std::lock_guard lk(_mutex);
-    return _started && !_shutdownRequested;
+    return _flushThread.joinable() && _tailerThread.joinable();
 }
 
 void SizeCountCheckpointCoordinator::requestFlush() {

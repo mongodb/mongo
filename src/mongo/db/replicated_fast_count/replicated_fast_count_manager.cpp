@@ -173,7 +173,9 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     }
 
     if (!_isUnderTest) {
-        checkpointer->shutdown();
+        // Join the checkpointer threads before the final flush.
+        checkpointer.reset();
+
         // Final synchronous flush after checkpoint coordinator threads have stopped.
         try {
             advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
