@@ -1704,13 +1704,10 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
 
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t scannedBefore = 0;
-    int64_t keysGeneratedBefore = 0;
     int64_t keysInsertedBefore = 0;
     if (capturer.canReadMetrics()) {
         scannedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned);
-        keysGeneratedBefore =
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan);
         keysInsertedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan);
     }
@@ -1767,9 +1764,6 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
         EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
                   scannedBefore + numDocsInColl);
         EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan),
-            keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
-        EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
             keysInsertedBefore + (numDocsInColl * numIndexSpecs));
     }
@@ -1787,9 +1781,6 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
                   scannedBefore + numDocsInColl);
-        EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan),
-            keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
             keysInsertedBefore + (numDocsInColl * numIndexSpecs));

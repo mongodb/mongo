@@ -352,8 +352,6 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.keysInsertedFromScan");
     static constexpr MetricName kIndexBuildDocsScanned =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.docsScanned");
-    static constexpr MetricName kIndexBuildKeysGeneratedFromScan =
-        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.keysGeneratedFromScan");
     static constexpr MetricName kIndexBuildResumeSucceeded =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.resume.succeeded");
     static constexpr MetricName kIndexBuildResumeFailed =
