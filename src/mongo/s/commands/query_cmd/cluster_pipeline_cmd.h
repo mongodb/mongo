@@ -93,6 +93,11 @@ public:
                 "BSON field 'querySettings' is an unknown field",
                 !aggregationRequest.getQuerySettings().has_value());
 
+        // Checked at parse time, before 'runAggregate()' sets this field on the user's own request
+        // for a pipeline containing a hybrid search stage.
+        aggregation_request_helper::assertIsHybridSearchNotSetByExternalClient(aggregationRequest,
+                                                                               *opCtx->getClient());
+
         return std::make_unique<Invocation>(
             opCtx, this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
     }

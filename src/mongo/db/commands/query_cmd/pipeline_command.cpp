@@ -257,6 +257,11 @@ public:
             // explainVerbosity as a top-level explain.
             // TODO SERVER-119402: Change explainVerbosity parameter to bool.
             aggregation_request_helper::validate(request(), body, ns(), boost::none);
+
+            // Checked here, before any server-side code sets this field on the user's own request.
+            aggregation_request_helper::assertIsHybridSearchNotSetByExternalClient(
+                request(), *opCtx->getClient());
+
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx,
                                                              !Pipeline::aggHasWriteStage(body));
 
@@ -316,6 +321,10 @@ public:
             // See run() for why we need this validation.
             // TODO SERVER-119402: Change explainVerbosity parameter to bool.
             aggregation_request_helper::validate(request(), body, ns(), verbosity);
+
+            // Checked here, before any server-side code sets this field on the user's own request.
+            aggregation_request_helper::assertIsHybridSearchNotSetByExternalClient(
+                request(), *opCtx->getClient());
 
             // Mark this request as 'explain' so that downstream components such as query stats key
             // construction can see it.

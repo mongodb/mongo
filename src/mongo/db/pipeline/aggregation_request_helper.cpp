@@ -45,6 +45,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
@@ -190,6 +191,14 @@ void validate(const AggregateCommandRequest& aggregate,
                 "$_resumeAfter is not supported for collectionless aggregations",
                 !nss.isCollectionlessAggregateNS());
     }
+}
+
+void assertIsHybridSearchNotSetByExternalClient(const AggregateCommandRequest& aggregate,
+                                                Client& client) {
+    uassert(13212500,
+            str::stream() << "BSON field '" << AggregateCommandRequest::kIsHybridSearchFieldName
+                          << "' is an unknown field",
+            isInternalOrDirectClient(&client) || !aggregate.getIsHybridSearch().has_value());
 }
 
 void validateRequestWithClient(const OperationContext* opCtx,

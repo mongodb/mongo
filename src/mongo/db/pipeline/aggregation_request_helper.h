@@ -115,6 +115,15 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
                           std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
 
 /**
+ * Throws if a non-internal 'client' specified the internal '$_isHybridSearch' field.
+ *
+ * Must be called on the request as it came off the wire, before any server-side code sets the field
+ * on it.
+ */
+void assertIsHybridSearchNotSetByExternalClient(const AggregateCommandRequest& aggregate,
+                                                Client& client);
+
+/**
  * Validate the aggregate command object.
  */
 void validate(const AggregateCommandRequest& aggregate,
