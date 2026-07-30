@@ -155,8 +155,8 @@ public:
         std::vector<BSONObj> sortedDocs = docs;
         std::sort(sortedDocs.begin(), sortedDocs.end(), [&](const BSONObj& a, const BSONObj& b) {
             // FORWARD : sort in increasing _id order. BACKWARD: decreasing.
-            return (a["_id"].Int() < b["_id"].Int()) ^
-                (direction == CollectionScanParams::BACKWARD);
+            return (direction == CollectionScanParams::FORWARD) ? (a["_id"].Int() < b["_id"].Int())
+                                                                : (b["_id"].Int() < a["_id"].Int());
         });
 
         int expectedDocsTested = 0;
