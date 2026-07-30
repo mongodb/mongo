@@ -85,6 +85,7 @@
 #include <thread>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -584,6 +585,22 @@ public:
                                                               const OpTime& opTime,
                                                               Date_t wallTime = Date_t());
 
+    // What to do with the waiters of a single WriteConcern:
+    //  - OpTime: wake every waiter whose opTime is <= this value, i.e. the highest OpTime that
+    //            currently satisfies the WriteConcern. A null OpTime wakes none of its waiters,
+    //            which is how an unsatisfied condition is reported.
+    //  - bool:   only ever true, and only for OpTime-independent (config-commitment) conditions:
+    //            wake all of that WriteConcern's waiters regardless of their opTime.
+    //  - Status: fail all of that WriteConcern's waiters with this error.
+    using WriteConcernFulfillment = std::variant<OpTime, bool, Status>;
+
+    /**
+     * Resolves `writeConcern` into the fulfillment that _wakeReadyWaiters() would act on. Acquires
+     * _mutex.
+     */
+    [[MONGO_MOD_PRIVATE]] WriteConcernFulfillment resolveWriteConcernFulfillment_forTest(
+        const WriteConcernOptions& writeConcern);
+
     /**
      * Simple test wrappers that expose private methods.
      */
@@ -809,6 +826,11 @@ private:
         Counter64& _waiterCountMetric;
     };
 
+    // Decides, for a single WriteConcern, which of its waiters can be woken. Called once per
+    // distinct WriteConcern being waited on -- see WriteConcernWaiterList::setValueIf().
+    using WriteConcernFulfillmentResolver =
+        std::function<WriteConcernFulfillment(WithLock, const WriteConcernOptions&)>;
+
     // This is a waiter list for things waiting on opTimes along with a WriteConcern.  It breaks
     // the waiters up by WriteConcern (using the hash and equal functors above) so that within a
     // sub-list, the waiters are satisfied in order.
@@ -826,14 +848,12 @@ private:
         // Returns whether waiter is found and removed.
         bool remove(WithLock lk, const OpTime& opTime, SharedWaiterHandle waiter);
 
-        // Signals all waiters whose opTime is <= the given opTime (if any) that satisfy the
-        // condition in func.  The func must have the property that, for any given
-        // WriteConcernOptions, there is some optime T such that func returns true for all
-        // optimes <= T, and false for all optimes > T.
-        void setValueIf(
-            WithLock lk,
-            std::function<bool(WithLock, const OpTime&, const WriteConcernOptions&)> func,
-            boost::optional<OpTime> opTime = boost::none);
+        // Signals the waiters that `resolve` says can be woken.  `resolve` is consulted once per
+        // distinct WriteConcern currently being waited on -- not once per waiter -- and returns
+        // that WriteConcern's fulfillment (see WriteConcernFulfillment).  This relies on each
+        // sub-list being ordered by opTime, so the waiters an OpTime fulfillment wakes are a
+        // prefix of their sub-list.
+        void setValueIf(WithLock lk, const WriteConcernFulfillmentResolver& resolve);
         // Signals all waiters from the list and fulfills promises with Error status.
         void setErrorAll(WithLock lk, Status status);
 
@@ -1091,10 +1111,23 @@ private:
                                                     int myIndex);
 
     /**
-     * Helper to wake waiters in _replicationWaiterList waiting for opTime <= the opTime passed in
-     * (or all waiters if opTime passed in is boost::none) that are doneWaitingForReplication.
+     * Helper to wake the waiters in _replicationWaiterList that are doneWaitingForReplication, by
+     * resolving each waited-on WriteConcern to the highest opTime that currently satisfies it (see
+     * _resolveWriteConcernFulfillment).
      */
-    void _wakeReadyWaiters(WithLock lk, boost::optional<OpTime> opTime = boost::none);
+    void _wakeReadyWaiters(WithLock lk);
+
+    /**
+     * Returns which of `writeConcern`'s waiters can be woken right now: the highest opTime that
+     * currently satisfies it (null if none does), `true` if it is an OpTime-independent condition
+     * that is now satisfied, or an error Status if resolving it failed.
+     *
+     * This answers for a whole WriteConcern at once what _doneWaitingForReplication() answers for a
+     * single (opTime, writeConcern) pair, so that waking waiters does not have to test them one by
+     * one.
+     */
+    WriteConcernFulfillment _resolveWriteConcernFulfillment(
+        WithLock lk, const WriteConcernOptions& writeConcern);
 
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might

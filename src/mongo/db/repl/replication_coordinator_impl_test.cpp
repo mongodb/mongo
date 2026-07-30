@@ -1403,6 +1403,94 @@ TEST_F(ReplCoordTest, SupportTaggedWriteConcern) {
     awaiter.reset();
 }
 
+/**
+ * Brings up a 3-node set with this node primary, and exposes
+ * _resolveWriteConcernFulfillment() through the coordinator's test accessor. All three tests
+ * below need the same set, so the fixture owns the setup.
+ */
+class ReplCoordResolveWriteConcernTest : public ReplCoordTest {
+public:
+    void setUpThreeNodeSetWithSelfPrimary() {
+        assertStartSuccess(BSON("_id"
+                                << "mySet"
+                                << "version" << 2 << "members"
+                                << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0)
+                                              << BSON("host" << "node2:12345" << "_id" << 1)
+                                              << BSON("host" << "node3:12345" << "_id" << 2))),
+                           HostAndPort("node1", 12345));
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(selfOpTime(), Date_t() + Seconds(100));
+        simulateSuccessfulV1Election();
+    }
+
+    OpTime selfOpTime() const {
+        return OpTimeWithTermOne(100, 2);
+    }
+    OpTime peerOpTime() const {
+        return OpTimeWithTermOne(100, 1);
+    }
+
+    /** Reports `opTime` for the given member on every opTime the recency checks consider. */
+    void peerReached(long long memberId, const OpTime& opTime) {
+        ASSERT_OK(getReplCoord()->setLastWrittenOptime_forTest(2, memberId, opTime));
+        ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, memberId, opTime));
+        ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, memberId, opTime));
+    }
+
+    WriteConcernOptions writeConcern(WriteConcernW w) {
+        WriteConcernOptions wc;
+        wc.w = std::move(w);
+        // An unset syncMode trips an invariant in the resolver; these tests are all about the
+        // non-durable path.
+        wc.syncMode = WriteConcernOptions::SyncMode::NONE;
+        wc.wTimeout = WriteConcernOptions::kNoTimeout;
+        return wc;
+    }
+
+    auto resolve(WriteConcernW w) {
+        return getReplCoord()->resolveWriteConcernFulfillment_forTest(writeConcern(std::move(w)));
+    }
+};
+
+TEST_F(ReplCoordResolveWriteConcernTest, NumericWriteConcernResolvesToTheNthLargestOpTime) {
+    setUpThreeNodeSetWithSelfPrimary();
+    // Self is ahead of node2; node3 has not reported, so it is not in the current term at all.
+    peerReached(1, peerOpTime());
+
+    // Self alone satisfies w:1, and self caps the answer even though nothing is ahead of it.
+    ASSERT_EQ(selfOpTime(), std::get<OpTime>(resolve(1)));
+    // Self plus node2 satisfy w:2, but only up to node2's opTime.
+    ASSERT_EQ(peerOpTime(), std::get<OpTime>(resolve(2)));
+    // Only two members have reached the current term, so w:3 is not satisfiable by any opTime.
+    ASSERT_TRUE(std::get<OpTime>(resolve(3)).isNull());
+
+    // The resolved opTimes agree with the per-opTime predicate the resolver replaced.
+    ASSERT_TRUE(getTopoCoord().haveNumNodesReachedOpTime(peerOpTime(), 2, false));
+    ASSERT_FALSE(getTopoCoord().haveNumNodesReachedOpTime(selfOpTime(), 2, false));
+}
+
+TEST_F(ReplCoordResolveWriteConcernTest, UnknownWriteModeResolvesToAnError) {
+    setUpThreeNodeSetWithSelfPrimary();
+
+    // Resolving the write mode throws; the resolver reports it as this write concern's outcome so
+    // that its waiters are failed rather than left waiting forever.
+    auto fulfillment = resolve(std::string{"thisModeDoesNotExist"});
+    ASSERT_TRUE(std::holds_alternative<Status>(fulfillment));
+    ASSERT_EQ(ErrorCodes::UnknownReplWriteConcern, std::get<Status>(fulfillment).code());
+}
+
+TEST_F(ReplCoordResolveWriteConcernTest, MajorityIsUnsatisfiableWithoutACommittedSnapshot) {
+    setUpThreeNodeSetWithSelfPrimary();
+    peerReached(1, selfOpTime());
+
+    // Snapshots are enabled and no committed snapshot has been established, so majority write
+    // concern cannot be satisfied at any opTime yet -- even though a majority of nodes have in fact
+    // reached selfOpTime().
+    ASSERT_TRUE(getExternalState()->snapshotsEnabled());
+    ASSERT_TRUE(std::get<OpTime>(resolve(std::string{WriteConcernOptions::kMajority})).isNull());
+}
+
+
 TEST_F(ReplCoordTest, NodeReturnsNotPrimaryWhenSteppingDownBeforeSatisfyingAWriteConcern) {
     // Test that a thread blocked in awaitReplication will be woken up and return PrimarySteppedDown
     // (a NotPrimaryError) if the node steps down while it is waiting.

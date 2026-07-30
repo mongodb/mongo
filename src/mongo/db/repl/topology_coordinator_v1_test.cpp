@@ -7384,6 +7384,210 @@ TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
         caughtUpOpTime, 3 /* numNodes */, true /* durablyWritten */));
 }
 
+/**
+ * Fixture for the getMaxReachedOpTimeFor*() tests.
+ *
+ * Those tests differ only in the shape of the replica set and in which opTime each node has
+ * reached, so setUpReplSet() takes exactly that as data and does everything else: build and install
+ * the config, make self primary, set self's opTime, and deliver the initial heartbeats.
+ *
+ * Every opTime here is one of two timestamps -- caughtUp() or lagged() -- which setUpReplSet()
+ * stamps with the term the set ends up in. Keeping the spec term-free is what lets a test name its
+ * opTimes before the set exists.
+ */
+class TopoCoordMaxReachedOpTimeTest : public TopoCoordTest {
+public:
+    static constexpr auto kSetName = "rs0";
+
+    /** A member to configure. Member 0 is self; the defaults describe a data-bearing voter. */
+    struct Member {
+        std::string host;
+        bool arbiter = false;
+        bool voter = true;
+    };
+
+    /**
+     * How to bring the replica set up: the members to configure, the timestamp self is at, and the
+     * timestamp each other member has reported. A member with no entry has not been heard from.
+     */
+    struct ReplSetSpec {
+        std::vector<Member> members;
+        Timestamp selfTimestamp;
+        std::vector<std::pair<std::string, Timestamp>> reached;
+    };
+
+    /** The two timestamps these tests distinguish between. */
+    static Timestamp caughtUp() {
+        return Timestamp(100, 0);
+    }
+    static Timestamp lagged() {
+        return Timestamp(50, 0);
+    }
+
+    void setUpReplSet(const ReplSetSpec& spec) {
+        _members = spec.members;
+
+        BSONArrayBuilder members;
+        for (size_t i = 0; i < _members.size(); ++i) {
+            const auto& member = _members[i];
+            BSONObjBuilder builder;
+            builder.append("_id", static_cast<int>(i));
+            builder.append("host", member.host + ":27017");
+            if (member.arbiter) {
+                builder.append("arbiterOnly", true);
+            }
+            if (!member.voter) {
+                builder.append("votes", 0);
+                builder.append("priority", 0);
+            }
+            members.append(builder.obj());
+        }
+        updateConfig(BSON("_id" << kSetName << "version" << 2 << "members" << members.arr()),
+                     0 /* selfIndex */);
+
+        makeSelfPrimary();
+        _term = getTopoCoord().getTerm();
+
+        setMyOpTime(opTimeAt(spec.selfTimestamp));
+        for (const auto& [host, timestamp] : spec.reached) {
+            reportOpTime(host, timestamp);
+        }
+    }
+
+    /**
+     * Delivers a heartbeat reporting that `host` has reached `timestamp`. Members configured as
+     * arbiters report as arbiters, everyone else as a secondary.
+     */
+    void reportOpTime(const std::string& host, Timestamp timestamp) {
+        heartbeatFromMember(HostAndPort(host),
+                            kSetName,
+                            _isArbiter(host) ? MemberState::RS_ARBITER : MemberState::RS_SECONDARY,
+                            opTimeAt(timestamp));
+    }
+
+    OpTime opTimeAt(Timestamp timestamp) const {
+        return OpTime(timestamp, _term);
+    }
+    OpTime caughtUpOpTime() const {
+        return opTimeAt(caughtUp());
+    }
+    OpTime laggedOpTime() const {
+        return opTimeAt(lagged());
+    }
+
+    /** The tag pattern for w:"majority" in the current config. */
+    ReplSetTagPattern majorityPattern() {
+        return unittest::assertGet(
+            getCurrentConfig().findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName));
+    }
+
+    // The methods under test, and the predicates they are expected to agree with. These tests only
+    // ever ask about non-durable opTimes.
+    OpTime maxReachedForNumNodes(int numNodes) {
+        return getTopoCoord().getMaxReachedOpTimeForNumNodes(numNodes, kDurablyWritten);
+    }
+    OpTime maxReachedForMajority() {
+        return getTopoCoord().getMaxReachedOpTimeForTaggedNodes(majorityPattern(), kDurablyWritten);
+    }
+    bool haveNumNodesReached(const OpTime& opTime, int numNodes) {
+        return getTopoCoord().haveNumNodesReachedOpTime(opTime, numNodes, kDurablyWritten);
+    }
+    bool haveMajorityReached(const OpTime& opTime) {
+        return getTopoCoord().haveTaggedNodesReachedOpTime(
+            opTime, majorityPattern(), kDurablyWritten);
+    }
+
+private:
+    static constexpr bool kDurablyWritten = false;
+
+    bool _isArbiter(const std::string& host) const {
+        for (const auto& member : _members) {
+            if (member.host == host) {
+                return member.arbiter;
+            }
+        }
+        return false;
+    }
+
+    long long _term = 0;
+    std::vector<Member> _members;
+};
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, NumNodesReturnsNthLargestOpTime) {
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {"host2"}},
+                  .selfTimestamp = caughtUp(),
+                  .reached = {{"host1", caughtUp()}, {"host2", lagged()}}});
+
+    // Two nodes are at the caught-up opTime and all three are at the lagged one, so those are the
+    // highest opTimes satisfying w:2 and w:3 respectively.
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForNumNodes(1));
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForNumNodes(2));
+    ASSERT_EQ(laggedOpTime(), maxReachedForNumNodes(3));
+
+    // The returned opTimes agree with what haveNumNodesReachedOpTime() reports.
+    ASSERT_TRUE(haveNumNodesReached(caughtUpOpTime(), 2));
+    ASSERT_FALSE(haveNumNodesReached(caughtUpOpTime(), 3));
+    ASSERT_TRUE(haveNumNodesReached(laggedOpTime(), 3));
+
+    // More nodes are required than the set has, so nothing is satisfiable.
+    ASSERT_TRUE(maxReachedForNumNodes(4).isNull());
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, NumNodesExcludesArbiters) {
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {.host = "host2", .arbiter = true}},
+                  .selfTimestamp = caughtUp(),
+                  .reached = {{"host1", caughtUp()}, {"host2", caughtUp()}}});
+
+    // Only the two data-bearing nodes count, so w:3 is not satisfiable even though the arbiter has
+    // reported the same opTime.
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForNumNodes(2));
+    ASSERT_TRUE(maxReachedForNumNodes(3).isNull());
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, NumNodesIsCappedBySelf) {
+    // Self is behind both secondaries. Self is a required participant, so it caps the answer.
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {"host2"}},
+                  .selfTimestamp = lagged(),
+                  .reached = {{"host1", caughtUp()}, {"host2", caughtUp()}}});
+
+    ASSERT_EQ(laggedOpTime(), maxReachedForNumNodes(2));
+    ASSERT_FALSE(haveNumNodesReached(caughtUpOpTime(), 2));
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, TaggedNodesReturnsHighestSatisfyingOpTime) {
+    // The config has 3 voting members, so the majority number is 2. No secondary has reported yet.
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {"host2"}}, .selfTimestamp = caughtUp()});
+
+    // Only self has reached the caught-up opTime, which is not yet a majority.
+    ASSERT_TRUE(maxReachedForMajority().isNull());
+
+    // With one lagging secondary, a majority has reached the lagged opTime but no higher.
+    reportOpTime("host1", lagged());
+    ASSERT_EQ(laggedOpTime(), maxReachedForMajority());
+    ASSERT_TRUE(haveMajorityReached(laggedOpTime()));
+    ASSERT_FALSE(haveMajorityReached(caughtUpOpTime()));
+
+    // Once that secondary catches up, the majority has reached the caught-up opTime.
+    reportOpTime("host1", caughtUp());
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForMajority());
+    ASSERT_TRUE(haveMajorityReached(caughtUpOpTime()));
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, TaggedNodesExcludeNonVotersAndArbiters) {
+    // The config has 3 voting members including an arbiter, so the majority number is 2. Neither
+    // the non-voter nor the arbiter counts towards it, so the only other node that does is the
+    // lagging secondary.
+    setUpReplSet({.members = {{"host0"},
+                              {"host1"},
+                              {.host = "host2", .voter = false},
+                              {.host = "host3", .arbiter = true}},
+                  .selfTimestamp = caughtUp(),
+                  .reached = {{"host1", lagged()}, {"host2", caughtUp()}, {"host3", caughtUp()}}});
+
+    ASSERT_EQ(laggedOpTime(), maxReachedForMajority());
+}
+
+
 TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
     auto configA = ReplSetConfig::parse(
         BSON("_id" << "rs0" << "version" << 1 << "protocolVersion" << 1 << "members"

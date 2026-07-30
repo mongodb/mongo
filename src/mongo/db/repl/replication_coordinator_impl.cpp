@@ -344,25 +344,48 @@ bool ReplicationCoordinatorImpl::WriteConcernWaiterList::remove(WithLock lk,
 }
 
 void ReplicationCoordinatorImpl::WriteConcernWaiterList::setValueIf(
-    WithLock lk,
-    std::function<bool(WithLock, const OpTime&, const WriteConcernOptions&)> func,
-    boost::optional<OpTime> opTime) {
+    WithLock lk, const WriteConcernFulfillmentResolver& resolve) {
     std::size_t erased = 0;
-    for (auto& waiterListEntry : _waiters) {
-        auto& waiterList = waiterListEntry.second;
-        auto it = waiterList.begin();
-        for (; it != waiterList.end() && (!opTime || it->first <= *opTime); ++it) {
-            const auto& waiter = it->second;
-            try {
-                if (!func(lk, it->first, waiterListEntry.first))
-                    break;
-                waiter->promise.emplaceValue();
-            } catch (const DBException& e) {
-                waiter->promise.setError(e.toStatus());
-            }
-            ++erased;
+    for (auto& [writeConcern, waiterList] : _waiters) {
+        if (waiterList.empty()) {
+            // An emptied bucket is left in place, so skip it rather than resolving a WriteConcern
+            // that nobody is waiting on.
+            continue;
         }
-        waiterList.erase(waiterList.begin(), it);
+
+        const auto fulfillment = resolve(lk, writeConcern);
+        std::visit(OverloadedVisitor{[&](OpTime maxOpTime) {
+                                         if (maxOpTime.isNull())
+                                             return;
+                                         // The waiters to wake are the sub-list's prefix up to
+                                         // `maxOpTime`, since the sub-list is ordered by opTime.
+                                         auto it = waiterList.begin();
+                                         for (; it != waiterList.end() && it->first <= maxOpTime;
+                                              ++it) {
+                                             it->second->promise.emplaceValue();
+                                             ++erased;
+                                         }
+                                         waiterList.erase(waiterList.begin(), it);
+                                     },
+                                     [&](bool satisfied) {
+                                         // A boolean fulfillment is only ever populated as true; an
+                                         // unsatisfied condition is reported as a null OpTime
+                                         // instead.
+                                         invariant(satisfied);
+                                         for (auto& [opTime, waiter] : waiterList) {
+                                             waiter->promise.emplaceValue();
+                                             ++erased;
+                                         }
+                                         waiterList.clear();
+                                     },
+                                     [&](const Status& error) {
+                                         for (auto& [opTime, waiter] : waiterList) {
+                                             waiter->promise.setError(error);
+                                             ++erased;
+                                         }
+                                         waiterList.clear();
+                                     }},
+                   fulfillment);
     }
     _waiterCountMetric.decrementRelaxed(erased);
 }
@@ -1725,7 +1748,7 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     }
     // There could be replication waiters waiting for our lastDurable for {j: true}, wake up those
     // that now have their write concern satisfied.
-    _wakeReadyWaiters(lk, opTimeAndWallTime.opTime);
+    _wakeReadyWaiters(lk);
 }
 
 bool ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTimeForward(
@@ -2176,7 +2199,7 @@ void ReplicationCoordinatorImpl::_updateStateAfterRemoteOpTimeUpdates(
     if (!maxRemoteOpTime.isNull()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
         // Wait up replication waiters on optime changes.
-        _wakeReadyWaiters(lk, maxRemoteOpTime);
+        _wakeReadyWaiters(lk);
     }
 }
 
@@ -4720,13 +4743,15 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
 
     // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.
     _replicationWaiterList.setValueIf(
-        lk, [this](WithLock lk, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
-            // This throws if a waiter's writeConcern is no longer satisfiable, in which case
-            // setValueIf will fulfill the waiter's promise with the error status.
-            uassertStatusOK(_checkIfWriteConcernCanBeSatisfied(lk, writeConcern));
-            // Return false meaning that the waiter is still satisfiable and thus can remain in the
-            // waiter list.
-            return false;
+        lk,
+        [this](WithLock lk, const WriteConcernOptions& writeConcern) -> WriteConcernFulfillment {
+            auto satisfiableStatus = _checkIfWriteConcernCanBeSatisfied(lk, writeConcern);
+            if (!satisfiableStatus.isOK()) {
+                // Fail this write concern's waiters: it can no longer be satisfied.
+                return satisfiableStatus;
+            }
+            // A null OpTime leaves the still-satisfiable waiters in the list.
+            return OpTime();
         });
 
     _cancelCatchupTakeover(lk);
@@ -4767,13 +4792,96 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     return action;
 }
 
-void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk, boost::optional<OpTime> opTime) {
-    _replicationWaiterList.setValueIf(
-        lk,
-        [this](WithLock lk, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
-            return _doneWaitingForReplication(lk, opTime, writeConcern);
-        },
-        opTime);
+ReplicationCoordinatorImpl::WriteConcernFulfillment
+ReplicationCoordinatorImpl::resolveWriteConcernFulfillment_forTest(
+    const WriteConcernOptions& writeConcern) {
+    std::lock_guard lk(_mutex);
+    return _resolveWriteConcernFulfillment(lk, writeConcern);
+}
+
+ReplicationCoordinatorImpl::WriteConcernFulfillment
+ReplicationCoordinatorImpl::_resolveWriteConcernFulfillment(
+    WithLock lk, const WriteConcernOptions& writeConcern) try {
+    // The syncMode cannot be unset.
+    invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
+    const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
+
+    return std::visit(
+        OverloadedVisitor{
+            [&](std::int64_t w) -> WriteConcernFulfillment {
+                // A numeric WriteConcern is always an opTime condition.
+                return _topCoord->getMaxReachedOpTimeForNumNodes(w, useDurableOpTime);
+            },
+            [&](const WTags& wTags) -> WriteConcernFulfillment {
+                // A WTags WriteConcern is always an opTime condition.
+                auto tagPattern =
+                    uassertStatusOK(_rsConfig.unsafePeek().makeCustomWriteMode(wTags));
+                return _topCoord->getMaxReachedOpTimeForTaggedNodes(tagPattern, useDurableOpTime);
+            },
+            [&](const std::string& wMode) -> WriteConcernFulfillment {
+                // The "committed" snapshot bounds what majority write concern can satisfy, when set
+                // below.
+                boost::optional<OpTime> snapshotCap;
+                std::string_view patternName;
+                if (wMode == WriteConcernOptions::kMajority) {
+                    if (_externalState->snapshotsEnabled() &&
+                        !gTestingSnapshotBehaviorInIsolation) {
+                        // Without a "committed" snapshot nothing can be satisfied.
+                        if (!_currentCommittedSnapshot) {
+                            return OpTime();
+                        }
+                        snapshotCap = *_currentCommittedSnapshot;
+
+                        // Waiting for the committed snapshot to advance past the write is
+                        // sufficient in most cases; the additional wait for a majority of nodes is
+                        // only needed when writeConcernMajorityJournalDefault is false and j: true.
+                        // See _doneWaitingForReplication() for the full reasoning.
+                        if (writeConcern.checkCondition ==
+                                WriteConcernOptions::CheckCondition::OpTime &&
+                            (getWriteConcernMajorityShouldJournal(lk) || !useDurableOpTime)) {
+                            return *snapshotCap;
+                        }
+                        // Otherwise fall through to also wait for "majority" write concern.
+                    }
+                    patternName = ReplSetConfig::kMajorityWriteConcernModeName;
+                } else {
+                    patternName = wMode;
+                }
+
+                auto tagPattern =
+                    uassertStatusOK(_rsConfig.unsafePeek().findCustomWriteMode(patternName));
+                if (writeConcern.checkCondition == WriteConcernOptions::CheckCondition::OpTime) {
+                    auto maxOpTime =
+                        _topCoord->getMaxReachedOpTimeForTaggedNodes(tagPattern, useDurableOpTime);
+                    // A null OpTime is already the minimum, so an unsatisfiable pattern stays
+                    // unsatisfiable.
+                    return snapshotCap ? std::min(*snapshotCap, maxOpTime) : maxOpTime;
+                }
+
+                invariant(writeConcern.checkCondition ==
+                          WriteConcernOptions::CheckCondition::Config);
+                if (!_topCoord->haveTaggedNodesSatisfiedCondition(_topCoord->makeConfigPredicate(),
+                                                                  tagPattern)) {
+                    return OpTime();
+                }
+                // Config commitment itself does not depend on the waiter's opTime, so every waiter
+                // of this WriteConcern qualifies -- unless the committed snapshot also gates the
+                // wait, in which case only the waiters at or below it do.
+                if (snapshotCap) {
+                    return *snapshotCap;
+                }
+                return true;
+            }},
+        writeConcern.w);
+} catch (const DBException& e) {
+    return e.toStatus();
+}
+
+void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk) {
+    _replicationWaiterList.setValueIf(lk,
+                                      [this](WithLock lk, const WriteConcernOptions& writeConcern) {
+                                          return _resolveWriteConcernFulfillment(lk, writeConcern);
+                                      });
 }
 
 Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePositionArgs& updates) {
@@ -5727,7 +5835,7 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
 
     // Wake up any threads waiting for read concern or write concern.
     if (_externalState->snapshotsEnabled() && _currentCommittedSnapshot) {
-        _wakeReadyWaiters(lk, _currentCommittedSnapshot);
+        _wakeReadyWaiters(lk);
 
         _majorityReadWaiterList.setValueIf(
             lk,

@@ -29,10 +29,13 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <ostream>
+#include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -1381,6 +1384,93 @@ bool TopologyCoordinator::haveTaggedNodesReachedOpTime(const OpTime& opTime,
                                                        bool durablyWritten) {
     auto pred = makeOpTimePredicate(opTime, durablyWritten);
     return haveTaggedNodesSatisfiedCondition(pred, tagPattern);
+}
+
+OpTime TopologyCoordinator::getMaxReachedOpTimeForNumNodes(int numNodes, bool durablyWritten) {
+    // haveNumNodesReachedOpTime() only ever considers targets in our current term (it invariants
+    // that target.term == getMyLastAppliedOpTime().term), so the answer is expressed in that term.
+    const long long currentTerm = getMyLastAppliedOpTime().getTerm();
+
+    // Self is a required participant (mirrors the self-recency gate in haveNumNodesReachedOpTime).
+    // If self has not written in the current term, nothing in that term can be satisfied.
+    const OpTime selfOpTime = _getMemberOpTimeForRecencyCheck(_selfMemberData(), durablyWritten);
+    if (selfOpTime.getTerm() != currentTerm) {
+        return OpTime();
+    }
+
+    // With no node-count requirement, only the self gate constrains the satisfiable point.
+    if (numNodes <= 0) {
+        return selfOpTime;
+    }
+
+    // Only members whose OpTime is in the current term count toward the write concern (the check in
+    // haveNumNodesReachedOpTime requires term equality). Arbiters never count.
+    std::vector<Timestamp> timestamps;
+    timestamps.reserve(_memberData.size());
+    for (auto&& memberData : _memberData) {
+        if (_rsConfig.getMemberAt(memberData.getConfigIndex()).isArbiter()) {
+            continue;
+        }
+        const OpTime memberOpTime = _getMemberOpTimeForRecencyCheck(memberData, durablyWritten);
+        if (memberOpTime.getTerm() == currentTerm) {
+            timestamps.push_back(memberOpTime.getTimestamp());
+        }
+    }
+
+    // Fewer than numNodes members have reached the current term, so no target is satisfiable.
+    if (timestamps.size() < static_cast<size_t>(numNodes)) {
+        return OpTime();
+    }
+
+    // The highest timestamp reached by at least numNodes members is the numNodes-th largest one.
+    std::nth_element(timestamps.begin(),
+                     timestamps.begin() + (numNodes - 1),
+                     timestamps.end(),
+                     std::greater<>());
+    const Timestamp nthLargest = timestamps[numNodes - 1];
+
+    // Self is required, so it also caps the satisfiable timestamp.
+    return OpTime(std::min(nthLargest, selfOpTime.getTimestamp()), currentTerm);
+}
+
+OpTime TopologyCoordinator::getMaxReachedOpTimeForTaggedNodes(const ReplSetTagPattern& tagPattern,
+                                                              bool durablyWritten) {
+    // As with haveNumNodesReachedOpTime, makeOpTimePredicate only counts members in our current
+    // term, so the answer is expressed in that term.
+    const long long currentTerm = getMyLastAppliedOpTime().getTerm();
+
+    // Collect (timestamp, config index) for members whose OpTime is in the current term; only those
+    // can satisfy the OpTime predicate's term check. Members not in the current term (including
+    // arbiters, whose OpTime is null) are ignored.
+    struct MemberTimestamp {
+        Timestamp ts;
+        int configIndex;
+    };
+
+    // Ordered highest-timestamp-first.
+    auto byDescendingTimestamp = [](const MemberTimestamp& a, const MemberTimestamp& b) {
+        return a.ts > b.ts;
+    };
+    std::multiset<MemberTimestamp, decltype(byDescendingTimestamp)> members(byDescendingTimestamp);
+    for (auto&& memberData : _memberData) {
+        const OpTime memberOpTime = _getMemberOpTimeForRecencyCheck(memberData, durablyWritten);
+        if (memberOpTime.getTerm() == currentTerm) {
+            members.insert({memberOpTime.getTimestamp(), memberData.getConfigIndex()});
+        }
+    }
+
+    // The first member that satisfies the tag pattern has the highest timestamp that does, since
+    // `members` is ordered on timestamp descending.
+    ReplSetTagMatch matcher(tagPattern);
+    for (const auto& member : members) {
+        const MemberConfig& memberConfig = _rsConfig.getMemberAt(member.configIndex);
+        for (auto&& it = memberConfig.tagsBegin(); it != memberConfig.tagsEnd(); ++it) {
+            if (matcher.update(*it)) {
+                return OpTime(member.ts, currentTerm);
+            }
+        }
+    }
+    return OpTime();
 }
 
 TopologyCoordinator::MemberPredicate TopologyCoordinator::makeOpTimePredicate(const OpTime& opTime,

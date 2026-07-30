@@ -534,6 +534,31 @@ public:
                                                             const ReplSetTagPattern& tagPattern,
                                                             bool durablyWritten);
 
+    /**
+     * Returns the highest OpTime that at least 'numNodes' nodes have reached, i.e. the highest
+     * OpTime T for which haveNumNodesReachedOpTime(T, numNodes, durablyWritten) returns true. That
+     * is the 'numNodes'-th largest current-term member OpTime, capped by self's (self is a required
+     * participant). Returns a null OpTime when fewer than 'numNodes' nodes have reached the current
+     * term, meaning no OpTime satisfies the requirement right now.
+     *
+     * Lets a caller learn the satisfiable point in one pass instead of probing a series of
+     * candidate OpTimes. "durablyWritten" indicates whether the operation has to be durably
+     * written.
+     */
+    [[MONGO_MOD_PRIVATE]] OpTime getMaxReachedOpTimeForNumNodes(int numNodes, bool durablyWritten);
+
+    /**
+     * Returns the highest OpTime that the nodes matching 'tagPattern' have reached, i.e. the
+     * highest OpTime T for which haveTaggedNodesReachedOpTime(T, tagPattern, durablyWritten)
+     * returns true. Returns a null OpTime when the pattern cannot be satisfied in the current term,
+     * meaning no OpTime satisfies the requirement right now.
+     *
+     * The tagged-nodes counterpart of getMaxReachedOpTimeForNumNodes().
+     * "durablyWritten" indicates whether the operation has to be durably written.
+     */
+    [[MONGO_MOD_PRIVATE]] OpTime getMaxReachedOpTimeForTaggedNodes(
+        const ReplSetTagPattern& tagPattern, bool durablyWritten);
+
     using MemberPredicate = std::function<bool(const MemberData&)>;
 
     /**
