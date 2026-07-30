@@ -54,7 +54,7 @@ typedef enum {
     WTI_CLAYERED_MODE_SEARCH,      /* search */
     WTI_CLAYERED_MODE_ITERATE,     /* next, prev */
     WTI_CLAYERED_MODE_RANDOM,      /* next_random */
-    WTI_CLAYERED_MODE_SCAN,        /* largest_key */
+    WTI_CLAYERED_MODE_LARGEST_KEY, /* largest_key */
     WTI_CLAYERED_MODE_WRITE        /* reserve, modify, insert, update, remove */
 } WTI_CLAYERED_OP_MODE;
 

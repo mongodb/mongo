@@ -183,6 +183,7 @@ func_ok()
         -e '/int lz4_terminate$/d' \
         -e '/int main$/d' \
         -e '/int message_handler$/d' \
+        -e '/int node_run$/d' \
         -e '/int nop_decompress$/d' \
         -e '/int nop_decrypt$/d' \
         -e '/int nop_error$/d' \

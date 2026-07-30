@@ -346,7 +346,8 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONFIG_ITEM durable_cval, oldest_cval, stable_cval, step_down_cval;
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t durable_ts, oldest_ts, stable_disagg_epoch, stable_ts, step_down_ts;
-    wt_timestamp_t last_oldest_ts, last_stable_disagg_epoch, last_stable_ts;
+    wt_timestamp_t last_durable_ts, last_oldest_ts, last_stable_disagg_epoch, last_stable_ts,
+      current_step_down_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool force, has_durable, has_oldest, has_stable, has_stable_disagg_epoch, has_step_down;
 
@@ -396,7 +397,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     force = cval.val != 0;
 
     /*
-     * The step-down timestamp is only valid on a disaggregated leader and cannot be re-armed while
+     * The step-down timestamp is only valid on a disaggregated leader and cannot be changed while
      * one is already set. These are hard invariants, so validate them even under force.
      */
     if (has_step_down) {
@@ -418,6 +419,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     last_stable_ts = __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp);
     last_stable_disagg_epoch =
       __wt_atomic_load_uint64_relaxed(&txn_global->stable_disaggregated_schema_epoch);
+    current_step_down_ts = __wt_atomic_load_uint64_relaxed(&txn_global->step_down_timestamp);
 
     /*
      * It is an invalid call to set the oldest or stable timestamps or the stable disaggregated
@@ -472,6 +474,49 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
           "set_timestamp: oldest timestamp %s must not be later than stable timestamp %s",
           __wt_timestamp_to_string(oldest_ts, ts_string[0]),
           __wt_timestamp_to_string(stable_ts, ts_string[1]));
+    }
+
+    /*
+     * The step-down timestamp is the boundary the step-down checkpoint is taken at: everything
+     * committed at or before it belongs to stable. Reject a value below the current stable
+     * timestamp, which can never move backwards to meet it, and a value below the newest committed
+     * durable timestamp, whose content already lives in stable above the boundary.
+     */
+    if (has_step_down) {
+        if (__wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp) &&
+          step_down_ts < last_stable_ts) {
+            __wt_readunlock(session, &txn_global->rwlock);
+            WT_RET_MSG(session, EINVAL,
+              "set_timestamp: step down timestamp %s must not be older than the stable timestamp "
+              "%s",
+              __wt_timestamp_to_string(step_down_ts, ts_string[0]),
+              __wt_timestamp_to_string(last_stable_ts, ts_string[1]));
+        }
+        last_durable_ts = __wt_atomic_load_uint64_relaxed(&txn_global->durable_timestamp);
+        if (__wt_atomic_load_bool_relaxed(&txn_global->has_durable_timestamp) &&
+          step_down_ts < last_durable_ts) {
+            __wt_readunlock(session, &txn_global->rwlock);
+            WT_RET_MSG(session, EINVAL,
+              "set_timestamp: step down timestamp %s must not be older than the newest durable "
+              "timestamp %s",
+              __wt_timestamp_to_string(step_down_ts, ts_string[0]),
+              __wt_timestamp_to_string(last_durable_ts, ts_string[1]));
+        }
+    }
+
+    /*
+     * Symmetrically, while the step-down timestamp is set the stable timestamp must not advance
+     * past it, including a later call that raises stable on its own. Stable is the boundary the
+     * step-down checkpoint is taken at, and content above the step-down timestamp belongs to
+     * ingest, not stable. Reaching the step-down timestamp exactly is the goal and is allowed;
+     * overshooting it is not.
+     */
+    if (has_stable && current_step_down_ts != WT_TS_NONE && stable_ts > current_step_down_ts) {
+        __wt_readunlock(session, &txn_global->rwlock);
+        WT_RET_MSG(session, EINVAL,
+          "set_timestamp: stable timestamp %s must not advance past the step down timestamp %s",
+          __wt_timestamp_to_string(stable_ts, ts_string[0]),
+          __wt_timestamp_to_string(current_step_down_ts, ts_string[1]));
     }
 
     __wt_readunlock(session, &txn_global->rwlock);
@@ -531,15 +576,17 @@ set:
     }
 
     /*
-     * The cutover timestamp for a planned step-down: committed writes after it are directed to the
-     * ingest constituent and writes at or before it to the stable constituent. The caller is
-     * expected to step down after setting it, which clears it, so it is only valid on a leader and
-     * cannot be re-armed while one is already set.
+     * Once the step-down timestamp is set, committed writes are directed to the ingest constituent
+     * and everything from before belongs to stable. The application is expected to step down after
+     * setting it, which clears it, so it is only valid on a leader and cannot be changed while set.
      */
     if (has_step_down) {
+        __wt_writelock(session, &txn_global->step_down_lock);
         __wt_atomic_store_uint64_relaxed(&txn_global->step_down_timestamp, step_down_ts);
-        WT_STAT_CONN_INCR(session, txn_set_ts_step_down_upd);
-        __wt_verbose_timestamp(session, step_down_ts, "Updated global step down timestamp");
+        __wt_writeunlock(session, &txn_global->step_down_lock);
+        WT_STAT_CONN_SET(session, txn_stepdown_ts_set, 1);
+        __wt_verbose_info(session, WT_VERB_TIMESTAMP, "Updated global step down timestamp to %s",
+          __wt_timestamp_to_string(step_down_ts, ts_string[0]));
     }
 
     /*
@@ -619,7 +666,7 @@ static int
 __txn_validate_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *commit_tsp)
 {
     WT_TXN *txn;
-    wt_timestamp_t commit_ts, oldest_ts, stable_ts;
+    wt_timestamp_t commit_ts, oldest_ts, stable_ts, step_down_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     txn = session->txn;
@@ -657,6 +704,22 @@ __txn_validate_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *commit
             WT_RET_MSG(session, EINVAL, "commit timestamp %s must be after the stable timestamp %s",
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(stable_ts, ts_string[1]));
+
+        /*
+         * A transaction that began after the step-down timestamp was set commits to the ingest
+         * constituent, which lives strictly above that timestamp, so supplying a commit timestamp
+         * at or below it is a contradiction. A transaction that began before the timestamp was set
+         * passes here: the straddler guard rolls it back at commit, and one racing the set past
+         * that guard carries a timestamp at or below the step-down timestamp, on the stable side of
+         * the boundary.
+         */
+        step_down_ts =
+          __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.step_down_timestamp);
+        if (txn->stepdown_ts_set && commit_ts <= step_down_ts)
+            WT_RET_MSG(session, EINVAL,
+              "commit timestamp %s must be after the step down timestamp %s",
+              __wt_timestamp_to_string(commit_ts, ts_string[0]),
+              __wt_timestamp_to_string(step_down_ts, ts_string[1]));
 
         __txn_assert_after_reads(session, "commit", commit_ts);
     } else {

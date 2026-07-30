@@ -148,7 +148,7 @@ class test_layered_schema13(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.checkpoint_and_advance(100, 2, conn_follow)
         # The create remains at the unpublished sentinel epoch, deferred past any stable epoch.
         self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
-        self.assertFalse(self.uri_in_local_metadata(self.conn, self.uri))
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -242,6 +242,6 @@ class test_layered_schema13(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         _, _, checkpoint_timestamp, _ = self.disagg_get_complete_checkpoint_ext(conn_inspect)
         self.assertEqual(checkpoint_timestamp, 1)
         self.assertFalse(self.uri_in_shared_metadata(conn_inspect, self.uri))
-        self.assertFalse(self.uri_in_local_metadata(conn_inspect, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_inspect, self.uri))
 
         conn_inspect.close('debug=(skip_checkpoint=true)')

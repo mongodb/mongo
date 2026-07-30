@@ -569,10 +569,11 @@ err:
 
 /*
  * __disagg_handle_create_remove_pairing --
- *     Handle CREATE/REMOVE pairing detection during queue processing. If the entry is a CREATE with
- *     no stable value, park it in the skipped list and return true (caller should continue). If the
- *     entry is a REMOVE that cancels a parked CREATE, free both and return true. Otherwise return
- *     false.
+ *     Resolve a follower-side CREATE/REMOVE pair during queue processing. A CREATE with no stable
+ *     value is follower-side: the stable constituent is built only on step-up, so a leader CREATE
+ *     always has a stable value and is written normally. Park such a follower CREATE and return
+ *     true (caller should continue); when its matching REMOVE arrives, free both and return true.
+ *     Otherwise return false.
  */
 static bool
 __disagg_handle_create_remove_pairing(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn,
@@ -1029,6 +1030,14 @@ __disagg_step_up(WT_SESSION_IMPL *session)
     __wt_timing_stress(session, WT_TIMING_STRESS_DISAGG_ROLE_TRANSITION, &tsp);
 
     /*
+     * The step-down timestamp never survives into a step-up: completing the step-down is the only
+     * way it clears, so finding it set here means the role state machine was violated.
+     */
+    WT_ASSERT_ALWAYS(session,
+      __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) == WT_TS_NONE,
+      "stepping up while the step-down timestamp is set");
+
+    /*
      * Step up to the leader mode. We need to do this first, because the rest of the operations
      * below depend on WiredTiger already being in the leader mode.
      */
@@ -1164,6 +1173,8 @@ __disagg_step_down(WT_SESSION_IMPL *session)
     struct timespec tsp;
     WT_DECL_RET;
     WT_SHARED_DSK_CACHE *shared_dsk_cache;
+    wt_timestamp_t stable_ts, step_down_ts;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     WT_CONNECTION_IMPL *conn = S2C(session);
     F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
@@ -1202,8 +1213,33 @@ __disagg_step_down(WT_SESSION_IMPL *session)
     if (shared_dsk_cache->hash != NULL)
         __wt_atomic_store_uint8_release(&shared_dsk_cache->state, WT_DSK_CACHE_ACTIVE);
 
-    /* Clear the step-down timestamp after stepping down. */
+    /*
+     * If a step-down timestamp was set, the step-down checkpoint must have landed exactly on it:
+     * the application advances stable to the step-down timestamp so the checkpoint holds everything
+     * up to that point and nothing newer. A mismatch means the checkpoint captured a different
+     * boundary than the one writes were split on; advancing stable is the application's
+     * responsibility, so treat a mismatch as a fatal protocol violation.
+     */
+    step_down_ts = __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp);
+    if (step_down_ts != WT_TS_NONE) {
+        stable_ts = __wt_get_stable_timestamp(session);
+        WT_ASSERT_ALWAYS(session, stable_ts == step_down_ts,
+          "stable timestamp %s does not match the step down timestamp %s at step down",
+          __wt_timestamp_to_string(stable_ts, ts_string[0]),
+          __wt_timestamp_to_string(step_down_ts, ts_string[1]));
+    }
+
+    /*
+     * Clear the step-down timestamp. No write transaction runs concurrently with the step-down, but
+     * the lock is still required for readers: transaction begin reads the step-down timestamp under
+     * it, so a transaction that sees the timestamp cleared is guaranteed to also see the earlier
+     * switch of the role to follower. Without that ordering a reader could observe the stale leader
+     * role with no step-down timestamp and read only stable, missing ingest content.
+     */
+    __wt_writelock(session, &conn->txn_global.step_down_lock);
     __wt_atomic_store_uint64_relaxed(&conn->txn_global.step_down_timestamp, WT_TS_NONE);
+    __wt_writeunlock(session, &conn->txn_global.step_down_lock);
+    WT_STAT_CONN_SET(session, txn_stepdown_ts_set, 0);
 
 err:
     WT_STAT_CONN_SET(session, disagg_step_down_in_progress, 0);

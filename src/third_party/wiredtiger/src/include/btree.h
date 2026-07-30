@@ -346,6 +346,7 @@ struct __wt_btree {
     u_int evict_walk_skips;                    /* Number of walks skipped */
     wt_shared int32_t evict_disabled;          /* Eviction disabled count */
     bool evict_disabled_open;                  /* Eviction disabled on open */
+    bool evict_walk_dominating;                /* Current walk overrode the walk period */
     wt_shared volatile uint32_t evict_busy;    /* Count of threads in eviction */
     wt_shared volatile uint32_t prefetch_busy; /* Count of threads in prefetch */
     WT_EVICT_WALK_TYPE evict_start_type;

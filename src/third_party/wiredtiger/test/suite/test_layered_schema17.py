@@ -92,21 +92,6 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.set_stable_epoch(epoch)
         self.leader_checkpoint(stable_ts)
 
-    def uri_layered_in_local_metadata(self, conn, uri):
-        """
-        Return True if the layered: entry is present in conn's local metadata.
-
-        Unlike uri_in_local_metadata, this does not rely on the stable constituent,
-        which follower-created tables lack until step-up.
-        """
-        session = conn.open_session('')
-        cursor = session.open_cursor('metadata:')
-        cursor.set_key(uri)
-        found = cursor.search() == 0
-        cursor.close()
-        session.close()
-        return found
-
     def run_panic_subprocess(self, name):
         """
         Run subprocess_<name> in a subprocess and assert it died from the strict
@@ -130,14 +115,14 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         session_follow.close()
 
         # The startup pickup created uri locally, so the next pickup sees matched sets.
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 
         self.leader_checkpoint_at_epoch(21, 2)
         # The advance passes only checkpoint_meta, so strict mode must remain on (sticky).
         self.disagg_advance_checkpoint(conn_follow)
 
         self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri))
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -156,7 +141,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.disagg_advance_checkpoint(conn_follow)
 
         # uri2 survives locally and never reaches shared metadata.
-        self.assertTrue(self.uri_layered_in_local_metadata(conn_follow, self.uri2))
+        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
         self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri2))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
@@ -177,7 +162,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.leader_checkpoint_at_epoch(30, 2)
         self.disagg_advance_checkpoint(conn_follow)
 
-        self.assertTrue(self.uri_layered_in_local_metadata(conn_follow, self.uri2))
+        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
         self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri2))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
@@ -200,7 +185,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.disagg_advance_checkpoint(conn_follow)
 
         self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri))
-        self.assertFalse(self.uri_layered_in_local_metadata(conn_follow, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
         self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
@@ -379,8 +364,8 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.conn.reconfigure('disaggregated=(strict_checkpoint_metadata=true)')
         self.disagg_advance_checkpoint(self.conn, conn_lead)
 
-        self.assertTrue(self.uri_layered_in_local_metadata(self.conn, self.uri))
-        self.assertFalse(self.uri_layered_in_local_metadata(self.conn, self.uri2))
+        self.assertTrue(self.uri_in_local_metadata(self.conn, self.uri, leader=True))
+        self.assertFalse(self.uri_in_local_metadata(self.conn, self.uri2, leader=True))
         self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri2))
 
         conn_lead.close('debug=(skip_checkpoint=true)')
@@ -406,7 +391,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.disagg_advance_checkpoint(conn_follow)
 
         self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri2))
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri2))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -429,6 +414,6 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.disagg_advance_checkpoint(conn_follow)
 
         self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri2))
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri2))
 
         conn_follow.close('debug=(skip_checkpoint=true)')

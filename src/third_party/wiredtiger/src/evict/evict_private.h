@@ -16,6 +16,12 @@
 #define WTI_EVICT_WALK_BASE 300         /* Pages tracked across file visits */
 #define WTI_EVICT_WALK_INCR 100         /* Pages added each walk */
 
+/*
+ * The walk period doubles on every unproductive walk of a tree, so saturation means the tree has
+ * been unproductive for many consecutive walks.
+ */
+#define WTI_EVICT_WALK_PERIOD_MAX 100 /* Ceiling on walks skipped for one tree */
+
 /* True if there are eviction worker threads beyond the server thread itself. */
 #define WT_EVICT_HAS_WORKERS(s) \
     (__wt_atomic_load_uint32_relaxed(&S2C(s)->evict_config.threads.current_threads) > 1)

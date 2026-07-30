@@ -139,6 +139,13 @@ __schema_layered_ingest_worker_verify(WT_SESSION_IMPL *session, const char *inge
     if (!conn->layered_table_manager.leader)
         return (0);
 
+    /*
+     * While a step-down timestamp is set, the leader directs writes to ingest, so it is expected to
+     * hold the post-cutoff content rather than be empty.
+     */
+    if (__wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)
+        return (0);
+
     /* The ingest table on a leader has to be empty. Use a standard cursor to verify this. */
     const char *cursor_config[] = {
       WT_CONFIG_BASE(session, WT_SESSION_open_cursor), "readonly", NULL, NULL};

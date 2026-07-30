@@ -818,7 +818,7 @@ class DisaggSchemaEpochMixin:
         session.close()
         return found
 
-    def uri_in_local_metadata(self, conn, uri):
+    def uri_stable_exists(self, conn, uri):
         """Return True if uri's stable constituent is present in conn's local metadata."""
         session = conn.open_session('')
         exists = True
@@ -829,6 +829,29 @@ class DisaggSchemaEpochMixin:
             exists = False
         session.close()
         return exists
+
+    def uri_in_local_metadata(self, conn, uri, leader=False):
+        """
+        Return True if uri is present in conn's local metadata.
+
+        On a follower, checks the ingest constituent. On a leader, checks both the ingest and
+        stable constituents.
+        """
+        tablename = uri[len('layered:'):]
+        session = conn.open_session('')
+        cursor = session.open_cursor('metadata:')
+        if leader:
+            cursor.set_key('file:' + tablename + '.wt_ingest')
+            ingest_found = cursor.search() == 0
+            cursor.set_key('file:' + tablename + '.wt_stable')
+            stable_found = cursor.search() == 0
+            found = ingest_found and stable_found
+        else:
+            cursor.set_key('file:' + tablename + '.wt_ingest')
+            found = cursor.search() == 0
+        cursor.close()
+        session.close()
+        return found
 
     def open_follower(self):
         """Open a follower, pick up the latest leader checkpoint, and open a session on it."""

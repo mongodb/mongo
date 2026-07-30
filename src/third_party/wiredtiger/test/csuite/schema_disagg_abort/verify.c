@@ -1,35 +1,22 @@
 /*-
- * Public Domain 2014-present MongoDB, Inc.
- * Public Domain 2008-2014 WiredTiger, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
+ *	All rights reserved.
  *
- * This is free and unencumbered software released into the public domain.
- *
- * Anyone is free to copy, modify, publish, use, compile, sell, or
- * distribute this software, either in source code form or as a compiled
- * binary, for any purpose, commercial or non-commercial, and by any
- * means.
- *
- * In jurisdictions that recognize copyright laws, the author or authors
- * of this software dedicate any and all copyright interest in the
- * software to the public domain. We make this dedication for the benefit
- * of the public at large and to the detriment of our heirs and
- * successors. We intend this dedication to be an overt act of
- * relinquishment in perpetuity of all present and future rights to this
- * software under copyright law.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * See the file LICENSE for redistribution information.
+ */
+
+/*
+ * Verification: run by the parent after recovery. Replays the record files against the recovered
+ * database state.
  */
 
 #include "schema_disagg_abort.h"
 
-/* No durable insert was recorded for the slot's last create. */
-#define DATA_COMMIT_TS_NONE UINT64_MAX
+/*
+ * No durable insert was recorded for the slot's last create.
+ */
+#define DATA_COMMIT_TS_NONE WT_TS_NONE
 
 /* The last durable create or drop recorded for one URI slot, and its inserted data if any. */
 typedef struct {
@@ -39,13 +26,26 @@ typedef struct {
     uint32_t key_max;
     bool is_create;
     bool valid;
-    /*
-     * FIXME-WT-18099: A create or drop above the recovered epoch churns the reused URI. After
-     * recovery the slot no longer matches its durable state, so a dropped table can reappear or a
-     * durable create can read back empty. Skip verifying it.
-     */
-    bool churned_past_durable;
+    char uri[64]; /* filled when valid, so the checks need not rebuild it */
 } SLOT_STATE;
+
+/*
+ * parse_record_uri --
+ *     Parse and filter one record's URI: true when it belongs to the given node and thread and its
+ *     slot is inside the pool, reporting the slot.
+ */
+static bool
+parse_record_uri(
+  const char *rec_uri, uint32_t node, uint32_t t, uint32_t pool_size, uint32_t *slotp)
+{
+    uint32_t n2, s, t2;
+
+    if (sscanf(rec_uri, SCHEMA_TABLE_FMT, &n2, &t2, &s) != 3 || n2 != node || t2 != t ||
+      s >= pool_size)
+        return (false);
+    *slotp = s;
+    return (true);
+}
 
 /*
  * parse_schema_records --
@@ -55,40 +55,41 @@ typedef struct {
  *     threads.
  */
 static void
-parse_schema_records(const char *fname, uint32_t t, uint64_t durable_epoch,
+parse_schema_records(const char *fname, uint32_t node, uint32_t t, uint64_t durable_epoch,
   SLOT_STATE states[MAX_POOL_SIZE], uint32_t pool_size)
 {
     FILE *fp;
-    uint64_t commit_ts, entry_epoch;
-    uint32_t key_max, key_min, s, t2;
-    char line[256], op[16], rec_uri[128];
+    testutil_assert_errno((fp = fopen(fname, "r")) != NULL);
 
-    for (s = 0; s < pool_size; s++) {
-        states[s].epoch = 0;
-        states[s].commit_ts = DATA_COMMIT_TS_NONE;
-        states[s].key_min = states[s].key_max = 0;
-        states[s].is_create = false;
-        states[s].valid = false;
-        states[s].churned_past_durable = false;
-    }
-
-    if ((fp = fopen(fname, "r")) == NULL)
-        return;
-
+    /* Zero state is fully valid: invalid slot, no durable insert (DATA_COMMIT_TS_NONE). */
+    memset(states, 0, sizeof(SLOT_STATE) * pool_size);
+    char line[256];
     while (fgets(line, sizeof(line), fp) != NULL) {
+        char op[16];
         if (sscanf(line, "%15s", op) != 1)
             continue;
 
+        uint64_t entry_epoch;
+        uint32_t s;
+        char rec_uri[128];
+
         if (strcmp(op, "INSERT") == 0) {
-            if (sscanf(line, "%*s %" SCNu64 " %" SCNu64 " %" SCNu32 " %" SCNu32 " %127s",
-                  &entry_epoch, &commit_ts, &key_min, &key_max, rec_uri) != 5)
+            uint64_t commit_ts;
+            uint32_t key_max, key_min;
+            if (sscanf(line, "%*s %" SCNu64 " %" SCNu32 " %" SCNu32 " %127s", &commit_ts, &key_min,
+                  &key_max, rec_uri) != 4)
                 continue;
-            if (entry_epoch > durable_epoch)
+            if (commit_ts > durable_epoch)
                 continue;
-            if (sscanf(rec_uri, SCHEMA_TABLE_FMT, &t2, &s) != 2 || t2 != t || s >= pool_size)
+            if (!parse_record_uri(rec_uri, node, t, pool_size, &s))
                 continue;
-            /* The insert belongs to the slot's current create. */
-            if (states[s].valid && states[s].is_create && states[s].epoch == entry_epoch) {
+            /*
+             * The insert belongs to the slot's current create: the per-thread records are in apply
+             * order and an insert immediately follows its create. A cut-off create cannot capture a
+             * stray insert - a commit's value always exceeds its table's create epoch, so the
+             * durability cutoff above already dropped the insert too.
+             */
+            if (states[s].valid && states[s].is_create) {
                 states[s].commit_ts = commit_ts;
                 states[s].key_min = key_min;
                 states[s].key_max = key_max;
@@ -98,17 +99,16 @@ parse_schema_records(const char *fname, uint32_t t, uint64_t durable_epoch,
 
         if (sscanf(line, "%*s %" SCNu64 " %127s", &entry_epoch, rec_uri) != 2)
             continue;
-        if (sscanf(rec_uri, SCHEMA_TABLE_FMT, &t2, &s) != 2 || t2 != t || s >= pool_size)
+        if (!parse_record_uri(rec_uri, node, t, pool_size, &s))
             continue;
-        if (entry_epoch > durable_epoch) {
-            states[s].churned_past_durable = true;
+        if (entry_epoch > durable_epoch)
             continue;
-        }
         if (entry_epoch > states[s].epoch) {
             states[s].epoch = entry_epoch;
             states[s].commit_ts = DATA_COMMIT_TS_NONE;
             states[s].is_create = (strcmp(op, "CREATE") == 0);
             states[s].valid = true;
+            testutil_snprintf(states[s].uri, sizeof(states[s].uri), "%s", rec_uri);
         }
     }
     (void)fclose(fp);
@@ -117,47 +117,33 @@ parse_schema_records(const char *fname, uint32_t t, uint64_t durable_epoch,
 /*
  * check_schema_presence --
  *     For each slot with a durable record, assert that a table whose last operation was a create
- *     still exists and one whose last operation was a drop is absent. Returns the number of slots
- *     skipped for FIXME-WT-18099.
+ *     still exists and one whose last operation was a drop is absent.
  */
-static uint32_t
+static void
 check_schema_presence(
-  WT_SESSION *session, uint32_t t, const SLOT_STATE states[MAX_POOL_SIZE], uint32_t pool_size)
+  WT_SESSION *session, const SLOT_STATE states[MAX_POOL_SIZE], uint32_t pool_size)
 {
-    WT_CURSOR *md_cursor;
-    WT_DECL_RET;
-    uint32_t s, skipped;
-    char uri[64];
-
-    skipped = 0;
-
     /* Validate presence against the metadata entry rather than instantiating each table. */
+    WT_CURSOR *md_cursor;
     testutil_check(session->open_cursor(session, "metadata:", NULL, NULL, &md_cursor));
 
-    for (s = 0; s < pool_size; s++) {
+    for (uint32_t s = 0; s < pool_size; s++) {
         if (!states[s].valid)
             continue;
-        /* FIXME-WT-18099: A create above the recovered epoch resurrects a dropped table. */
-        if (!states[s].is_create && states[s].churned_past_durable) {
-            ++skipped;
-            continue;
-        }
 
-        testutil_snprintf(uri, sizeof(uri), SCHEMA_TABLE_FMT, t, s);
-        md_cursor->set_key(md_cursor, uri);
-        ret = md_cursor->search(md_cursor);
+        md_cursor->set_key(md_cursor, states[s].uri);
+        const int ret = md_cursor->search(md_cursor);
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
 
         if (states[s].is_create)
             testutil_assertfmt(ret == 0, "%s missing after recovery (CREATE at epoch %" PRIu64 ")",
-              uri, states[s].epoch);
+              states[s].uri, states[s].epoch);
         else
             testutil_assertfmt(
-              ret == WT_NOTFOUND, "%s present after recovery (last op was DROP)", uri);
+              ret == WT_NOTFOUND, "%s present after recovery (last op was DROP)", states[s].uri);
     }
 
     testutil_check(md_cursor->close(md_cursor));
-    return (skipped);
 }
 
 /*
@@ -167,94 +153,146 @@ check_schema_presence(
  *     Slots with no durable insert record, or whose data commit timestamp exceeds last_ckpt_ts, are
  *     skipped.
  */
-static uint32_t
-check_data_rows(WT_SESSION *session, uint32_t t, const SLOT_STATE states[MAX_POOL_SIZE],
-  uint32_t pool_size, uint64_t last_ckpt_ts)
+static void
+check_data_rows(WT_SESSION *session, const SLOT_STATE states[MAX_POOL_SIZE], uint32_t pool_size,
+  uint64_t last_ckpt_ts)
 {
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    uint32_t r, s, skipped;
-    char expected_val[32], key_buf[16], uri[64];
-    const char *actual_val;
-
-    skipped = 0;
-    for (s = 0; s < pool_size; s++) {
+    for (uint32_t s = 0; s < pool_size; s++) {
         if (!states[s].valid || !states[s].is_create)
             continue;
-        /* FIXME-WT-18099: The URI was churned above the recovered epoch, so its data is unreliable.
-         */
-        if (states[s].churned_past_durable) {
-            ++skipped;
-            continue;
-        }
         if (states[s].commit_ts == DATA_COMMIT_TS_NONE)
             continue;
         if (last_ckpt_ts > 0 && states[s].commit_ts > last_ckpt_ts)
             continue;
 
-        testutil_snprintf(uri, sizeof(uri), SCHEMA_TABLE_FMT, t, s);
-        testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
+        WT_CURSOR *cursor;
+        testutil_check(session->open_cursor(session, states[s].uri, NULL, NULL, &cursor));
 
-        testutil_snprintf(expected_val, sizeof(expected_val), "%" PRIu64, states[s].epoch);
-        for (r = states[s].key_min; r <= states[s].key_max; r++) {
+        /* Rows are valued with their commit timestamp; a mismatch means another generation's
+         * data. */
+        char expected_val[32];
+        testutil_snprintf(expected_val, sizeof(expected_val), "%" PRIu64, states[s].commit_ts);
+        for (uint32_t r = states[s].key_min; r <= states[s].key_max; r++) {
+            char key_buf[16];
             testutil_snprintf(key_buf, sizeof(key_buf), "%" PRIu32, r);
             cursor->set_key(cursor, key_buf);
-            ret = cursor->search(cursor);
-            testutil_assertfmt(ret == 0, "%s key %s: %s (epoch %" PRIu64 ")", uri, key_buf,
-              ret == WT_NOTFOUND ? "missing" : wiredtiger_strerror(ret), states[s].epoch);
+            const int ret = cursor->search(cursor);
+            testutil_assertfmt(ret == 0, "%s key %s: %s (epoch %" PRIu64 ")", states[s].uri,
+              key_buf, ret == WT_NOTFOUND ? "missing" : wiredtiger_strerror(ret), states[s].epoch);
+
+            const char *actual_val;
             testutil_check(cursor->get_value(cursor, &actual_val));
             testutil_assertfmt(strcmp(actual_val, expected_val) == 0, "%s key %s: got %s want %s",
-              uri, key_buf, actual_val, expected_val);
+              states[s].uri, key_buf, actual_val, expected_val);
         }
         testutil_check(cursor->close(cursor));
     }
-    return (skipped);
 }
 
 /*
  * verify_schema_state --
  *     Verify schema and data state after recovery.
  *
- * Reads the per-thread schema record files and takes last_disaggregated_schema_epoch as the highest
- *     durable schema epoch. Asserts that every table whose last durable operation was a create
- *     exists and holds the right rows, and every one last dropped is gone. Aborts on the first
- *     mismatch.
+ * Reads every node's per-thread leader record files (each node logs only its own operations while
+ *     it leads; the shared page log makes all of them visible to any recovered node) and takes
+ *     last_disaggregated_schema_epoch as the highest durable schema epoch. Asserts that every table
+ *     whose last durable operation was a create exists and holds the right rows, and every one last
+ *     dropped is gone. Aborts on the first mismatch.
  */
 void
-verify_schema_state(WT_CONNECTION *conn, TEST_CONFIG *cfg)
+verify_schema_state(WT_CONNECTION *conn, const TEST_CONFIG *cfg)
 {
-    SLOT_STATE states[MAX_POOL_SIZE];
-    WT_SESSION *session;
-    uint64_t durable_epoch, last_ckpt_ts;
-    char fname[128], ts_buf[64];
-    uint32_t presence_skipped, data_skipped, t;
-
-    presence_skipped = data_skipped = 0;
-    durable_epoch = 0;
-    testutil_check(conn->query_timestamp(conn, ts_buf, "get=last_disaggregated_schema_epoch"));
-    (void)sscanf(ts_buf, "%" SCNx64, &durable_epoch);
-    printf("Schema verify: last_disaggregated_schema_epoch = %" PRIu64 "\n", durable_epoch);
-    if (durable_epoch == 0)
-        testutil_die(EINVAL, "last_disaggregated_schema_epoch is 0 after recovery");
-
-    last_ckpt_ts = 0;
-    (void)conn->query_timestamp(conn, ts_buf, "get=last_checkpoint");
-    (void)sscanf(ts_buf, "%" SCNx64, &last_ckpt_ts);
-    printf("Schema verify: last_checkpoint_timestamp = %" PRIu64 "\n", last_ckpt_ts);
-
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    for (t = 0; t < cfg->nth; t++) {
-        testutil_snprintf(fname, sizeof(fname), SCHEMA_RECORDS_FILE, t);
-        parse_schema_records(fname, t, durable_epoch, states, cfg->pool_size);
-        presence_skipped += check_schema_presence(session, t, states, cfg->pool_size);
-        data_skipped += check_data_rows(session, t, states, cfg->pool_size, last_ckpt_ts);
+    const uint64_t durable_epoch = query_ts(conn, "last_disaggregated_schema_epoch");
+    println("Schema verify: last_disaggregated_schema_epoch = %" PRIu64, durable_epoch);
+    /* Nothing durable means no record is below the cutoff, so there is nothing to check. */
+    if (durable_epoch == 0) {
+        println("Schema verify: nothing durable, no expectations to check");
+        return;
     }
 
-    /* Surface how much coverage the WT-18099 pick-up gap costs this run. */
-    printf("Schema verify: skipped %" PRIu32 " presence and %" PRIu32
-           " data checks for churned-above-epoch slots (FIXME-WT-18099)\n",
-      presence_skipped, data_skipped);
+    const uint64_t last_ckpt_ts = query_ts(conn, "last_checkpoint");
+    println("Schema verify: last_checkpoint_timestamp = %" PRIu64, last_ckpt_ts);
+
+    WT_SESSION *session;
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+    for (uint32_t n = 0; n < MAX_NODES; n++)
+        for (uint32_t t = 0; t < cfg->nth; t++) {
+            char fname[128];
+            testutil_snprintf(fname, sizeof(fname), LEADER_RECORDS_FILE, n, t);
+
+            /*
+             * A missing record file means there are no expectations to verify for this thread:
+             * record files are created lazily, so a thread that never got to operate (or a node
+             * that never led) leaves none.
+             */
+            if (!testutil_exists(NULL, fname))
+                continue;
+
+            SLOT_STATE states[MAX_POOL_SIZE];
+            parse_schema_records(fname, n, t, durable_epoch, states, cfg->pool_size);
+            check_schema_presence(session, states, cfg->pool_size);
+            check_data_rows(session, states, cfg->pool_size, last_ckpt_ts);
+        }
 
     testutil_check(session->close(session, NULL));
+}
+
+/*
+ * verify_relay_prefix --
+ *     Check the integrity of the event relay: everything a node recorded while following must be an
+ *     exact prefix of what its peer recorded while leading, per thread.
+ *
+ * The leader writes its own record before relaying the event, and the pipe preserves order, so any
+ *     divergence or reordering is a relay bug. A SIGKILL can truncate the recorder's final line, so
+ *     a partial trailing line is accepted if it is a prefix of the peer's line.
+ */
+void
+verify_relay_prefix(const TEST_CONFIG *cfg)
+{
+    uint32_t checked = 0;
+    for (uint32_t n = 0; n < MAX_NODES; n++)
+        for (uint32_t t = 0; t < cfg->nth; t++) {
+            char follower_fname[128], leader_fname[128];
+            testutil_snprintf(follower_fname, sizeof(follower_fname), FOLLOWER_RECORDS_FILE, n, t);
+            testutil_snprintf(leader_fname, sizeof(leader_fname), LEADER_RECORDS_FILE, 1 - n, t);
+
+            /* No relay file means no events were relayed for this thread; nothing to check. */
+            if (!testutil_exists(NULL, follower_fname))
+                continue;
+            testutil_assertfmt(testutil_exists(NULL, leader_fname),
+              "%s exists but the peer's %s does not", follower_fname, leader_fname);
+
+            FILE *ffp, *sfp;
+            testutil_assert_errno((ffp = fopen(follower_fname, "r")) != NULL);
+            testutil_assert_errno((sfp = fopen(leader_fname, "r")) != NULL);
+
+            char fline[256], sline[256];
+            uint32_t lineno = 0;
+            while (fgets(fline, sizeof(fline), ffp) != NULL) {
+                ++lineno;
+                testutil_assertfmt(fgets(sline, sizeof(sline), sfp) != NULL,
+                  "%s line %" PRIu32 " has no counterpart in %s", follower_fname, lineno,
+                  leader_fname);
+
+                const size_t flen = strlen(fline);
+                if (flen > 0 && fline[flen - 1] == '\n')
+                    testutil_assertfmt(strcmp(fline, sline) == 0,
+                      "%s diverges from %s at line %" PRIu32 ": \"%s\" vs \"%s\"", follower_fname,
+                      leader_fname, lineno, fline, sline);
+                else
+                    /* Partial trailing line: the recorder was killed mid-write. */
+                    testutil_assertfmt(strncmp(sline, fline, flen) == 0,
+                      "%s truncated line %" PRIu32 " is not a prefix of %s: \"%s\" vs \"%s\"",
+                      follower_fname, lineno, leader_fname, fline, sline);
+            }
+
+            (void)fclose(ffp);
+            (void)fclose(sfp);
+            ++checked;
+        }
+
+    println("Relay verify: %" PRIu32
+            " follower record files are prefixes of the peer's leader records",
+      checked);
 }

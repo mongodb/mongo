@@ -29,6 +29,8 @@
 #define WT_TXN_ROLLBACK_REASON_CONFLICT "Write conflict between concurrent operations"
 #define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
     "Transaction has the oldest pinned transaction ID"
+#define WT_TXN_ROLLBACK_REASON_STEP_DOWN \
+    "Write transaction straddled the step-down timestamp setting boundary"
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TXN_LOG_CKPT_CLEANUP 0x01u
@@ -213,6 +215,14 @@ struct __wt_txn_global {
 
     /* Protects logging, checkpoints and transaction visibility. */
     WT_RWLOCK visibility_rwlock;
+
+    /*
+     * Protects the step-down timestamp: writers set or clear it, readers sample it at transaction
+     * begin and check it when a write transaction commits. A committing write transaction either
+     * observes the timestamp and rolls back, or its writes happen before the timestamp store and
+     * are visible to every transaction that begins with the timestamp set.
+     */
+    WT_RWLOCK step_down_lock;
 
     /*
      * Track information about the running checkpoint. The transaction snapshot used when
@@ -417,6 +427,13 @@ struct __wt_txn {
      * on the public list of committed timestamps.
      */
     wt_timestamp_t first_commit_timestamp;
+
+    /*
+     * True if the step-down timestamp was set when this transaction began. Used to redirect the
+     * transaction's writes to the ingest constituent, to include ingest in its reads, and to detect
+     * straddlers.
+     */
+    bool stepdown_ts_set;
 
     /*
      * Timestamps used for reading via a checkpoint cursor instead of txn_shared->read_timestamp and

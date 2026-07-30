@@ -953,7 +953,8 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
         F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
     F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
     if (ret != 0)
-        __wt_err(session, ret, "unable to read root page from %s", session->dhandle->name);
+        __wt_err(session, ret, "unable to read root page from %s (address %s)",
+          session->dhandle->name, (const char *)tmp->data);
     /*
      * Failure to open metadata means that the database is unavailable. Try to provide a helpful
      * failure message.

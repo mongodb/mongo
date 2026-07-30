@@ -417,7 +417,8 @@ __checkpoint_disagg_maybe_publish(WT_SESSION_IMPL *session, WT_BTREE *btree)
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
     WT_DISAGG_METADATA_OP *entry;
-    wt_timestamp_t ckpt_epoch, ckpt_timestamp;
+    WT_SHARED_METADATA_OP latest_op;
+    wt_timestamp_t ckpt_epoch, ckpt_timestamp, latest_epoch;
     bool published;
 
     conn = S2C(session);
@@ -430,15 +431,25 @@ __checkpoint_disagg_maybe_publish(WT_SESSION_IMPL *session, WT_BTREE *btree)
     if (ckpt_epoch == WT_SCHEMA_EPOCH_NONE)
         return (0);
 
-    published = false;
+    /*
+     * Publish only when the table's latest create/remove is a CREATE at or below the checkpoint's
+     * schema epoch.
+     *
+     * FIXME-WT-18187: This walks the whole queue once per awaiting-publish btree. Caching the
+     * create schema epoch on WT_BTREE would make this an O(1) field read.
+     */
+    latest_op = WT_SHARED_METADATA_NONE;
+    latest_epoch = WT_SCHEMA_EPOCH_NONE;
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
     TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q)
-        if (entry->metadata_op == WT_SHARED_METADATA_CREATE &&
-          strcmp(entry->stable_uri, dhandle->name) == 0 && entry->schema_epoch <= ckpt_epoch) {
-            published = true;
-            break;
+        if (entry->metadata_op != WT_SHARED_METADATA_UPDATE &&
+          strcmp(entry->stable_uri, dhandle->name) == 0) {
+            latest_op = entry->metadata_op;
+            latest_epoch = entry->schema_epoch;
         }
     __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
+    published = latest_op == WT_SHARED_METADATA_CREATE && latest_epoch <= ckpt_epoch;
 
     if (!published) {
         ckpt_timestamp = conn->txn_global.checkpoint_timestamp;

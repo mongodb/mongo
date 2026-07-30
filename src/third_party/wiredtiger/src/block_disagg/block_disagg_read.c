@@ -38,7 +38,8 @@ err:
 
 /*
  * __block_disagg_read_err --
- *     Print a block disagg read error context in a standard way.
+ *     Print a block disagg read error context in a standard way. When the caller expects and
+ *     tolerates corruption, report at read-verbose level instead of dropping the context entirely.
  */
 static void
 __block_disagg_read_err(WT_SESSION_IMPL *session, const char *name, uint64_t table_id,
@@ -67,11 +68,20 @@ err:
     }
     va_end(args);
 
-    __wt_errx(session,
-      "%s: read error for %" PRIu32
-      "B block at "
-      "page %" PRIu64 ", lsn %" PRIu64 ", table_id %" PRIu64 ", %s, %s",
-      name, size, page_id, lsn, table_id, page_desc, context_msg);
+    /*
+     * Build the message once: the two sinks differ only in where the text goes. Truncation is
+     * harmless here and a failure return has nowhere useful to go, so the result is ignored.
+     */
+    char msg[1024];
+    WT_IGNORE_RET(__wt_snprintf(msg, sizeof(msg),
+      "%s: read error for %" PRIu32 "B block at page %" PRIu64 ", lsn %" PRIu64
+      ", table_id %" PRIu64 ", %s, %s",
+      name, size, page_id, lsn, table_id, page_desc, context_msg));
+
+    if (F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
+        __wt_verbose_debug1(session, WT_VERB_READ, "%s", msg);
+    else
+        __wt_errx(session, "%s", msg);
 }
 
 /*
@@ -266,12 +276,11 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
                 continue;
             }
 
-            if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
-                __block_disagg_read_err(session, block_disagg->name, block_disagg->tableid, size,
-                  page_id, lsn, is_delta, result,
-                  "calculated checksum of %" PRIx32 " doesn't match expected checksum of %" PRIx32,
-                  swap.checksum, checksum);
-        } else if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
+            __block_disagg_read_err(session, block_disagg->name, block_disagg->tableid, size,
+              page_id, lsn, is_delta, result,
+              "calculated checksum of %" PRIx32 " doesn't match expected checksum of %" PRIx32,
+              swap.checksum, checksum);
+        } else
             __block_disagg_read_err(session, block_disagg->name, block_disagg->tableid, size,
               page_id, lsn, is_delta, result,
               "header checksum of %" PRIx32 " doesn't match expected checksum of %" PRIx32,

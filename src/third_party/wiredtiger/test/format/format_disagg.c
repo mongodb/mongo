@@ -418,11 +418,16 @@ disagg_switch_roles(void)
     } else {
         /* Stepping up: [follower -> leader] */
         track("[role change] follower -> leader", 0ULL);
-        testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=leader)"));
 
-        /* Advance timestamps to cover all in-memory commits from the follower phase. */
+        /*
+         * Push stable past the follower phase's commits before stepping up; otherwise eviction
+         * couldn't reconcile pages holding updates newer than stable, and those pages would stay
+         * pinned in cache during step-up.
+         */
         timestamp_sync_threads_commit_ts();
         timestamp_once(session, false, false);
+
+        testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=leader)"));
         testutil_check(session->checkpoint(session, NULL));
 
         /* Verify that this step-up checkpoint persisted the correct KEK. */

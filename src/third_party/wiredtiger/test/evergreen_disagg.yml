@@ -658,8 +658,9 @@ variables:
             build_dir=$(cd ../../../ && pwd)
             for i in $(seq ${times|10}); do
               echo "Iteration $i/${times|10}"
-              # Max out pool size (-s) and schema threads (-T) for maximum schema churn.
-              ./test_schema_disagg_abort -b "$build_dir" -s 64 -T 12 -t 300
+              # One node leading throughout. Max out the schema threads (-T) and the per-thread
+              # URI pool (-u) for maximum schema churn.
+              ./test_schema_disagg_abort -b "$build_dir" -r l -T 12 -u 64 -t 300
             done
 
   - &schema-disagg-abort-switch-test-disagg
@@ -679,8 +680,140 @@ variables:
             build_dir=$(cd ../../../ && pwd)
             for i in $(seq ${times|10}); do
               echo "Iteration $i/${times|10}"
-              # Switch mode (-m) exercises a random role switch mid-workload before the crash.
-              ./test_schema_disagg_abort -b "$build_dir" -s 64 -T 12 -t 300 -m
+              # One node stepping down and back up every 30 seconds (-s).
+              ./test_schema_disagg_abort -b "$build_dir" -r l -s 30 -T 12 -u 64 -t 300
+            done
+
+  - &schema-disagg-abort-crash-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            build_dir=$(cd ../../../ && pwd)
+            for i in $(seq ${times|10}); do
+              echo "Iteration $i/${times|10}"
+              # SIGKILL the lone node at 150s (-k), then recover and verify at the timeout.
+              ./test_schema_disagg_abort -b "$build_dir" -r l -k 150 -T 12 -u 64 -t 300
+            done
+
+  - &schema-disagg-abort-multi-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            build_dir=$(cd ../../../ && pwd)
+            for i in $(seq ${times|10}); do
+              echo "Iteration $i/${times|10}"
+              # Leader and follower (-r lf): the follower applies the relayed stream and picks up
+              # the leader's checkpoints.
+              ./test_schema_disagg_abort -b "$build_dir" -r lf -T 12 -u 64 -t 300
+            done
+
+  - &schema-disagg-abort-multi-crash-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            build_dir=$(cd ../../../ && pwd)
+            for i in $(seq ${times|10}); do
+              echo "Iteration $i/${times|10}"
+              # Kill the leader at 100s and the follower at 200s; each survivor carries on alone.
+              ./test_schema_disagg_abort -b "$build_dir" -r lf -k l100 -k f200 -T 12 -u 64 -t 300
+            done
+
+  # Two-node role switches. A step-up over a table the peer created.
+  - &schema-disagg-abort-multi-switch-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            build_dir=$(cd ../../../ && pwd)
+            for i in $(seq ${times|10}); do
+              echo "Iteration $i/${times|10}"
+              # The two nodes swap roles every 30 seconds.
+              ./test_schema_disagg_abort -b "$build_dir" -r lf -s 30 -T 12 -u 64 -t 300
+            done
+
+  # Same step-up exposure as above, with a kill on top.
+  - &schema-disagg-abort-multi-switch-crash-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            build_dir=$(cd ../../../ && pwd)
+            for i in $(seq ${times|10}); do
+              echo "Iteration $i/${times|10}"
+              # Swap roles every 30s and kill whoever leads at 150s; the survivor keeps switching
+              # by sentinel.
+              ./test_schema_disagg_abort -b "$build_dir" -r lf -s 30 -k l150 -T 12 -u 64 -t 300
+            done
+
+  - &schema-disagg-abort-follower-stepup-test-disagg
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            build_dir=$(cd ../../../ && pwd)
+            for i in $(seq ${times|10}); do
+              echo "Iteration $i/${times|10}"
+              # A lone follower generates its own workload and never checkpoints, then steps up over
+              # the operations it accumulated: the way a fresh node bootstraps its own tables before
+              # taking leadership.
+              ./test_schema_disagg_abort -b "$build_dir" -r f -s 30 -T 12 -u 64 -t 300
             done
 
   - &schema-disagg-abort-smoke-test-disagg
@@ -697,7 +830,9 @@ variables:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            # Lightweight smoke coverage: leader plus short switch-mode runs.
+            # The full mode matrix in short runs: single node, lone follower, role switches,
+            # kills, and both two-node topologies. The two-node switch modes at the end are
+            # EXPECTED to fail until FIXME-WT-18068 and FIXME-WT-17746 land.
             bash ./smoke.sh
 
   # Configure flags for builtins.
@@ -771,6 +906,30 @@ tasks:
 
   - <<: *schema-disagg-abort-switch-test-disagg
     name: schema-disagg-abort-switch-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-crash-test-disagg
+    name: schema-disagg-abort-crash-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-multi-test-disagg
+    name: schema-disagg-abort-multi-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-multi-crash-test-disagg
+    name: schema-disagg-abort-multi-crash-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-multi-switch-test-disagg
+    name: schema-disagg-abort-multi-switch-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-multi-switch-crash-test-disagg
+    name: schema-disagg-abort-multi-switch-crash-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+
+  - <<: *schema-disagg-abort-follower-stepup-test-disagg
+    name: schema-disagg-abort-follower-stepup-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
 
   - <<: *schema-disagg-abort-smoke-test-disagg

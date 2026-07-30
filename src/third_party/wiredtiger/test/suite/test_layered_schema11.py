@@ -66,7 +66,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
         # Step 2: Follower picks up the checkpoint.
         conn_follow, session_follow = self.open_follower_epoch()
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 
         # Step 3: Both the follower and the leader drop the table and publish the drop at
         # epoch 25. The follower's REMOVE(25) enters its local queue. The leader's REMOVE(25)
@@ -74,7 +74,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         # shared metadata for now.
         session_follow.drop(self.uri)
         self.publish(self.uri, 25, session_follow)
-        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
         self.session.drop(self.uri)
         self.publish(self.uri, 25)
 
@@ -86,7 +86,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         # Step 5: Follower picks up the new checkpoint. The table is in shared metadata but
         # absent locally; the REMOVE in the queue prevents recreation.
         self.disagg_advance_checkpoint(conn_follow)
-        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
 
         # Step 6: Leader advances past the drop epoch (epoch 25) and checkpoints. The REMOVE(25)
         # is now eligible to be flushed; the table must be removed from shared metadata.
@@ -97,7 +97,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         # both shared and local metadata.
         self.disagg_advance_checkpoint(conn_follow)
         self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
-        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
 
         session_follow.close()
         conn_follow.close('debug=(skip_checkpoint=true)')
@@ -115,14 +115,14 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
         # Step 2: Follower picks up the checkpoint; both tables are in local metadata.
         conn_follow, session_follow = self.open_follower_epoch()
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri2))
 
         # Step 3: Both follower and leader drop uri at epoch 25; uri2 is kept.
         session_follow.drop(self.uri)
         self.publish(self.uri, 25, session_follow)
-        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri2))
         self.session.drop(self.uri)
         self.publish(self.uri, 25)
 
@@ -133,8 +133,8 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
         # Step 5: Follower picks up; uri must not be recreated, uri2 must still be present.
         self.disagg_advance_checkpoint(conn_follow)
-        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri2))
 
         # Step 6: Leader advances to epoch 25 and checkpoints; uri is removed from shared metadata.
         self.set_stable_epoch(25)
@@ -143,8 +143,8 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         # Step 7: Follower picks up; uri absent from both shared and local; uri2 intact.
         self.disagg_advance_checkpoint(conn_follow)
         self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
-        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri2))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri2))
 
         session_follow.close()
         conn_follow.close('debug=(skip_checkpoint=true)')
@@ -164,7 +164,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
         # Step 2: Follower picks up; uri is in local metadata.
         conn_follow, session_follow = self.open_follower_epoch()
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 
         # Step 3: Both follower and leader drop uri at epoch 25 (REMOVE(25) queued), then
         # re-create it at epoch 40 (CREATE(40) queued). The latest queue entry for uri is now
@@ -186,7 +186,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         # Step 5: Follower picks up. Because the latest queue entry is CREATE(40) (not REMOVE),
         # the REMOVE check does not block pickup; uri must be present in local metadata.
         self.disagg_advance_checkpoint(conn_follow)
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 
         session_follow.close()
         conn_follow.close('debug=(skip_checkpoint=true)')
@@ -206,7 +206,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.set_stable_epoch(10)
         self.leader_checkpoint(1)
         conn_follow, session_follow = self.open_follower()
-        self.assertTrue(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
         return conn_follow, session_follow
 
     def test_follower_drop_publish_zero_epoch(self):
@@ -261,7 +261,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.leader_checkpoint(2)
         self.disagg_advance_checkpoint(conn_follow)
         self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri))
-        self.assertFalse(self.uri_in_local_metadata(conn_follow, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
 
         # The remove is still unpublished: publishing it with a real epoch succeeds.
         self.set_stable_epoch(1, conn_follow)

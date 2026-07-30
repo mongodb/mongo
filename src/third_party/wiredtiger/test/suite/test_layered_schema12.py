@@ -75,10 +75,10 @@ class test_layered_schema12(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         try:
             for uri, expected in present.items():
                 if expected:
-                    self.assertTrue(self.uri_in_local_metadata(conn, uri))
+                    self.assertTrue(self.uri_stable_exists(conn, uri))
                     self.assertTrue(self.uri_in_shared_metadata(conn, uri))
                 else:
-                    self.assertFalse(self.uri_in_local_metadata(conn, uri))
+                    self.assertFalse(self.uri_stable_exists(conn, uri))
                     self.assertFalse(self.uri_in_shared_metadata(conn, uri))
         finally:
             conn.close('debug=(skip_checkpoint=true)')
@@ -242,6 +242,6 @@ class test_layered_schema12(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
             ',oldest_timestamp=' + self.timestamp_str(1))
 
         # The durable table survives; the transient table is not resurrected.
-        self.assertTrue(self.uri_in_local_metadata(self.conn, self.uri))
-        self.assertFalse(self.uri_in_local_metadata(self.conn, self.uri2))
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri))
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri2))
         self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri2))

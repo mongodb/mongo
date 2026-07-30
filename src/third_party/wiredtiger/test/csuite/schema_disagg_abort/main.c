@@ -1,316 +1,381 @@
 /*-
- * Public Domain 2014-present MongoDB, Inc.
- * Public Domain 2008-2014 WiredTiger, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
+ *	All rights reserved.
  *
- * This is free and unencumbered software released into the public domain.
- *
- * Anyone is free to copy, modify, publish, use, compile, sell, or
- * distribute this software, either in source code form or as a compiled
- * binary, for any purpose, commercial or non-commercial, and by any
- * means.
- *
- * In jurisdictions that recognize copyright laws, the author or authors
- * of this software dedicate any and all copyright interest in the
- * software to the public domain. We make this dedication for the benefit
- * of the public at large and to the detriment of our heirs and
- * successors. We intend this dedication to be an overt act of
- * relinquishment in perpetuity of all present and future rights to this
- * software under copyright law.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * See the file LICENSE for redistribution information.
+ */
+
+/*
+ * Entry point: parse the command line, then dispatch to the parent or node role. See
+ * schema_disagg_abort.h for the overall test structure.
  */
 
 #include "schema_disagg_abort.h"
 
-/*
- * Disaggregated schema epoch crash recovery test.
- *
- * Worker threads create, drop, and publish layered tables on a leader while it checkpoints. The
- * test crashes the leader mid-run and confirms that, after recovery, the tables match the schema
- * operations that were made durable before the crash.
- */
+#include "subproc.h"
 
 extern int __wt_optind;
 extern char *__wt_optarg;
 
-static TEST_OPTS _opts;
-
-static void sig_handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 /*
+ * println --
+ *     Print one progress line, immediately flushed so it survives a SIGKILL and interleaves
+ *     usefully with the other processes' output.
+ */
+void
+println(const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    putchar('\n');
+    fflush(stdout);
+}
+
+/*
+ * query_ts --
+ *     Return one of the connection's timestamps as an integer. A timestamp that was never set reads
+ *     as zero; an unknown name is a coding error and fails the test.
+ */
+uint64_t
+query_ts(WT_CONNECTION *conn, const char *name)
+{
+    char config[64], hex_ts[64];
+    testutil_snprintf(config, sizeof(config), "get=%s", name);
+    testutil_check(conn->query_timestamp(conn, hex_ts, config));
+
+    uint64_t ts = 0;
+    (void)sscanf(hex_ts, "%" SCNx64, &ts);
+    return (ts);
+}
+
+/*
+ * set_frontier --
+ *     Move the connection's frontier - the oldest and stable timestamps and the stable schema epoch
+ *     - to one allocator value. The three always advance together: a single counter feeds both the
+ *     timestamp and the epoch axis, so everything at or below the value is committed and published.
+ */
+void
+set_frontier(WT_CONNECTION *conn, uint64_t ts)
+{
+    char config[128];
+    testutil_snprintf(config, sizeof(config),
+      "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64
+      ",stable_disaggregated_schema_epoch=%" PRIx64,
+      ts, ts, ts);
+    testutil_check(conn->set_timestamp(conn, config));
+}
+
+/*
  * usage --
- *     Print the command-line usage and exit.
+ *     Print the command-line usage and exit. The -A/-i/-R/-W options and the "-r node" value are
+ *     internal: the parent uses them to spawn its nodes.
  */
 static void
 usage(void)
 {
     fprintf(stderr,
-      "usage: %s [-b build-dir] [-h dir] [-m] [-p] [-s pool] [-T threads] [-t time] [-v]\n",
+      "usage: %s [-b build-dir] [-h dir] [-k [l|f]N] [-p] [-r l|f|lf] [-s N] [-T threads] "
+      "[-t time] [-u pool] [-v]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-b build directory (required for PALite extension)\n"
       "\t-h home directory\n"
-      "\t-m switch mode (randomly start as leader or follower, then switch roles mid-run)\n"
+      "\t-k kill after N seconds: lN the current leader, fN the current follower (two nodes),\n"
+      "\t   plain N the lone node (single node); may be given more than once\n"
       "\t-p preserve directory contents\n"
-      "\t-s URI pool size per thread\n"
+      "\t-r roles to run: l leader, f follower, lf both; default: a random single node\n"
+      "\t-s switch roles every N seconds\n"
       "\t-T number of schema threads\n"
-      "\t-t timeout in seconds\n"
+      "\t-t total run time in seconds; the nodes stop gracefully unless killed\n"
+      "\t-u URI pool size per thread\n"
       "\t-v verify only\n");
     exit(EXIT_FAILURE);
 }
 
 /*
- * sig_handler --
- *     Reap the leader child and fail the test if it exits before the parent kills it.
+ * parse_uint_in_range --
+ *     Parse a numeric option value, enforcing an inclusive range.
  */
-static void
-sig_handler(int sig)
+static uint32_t
+parse_uint_in_range(const char *arg, uint32_t min, uint32_t max, const char *what)
 {
-    pid_t pid;
-
-    WT_UNUSED(sig);
-    pid = wait(NULL);
-    testutil_die(EINVAL, "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
+    const uint32_t value = (uint32_t)atoi(arg);
+    if (value < min || value > max) {
+        fprintf(stderr, "%s must be between %" PRIu32 " and %" PRIu32 "\n", what, min, max);
+        usage();
+    }
+    return (value);
 }
 
 /*
- * create_test_dirs --
- *     Create the directory structure needed for a fresh test run.
+ * parse_roles --
+ *     Translate the -r option value: the public topology letters, or the internal "node" value the
+ *     parent spawns children with.
  */
 static void
-create_test_dirs(TEST_CONFIG *cfg)
+parse_roles(TEST_CONFIG *cfg, const char *arg)
 {
-    char buf[PATH_MAX];
-
-    testutil_recreate_dir(cfg->home);
-    testutil_snprintf(buf, sizeof(buf), "%s/%s", cfg->home, RECORDS_DIR);
-    testutil_mkdir(buf);
-    testutil_snprintf(buf, sizeof(buf), "%s/%s", cfg->home, WT_HOME_DIR);
-    testutil_mkdir(buf);
+    if (strcmp(arg, "node") == 0) {
+        cfg->role = ROLE_NODE;
+        return;
+    }
+    for (const char *p = arg; *p != '\0'; p++)
+        if (*p == 'l')
+            cfg->with_leader = true;
+        else if (*p == 'f')
+            cfg->with_follower = true;
+        else
+            usage();
+    if (!cfg->with_leader && !cfg->with_follower)
+        usage();
 }
 
-/*
- * switch_recorded --
- *     Return whether the child has written the switch marker to thread 0's record file.
- */
-static bool
-switch_recorded(const char *home)
-{
-    FILE *fp;
-    char line[512], path[512];
-    bool found;
-
-    testutil_snprintf(path, sizeof(path), "%s/" SCHEMA_RECORDS_FILE, home, (uint32_t)0);
-    if ((fp = fopen(path, "r")) == NULL)
-        return (false);
-    found = false;
-    while (fgets(line, sizeof(line), fp) != NULL)
-        if (strncmp(line, "SWITCH", strlen("SWITCH")) == 0) {
-            found = true;
-            break;
-        }
-    (void)fclose(fp);
-    return (found);
-}
+/* Command-line prefixes of the kill targets, indexed by KILL_TARGET. */
+static const char *const kill_prefix[KILL_TARGETS] = {"", "l", "f"};
 
 /*
- * fork_and_kill_child --
- *     Fork the child, wait until the crash window has opened, sleep the timeout, then SIGKILL it to
- *     simulate a crash.
+ * parse_kill_spec --
+ *     Translate one -k option value: "lN" kills the current leader at N seconds, "fN" the current
+ *     follower, a plain "N" the lone node.
  */
 static void
-fork_and_kill_child(TEST_CONFIG *cfg, uint32_t timeout)
+parse_kill_spec(TEST_CONFIG *cfg, const char *arg)
 {
-    struct sigaction sa;
-    pid_t child_pid;
-    int status;
+    KILL_TARGET target = KILL_LONE;
+    const char *num = arg;
 
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = sig_handler;
-    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
-
-    testutil_assert_errno((child_pid = fork()) >= 0);
-    if (child_pid == 0) {
-        run_workload(cfg);
-        /* NOTREACHED */
+    if (arg[0] == 'l') {
+        target = KILL_LEADER;
+        ++num;
+    } else if (arg[0] == 'f') {
+        target = KILL_FOLLOWER;
+        ++num;
     }
 
-    /*
-     * Wait until the crash window has opened before starting the timer. In switch mode the crash
-     * must land in phase 2, so wait for the switch marker, which appears regardless of the starting
-     * role. Otherwise wait for the first leader checkpoint.
-     */
-    if (cfg->switch_mode) {
-        while (!switch_recorded(cfg->home))
-            testutil_sleep_wait(1, child_pid);
-    } else
-        while (!testutil_exists(cfg->home, READY_FILE))
-            testutil_sleep_wait(1, child_pid);
-
-    sleep(timeout);
-
-    sa.sa_handler = SIG_DFL;
-    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
-
-    testutil_assert_errno(kill(child_pid, SIGKILL) == 0);
-    testutil_assert_errno(waitpid(child_pid, &status, 0) != -1);
+    const uint32_t value = (uint32_t)atoi(num);
+    if (value == 0 || cfg->kill_time[target] != 0)
+        usage();
+    cfg->kill_time[target] = value;
 }
 
 /*
- * open_leader_for_recovery --
- *     Configure disaggregated leader options and open the database to trigger recovery.
+ * parse_args --
+ *     Parse the command line into the configuration and derive the path fields. Reports whether the
+ *     thread count and total time were left to be randomized.
  */
 static void
-open_leader_for_recovery(TEST_CONFIG *cfg, WT_CONNECTION **connp)
+parse_args(TEST_CONFIG *cfg, int argc, char *argv[], bool *rand_thp, bool *rand_timep)
 {
-    cfg->opts->disagg.is_enabled = true;
-    cfg->opts->disagg.mode = "leader";
-    cfg->opts->disagg.page_log = "palite";
-    cfg->opts->disagg.page_log_home = cfg->page_log_home;
-    cfg->opts->disagg.drain_threads = 1;
+    bool pool_size_set = false;
 
-    testutil_wiredtiger_open(cfg->opts, WT_HOME_DIR, "create,disaggregated=(lose_all_my_data=true)",
-      NULL, connp, true, false);
+    *rand_thp = *rand_timep = true;
+
+    testutil_parse_begin_opt(argc, argv, "A:b:h:i:k:pP:r:R:s:t:T:u:vW:", cfg->opts);
+
+    int ch;
+    while ((ch = __wt_getopt(progname, argc, argv, "A:b:h:i:k:pP:r:R:s:t:T:u:vW:")) != EOF)
+        switch (ch) {
+        case 'A':
+            if (strcmp(__wt_optarg, "l") == 0)
+                cfg->start_leader = true;
+            else if (strcmp(__wt_optarg, "f") == 0)
+                cfg->start_leader = false;
+            else
+                usage();
+            break;
+        case 'i':
+            cfg->node_id = parse_uint_in_range(__wt_optarg, 0, MAX_NODES - 1, "Node id");
+            break;
+        case 'k':
+            parse_kill_spec(cfg, __wt_optarg);
+            break;
+        case 'r':
+            parse_roles(cfg, __wt_optarg);
+            break;
+        case 'R':
+            cfg->pipe_read_fd = atoi(__wt_optarg);
+            break;
+        case 's':
+            cfg->switch_interval = parse_uint_in_range(__wt_optarg, 1, UINT32_MAX, "Interval");
+            break;
+        case 't':
+            *rand_timep = false;
+            cfg->total_time = (uint32_t)atoi(__wt_optarg);
+            break;
+        case 'T':
+            *rand_thp = false;
+            cfg->nth = parse_uint_in_range(__wt_optarg, 1, MAX_TH, "Thread count");
+            break;
+        case 'u':
+            pool_size_set = true;
+            cfg->pool_size =
+              parse_uint_in_range(__wt_optarg, MIN_POOL_SIZE, MAX_POOL_SIZE, "Pool size");
+            break;
+        case 'v':
+            cfg->verify_only = true;
+            break;
+        case 'W':
+            cfg->pipe_write_fd = atoi(__wt_optarg);
+            break;
+        default:
+            if (testutil_parse_single_opt(cfg->opts, ch) != 0)
+                usage();
+        }
+    if (argc - __wt_optind != 0)
+        usage();
+    if (cfg->verify_only && *rand_thp) {
+        fprintf(stderr, "Verify requires -T\n");
+        exit(EXIT_FAILURE);
+    }
+    if (cfg->verify_only && !pool_size_set) {
+        fprintf(stderr, "Verify requires -u\n");
+        exit(EXIT_FAILURE);
+    }
+
+    cfg->opts->disagg.is_enabled = true;
+    testutil_parse_end_opt(cfg->opts);
+    testutil_work_dir_from_path(cfg->home, sizeof(cfg->home), cfg->opts->home);
+
+    char cwd[PATH_MAX];
+    testutil_assert_errno(getcwd(cwd, sizeof(cwd)) != NULL);
+    testutil_snprintf(
+      cfg->page_log_home, sizeof(cfg->page_log_home), "%s/%s/%s", cwd, cfg->home, PAGE_LOG_DIR);
+}
+
+/*
+ * randomize_run_parameters --
+ *     Choose random values for the parameters not fixed on the command line. The data random stream
+ *     is consumed unconditionally to keep it in sync between runs with and without -T.
+ */
+static void
+randomize_run_parameters(TEST_CONFIG *cfg, bool rand_th, bool rand_time)
+{
+    if (rand_time) {
+        cfg->total_time = __wt_random(&cfg->opts->extra_rnd) % MAX_TIME;
+        if (cfg->total_time < MIN_TIME)
+            cfg->total_time = MIN_TIME;
+    }
+
+    const uint32_t rand_value = __wt_random(&cfg->opts->data_rnd);
+    if (rand_th) {
+        cfg->nth = rand_value % MAX_TH;
+        if (cfg->nth < MIN_TH)
+            cfg->nth = MIN_TH;
+    }
+
+    /* No -r: run a random single node. */
+    if (!cfg->with_leader && !cfg->with_follower) {
+        if ((__wt_random(&cfg->opts->data_rnd) & 1) != 0)
+            cfg->with_leader = true;
+        else
+            cfg->with_follower = true;
+    }
+}
+
+/*
+ * validate_run_parameters --
+ *     Reject option combinations that make no sense for the resolved topology.
+ */
+static void
+validate_run_parameters(const TEST_CONFIG *cfg)
+{
+    const bool multi_node = cfg->with_leader && cfg->with_follower;
+
+    if (cfg->kill_time[KILL_LONE] != 0 && multi_node) {
+        fprintf(stderr, "-k N targets the lone node; use -k lN / -k fN with -r lf\n");
+        usage();
+    }
+    if ((cfg->kill_time[KILL_LEADER] != 0 || cfg->kill_time[KILL_FOLLOWER] != 0) && !multi_node) {
+        fprintf(stderr, "-k lN / -k fN target roles; use plain -k N with a single node\n");
+        usage();
+    }
+}
+
+/*
+ * roles_arg --
+ *     Return the -r fragment reproducing the resolved topology.
+ */
+static const char *
+roles_arg(const TEST_CONFIG *cfg)
+{
+    if (cfg->with_leader && cfg->with_follower)
+        return ("lf");
+    return (cfg->with_leader ? "l" : "f");
+}
+
+/*
+ * print_run_banner --
+ *     Report the effective run parameters, including the CONFIG line that reproduces the run.
+ */
+static void
+print_run_banner(const TEST_CONFIG *cfg)
+{
+    println("Parent: roles %s; %" PRIu32 " schema threads; pool %" PRIu32
+            " slots; switch every %" PRIu32 "s; kill leader@%" PRIu32 " follower@%" PRIu32
+            " lone@%" PRIu32 "; stop at %" PRIu32 "s",
+      roles_arg(cfg), cfg->nth, cfg->pool_size, cfg->switch_interval, cfg->kill_time[KILL_LEADER],
+      cfg->kill_time[KILL_FOLLOWER], cfg->kill_time[KILL_LONE], cfg->total_time);
+
+    char switch_arg[32] = "", kill_args[64] = "";
+    if (cfg->switch_interval != 0)
+        testutil_snprintf(switch_arg, sizeof(switch_arg), " -s %" PRIu32, cfg->switch_interval);
+    size_t len = 0;
+    for (int k = 0; k < KILL_TARGETS; k++)
+        if (cfg->kill_time[k] != 0)
+            testutil_snprintf_len_incr(kill_args, sizeof(kill_args), &len, " -k %s%" PRIu32,
+              kill_prefix[k], cfg->kill_time[k]);
+
+    println("CONFIG: %s -r %s%s%s -u %" PRIu32 " -T %" PRIu32 " -t %" PRIu32
+            " " TESTUTIL_SEED_FORMAT,
+      progname, roles_arg(cfg), switch_arg, kill_args, cfg->pool_size, cfg->nth, cfg->total_time,
+      cfg->opts->data_seed, cfg->opts->extra_seed);
 }
 
 /*
  * main --
- *     Parse arguments, run the workload, then verify schema and data state after recovery.
+ *     Parse arguments and run the requested role.
  */
 int
 main(int argc, char *argv[])
 {
-    TEST_CONFIG cfg;
-    WT_CONNECTION *conn;
-    uint32_t rand_value, timeout;
-    int ch;
-    char cwd_start[PATH_MAX];
-    bool pool_size_set, rand_th, rand_time, verify_only;
+    static TEST_OPTS s_opts;
 
     (void)testutil_set_progname(argv);
 
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.opts = &_opts;
-    memset(cfg.opts, 0, sizeof(*cfg.opts));
-
+    TEST_CONFIG cfg = {0};
+    cfg.opts = &s_opts;
     cfg.nth = MIN_TH;
-    cfg.pool_size = MAX_POOL_SIZE / 8; /* Default: 8 slots per thread. */
-    pool_size_set = false;
-    rand_th = rand_time = true;
-    timeout = MIN_TIME;
-    verify_only = false;
+    /*
+     * Default: 32 slots per thread. A wide pool keeps the generator's picks off the few slots gated
+     * behind a checkpoint, so it rarely comes up empty and has to wait.
+     */
+    cfg.pool_size = MAX_POOL_SIZE / 2;
+    cfg.total_time = MIN_TIME;
+    cfg.pipe_read_fd = cfg.pipe_write_fd = -1;
+    cfg.self_pipe_read_fd = cfg.self_pipe_write_fd = -1;
 
-    testutil_parse_begin_opt(argc, argv, "b:h:mpP:s:T:t:v", cfg.opts);
+    bool rand_th, rand_time;
+    parse_args(&cfg, argc, argv, &rand_th, &rand_time);
 
-    while ((ch = __wt_getopt(progname, argc, argv, "b:h:mpP:s:T:t:v")) != EOF)
-        switch (ch) {
-        case 'm':
-            cfg.switch_mode = true;
-            break;
-        case 's':
-            pool_size_set = true;
-            cfg.pool_size = (uint32_t)atoi(__wt_optarg);
-            if (cfg.pool_size < MIN_POOL_SIZE || cfg.pool_size > MAX_POOL_SIZE) {
-                fprintf(
-                  stderr, "Pool size must be between %d and %d\n", MIN_POOL_SIZE, MAX_POOL_SIZE);
-                usage();
-            }
-            break;
-        case 'T':
-            rand_th = false;
-            cfg.nth = (uint32_t)atoi(__wt_optarg);
-            if (cfg.nth < MIN_TH || cfg.nth > MAX_TH) {
-                fprintf(stderr, "Thread count must be between %d and %d\n", MIN_TH, MAX_TH);
-                usage();
-            }
-            break;
-        case 't':
-            rand_time = false;
-            timeout = (uint32_t)atoi(__wt_optarg);
-            break;
-        case 'v':
-            verify_only = true;
-            break;
-        default:
-            if (testutil_parse_single_opt(cfg.opts, ch) != 0)
-                usage();
-        }
-    argc -= __wt_optind;
-    if (argc != 0)
-        usage();
-    if (verify_only && rand_th) {
-        fprintf(stderr, "Verify requires -T\n");
-        exit(EXIT_FAILURE);
-    }
-    if (verify_only && !pool_size_set) {
-        fprintf(stderr, "Verify requires -s\n");
-        exit(EXIT_FAILURE);
+    /* The node role gets its full configuration from the command line; just run it. */
+    if (cfg.role == ROLE_NODE)
+        return (node_main(&cfg));
+
+    if (!cfg.verify_only) {
+        randomize_run_parameters(&cfg, rand_th, rand_time);
+        validate_run_parameters(&cfg);
+        print_run_banner(&cfg);
     }
 
-    cfg.opts->disagg.is_enabled = true;
-    testutil_parse_end_opt(cfg.opts);
-    testutil_work_dir_from_path(cfg.home, sizeof(cfg.home), cfg.opts->home);
-    testutil_assert_errno(getcwd(cwd_start, sizeof(cwd_start)) != NULL);
+    char self_path[PATH_MAX];
+    subproc_self_path(argv[0], self_path, sizeof(self_path));
 
-    if (!verify_only) {
-        create_test_dirs(&cfg);
-
-        if (rand_time) {
-            timeout = __wt_random(&cfg.opts->extra_rnd) % MAX_TIME;
-            if (timeout < MIN_TIME)
-                timeout = MIN_TIME;
-        }
-
-        rand_value = __wt_random(&cfg.opts->data_rnd);
-        if (rand_th) {
-            cfg.nth = rand_value % MAX_TH;
-            if (cfg.nth < MIN_TH)
-                cfg.nth = MIN_TH;
-        }
-
-        printf("Parent: Create %" PRIu32 " schema threads; pool %" PRIu32 " slots; sleep %" PRIu32
-               " seconds\n",
-          cfg.nth, cfg.pool_size, timeout);
-        printf("CONFIG: %s -s %" PRIu32 " -T %" PRIu32 " -t %" PRIu32 "%s " TESTUTIL_SEED_FORMAT
-               "\n",
-          progname, cfg.pool_size, cfg.nth, timeout, cfg.switch_mode ? " -m" : "",
-          cfg.opts->data_seed, cfg.opts->extra_seed);
-
-        testutil_snprintf(cfg.page_log_home, sizeof(cfg.page_log_home), "%s/%s/%s", cwd_start,
-          cfg.home, WT_HOME_DIR);
-
-        fork_and_kill_child(&cfg, timeout);
-    }
-
-    if (chdir(cfg.home) != 0)
-        testutil_die(errno, "parent chdir: %s", cfg.home);
-
-    if (!verify_only)
-        testutil_copy_data();
-
-    if (cfg.page_log_home[0] == '\0')
-        testutil_snprintf(cfg.page_log_home, sizeof(cfg.page_log_home), "%s/%s/%s", cwd_start,
-          cfg.home, WT_HOME_DIR);
-
-    printf("Open leader database, run recovery and verify content\n");
-
-    open_leader_for_recovery(&cfg, &conn);
-    verify_schema_state(conn, &cfg);
-    testutil_check(conn->close(conn, "debug=(skip_checkpoint=true)"));
-
-    if (chdir(cwd_start) != 0)
-        testutil_die(errno, "root chdir: %s", cfg.home);
-
-    if (!cfg.opts->preserve)
-        testutil_remove(cfg.home);
-
-    testutil_cleanup(cfg.opts);
+    parent_main(&cfg, self_path);
     return (EXIT_SUCCESS);
 }

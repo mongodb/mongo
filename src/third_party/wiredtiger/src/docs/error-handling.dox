@@ -158,6 +158,10 @@ running live restore in the system.
 This sub-level error indicates that an operation or configuration conflicts with disaggregated
 storage.
 
+@par \c WT_STEP_DOWN
+This sub-level error indicates that a transaction was rolled back because it was in flight when the
+step-down timestamp was set.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

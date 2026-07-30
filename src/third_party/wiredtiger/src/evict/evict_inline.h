@@ -575,13 +575,16 @@ __wt_evict_needed(
         updates_needed = __wti_evict_updates_needed(session, &pct_updates);
 
         /*
-         * Temporary solution to not do updates and dirty eviction using application threads on
-         * followers or during step-up. Log an error and log an error if the cache is full of
-         * updates or dirty pages.
+         * Temporary solution: application threads skip update and dirty eviction on followers,
+         * during step-up, and on a leader with the step-down timestamp set. In these states the
+         * dirty content is mostly ingest pages that cannot be evicted until a drain or checkpoint
+         * releases them, so pressing application threads into dirty eviction would stall them on
+         * work that cannot succeed. Log a message if the cache fills with updates or dirty pages.
          */
         if (ignore_updates_dirty && __wt_conn_is_disagg(session) &&
           (!conn->layered_table_manager.leader ||
-            F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP))) {
+            F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP) ||
+            __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)) {
             double cache_full = (evict->eviction_target + evict->eviction_trigger) / 2;
             if (pct_updates > cache_full)
                 __wt_verbose_debug1(
