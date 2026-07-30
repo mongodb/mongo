@@ -313,6 +313,7 @@ private:
         const Status& status) noexcept;
 
     virtual void _onCleanup(OperationContext* opCtx) {}
+    virtual void _onInterrupt(Status status) {}
 
     void interrupt(Status status) final;
 

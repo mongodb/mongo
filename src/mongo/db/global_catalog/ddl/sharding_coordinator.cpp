@@ -206,12 +206,25 @@ void ShardingCoordinator::interrupt(Status status) {
                 logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
     // Resolve any unresolved promises to avoid hanging.
-    std::lock_guard<std::mutex> lg(_mutex);
-    if (!_constructionCompletionPromise.getFuture().isReady()) {
-        _constructionCompletionPromise.setError(status);
+    {
+        std::lock_guard<std::mutex> lg(_mutex);
+        if (!_constructionCompletionPromise.getFuture().isReady()) {
+            _constructionCompletionPromise.setError(status);
+        }
+        if (!_completionPromise.getFuture().isReady()) {
+            _completionPromise.setError(status);
+        }
     }
-    if (!_completionPromise.getFuture().isReady()) {
-        _completionPromise.setError(status);
+
+    try {
+        _onInterrupt(status);
+    } catch (const DBException& ex) {
+        // TODO SERVER-114180: Write this in a cleaner way.
+        try {
+            tasserted(13157103,
+                      str::stream() << "_onInterrupt() hook should not throw: " << ex.toStatus());
+        } catch (const AssertionException&) {
+        }
     }
 }
 
@@ -719,8 +732,8 @@ void RecoverableShardingCoordinator::_performCausalityBarrier(
 
     auto opCtxHolder = makeOperationContext();
     auto* opCtx = opCtxHolder.get();
-    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-    performCausalityBarrier(opCtx, barrier);
+    auto barrier = _getExternalState()->makeCausalityBarrier(**executor, token);
+    performCausalityBarrier(opCtx, *barrier);
 }
 
 boost::optional<OperationSessionInfo> RecoverableShardingCoordinator::readSession(

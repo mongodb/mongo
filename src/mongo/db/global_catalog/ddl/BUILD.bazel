@@ -162,6 +162,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "migration_blocking_operation_coordinator_v2_gen",
+    src = "migration_blocking_operation_coordinator_v2.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
+    ],
+)
+
+idl_generator(
     name = "move_primary_coordinator_document_gen",
     src = "move_primary_coordinator_document.idl",
     deps = [

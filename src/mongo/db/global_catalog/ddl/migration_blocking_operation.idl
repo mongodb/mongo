@@ -29,6 +29,14 @@ commands:
                 description: The unique identifier for this operation.
                 type: uuid
                 optional: false
+            authoritative:
+                description: >-
+                    Whether the operation that issued this command captured a non-none authoritative
+                    metadata access level. Selects the migration-blocking coordinator implementation
+                    (V2 when true, V1 otherwise) so that it stays consistent for the whole operation
+                    even if the FCV changes. Defaults to false so pre-existing senders keep V1.
+                type: bool
+                default: false
 
     _shardsvrEndMigrationBlockingOperation:
         command_name: _shardsvrEndMigrationBlockingOperation
@@ -43,3 +51,11 @@ commands:
                 description: The unique identifier for this operation.
                 type: uuid
                 optional: false
+            authoritative:
+                description: >-
+                    Whether the operation that issued this command captured a non-none authoritative
+                    metadata access level. Selects the migration-blocking coordinator implementation
+                    (V2 when true, V1 otherwise) so that it stays consistent for the whole operation
+                    even if the FCV changes. Defaults to false so pre-existing senders keep V1.
+                type: bool
+                default: false

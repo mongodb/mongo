@@ -33,6 +33,7 @@ enums:
             kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V3"
             kCleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
             kMigrationBlockingOperation: "migrationBlockingOperation"
+            kMigrationBlockingOperationV2: "migrationBlockingOperationV2"
             kConvertToCapped: "convertToCapped"
             kUntrackUnsplittableCollection: "untrackUnsplittableCollection"
             kCreateDatabase: "createDatabase"

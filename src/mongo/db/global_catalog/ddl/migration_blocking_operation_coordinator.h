@@ -10,6 +10,7 @@
 
 namespace mongo {
 
+// TODO SERVER-132161: Remove this after we no longer need to support FCVs prior to 9.0.
 class MigrationBlockingOperationCoordinator
     : public RecoverableShardingDDLCoordinator<MigrationBlockingOperationCoordinatorDocument> {
 public:

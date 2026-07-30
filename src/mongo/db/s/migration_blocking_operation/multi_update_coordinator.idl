@@ -7,6 +7,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/versioning_protocol/database_version.idl"
 
@@ -47,6 +48,14 @@ structs:
                 type: bool
                 description: "Indicates a multi update with upsert: true."
                 default: false
+            authoritativeMetadataAccessLevel:
+                type: AuthoritativeMetadataAccessLevel
+                description: >-
+                    Authoritative metadata access level granted by the FCV state when this
+                    coordinator was created. Captured once and forwarded to the migration-blocking
+                    begin/end commands so a single operation always uses the same coordinator
+                    version, even if the FCV changes mid-flight.
+                default: kNone
 
     MultiUpdateCoordinatorMutableFields:
         description: Contains mutable fields for a MultiUpdateCoordinator.

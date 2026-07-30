@@ -5,6 +5,7 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -48,6 +49,12 @@ void ShardingCoordinatorExternalStateImpl::allowMigrations(
 bool ShardingCoordinatorExternalStateImpl::checkAllowMigrationsOnConfigServer(
     OperationContext* opCtx, const NamespaceString& nss) {
     return sharding_ddl_util::checkAllowMigrationsOnConfigServer(opCtx, nss);
+}
+
+std::unique_ptr<CausalityBarrier> ShardingCoordinatorExternalStateImpl::makeCausalityBarrier(
+    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken token) {
+    return std::make_unique<AllShardsAndConfigCausalityBarrier>(std::move(executor),
+                                                                std::move(token));
 }
 
 std::shared_ptr<ShardingCoordinatorExternalState>

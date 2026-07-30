@@ -62,18 +62,18 @@ Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCom
 
 void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations(
     OperationContext* opCtx, const MultiUpdateCoordinatorMetadata& metadata) {
-    runDDLOperationOnCurrentShard(
-        opCtx,
-        getDatabaseVersion(opCtx, metadata),
-        ShardsvrBeginMigrationBlockingOperation{metadata.getNss(), metadata.getId()});
+    ShardsvrBeginMigrationBlockingOperation command{metadata.getNss(), metadata.getId()};
+    command.setAuthoritative(metadata.getAuthoritativeMetadataAccessLevel() !=
+                             AuthoritativeMetadataAccessLevelEnum::kNone);
+    runDDLOperationOnCurrentShard(opCtx, getDatabaseVersion(opCtx, metadata), std::move(command));
 }
 
 void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations(
     OperationContext* opCtx, const MultiUpdateCoordinatorMetadata& metadata) {
-    runDDLOperationOnCurrentShard(
-        opCtx,
-        getDatabaseVersion(opCtx, metadata),
-        ShardsvrEndMigrationBlockingOperation{metadata.getNss(), metadata.getId()});
+    ShardsvrEndMigrationBlockingOperation command{metadata.getNss(), metadata.getId()};
+    command.setAuthoritative(metadata.getAuthoritativeMetadataAccessLevel() !=
+                             AuthoritativeMetadataAccessLevelEnum::kNone);
+    runDDLOperationOnCurrentShard(opCtx, getDatabaseVersion(opCtx, metadata), std::move(command));
 }
 
 bool MultiUpdateCoordinatorExternalStateImpl::isUpdatePending(

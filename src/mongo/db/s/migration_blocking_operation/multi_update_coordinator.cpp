@@ -408,7 +408,11 @@ bool MultiUpdateCoordinatorInstance::_shouldReleaseSession() const {
 }
 
 bool MultiUpdateCoordinatorInstance::_shouldUnblockMigrations() const {
-    return _getCurrentPhase() > Phase::kBlockMigrations;
+    // Once we have reached kBlockMigrations, migrations may have been blocked: the phase is
+    // persisted before we run allowMigrations(false), so we could have blocked migrations and then
+    // been aborted before transitioning to the next phase. In that case we must still unblock them,
+    // otherwise migrations would be left blocked with no coordinator to release them.
+    return _getCurrentPhase() >= Phase::kBlockMigrations;
 }
 
 bool MultiUpdateCoordinatorInstance::_updatesPossiblyRunningFromPreviousTerm() const {
