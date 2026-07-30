@@ -41,6 +41,8 @@ last-patch:
       ticket: SERVER-112940
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
       ticket: SERVER-127051
+    - test_file: jstests/core/timeseries/ddl/timeseries_split_vector.js
+      ticket: SERVER-127074
     - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
       ticket: SERVER-121084
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js

@@ -18,3 +18,6 @@ filters:
   - "timeseries_index_use.js":
     approvers:
       - 10gen/query-integration-timeseries
+  - "timeseries_split_vector.js":
+    approvers:
+      - 10gen/server-cluster-scalability
