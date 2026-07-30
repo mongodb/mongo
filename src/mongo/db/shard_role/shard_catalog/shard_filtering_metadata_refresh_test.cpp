@@ -13,6 +13,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_recoverer_tracker.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
@@ -22,7 +23,6 @@
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -232,8 +232,8 @@ TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
     ASSERT_EQ(csr->getCurrentMetadataIfKnown()->getCollPlacementVersion(), matchingVersion);
     auto stats = getStatistics(opCtx);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsAfterRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutions"), 1);
 }
 
 // Refresh uses the node FCV, not the operation's OFCV (see SERVER-128194 for details).
@@ -278,7 +278,7 @@ TEST_F(AuthoritativeRefreshFixture,
 
     auto statsAfterFirst = getStatistics(opCtx);
     ASSERT_EQ(statsAfterFirst.getIntField("countDiskRecoveriesPerformed"), 1);
-    ASSERT_EQ(statsAfterFirst.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(statsAfterFirst.getIntField("countMetadataSynchronizersCreated"), 1);
 
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, ChunkVersion::UNTRACKED()));
 
@@ -286,7 +286,7 @@ TEST_F(AuthoritativeRefreshFixture,
     ASSERT_EQ(statsAfterSecond.getIntField("countDiskRecoveriesPerformed"), 1)
         << "Second placement mismatch should not re-run disk recovery when CSS already has "
            "metadata";
-    ASSERT_EQ(statsAfterSecond.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(statsAfterSecond.getIntField("countMetadataSynchronizersCreated"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture,
@@ -310,8 +310,8 @@ TEST_F(AuthoritativeRefreshFixture,
               chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsAfterRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutions"), 1);
     ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 0);
     ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByVersionChange"), 0);
 }
@@ -339,7 +339,7 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
     ASSERT_EQ(csr->getCurrentMetadataIfKnown()->getCollPlacementVersion(), currentVersion);
     auto stats = getStatistics(opCtx);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
     ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 1);
     ASSERT_TRUE(stats.hasField("totalPostRecoveryWaitMillis"));
     ASSERT_GTE(stats["totalPostRecoveryWaitMillis"].safeNumberLong(), 0);
@@ -347,7 +347,7 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
 
 // Helper to drive an incomparable-version recovery that reaches the configTime wait: the router
 // sends a higher tracked version than what is recovered from disk, so the post-recovery
-// compatibility check falls through to _waitForConfigTimeOrChunkVersionChange.
+// compatibility check falls through to waitForConfigTimeOrShardVersionChange.
 class IncomparableVersionNoopFailureFixture : public AuthoritativeRefreshFixture {
 protected:
     ChunkVersion setupHigherRouterVersion(OperationContext* opCtx) {
@@ -473,7 +473,7 @@ TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRec
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
@@ -518,8 +518,7 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
 }
 
-TEST_F(AuthoritativeRefreshFixture, CollectionCriticalSectionWaitDoesNotCountAsNoProgress) {
-    unittest::ServerParameterGuard maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
+TEST_F(AuthoritativeRefreshFixture, CollectionCriticalSectionWaitAllowsRecoveryToComplete) {
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -557,24 +556,6 @@ TEST_F(AuthoritativeRefreshFixture, CollectionCriticalSectionWaitDoesNotCountAsN
     auto metadataOpt = csr->getCurrentMetadataIfKnown();
     ASSERT_TRUE(metadataOpt.has_value());
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
-}
-
-using AuthoritativeRefreshFixtureDeathTest = AuthoritativeRefreshFixture;
-DEATH_TEST_REGEX_F(AuthoritativeRefreshFixtureDeathTest,
-                   PostDrainRetryCountsAgainstNoProgressBudget,
-                   "Tripwire assertion.*Exhausted maximum number") {
-    unittest::ServerParameterGuard maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
-    auto* opCtx = operationContext();
-
-    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
-    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
-
-    {
-        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
-        csr->clearCollectionMetadata(opCtx);
-    }
-
-    uassertStatusOK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
 }
 
 TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWaitTriggersRetry) {
@@ -627,7 +608,7 @@ TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWait
         << "Expected the wait interrupt to trigger a second disk recovery";
 }
 
-TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
+TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneMetadataSynchronizer) {
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -648,15 +629,11 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
     ASSERT_TRUE(metadataOpt.has_value());
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    // A tracked collection is resolved in a single Mode A pass, so the no-progress budget is never
-    // touched on the happy path.
-    ASSERT_EQ(stats.getIntField("countDiskRecoveryNoProgressRetries"), 0);
-    ASSERT_EQ(stats.getIntField("countDiskRecoveryAttemptsExhausted"), 0);
 }
 
-TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
+TEST_F(AuthoritativeRefreshFixture, MetadataSynchronizerCleanedUpAfterRecovery) {
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 3, kMyShardName);
@@ -672,7 +649,7 @@ TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
 
     auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
     ASSERT_TRUE(csr->getCurrentMetadataIfKnown().has_value());
-    ASSERT_FALSE(csr->getCollectionCacheRecoverer());
+    ASSERT_FALSE(csr->getMetadataSynchronizer());
 }
 
 TEST_F(AuthoritativeRefreshFixture, ThreeConcurrentCallersAllSucceed) {
@@ -715,7 +692,7 @@ TEST_F(AuthoritativeRefreshFixture, ThreeConcurrentCallersAllSucceed) {
     auto metadataOpt = csr->getCurrentMetadataIfKnown();
     ASSERT_TRUE(metadataOpt.has_value());
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
-    ASSERT_FALSE(csr->getCollectionCacheRecoverer());
+    ASSERT_FALSE(csr->getMetadataSynchronizer());
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecoveryWithSingleChunkVerifiesExactMetadata) {
@@ -829,7 +806,7 @@ TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkM
     ASSERT_EQ(metadataOpt->getShardPlacementVersion(), myOwnedChunks.back().getVersion());
     auto stats = getStatistics(opCtx);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
@@ -855,7 +832,8 @@ TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
     ASSERT_EQ(recoveredVersion, chunks.back().getVersion());
 
     // Second call with the same stale version: the pre-recovery comparison sees that the current
-    // metadata is already newer, so the request returns without creating another recoverer.
+    // metadata is already newer, so the request returns without creating another metadata
+    // synchronizer.
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, dummyVersion));
 
     auto secondVersion = [&] {
@@ -865,8 +843,9 @@ TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
     ASSERT_EQ(secondVersion, recoveredVersion);
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
+    // One resolution after recovery, one from the subsequent cached short-circuit.
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutions"), 2);
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNextCall) {
@@ -899,8 +878,9 @@ TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNext
     ASSERT_EQ(finalVersion, recoveredVersion);
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
+    // One resolution after forced recovery, one from the follow-up matching-version call.
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutions"), 2);
 }
 
 TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskRecovery) {
@@ -958,8 +938,9 @@ TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskReco
     ASSERT_EQ(csr->getCurrentMetadataIfKnown()->getCollPlacementVersion(), matchingVersion);
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
-    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
+    // Thread A resolves after forced recovery; Thread B resolves once installed metadata matches.
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutions"), 2);
 }
 
 TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
@@ -977,7 +958,7 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 
     {
@@ -1001,7 +982,7 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
     ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
 
     stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 2);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 2);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 2);
 
     auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
@@ -1060,9 +1041,9 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), externalMetadata.getCollPlacementVersion());
     ASSERT_NE(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 0);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 0);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 0);
-    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsBeforeRecovery"), 1);
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutions"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture, KnownMetadataShortCircuitDoesNotRecordDiskRecoveryMillis) {
@@ -1100,7 +1081,7 @@ TEST_F(AuthoritativeRefreshFixture, KnownMetadataShortCircuitDoesNotRecordDiskRe
     recoveryThread.join();
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 0);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 0);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 0);
     ASSERT_EQ(stats.getIntField("totalDiskRecoveryMillis"), 0);
 }
@@ -1132,7 +1113,7 @@ TEST_F(AuthoritativeRefreshFixture, UnownedRecoveryAcceptsTrackedWithNoChunksVer
 
     auto stats = getStatistics(opCtx);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutionsAfterRecovery"), 1)
+    ASSERT_EQ(stats.getIntField("countVersionMismatchResolutions"), 1)
         << "Expected the post-recovery compatibility check to accept UNOWNED + 0-chunks without "
            "falling through to a configTime wait";
     ASSERT_EQ(stats.getIntField("countPostRecoveryWaitsResolvedByConfigTime"), 0);
@@ -1223,7 +1204,8 @@ TEST_F(AuthoritativeRefreshFixture, TrackedCollectionWithNoChunksOnDiskRecovered
 }
 
 // Runs recovery on a background thread and pauses it inside the Mode B attempt (Mode A's
-// failpoint hit is skipped), invokes `duringPauseFn` on the main thread, then resumes.
+// hangInRecoverRefreshThread hit is skipped), invokes `duringPauseFn` on the main thread, then
+// resumes.
 template <typename Fn>
 void runRecoveryAndInjectInModeB(OperationContext* opCtx,
                                  const NamespaceString& nss,
@@ -1282,17 +1264,14 @@ TEST_F(AuthoritativeRefreshFixture, TransientPrimaryAbaForcesModeBRetry) {
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 3);  // 1 Mode A + 2 Mode B (one retry).
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"),
+              3);  // 1 Mode A + 2 Mode B (one retry).
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
-    // Mode A -> Mode B switch plus the ABA-driven Mode B retry both count against the no-progress
-    // budget, but the recovery still converges so nothing is reported as exhausted.
-    ASSERT_GTE(stats.getIntField("countDiskRecoveryNoProgressRetries"), 2);
-    ASSERT_EQ(stats.getIntField("countDiskRecoveryAttemptsExhausted"), 0);
     ASSERT_GTE(stats.getIntField("totalDiskRecoveryMillis"), 0);
 }
 
 // Stable DB primary baseline: no mid-flight mutation, no retry. Converges to kUntracked with
-// exactly 1 Mode A + 1 Mode B recoverer.
+// exactly 1 Mode A + 1 Mode B metadata synchronizer.
 TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) {
     auto* opCtx = operationContext();
 
@@ -1313,7 +1292,8 @@ TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) 
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"),
+              2);  // 1 Mode A + 1 Mode B, no retry.
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
@@ -1344,7 +1324,8 @@ TEST_F(AuthoritativeRefreshFixture, RetainedNonAuthoritativeDsrEntryInstallsUnow
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"),
+              2);  // 1 Mode A + 1 Mode B, no retry.
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
@@ -1397,7 +1378,7 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
     ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
 
     auto stats = getStatistics(opCtx);
-    ASSERT_EQ(stats.getIntField("countRecoverersCreated"), 3);
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 3);
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
@@ -1409,17 +1390,17 @@ protected:
     // fixture.
     unittest::ServerParameterGuard ddlFeatureFlag{"featureFlagAuthoritativeShardsDDL", true};
 
-    // Cancel incompatible refreshes off-thread (interrupt blocks on drain), then unhang `fp`.
-    void interruptRefreshesThenUnhangFailpoint(FailPoint* fp) {
+    // Cancel incompatible recoveries off-thread (interrupt blocks on drain), then unhang `fp`.
+    void interruptRecoveriesThenUnhangFailpoint(FailPoint* fp) {
         auto* hangAfterCancelingFp =
-            globalFailPointRegistry().find("hangAfterCancelingIncompatibleRefreshes");
+            globalFailPointRegistry().find("hangAfterCancelingIncompatibleRecoveries");
         const auto initialTimesEntered = hangAfterCancelingFp->setMode(FailPoint::alwaysOn);
 
         stdx::thread interruptThread([&] {
             auto client = getGlobalServiceContext()->getService()->makeClient("bgInterrupt");
             auto interruptOpCtx = client->makeOperationContext();
-            FilteringMetadataRefreshTracker::get(interruptOpCtx.get())
-                ->interruptIncompatibleRefreshes(interruptOpCtx.get());
+            ShardCatalogRecovererTracker::get(interruptOpCtx.get())
+                ->interruptIncompatibleRecoveries(interruptOpCtx.get());
         });
 
         hangAfterCancelingFp->waitForTimesEntered(initialTimesEntered + 1);
@@ -1428,45 +1409,6 @@ protected:
         interruptThread.join();
     }
 };
-
-TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
-    auto* opCtx = operationContext();
-
-    // Force the flag on so the bg thread picks the auth path on the first attempt.
-    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
-
-    // Cached version matches received, so both the initial auth path (before we cancel it) and the
-    // non-auth retry can complete from the local cache.
-    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
-    const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 0));
-
-    unittest::LogCaptureGuard logs;
-
-    auto* fp = globalFailPointRegistry().find("hangBeforeAuthoritativeDbVersionMismatchWait");
-    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
-
-    stdx::thread t([&] {
-        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgAuth");
-        auto bgOpCtx = bgClient->makeOperationContext();
-        ASSERT_OK(FilteringMetadataCache::get(bgOpCtx.get())
-                      ->onDbVersionMismatch(bgOpCtx.get(), kTestNss.dbName(), receivedDbVersion));
-    });
-
-    fp->waitForTimesEntered(initialTimesEntered + 1);
-
-    // Flip the flag before cancelling so the outer retry dispatches to the non-auth path.
-    unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                         false);
-
-    interruptRefreshesThenUnhangFailpoint(fp);
-    t.join();
-
-    // The retry-after-cancel log must have fired for the canceled auth attempt.
-    ASSERT_EQ(1,
-              logs.countBSONContainingSubset(
-                  BSON("id" << 12436401 << "attr" << BSON("isAuthoritative" << true))));
-}
-
 TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     auto* opCtx = operationContext();
 
@@ -1477,8 +1419,6 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     // Set a dbVersion lower than receivedDbVersion, to actually run the non-authoritative refresh.
     setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
     const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(2, 0));
-
-    unittest::LogCaptureGuard logs;
 
     auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshDbVersionThread");
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
@@ -1498,13 +1438,9 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
-    interruptRefreshesThenUnhangFailpoint(fp);
+    interruptRecoveriesThenUnhangFailpoint(fp);
     t.join();
-
-    // The retry-after-cancel log must have fired for the canceled non-auth attempt.
-    ASSERT_EQ(1,
-              logs.countBSONContainingSubset(
-                  BSON("id" << 12436401 << "attr" << BSON("isAuthoritative" << false))));
+    // Succeeded after setFCV cancel: outer loop re-sampled FCV and finished on the auth path.
 }
 
 TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthoritative) {
@@ -1513,7 +1449,19 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     // Force the flag on so the bg thread picks the auth path on the first attempt.
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
-    // Auth CSR with no metadata: forces the authoritative path to recover from disk.
+    // Populate on-disk catalog so authoritative recovery runs the synchronizer.
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 1, kMyShardName);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+    {
+        DBDirectClient client(opCtx);
+        client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace, collType.toBSON());
+        for (const auto& chunk : chunks) {
+            client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
+                          chunk.toConfigBSON());
+        }
+    }
+
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
         csr->clearCollectionMetadata(opCtx);
@@ -1522,8 +1470,6 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     auto sharedMetadata =
         makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
     const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
-
-    unittest::LogCaptureGuard logs;
 
     auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
@@ -1548,13 +1494,9 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
                                                          false);
 
-    interruptRefreshesThenUnhangFailpoint(fp);
+    interruptRecoveriesThenUnhangFailpoint(fp);
     t.join();
-
-    // The retry-after-cancel log must have fired for the canceled auth attempt.
-    ASSERT_EQ(1,
-              logs.countBSONContainingSubset(
-                  BSON("id" << 12436300 << "attr" << BSON("isAuthoritative" << true))));
+    // Succeeded after setFCV cancel: outer loop re-sampled FCV and finished on the non-auth path.
 }
 
 TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthoritative) {
@@ -1567,8 +1509,6 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
     auto sharedMetadata =
         makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
     const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
-
-    unittest::LogCaptureGuard logs;
 
     auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
@@ -1593,46 +1533,9 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
-    interruptRefreshesThenUnhangFailpoint(fp);
+    interruptRecoveriesThenUnhangFailpoint(fp);
     t.join();
-
-    // The retry-after-cancel log must have fired for the canceled non-auth attempt.
-    ASSERT_EQ(1,
-              logs.countBSONContainingSubset(
-                  BSON("id" << 12436300 << "attr" << BSON("isAuthoritative" << false))));
-}
-
-// Test that the refresh path respects the maxTimeMS on the original OperationContext.
-TEST_F(RefreshCancellationFixture, MaxTimeMsOnOperationContextInterruptsRefresh) {
-    auto* opCtx = operationContext();
-
-    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
-
-    // Force the authoritative path to recover from disk and block.
-    {
-        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
-        csr->clearCollectionMetadata(opCtx);
-    }
-
-    auto sharedMetadata =
-        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
-    const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
-
-    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
-    fp->setMode(FailPoint::alwaysOn);
-
-    stdx::thread t([&] {
-        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgMaxTimeMs");
-        auto bgOpCtx = bgClient->makeOperationContext();
-        // Match how the command dispatch path sets a client's maxTimeMS deadline.
-        bgOpCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::MaxTimeMSExpired);
-        ASSERT_EQ(FilteringMetadataCache::get(bgOpCtx.get())
-                      ->onShardVersionMismatch(bgOpCtx.get(), kTestNss, receivedShardVersion),
-                  ErrorCodes::MaxTimeMSExpired);
-    });
-
-    t.join();
-    fp->setMode(FailPoint::off);
+    // Succeeded after setFCV cancel: outer loop re-sampled FCV and finished on the auth path.
 }
 
 // Tests that after interrupted refreshes, we block until they have drained.
@@ -1661,8 +1564,8 @@ TEST_F(RefreshCancellationFixture, InterruptIncompatibleRefreshesWaitsForDrain) 
     stdx::thread interruptThread([&] {
         auto client = getGlobalServiceContext()->getService()->makeClient("bgInterrupt");
         auto interruptOpCtx = client->makeOperationContext();
-        FilteringMetadataRefreshTracker::get(interruptOpCtx.get())
-            ->interruptIncompatibleRefreshes(interruptOpCtx.get());
+        ShardCatalogRecovererTracker::get(interruptOpCtx.get())
+            ->interruptIncompatibleRecoveries(interruptOpCtx.get());
         interruptFinished.store(true);
     });
 
@@ -1674,6 +1577,161 @@ TEST_F(RefreshCancellationFixture, InterruptIncompatibleRefreshesWaitsForDrain) 
     ASSERT_TRUE(interruptFinished.load());
 
     t.join();
+}
+
+// Waiter expires via maxTimeMS; in-flight disk recovery stays tracked and is canceled by setFCV.
+TEST_F(AuthoritativeRefreshFixture, SetFcvCancelsDiskRecoveryAfterWaiterMaxTimeMs) {
+    auto* opCtx = operationContext();
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
+
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 1, kMyShardName);
+    populateDiskCatalog(opCtx, collType, chunks);
+    advanceCommittedSnapshot(opCtx);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+    }
+
+    const auto receivedShardVersion = chunks.back().getVersion();
+
+    auto* hangRecoveryFp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
+    const auto recoveryTimesEntered = hangRecoveryFp->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([&] { hangRecoveryFp->setMode(FailPoint::off); });
+
+    stdx::thread waiterThread([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgMaxTimeMsFcv");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        bgOpCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_EQ(onShardVersionMismatch(bgOpCtx.get(), kTestNss, receivedShardVersion),
+                  ErrorCodes::MaxTimeMSExpired);
+    });
+
+    hangRecoveryFp->waitForTimesEntered(recoveryTimesEntered + 1);
+
+    SharedSemiFuture<void> diskRecoveryFuture;
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_TRUE(csr->getMetadataRefreshFuture().has_value());
+        diskRecoveryFuture = *csr->getMetadataRefreshFuture();
+    }
+
+    waiterThread.join();
+
+    // Waiter is gone; recovery must still be tracked so setFCV can cancel it.
+    unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                         false);
+
+    auto* hangAfterCancelingFp =
+        globalFailPointRegistry().find("hangAfterCancelingIncompatibleRecoveries");
+    const auto cancelTimesEntered = hangAfterCancelingFp->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([&] { hangAfterCancelingFp->setMode(FailPoint::off); });
+
+    stdx::thread interruptThread([&] {
+        auto client = getGlobalServiceContext()->getService()->makeClient("bgInterruptMaxTimeMs");
+        auto interruptOpCtx = client->makeOperationContext();
+        ShardCatalogRecovererTracker::get(interruptOpCtx.get())
+            ->interruptIncompatibleRecoveries(interruptOpCtx.get());
+    });
+
+    hangAfterCancelingFp->waitForTimesEntered(cancelTimesEntered + 1);
+    hangRecoveryFp->setMode(FailPoint::off);
+    hangAfterCancelingFp->setMode(FailPoint::off);
+    interruptThread.join();
+
+    ASSERT_EQ(diskRecoveryFuture.getNoThrow(opCtx), ErrorCodes::PlacementVersionRefreshCanceled);
+}
+
+// maxTimeMS cancels only the waiter; disk recovery keeps running and installs metadata.
+TEST_F(AuthoritativeRefreshFixture, MaxTimeMsCancelsWaiterButRefreshCompletes) {
+    auto* opCtx = operationContext();
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
+
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 1, kMyShardName);
+    populateDiskCatalog(opCtx, collType, chunks);
+    advanceCommittedSnapshot(opCtx);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+    }
+
+    const auto receivedShardVersion = chunks.back().getVersion();
+
+    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([&] { fp->setMode(FailPoint::off); });
+
+    stdx::thread waiterThread([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgMaxTimeMsOnly");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        bgOpCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_EQ(onShardVersionMismatch(bgOpCtx.get(), kTestNss, receivedShardVersion),
+                  ErrorCodes::MaxTimeMSExpired);
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    SharedSemiFuture<void> diskRecoveryFuture;
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_TRUE(csr->getMetadataRefreshFuture().has_value());
+        diskRecoveryFuture = *csr->getMetadataRefreshFuture();
+    }
+
+    waiterThread.join();
+
+    fp->setMode(FailPoint::off);
+    ASSERT_OK(diskRecoveryFuture.getNoThrow(opCtx));
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_TRUE(csr->getCurrentMetadataIfKnown().has_value());
+}
+
+// Starts in the post-phase-1 empty-catalog state (needsDbPrimaryClassification set, no metadata)
+// with no DSR write critical section held. With nothing to wait on,
+// waitDbPrimaryCriticalSectionIfNeeded must re-acquire the CSR so the following join can continue
+// into phase-2 rather than returning kRetry forever. Asserts recovery converges to untracked
+// metadata and skips a redundant phase-1 synchronizer.
+TEST_F(AuthoritativeRefreshFixture,
+       NeedsDbPrimaryClassificationWithNoDsrWriteCritSecConvergesWithoutSpin) {
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 1));
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+        csr->setNeedsDbPrimaryClassification(true);
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
+        ASSERT_TRUE(csr->needsDbPrimaryClassification());
+    }
+
+    {
+        // Preconditions for the spin: DSR has no write critical section to wait out.
+        auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, kTestNss.dbName());
+        ASSERT_FALSE(scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_FALSE(csr->needsDbPrimaryClassification());
+        ASSERT_FALSE(csr->isUnowned());
+        ASSERT_TRUE(csr->getCurrentMetadataIfKnown());
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+    }
+
+    auto stats = getStatistics(opCtx);
+    // Flag was already set, so phase-1 is skipped; only phase-2 creates a synchronizer.
+    ASSERT_EQ(stats.getIntField("countMetadataSynchronizersCreated"), 1);
+    ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
 }  // namespace

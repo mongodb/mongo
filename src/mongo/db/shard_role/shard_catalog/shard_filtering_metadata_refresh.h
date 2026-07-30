@@ -12,13 +12,12 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
-#include <list>
-#include <mutex>
+#include <memory>
 
 #include <boost/optional/optional.hpp>
 
@@ -187,58 +186,18 @@ private:
                                                     const DatabaseName& dbName,
                                                     const CancellationToken& cancellationToken);
 
-    void _onDbVersionMismatch(OperationContext* opCtx,
-                              const DatabaseName& dbName,
-                              boost::optional<DatabaseVersion> receivedDbVersion);
-
-    void _onDbVersionMismatchAuthoritative(OperationContext* opCtx,
-                                           const DatabaseName& dbName,
-                                           const DatabaseVersion& receivedDbVersion);
-
     /**
-     * Creates a CollectionCacheRecoverer and drives a full metadata recovery from disk to
-     * completion. Retries if a critical section, concurrent refresh, or cancellation is
-     * encountered.
-     *
-     * This is the first step of the authoritative shard versioning protocol: unconditionally
-     * recover the shard's current state from the durable catalog so that subsequent version
-     * comparisons operate on up-to-date metadata.
+     * Result of one mismatch-handler attempt. Callers loop on kRetry at the top-level entry points.
      */
-    void _recoverCollectionMetadataFromDisk(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            boost::optional<ChunkVersion> chunkVersionReceived);
+    enum class MismatchAttemptResult {
+        kDone,
+        kRetry,
+    };
 
-    /**
-     * Joins any ongoing placement version operations and checks whether the shard's current shard
-     * version (wantedShardVersion) already satisfies the router's shard version
-     * (receivedShardVersion). Waits for any ongoing critical sections or refreshes before
-     * comparing.
-     *
-     * When both versions are comparable (both tracked or both untracked), the partial ordering
-     * determines whether the shard is up to date or the router is stale. Returns true in either
-     * case since the caller can return to the retry loop. Returns false when the versions are not
-     * comparable (one tracked, one untracked) or no metadata is known.
-     */
-    bool _isRecoveredShardVersionSufficient(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            const ChunkVersion& receivedShardVersion);
-
-    enum class WasWaitInterrupted { kNo, kYes };
-    /**
-     * Handles the case where router's shard version (receivedShardVersion) and shard's shard
-     * version (wantedShardVersion) are not directly comparable (e.g. one tracked, one untracked).
-     * Blocks until one of:
-     *   1. The shard version on the shard matches the router's version (via oplog application).
-     *   2. The node has replicated up to the router's configTime with majority read concern.
-     *
-     * configTime serves as an upper bound: if the shard reaches configTime without the version
-     * matching, the router is guaranteed to be stale since all DDL critical sections that could
-     * have changed the version have already been applied. On a primary this wait is an instant
-     * no-op since it has already applied all oplog entries.
-     */
-    WasWaitInterrupted _waitForConfigTimeOrChunkVersionChange(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              const ChunkVersion& chunkVersion);
+    MismatchAttemptResult _onDbVersionMismatchNonAuthoritative(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        boost::optional<DatabaseVersion> receivedDbVersion);
 
     SharedSemiFuture<void> _recoverRefreshCollectionPlacementVersion(
         ServiceContext* serviceContext,
@@ -246,13 +205,10 @@ private:
         bool runRecover,
         CancellationToken cancellationToken);
 
-    void _onShardVersionMismatch(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersionReceived);
-
-    void _onShardVersionMismatchAuthoritative(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              boost::optional<ChunkVersion> receivedShardVersion);
+    MismatchAttemptResult _onShardVersionMismatchNonAuthoritative(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<ChunkVersion> chunkVersionReceived);
 
     // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
     // If _cache is set, it will be used only for filtering; otherwise, the Grid's CatalogCache will
@@ -265,71 +221,5 @@ private:
     hangInRefreshFilteringMetadataUntilSuccessInterruptible;
 [[MONGO_MOD_NEEDS_REPLACEMENT]] extern FailPoint
     hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible;
-
-enum class FilteringMetadataRefreshKind { kNonAuthoritative, kAuthoritative };
-
-/**
- * The `FilteringMetadataRefreshTracker` is responsible for tracking in-flight filtering metadata
- * refreshes and offering the possibility to interrupt them.
- */
-class [[MONGO_MOD_NEEDS_REPLACEMENT]] FilteringMetadataRefreshTracker {
-public:
-    static FilteringMetadataRefreshTracker* get(OperationContext* opCtx);
-
-    class Acquisition {
-    public:
-        Acquisition(const Acquisition&) = delete;
-        Acquisition& operator=(const Acquisition&) = delete;
-        Acquisition(Acquisition&&) = delete;
-        Acquisition& operator=(Acquisition&&) = delete;
-
-        ~Acquisition() {
-            _tracker->_release(kind, _cancellationIt);
-        }
-
-        const FilteringMetadataRefreshKind kind;
-        const CancellationToken cancellationToken;
-
-    private:
-        friend class FilteringMetadataRefreshTracker;
-
-        Acquisition(FilteringMetadataRefreshTracker* tracker,
-                    FilteringMetadataRefreshKind kind,
-                    std::list<CancellationSource>::iterator cancellationIt)
-            : kind(kind),
-              cancellationToken(cancellationIt->token()),
-              _tracker(tracker),
-              _cancellationIt(cancellationIt) {}
-
-        FilteringMetadataRefreshTracker* const _tracker;
-        const std::list<CancellationSource>::iterator _cancellationIt;
-    };
-
-    /**
-     * Marks that the current thread is doing a filtering metadata refresh. Unless forced, the
-     * refresh kind is selected automatically based on the Authoritative Shards feature flag.
-     */
-    Acquisition acquire(OperationContext* opCtx,
-                        boost::optional<FilteringMetadataRefreshKind> forceKind = boost::none);
-
-    /**
-     * Cancels in-flight refreshes that are incompatible with the current value of the Authoritative
-     * Shards feature flag (i.e. cancels non-authoritative refreshes when the flag is enabled,
-     * authoritative refreshes when it is disabled) and waits until they drain.
-     */
-    void interruptIncompatibleRefreshes(OperationContext* opCtx);
-
-private:
-    void _release(FilteringMetadataRefreshKind kind,
-                  std::list<CancellationSource>::iterator cancellationIt);
-
-    std::mutex _mutex;
-    // Notified when a canceled refresh is released, so we can wait for them to drain.
-    stdx::condition_variable _canceled;
-    // Cancellation source for each ongoing filtering metadata refresh. We do not use a single
-    // "root" CancellationSource in order to avoid the memory leak described in SERVER-92333.
-    std::list<CancellationSource> _activeAuthoritativeRefreshes;
-    std::list<CancellationSource> _activeNonAuthoritativeRefreshes;
-};
 
 }  // namespace mongo

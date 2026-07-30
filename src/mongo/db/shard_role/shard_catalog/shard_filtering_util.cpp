@@ -1,11 +1,17 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_util.h"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_api_d_params_gen.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforePlacementVersionCriticalSectionWait);
 
 namespace refresh_util {
 
@@ -30,20 +36,26 @@ void waitForSignalToComplete(OperationContext* opCtx, const SignalT& future) {
 }
 }  // namespace
 
-void waitForRefreshToComplete(OperationContext* opCtx, const SharedSemiFuture<void>& future) {
-    waitForSignalToComplete(opCtx, future);
+bool waitForRefreshToComplete(OperationContext* opCtx, const SharedSemiFuture<void>& refresh) try {
+    waitForSignalToComplete(opCtx, refresh);
+    return true;
+} catch (const DBException& ex) {
+    if (ex.code() == ErrorCodes::DatabaseMetadataRefreshCanceled ||
+        ex.code() == ErrorCodes::PlacementVersionRefreshCanceled ||
+        ex.code() == ErrorCodes::MetadataRefreshCanceledDueToFCVTransition) {
+        return false;
+    }
+    throw;
 }
 
 Status waitForCriticalSectionToComplete(OperationContext* opCtx,
-                                        const CriticalSectionSignal& critSecSignal) noexcept {
-    try {
-        waitForSignalToComplete(opCtx, critSecSignal);
-    } catch (const DBException& ex) {
-        // This is a best-effort attempt to wait for the critical section to complete, so no
-        // need to handle any exceptions
-        return ex.toStatus();
-    }
+                                        const CriticalSectionSignal& critSecSignal) noexcept try {
+    waitForSignalToComplete(opCtx, critSecSignal);
     return Status::OK();
+} catch (const DBException& ex) {
+    // This is a best-effort attempt to wait for the critical section to complete, so no need to
+    // handle any exceptions
+    return ex.toStatus();
 }
 
 }  // namespace refresh_util

@@ -208,7 +208,8 @@ public:
     static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(
         const NamespaceString& nss, const UUID& uuid, bool forDroppedCollection = false) {
         // Fixed OpTime used for synthetic oplog entries. These tests should never read it because
-        // CollectionCacheRecoverer is not installed, so reusing the same value everywhere is fine.
+        // CollectionMetadataSynchronizer is not installed, so reusing the same value everywhere is
+        // fine.
         return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
                                            nss.getCommandNS(),
                                            BSON("invalidateCollectionMetadata"
@@ -226,7 +227,8 @@ public:
         }
 
         // Fixed OpTime used for synthetic oplog entries. These tests should never read it because
-        // CollectionCacheRecoverer is not installed, so reusing the same value everywhere is fine.
+        // CollectionMetadataSynchronizer is not installed, so reusing the same value everywhere is
+        // fine.
         return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
                                            nss,
                                            BSON("updateCollectionMetadata"

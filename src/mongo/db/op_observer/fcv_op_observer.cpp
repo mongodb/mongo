@@ -21,6 +21,7 @@
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_recoverer_tracker.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -114,7 +115,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
 
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         if (role && role->has(ClusterRole::ShardServer)) {
-            FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
+            ShardCatalogRecovererTracker::get(opCtx)->interruptIncompatibleRecoveries(opCtx);
         }
     } catch (const DBException&) {
         // Swallow the error when running within a recovery unit to avoid process termination.
