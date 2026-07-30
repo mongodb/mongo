@@ -187,6 +187,9 @@ public:
                         !hasQueryType(cmd.getEncryptedFields().get(),
                                       QueryTypeEnum::RangePreviewDeprecated));
 
+                EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(
+                    cmd.getEncryptedFields().get());
+
                 if (!gFeatureFlagQETextSearchPreview.isEnabledUseLastLTSFCVWhenUninitialized(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
