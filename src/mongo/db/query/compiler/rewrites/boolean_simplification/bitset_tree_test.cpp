@@ -152,4 +152,18 @@ TEST(BitsetTreeTests, ApplyDeMorgan) {
     root.applyDeMorgan();
     ASSERT_EQ(expectedRoot, root);
 }
+
+// A disjunction of a literal and its complement on the same bit, i.e. (x) | (~x), is a tautology
+// and must convert to an always-true (empty $and) tree. See SERVER-131802.
+TEST(ConvertToBitsetTreeTests, OrOfComplementaryLiteralsIsAlwaysTrue) {
+    Maxterm maxterm{
+        {"1", "1"},
+        {"0", "1"},
+    };
+
+    BitsetTreeNode expectedTree{BitsetTreeNode::And, false};
+
+    auto tree = convertToBitsetTree(maxterm);
+    ASSERT_EQ(expectedTree, tree);
+}
 }  // namespace mongo::boolean_simplification
