@@ -3,11 +3,14 @@
 
 #include "mongo/client/retry_strategy.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/join_thread.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
@@ -290,6 +293,40 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyDefaultCallbackErrorLabelNonRetrya
 TEST_F(RetryStrategyTest, DefaultRetryCriteriaDoesNotRetryIFRFlagRetry) {
     const Status ifrStatus{IFRFlagRetryInfo{"someFlag"}, "flag retry"};
     ASSERT_FALSE(DefaultRetryStrategy::defaultRetryCriteria(ifrStatus, {}));
+}
+
+TEST_F(RetryStrategyTest, GetRetryParametersFromServerParametersUsesConfiguredValues) {
+    unittest::ServerParameterGuard baseBackoffGuard{"defaultClientBaseBackoffMillis", 250};
+    unittest::ServerParameterGuard maxBackoffGuard{"defaultClientMaxBackoffMillis", 4000};
+    unittest::ServerParameterGuard maxRetryAttemptsGuard{"defaultClientMaxRetryAttempts", 5};
+
+    const auto params = DefaultRetryStrategy::getRetryParametersFromServerParameters();
+    ASSERT_EQ(params.baseBackoff, Milliseconds{250});
+    ASSERT_EQ(params.maxBackoff, Milliseconds{4000});
+    ASSERT_EQ(params.maxRetryAttempts, 5);
+}
+
+TEST_F(RetryStrategyTest, GetRetryParametersFromServerParametersClampsBaseBackoffToMaxBackoff) {
+    unittest::ServerParameterGuard baseBackoffGuard{"defaultClientBaseBackoffMillis", 8000};
+    unittest::ServerParameterGuard maxBackoffGuard{"defaultClientMaxBackoffMillis", 3000};
+
+    unittest::LogCaptureGuard logs;
+
+    const auto params = DefaultRetryStrategy::getRetryParametersFromServerParameters();
+    ASSERT_EQ(params.baseBackoff, Milliseconds{3000});
+    ASSERT_EQ(params.maxBackoff, Milliseconds{3000});
+
+    for (int i = 0; i < 4; ++i) {
+        DefaultRetryStrategy::getRetryParametersFromServerParameters();
+    }
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13238300)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("defaultClientBaseBackoffMillis" << 8000))),
+              1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("defaultClientMaxBackoffMillis" << 3000))),
+              1);
 }
 
 TEST_F(RetryStrategyTest, DefaultRetryStrategyTargetingMetadataInitiallyEmpty) {

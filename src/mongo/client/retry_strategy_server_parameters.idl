@@ -12,6 +12,8 @@ server_parameters:
         description: >-
             Controls the default base backoff for the default retry strategy. When performing
             retries, the server will use this base backoff as a factor for the exponential delay.
+            If this value is larger than defaultClientMaxBackoffMillis, the server will use
+            defaultClientMaxBackoffMillis as the default base backoff instead.
         set_at: [startup, runtime]
         cpp_varname: gDefaultClientBaseBackoffMillis
         cpp_vartype: Atomic<int32_t>
