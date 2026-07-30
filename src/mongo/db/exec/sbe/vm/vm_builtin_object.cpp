@@ -3,6 +3,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/value_size.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #include <string_view>
@@ -131,6 +132,9 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
         obj->reserve(arity / 2);
     }
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; idx += 2) {
         auto nameView = viewFromStack(idx);
 
@@ -138,9 +142,17 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
             return value::TagValueMaybeOwned::nothing();
         }
 
+        auto name = value::getStringView(nameView.tag, nameView.value);
         auto fieldView = viewFromStack(idx + 1);
-        obj->push_back(value::getStringView(nameView.tag, nameView.value),
-                       value::copyValue(fieldView.tag, fieldView.value));
+        currentMemoryBytes +=
+            name.size() + value::getApproximateSize(fieldView.tag, fieldView.value);
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream() << "$object would use too much memory (" << currentMemoryBytes
+                                    << " bytes) and cannot spill to disk. Memory limit: "
+                                    << maxMemoryBytes << " bytes");
+        }
+        obj->push_back(name, value::copyValue(fieldView.tag, fieldView.value));
     }
 
     return std::move(result);

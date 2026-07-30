@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -79,6 +82,15 @@ protected:
             actualResult.first, actualResult.second, expectedResult.first, expectedResult.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(compareValue, 0);
+    }
+
+    static BSONArray makeLargeBsonArray(int numElements, size_t valueSizeBytes) {
+        BSONArrayBuilder builder;
+        const std::string value(valueSizeBytes, 'a');
+        for (int i = 0; i < numElements; ++i) {
+            builder.append(value);
+        }
+        return builder.arr();
     }
 };
 
@@ -164,6 +176,35 @@ TEST_F(SBEBuiltinZipArraysTest, NonArrayInputReturnsNothing) {
     value::TagValueOwned resultGuard = value::TagValueOwned::fromRaw(result);
 
     ASSERT_EQ(result.first, value::TypeTags::Nothing);
+}
+
+TEST_F(SBEBuiltinZipArraysTest, ZipArraysWithinLimitSucceeds) {
+    auto input1 = makeArray(makeLargeBsonArray(10, 1024));
+    value::TagValueOwned input1Guard = value::TagValueOwned::fromRaw(input1);
+    auto input2 = makeArray(makeLargeBsonArray(10, 1024));
+    value::TagValueOwned input2Guard = value::TagValueOwned::fromRaw(input2);
+
+    // 2 arrays * 10 elements * 1024 bytes zipped = ~20KB; limit set well above that.
+    unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                         30 * 1024};
+    auto result = runExpression({input1, input2}, false /* useLongestLength */, boost::none);
+    value::TagValueOwned resultGuard = value::TagValueOwned::fromRaw(result);
+
+    ASSERT(value::isArray(result.first));
+    ASSERT_EQ(value::getArrayView(result.second)->size(), 10u);
+}
+
+TEST_F(SBEBuiltinZipArraysTest, ZipArraysExceedsMemoryLimit) {
+    auto input1 = makeArray(makeLargeBsonArray(10, 1024));
+    value::TagValueOwned input1Guard = value::TagValueOwned::fromRaw(input1);
+    auto input2 = makeArray(makeLargeBsonArray(10, 1024));
+    value::TagValueOwned input2Guard = value::TagValueOwned::fromRaw(input2);
+
+    unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                         10 * 1024};
+    ASSERT_THROWS_CODE(runExpression({input1, input2}, false /* useLongestLength */, boost::none),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
 }
 
 }  // namespace mongo::sbe

@@ -4,12 +4,15 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -34,6 +37,17 @@ protected:
         value::ValueGuard guard(tag, val);
 
         ASSERT_EQUALS(value::TypeTags::Nothing, tag);
+    }
+
+    std::unique_ptr<EExpression> makeNewObjOfLargeValues(size_t numFields, size_t valueSize) {
+        EExpression::Vector args;
+        args.reserve(numFields * 2);
+        const std::string largeStr(valueSize, 'a');
+        for (size_t i = 0; i < numFields; ++i) {
+            args.emplace_back(makeStringConstant("f" + std::to_string(i)));
+            args.emplace_back(makeStringConstant(largeStr));
+        }
+        return makeFunction(EFn::kNewObj, std::move(args));
     }
 };
 
@@ -165,5 +179,41 @@ TEST_F(SBENewObjTest, DeepCopiesNestedObjectArgument) {
     auto [innerFieldTag, innerFieldVal] = value::getObjectView(nestedVal)->getField("inner");
     ASSERT_EQUALS(value::TypeTags::NumberInt32, innerFieldTag);
     ASSERT_EQUALS(42, value::bitcastTo<int32_t>(innerFieldVal));
+}
+
+TEST_F(SBENewObjTest, BuildsLargeObjectWithinMemoryLimit) {
+    auto expr = makeNewObjOfLargeValues(10, 1024);
+    auto compiledExpr = compileExpression(*expr);
+
+    value::ValueGuard guard{value::TypeTags::Nothing, 0};
+    auto obj = runAndGetObject(compiledExpr.get(), guard);
+    ASSERT_EQUALS(10u, obj->size());
+}
+
+TEST_F(SBENewObjTest, ThrowsWhenMemoryLimitExceeded) {
+    auto expr = makeNewObjOfLargeValues(10, 1024);
+    auto compiledExpr = compileExpression(*expr);
+
+    unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                         10 * 1024};
+    ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST_F(SBENewObjTest, CountsFieldNamesTowardMemoryLimit) {
+    EExpression::Vector args;
+    const std::string longKey(200, 'k');
+    for (int i = 0; i < 10; ++i) {
+        args.emplace_back(makeStringConstant(longKey + std::to_string(i)));
+        args.emplace_back(makeInt32Constant(1));
+    }
+    auto expr = makeFunction(EFn::kNewObj, std::move(args));
+    auto compiledExpr = compileExpression(*expr);
+
+    unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes", 500};
+    ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
 }
 }  // namespace mongo::sbe

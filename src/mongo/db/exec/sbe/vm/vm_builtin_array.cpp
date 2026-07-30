@@ -34,9 +34,22 @@ value::TagValueMaybeOwned ByteCode::builtinNewArray(ArityType arity) {
     auto arr = value::getArrayView(result.value());
 
     if (arity) {
+        size_t currentMemoryBytes = 0;
+        const size_t maxMemoryBytes =
+            internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
         arr->reserve(arity);
         for (ArityType idx = 0; idx < arity; ++idx) {
-            arr->push_back(moveOwnedFromStack(idx));
+            auto elem = moveOwnedFromStack(idx);
+            currentMemoryBytes += value::getApproximateSize(elem.tag(), elem.value());
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$array would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
+            arr->push_back(std::move(elem));
         }
     }
 
@@ -196,6 +209,9 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
     auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto resView = value::getArrayView(result.value());
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto elem = viewFromStack(idx);
         if (!value::isArray(elem.tag)) {
@@ -203,6 +219,14 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
         }
 
         value::arrayForEach(elem.tag, elem.value, [&](value::TypeTags elTag, value::Value elVal) {
+            currentMemoryBytes += value::getApproximateSize(elTag, elVal);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$concatArrays would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
             resView->push_back_raw(value::copyValue(elTag, elVal));
         });
     }
@@ -287,6 +311,9 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
     auto* resView = value::getArrayView(result.value());
     resView->reserve(outputLength);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
     for (size_t row = 0; row < outputLength; row++) {
         // Used to construct each array in the output, e.g. [1, 2, 3].
         auto intermediateRes = value::TagValueOwned::fromRaw(value::makeNewArray());
@@ -310,6 +337,14 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
                 // Add a null default value.
                 intermediateResView->push_back_raw(value::TypeTags::Null, 0);
             }
+        }
+        currentMemoryBytes +=
+            value::getApproximateSize(intermediateRes.tag(), intermediateRes.value());
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream() << "$zip would use too much memory (" << currentMemoryBytes
+                                    << " bytes) and cannot spill to disk. Memory limit: "
+                                    << maxMemoryBytes << " bytes");
         }
         resView->push_back(std::move(intermediateRes));
     }

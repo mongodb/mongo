@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_size.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo {
@@ -147,12 +148,24 @@ value::TagValueMaybeOwned setUnion(const std::vector<value::TypeTags>& argTags,
     value::TagValueOwned res{value::makeNewArraySet(collator)};
     auto resView = value::getArraySetView(res.value());
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
     for (size_t idx = 0; idx < argVals.size(); ++idx) {
         auto argTag = argTags[idx];
         auto argVal = argVals[idx];
 
         value::arrayForEach(argTag, argVal, [&](value::TypeTags elTag, value::Value elVal) {
-            resView->push_back_clone(elTag, elVal);
+            if (resView->push_back_clone(elTag, elVal)) {
+                currentMemoryBytes += value::getApproximateSize(elTag, elVal);
+                if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                    uasserted(ErrorCodes::ExceededMemoryLimit,
+                              str::stream()
+                                  << "$setUnion would use too much memory (" << currentMemoryBytes
+                                  << " bytes) and cannot spill to disk. Memory limit: "
+                                  << maxMemoryBytes << " bytes");
+                }
+            }
         });
     }
     return std::move(res);
