@@ -1,5 +1,5 @@
 export var MetadataConsistencyChecker = (function () {
-    const run = (mongos, ignoreInconsistenciesTempWorkaround = false) => {
+    const run = (mongos) => {
         const adminDB = mongos.getDB("admin");
 
         // The isTransientError() function is responsible for setting an error as transient and
@@ -86,41 +86,6 @@ export var MetadataConsistencyChecker = (function () {
                         inconsistencies.splice(i, 1); // Remove inconsistency
                     }
                 }
-            }
-
-            // Temporary workaround: tolerate these inconsistencies until linked tickets are fixed.
-            const shouldIgnoreInconsistencyTempWorkaround = (inconsistency) => {
-                if (inconsistency.type !== "InconsistentShardCatalogCollectionMetadata") {
-                    return false;
-                }
-                const details = inconsistency.details;
-                if (!details) {
-                    return false;
-                }
-                const innerDetails = details.details;
-                if (!innerDetails) {
-                    return false;
-                }
-
-                // TODO (SERVER-131571): Re-enable this check.
-                const isPausedMigrationShardCatalogEntryMismatch =
-                    innerDetails.field === "shardCatalogEntry" &&
-                    innerDetails.source === "inMemoryShardCatalog" &&
-                    innerDetails.shardCatalog &&
-                    innerDetails.globalCatalog &&
-                    !innerDetails.shardCatalog.hasOwnProperty("allowChunkOperations") &&
-                    innerDetails.globalCatalog.allowChunkOperations === false;
-
-                return isPausedMigrationShardCatalogEntryMismatch;
-            };
-            if (ignoreInconsistenciesTempWorkaround) {
-                inconsistencies = inconsistencies.filter((inconsistency) => {
-                    if (!shouldIgnoreInconsistencyTempWorkaround(inconsistency)) {
-                        return true;
-                    }
-                    jsTest.log.info("Ignored metadata inconsistency (workaround)", {inconsistency});
-                    return false;
-                });
             }
 
             assert.eq(
