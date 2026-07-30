@@ -142,16 +142,16 @@ describe("maxTimeMS query setting enforcement", function () {
         };
     }
 
-    // Returns the 'durationMillis' of the most recently logged slow query tagged with 'comment'
-    // that timed out due to maxTimeMS expiry. Reads every discovered node's own log (rather than
-    // just 'db''s) since the query may have actually executed on a different node than 'db' is
+    // Returns the 'durationMillis' of every logged slow query tagged with 'comment' that timed
+    // out due to maxTimeMS expiry. Reads every discovered node's own log (rather than just
+    // 'db''s) since the query may have actually executed on a different node than 'db' is
     // connected to (e.g. under random mongos dispatch or secondary-read redirection); each node
     // is queried through a fresh, direct connection so this doesn't depend on 'db' targeting any
     // particular node.
-    function getLastDurationMillis(comment) {
+    function getDurationsMillis(comment) {
         const slowQueryLogId = 51803; // ID for 'Slow query' log messages.
         const hosts = DiscoverTopology.findNonConfigNodes(db.getMongo());
-        const messages = hosts
+        return hosts
             .flatMap(
                 (host) =>
                     checkLog.getFilteredLogMessages(new Mongo(host), slowQueryLogId, {}) || [],
@@ -160,9 +160,27 @@ describe("maxTimeMS query setting enforcement", function () {
                 (message) =>
                     message.attr.command?.comment === comment &&
                     message.attr.errName === "MaxTimeMSExpired",
-            );
-        assert.gt(messages.length, 0, "expected at least one slow query log line", {messages});
-        return messages[messages.length - 1].attr.durationMillis;
+            )
+            .map((message) => message.attr.durationMillis);
+    }
+
+    function runTimedOutQueryAndGetDurationsMillis(cmd) {
+        const kMaxAttempts = 10;
+        const kReadAttempts = 3;
+        for (let attempt = 1; attempt <= kMaxAttempts; attempt++) {
+            assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.MaxTimeMSExpired);
+            for (let readAttempt = 1; readAttempt <= kReadAttempts; readAttempt++) {
+                const durations = getDurationsMillis(cmd.comment);
+                if (durations.length > 0) {
+                    return durations;
+                }
+            }
+            jsTest.log.info("No matching slow query log line found (evicted or read failed)", {
+                attempt,
+                comment: cmd.comment,
+            });
+        }
+        assert(false, `No slow query log line found in ${kMaxAttempts} attempts`);
     }
 
     it("QS maxTimeMS causes MaxTimeMSExpired", function () {
@@ -194,17 +212,15 @@ describe("maxTimeMS query setting enforcement", function () {
         qsutils.withQuerySettings(aggCmd, {maxTimeMS: kLooseMaxTimeMS}, () => {
             const fp = hangMatchingQuery(comment);
             try {
-                assert.commandFailedWithCode(
-                    db.runCommand({
-                        ...makeAggCmd({a: 1}),
-                        maxTimeMS: kTightMaxTimeMS,
-                        comment,
-                    }),
-                    ErrorCodes.MaxTimeMSExpired,
-                );
+                const durations = runTimedOutQueryAndGetDurationsMillis({
+                    ...makeAggCmd({a: 1}),
+                    maxTimeMS: kTightMaxTimeMS,
+                    comment,
+                });
                 // Had the tight user value won, this would have run for ~kTightMaxTimeMS, not
-                // ~kLooseMaxTimeMS.
-                assert.gte(getLastDurationMillis(comment), kLooseMaxTimeMS);
+                // ~kLooseMaxTimeMS. We assert on the largest duration because e.g. an executing
+                // shard only receives the time remaining from the router, not the full deadline.
+                assert.gte(Math.max(...durations), kLooseMaxTimeMS);
             } finally {
                 fp.off();
             }
@@ -217,19 +233,16 @@ describe("maxTimeMS query setting enforcement", function () {
         qsutils.withQuerySettings(aggCmd, {maxTimeMS: kTightMaxTimeMS}, () => {
             const fp = hangMatchingQuery(comment);
             try {
-                assert.commandFailedWithCode(
-                    db.runCommand({
-                        ...makeAggCmd({a: 1}),
-                        maxTimeMS: kLooseMaxTimeMS,
-                        comment,
-                    }),
-                    ErrorCodes.MaxTimeMSExpired,
-                );
+                const durations = runTimedOutQueryAndGetDurationsMillis({
+                    ...makeAggCmd({a: 1}),
+                    maxTimeMS: kLooseMaxTimeMS,
+                    comment,
+                });
                 // Had the loose user value won, this would have run for ~kLooseMaxTimeMS, not
                 // ~kTightMaxTimeMS. Asserting against kTightUpperBoundMS (rather than just
                 // "< kLooseMaxTimeMS") proves the tight value actually governed, not merely that
                 // the loose one didn't.
-                assert.lt(getLastDurationMillis(comment), kTightUpperBoundMS);
+                assert.lt(Math.min(...durations), kTightUpperBoundMS);
             } finally {
                 fp.off();
             }
@@ -246,17 +259,14 @@ describe("maxTimeMS query setting enforcement", function () {
         qsutils.withQuerySettings(aggCmd, {maxTimeMS: kLooseMaxTimeMS}, () => {
             const fp = hangMatchingQuery(comment);
             try {
-                assert.commandFailedWithCode(
-                    db.runCommand({
-                        ...makeAggCmd({a: 1}),
-                        querySettings: {maxTimeMS: NumberLong(kTightMaxTimeMS)},
-                        comment,
-                    }),
-                    ErrorCodes.MaxTimeMSExpired,
-                );
+                const durations = runTimedOutQueryAndGetDurationsMillis({
+                    ...makeAggCmd({a: 1}),
+                    querySettings: {maxTimeMS: NumberLong(kTightMaxTimeMS)},
+                    comment,
+                });
                 // Had the tight client-side value won, this would have run for
                 // ~kTightMaxTimeMS, not ~kLooseMaxTimeMS.
-                assert.gte(getLastDurationMillis(comment), kLooseMaxTimeMS);
+                assert.gte(Math.max(...durations), kLooseMaxTimeMS);
             } finally {
                 fp.off();
             }
@@ -273,19 +283,16 @@ describe("maxTimeMS query setting enforcement", function () {
         qsutils.withQuerySettings(aggCmd, {maxTimeMS: kTightMaxTimeMS}, () => {
             const fp = hangMatchingQuery(comment);
             try {
-                assert.commandFailedWithCode(
-                    db.runCommand({
-                        ...makeAggCmd({a: 1}),
-                        querySettings: {maxTimeMS: NumberLong(kLooseMaxTimeMS)},
-                        comment,
-                    }),
-                    ErrorCodes.MaxTimeMSExpired,
-                );
+                const durations = runTimedOutQueryAndGetDurationsMillis({
+                    ...makeAggCmd({a: 1}),
+                    querySettings: {maxTimeMS: NumberLong(kLooseMaxTimeMS)},
+                    comment,
+                });
                 // Had the loose client-side value won, this would have run for
                 // ~kLooseMaxTimeMS, not ~kTightMaxTimeMS. Asserting against kTightUpperBoundMS
                 // (rather than just "< kLooseMaxTimeMS") proves the tight value actually
                 // governed, not merely that the loose one didn't.
-                assert.lt(getLastDurationMillis(comment), kTightUpperBoundMS);
+                assert.lt(Math.min(...durations), kTightUpperBoundMS);
             } finally {
                 fp.off();
             }
