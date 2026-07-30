@@ -1343,5 +1343,7 @@ error_codes:
 
   - {code: 522, name: RetryBackoff}
 
+  - {code: 523, name: InvalidBSONFromJavaScript, categories: [ValidationError]}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

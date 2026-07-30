@@ -82,12 +82,14 @@ mongo_cc_library(
         "//bazel/config:wasi": [
             # WASI builds don't need scripting_common (avoids networking/SSL dependencies)
             # and use SpiderMonkey headers from @spidermonkey_wasi, not //src/third_party/mozjs
+            "//src/mongo/bson:bson_validate",
             "//src/mongo/util:buildinfo",
             "@spidermonkey_wasi//:headers",
             "//src/mongo/scripting/mozjs/wasm/engine:headers",
             "//src/mongo/scripting/mozjs/shared:mozjs_shared_types",
         ],
         "//conditions:default": [
+            "//src/mongo/bson:bson_validate",
             "//src/mongo/scripting:scripting_common",
             "//src/mongo/util:buildinfo",
             "//src/third_party/mozjs",

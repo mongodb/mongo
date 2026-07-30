@@ -20,6 +20,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -354,6 +355,39 @@ TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitReusesOperationContextA
 
     Value secondResult = evaluateJsEmit("function() {emit(this.c, 2)};", Document{BSON("c" << 9)});
     ASSERT_VALUE_EQ(secondResult, Value(BSON_ARRAY(BSON("k" << 9 << "v" << 2))));
+}
+
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionRejectsMalformedBSONColumn) {
+    auto bsonExpr = BSON("expr" << BSON("body" << "function() { return new BinData(7, 'Ag=='); };"
+                                               << "args" << BSONArray() << "lang"
+                                               << ExpressionFunction::kJavaScript));
+    auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()),
+                       AssertionException,
+                       ErrorCodes::InvalidBSONFromJavaScript);
+}
+
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionPreservesExceededMemoryLimit) {
+    unittest::ServerParameterGuard memLimitParam("bsonMaxExpandedMemUsage", 1);
+    auto bsonExpr =
+        BSON("expr" << BSON("body"
+                            << "function() { return new BinData(7, "
+                               "'AQAAAAAAAAAAQJN/AAAAAAAAAAIAAAAAAAAABwAAAAAAAAAOAAAAAAAAAAA='); };"
+                            << "args" << BSONArray() << "lang" << ExpressionFunction::kJavaScript));
+    auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_CODE(
+        expr->evaluate({}, getVariables()), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitRejectsMalformedBSONColumn) {
+    auto bsonExpr =
+        BSON("expr" << BSON("this" << "$$ROOT"
+                                   << "eval"
+                                   << "function() { emit(this._id, new BinData(7, 'Ag==')); }"));
+    auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_CODE(expr->evaluate(Document{BSON("_id" << 1)}, getVariables()),
+                       AssertionException,
+                       ErrorCodes::InvalidBSONFromJavaScript);
 }
 }  // namespace
 }  // namespace mongo

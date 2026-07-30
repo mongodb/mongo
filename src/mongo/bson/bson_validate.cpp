@@ -1016,4 +1016,15 @@ Status validateBSONColumn(const char* originalBuffer,
         originalBuffer, maxLength, uncompressedSize, mode, validationVersion);
 }
 
+void uassertValidBSONFromJavaScript(const BSONObj& obj, std::string_view context) {
+    if (auto status = validateBSON(obj); !status.isOK()) {
+        std::string ctx{context};
+        if (status.code() == ErrorCodes::ExceededMemoryLimit) {
+            uassertStatusOKWithContext(status, ctx);
+        }
+        uasserted(ErrorCodes::InvalidBSONFromJavaScript,
+                  str::stream() << ctx << ": " << status.toString());
+    }
+}
+
 }  // namespace mongo
