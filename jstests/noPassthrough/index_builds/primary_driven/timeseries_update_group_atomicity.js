@@ -71,7 +71,9 @@ const awaitIndex = IndexBuildTest.startIndexBuild(
     {v: 1},
     {name: indexName},
 );
-IndexBuildTest.waitForIndexBuildToStart(db, collName, indexName);
+// Wait for the scan phase, not just registration. Side writes are only captured once the build
+// thread has initialized, so a write made earlier would bypass the side table.
+IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, indexName);
 
 // Append one measurement to each existing bucket: >1 bucket update op in one batched write, each
 // producing container side writes. Capture the oplog timestamp first so the check below skips the

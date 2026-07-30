@@ -70,7 +70,9 @@ function runScenario({retryable}) {
         {x: 1},
         {name: indexName},
     );
-    IndexBuildTest.waitForIndexBuildToStart(db, collName, indexName);
+    // Wait for the scan phase, not just registration. Side writes are only captured once the
+    // build thread has initialized, so a write made earlier would bypass the side table.
+    IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, indexName);
 
     let session;
     let insertColl = coll;
