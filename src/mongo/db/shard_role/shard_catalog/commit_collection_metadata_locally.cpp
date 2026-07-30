@@ -429,6 +429,7 @@ void commitCollectionMetadataLocallyImpl(OperationContext* opCtx,
                                          const CollectionType& coll,
                                          const std::vector<ChunkType>& ownedChunks,
                                          bool isDbPrimaryShard,
+                                         bool commitAllowChunkOperations,
                                          const CommitCollectionMetadataOptions& options) {
     if (options.rewritePersistedChunks) {
         // Drop any prior chunks for this collection so repeated calls don't accumulate stale rows.
@@ -446,6 +447,18 @@ void commitCollectionMetadataLocallyImpl(OperationContext* opCtx,
         deleteCollectionEntryLocally(opCtx, nss);
     }
 
+    auto setAllowChunkOperations = [&] {
+        if (!commitAllowChunkOperations) {
+            return;
+        }
+        const bool allowChunkOperations = coll.getAllowChunkOperations();
+        {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+            scopedCsr->setAllowChunkOperations(allowChunkOperations);
+        }
+        setAllowChunkOperationsOnSecondaries(opCtx, nss, coll.getUuid(), allowChunkOperations);
+    };
+
     switch (options.notifyMode) {
         case CommitCollectionMetadataOptions::NotifyMode::kNone:
             return;
@@ -457,6 +470,7 @@ void commitCollectionMetadataLocallyImpl(OperationContext* opCtx,
                 // Update this node's CSR with collection metadata and chunks as an optimization,
                 // so the next query doesn't have to recover it from disk.
                 updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
+                setAllowChunkOperations();
             }
             return;
         case CommitCollectionMetadataOptions::NotifyMode::kInvalidateIfStale:
@@ -470,6 +484,7 @@ void commitCollectionMetadataLocallyImpl(OperationContext* opCtx,
                         .getShardPlacementVersion();
                 invalidateCollectionMetadata(
                     opCtx, nss, coll.getUuid(), false /* forDroppedCollection */, diskShardVersion);
+                setAllowChunkOperations();
             }
             return;
     }
@@ -689,15 +704,6 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         }
     };
 
-    auto setAllowChunkOperations = [&](const NamespaceString& nss, const CollectionType& coll) {
-        const bool allowChunkOperations = coll.getAllowChunkOperations();
-        {
-            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-            scopedCsr->setAllowChunkOperations(allowChunkOperations);
-        }
-        setAllowChunkOperationsOnSecondaries(opCtx, nss, coll.getUuid(), allowChunkOperations);
-    };
-
     // Fetches the target collection's entry from the CSRS. If it's untracked, the rename left
     // nothing to persist in the local shard catalog: log it, clear the target's in-memory state
     // (the durable collection entry was already deleted above), and return boost::none so the
@@ -739,8 +745,8 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         if (!coll) {
             return;
         }
-        commitCollectionMetadataLocally(opCtx, toNss, isDbPrimaryShard);
-        setAllowChunkOperations(toNss, *coll);
+        commitCollectionMetadataLocally(
+            opCtx, toNss, isDbPrimaryShard, true /*commitAllowChunkOperations*/);
         return;
     }
 
@@ -781,13 +787,10 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         newEntry,
         ownedChunks,
         isDbPrimaryShard,
+        true /*commitAllowChunkOperations*/,
         {.rewritePersistedChunks = false,
          .notifyMode =
              CommitCollectionMetadataOptions::NotifyMode::kInvalidateThenReinstallOnPrimary});
-
-    // The invalidate above used forDroppedCollection=false (the target survives the rename), so it
-    // left the in-memory allowChunkOperations flag untouched. Re-sync it.
-    setAllowChunkOperations(toNss, newEntry);
 
     // The old chunks will now get cleaned up outside of the critical section if the rename actually
     // replaced an existing sharded collection.
@@ -795,14 +798,16 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
 
 void commitCollectionMetadataLocally(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     bool isDbPrimaryShard) {
+                                     bool isDbPrimaryShard,
+                                     bool commitAllowChunkOperations) {
     // The shard catalog commit holds the critical section blocking reads and writes, so it must not
     // be deprioritized by execution control.
     admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
 
     auto coll = fetchCollection(opCtx, nss);
     const auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
-    commitCollectionMetadataLocallyImpl(opCtx, nss, coll, ownedChunks, isDbPrimaryShard, {});
+    commitCollectionMetadataLocallyImpl(
+        opCtx, nss, coll, ownedChunks, isDbPrimaryShard, commitAllowChunkOperations, {});
 
     ShardingStatistics::get(opCtx)
         .collectionShardingMetadataStatistics.registerLocalCollectionMetadataCommit();
@@ -834,6 +839,7 @@ void cloneCollectionMetadataLocally(OperationContext* opCtx,
         coll,
         ownedChunks,
         isDbPrimaryShard,
+        false /*commitAllowChunkOperations*/,
         {.notifyMode = CommitCollectionMetadataOptions::NotifyMode::kInvalidateIfStale});
 
     ShardingStatistics::get(opCtx)
@@ -989,7 +995,7 @@ void commitCreateCollection(OperationContext* opCtx,
                             const NamespaceString& tempReshardingNss,
                             bool isDbPrimaryShard) {
     return shard_catalog_commit::commitCollectionMetadataLocally(
-        opCtx, tempReshardingNss, isDbPrimaryShard);
+        opCtx, tempReshardingNss, isDbPrimaryShard, true /*commitAllowChunkOperations*/);
 }
 
 void commitDropCollection(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {

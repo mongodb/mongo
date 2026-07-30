@@ -72,7 +72,7 @@ public:
                 bool isPrimaryDbShard =
                     ShardingState::get(newOpCtx.get())->shardId() == request().getPrimaryShardId();
                 shard_catalog_commit::commitCollectionMetadataLocally(
-                    newOpCtx.get(), ns(), isPrimaryDbShard);
+                    newOpCtx.get(), ns(), isPrimaryDbShard, true /*commitAllowChunkOperations*/);
             }
 
             LOGV2_INFO(

@@ -363,11 +363,13 @@ void renameTrackedCollectionStatement(const txn_api::TransactionClient& txnClien
                                       const boost::optional<UUID>& newTargetCollectionUuid,
                                       const Timestamp& timeInsertion,
                                       const OID& renamedCollectionEpoch,
+                                      bool disallowChunkOperations,
                                       int stmtId) {
     auto newCollectionType = oldCollection;
     newCollectionType.setNss(newNss);
     newCollectionType.setTimestamp(timeInsertion);
     newCollectionType.setEpoch(renamedCollectionEpoch);
+    newCollectionType.setAllowChunkOperations(!disallowChunkOperations);
     if (newTargetCollectionUuid.has_value()) {
         newCollectionType.setUuid(newTargetCollectionUuid.get());
     }
@@ -435,18 +437,29 @@ void deleteZonesStatement(const txn_api::TransactionClient& txnClient, const Nam
     uassertStatusOK(txnClient.runCRUDOpSync(request, {-1}).toStatus());
 }
 
+bool shouldDisallowChunkOperations(AuthoritativeMetadataAccessLevelEnum authMetadataAccessLevel,
+                                   const boost::optional<CollectionType>& collMetadata) {
+    // Chunk operations are disallowed on unsplittable collections, there is no need to explicitly
+    // block them with `allowChunkOperations: false`. Not doing it saves an `allowChunkOperations:
+    // true` command later.
+    return authMetadataAccessLevel >= AuthoritativeMetadataAccessLevelEnum::kWritesAllowed &&
+        collMetadata.has_value() && !collMetadata->getUnsplittable().value_or(false);
+}
+
 // TODO (SERVER-98118): remove the logTargetPlacementChange parameter (assuming a 'false' value)
 // once v9.0 become last-lts.
-void renameCollectionMetadataInTransaction(OperationContext* opCtx,
-                                           const boost::optional<CollectionType>& optFromCollType,
-                                           const NamespaceString& fromNss,
-                                           const NamespaceString& toNss,
-                                           const boost::optional<UUID>& droppedTargetUUID,
-                                           const boost::optional<UUID>& newTargetCollectionUuid,
-                                           const Timestamp& commitTime,
-                                           const OID& renamedCollectionEpoch,
-                                           const std::shared_ptr<executor::TaskExecutor>& executor,
-                                           const OperationSessionInfo& osi) {
+void renameCollectionMetadataInTransaction(
+    OperationContext* opCtx,
+    const boost::optional<CollectionType>& optFromCollType,
+    const NamespaceString& fromNss,
+    const NamespaceString& toNss,
+    const boost::optional<UUID>& droppedTargetUUID,
+    const boost::optional<UUID>& newTargetCollectionUuid,
+    const Timestamp& commitTime,
+    const OID& renamedCollectionEpoch,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const OperationSessionInfo& osi,
+    AuthoritativeMetadataAccessLevelEnum authMetadataAccessLevel) {
     const auto isFromCollTracked = optFromCollType.has_value();
 
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
@@ -461,13 +474,15 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             sharding_ddl_util::deleteTrackedCollectionInTransaction(
                 txnClient, fromNss, fromUUID, stmtId++);
             // Persist the entry for the renamed collection
-            renameTrackedCollectionStatement(txnClient,
-                                             *optFromCollType,
-                                             toNss,
-                                             newTargetCollectionUuid,
-                                             commitTime,
-                                             renamedCollectionEpoch,
-                                             stmtId++);
+            renameTrackedCollectionStatement(
+                txnClient,
+                *optFromCollType,
+                toNss,
+                newTargetCollectionUuid,
+                commitTime,
+                renamedCollectionEpoch,
+                shouldDisallowChunkOperations(authMetadataAccessLevel, optFromCollType),
+                stmtId++);
             // Log the placement change of FROM.
             sharding_ddl_util::upsertPlacementHistoryDocInTransaction(
                 txnClient, fromNss, fromUUID, commitTime, {} /*shards*/, stmtId++);
@@ -1075,6 +1090,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     return now.clusterTime().asTimestamp();
                 }();
 
+                const auto authMetadataAccessLevel = _doc.getAuthoritativeMetadataAccessLevel();
                 const auto renamedCollectionEpoch = OID::gen();
 
                 {
@@ -1088,12 +1104,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                                           commitTime,
                                                           renamedCollectionEpoch,
                                                           **executor,
-                                                          session);
+                                                          session,
+                                                          authMetadataAccessLevel);
                 }
 
-                bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
-                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-                if (isDDLAuthoritative) {
+                if (authMetadataAccessLevel >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                     const auto session = getNewSession(opCtx);
                     sharding_ddl_util::commitRenameCollectionMetadataToShardCatalog(
                         opCtx,
@@ -1108,7 +1124,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         executor,
                         token);
                 }
-
 
                 // Generate post-commit placement change event for FROM.
                 if (preciseChangeStreamTargeterEnabled) {
@@ -1134,6 +1149,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             Phase::kUnblockCRUD,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = nss();
+                const auto& toNss = _request.getTo();
                 // On participant shards:
                 // - Unblock CRUD on participants for both source and destination collections
                 ShardsvrRenameCollectionUnblockParticipant unblockParticipantRequest(
@@ -1161,6 +1177,19 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         NamespaceString::kConfigsvrChunksNamespace,
                         query,
                         defaultMajorityWriteConcernDoNotUse()));
+                }
+
+                if (const auto authMetadataAccessLevel = _doc.getAuthoritativeMetadataAccessLevel();
+                    shouldDisallowChunkOperations(authMetadataAccessLevel,
+                                                  _doc.getOptTrackedCollInfo())) {
+                    // After the commit, the target collection has allowChunkOperations set to
+                    // false. We need to re-enable chunk operations after releasing the CS.
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx,
+                        toNss,
+                        _doc.getNewTargetCollectionUuid(),
+                        [&] { return getNewSession(opCtx); },
+                        authMetadataAccessLevel);
                 }
             }))
         .then(_buildPhaseHandler(
