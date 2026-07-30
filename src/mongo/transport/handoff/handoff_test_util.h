@@ -70,6 +70,7 @@ public:
     std::function<int(int, int)> onListen;
     std::function<int(int*)> onPipe;
     std::function<int(struct pollfd*, nfds_t, int)> onPoll;
+    std::function<int(int, int, int, const void*, socklen_t)> onSetsockopt;
     std::function<int(int, int, int)> onSocket;
     std::function<ssize_t(int, const void*, size_t)> onWrite;
 
@@ -102,6 +103,15 @@ public:
     }
     int poll(struct pollfd* fds, nfds_t n, int t) override {
         return onPoll ? onPoll(fds, n, t) : POSIXInterface::poll(fds, n, t);
+    }
+    int setsockopt(int socket,
+                   int level,
+                   int option_name,
+                   const void* option_value,
+                   socklen_t option_len) override {
+        return onSetsockopt
+            ? onSetsockopt(socket, level, option_name, option_value, option_len)
+            : POSIXInterface::setsockopt(socket, level, option_name, option_value, option_len);
     }
     int socket(int domain, int type, int protocol) override {
         return onSocket ? onSocket(domain, type, protocol)
