@@ -691,7 +691,9 @@ def validate_no_remote_cache_or_execution(bep_json_path: str) -> None:
     """Validate that the build did not use remote cache or remote execution.
 
     Parses a Bazel Build Event Protocol (BEP) JSON file and checks that
-    --remote_executor and --remote_cache were both empty/unset.
+    --remote_executor was empty/unset and --modify_execution_info=.*=+no-cache
+    was set. The remote cache endpoint may still be configured (needed by the
+    remote downloader for artifact caching) as long as action caching is disabled.
     """
     logging.info("Validating no remote cache or execution in BEP file: %s", bep_json_path)
     with open(bep_json_path, "r") as f:
@@ -704,21 +706,21 @@ def validate_no_remote_cache_or_execution(bep_json_path: str) -> None:
                 continue
             cmd_line = event.get("optionsParsed", {}).get("cmdLine", [])
             remote_executor = ""
-            remote_cache = ""
+            has_no_cache = False
             for opt in cmd_line:
                 if opt.startswith("--remote_executor="):
                     remote_executor = opt[len("--remote_executor=") :]
-                elif opt.startswith("--remote_cache="):
-                    remote_cache = opt[len("--remote_cache=") :]
+                elif opt.startswith("--modify_execution_info=") and "no-cache" in opt:
+                    has_no_cache = True
             if remote_executor:
                 raise Exception(
                     f"Build used remote execution: --remote_executor={remote_executor}. "
                     "Release builds must not use remote execution."
                 )
-            if remote_cache:
+            if not has_no_cache:
                 raise Exception(
-                    f"Build used remote cache: --remote_cache={remote_cache}. "
-                    "Release builds must not use remote cache."
+                    "Build did not disable action caching. "
+                    "Release builds must set --modify_execution_info=.*=+no-cache."
                 )
             logging.info("Validated: no remote cache or remote execution detected in BEP")
             return
