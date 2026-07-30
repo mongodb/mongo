@@ -2079,8 +2079,8 @@ export class ReplSetTest {
     /**
      * If query sampling is supported, waits for the query analysis writer to finish setting up
      * after a primary is elected. This is useful for tests that expect particular write timestamps
-     * since the query analysis writer setup involves building indexes for the config.sampledQueries
-     * and config.sampledQueriesDiff collections.
+     * since the query analysis writer setup involves building indexes for the config.sampledQueries,
+     * config.sampledQueriesDiff, and config.analyzeShardKeySplitPoints collections.
      */
     waitForQueryAnalysisWriterSetup(primary) {
         primary = primary || this.getPrimary();
@@ -2108,8 +2108,15 @@ export class ReplSetTest {
             const sampledQueriesDiffIndexes = primary
                 .getCollection("config.sampledQueriesDiff")
                 .getIndexes();
+            const analyzeShardKeySplitPointsIndexes = primary
+                .getCollection("config.analyzeShardKeySplitPoints")
+                .getIndexes();
             // There should be two indexes: _id index and TTL index.
-            return sampledQueriesIndexes.length == 2 && sampledQueriesDiffIndexes.length == 2;
+            return (
+                sampledQueriesIndexes.length == 2 &&
+                sampledQueriesDiffIndexes.length == 2 &&
+                analyzeShardKeySplitPointsIndexes.length == 2
+            );
         }, "Timed out waiting for query analysis writer to finish setting up");
     }
 
