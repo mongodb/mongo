@@ -41,8 +41,11 @@ function getNewDb() {
     return mongos.getDB(dbName + dbCounter++);
 }
 
-function assertNoInconsistencies() {
-    const checkOptions = {"checkIndexes": 1};
+function assertNoInconsistencies(doStrictChunkChecks = true) {
+    const checkOptions = {
+        "checkIndexes": 1,
+        performStrictChunkChecksIfBelowThreshold: doStrictChunkChecks ? 123456789 : 0,
+    };
 
     let res = checkMetadataConsistency(mongos.getDB("admin"), checkOptions);
     assert.eq(
@@ -156,6 +159,14 @@ function isFcvGraterOrEqualTo(fcvRequired) {
         }
     });
     return isFcvGreater;
+}
+
+// Returns the durable shard catalog chunks collection (config.shard.catalog.chunks) on the given
+// shard's replica set primary. Direct edits to this collection desync the shard catalog from the
+// global catalog without touching config.chunks, so the config-server routing-table checks stay
+// clean.
+function durableShardCatalogChunks(rs) {
+    return rs.getPrimary().getDB("config").getCollection("shard.catalog.chunks");
 }
 
 (function testCursor() {
@@ -2039,6 +2050,225 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
     assertNoInconsistencies();
     db.dropDatabase();
+})();
+
+// The following tests exercise the enableCheckMetadataFullChunkChecks parameter, which selects
+// between full (per-chunk) and soft (aggregate) shard-catalog vs global-catalog chunk comparisons.
+// This comparison path only runs when authoritative shard CRUD is enabled, so the tests are skipped
+// otherwise.
+
+(function testSoftChunkChecksNoFalsePositives() {
+    if (!isAuthoritativeShardsCRUDEnabled) {
+        jsTestLog(
+            "Skipping testSoftChunkChecksNoFalsePositives because authoritative shard CRUD is disabled",
+        );
+        return;
+    }
+    jsTest.log("Executing testSoftChunkChecksNoFalsePositives");
+
+    const db = getNewDb();
+    const collName = "coll";
+    const kNss = db.getName() + "." + collName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assert.commandWorked(db.adminCommand({split: kNss, middle: {x: 0}}));
+
+    // A healthy sharded collection must report no inconsistencies with soft chunk checks enabled.
+    assertNoInconsistencies(false);
+
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testSoftChunkChecksDetectMissingDurableChunks() {
+    if (!isAuthoritativeShardsCRUDEnabled) {
+        jsTestLog(
+            "Skipping testSoftChunkChecksDetectMissingDurableChunks because authoritative shard CRUD is disabled",
+        );
+        return;
+    }
+    jsTest.log("Executing testSoftChunkChecksDetectMissingDurableChunks");
+
+    const db = getNewDb();
+    const collName = "coll";
+    const kNss = db.getName() + "." + collName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+
+    const collUuid = configDB.collections.findOne({_id: kNss}).uuid;
+    const shardCatalogChunks = durableShardCatalogChunks(st.rs0);
+    const savedChunks = shardCatalogChunks.find({uuid: collUuid}).toArray();
+    assert.gt(savedChunks.length, 0, savedChunks);
+
+    // Remove the chunks from the durable shard catalog while the global catalog still owns them.
+    // Even soft checks must report this since it is detected via chunk counts alone.
+    assert.commandWorked(shardCatalogChunks.deleteMany({uuid: collUuid}));
+
+    try {
+        const inconsistencies = db
+            .getCollection(collName)
+            .checkMetadataConsistency({performStrictChunkChecksIfBelowThreshold: 0})
+            .toArray();
+        const missingDurableChunks = inconsistencies.filter(
+            (inc) =>
+                inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                inc.details.details.reason ===
+                    "Chunk entries not found in the durable shard catalog " +
+                        "(config.shard.catalog.chunks)",
+        );
+        assert.eq(1, missingDurableChunks.length, tojson(inconsistencies));
+    } finally {
+        // Restore the durable shard catalog chunks before re-enabling full checks.
+        assert.commandWorked(shardCatalogChunks.insertMany(savedChunks));
+    }
+
+    assertNoInconsistencies();
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testFullVsSoftChunkCheckDivergence() {
+    if (!isAuthoritativeShardsCRUDEnabled) {
+        jsTestLog(
+            "Skipping testFullVsSoftChunkCheckDivergence because authoritative shard CRUD is disabled",
+        );
+        return;
+    }
+    jsTest.log("Executing testFullVsSoftChunkCheckDivergence");
+
+    const db = getNewDb();
+    const collName = "coll";
+    const kNss = db.getName() + "." + collName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+
+    const collUuid = configDB.collections.findOne({_id: kNss}).uuid;
+    const shardCatalogChunks = durableShardCatalogChunks(st.rs0);
+    const chunk = shardCatalogChunks.findOne({uuid: collUuid});
+    assert.neq(null, chunk, "expected a durable shard catalog chunk");
+    const originalOnCurrentShardSince = chunk.onCurrentShardSince;
+    const originalValidAfter = chunk.history[0].validAfter;
+
+    // Corrupt a value field on the durable shard-catalog chunk only. The global catalog
+    // (config.chunks) is left untouched, so the count and presence checks pass and the
+    // config-server routing-table checks stay clean; only the per-chunk comparison diverges.
+    // Bump both onCurrentShardSince and the first history validAfter so the durable chunk stays
+    // internally consistent (otherwise the mismatch is caught by intra-chunk validation even in
+    // soft mode) while still differing from the global catalog chunk.
+    const bumpedTimestamp = new Timestamp(originalOnCurrentShardSince.getTime() + 1000, 0);
+    assert.commandWorked(
+        shardCatalogChunks.update(
+            {_id: chunk._id},
+            {
+                $set: {
+                    onCurrentShardSince: bumpedTimestamp,
+                    "history.0.validAfter": bumpedTimestamp,
+                },
+            },
+        ),
+    );
+
+    try {
+        // Full checks compare every chunk field and must catch the durable shard-catalog mismatch.
+        let inconsistencies = db.getCollection(collName).checkMetadataConsistency().toArray();
+        const durableMismatch = inconsistencies.filter(
+            (inc) => inc.type === "InconsistentShardCatalogCollectionMetadata",
+        );
+        assert.eq(1, durableMismatch.length, tojson(inconsistencies));
+
+        // Soft checks only compare chunk counts, so the per-chunk mismatch is intentionally missed.
+        inconsistencies = db
+            .getCollection(collName)
+            .checkMetadataConsistency({performStrictChunkChecksIfBelowThreshold: 0})
+            .toArray();
+        assert(
+            !inconsistencies.some(
+                (inc) => inc.type === "InconsistentShardCatalogCollectionMetadata",
+            ),
+            tojson(inconsistencies),
+        );
+    } finally {
+        assert.commandWorked(
+            shardCatalogChunks.update(
+                {_id: chunk._id},
+                {
+                    $set: {
+                        onCurrentShardSince: originalOnCurrentShardSince,
+                        "history.0.validAfter": originalValidAfter,
+                    },
+                },
+            ),
+        );
+    }
+
+    assertNoInconsistencies();
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testSoftChunkChecksDetectShardVersionMismatch() {
+    if (!isAuthoritativeShardsCRUDEnabled) {
+        jsTestLog(
+            "Skipping testSoftChunkChecksDetectShardVersionMismatch because authoritative shard CRUD is disabled",
+        );
+        return;
+    }
+    jsTest.log("Executing testSoftChunkChecksDetectShardVersionMismatch");
+
+    const db = getNewDb();
+    const collName = "coll";
+    const kNss = db.getName() + "." + collName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+
+    const collUuid = configDB.collections.findOne({_id: kNss}).uuid;
+    const shardCatalogChunks = durableShardCatalogChunks(st.rs0);
+    const chunk = shardCatalogChunks.findOne({uuid: collUuid});
+    assert.neq(null, chunk, "expected a durable shard catalog chunk");
+    const originalLastmod = chunk.lastmod;
+
+    // Bump only the durable shard-catalog chunk's lastmod. Soft checks derive the max chunk version
+    // from the $max of lastmod, so this raises the durable max version above the global one while
+    // the chunk count stays equal. The global catalog (config.chunks) is left untouched, so the
+    // config-server routing-table checks stay clean and only the shard-vs-global version comparison
+    // diverges.
+    const bumpedLastmod = new Timestamp(originalLastmod.getTime() + 1000, 0);
+    assert.commandWorked(
+        shardCatalogChunks.update({_id: chunk._id}, {$set: {lastmod: bumpedLastmod}}),
+    );
+
+    try {
+        const inconsistencies = db
+            .getCollection(collName)
+            .checkMetadataConsistency({performStrictChunkChecksIfBelowThreshold: 0})
+            .toArray();
+        const versionMismatch = inconsistencies.filter(
+            (inc) =>
+                inc.type === "InconsistentShardCatalogCollectionMetadata" &&
+                inc.details.details.field === "shardVersion",
+        );
+        assert.eq(1, versionMismatch.length, tojson(inconsistencies));
+    } finally {
+        assert.commandWorked(
+            shardCatalogChunks.update({_id: chunk._id}, {$set: {lastmod: originalLastmod}}),
+        );
+    }
+
+    assertNoInconsistencies();
+    db.dropDatabase();
+    assertNoInconsistencies();
 })();
 
 st.stop();

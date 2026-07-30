@@ -634,6 +634,16 @@ structs:
                 description: "How metadata is checked on secondaries"
                 type: CheckMetadataConsistencySecondaryMode
                 optional: true
+            performStrictChunkChecksIfBelowThreshold:
+                type: safeInt64
+                description: >
+                    Enables full chunk checks whenever the number of chunks that the receiving shard owns
+                    is below a certain threshold. Otherwise the command will only do a subset of checks
+                    based on the aggregate. Defaults to always running strict checks.
+                default: 1152921504606846975 # = 2^60 - 1
+                validator:
+                    gte: 0
+                    lt: 1152921504606846976 # = 2^60
 
     UniqueIndexInconsistencyInfo:
         description: "Details about unique index misconfiguration."

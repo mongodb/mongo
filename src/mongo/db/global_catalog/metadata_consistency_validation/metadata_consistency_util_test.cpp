@@ -12,6 +12,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/metadata_consistency_validation/check_metadata_consistency_statistics.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
@@ -430,7 +431,8 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
     assertCollectionOptionsMismatchInconsistencyFound(
         inconsistencies,
         BSON("capped" << true),
@@ -482,7 +484,8 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
             localCatalogSnapshot,
             localCatalogCollections,
             false /*checkRangeDeletionIndexes*/,
-            false /*optionalCheckIndexes*/);
+            false /*optionalCheckIndexes*/,
+            0x1000000000000000);
 
         if (expectInconsistencies) {
             BSONObj collationLocalCatalog =
@@ -580,7 +583,8 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                     localCatalogSnapshot,
                     localCatalogCollections,
                     false /*checkRangeDeletionIndexes*/,
-                    false /*optionalCheckIndexes*/);
+                    false /*optionalCheckIndexes*/,
+                    0x1000000000000000);
 
             if (expectInconsistencies) {
                 const BSONObj& localCatalogBSON =
@@ -837,7 +841,8 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
         inconsistencies);
@@ -858,7 +863,8 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
     ASSERT_EQ(0, inconsistencies.size());
 }
 
@@ -908,7 +914,8 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
         inconsistencies);
@@ -929,7 +936,8 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
     ASSERT_EQ(0, inconsistencies.size());
 }
 
@@ -976,7 +984,8 @@ TEST_F(MetadataConsistencyTest,
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        true /*optionalCheckIndexes*/);
+        true /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     assertIncompatibleUniqueIndexFound(inconsistencies);
 }
@@ -1006,7 +1015,8 @@ TEST_F(MetadataConsistencyTest, NonUniqueIndexWithNonSimpleCollationDoesNotRepor
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        true /*optionalCheckIndexes*/);
+        true /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     assertNoIncompatibleUniqueIndexFound(inconsistencies);
 }
@@ -1036,7 +1046,8 @@ TEST_F(MetadataConsistencyTest, UniqueIndexWithSimpleCollationDoesNotReportIncon
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        true /*optionalCheckIndexes*/);
+        true /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     assertNoIncompatibleUniqueIndexFound(inconsistencies);
 }
@@ -1068,7 +1079,8 @@ TEST_F(MetadataConsistencyTest,
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     assertNoIncompatibleUniqueIndexFound(inconsistencies);
 }
@@ -1100,7 +1112,8 @@ TEST_F(MetadataConsistencyTest, UniqueIndexWithNonSimpleCollationAllowedInUnspli
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        true /*optionalCheckIndexes*/);
+        true /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     assertNoIncompatibleUniqueIndexFound(inconsistencies);
 }
@@ -1355,7 +1368,8 @@ protected:
             _localCatalogSnapshot,
             _localCatalogCollections,
             false /*checkRangeDeletionIndexes*/,
-            false /*optionalCheckIndexes*/);
+            false /*optionalCheckIndexes*/,
+            0x1000000000000000);
     }
 
     std::vector<MetadataInconsistencyItem> checkConsistency(const CollectionType& globalCatalogColl,
@@ -2463,7 +2477,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, OrphanCollectrionEntryInUntrackedCol
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
 }
@@ -2489,7 +2504,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, OrphanChunkEntryInUntrackedCollectio
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
 }
@@ -2662,7 +2678,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
 }
@@ -2909,7 +2926,8 @@ TEST_F(MetadataConsistencyTest,
         localCatalogSnapshot,
         localCatalogCollections,
         false /* checkRangeDeletionIndexes */,
-        false /* optionalCheckIndexes */);
+        false /* optionalCheckIndexes */,
+        0x1000000000000000);
 
     ASSERT_TRUE(
         std::none_of(inconsistencies.begin(), inconsistencies.end(), [](const auto& inconsistency) {
@@ -2939,7 +2957,8 @@ TEST_F(MetadataConsistencyTest,
         localCatalogSnapshot,
         localCatalogCollections,
         false /* checkRangeDeletionIndexes */,
-        false /* optionalCheckIndexes */);
+        false /* optionalCheckIndexes */,
+        0x1000000000000000);
 
     assertOneInconsistencyFound(MetadataInconsistencyTypeEnum::kMisplacedCollection,
                                 inconsistencies);
@@ -2967,7 +2986,8 @@ TEST_F(MetadataConsistencyTest, CollectionUUIDMismatchOnSessionsNamespaceHasLowS
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     const auto it =
         std::find_if(inconsistencies.begin(), inconsistencies.end(), [](const auto& item) {
@@ -3002,7 +3022,8 @@ TEST_F(MetadataConsistencyTest, CollectionOptionsMismatchOnSessionsNamespaceHasL
         localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/,
-        false /*optionalCheckIndexes*/);
+        false /*optionalCheckIndexes*/,
+        0x1000000000000000);
 
     const auto it =
         std::find_if(inconsistencies.begin(), inconsistencies.end(), [](const auto& item) {
@@ -3011,6 +3032,150 @@ TEST_F(MetadataConsistencyTest, CollectionOptionsMismatchOnSessionsNamespaceHasL
     ASSERT_NE(it, inconsistencies.end());
     ASSERT_TRUE(it->getSeverity().has_value());
     ASSERT_EQ(MetadataInconsistencySeverityEnum::kLow, it->getSeverity().value());
+}
+
+// Tests for the CheckMetadataConsistencyStatistics observability metrics. The statistics object is
+// standalone, so these tests exercise it directly rather than through the shard server fixture.
+class CheckMetadataConsistencyStatisticsTest : public unittest::Test {
+protected:
+    // Serializes the statistics into a BSONObj by calling report().
+    BSONObj report() const {
+        BSONObjBuilder builder;
+        _stats.report(builder);
+        return builder.obj();
+    }
+
+    CheckMetadataConsistencyStatistics _stats;
+};
+
+TEST_F(CheckMetadataConsistencyStatisticsTest, NumberOfChunksCheckedIsCorrect) {
+    ASSERT_EQ(0, report()["numberOfChunksChecked"].numberLong());
+
+    // The default increment is 1.
+    _stats.registerChunksChecked();
+    ASSERT_EQ(1, report()["numberOfChunksChecked"].numberLong());
+
+    // Batches of chunks are accumulated.
+    _stats.registerChunksChecked(10);
+    ASSERT_EQ(11, report()["numberOfChunksChecked"].numberLong());
+
+    _stats.registerChunksChecked(0);
+    ASSERT_EQ(11, report()["numberOfChunksChecked"].numberLong());
+}
+
+TEST_F(CheckMetadataConsistencyStatisticsTest, NumberOfCollectionsCheckedIsCorrect) {
+    ASSERT_EQ(0, report()["numberOfCollectionsChecked"].numberLong());
+
+    for (int i = 1; i <= 5; ++i) {
+        _stats.registerCollectionChecked();
+        ASSERT_EQ(i, report()["numberOfCollectionsChecked"].numberLong());
+    }
+}
+
+TEST_F(CheckMetadataConsistencyStatisticsTest,
+       NumberOfDatabasesCheckedIsCorrectAndCountsInnerCollections) {
+    ASSERT_EQ(0, report()["numberOfDatabasesChecked"].numberLong());
+    ASSERT_EQ(0, report()["numberOfCollectionsChecked"].numberLong());
+
+    // Simulate checking 2 databases, each holding some collections. Every collection checked within
+    // a database must also be reflected in the collection counter.
+    constexpr int kNumDatabases = 2;
+    constexpr int kCollectionsPerDatabase = 3;
+    for (int db = 0; db < kNumDatabases; ++db) {
+        _stats.registerDatabaseChecked();
+        for (int coll = 0; coll < kCollectionsPerDatabase; ++coll) {
+            _stats.registerCollectionChecked();
+        }
+    }
+
+    ASSERT_EQ(kNumDatabases, report()["numberOfDatabasesChecked"].numberLong());
+    ASSERT_EQ(kNumDatabases * kCollectionsPerDatabase,
+              report()["numberOfCollectionsChecked"].numberLong());
+}
+
+TEST_F(CheckMetadataConsistencyStatisticsTest, ActiveDatabaseDdlLockCountIsCorrect) {
+    ASSERT_EQ(0, report()["activeDdlLocksHeldForDatabase"].numberLong());
+
+    {
+        auto recorder1 = _stats.registerDatabaseDDLLockForStatistics();
+        ASSERT_EQ(1, report()["activeDdlLocksHeldForDatabase"].numberLong());
+
+        {
+            auto recorder2 = _stats.registerDatabaseDDLLockForStatistics();
+            ASSERT_EQ(2, report()["activeDdlLocksHeldForDatabase"].numberLong());
+        }
+
+        // Releasing the inner lock brings the active count back down.
+        ASSERT_EQ(1, report()["activeDdlLocksHeldForDatabase"].numberLong());
+    }
+
+    ASSERT_EQ(0, report()["activeDdlLocksHeldForDatabase"].numberLong());
+}
+
+TEST_F(CheckMetadataConsistencyStatisticsTest, ActiveCollectionDdlLockCountIsCorrect) {
+    ASSERT_EQ(0, report()["activeDdlLocksHeldForCollection"].numberLong());
+
+    {
+        auto recorder1 = _stats.registerCollectionDDLLockForStatistics();
+        auto recorder2 = _stats.registerCollectionDDLLockForStatistics();
+        ASSERT_EQ(2, report()["activeDdlLocksHeldForCollection"].numberLong());
+    }
+
+    ASSERT_EQ(0, report()["activeDdlLocksHeldForCollection"].numberLong());
+}
+
+TEST_F(CheckMetadataConsistencyStatisticsTest, ActiveDdlLockDurationKeepsIncreasing) {
+    auto recorder = _stats.registerDatabaseDDLLockForStatistics();
+
+    const auto firstDuration = report()["activeDdlLocksHeldForDatabaseDurationMillis"].numberLong();
+    sleepFor(Milliseconds(5));
+    const auto secondDuration =
+        report()["activeDdlLocksHeldForDatabaseDurationMillis"].numberLong();
+
+    // While the lock is held, the reported duration must keep growing.
+    ASSERT_GTE(secondDuration, firstDuration);
+    ASSERT_GT(report()["activeDdlLocksHeldForDatabaseDurationMillis"].numberLong(), 0);
+}
+
+TEST_F(CheckMetadataConsistencyStatisticsTest,
+       DatabaseDdlLockDurationIsAddedToCumulativeTotalOnRelease) {
+    ASSERT_EQ(0, report()["ddlLockHeldForDatabaseDurationMillis"].numberLong());
+
+    {
+        auto recorder = _stats.registerDatabaseDDLLockForStatistics();
+        sleepFor(Milliseconds(5));
+
+        // While the lock is held nothing is added to the cumulative total; the time is only tracked
+        // in the active-duration metric.
+        ASSERT_EQ(0, report()["ddlLockHeldForDatabaseDurationMillis"].numberLong());
+        ASSERT_EQ(1, report()["activeDdlLocksHeldForDatabase"].numberLong());
+    }
+
+    // Once released, the held time is accumulated and the lock is no longer active.
+    ASSERT_EQ(0, report()["activeDdlLocksHeldForDatabase"].numberLong());
+    const auto firstCumulative = report()["ddlLockHeldForDatabaseDurationMillis"].numberLong();
+    ASSERT_GT(firstCumulative, 0);
+
+    // A second lock adds on top of the existing cumulative total.
+    {
+        auto recorder = _stats.registerDatabaseDDLLockForStatistics();
+        sleepFor(Milliseconds(5));
+    }
+    ASSERT_GTE(report()["ddlLockHeldForDatabaseDurationMillis"].numberLong(), firstCumulative);
+}
+
+TEST_F(CheckMetadataConsistencyStatisticsTest,
+       CollectionDdlLockDurationIsAddedToCumulativeTotalOnRelease) {
+    ASSERT_EQ(0, report()["ddlLockHeldForCollectionDurationMillis"].numberLong());
+
+    {
+        auto recorder = _stats.registerCollectionDDLLockForStatistics();
+        sleepFor(Milliseconds(5));
+        ASSERT_EQ(0, report()["ddlLockHeldForCollectionDurationMillis"].numberLong());
+    }
+
+    ASSERT_EQ(0, report()["activeDdlLocksHeldForCollection"].numberLong());
+    ASSERT_GT(report()["ddlLockHeldForCollectionDurationMillis"].numberLong(), 0);
 }
 
 }  // namespace

@@ -10,6 +10,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/global_catalog/metadata_consistency_validation/check_metadata_consistency_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_util.h"
 #include "mongo/db/namespace_string.h"
@@ -94,6 +95,7 @@ public:
                     primaryShardId,
                     checkRangeDeletionIndexes,
                     checkIndexes,
+                    request().getPerformStrictChunkChecksIfBelowThreshold(),
                     metadata_consistency_util::RSNodeMode::kPrimary);
 
             // Build a streaming executor that merges the secondaries' cursors (or null if there are

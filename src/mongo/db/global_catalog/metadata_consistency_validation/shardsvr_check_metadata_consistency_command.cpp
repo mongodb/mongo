@@ -43,6 +43,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -281,6 +282,9 @@ public:
                             });
                             DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
                                 opCtx, dbNss.dbName(), kDDLLockReason, MODE_S, backoffStrategy};
+                            auto& stats = ShardingStatistics::get(opCtx).checkMetadataStatistics;
+                            auto recorder = stats.registerDatabaseDDLLockForStatistics();
+
                             tassert(
                                 9504001,
                                 "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
@@ -374,6 +378,9 @@ public:
                     hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                     DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
                         opCtx, nss.dbName(), kDDLLockReason, MODE_S};
+                    auto& stats = ShardingStatistics::get(opCtx).checkMetadataStatistics;
+                    auto recorder = stats.registerDatabaseDDLLockForStatistics();
+
                     tassert(9504002,
                             "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                             !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
@@ -397,6 +404,9 @@ public:
                 hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                 DDLLockManager::ScopedCollectionDDLLock dbDDLLock{
                     opCtx, nss, kDDLLockReason, MODE_S};
+                auto& stats = ShardingStatistics::get(opCtx).checkMetadataStatistics;
+                auto recorder = stats.registerCollectionDDLLockForStatistics();
+
                 tassert(9504003,
                         "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                         !tripwireShardCheckMetadataAfterDDLLock.shouldFail());

@@ -131,5 +131,10 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
         chunkOperationsStatistics.report(subobj);
         subobj.doneFast();
     }
+    {
+        BSONObjBuilder subobj{builder->subobjStart("checkMetadataConsistencyStatistics")};
+        checkMetadataStatistics.report(subobj);
+        subobj.doneFast();
+    }
 }
 }  // namespace mongo
