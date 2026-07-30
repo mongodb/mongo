@@ -1202,17 +1202,22 @@ value::TagValueMaybeOwned ByteCode::builtinAggDenseRank(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinAggRank(ArityType arity) {
     tassert(11080082, "Unexpected arity value", arity == 3);
-    auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
-    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto isAscendingTagVal = value::TagValueMaybeOwned::fromRaw(getFromStack(2));
+    auto valueTagVal = value::TagValueMaybeOwned::fromRaw(getFromStack(1));
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
 
     tassert(8216803,
             "Incorrect value type passed to aggRank for 'isAscending' parameter.",
-            isAscendingTag == value::TypeTags::Boolean);
-    auto isAscending = value::bitcastTo<bool>(isAscendingVal);
+            isAscendingTagVal.tag() == value::TypeTags::Boolean);
+    auto isAscending = value::bitcastTo<bool>(isAscendingTagVal.value());
 
-    return builtinAggRankImpl(
-        stateTag, stateVal, valueOwned, valueTag, valueVal, isAscending, false /* dense */);
+    return builtinAggRankImpl(stateTag,
+                              stateVal,
+                              valueTagVal.owned(),
+                              valueTagVal.tag(),
+                              valueTagVal.value(),
+                              isAscending,
+                              false /* dense */);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAggDenseRankColl(ArityType arity) {

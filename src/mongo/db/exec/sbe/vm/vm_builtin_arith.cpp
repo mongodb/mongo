@@ -98,76 +98,91 @@ value::TagValueMaybeOwned ByteCode::builtinPow(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAcos(ArityType arity) {
+    tassert(12603700, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAcos(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAcosh(ArityType arity) {
+    tassert(12603701, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAcosh(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAsin(ArityType arity) {
+    tassert(12603702, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAsin(operandTag, operandValue);
 }
 value::TagValueMaybeOwned ByteCode::builtinAsinh(ArityType arity) {
+    tassert(12603703, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAsinh(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAtan(ArityType arity) {
+    tassert(12603704, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAtan(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAtanh(ArityType arity) {
+    tassert(12603705, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAtanh(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAtan2(ArityType arity) {
+    tassert(12603706, "Unexpected arity value", arity == 2);
     auto [owned1, operandTag1, operandValue1] = getFromStack(0);
     auto [owned2, operandTag2, operandValue2] = getFromStack(1);
     return genericAtan2(operandTag1, operandValue1, operandTag2, operandValue2);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCos(ArityType arity) {
+    tassert(12603707, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericCos(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCosh(ArityType arity) {
+    tassert(12603708, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericCosh(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDegreesToRadians(ArityType arity) {
+    tassert(12603709, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericDegreesToRadians(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinRadiansToDegrees(ArityType arity) {
+    tassert(12603710, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericRadiansToDegrees(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSin(ArityType arity) {
+    tassert(12603711, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericSin(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSinh(ArityType arity) {
+    tassert(12603712, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericSinh(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinTan(ArityType arity) {
+    tassert(12603713, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericTan(operandTag, operandValue);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinTanh(ArityType arity) {
+    tassert(12603714, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericTanh(operandTag, operandValue);
 }

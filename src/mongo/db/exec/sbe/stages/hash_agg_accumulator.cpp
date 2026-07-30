@@ -339,6 +339,9 @@ void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
     auto [tagPartialSum, valPartialSum] = partialAggregateArray->getAt(0);
     auto [ownedFinalizedSum, tagFinalizedSum, valFinalizedSum] =
         vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagPartialSum, valPartialSum);
+    tassert(12084100,
+            "Expected builtinDoubleDoublePartialSumFinalizeImpl to return owned value",
+            ownedFinalizedSum);
     resultObject->push_back(mongo::stage_builder::partialSumName, tagFinalizedSum, valFinalizedSum);
 
     result.reset(std::move(resultObj));

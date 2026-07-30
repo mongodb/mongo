@@ -169,9 +169,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapp
 
     // Return the unmodified accumulator state when the size cap or collator is malformed.
     if (tagCollator != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
-        auto [arrOwned, arrTag, arrVal] = getFromStack(0);
-        topStack(false, value::TypeTags::Nothing, 0);
-        return {arrOwned, arrTag, arrVal};
+        return accumulatorState.releaseToMaybeOwnedRaw();
     }
 
     return setUnionAccumImpl(std::move(accumulatorState),

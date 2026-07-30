@@ -195,13 +195,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrCP(ArityTy
     auto [lenOwned, lenTag, lenVal] = getFromStack(2);
 
     if (!value::isString(strTag) || startIndexTag != value::TypeTags::NumberInt32 ||
-        lenTag != value::TypeTags::NumberInt32 || startIndexVal < 0 || lenVal < 0) {
+        lenTag != value::TypeTags::NumberInt32) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    int32_t startIndex = value::bitcastTo<int32_t>(startIndexVal);
+    int32_t len = value::bitcastTo<int32_t>(lenVal);
+    if (startIndex < 0 || len < 0) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
     StringData str = value::getStringView(strTag, strVal);
     auto [outTag, outVal] =
-        value::makeNewString(substr_utils::getSubstringCP(str, startIndexVal, lenVal));
+        value::makeNewString(substr_utils::getSubstringCP(str, startIndex, len));
     return {true, outTag, outVal};
 }
 
