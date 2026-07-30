@@ -383,7 +383,12 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
                 estimate(static_cast<const InternalSchemaAllowedPropertiesMatchExpression*>(node));
             break;
         default:
-            MONGO_UNIMPLEMENTED_TASSERT(9586708);
+            // CBR does not know how to estimate this match expression type. Fall back to
+            // multi-planning.
+            return Status(ErrorCodes::UnsupportedCbrNode,
+                          str::stream() << "unsupported match expression type "
+                                        << static_cast<int>(node->matchType())
+                                        << " for CBR CE mode " << idlSerialize(_ceMode));
     }
 
     return ceRes;
