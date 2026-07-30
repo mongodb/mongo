@@ -54,6 +54,8 @@ protected:
         ShardingCoordinatorMetadata metadata(getCoordinatorId());
         metadata.setForwardableOpMetadata(ForwardableOperationMetadata(_opCtx));
         metadata.setDatabaseVersion(kDbVersion);
+        metadata.setAuthoritativeMetadataAccessLevel(
+            AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
         return metadata;
     }
 
