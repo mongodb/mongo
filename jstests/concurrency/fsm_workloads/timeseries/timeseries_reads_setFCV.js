@@ -169,6 +169,14 @@ export const $config = (function () {
         },
     };
 
+    // The legacy shell does not attach readConcern.afterClusterTime to collStats, so it can read a
+    // snapshot predating this workload's setup when causal consistency suites route it to a
+    // secondary. Remove the state and its transitions in those suites, but retain collStats coverage
+    // everywhere else.
+    if (TestData.runningWithCausalConsistency) {
+        delete states.collStatsCmd;
+    }
+
     const setup = function (db, collName, cluster) {
         // Work with multiple collections to maximize the chance we find upgrade/downgrade issues
         // by spending a bigger fraction on time of setFCV on timeseries upgrade/downgrade.
