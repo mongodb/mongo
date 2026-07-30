@@ -3,29 +3,46 @@
 
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace mongo::join_ordering {
+namespace {
+
+// Quantizes a page count to the nearest power of 2^(1/4). This absorbs small run-to-run and
+// platform-dependent variations in the underlying value: 'onDiskSizeBytes' differs by a few percent
+// across platforms and restores of the same data, and the storage engine's leaf page counter
+// reflects timing-dependent page split/eviction/compaction history. The ~9.5% max quantization
+// error is acceptable given the Mackert-Lohman formula is already approximate.
+double quantizePageCount(double pages) {
+    constexpr double kQuantizationGranularity = 4.0;
+    return std::pow(
+        2.0, std::round(kQuantizationGranularity * std::log2(pages)) / kQuantizationGranularity);
+}
+
+}  // namespace
 
 double CollectionStats::numPages() const {
+    // Prefer the storage engine's leaf page count if available: it tracks the actual page structure
+    // of the tree, whereas the size-based fallback assumes leaf pages are filled to
+    // '_pageSizeBytes'.
+    if (_approxNumLeafPages && *_approxNumLeafPages > 0) {
+        return quantizePageCount(*_approxNumLeafPages);
+    }
+
     if (_onDiskSizeBytes <= 0) {
         return 0.0;
     }
+
     tassert(12259201, "pageSizeBytes must be > 0", _pageSizeBytes > 0);
-    double pagesInCollRaw = _onDiskSizeBytes / _pageSizeBytes;
-    // Quantize to the nearest power of 2^(1/4) to absorb small platform-dependent
-    // differences in onDiskSizeBytes (~3% observed between Ubuntu and Amazon Linux 2023 for
-    // TPC-H SF 0.1 orders table). This gives ~9.5% max quantization error, which is acceptable
-    // given the Mackert-Lohman formula is already approximate.
-    constexpr double kQuantizationGranularity = 4.0;
-    return std::pow(2.0,
-                    std::round(kQuantizationGranularity * std::log2(pagesInCollRaw)) /
-                        kQuantizationGranularity);
+    return quantizePageCount(_onDiskSizeBytes / _pageSizeBytes);
 }
 
 double CatalogStats::numPagesInStorageEngineCache(const NamespaceString& nss) const {
     const auto& coll = collStats.at(nss);
     // Estimate the average in memory page size by first estimating the number of leaf pages in
     // the collection. Take care to avoid division by 0 in cases of empty collection.
-    double avgInMemoryPageSize = 32 * 1024;
+    double avgInMemoryPageSize = kDefaultPageSizeBytes;
     double pagesInColl = coll.numPages();
     if (pagesInColl > 0 && coll.logicalDataSizeBytes > 0) {
         avgInMemoryPageSize = coll.logicalDataSizeBytes / pagesInColl;

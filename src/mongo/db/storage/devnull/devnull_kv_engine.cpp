@@ -124,6 +124,10 @@ public:
         return 0;
     }
 
+    boost::optional<int64_t> approxNumLeafPages(RecoveryUnit&) const override {
+        return boost::none;
+    }
+
     bool updateWithDamagesSupported() const override {
         return false;
     }

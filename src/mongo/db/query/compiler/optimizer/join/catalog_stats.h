@@ -8,7 +8,12 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo::join_ordering {
+
+// Approximate size, in bytes, of a single WT data page on-disk (WT's default leaf_page_max).
+constexpr double kDefaultPageSizeBytes = 32 * 1024;
 
 /**
  * Statistics for a single collection.
@@ -16,18 +21,21 @@ namespace mongo::join_ordering {
 struct CollectionStats {
     CollectionStats(double logicalDataSizeBytes,
                     double onDiskSizeBytes,
-                    double pageSizeBytes = 32 * 1024)
+                    double pageSizeBytes = kDefaultPageSizeBytes,
+                    boost::optional<double> approxNumLeafPages = boost::none)
         : logicalDataSizeBytes(logicalDataSizeBytes),
           _onDiskSizeBytes(onDiskSizeBytes),
-          _pageSizeBytes(pageSizeBytes) {}
+          _pageSizeBytes(pageSizeBytes),
+          _approxNumLeafPages(approxNumLeafPages) {}
 
     /**
-     * Returns the estimated number of on-disk pages for this collection, rounded to the nearest
-     * power of 2^(1/4). The purpose is to smooth-out small variations that can occur in
-     * onDiskSizeBytes across different runs of plan stability tests which invoke `mongorestore`
-     * each time. Returns 0 if the collection has no on-disk data. Callers should always prefer this
-     * over accessing the raw on-disk size directly, to avoid sensitivity to non-deterministic
-     * storage engine values.
+     * Returns the estimated number of leaf pages for this collection: the storage engine's
+     * approximate leaf page count when available (see RecordStore::approxNumLeafPages()),
+     * otherwise onDiskSizeBytes / pageSizeBytes. Either way the result is quantized to the
+     * nearest power of 2^(1/4) to absorb small run-to-run variations in the raw inputs. Returns
+     * 0 if the collection has no on-disk data. Callers should always prefer this over accessing
+     * the raw on-disk size directly, to avoid sensitivity to non-deterministic storage engine
+     * values.
      */
     double numPages() const;
 
@@ -36,14 +44,19 @@ struct CollectionStats {
 
 private:
     // Estimate of the data size of this collection on-disk post compression. Not exposed directly —
-    // callers must use numOnDiskPages() which applies quantization to absorb small
+    // callers must use numPages() which applies quantization to absorb small
     // platform-dependent differences in the raw value (e.g. between mongorestore runs).
     double _onDiskSizeBytes;
 
     // Approximate size, in bytes, of a single WT data page on-disk. The optimizer uses this as the
     // I/O granularity when estimating the number of disk I/Os performed by an operator for cost
-    // estimates. Default to 32KiB if not specified.
+    // estimates. Only used by the size-based fallback in numPages().
     double _pageSizeBytes;
+
+    // Approximate leaf page count reported by the storage engine, which maintains it incrementally
+    // as pages split and merge. Much more accurate than the size-based fallback, which wrongly
+    // assumes leaf pages are filled to _pageSizeBytes.
+    boost::optional<double> _approxNumLeafPages;
 };
 
 /**

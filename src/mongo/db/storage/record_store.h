@@ -433,6 +433,15 @@ public:
     virtual int64_t freeStorageSize(RecoveryUnit&) const = 0;
 
     /**
+     * Returns the storage engine's approximate count of leaf pages backing this record store, or
+     * boost::none if the engine does not maintain such a statistic or has not yet recorded a
+     * meaningful value for this table. The count is maintained incrementally by the storage engine
+     * and is cheap to read (no tree walk), but is not exact. Used by the query optimizer's cost
+     * model.
+     */
+    virtual boost::optional<int64_t> approxNumLeafPages(RecoveryUnit&) const = 0;
+
+    /**
      * Get the RecordData at loc, which must exist.
      *
      * If unowned data is returned, it is only valid until either of these happens:

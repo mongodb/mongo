@@ -46,6 +46,31 @@ TEST_F(CatalogStatsTest, FieldsAreUnique) {
     ASSERT_FALSE(fieldsAreUnique({"baz", "qux.subfield"}, uniqueFields));
 }
 
+TEST_F(CatalogStatsTest, NumPagesPrefersStorageEngineLeafPageCount) {
+    // A positive leaf page count is used regardless of the on-disk size, quantized to the nearest
+    // power of 2^(1/4).
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 4096.0).numPages(), 4096.0);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 4140.0).numPages(), 4096.0);
+
+    // Absent or non-positive counts fall back to the size-based estimate.
+    const double sizeBasedPages = CollectionStats(1000, 500, 100).numPages();
+    ASSERT_GT(sizeBasedPages, 0);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, boost::none).numPages(), sizeBasedPages);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 0.0).numPages(), sizeBasedPages);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, -1.0).numPages(), sizeBasedPages);
+
+    // Both paths are quantized, so values within the same 2^(1/4) bucket produce identical
+    // results.
+    ASSERT_EQ(CollectionStats(1000, 500, 100).numPages(),
+              CollectionStats(1000, 515, 100).numPages());
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 500.0).numPages(),
+              CollectionStats(1000, 500, 100, 515.0).numPages());
+
+    // Counter values far enough apart land in different buckets.
+    ASSERT_NE(CollectionStats(1000, 500, 100, 500.0).numPages(),
+              CollectionStats(1000, 500, 100, 600.0).numPages());
+}
+
 TEST_F(CatalogStatsTest, NumPagesInStorageEngineCache) {
     const auto nss = makeNSS("coll");
 

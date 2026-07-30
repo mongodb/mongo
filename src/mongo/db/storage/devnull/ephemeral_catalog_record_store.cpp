@@ -513,6 +513,10 @@ int64_t EphemeralForTestRecordStore::freeStorageSize(RecoveryUnit&) const {
     return 0;
 }
 
+boost::optional<int64_t> EphemeralForTestRecordStore::approxNumLeafPages(RecoveryUnit&) const {
+    return boost::none;
+}
+
 RecordId EphemeralForTestRecordStore::allocateLoc(WithLock) {
     RecordId out = RecordId(_data->nextId++);
     invariant(out.isValid());

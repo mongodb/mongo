@@ -753,6 +753,26 @@ int64_t WiredTigerRecordStore::freeStorageSize(RecoveryUnit& ru) const {
     return WiredTigerUtil::getIdentReuseSize(*session, std::string{getURI()});
 }
 
+boost::optional<int64_t> WiredTigerRecordStore::approxNumLeafPages(RecoveryUnit& ru) const {
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
+    // WT maintains this count incrementally and persists it in the checkpoint metadata, so
+    // reading it does not require a tree walk. It is only populated at the "fast" statistics
+    // level; "size" statistics bypass btree statistics entirely.
+    auto result = WiredTigerUtil::getStatisticsValue(*session,
+                                                     "statistics:" + std::string{getURI()},
+                                                     "statistics=(fast)",
+                                                     WT_STAT_DSRC_BTREE_ROW_LEAF_PAGES);
+    // A positive count is always trustworthy: a table whose checkpoint metadata predates the
+    // counter holds WT's internal "never tracked" marker (UINT64_MAX) rather than a partially
+    // tracked count, and the marker reads as 0 here because the statistics API clamps negative
+    // aggregates (the marker is -1 in the int64_t statistics slot). A 0 therefore means either
+    // "never tracked" or "tree never split", neither is a usable page count.
+    if (!result.isOK() || result.getValue() <= 0) {
+        return boost::none;
+    }
+    return result.getValue();
+}
+
 void WiredTigerRecordStore::_updateLargestRecordId(OperationContext* opCtx,
                                                    RecoveryUnit& ru,
                                                    long long largestSeen) {

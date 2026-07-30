@@ -173,6 +173,8 @@ public:
 
     int64_t freeStorageSize(RecoveryUnit& ru) const override;
 
+    boost::optional<int64_t> approxNumLeafPages(RecoveryUnit& ru) const override;
+
     bool updateWithDamagesSupported() const override;
 
     void printRecordMetadata(const RecordId& recordId,

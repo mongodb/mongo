@@ -1132,19 +1132,20 @@ db.supplier.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$and":[{"c_nationkey":{"$eq":13}},{"c_acctbal":{"$gt":1687.58}},{"c_mktsegment":{"$not":{"$eq":"MACHINERY"}}}]},{}]}}]}},
 {"$unwind":"$customer"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$customer"]}}},
 {"$lookup":{"from":"orders","localField":"c_custkey","foreignField":"o_custkey","as":"orders","pipeline":[
-{"$match":{"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]}}]}},
+{"$match":{"$and":[{"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]},{}]}}]}},
 {"$unwind":"$orders"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$orders"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-HJ customer.c_custkey = o_custkey
+INLJ customer.c_custkey = o_custkey
   -> [none] INLJ s_nationkey = c_nationkey
       -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_acctbal":{"$gte":-707.02}},{"s_name":{"$eq":"Supplier#000000717"}}]} 
           -> IXSCAN: plan_stability_subjoin_cardinality_md.supplier s_nationkey_1 {"s_nationkey":["[13.0, 13.0]"]}
       -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_nationkey":{"$eq":13}},{"c_acctbal":{"$gt":1687.58}},{"c_mktsegment":{"$not":{"$eq":"MACHINERY"}}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
-  -> [orders] COLLSCAN: plan_stability_subjoin_cardinality_md.orders {"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]}
+  -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]} 
+      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.orders o_custkey_1
 ```
 Estimated cardinality: 32  
 Actual cardinality: 23  
@@ -1160,7 +1161,7 @@ db.supplier.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$and":[{"c_nationkey":{"$eq":13}},{"c_acctbal":{"$gt":1687.58}},{"c_mktsegment":{"$not":{"$eq":"MACHINERY"}}}]},{}]}}]}},
 {"$unwind":"$customer"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$customer"]}}},
 {"$lookup":{"from":"orders","localField":"c_custkey","foreignField":"o_custkey","as":"orders","pipeline":[
-{"$match":{"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]}}]}},
+{"$match":{"$and":[{"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]},{}]}}]}},
 {"$unwind":"$orders"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$orders"]}}},
 {"$lookup":{"from":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
 {"$match":{"$and":[{"l_receiptdate":{"$not":{"$gte":"1996-12-14T00:00:00.000Z"}}},{}]}}]}},
@@ -1170,13 +1171,14 @@ db.supplier.aggregate(EJSON.deserialize(
 Subjoin plan:
 ```
 INLJ orders.o_orderkey = l_orderkey
-  -> [none] HJ customer.c_custkey = o_custkey
+  -> [none] INLJ customer.c_custkey = o_custkey
       -> [none] INLJ s_nationkey = c_nationkey
           -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_acctbal":{"$gte":-707.02}},{"s_name":{"$eq":"Supplier#000000717"}}]} 
               -> IXSCAN: plan_stability_subjoin_cardinality_md.supplier s_nationkey_1 {"s_nationkey":["[13.0, 13.0]"]}
           -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_nationkey":{"$eq":13}},{"c_acctbal":{"$gt":1687.58}},{"c_mktsegment":{"$not":{"$eq":"MACHINERY"}}}]} 
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
-      -> [orders] COLLSCAN: plan_stability_subjoin_cardinality_md.orders {"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]} 
+      -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]} 
+          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.orders o_custkey_1
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_receiptdate":{"$not":{"$gte":"1996-12-14T00:00:00.000Z"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```

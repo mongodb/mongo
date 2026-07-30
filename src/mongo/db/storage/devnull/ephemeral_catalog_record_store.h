@@ -113,6 +113,8 @@ public:
 
     int64_t freeStorageSize(RecoveryUnit&) const override;
 
+    boost::optional<int64_t> approxNumLeafPages(RecoveryUnit&) const override;
+
     long long dataSize() const override {
         return _data->dataSize;
     }

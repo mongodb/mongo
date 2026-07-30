@@ -109,6 +109,10 @@ public:
         return 0ULL;
     }
 
+    boost::optional<int64_t> approxNumLeafPages(RecoveryUnit&) const final {
+        return boost::none;
+    }
+
     RecordData dataFor(OperationContext*, RecoveryUnit&, const RecordId&) const final {
         unimplementedTasserted();
         return {};

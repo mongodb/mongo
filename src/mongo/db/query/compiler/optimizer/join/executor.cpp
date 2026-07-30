@@ -254,11 +254,14 @@ CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectio
     stdx::unordered_map<NamespaceString, CollectionStats> collStats;
     mca.forEach([&collStats, &ru](const CollectionPtr& coll) {
         auto* recordStore = coll->getRecordStore();
+        const boost::optional<double> approxNumLeafPages{recordStore->approxNumLeafPages(ru)};
         // TODO SERVER-117620: set .pageSizeBytes.
         collStats.emplace(coll->ns(),
                           CollectionStats{static_cast<double>(recordStore->dataSize()),
                                           static_cast<double>(recordStore->storageSize(ru) -
-                                                              recordStore->freeStorageSize(ru))});
+                                                              recordStore->freeStorageSize(ru)),
+                                          kDefaultPageSizeBytes,
+                                          approxNumLeafPages});
     });
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     double cacheSizeBytes = engine->getCacheSizeMB() * 1024 * 1024;
