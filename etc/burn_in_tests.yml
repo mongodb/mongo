@@ -42,6 +42,8 @@ selector:
       - with_mongot_extension_fully_enabled_single_shard
       - with_mongot_extension_fully_enabled_sharded_collections
       - with_mongot_extension_fully_enabled_sharded_cluster
+      # TODO SERVER-131289 Remove from exclusion when this test is stable.
+      - disagg_pali_chaos_key
     # Exclude list of etc/evergreen.yml task names.
     exclude_tasks:
     # Exclude list of jstests file names.

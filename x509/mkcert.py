@@ -331,6 +331,11 @@ class ExtensionParser:
                     val = [val]
                 for ip in val:
                     names.append(x509.IPAddress(ipaddress.ip_address(ip)))
+            elif key == "URI":
+                if not isinstance(val, list):
+                    val = [val]
+                for uri in val:
+                    names.append(x509.UniformResourceIdentifier(uri))
             else:
                 raise CertificateGenerationError(f'Unknown subject alt name type: "{key}"')
         return x509.SubjectAlternativeName(names)

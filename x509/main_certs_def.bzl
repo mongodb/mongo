@@ -1678,10 +1678,6 @@ certs_def = json.encode({
             "Issuer": "trusted-ca.pem",
             "keyfile": "trusted_key.pem",
             "split_cert_and_key": True,
-            "pkcs12": {
-                "passphrase": "qwerty",
-                "name": "trusted-server.pfx",
-            },
             "extensions": {
                 "extendedKeyUsage": [
                     "serverAuth",
@@ -1705,10 +1701,6 @@ certs_def = json.encode({
             "keyfile": "trusted_key.pem",
             "not_before": -10000000,
             "not_after": -1000000,
-            "pkcs12": {
-                "passphrase": "qwerty",
-                "name": "trusted-server-expired.pfx",
-            },
             "extensions": {
                 "extendedKeyUsage": [
                     "serverAuth",
@@ -1994,6 +1986,157 @@ certs_def = json.encode({
             },
             "Issuer": "ca.pem",
             "keyfile": "key.pem",
+        },
+        {
+            "name": "sls-root-ca.pem",
+            "description": "Root CA for Atlas disaggregated storage tests.",
+            "explicit_subject": True,
+            "Subject": {
+                "C": "US",
+                "L": "New York",
+                "O": "MongoDB, Inc.",
+                "CN": "Disaggregated Storage Testing Root Certificate Authority",
+            },
+            "Issuer": "self",
+            "keyfile": "ec_ca_key.pem",
+            "split_cert_and_key": True,
+            "extensions": {
+                "basicConstraints": {
+                    "critical": True,
+                    "CA": True,
+                },
+                "subjectKeyIdentifier": "hash",
+                "keyUsage": [
+                    "critical",
+                    "keyCertSign",
+                    "cRLSign",
+                ],
+            },
+        },
+        {
+            "name": "sls-intermediate-ca.pem",
+            "description": "Intermediate CA for Atlas disaggregated storage tests.",
+            "explicit_subject": True,
+            "Subject": {
+                "C": "US",
+                "L": "New York",
+                "O": "MongoDB, Inc.",
+                "OU": "Disaggregated Storage Testing Intermediate CA",
+                "CN": "Disaggregated Storage Testing Intermediate Certificate Authority",
+            },
+            "Issuer": "sls-root-ca.pem",
+            "keyfile": "ec_intermediate_key.pem",
+            "extensions": {
+                "basicConstraints": {
+                    "critical": True,
+                    "CA": True,
+                    "pathlen": 1,
+                },
+                "subjectKeyIdentifier": "hash",
+                "authorityKeyIdentifier": "issuer",
+                "keyUsage": [
+                    "critical",
+                    "keyCertSign",
+                    "cRLSign",
+                ],
+            },
+        },
+        {
+            "name": "sls-server.pem",
+            "description": "Server and client certificate for Atlas disaggregated storage tests.",
+            "explicit_subject": True,
+            "Subject": {
+                "C": "US",
+                "L": "New York",
+                "O": "MongoDB, Inc.",
+                "OU": "Disaggregated Storage Testing",
+                "CN": "localhost",
+            },
+            "Issuer": "sls-intermediate-ca.pem",
+            "keyfile": "ec_key.pem",
+            "split_cert_and_key": True,
+            "extensions": {
+                "basicConstraints": {
+                    "critical": True,
+                    "CA": False,
+                },
+                "subjectKeyIdentifier": "hash",
+                "authorityKeyIdentifier": "issuer",
+                "keyUsage": [
+                    "critical",
+                    "digitalSignature",
+                    "keyEncipherment",
+                ],
+                "extendedKeyUsage": [
+                    "serverAuth",
+                    "clientAuth",
+                ],
+                "subjectAltName": {
+                    "DNS": [
+                        "local.sls.mmscloudteam.com",
+                        "localhost.localstack.cloud",
+                        "localhost",
+                    ],
+                    "IP": [
+                        "172.17.0.1",
+                        "127.0.0.1",
+                        "::1",
+                    ],
+                    "URI": "spiffe://local.sls.mmscloudteam.com/testing",
+                },
+            },
+        },
+        {
+            "name": "sls-server-chain.pem",
+            "description": "Certificate-only server chain for Atlas disaggregated storage tests.",
+            "append_cert": [
+                "sls-server.pem",
+                "sls-intermediate-ca.pem",
+            ],
+        },
+        {
+            "name": "sls-invalid-hostname-leaf.pem",
+            "description": "Certificate with SANs that do not match the disaggregated storage server address.",
+            "explicit_subject": True,
+            "Subject": {
+                "C": "US",
+                "L": "New York",
+                "O": "MongoDB, Inc.",
+                "OU": "Disaggregated Storage Testing",
+                "CN": "localhost",
+            },
+            "Issuer": "sls-intermediate-ca.pem",
+            "keyfile": "ec_key.pem",
+            "split_cert_and_key": True,
+            "extensions": {
+                "basicConstraints": {
+                    "critical": True,
+                    "CA": False,
+                },
+                "subjectKeyIdentifier": "hash",
+                "authorityKeyIdentifier": "issuer",
+                "keyUsage": [
+                    "critical",
+                    "digitalSignature",
+                    "keyEncipherment",
+                ],
+                "extendedKeyUsage": [
+                    "serverAuth",
+                    "clientAuth",
+                ],
+                "subjectAltName": {
+                    "DNS": "localhost",
+                    "URI": "spiffe://local.sls.mmscloudteam.com/testing",
+                },
+            },
+        },
+        {
+            "name": "sls-invalid-hostname-leaf-bundle.pem",
+            "description": "Certificate-only invalid-hostname chain for Atlas disaggregated storage tests.",
+            "append_cert": [
+                "sls-invalid-hostname-leaf.pem",
+                "sls-intermediate-ca.pem",
+            ],
         },
     ],
     "crls": [

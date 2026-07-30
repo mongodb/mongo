@@ -6,6 +6,7 @@ certs.
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | ca_key.pem                                | `openssl genrsa -out x509/static/ca_key.pem 2048`                                                                                               |
 | ec_ca_key.pem                             | `openssl ecparam -name prime256v1 -genkey -out x509/static/ec_ca_key.pem`                                                                       |
+| ec_intermediate_key.pem                   | `openssl ecparam -name prime256v1 -genkey -out x509/static/ec_intermediate_key.pem`                                                             |
 | ec_key.pem                                | `openssl ecparam -name prime256v1 -genkey -out x509/static/ec_key.pem`                                                                          |
 | ec_ocsp_ca_key.pem                        | `openssl ecparam -name prime256v1 -genkey -out x509/static/ec_ocsp_ca_key.pem`                                                                  |
 | ec_ocsp_key.pem                           | `openssl ecparam -name prime256v1 -genkey -out x509/static/ec_ocsp_key.pem`                                                                     |
