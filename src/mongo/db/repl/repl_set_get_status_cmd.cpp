@@ -8,6 +8,8 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/metrics_filtering_util.h"
 #include "mongo/db/metrics_policy_manager.h"
@@ -15,6 +17,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_command.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
@@ -23,6 +26,18 @@
 
 namespace mongo {
 namespace repl {
+namespace {
+void checkIfAuthorizedForForceFiltered(OperationContext* opCtx) {
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    auto clusterResource = ResourcePattern::forClusterResource(authSession->getUserTenantId());
+    uassert(
+        ErrorCodes::Unauthorized,
+        "Not authorized to set forceFiltered on replSetGetStatus",
+        authSession->isAuthorizedForActionsOnResource(clusterResource,
+                                                      ActionType::getCompleteReplSetStatus) ||
+            authSession->isAuthorizedForActionsOnResource(clusterResource, ActionType::internal));
+}
+}  // namespace
 
 class CmdReplSetGetStatus : public ReplSetCommand {
 public:
@@ -92,7 +107,15 @@ public:
         // result builder and filter them at the end. Otherwise, append directly to the input result
         // builder to avoid additional costs in the non-filtering case.
         auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
-        bool requireFiltering = metricsPolicyManager.requiresReplSetGetStatusFiltering(opCtx);
+        bool forceFiltered = false;
+        if (gFeatureFlagReplSetGetStatusMetricsFiltering.isEnabled()) {
+            forceFiltered = cmdObj["forceFiltered"].trueValue();
+            if (forceFiltered) {
+                checkIfAuthorizedForForceFiltered(opCtx);
+            }
+        }
+        bool requireFiltering =
+            metricsPolicyManager.requiresReplSetGetStatusFiltering(opCtx, forceFiltered);
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {

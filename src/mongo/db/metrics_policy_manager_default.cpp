@@ -27,7 +27,7 @@ const PathMatcherNode& MetricsPolicyManagerDefault::getServerStatusAllowlistMatc
     _throwNoAllowlistError();
 }
 
-bool MetricsPolicyManagerDefault::requiresReplSetGetStatusFiltering(OperationContext* opCtx) const {
+bool MetricsPolicyManagerDefault::requiresReplSetGetStatusFiltering(OperationContext*, bool) const {
     return false;
 }
 

@@ -47,7 +47,8 @@ TEST_F(MetricsPolicyManagerDefaultTest, GetServerStatusAllowlistMatcherThrowsIll
 
 TEST_F(MetricsPolicyManagerDefaultTest, DoesNotRequireReplSetGetStatusFiltering) {
     auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_FALSE(manager->requiresReplSetGetStatusFiltering(/*opCtx=*/nullptr));
+    ASSERT_FALSE(
+        manager->requiresReplSetGetStatusFiltering(/*opCtx=*/nullptr, /*forceFiltered=*/false));
 }
 
 TEST_F(MetricsPolicyManagerDefaultTest, GetReplSetGetStatusAllowlistPathsThrowsIllegalOperation) {

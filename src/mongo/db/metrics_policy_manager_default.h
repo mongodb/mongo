@@ -23,7 +23,7 @@ public:
 
     const PathMatcherNode& getServerStatusAllowlistMatcher() const override;
 
-    bool requiresReplSetGetStatusFiltering(OperationContext* opCtx) const override;
+    bool requiresReplSetGetStatusFiltering(OperationContext*, bool) const override;
 
     const std::vector<std::string>& getReplSetGetStatusAllowlistPaths() const override;
 

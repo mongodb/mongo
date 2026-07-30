@@ -58,8 +58,10 @@ public:
 
     /**
      * Returns whether replSetGetStatus metrics filtering is required for the given client.
+     * The value of forceFiltered is ignored if metrics filtering is not enabled or supported.
      */
-    virtual bool requiresReplSetGetStatusFiltering(OperationContext* opCtx) const = 0;
+    virtual bool requiresReplSetGetStatusFiltering(OperationContext* opCtx,
+                                                   bool forceFiltered) const = 0;
 
     /**
      * Returns a reference to the allowlist paths for replSetGetStatus filtering. Throws
