@@ -431,7 +431,7 @@ TEST_F(ValueSerializeForKeyString, BsonBinData) {
     sbe::value::ValueGuard testDataGuard{binDataTag, binDataVal};
 
     auto [binDataTagDeprecated, binDataValDeprecated] = value::copyValue(
-        value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(bson[0].value()));
+        value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(bson[1].value()));
     sbe::value::ValueGuard testDataGuardDep{binDataTagDeprecated, binDataValDeprecated};
 
     runTest({{binDataTag, binDataVal}, {binDataTagDeprecated, binDataValDeprecated}});

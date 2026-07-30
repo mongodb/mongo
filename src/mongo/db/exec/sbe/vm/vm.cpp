@@ -3882,76 +3882,91 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(A
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAcos(ArityType arity) {
+    tassert(12603700, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAcos(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAcosh(ArityType arity) {
+    tassert(12603701, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAcosh(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAsin(ArityType arity) {
+    tassert(12603702, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAsin(operandTag, operandValue);
 }
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAsinh(ArityType arity) {
+    tassert(12603703, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAsinh(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAtan(ArityType arity) {
+    tassert(12603704, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAtan(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAtanh(ArityType arity) {
+    tassert(12603705, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericAtanh(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAtan2(ArityType arity) {
+    tassert(12603706, "Unexpected arity value", arity == 2);
     auto [owned1, operandTag1, operandValue1] = getFromStack(0);
     auto [owned2, operandTag2, operandValue2] = getFromStack(1);
     return genericAtan2(operandTag1, operandValue1, operandTag2, operandValue2);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCos(ArityType arity) {
+    tassert(12603707, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericCos(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCosh(ArityType arity) {
+    tassert(12603708, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericCosh(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDegreesToRadians(ArityType arity) {
+    tassert(12603709, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericDegreesToRadians(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRadiansToDegrees(ArityType arity) {
+    tassert(12603710, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericRadiansToDegrees(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSin(ArityType arity) {
+    tassert(12603711, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericSin(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSinh(ArityType arity) {
+    tassert(12603712, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericSinh(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTan(ArityType arity) {
+    tassert(12603713, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericTan(operandTag, operandValue);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTanh(ArityType arity) {
+    tassert(12603714, "Unexpected arity value", arity == 1);
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericTanh(operandTag, operandValue);
 }
@@ -7188,7 +7203,7 @@ FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRank(ArityType arity) {
     invariant(arity == 3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
-    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [_, valueTag, valueVal] = getFromStack(1);
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
 
     tassert(8216803,
@@ -7196,15 +7211,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRank(ArityTyp
             isAscendingTag == value::TypeTags::Boolean);
     auto isAscending = value::bitcastTo<bool>(isAscendingVal);
 
+    // getFromStack borrows, so avoid taking ownership of state in the callee.
     return builtinAggRankImpl(
-        stateTag, stateVal, valueOwned, valueTag, valueVal, isAscending, false /* dense */);
+        stateTag, stateVal, false /* owned */, valueTag, valueVal, isAscending, false /* dense */);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankColl(ArityType arity) {
     invariant(arity == 4);
     auto [collatorOwned, collatorTag, collatorVal] = getFromStack(3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
-    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [_, valueTag, valueVal] = getFromStack(1);
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
 
     tassert(8216804,
@@ -7217,9 +7233,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankColl(Arit
             collatorTag == value::TypeTags::collator);
     auto collator = value::getCollatorView(collatorVal);
 
+    // getFromStack borrows, so avoid taking ownership of state in the callee.
     return builtinAggRankImpl(stateTag,
                               stateVal,
-                              valueOwned,
+                              false /* owned */,
                               valueTag,
                               valueVal,
                               isAscending,
@@ -7230,7 +7247,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankColl(Arit
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRank(ArityType arity) {
     invariant(arity == 3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
-    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [_, valueTag, valueVal] = getFromStack(1);
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
 
     tassert(8216805,
@@ -7238,15 +7255,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRank(Ari
             isAscendingTag == value::TypeTags::Boolean);
     auto isAscending = value::bitcastTo<bool>(isAscendingVal);
 
+    // getFromStack borrows, so avoid taking ownership of state in the callee.
     return builtinAggRankImpl(
-        stateTag, stateVal, valueOwned, valueTag, valueVal, isAscending, true /* dense */);
+        stateTag, stateVal, false /* owned */, valueTag, valueVal, isAscending, true /* dense */);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRankColl(ArityType arity) {
     invariant(arity == 4);
     auto [collatorOwned, collatorTag, collatorVal] = getFromStack(3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
-    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [_, valueTag, valueVal] = getFromStack(1);
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
 
     tassert(8216806,
@@ -7259,9 +7277,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRankColl
             collatorTag == value::TypeTags::collator);
     auto collator = value::getCollatorView(collatorVal);
 
+    // getFromStack borrows, so avoid taking ownership of state in the callee.
     return builtinAggRankImpl(stateTag,
                               stateVal,
-                              valueOwned,
+                              false /* owned */,
                               valueTag,
                               valueVal,
                               isAscending,
@@ -11396,6 +11415,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 if (collTag != value::TypeTags::collator) {
                     auto [tag, val] = value::copyValue(accTag, accVal);
                     topStack(true, tag, val);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
+                    }
                     break;
                 }
                 auto collator = value::getCollatorView(collVal);
@@ -11438,6 +11460,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 if (collTag != value::TypeTags::collator) {
                     auto [tag, val] = value::copyValue(accTag, accVal);
                     topStack(true, tag, val);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
+                    }
                     break;
                 }
                 auto collator = value::getCollatorView(collVal);
