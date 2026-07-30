@@ -77,10 +77,18 @@ namespace mongo {
 
 // Generated symbols for JS files
 namespace JSFiles {
+// Shell-specific modules.
 extern const JSFile stringdiff;
 extern const JSFile types;
 extern const JSFile assert;
 extern const JSFile assert_global;
+
+// Shared helper scripts used by both the server and shell execution environments.
+extern const JSFile types;
+
+// Server-specific, self-contained (non-module) copies of the setup scripts, used to initialize the
+// JS scope in the server execution environment without the filesystem-backed module loader.
+extern const JSFile server_assert;
 }  // namespace JSFiles
 
 namespace mozjs {
@@ -556,7 +564,18 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _status(Status::OK()),
       _generation(0),
       _requireOwnedObjects(false),
+      _baseURL{[](const MozJSImplScope& scope) {
+          tassert(12883201,
+                  "BaseURL is not supported in the current context.",
+                  scope.supportsModules());
+          return scope.getModuleLoader().getBaseURL();
+      }},
       _hasOutOfMemoryException(false),
+      _moduleLoader([&]() {
+          return engine->executionEnvironment() == ExecutionEnvironment::Server
+              ? nullptr
+              : std::make_unique<ModuleLoader>(_engine->executionEnvironment());
+      }()),
       _binDataProto(_context),
       _bsonProto(_context),
       _codeProto(_context),
@@ -593,24 +612,21 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 
         JSAutoRealm ac(_context, _global);
         _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
-        _moduleLoader = std::make_unique<ModuleLoader>();
-        uassert(ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
-        uassert(ErrorCodes::JSInterpreterFailure,
-                "Failed to initialize ModuleLoader",
-                _moduleLoader->init(_context, engine->getLoadPath()));
 
-        _baseURL = _moduleLoader->getBaseURL();
+        if (supportsModules()) {
+            uassert(
+                ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
+            uassert(ErrorCodes::JSInterpreterFailure,
+                    "Failed to initialize ModuleLoader",
+                    getModuleLoader().init(_context, engine->getLoadPath()));
+        }
 
         _checkErrorState(JS::InitRealmStandardClasses(_context));
 
         installBSONTypes();
 
         JS_FireOnNewGlobalObject(_context, _global);
-
-        execSetup(JSFiles::stringdiff);
-        execSetup(JSFiles::assert);
-        execSetup(JSFiles::assert_global);
-        execSetup(JSFiles::types);
+        _setupScripts();
 
         if (_engine->executionEnvironment() == ExecutionEnvironment::Server) {
             // For legacy support in server-side javascript execution, delete the ECMAScript defined
@@ -685,7 +701,7 @@ MozJSImplScope::~MozJSImplScope() {
 }
 
 std::string MozJSImplScope::getBaseURL() const {
-    return _baseURL;
+    return _baseURL.get(*this);
 }
 
 bool MozJSImplScope::hasOutOfMemoryException() {
@@ -1054,8 +1070,8 @@ int MozJSImplScope::invoke(ScriptingFunction func,
     });
 }
 
-bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success) {
-    if (name == MozJSImplScope::kInteractiveShellName) {
+bool MozJSImplScope::_shouldTryExecAsModule(const std::string& name, bool success) const {
+    if (name == kInteractiveShellName) {
         return false;
     }
 
@@ -1063,13 +1079,17 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
         return false;
     }
 
-    JS::RootedValue ex(cx);
-    if (!JS_GetPendingException(cx, &ex) || !ex.isObject()) {
+    if (!supportsModules()) {
         return false;
     }
 
-    JS::RootedObject obj(cx, ex.toObjectOrNull());
-    JSErrorReport* report = JS_ErrorFromException(cx, obj);
+    JS::RootedValue ex(_context);
+    if (!JS_GetPendingException(_context, &ex) || !ex.isObject()) {
+        return false;
+    }
+
+    JS::RootedObject obj(_context, ex.toObjectOrNull());
+    JSErrorReport* report = JS_ErrorFromException(_context, obj);
     if (!report) {
         return false;
     }
@@ -1077,7 +1097,7 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
     const JSClass* referenceError = js::ProtoKeyToClass(JSProto_ReferenceError);
     // During runtime, we can get a ReferenceError: await is not defined because there can be await
     // not in global scope, which is not detected during compile.
-    if (JS_InstanceOf(cx, obj, referenceError, nullptr) &&
+    if (JS_InstanceOf(_context, obj, referenceError, nullptr) &&
         strstr(report->message().c_str(), "await is not defined")) {
         return true;
     }
@@ -1086,7 +1106,7 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
     // since these can be indistinguishable from syntax errors either caused by not loading
     // as a module, or generic syntax errors regardless of scripts/modules.
     const JSClass* syntaxError = js::ProtoKeyToClass(JSProto_SyntaxError);
-    return JS_InstanceOf(cx, obj, syntaxError, nullptr);
+    return JS_InstanceOf(_context, obj, syntaxError, nullptr);
 }
 
 bool MozJSImplScope::exec(std::string_view code,
@@ -1111,12 +1131,12 @@ bool MozJSImplScope::exec(std::string_view code,
         success = scriptPtr != nullptr;
 
         JSObject* modulePtr = nullptr;
-        if (shouldTryExecAsModule(_context, name, success)) {
+        if (_shouldTryExecAsModule(name, success)) {
             // If we should run this as a module, we need to clear the previous exception in order
             // to catch stack traces for future exceptions.
             JS_ClearPendingException(_context);
 
-            modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
+            modulePtr = getModuleLoader().loadRootModuleFromSource(_context, name, code);
             success = modulePtr != nullptr;
         }
 
@@ -1138,12 +1158,12 @@ bool MozJSImplScope::exec(std::string_view code,
                 JS::RootedScript script(_context, scriptPtr);
                 success = JS_ExecuteScript(_context, script, &out);
 
-                if (shouldTryExecAsModule(_context, name, success)) {
+                if (_shouldTryExecAsModule(name, success)) {
                     // If we should run this as a module, we need to clear the previous exception
                     // in order to catch stack traces for future exceptions.
                     JS_ClearPendingException(_context);
 
-                    modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
+                    modulePtr = getModuleLoader().loadRootModuleFromSource(_context, name, code);
                     success = modulePtr != nullptr;
                 }
             }
@@ -1411,8 +1431,26 @@ std::string MozJSImplScope::buildStackString() {
     }
 }
 
-ModuleLoader* MozJSImplScope::getModuleLoader() const {
-    return _moduleLoader.get();
+ModuleLoader& MozJSImplScope::getModuleLoader() const {
+    tassert(12883200,
+            "ModuleLoader not supported in this context.",
+            supportsModules() && _moduleLoader.get());
+    return *_moduleLoader;
+}
+
+bool MozJSImplScope::supportsModules() const {
+    return _engine->executionEnvironment() != ExecutionEnvironment::Server;
+}
+
+void MozJSImplScope::_setupScripts() {
+    if (supportsModules()) {
+        execSetup(JSFiles::stringdiff);
+        execSetup(JSFiles::assert);
+        execSetup(JSFiles::assert_global);
+    } else {
+        execSetup(JSFiles::server_assert);
+    }
+    execSetup(JSFiles::types);
 }
 
 }  // namespace mozjs

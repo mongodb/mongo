@@ -152,8 +152,6 @@ const globalVarsNative = [
     // sortDoc and tostrictjson are not available in the WAsm engine.
     "sortDoc",
     "tostrictjson",
-    // WAsm doesn't support module loading.
-    "internalModule",
 ];
 
 const globalVarsWasm = [

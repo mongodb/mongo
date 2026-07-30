@@ -27,3 +27,6 @@ filters:
   - "timeseries_upgrade_downgrade_apply_ops.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "server_side_js_import_disabled.js":
+    approvers:
+      - 10gen/query-integration-features
