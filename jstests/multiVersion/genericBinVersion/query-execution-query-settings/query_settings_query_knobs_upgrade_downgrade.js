@@ -9,7 +9,7 @@
  *   - After a downgrade then re-upgrade, the stripped 'queryKnobs' stay gone and new 'queryKnobs'
  *     can be set again.
  *
- * @tags: [featureFlagPqsQueryKnobs]
+ * @tags: [featureFlagPqsQueryKnobs, future_git_tag_incompatible]
  **/
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

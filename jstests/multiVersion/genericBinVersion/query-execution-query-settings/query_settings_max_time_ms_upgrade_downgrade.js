@@ -8,6 +8,8 @@
  *     settings are retained. A setting that contained only 'maxTimeMS' is removed entirely.
  *   - After a downgrade then re-upgrade, the stripped 'maxTimeMS' stays gone and a new one can be
  *     set again.
+ *
+ * @tags: [future_git_tag_incompatible]
  **/
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
