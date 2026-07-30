@@ -19,13 +19,12 @@
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {isReshardingVerificationEnabled} from "jstests/sharding/libs/reshard_collection_util.js";
 import {getShardNamesForCollection} from "jstests/sharding/libs/sharding_util.js";
 
 const topology = DiscoverTopology.findConnectedNodes(db);
-// TODO(SERVER-94583): Remove this check when featureFlagReshardingVerification is removed.
-const isVerificationEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
+const isVerificationEnabled = isReshardingVerificationEnabled(db);
 
 const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
@@ -181,13 +180,19 @@ function testResharding(thread, countDownLatch, collNS, performVerification) {
         } else {
             // This error is expected when this test runs in a mixed version cluster and it
             // specifies 'performVerification' to true, and the resharding command runs only on
-            // configsvr or shardsvr nodes that know about the this field.
+            // configsvr or shardsvr nodes that know about the this field. Verification is gated by
+            // both the feature flag and the 'reshardingDocumentVerification' server parameter, and
+            // either gate can be the one that rejects the command.
             assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
             assert(
                 res.errmsg.includes(
                     "Cannot set 'performVerification' to true when " +
                         "featureFlagReshardingVerification is not enabled",
-                ),
+                ) ||
+                    res.errmsg.includes(
+                        "Cannot set 'performVerification' to true when " +
+                            "reshardingDocumentVerification is false",
+                    ),
                 res,
             );
             assert.eq(performVerification, true, res);

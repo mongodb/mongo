@@ -20,9 +20,9 @@
 import {withSkipRetryOnNetworkError} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
+import {isReshardingVerificationEnabled} from "jstests/sharding/libs/reshard_collection_util.js";
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
 const TestMode = {
@@ -106,8 +106,7 @@ const kExpectedValidationOutcomes = {
 main();
 
 function main() {
-    // TODO(SERVER-94583): Remove this check when featureFlagReshardingVerification is removed.
-    const verificationEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
+    const verificationEnabled = isReshardingVerificationEnabled(db);
 
     const testCases = [
         TestMode.kSuccess,
