@@ -24,6 +24,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/internode_validation_hash_utils.h"
@@ -851,6 +852,19 @@ bool _skipOplogOps(const bool isOplogDisabled,
     }
 }
 
+// Clustered collections don't replicate record ids, so this op has none of its own. When the batch
+// groups operations by record id, derive this op's record id from its document key so it groups
+// with the other operations on the same record.
+boost::optional<RecordId> _groupRecordIdForClusteredOp(OperationContext* opCtx,
+                                                       const CollectionPtr& coll,
+                                                       const BSONObj& documentKey) {
+    if (!BatchedWriteContext::get(opCtx).hasAtomicOperationGroups() || !coll->isClustered()) {
+        return boost::none;
+    }
+    return uassertStatusOK(record_id_helpers::keyForDoc(
+        documentKey, coll->getClusteredInfo()->getIndexSpec(), coll->getDefaultCollator()));
+}
+
 }  // namespace
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,
@@ -911,6 +925,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             operation.setFromMigrateIfTrue(fromMigrate[std::distance(first, iter)]);
             if (!recordIds.empty()) {
                 operation.setRecordId(recordIds[i++]);
+            } else if (auto groupId = _groupRecordIdForClusteredOp(opCtx, coll, docKey)) {
+                operation.setGroupRecordId(std::move(groupId));
             }
             operation.setInitializedStatementIds(iter->stmtIds);
             batchedWriteContext.addBatchedOperation(opCtx, operation);
@@ -1071,6 +1087,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         }
         if (!args.updateArgs->replicatedRecordId.isNull()) {
             operation.setRecordId(args.updateArgs->replicatedRecordId);
+        } else if (auto groupId =
+                       _groupRecordIdForClusteredOp(opCtx, args.coll, args.updateArgs->criteria)) {
+            operation.setGroupRecordId(std::move(groupId));
         }
         if (args.coll->isNewTimeseriesWithoutView() &&
             shouldSetIsTimeseriesField(VersionContext::getDecoration(opCtx))) {
@@ -1265,6 +1284,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         operation.setFromMigrateIfTrue(args.fromMigrate);
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
+        } else if (auto groupId =
+                       _groupRecordIdForClusteredOp(opCtx, coll, documentKey.getShardKeyAndId())) {
+            operation.setGroupRecordId(std::move(groupId));
         }
         setSizeMetadataIfNeeded(operation, args.replicatedSizeDelta, doc, useValidationHash);
         if (coll->isNewTimeseriesWithoutView() &&

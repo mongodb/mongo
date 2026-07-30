@@ -1,9 +1,12 @@
 /**
- * Group atomicity for timeseries bucket *updates* during a primary-driven index build (PDIB). A
- * timeseries insert batch that appends measurements to existing buckets produces bucket update ops,
- * which fire side-table (container) writes via the index interceptor's update() path. The batch
- * replicates as a single batched write, and each bucket update's collection write must stay with its
- * side writes in one applyOps entry.
+ * Group atomicity for timeseries bucket updates during a primary-driven index build (PDIB). A
+ * timeseries insert batch that appends measurements to existing buckets updates those buckets, and
+ * each update produces index writes. Timeseries bucket collections are clustered and so have no
+ * replicated record id, so verify a bucket update's collection write still stays with its index
+ * writes in one applyOps entry when the batch spans several entries. The limit is chosen so it does
+ * not divide a single update's operation count, forcing an entry boundary in the middle of an
+ * update. A limit that divided evenly would place every boundary between updates and hide a torn
+ * group.
  *
  * @tags: [
  *   requires_replication,
@@ -19,7 +22,9 @@ import {
     getGroupedApplyOps,
 } from "jstests/noPassthrough/libs/index_builds/pdib_group_atomicity.js";
 
-const kMaxOpsInEntry = 3;
+// Each bucket update is 3 ops (its collection write plus two index writes). 5 does not divide 3, so
+// an entry boundary lands inside an update rather than only between updates.
+const kMaxOpsInEntry = 5;
 const dbName = "test";
 const collName = jsTestName();
 const rst = new ReplSetTest({
@@ -62,7 +67,8 @@ assert.commandWorked(
     coll.insertMany(metas.map((m) => ({[timeField]: baseTime, [metaField]: m, v: m}))),
 );
 
-// Build an index on a measurement field so bucket updates change index keys and fire side writes.
+// Build an index on a measurement field so bucket updates change index keys and produce index
+// writes.
 const indexName = "v_1";
 IndexBuildTest.pauseIndexBuilds(primary);
 const awaitIndex = IndexBuildTest.startIndexBuild(
@@ -75,9 +81,9 @@ const awaitIndex = IndexBuildTest.startIndexBuild(
 // thread has initialized, so a write made earlier would bypass the side table.
 IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, indexName);
 
-// Append one measurement to each existing bucket: >1 bucket update op in one batched write, each
-// producing container side writes. Capture the oplog timestamp first so the check below skips the
-// seed insertMany (also a batched write, but it predates the index build so it has no side writes).
+// Append one measurement to each existing bucket: >1 bucket update in one batched write, each
+// producing index writes. Capture the oplog timestamp first so the check below skips the seed
+// insertMany (also a batched write, but it predates the index build so it produces no index writes).
 const oplog = primary.getDB("local").getCollection("oplog.rs");
 const tsBeforeAppend = oplog.find().sort({$natural: -1}).limit(1).next().ts;
 assert.commandWorked(
@@ -102,11 +108,13 @@ assert.gte(
         applyOps,
     },
 );
-// Each bucket update rewrites the indexed max-key: one side write to remove the old key and one to
-// add the new key, so two side writes per bucket update.
+// Each bucket update rewrites the indexed key: one index write to remove the old key and one to add
+// the new key, so two index writes per bucket update.
 const {primaryOps, containerOps} = assertGroupAtomicity(applyOps, nss, {sideWritesPerRecord: 2});
 assert.eq(primaryOps, metas.length, "expected one bucket update per seeded bucket", {applyOps});
-assert.eq(containerOps, 2 * metas.length, "expected two side writes per bucket update", {applyOps});
+assert.eq(containerOps, 2 * metas.length, "expected two index writes per bucket update", {
+    applyOps,
+});
 
 // The build drained correctly on the secondary: the measurement index returns the same result there.
 assertIndexMatchesOnSecondary(rst, dbName, collName, indexName, {v: {$gte: 0}});
