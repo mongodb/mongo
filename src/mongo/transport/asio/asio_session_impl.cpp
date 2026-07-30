@@ -409,12 +409,12 @@ bool CommonAsioSession::isConnected() {
             char testByte;
             const auto bytesRead =
                 peekASIOStream(getSocket(), asio::buffer(&testByte, sizeof(testByte)));
-            uassert(ErrorCodes::SocketException,
-                    "Couldn't peek from underlying socket",
-                    bytesRead == sizeof(testByte));
-            return true;
+            // Nothing to peek after POLLIN means the peer has shut down its write side: a
+            // normal disconnect, not an error.
+            return bytesRead == sizeof(testByte);
         } catch (const DBException& e) {
             LOGV2_WARNING(4615610, "Failed to check socket connectivity", "error"_attr = e);
+            return false;
         }
     }
 
