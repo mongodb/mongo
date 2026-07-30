@@ -46,72 +46,33 @@ assert.eq(res.internalValidateFeaturesAsPrimary, true);
 MongoRunner.stopMongod(conn);
 
 // internalValidateFeaturesAsPrimary cannot be set with --replSet.
-assert.throws(
-    () =>
-        MongoRunner.runMongod({
-            replSet: "replSetName",
-            setParameter: "internalValidateFeaturesAsPrimary=0",
-        }),
-    [],
-    "mongod was unexpectedly able to start up",
-);
-
-assert.throws(
-    () =>
-        MongoRunner.runMongod({
-            replSet: "replSetName",
-            setParameter: "internalValidateFeaturesAsPrimary=1",
-        }),
-    [],
-    "mongod was unexpectedly able to start up",
-);
-
 // Correct error message is logged based on parameter name.
-conn = MongoRunner.runMongod({});
-joinShell = startParallelShell(() => {
-    assert.throws(() =>
-        MongoRunner.runMongod({
-            replSet: "replSetName",
-            setParameter: "internalValidateFeaturesAsPrimary=0",
-        }),
+function assertStartupFailsWithReplSet(paramName, paramValue) {
+    const otherName =
+        paramName === "internalValidateFeaturesAsPrimary"
+            ? "internalValidateFeaturesAsMaster"
+            : "internalValidateFeaturesAsPrimary";
+    clearRawMongoProgramOutput();
+    assert.throws(
+        () =>
+            MongoRunner.runMongod({
+                replSet: "replSetName",
+                setParameter: `${paramName}=${paramValue}`,
+            }),
+        [],
+        "mongod was unexpectedly able to start up",
     );
-}, conn.port);
-joinShell();
-let joinShellOutput = rawMongoProgramOutput("Cannot specify both .* and replication.replSet");
-assert(
-    joinShellOutput.match(
-        "Cannot specify both internalValidateFeaturesAsPrimary and replication.replSet",
-    ),
-);
-assert(
-    !joinShellOutput.match(
-        "Cannot specify both internalValidateFeaturesAsMaster and replication.replSet",
-    ),
-);
+    let output;
+    assert.soon(() => {
+        output = rawMongoProgramOutput("Cannot specify both .* and replication.replSet");
+        return output.match(`Cannot specify both ${paramName} and replication.replSet`);
+    }, `Expected startup error message mentioning ${paramName}`);
+    assert(!output.match(`Cannot specify both ${otherName} and replication.replSet`));
+}
 
-clearRawMongoProgramOutput();
-joinShell = startParallelShell(() => {
-    assert.throws(() =>
-        MongoRunner.runMongod({
-            replSet: "replSetName",
-            setParameter: "internalValidateFeaturesAsMaster=0",
-        }),
-    );
-}, conn.port);
-joinShell();
-joinShellOutput = rawMongoProgramOutput("Cannot specify both .* and replication.replSet");
-assert(
-    joinShellOutput.match(
-        "Cannot specify both internalValidateFeaturesAsMaster and replication.replSet",
-    ),
-);
-assert(
-    !joinShellOutput.match(
-        "Cannot specify both internalValidateFeaturesAsPrimary and replication.replSet",
-    ),
-);
-
-MongoRunner.stopMongod(conn);
+assertStartupFailsWithReplSet("internalValidateFeaturesAsPrimary", 0);
+assertStartupFailsWithReplSet("internalValidateFeaturesAsPrimary", 1);
+assertStartupFailsWithReplSet("internalValidateFeaturesAsMaster", 0);
 
 // internalValidateFeaturesAsPrimary cannot be set via runtime parameter.
 conn = MongoRunner.runMongod({});
