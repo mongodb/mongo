@@ -10,6 +10,8 @@
 #include "mongo/util/str_escape.h"
 #include "mongo/util/text.h"
 
+#include <cmath>
+
 #include <fmt/compile.h>
 #include <fmt/format.h>
 
@@ -670,7 +672,18 @@ Value evaluateRoundOrTrunc(const Document& root,
             return Value(out);
         }
         case BSONType::numberDouble: {
-            auto dec = Decimal128(numericArg.getDouble(), Decimal128::kRoundTo34Digits);
+            const double doubleArg = numericArg.getDouble();
+            // Fast path: rounding/truncating to an integer (precision 0) can be done with native
+            // floating-point rounding, avoiding an expensive double->Decimal128->quantize->double
+            // round-trip. For integer precision this is numerically identical to the Decimal128
+            // path (the nearest integer / truncated value of a finite double is unambiguous, and
+            // exact half-integers are representable and rounded ties-to-even by both paths).
+            // Non-zero precision still needs Decimal128 to match decimal rounding semantics
+            // (see SERVER-71557 / DOCSP-27333).
+            if (precisionValue == 0 && std::isfinite(doubleArg)) {
+                return Value(doubleOp(doubleArg));
+            }
+            auto dec = Decimal128(doubleArg, Decimal128::kRoundTo34Digits);
             if (dec.isInfinite()) {
                 return numericArg;
             }
@@ -707,11 +720,14 @@ Value evaluate(const ExpressionRound& expr,
                Variables* variables,
                const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
+    // Use nearbyint (not round) for the native double fast path: $round rounds ties to even
+    // (kRoundTiesToEven), which nearbyint honors under the default FE_TONEAREST rounding mode,
+    // whereas std::round rounds half away from zero and would be incorrect for ties.
     return evaluateRoundOrTrunc(root,
                                 children,
                                 expr.getOpName(),
                                 Decimal128::kRoundTiesToEven,
-                                &std::round,
+                                &std::nearbyint,
                                 variables,
                                 ctx);
 }
