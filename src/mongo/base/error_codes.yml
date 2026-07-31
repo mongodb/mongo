@@ -1206,6 +1206,8 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
 
+  - {code: 508, name: SearchIndexManagementHostUnreachable}
+
   - {code: 509, name: TooManyOpenTransactions, categories: [Interruption]}
 
   - {code: 513, name: InvalidBSONFromJavaScript, categories: [ValidationError]}
