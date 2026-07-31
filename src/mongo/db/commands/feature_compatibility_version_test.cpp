@@ -20,6 +20,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -256,14 +257,13 @@ TEST_F(FeatureCompatibilityVersionTestFixture, FindFCVDocumentRetriesWriteConfli
 
     // Inject a conflict into the first storage read. The FCV lookup should retry the collection
     // scan and return the document successfully.
-    FailPointEnableBlock failPoint(
-        "WTWriteConflictExceptionForReads",
+    auto failPoint = enableWriteConflictForReads(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint.initialTimesEntered();
+    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     auto fcvDocument =
         FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
-    EXPECT_EQ(initialTimesEntered + 1, failPoint->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
     ASSERT_OK(fcvDocument);
     ASSERT_EQ(FeatureCompatibilityVersionDocument::parse(fcvDocument.getValue()).getVersion(),
               multiversion::GenericFCV::kLatest);

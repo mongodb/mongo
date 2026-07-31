@@ -1291,5 +1291,6 @@ mongo_cc_unit_test(
         "mongod_fcv",
         "//src/mongo/db/op_observer:fcv_op_observer",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:record_store_write_conflict_fail_points",
     ],
 )

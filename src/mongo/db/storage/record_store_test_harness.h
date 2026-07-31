@@ -8,13 +8,11 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/test_harness_helper.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
 #include <string>
-#include <string_view>
 
 namespace mongo {
 
@@ -71,16 +69,5 @@ void registerRecordStoreHarnessHelperFactory(
 std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper(
     RecordStoreHarnessHelper::Options options =
         RecordStoreHarnessHelper::Options::ReplicationEnabled);
-
-using WriteConflictFailPointFn =
-    std::function<std::unique_ptr<FailPointEnableBlock>(FailPoint::ModeOptions)>;
-
-void registerWriteConflictForWritesFactory(std::string_view engineName,
-                                           WriteConflictFailPointFn factory);
-void registerWriteConflictForReadsFactory(std::string_view engineName,
-                                          WriteConflictFailPointFn factory);
-
-std::unique_ptr<FailPointEnableBlock> enableWriteConflictForWrites(FailPoint::ModeOptions mode);
-std::unique_ptr<FailPointEnableBlock> enableWriteConflictForReads(FailPoint::ModeOptions mode);
 
 }  // namespace mongo

@@ -189,6 +189,7 @@ mongo_cc_binary(
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/shard_role/shard_catalog:durable_catalog",
         "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/storage:record_store_write_conflict_fail_points",
         "//src/mongo/db/storage:sorted_data_interface_test_assert",
         "//src/mongo/db/storage:storage_engine_impl",
         "//src/mongo/db/storage:storage_options",

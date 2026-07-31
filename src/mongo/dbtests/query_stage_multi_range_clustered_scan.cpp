@@ -34,6 +34,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
@@ -465,8 +466,7 @@ TEST_F(MultiRangeClusteredScanTest, PendingSeekSurvivesWriteConflict) {
     // seek is the only pending read, so this targets it precisely. `nTimes=1` ensures that only
     // the inter-range seek throws — subsequent reads execute normally.
     {
-        FailPointEnableBlock failPoint(
-            "WTWriteConflictExceptionForReads",
+        auto failPoint = enableWriteConflictForReads(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
         WorkingSetID id = WorkingSet::INVALID_ID;
         ASSERT_EQ(scan->work(&id), PlanStage::NEED_YIELD);

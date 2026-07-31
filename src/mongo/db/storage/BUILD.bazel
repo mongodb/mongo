@@ -526,6 +526,19 @@ mongo_cc_library(
     ],
 )
 
+# Storage engine-agnostic way for unit tests to turn on the write conflict fail points. The storage
+# engine in use registers its own fail points, so this must not depend on any specific engine.
+mongo_cc_library(
+    name = "record_store_write_conflict_fail_points",
+    srcs = [
+        "record_store_write_conflict_fail_points.cpp",
+    ],
+    deps = [
+        ":storage_options",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
 mongo_cc_library(
     name = "record_store_test_harness",
     srcs = [
@@ -536,7 +549,6 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/unittest",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -569,6 +581,7 @@ mongo_cc_library(
     ],
     deps = [
         ":record_store_test_harness",
+        ":record_store_write_conflict_fail_points",
         ":storage_options",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:shard_role_api",
@@ -665,6 +678,7 @@ mongo_cc_unit_test(
         ":checkpointer",
         ":disk_space_monitor",
         ":record_store_base",
+        ":record_store_write_conflict_fail_points",
         ":spill_table",
         ":spill_util",
         ":storage_engine_common",
@@ -693,7 +707,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
-        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:network_interface_mock",
@@ -723,6 +736,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":oplog_truncation",
+        ":record_store_write_conflict_fail_points",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_test_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",

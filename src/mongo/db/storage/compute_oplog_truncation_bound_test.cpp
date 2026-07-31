@@ -6,6 +6,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/oplog_truncation.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -87,8 +88,8 @@ TEST_F(ComputeOplogTruncationBoundWithReplicatedFastCountTest,
     setPersistedTimestamp(persistedValidAsOfTs);
 
     // Throw WCE on the first call, then disable.
-    FailPointEnableBlock fp("WTWriteConflictExceptionForReads",
-                            FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 1});
+    auto fp =
+        enableWriteConflictForReads(FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 1});
 
     // Should retry and return the correct value on the second attempt.
     ASSERT_EQ(oplog_truncation::computeTruncationBound(operationContext()), persistedValidAsOfTs);

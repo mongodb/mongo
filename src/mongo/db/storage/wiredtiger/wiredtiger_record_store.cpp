@@ -4,6 +4,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
@@ -21,6 +23,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
@@ -148,6 +151,20 @@ MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
+
+namespace {
+
+MONGO_INITIALIZER(WiredTigerRegisterWriteConflictFailPoints)(InitializerContext*) {
+    registerWriteConflictForWritesFactory(kWiredTigerEngineName, [](FailPoint::ModeOptions mode) {
+        return std::make_unique<FailPointEnableBlock>(&WTWriteConflictException, std::move(mode));
+    });
+    registerWriteConflictForReadsFactory(kWiredTigerEngineName, [](FailPoint::ModeOptions mode) {
+        return std::make_unique<FailPointEnableBlock>(&WTWriteConflictExceptionForReads,
+                                                      std::move(mode));
+    });
+}
+
+}  // namespace
 
 std::variant<WiredTigerIntegerKeyedContainer, WiredTigerStringKeyedContainer>
 WiredTigerRecordStore::_makeContainer(Params& params) {

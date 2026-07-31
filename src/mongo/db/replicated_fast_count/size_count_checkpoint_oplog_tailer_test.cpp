@@ -10,6 +10,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
@@ -187,8 +188,8 @@ TEST_F(OplogTailerTest, RetriesScanOnWriteConflict) {
 
     {
         // Make bufferNewOplogEntries() fail twice before successfully scanning the oplog.
-        FailPointEnableBlock fp("WTWriteConflictExceptionForReads",
-                                FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 2});
+        auto fp = enableWriteConflictForReads(
+            FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 2});
         bufferNewOplogEntries(_opCtx, buffer);
     }
 

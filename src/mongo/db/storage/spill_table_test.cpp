@@ -8,7 +8,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_monitor.h"
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"

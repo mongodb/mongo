@@ -8,6 +8,7 @@
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -536,7 +537,8 @@ TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerBubblesUpCachePressureEr
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kShard);
     seedShardCatalogOnDisk(opCtx, collType, chunks);
 
-    FailPointEnableBlock intermittentFailure{"WTWriteConflictExceptionForReads"};
+    auto intermittentFailure =
+        enableWriteConflictForReads(FailPoint::ModeOptions{.mode = FailPoint::alwaysOn});
 
     CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 

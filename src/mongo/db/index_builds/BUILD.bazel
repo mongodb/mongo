@@ -362,10 +362,6 @@ mongo_cc_unit_test(
         "mongo_unittest_seventh_group",
         "server-index-builds",
     ],
-    target_compatible_with = select({
-        "//bazel/config:use_wiredtiger_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
     deps = [
         ":index_build_entry_helpers",
         ":index_build_entry_idl",
@@ -380,9 +376,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
-        "//src/mongo/db/storage:record_store_test_harness",
-        # TODO SERVER-127391: Remove dependency on wiredtiger_record_store_test_harness.
-        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
+        "//src/mongo/db/storage:record_store_write_conflict_fail_points",
         "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )

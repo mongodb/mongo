@@ -95,6 +95,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:prepare_conflict_tracker",
         "//src/mongo/db/storage:prepared_transactions_iterator",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:record_store_write_conflict_fail_points",
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:storage_file_util",
         "//src/mongo/db/storage:storage_oplog_manager",

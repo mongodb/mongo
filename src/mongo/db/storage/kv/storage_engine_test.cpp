@@ -28,6 +28,7 @@
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
@@ -984,10 +985,8 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndexRetriesWriteConflicts) {
 
     // Dropping the unfinished index writes to the catalog. Reconcile must retry that write on
     // consecutive write conflicts rather than let the exception escape and take down startup.
-    auto fp = globalFailPointRegistry().find("WTWriteConflictException");
-    ASSERT(fp);
-    fp->setMode(FailPoint::nTimes, 2);
-    ON_BLOCK_EXIT([&] { fp->setMode(FailPoint::off); });
+    auto fp = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 2});
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
 

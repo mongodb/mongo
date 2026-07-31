@@ -109,12 +109,5 @@ std::unique_ptr<RecordStoreHarnessHelper> makeWTRecordStoreHarnessHelper(
 
 MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
     mongo::registerRecordStoreHarnessHelperFactory(makeWTRecordStoreHarnessHelper);
-    registerWriteConflictForWritesFactory(kWiredTigerEngineName, [](FailPoint::ModeOptions mode) {
-        return std::make_unique<FailPointEnableBlock>("WTWriteConflictException", std::move(mode));
-    });
-    registerWriteConflictForReadsFactory(kWiredTigerEngineName, [](FailPoint::ModeOptions mode) {
-        return std::make_unique<FailPointEnableBlock>("WTWriteConflictExceptionForReads",
-                                                      std::move(mode));
-    });
 }
 }  // namespace mongo
