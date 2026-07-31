@@ -10,6 +10,8 @@
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
 
 #include <atomic>
 #include <chrono>
@@ -66,9 +68,8 @@ TEST(TracerProviderServiceTest, ConcurrentGetTracerAndShutdownIsRaceFree) {
 }
 
 /**
- * A SpanExporter whose Export() (invoked on the BatchSpanProcessor's background thread) reads a
- * heap object owned by the test. By destroying the `exportCanary`, tests can verify that no threads
- * call `Export` after a certain point.
+ * A SpanExporter whose Export() (invoked on the BatchSpanProcessor's background thread) increments
+ * an atomic counter. A post-shutdown canary of zero proves Export() was never called.
  */
 class CanaryExporter final : public opentelemetry::sdk::trace::SpanExporter {
 public:
@@ -100,9 +101,6 @@ private:
 };
 
 TEST(TracerProviderServiceTest, ShutdownEndsExportThread) {
-    // A heap-allocated canary the exporter dereferences on every Export(). Freeing it while the
-    // export thread can still run turns "export thread outlived shutdown()" into a UAF bug ASAN
-    // can catch.
     std::atomic<int> canary{0};
 
     // Build a provider whose processor never auto-flushes (huge delay), so the only export is the
@@ -110,7 +108,7 @@ TEST(TracerProviderServiceTest, ShutdownEndsExportThread) {
     opentelemetry::sdk::trace::BatchSpanProcessorOptions opts;
     opts.max_queue_size = 4096;
     opts.max_export_batch_size = 512;
-    opts.schedule_delay_millis = std::chrono::hours{1};
+    opts.schedule_delay_millis = std::chrono::minutes{1};
     auto processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
         std::make_unique<CanaryExporter>(&canary), opts);
     auto provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor));
@@ -158,7 +156,12 @@ TEST(TracerProviderServiceTest, ShutdownEndsExportThread) {
 
         // Shutdown after the thread has pinned the provider and started some spans.
         providerPinned.countDownAndWait();
+        Timer shutdownTimer;
         service.shutdown();
+        // shutdown() joins the processor's export thread. If there is a synchronization issue
+        // there, this will fail.
+        EXPECT_LE(duration_cast<Milliseconds>(shutdownTimer.elapsed()), Seconds{50})
+            << "Shutdown thread hung instead of shutting down immediately.";
         shutdownComplete.countDownAndWait();
 
         opThread.join();

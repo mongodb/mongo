@@ -992,6 +992,10 @@ public:
   {
     if (file_)
     {
+      {
+        std::lock_guard<std::mutex> waker_guard{file_->background_thread_waker_lock};
+        file_->is_shutdown.store(true, std::memory_order_release);
+      }
       file_->background_thread_waker_cv.notify_all();
       std::unique_ptr<std::thread> background_flush_thread;
       {
@@ -1476,11 +1480,6 @@ private:
             break;
           }
 
-          if (concurrency_file->is_shutdown.load(std::memory_order_acquire))
-          {
-            break;
-          }
-
 #ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
           if (thread_instrumentation != nullptr)
           {
@@ -1490,6 +1489,13 @@ private:
 
           {
             std::unique_lock<std::mutex> lk(concurrency_file->background_thread_waker_lock);
+            // Even though is_shutdown is atomic, the lock guarantees that either a change to
+            // is_shutdown will be observed, or background_thread_waker_cv will see the notification
+            // at shutdown.
+            if (concurrency_file->is_shutdown.load(std::memory_order_acquire))
+            {
+              break;
+            }
             concurrency_file->background_thread_waker_cv.wait_for(lk, flush_interval);
           }
 
