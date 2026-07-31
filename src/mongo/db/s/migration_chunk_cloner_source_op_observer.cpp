@@ -321,7 +321,7 @@ bool MigrationChunkClonerSourceOpObserver::shouldLogBatchedWriteForSessionMigrat
     }
     // Only retryable batched writes need their session history migrated.
     if (oplogGroupingFormat != WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
-        oplogGroupingFormat != WriteUnitOfWork::kGroupForAtomicWrite) {
+        oplogGroupingFormat != WriteUnitOfWork::kGroupForRetryableAtomicWrite) {
         return false;
     }
     // A retryable write must carry both a session id and a txnNumber.

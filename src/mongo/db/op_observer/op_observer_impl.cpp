@@ -2144,7 +2144,7 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
             // No statement IDs; don't set prevWriteOpTimeInTransaction.
             oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
         }
-    } else if (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite) {
+    } else if (oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite) {
         // This mode is only used with retryable writes; the entry is tagged retryable
         // (multiOpType) below, so it must carry session info (lsid + txnNumber).
         invariant(opCtx->isRetryableWrite());
@@ -2425,13 +2425,14 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
         }
     }
 
-    if (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite) {
+    if (oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite) {
         auto numOpsWithStatementIds = batchedOps->getNumberOfOperationsWithStatementIds();
         tassert(12782600,
-                fmt::format("kGroupForAtomicWrite WUOW must contain at most one operation with "
-                            "retryable statements, but found {}",
-                            numOpsWithStatementIds),
-                numOpsWithStatementIds <= 1);
+                fmt::format(
+                    "kGroupForRetryableAtomicWrite WUOW must contain exactly one operation with "
+                    "retryable statements, but found {}",
+                    numOpsWithStatementIds),
+                numOpsWithStatementIds == 1);
     }
 
     // Serialize batched statements to BSON and determine their assignment to "applyOps"
@@ -2541,7 +2542,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             const bool updateTxnTable =
                 (oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations) ||
-                (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite && lastOp);
+                (oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite && lastOp);
             return logApplyOps(opCtx,
                                oplogEntry,
                                /*txnState=*/boost::none,

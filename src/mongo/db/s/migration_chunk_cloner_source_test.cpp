@@ -1995,7 +1995,7 @@ TEST(MigrationChunkClonerSourceOpObserverTest, ShouldLogBatchedWriteForSessionMi
     // Both retryable grouping formats are logged when oplog entries exist and session info is
     // present.
     for (auto format : {WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
-                        WriteUnitOfWork::kGroupForAtomicWrite}) {
+                        WriteUnitOfWork::kGroupForRetryableAtomicWrite}) {
         EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
             &withBatchOpTimes, format, true /* hasTxnNumber */, true /* hasLogicalSessionId */));
         EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
@@ -2009,28 +2009,28 @@ TEST(MigrationChunkClonerSourceOpObserverTest, ShouldLogBatchedWriteForSessionMi
     }
 
     // Missing session info (either txnNumber or lsid) is never logged.
-    EXPECT_FALSE(
-        Observer::shouldLogBatchedWriteForSessionMigration(&withBatchOpTimes,
-                                                           WriteUnitOfWork::kGroupForAtomicWrite,
-                                                           false /* hasTxnNumber */,
-                                                           true /* hasLogicalSessionId */));
-    EXPECT_FALSE(
-        Observer::shouldLogBatchedWriteForSessionMigration(&withBatchOpTimes,
-                                                           WriteUnitOfWork::kGroupForAtomicWrite,
-                                                           true /* hasTxnNumber */,
-                                                           false /* hasLogicalSessionId */));
+    EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
+        &withBatchOpTimes,
+        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
+        false /* hasTxnNumber */,
+        true /* hasLogicalSessionId */));
+    EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
+        &withBatchOpTimes,
+        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
+        true /* hasTxnNumber */,
+        false /* hasLogicalSessionId */));
 
     // No oplog entries (null accumulator or no recorded op times) is never logged.
-    EXPECT_FALSE(
-        Observer::shouldLogBatchedWriteForSessionMigration(nullptr,
-                                                           WriteUnitOfWork::kGroupForAtomicWrite,
-                                                           true /* hasTxnNumber */,
-                                                           true /* hasLogicalSessionId */));
-    EXPECT_FALSE(
-        Observer::shouldLogBatchedWriteForSessionMigration(&empty,
-                                                           WriteUnitOfWork::kGroupForAtomicWrite,
-                                                           true /* hasTxnNumber */,
-                                                           true /* hasLogicalSessionId */));
+    EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
+        nullptr,
+        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
+        true /* hasTxnNumber */,
+        true /* hasLogicalSessionId */));
+    EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
+        &empty,
+        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
+        true /* hasTxnNumber */,
+        true /* hasLogicalSessionId */));
 }
 
 }  // namespace

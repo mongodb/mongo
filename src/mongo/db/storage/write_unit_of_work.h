@@ -62,7 +62,7 @@ public:
         kDontGroup,
         kGroupForTransaction,
         kGroupForPossiblyRetryableOperations,
-        kGroupForAtomicWrite,
+        kGroupForRetryableAtomicWrite,
     };
 
     WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupType = kDontGroup);

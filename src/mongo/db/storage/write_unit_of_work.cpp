@@ -26,7 +26,8 @@ const auto getOplogGroupingPolicy =
  * Returns the grouping type to be used, converting kDontGroup to a batched mode for a top-level
  * WriteUnitOfWork if the operation is not a multi-document transaction and oplog entry grouping is
  * enabled. The chosen mode depends on whether the write is retryable:
- *   - retryable write -> kGroupForAtomicWrite (single retryable statement, applied atomically).
+ *   - retryable write -> kGroupForRetryableAtomicWrite (single retryable statement, applied
+ * atomically).
  *   - otherwise       -> kGroupForTransaction (atomic batched write without session info).
  *
  * A caller that requests an explicit (non-kDontGroup) grouping mode bypasses this conversion:
@@ -47,8 +48,9 @@ WriteUnitOfWork::OplogEntryGroupType getGroupType(OperationContext* opCtx,
 
     // Multi-document transactions already returned above, so a present txnNumber here means a
     // retryable write.
-    return opCtx->getTxnNumber() ? WriteUnitOfWork::OplogEntryGroupType::kGroupForAtomicWrite
-                                 : WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction;
+    return opCtx->getTxnNumber()
+        ? WriteUnitOfWork::OplogEntryGroupType::kGroupForRetryableAtomicWrite
+        : WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction;
 }
 
 }  // namespace

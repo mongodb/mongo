@@ -4217,13 +4217,13 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
 }
 
 // getGroupType() converts a top-level WUOW created with kDontGroup to a batched mode when
-// primary-driven index builds are enabled: kGroupForAtomicWrite for a retryable write, otherwise
-// kGroupForTransaction. The following tests verify the conversion through the resulting oplog
-// output.
+// primary-driven index builds are enabled: kGroupForRetryableAtomicWrite for a retryable write,
+// otherwise kGroupForTransaction. The following tests verify the conversion through the resulting
+// oplog output.
 
 // A retryable write is grouped atomically: the batch replicates as an applyOps tagged
 // kApplyOpsAppliedAtomically and stamped with the session id and txnNumber, exactly as an explicit
-// kGroupForAtomicWrite would (see AtomicWriteEmitsAppliedAtomicallyTag).
+// kGroupForRetryableAtomicWrite would (see RetryableAtomicWriteEmitsAppliedAtomicallyTag).
 TEST_F(BatchedWriteOutputsTest, RetryableWriteWithPdibGroupsAtomically) {
     // (Generic FCV reference): test requires an initialized FCV to enable the feature flag.
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
@@ -4685,9 +4685,9 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     }
 }
 
-// Verifies a retryable kGroupForAtomicWrite batch emits an applyOps tagged
+// Verifies a retryable kGroupForRetryableAtomicWrite batch emits an applyOps tagged
 // kApplyOpsAppliedAtomically with the session metadata, and updates config.transactions.
-TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
+TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteEmitsAppliedAtomicallyTag) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     // Create the collection before resetting the oplog so its 'create' entry isn't counted below.
@@ -4705,7 +4705,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
 
     {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForRetryableAtomicWrite);
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx,
             *autoColl,
@@ -4747,11 +4747,11 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
     EXPECT_EQ(opCtx->getTxnNumber(), txnRecord.getTxnNum());
 }
 
-// Verifies an oversized kGroupForAtomicWrite batch replicates as a chain of applyOps entries: every
-// entry is tagged kApplyOpsAppliedAtomically and linked via prevOpTime, and config.transactions is
-// updated only once, pointing at the terminal entry. The per-applyOps op-count limit is lowered so
-// a small batch splits into multiple entries.
-TEST_F(BatchedWriteOutputsTest, AtomicWriteChainTagsAndLinksEveryEntry) {
+// Verifies an oversized kGroupForRetryableAtomicWrite batch replicates as a chain of applyOps
+// entries: every entry is tagged kApplyOpsAppliedAtomically and linked via prevOpTime, and
+// config.transactions is updated only once, pointing at the terminal entry. The per-applyOps
+// op-count limit is lowered so a small batch splits into multiple entries.
+TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteChainTagsAndLinksEveryEntry) {
     unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
     unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 1);
 
@@ -4775,7 +4775,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteChainTagsAndLinksEveryEntry) {
 
     {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForRetryableAtomicWrite);
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx,
             *autoColl,
@@ -5141,7 +5141,7 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertApplyOpsGrouping) {
     }
 }
 
-TEST_F(BatchedWriteOutputsTest, AtomicWriteWithMultipleStatementBearingOpsTrips) {
+TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteWithMultipleStatementBearingOpsTrips) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, _nss);
@@ -5152,7 +5152,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteWithMultipleStatementBearingOpsTrips)
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
 
     // Two separate inserts in one WUOW, each its own statement-bearing operation.
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForRetryableAtomicWrite);
     std::vector<InsertStatement> inserts;
     inserts.emplace_back(StmtId(0), BSON("_id" << 0));
     inserts.emplace_back(StmtId(1), BSON("_id" << 1));
@@ -5165,8 +5165,8 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteWithMultipleStatementBearingOpsTrips)
         /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
         /*defaultFromMigrate=*/false);
 
-    // Committing trips the kGroupForAtomicWrite assertion. tassert both throws and arms the
-    // tripwire; clear the tripwire so the test process doesn't abort at shutdown.
+    // Committing trips the kGroupForRetryableAtomicWrite assertion. tassert both throws and arms
+    // the tripwire; clear the tripwire so the test process doesn't abort at shutdown.
     ASSERT_THROWS_WITH_CHECK(wuow.commit(), DBException, [](const DBException& ex) {
         EXPECT_EQ(ex.code(), 12782600);
         assertionCount.tripwire.subtractAndFetch(1);
