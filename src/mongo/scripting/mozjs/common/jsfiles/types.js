@@ -2,6 +2,15 @@
  * Shims and polyfills for various types.
  */
 
+/**
+ * NOTE: This file is shared by every JS engine: the shell, the legacy in-process MozJS server scope
+ * and the WASM server scope. The latter two have no filesystem-backed module loader, so this file
+ * must remain a classic script -- it may not use `import` or `export`, and it may not rely on
+ * anything a module would provide. That is enforced by a lint rule (see "no-restricted-syntax" for
+ * this path in eslint.config.mjs); if you need module syntax here, the file has to be forked for
+ * server-side use first, and the fork needs a test guarding it against drift.
+ */
+
 // Date and time types
 /**
  * The return value is not a valid JSON string. See 'tojson()' function comment for details.

@@ -86,7 +86,6 @@ extern const JSFile types;
 // Server-specific, self-contained (non-module) copies of the setup scripts, used to initialize the
 // JS scope in the server execution environment without the filesystem-backed module loader.
 extern const JSFile server_assert;
-extern const JSFile server_types;
 }  // namespace JSFiles
 
 namespace mozjs {
@@ -1450,11 +1449,10 @@ void MozJSImplScope::_setupScripts() {
         execSetup(JSFiles::stringdiff);
         execSetup(JSFiles::assert);
         execSetup(JSFiles::assert_global);
-        execSetup(JSFiles::types);
     } else {
         execSetup(JSFiles::server_assert);
-        execSetup(JSFiles::server_types);
     }
+    execSetup(JSFiles::types);
 }
 
 }  // namespace mozjs

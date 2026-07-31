@@ -15,7 +15,6 @@ exports_files(
 # shell's (e.g. JSFiles::assert), which would otherwise collide at link time.
 SERVER_CPP_JSFILES = [
     ("server_assert", "assert.js"),
-    ("server_types", "types.js"),
 ]
 
 render_template(
