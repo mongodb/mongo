@@ -37,7 +37,6 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
     otel::metrics::OtelMetricsCapturer capturer;
 
     for (const auto& gaugeName : {
-             MetricNames::kReplicatedFastCountIsRunning,
              MetricNames::kReplicatedFastCountOplogLagSecs,
              MetricNames::kReplicatedFastCountTailerIsRunning,
              MetricNames::kReplicatedFastCountFlusherIsRunning,
@@ -58,17 +57,6 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
          }) {
         EXPECT_EQ(capturer.readInt64Counter(counterName), 0);
     }
-}
-
-TEST(ReplicatedFastCountMetricsTest, IsRunningGaugeClearedBySetIsRunning) {
-    OtelMetricsCapturer capturer;
-    setIsRunning(false);
-
-    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 0);
-
-    setIsRunning(true);
-
-    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 1);
 }
 
 TEST(ReplicatedFastCountMetricsTest, FlushSuccessCounterIncrementsViaRecordFlush) {
@@ -193,10 +181,6 @@ protected:
     ReplicatedFastCountManager* _fastCountManager;
     OtelMetricsCapturer _capturer;
 };
-
-TEST_F(ReplicatedFastCountManagerMetricsTest, IsRunningGaugeSetByStartup) {
-    EXPECT_EQ(_capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 1);
-}
 
 // TODO SERVER-122992: Re-enable once the number of entries inserted versus updated are
 // communicated.

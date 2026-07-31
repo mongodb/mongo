@@ -414,8 +414,6 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.drainBytes");
     static constexpr MetricName kIndexBuildSideWritesDrainYields =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.drainYields");
-    static constexpr MetricName kReplicatedFastCountIsRunning =
-        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.isRunning");
     static constexpr MetricName kReplicatedFastCountFlushSuccessCount = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.replicatedFastCount.flush.successCount");
     static constexpr MetricName kReplicatedFastCountFlushFailureCount = MetricNameMaker::make(

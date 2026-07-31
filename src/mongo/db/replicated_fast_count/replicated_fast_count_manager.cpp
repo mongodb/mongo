@@ -156,8 +156,6 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
     if (!_isUnderTest) {
         _checkpointer->startup(opCtx->getServiceContext());
     }
-
-    setIsRunning(true);
 }
 
 void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
@@ -195,7 +193,6 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     }
 
     LOGV2(12101800, "ReplicatedFastCountManager stopped");
-    setIsRunning(false);
 }
 
 int ReplicatedFastCountManager::_hydrateMetadataFromContainer(

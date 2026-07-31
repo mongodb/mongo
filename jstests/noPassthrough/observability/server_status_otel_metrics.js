@@ -16,15 +16,16 @@ describe("OTel metrics reported under serverStatus", function () {
         MongoRunner.stopMongod(this.mongod);
     });
 
-    it("reports replicatedFastCount.isRunning under metrics.replicatedFastCount", function () {
-        // replicatedFastCount.isRunning is an OTel gauge registered with serverStatusOptions. Its
-        // value is 0 on a plain mongod (the background thread is not running), but it must be
-        // present and non-negative to confirm the serverStatusOptions adapter is wired up correctly.
+    it("reports replicatedFastCount.tailer.isRunning under metrics.replicatedFastCount", function () {
+        // replicatedFastCount.tailer.isRunning is an OTel gauge registered with
+        // serverStatusOptions. Its value is 0 on a plain mongod (the background thread is not
+        // running), but it must be present and non-negative to confirm the serverStatusOptions
+        // adapter is wired up correctly.
         const metrics = this.mongod.getDB(jsTestName()).serverStatus().metrics;
         assert.gte(
-            metrics.replicatedFastCount.isRunning,
+            metrics.replicatedFastCount.tailer.isRunning,
             0,
-            "Expected metrics.replicatedFastCount.isRunning to be present and non-negative",
+            "Expected metrics.replicatedFastCount.tailer.isRunning to be present and non-negative",
             {replicatedFastCount: metrics.replicatedFastCount},
         );
     });

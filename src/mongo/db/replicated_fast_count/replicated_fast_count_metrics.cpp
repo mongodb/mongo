@@ -21,15 +21,6 @@ using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 using otel::metrics::ServerStatusOptions;
 
-// Boolean flag indicating whether or not the fast count background thread is currently running.
-// Since OTel gauges do not natively support booleans, we use an int64_t gauge instead.
-auto& isRunningGauge = MetricsService::instance().createInt64Gauge(
-    MetricNames::kReplicatedFastCountIsRunning,
-    "1 if the replicated fast count background thread is running, 0 otherwise",
-    MetricUnit::kEvents,
-    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.isRunning",
-                                                .role = ClusterRole::None}});
-
 // Per-thread isRunning gauges. Useful for identifying if a thread has independently died.
 auto& tailerIsRunningGauge = MetricsService::instance().createInt64Gauge(
     MetricNames::kReplicatedFastCountTailerIsRunning,
@@ -138,10 +129,6 @@ void refreshOplogLagGauge() {
 }
 
 }  // namespace
-
-void setIsRunning(bool running) {
-    isRunningGauge.set(running ? 1 : 0);
-}
 
 void setTailerIsRunning(bool running) {
     tailerIsRunningGauge.set(running ? 1 : 0);
