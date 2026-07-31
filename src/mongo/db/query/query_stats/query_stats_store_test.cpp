@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -17,6 +18,8 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/agg_key.h"
@@ -32,6 +35,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -185,12 +189,13 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     auto query = BSON("query" << 1 << "xEquals" << 42);
     auto key = makeFindKeyFromQuery(query);
 
-    const size_t cacheSize = key->size() + sizeof(QueryStatsEntry) + 100;
+    auto hash = absl::HashOf(key);
+    QueryStatsEntry entry{std::move(key)};
+    const size_t cacheSize = QueryStatsStoreEntryBudgetor{}(hash, entry) + 100;
     const auto numPartitions = 1;
     QueryStatsStore queryStatsStore{cacheSize, numPartitions};
 
-    auto hash = absl::HashOf(key);
-    queryStatsStore.put(hash, QueryStatsEntry{std::move(key)});
+    queryStatsStore.put(hash, std::move(entry));
     ASSERT_EQ(countAllEntries(queryStatsStore), 1);
 
     // We'll do this again later so save this as a helper function.
@@ -243,6 +248,135 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     // bytes and thus over budget for the partitions of this cache.
     addLargeEntry(queryStatsStoreTwo);
     ASSERT_EQ(countAllEntries(queryStatsStoreTwo), 0);
+}
+
+TEST_F(QueryStatsStoreTest, RecordErrorCodeBasic) {
+    auto query = BSON("query" << 1);
+    QueryStatsEntry entry{makeFindKeyFromQuery(query)};
+    entry.recordErrorCode(ErrorCodes::BadValue);
+
+    ASSERT_EQ(entry.execCountErrored, 1);
+    ASSERT_EQ(entry.recentErrors.size(), 1);
+    auto [code, stats] = *entry.recentErrors.begin();
+    ASSERT_EQ(code, ErrorCodes::BadValue);
+    ASSERT_EQ(stats.count, 1);
+}
+
+TEST_F(QueryStatsStoreTest, RecordErrorCodeUpdatesExistingEntry) {
+    auto query = BSON("query" << 1);
+    QueryStatsEntry entry{makeFindKeyFromQuery(query)};
+
+    entry.recordErrorCode(ErrorCodes::BadValue);
+    entry.recordErrorCode(ErrorCodes::BadValue);
+
+    ASSERT_EQ(entry.execCountErrored, 2);
+    ASSERT_EQ(entry.recentErrors.size(), 1);
+    auto [code, stats] = *entry.recentErrors.begin();
+    ASSERT_EQ(code, ErrorCodes::BadValue);
+    ASSERT_EQ(stats.count, 2);
+}
+
+TEST_F(QueryStatsStoreTest, RecordErrorCodeEvictsLeastRecentlySeen) {
+    // Pin the bound to the lowest value the knob's validator accepts, so that the eviction path is
+    // exercised with a configuration production could actually run with.
+    const size_t maxRecentErrors = 5;
+    const auto originalMax = internalQueryStatsMaxErrorCodesPerShape.load();
+    ON_BLOCK_EXIT([&] { internalQueryStatsMaxErrorCodesPerShape.store(originalMax); });
+    internalQueryStatsMaxErrorCodesPerShape.store(static_cast<int>(maxRecentErrors));
+
+    auto query = BSON("query" << 1);
+    QueryStatsEntry entry{makeFindKeyFromQuery(query)};
+
+    entry.recordErrorCode(ErrorCodes::BadValue);
+    entry.recordErrorCode(ErrorCodes::MaxTimeMSExpired);
+    entry.recordErrorCode(ErrorCodes::NoSuchKey);
+    entry.recordErrorCode(ErrorCodes::Unauthorized);
+    entry.recordErrorCode(ErrorCodes::HostUnreachable);
+    // A sixth distinct code should evict BadValue, since it is the least-recently-seen.
+    entry.recordErrorCode(ErrorCodes::NetworkTimeout);
+
+    ASSERT_EQ(entry.recentErrors.size(), maxRecentErrors);
+    // execCountErrored still reflects all 6 errors.
+    ASSERT_EQ(entry.execCountErrored, 6);
+
+    ASSERT_FALSE(entry.recentErrors.hasKey(ErrorCodes::BadValue));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::MaxTimeMSExpired));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::NoSuchKey));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::Unauthorized));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::HostUnreachable));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::NetworkTimeout));
+
+    // Re-recording the evicted code does not merge with its pre-eviction count.
+    entry.recordErrorCode(ErrorCodes::BadValue);
+    ASSERT_EQ(entry.execCountErrored, 7);
+    ASSERT_EQ(entry.recentErrors.size(), maxRecentErrors);
+    auto [code, stats] = *entry.recentErrors.begin();
+    ASSERT_EQ(code, ErrorCodes::BadValue);
+    ASSERT_EQ(stats.count, 1);
+}
+
+TEST_F(QueryStatsStoreTest, UpdateStatisticsGatesErrorCollectionBehindFeatureFlag) {
+    const bool originalFlagValue = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
+    ON_BLOCK_EXIT([&] {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(originalFlagValue);
+    });
+
+    auto opCtx = makeOperationContext();
+    auto makeMutableFindKey = [&](BSONObj filter) -> std::unique_ptr<Key> {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(filter.getOwned());
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        return std::make_unique<FindKey>(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
+    };
+
+    QueryStatsSnapshot erroredSnapshot{};
+    erroredSnapshot.errorCode = ErrorCodes::BadValue;
+
+    // With the flag disabled, an errored execution must leave the shape's error-related counters
+    // untouched and execCount must stay zero'd out.
+    {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(false);
+        auto query = BSON("query" << 1 << "flag" << "disabled");
+        auto key = makeMutableFindKey(query);
+        auto keyHash = absl::HashOf(*key);
+        query_stats::writeQueryStats(opCtx.get(), keyHash, std::move(key), erroredSnapshot);
+
+        auto& queryStatsStore = getQueryStatsStore(opCtx.get());
+        auto lookupResult = queryStatsStore.lookup(keyHash);
+        ASSERT_OK(lookupResult);
+        auto& entry = *lookupResult.getValue();
+        ASSERT_EQ(entry.execCount, 0);
+        ASSERT_EQ(entry.execCountErrored, 0);
+        ASSERT_TRUE(entry.recentErrors.empty());
+    }
+
+    // With the flag enabled, an errored execution increments 'execCountErrored' and records the
+    // error code.
+    {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(true);
+        auto query = BSON("query" << 1 << "flag" << "enabled");
+        auto keyHash = [&] {
+            auto key = makeMutableFindKey(query);
+            return absl::HashOf(*key);
+        }();
+
+        query_stats::writeQueryStats(
+            opCtx.get(), keyHash, makeMutableFindKey(query), erroredSnapshot);
+
+        auto& queryStatsStore = getQueryStatsStore(opCtx.get());
+        {
+            auto lookupResult = queryStatsStore.lookup(keyHash);
+            ASSERT_OK(lookupResult);
+            auto& entry = *lookupResult.getValue();
+            ASSERT_EQ(entry.execCount, 0);
+            ASSERT_EQ(entry.execCountErrored, 1);
+            ASSERT_EQ(entry.recentErrors.size(), 1);
+            ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::BadValue));
+        }
+    }
 }
 
 TEST_F(QueryStatsStoreTest, RegisterRequestSkipsShapeExceedingMaxUserSize) {
@@ -1563,8 +1697,11 @@ struct QueryStatsBSONParams {
     bool useSubsections = false;
     bool includeWriteMetrics = false;
     bool includeCBRMetrics = false;
+    bool includeErrorMetrics = false;
     long long lastExecutionMicros = 0LL;
     long long execCount = 0LL;
+    long long execCountErrored = 0LL;
+    std::vector<BSONObj> errors = {};
     BSONObj hasSortStage = boolMetricBson(0, 0);
     BSONObj usedDisk = boolMetricBson(0, 0);
     BSONObj nMatched = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
@@ -1586,8 +1723,19 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
     const BSONObj emptyIntMetric = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObjBuilder testBuilder{};
     testBuilder.appendNumber("lastExecutionMicros", params.lastExecutionMicros)
-        .appendNumber("execCount", params.execCount)
-        .append("totalExecMicros", emptyIntMetric)
+        .appendNumber("execCount", params.execCount);
+
+    if (params.includeErrorMetrics) {
+        testBuilder.appendNumber("execCountErrored", params.execCountErrored);
+        if (!params.errors.empty()) {
+            BSONArrayBuilder errorsBuilder{testBuilder.subarrayStart("errors")};
+            for (const auto& error : params.errors) {
+                errorsBuilder.append(error);
+            }
+        }
+    }
+
+    testBuilder.append("totalExecMicros", emptyIntMetric)
         .append("cpuNanos", emptyIntMetric)
         .append("workingTimeMillis", emptyIntMetric);
 
@@ -1683,9 +1831,11 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
     testBuilder.append("firstSeenTimestamp", qse.firstSeenTimestamp)
         .append("latestSeenTimestamp", Date_t());
 
-    ASSERT_BSONOBJ_EQ(
-        qse.toBSON(params.useSubsections, params.includeWriteMetrics, params.includeCBRMetrics),
-        testBuilder.obj());
+    ASSERT_BSONOBJ_EQ(qse.toBSON(params.useSubsections,
+                                 params.includeWriteMetrics,
+                                 params.includeCBRMetrics,
+                                 params.includeErrorMetrics),
+                      testBuilder.obj());
 }
 
 TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
@@ -1773,6 +1923,50 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                 });
         }
     }
+}
+
+TEST_F(QueryStatsStoreTest, BasicErrorMetricsBSON) {
+    QueryStatsStore queryStatsStore{5000000, 1000};
+    auto query1 = BSON("query" << 1);
+    auto key = makeFindKeyFromQuery(query1);
+    auto lookupHash = absl::HashOf(key);
+    queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+    auto lookupResult = queryStatsStore.lookup(lookupHash);
+    ASSERT_OK(lookupResult);
+    auto& entry = *lookupResult.getValue();
+
+    // No errors recorded yet so 'errors' should be absent and 'execCountErrored' zero.
+    verifyQueryStatsBSON(entry, {.includeErrorMetrics = true});
+
+    // Defaults to 'includeErrorMetrics=false', so 'execCountErrored'/'errors' should be absent,
+    // matching pre-existing toBSON() shape.
+    ASSERT_FALSE(entry.toBSON().hasField("execCountErrored"));
+    ASSERT_FALSE(entry.toBSON().hasField("errors"));
+
+    entry.recordErrorCode(ErrorCodes::MaxTimeMSExpired);
+    entry.recordErrorCode(ErrorCodes::MaxTimeMSExpired);
+    const auto unnamedCode = static_cast<ErrorCodes::Error>(1234500);
+    entry.recordErrorCode(unnamedCode);
+
+    ASSERT_EQ(entry.recentErrors.size(), 2);
+    auto it = entry.recentErrors.begin();
+
+    ASSERT_EQ(it->first, unnamedCode);
+    BSONObj unnamedErrorBson =
+        BSON("code" << static_cast<int32_t>(unnamedCode) << "codeName"
+                    << ErrorCodes::errorString(unnamedCode) << "count" << 1LL
+                    << "latestSeenTimestamp" << it->second.latestSeenTimestamp);
+    ++it;
+    ASSERT_EQ(it->first, ErrorCodes::MaxTimeMSExpired);
+    BSONObj namedErrorBson =
+        BSON("code" << static_cast<int32_t>(ErrorCodes::MaxTimeMSExpired) << "codeName"
+                    << ErrorCodes::errorString(ErrorCodes::MaxTimeMSExpired) << "count" << 2LL
+                    << "latestSeenTimestamp" << it->second.latestSeenTimestamp);
+
+    verifyQueryStatsBSON(entry,
+                         {.includeErrorMetrics = true,
+                          .execCountErrored = 3LL,
+                          .errors = {unnamedErrorBson, namedErrorBson}});
 }
 
 TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {

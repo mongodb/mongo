@@ -11,16 +11,56 @@ namespace mongo::query_stats {
 // Estimated overhead for BSON document header, EOO, and potential subobject field names.
 const size_t kBSONOverhead = 100;
 
+// Estimated overhead of a single 'errors' array entry: {code, codeName, count,
+// latestSeenTimestamp}.
+const size_t kBSONOverheadPerErrorEntry = 100;
+
+void QueryStatsEntry::recordErrorCode(ErrorCodes::Error code) {
+    execCountErrored++;
+    const auto now = Date_t::now();
+
+    // 'find()' promotes the entry to most-recently-seen if it already exists.
+    if (auto it = recentErrors.find(code); it != recentErrors.end()) {
+        it->second.count++;
+        it->second.latestSeenTimestamp = now;
+    } else {
+        recentErrors.add(code, QueryStatsErrorEntry{1, now});
+    }
+}
+
+// Estimated BSON padding for a serialized QueryStatsEntry, on top of 'sizeof(QueryStatsEntry)'.
+// This is an estimate of future growth, made up of:
+// - overhead for the BSON structure itself, plus one allowance per top-level sub-structure
+//   (cursorStats, queryExecStats, queryPlannerStats and writesStats), and
+// - an additional 500 bytes to account for any potential supplemental metrics.
+const size_t kQueryStatsEntryPadding = (kBSONOverhead * 5) + 500;
+
 BSONObj QueryStatsEntry::toBSON(bool buildSubsections,
                                 bool includeWriteMetrics,
-                                bool includeCBRMetrics) const {
-    // Pad not only for the overhead of the BSON structure itself, but also for the
-    // sub-structures it contains. We have 4 sub-structures at the top level:
-    // cursorStats, queryExecStats, queryPlannerStats, and writesStats.
-    // Pad an additional 500 bytes to account for any potential supplemental metrics.
-    BSONObjBuilder builder{sizeof(QueryStatsEntry) + (kBSONOverhead * 5) + 500};
+                                bool includeCBRMetrics,
+                                bool includeErrorMetrics) const {
+    // Pad overhead for the 'errors' array based on the number of entries currently tracked.
+    const size_t errorEntriesSizeEstimate =
+        includeErrorMetrics ? recentErrors.size() * kBSONOverheadPerErrorEntry : 0;
+    BSONObjBuilder builder{static_cast<int>(sizeof(QueryStatsEntry) + kQueryStatsEntryPadding +
+                                            errorEntriesSizeEstimate)};
     builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
     builder.append("execCount", (long long)execCount);
+    if (includeErrorMetrics) {
+        builder.append("execCountErrored", (long long)execCountErrored);
+        // Serialize the bounded 'recentErrors' cache as the 'errors' array, resolving each stored
+        // code to its name.
+        if (!recentErrors.empty()) {
+            BSONArrayBuilder errorsBuilder{builder.subarrayStart("errors")};
+            for (const auto& [code, error] : recentErrors) {
+                BSONObjBuilder errorBuilder{errorsBuilder.subobjStart()};
+                errorBuilder.append("code", static_cast<int32_t>(code));
+                errorBuilder.append("codeName", ErrorCodes::errorString(code));
+                errorBuilder.append("count", (long long)error.count);
+                errorBuilder.append("latestSeenTimestamp", error.latestSeenTimestamp);
+            }
+        }
+    }
     totalExecMicros.appendTo(builder, "totalExecMicros");
     cpuNanos.appendToIfNonNegative(builder, "cpuNanos");
     workingTimeMillis.appendTo(builder, "workingTimeMillis");

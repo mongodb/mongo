@@ -182,13 +182,15 @@ boost::optional<Document> QueryStatsStage::toDocument(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         bool useQueryStatsWithSubsectionsFormat =
             feature_flags::gFeatureFlagQueryStatsMetricsSubsections.isEnabled();
+        bool includeErrorMetrics = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
         return Document{{"key", std::move(queryStatsKey)},
                         {"keyHash", keyHash},
                         {"queryShapeHash", queryShapeHash},
                         {"metrics",
                          queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat,
                                                 includeWriteMetrics,
-                                                includeCBRMetrics)},
+                                                includeCBRMetrics,
+                                                includeErrorMetrics)},
                         {"asOf", partitionReadTime}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();

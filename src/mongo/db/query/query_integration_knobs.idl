@@ -132,6 +132,20 @@ server_parameters:
             callback: query_stats_util::validateQueryStatsStoreSize
         redact: false
 
+    internalQueryStatsMaxErrorCodesPerShape:
+        description: >-
+            The maximum number of distinct recent error codes tracked per query shape in the query
+            stats store. Once this limit is reached, the least recently seen error code entry for
+            that shape is evicted.
+        set_at: startup
+        cpp_varname: "internalQueryStatsMaxErrorCodesPerShape"
+        cpp_vartype: Atomic<int>
+        default: 10
+        validator:
+            gte: 5
+            lte: 100
+        redact: false
+
     internalQueryStatsErrorsAreCommandFatal:
         description: >-
             Whether errors in the $queryStats stage cause the aggregation pipeline to

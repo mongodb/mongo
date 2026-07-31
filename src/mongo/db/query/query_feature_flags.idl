@@ -335,6 +335,14 @@ feature_flags:
         default: true
         fcv_gated: false
 
+    featureFlagQueryStatsErrors:
+        description: >-
+            Feature flag to enable collecting query stats for commands that error.
+        cpp_varname: gFeatureFlagQueryStatsErrors
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+
     featureFlagExtractFieldPathsSbeStage:
         description: "Feature flag to enable extract_field_paths SBE stage."
         cpp_varname: gFeatureFlagExtractFieldPathsSbeStage

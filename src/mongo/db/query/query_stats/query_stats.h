@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -33,9 +34,16 @@ struct QueryStatsPartitioner {
     }
 };
 
+/**
+ * Computes the budgeted size of a store entry. Note that a QueryStatsEntry only holds the
+ * 'recentErrors' LRU cache as a member, so 'sizeof()' does not account for the error entries it
+ * heap-allocates as codes are recorded. The worst-case cost of a full cache is reserved up front
+ * in 'value.reservedErrorBudgetBytes'.
+ */
 struct QueryStatsStoreEntryBudgetor {
     size_t operator()(const std::size_t hash, const QueryStatsEntry& value) {
-        return sizeof(decltype(value)) + sizeof(decltype(hash)) + value.key->size();
+        return sizeof(decltype(value)) + sizeof(decltype(hash)) + value.key->size() +
+            value.reservedErrorBudgetBytes;
     }
 };
 
@@ -254,6 +262,12 @@ struct QueryStatsSnapshot {
 
     uint64_t peakTrackedMemBytes;
     uint64_t clusterPeakTrackedMemBytes;
+
+    ErrorCodes::Error errorCode = ErrorCodes::OK;
+
+    bool isErrored() const {
+        return errorCode != ErrorCodes::OK;
+    }
 };
 
 /**
