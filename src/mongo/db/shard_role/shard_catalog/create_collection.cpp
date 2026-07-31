@@ -100,6 +100,17 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
                       "The clusteredIndex option requires unique: true to be specified");
     }
 
+    if (const auto& name = spec.getName()) {
+        if (name->find('\0') != std::string::npos) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "The clusteredIndex name cannot contain NUL bytes");
+        }
+
+        if (name->empty()) {
+            return Status(ErrorCodes::CannotCreateIndex, "The clusteredIndex name cannot be empty");
+        }
+    }
+
     bool clusterKeyOnId =
         SimpleBSONObjComparator::kInstance.evaluate(spec.getKey() == BSON("_id" << 1));
 
