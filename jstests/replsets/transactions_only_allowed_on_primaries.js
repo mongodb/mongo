@@ -1,20 +1,9 @@
 /**
  * Test that transactions are only allowed on primaries, and prohibited from running on secondaries.
  *
- * @tags: [
- *   disables_test_commands,
- *   uses_transactions,
- * ]
+ * @tags: [ uses_transactions ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-
-// In 4.0, we allow read-only transactions on secondaries when test commands are enabled, so we
-// disable them in this test, to test that transactions on secondaries will be disallowed
-// for production users.
-
-TestData.enableTestCommands = false;
-TestData.roleGraphInvalidationIsFatal = false;
-TestData.authenticationDatabase = "local";
 
 const dbName = "test";
 const collName = "transactions_only_allowed_on_primaries";
