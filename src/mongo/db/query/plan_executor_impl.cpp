@@ -106,6 +106,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                        std::move(maybeExplainData),
                                        _cq && _cq->getExplain().has_value() /* isExplain */)),
       _mustReturnOwnedBson(returnOwnedBson),
+      _mustSetRecordIdMetadata(_cq && _cq->metadataDeps()[DocumentMetadataFields::kRecordId]),
       // Read value of 'operationResponseMaxMS' query knob once, here at construction, where the
       // knob configuration is resolved and available. The knob is fixed for the query's lifetime,
       // so the value is cached and reused rather than re-read on every reattach (see header).
@@ -466,7 +467,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
 
         if (PlanStage::ADVANCED == code) {
             WorkingSetMember* member = _workingSet->get(id);
-            if (_cq && _cq->metadataDeps()[DocumentMetadataFields::kRecordId]) {
+            if (_mustSetRecordIdMetadata) {
                 member->metadata().setRecordId(member->recordId);
             }
             bool hasRequestedData = true;
@@ -480,7 +481,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
                         *objOut = Document{member->keyData[0].keyData};
                     }
                 } else if (member->hasObj()) {
-                    std::swap(*objOut, member->doc.value());
+                    using std::swap;
+                    swap(*objOut, member->doc.value());
                 } else {
                     _workingSet->free(id);
                     hasRequestedData = false;
@@ -495,8 +497,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
             if (hasRequestedData) {
                 // transfer the metadata from the WSM to Document.
                 if (objOut) {
-                    if (_mustReturnOwnedBson) {
-                        *objOut = objOut->getOwned();
+                    if (_mustReturnOwnedBson && !objOut->isOwned()) {
+                        *objOut = std::move(*objOut).getOwned();
                     }
 
                     if (member->metadata()) {
