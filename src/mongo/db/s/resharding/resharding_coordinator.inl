@@ -145,7 +145,8 @@ ReshardingCoordinator::ReshardingCoordinator(
           "ReshardingCoordinatorCancelableOpCtxPool")},
       _reshardingCoordinatorExternalState(externalState),
       _sessionTracker(this),
-      _isRecovery(coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
+      _isRecovery(coordinatorDoc.getState() > CoordinatorStateEnum::kUnused),
+      _isRecoveryInQuiesce(coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
     _reshardingCoordinatorObserver = std::make_shared<ReshardingCoordinatorObserver>();
 
     // If the coordinator is recovering from step-up, make sure to properly initialize the
@@ -2571,6 +2572,12 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
 }
 
 void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
+    // An instance recovered from a kQuiesced document did not run the operation, so the primary
+    // that did has already logged its outcome.
+    if (_isRecoveryInQuiesce) {
+        return;
+    }
+
     BSONObjBuilder builder;
     BSONObjBuilder statsBuilder;
     BSONObjBuilder totalsBuilder;
