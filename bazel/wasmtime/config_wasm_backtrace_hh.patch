@@ -1,0 +1,19 @@
+--- a/include/wasmtime/config.hh
++++ b/include/wasmtime/config.hh
+@@ -536,6 +536,16 @@
+   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.signals_based_traps
+   void signals_based_traps(bool enable) {
+     wasmtime_config_signals_based_traps_set(ptr.get(), enable);
++  }
++
++  /// \brief Configures whether backtraces are captured on wasm traps.
++  ///
++  /// Disabling makes the trap path allocation-free (no in-signal malloc to
++  /// build a wasm-frame backtrace), required to be async-signal-safe under
++  /// ASan/TSan.  See
++  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_backtrace
++  void wasm_backtrace(bool enable) {
++    wasmtime_config_wasm_backtrace_set(ptr.get(), enable);
+   }
+ 
+ #ifdef WASMTIME_FEATURE_CACHE

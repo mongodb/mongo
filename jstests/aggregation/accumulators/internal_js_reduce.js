@@ -3,9 +3,6 @@
 //
 // @tags: [
 //   requires_scripting,
-//   # TODO SERVER-128404: Wasmtime's rayon thread pool bypasses TSAN's pthread_create interception,
-//   # triggering a TSAN internal assertion (thr->slot == 0). Re-enable once SERVER-128404 is fixed.
-//   tsan_incompatible,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

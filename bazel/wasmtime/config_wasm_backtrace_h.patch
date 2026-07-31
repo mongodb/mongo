@@ -1,0 +1,21 @@
+--- a/include/wasmtime/config.h
++++ b/include/wasmtime/config.h
+@@ -486,6 +486,18 @@
+ WASMTIME_CONFIG_PROP(void, signals_based_traps, bool)
+ 
+ /**
++ * \brief Configures whether backtraces are captured on wasm traps.
++ *
++ * Defaults to `true`.  Disabling avoids the in-signal-handler allocation
++ * Wasmtime performs to build a wasm-frame backtrace, making the trap path
++ * async-signal-safe (see SERVER-128404).
++ *
++ * For more information see the Rust documentation at
++ * https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_backtrace
++ */
++WASMTIME_CONFIG_PROP(void, wasm_backtrace, bool)
++
++/**
+  * Return the data from a LinearMemory instance.
+  *
+  * The size in bytes as well as the maximum number of bytes that can be

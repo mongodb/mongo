@@ -449,6 +449,9 @@ crate.annotation(
         "//bazel/wasmtime:store_hh_resource_limiter.patch",
         "//bazel/wasmtime:val_raw_u8_list_h.patch",
         "//bazel/wasmtime:val_raw_u8_list_rs.patch",
+        "//bazel/wasmtime:config_wasm_backtrace_rs.patch",
+        "//bazel/wasmtime:config_wasm_backtrace_h.patch",
+        "//bazel/wasmtime:config_wasm_backtrace_hh.patch",
     ],
 )
 

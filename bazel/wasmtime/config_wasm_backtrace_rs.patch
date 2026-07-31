@@ -1,0 +1,14 @@
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -271,6 +271,11 @@
+ #[unsafe(no_mangle)]
+ pub extern "C" fn wasmtime_config_native_unwind_info_set(c: &mut wasm_config_t, enabled: bool) {
+     c.config.native_unwind_info(enabled);
++}
++
++#[unsafe(no_mangle)]
++pub extern "C" fn wasmtime_config_wasm_backtrace_set(c: &mut wasm_config_t, enable: bool) {
++    c.config.wasm_backtrace(enable);
+ }
+ 
+ #[unsafe(no_mangle)]

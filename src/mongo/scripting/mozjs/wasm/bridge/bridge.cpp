@@ -66,6 +66,7 @@ std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(cons
         config.wasm_component_model(true);
         config.epoch_interruption(true);
         config.wasm_exceptions(true);
+        config.wasm_backtrace(false);
 
         wt::Engine engine(std::move(config));
 
