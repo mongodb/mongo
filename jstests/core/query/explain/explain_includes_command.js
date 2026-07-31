@@ -4,6 +4,7 @@
  * @tags: [
  *   uses_explain,
  *   assumes_read_concern_local,
+ *   does_not_support_stepdowns,
  * ]
  */
 const collName = "explain_includes_command";
