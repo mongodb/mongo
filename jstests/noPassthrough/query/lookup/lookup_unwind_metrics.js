@@ -73,6 +73,22 @@ assert.commandWorked(localOrIdx.createIndex({b: 1}));
 assert.commandWorked(foreignWithIdx.createIndex({b: 1}));
 assert.commandWorked(foreignDinlj.createIndex({b: 1}, {collation: {locale: "en", strength: 2}}));
 
+const counterToFeatureFlag = {
+    indexedLoopJoin: "SbeEqLookupUnwindIndexedLoopJoin",
+    nestedLoopJoin: "SbeEqLookupUnwindNestedLoopJoin",
+    hashLookup: "SbeEqLookupUnwindHashJoin",
+    dynamicIndexedLoopJoin: "SbeEqLookupUnwindDynamicIndexedLoopJoin",
+    localCollscan: "SbeEqLookupUnwindLocalCollscan",
+    localIxscanFetch: "SbeEqLookupUnwindLocalIxscanFetch",
+    localComplex: "SbeEqLookupUnwindLocalComplexDataAccessPlans",
+};
+
+function requiredFlagsEnabled(expectedCounters) {
+    return expectedCounters.every((counter) =>
+        FeatureFlagUtil.isPresentAndEnabled(db, counterToFeatureFlag[counter]),
+    );
+}
+
 function getLuCounters() {
     return db.serverStatus().metrics.query.lookupUnwind;
 }
@@ -103,6 +119,13 @@ function makeLuComplexPipeline(foreignCollName) {
 }
 
 function assertCounterIncrement(localColl, pipeline, options, expectedCounters) {
+    if (!requiredFlagsEnabled(expectedCounters)) {
+        jsTest.log.info("Skipping case because a required LU IFR feature flag is disabled", {
+            expectedCounters,
+        });
+        return;
+    }
+
     const beforeLookupUnwind = getLuCounters();
     const beforeLookup = getLookupCounters();
     localColl.aggregate(pipeline, options).toArray();

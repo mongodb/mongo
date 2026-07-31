@@ -15,6 +15,9 @@ filters:
   - "aggregation_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
+  - "*qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
   - "aggregation_sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings

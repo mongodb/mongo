@@ -1,0 +1,51 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/aggregation_qemp_ifr_batch1.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+description:
+  "This suite runs the tests in the aggregation sub-directory against a
+  standalone mongod fixture.
+
+  "
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagGetExecutorDeferredEngineChoice: true
+        featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: false
+        featureFlagSbeEqLookupUnwindHashJoin: true
+        featureFlagSbeEqLookupUnwindIndexedLoopJoin: false
+        featureFlagSbeEqLookupUnwindLocalCollscan: true
+        featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+        featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+        featureFlagSbeEqLookupUnwindNestedLoopJoin: false
+        featureFlagSbeNonLeadingMatch: true
+        featureFlagSbeTransformStages: true
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1
+  hooks:
+    - class: RunQueryStats
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+  roots:
+    - jstests/aggregation/**/*.js
+test_kind: js_test

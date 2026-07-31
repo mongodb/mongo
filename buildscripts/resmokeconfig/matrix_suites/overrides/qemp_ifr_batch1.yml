@@ -1,0 +1,35 @@
+# Feature flag settings for the first QEMP incremental feature rollout batch.
+- name: enable_qemp_ifr_batch1_feature_flags_mongod
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagGetExecutorDeferredEngineChoice: true
+            featureFlagSbeTransformStages: true
+            featureFlagSbeNonLeadingMatch: true
+            featureFlagSbeEqLookupUnwindHashJoin: true
+            featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+            featureFlagSbeEqLookupUnwindLocalCollscan: true
+            featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+            featureFlagSbeEqLookupUnwindIndexedLoopJoin: false
+            featureFlagSbeEqLookupUnwindNestedLoopJoin: false
+            featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: false
+- name: enable_qemp_ifr_batch1_feature_flags_testdata_parameter_mongod
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                featureFlagGetExecutorDeferredEngineChoice: true
+                featureFlagSbeTransformStages: true
+                featureFlagSbeNonLeadingMatch: true
+                featureFlagSbeEqLookupUnwindHashJoin: true
+                featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+                featureFlagSbeEqLookupUnwindLocalCollscan: true
+                featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+                featureFlagSbeEqLookupUnwindIndexedLoopJoin: false
+                featureFlagSbeEqLookupUnwindNestedLoopJoin: false
+                featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: false

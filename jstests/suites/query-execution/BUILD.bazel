@@ -1500,3 +1500,126 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+# The qemp_ifr_batch1 suites run existing query suites with the first QEMP incremental feature
+# rollout batch of flag settings.
+resmoke_suite_test(
+    name = "core_qemp_ifr_batch1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_qemp_ifr_batch1.yml",
+    shard_count = 24,
+    tags = [
+        "ci-default",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_qemp_ifr_batch1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_qemp_ifr_batch1.yml",
+    shard_count = 4,
+    tags = [
+        "ci-default",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "no_passthrough_qemp_ifr_batch1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_qemp_ifr_batch1.yml",
+    shard_count = 40,
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "no_passthrough_with_mongod_qemp_ifr_batch1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_with_mongod_qemp_ifr_batch1.yml",
+    shard_count = 10,
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_qemp_ifr_batch1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_qemp_ifr_batch1.yml",
+    shard_count = 40,
+    tags = [
+        "ci-default",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_sharded_collections_passthrough_qemp_ifr_batch1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_sharded_collections_passthrough_qemp_ifr_batch1.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
