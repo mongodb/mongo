@@ -389,6 +389,54 @@ TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnStandaloneTrackerIsLocalOnly) 
     ASSERT_FALSE(tracker.withinMemoryLimit(nullptr));
 }
 
+TEST_F(MemoryUsageTrackerTest, RemainingMemoryUsageBytesReflectsAncestorLimit) {
+    // Operation-wide tracker enforces a 100 byte cap; stage limit is much larger, so the ancestor
+    // is the binding constraint and 'remaining' should reflect that, not the stage's own headroom.
+    SimpleMemoryUsageTracker opTracker{MemoryUsageLimit{100}};
+    SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{10 * 1024}};
+
+    stageTracker.add(50);
+    // Stage has 10 * 1024 - 50 bytes of local headroom, but the op tracker only has 50 left.
+    ASSERT_EQ(stageTracker.remainingMemoryUsageBytes(nullptr), 50);
+
+    stageTracker.add(51);
+    // Now over the op limit: remaining goes negative even though the stage's own limit isn't hit.
+    ASSERT_EQ(stageTracker.remainingMemoryUsageBytes(nullptr), -1);
+}
+
+TEST_F(MemoryUsageTrackerTest, RemainingMemoryUsageBytesReflectsLocalLimitWhenTighter) {
+    // Op limit is effectively unbounded, so the stage's own (tighter) limit is what binds.
+    SimpleMemoryUsageTracker opTracker{MemoryUsageLimit{std::numeric_limits<int64_t>::max()}};
+    SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{100}};
+
+    stageTracker.add(50);
+    ASSERT_EQ(stageTracker.remainingMemoryUsageBytes(nullptr), 50);
+
+    stageTracker.add(51);
+    ASSERT_EQ(stageTracker.remainingMemoryUsageBytes(nullptr), -1);
+}
+
+TEST_F(MemoryUsageTrackerTest, RemainingMemoryUsageBytesOnStandaloneTrackerIsLocalOnly) {
+    // No base: the chain walk collapses to the local check, same as withinMemoryLimit().
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{100}};
+    tracker.add(50);
+    ASSERT_EQ(tracker.remainingMemoryUsageBytes(nullptr), 50);
+    tracker.add(51);
+    ASSERT_EQ(tracker.remainingMemoryUsageBytes(nullptr), -1);
+}
+
+TEST_F(MemoryUsageTrackerTest, RemainingMemoryUsageBytesTakesMinimumAcrossChain) {
+    // A three-level chain where the middle tracker is the tightest: 'remaining' should reflect
+    // the minimum across all levels, not just the immediate tracker or the root.
+    SimpleMemoryUsageTracker opTracker{MemoryUsageLimit{10 * 1024}};
+    SimpleMemoryUsageTracker midTracker{&opTracker, MemoryUsageLimit{100}};
+    SimpleMemoryUsageTracker leafTracker{&midTracker, MemoryUsageLimit{10 * 1024}};
+
+    leafTracker.add(60);
+    // op: 10*1024 - 60, mid: 100 - 60 = 40, leaf: 10*1024 - 60. The minimum (mid) is 40.
+    ASSERT_EQ(leafTracker.remainingMemoryUsageBytes(nullptr), 40);
+}
+
 TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnMemoryUsageTracker) {
     // MemoryUsageTracker is the per-function variant whose internal _baseTracker is linked to
     // the op-wide tracker. The forwarder should pick up the op-wide breach too.

@@ -553,14 +553,6 @@ Value evaluateReplace(
     return replaceOpStr(input.getStringData(), find.getStringData(), replacement.getStringData());
 }
 
-void trackReplaceOutput(OperationContext* opCtx,
-                        const EvaluationContext& ctx,
-                        SimpleMemoryUsageToken& memToken,
-                        int64_t currentLength,
-                        std::string_view opName) {
-    memToken.set(currentLength);
-    memToken.tracker()->assertWithinMemoryLimit(opCtx, opName, ctx.stageName);
-}
 }  // namespace
 
 Value evaluate(const ExpressionReplaceOne& expr,
@@ -604,8 +596,7 @@ Value evaluate(const ExpressionReplaceAll& expr,
                const EvaluationContext& ctx) {
     auto replaceAllOpStr =
         [&](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
-        auto& tracker = getMemoryTracker(expr, ctx);
-        SimpleMemoryUsageToken memToken{0, &tracker};
+        BatchedExpressionMemoryCharger memCharger(expr, ctx);
 
         // An empty string matches at every position, so replaceAll should insert 'replacement'
         // at every position when 'find' is empty. Handling this as a special case lets us
@@ -614,11 +605,8 @@ Value evaluate(const ExpressionReplaceAll& expr,
             const int64_t inputSize = static_cast<int64_t>(input.size());
             const int64_t replacementSize = static_cast<int64_t>(replacement.size());
             const int64_t expectedSize = (inputSize + 1) * replacementSize + inputSize;
-            trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
-                               ctx,
-                               memToken,
-                               expectedSize,
-                               expr.getOpName());
+            memCharger.setTotal(expectedSize);
+            memCharger.flush();
 
             StringBuilder output;
             for (char c : input) {
@@ -639,27 +627,19 @@ Value evaluate(const ExpressionReplaceAll& expr,
             size_t endIndex = startIndex + find.size();
             output << input.substr(0, startIndex);
             output << replacement;
-            trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
-                               ctx,
-                               memToken,
-                               output.len(),
-                               expr.getOpName());
+            memCharger.setTotal(output.len());
             // This step assumes 'find' is nonempty. If 'find' were empty then input.find would
             // always find a match at position 0, and the input would never shrink.
             input = input.substr(endIndex);
         }
-        trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
-                           ctx,
-                           memToken,
-                           output.len(),
-                           expr.getOpName());
+        memCharger.setTotal(output.len());
+        memCharger.flush();
         return Value(output.stringData());
     };
     auto replaceAllOpRegEx = [&](std::string_view input,
                                  RegexExecutionState executionState,
                                  std::string_view replacement) -> Value {
-        auto& tracker = getMemoryTracker(expr, ctx);
-        SimpleMemoryUsageToken memToken{0, &tracker};
+        BatchedExpressionMemoryCharger memCharger(expr, ctx);
         StringBuilder output;
 
         // Condition uses <= instead of < to also capture possible empty matches at the end of the
@@ -672,18 +652,11 @@ Value evaluate(const ExpressionReplaceAll& expr,
                 break;
             }
             output << beforeMatch << replacement;
-            trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
-                               ctx,
-                               memToken,
-                               output.len(),
-                               expr.getOpName());
+            memCharger.setTotal(output.len());
         }
         output << input.substr(executionState.beforeMatchStrStart);
-        trackReplaceOutput(expr.getExpressionContext()->getOperationContext(),
-                           ctx,
-                           memToken,
-                           output.len(),
-                           expr.getOpName());
+        memCharger.setTotal(output.len());
+        memCharger.flush();
 
         return Value(output.stringData());
     };
