@@ -46,6 +46,14 @@
         load_extensions:
           - "mongot-extension"
 
+# TODO SERVER-132622. Remove this exclusion.
+# 'featureFlagExtensionsInsideHybridSearch' solves a timeseries bug. Exclude when the flag is disabled.
+- name: hybrid_search_sharded_cluster_excludes
+  value:
+    exclude_files:
+      - jstests/with_mongot/e2e/sharding_no_passthrough/hybrid_search_in_union_with_lookup_ts_sharding.js
+      - jstests/with_mongot/e2e/hybridSearch/hybrid_search_in_union_with_lookup_on_ts_rejected.js
+
 # ---------------------------------------------------------------------------------------------
 # with_mongot_extension_hybridSearch_disabled_* family: every extension flag on except
 # featureFlagExtensionsInsideHybridSearch. $search/$searchMeta and $vectorSearch run through the
