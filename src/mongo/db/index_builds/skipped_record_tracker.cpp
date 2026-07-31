@@ -93,6 +93,7 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
                     container,
                     reservedRidBlock[0].getLong(),
                     std::span<const char>(toInsert.objdata(), toInsert.objsize()),
+                    boost::none,
                     container_write::NonexistentKeyGuarantee{}));
             } else {
                 uassertStatusOK(rs.insertRecord(opCtx,

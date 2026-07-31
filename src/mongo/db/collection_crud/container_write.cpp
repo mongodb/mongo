@@ -9,32 +9,37 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/version_context.h"
 
+#include <tuple>
+
 namespace mongo::container_write {
-namespace {
-void assertCanAcceptContainerWrites(OperationContext* opCtx) {
-    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+CanAcceptContainerWritesGuarantee CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(
+    OperationContext* opCtx) {
     uassert(ErrorCodes::InvalidOptions,
             "Container write support is not enabled",
             rss::ReplicatedStorageService::get(opCtx->getServiceContext())
                     .getPersistenceProvider()
                     .mustUseContainerWrites() ||
                 ::mongo::feature_flags::gContainerWrites.isEnabledUseLastLTSFCVWhenUninitialized(
-                    VersionContext::getDecoration(opCtx), fcv));
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while writing to container",
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
                 opCtx, NamespaceString::kContainerNamespace));
+    return CanAcceptContainerWritesGuarantee{};
 }
-}  // namespace
 
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
               boost::optional<NonexistentKeyGuarantee> nkg) {
-    assertCanAcceptContainerWrites(opCtx);
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.insert(ru,
                                    key,
                                    value,
@@ -55,8 +60,11 @@ Status insert(OperationContext* opCtx,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
               boost::optional<NonexistentKeyGuarantee> nkg) {
-    assertCanAcceptContainerWrites(opCtx);
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.insert(ru,
                                    key,
                                    value,
@@ -76,8 +84,11 @@ Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
               int64_t key,
-              std::span<const char> value) {
-    assertCanAcceptContainerWrites(opCtx);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.update(ru, key, value);
     if (!status.isOK()) {
         return status;
@@ -93,8 +104,11 @@ Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
               std::span<const char> key,
-              std::span<const char> value) {
-    assertCanAcceptContainerWrites(opCtx);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.update(ru, key, value);
     if (!status.isOK()) {
         return status;
@@ -109,8 +123,11 @@ Status update(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
-              int64_t key) {
-    assertCanAcceptContainerWrites(opCtx);
+              int64_t key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;
@@ -125,8 +142,11 @@ Status remove(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
-              std::span<const char> key) {
-    assertCanAcceptContainerWrites(opCtx);
+              std::span<const char> key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;

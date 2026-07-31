@@ -594,6 +594,7 @@ void insertSorterEntries(OperationContext* opCtx,
                                           container,
                                           key,
                                           std::span<const char>(dummyValue, sizeof(dummyValue)),
+                                          boost::none,
                                           container_write::NonexistentKeyGuarantee{}));
     }
     wuow.commit();

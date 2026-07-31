@@ -369,6 +369,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
     }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     int64_t numExistingKeys = 0;
+    boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg;
     for (const auto& keyString : keys) {
         std::variant<Status, SortedDataInterface::DuplicateKey> result = Status::OK();
         if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
@@ -392,11 +393,17 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                 insertDup = true;
             }
 
+            if (!wg) {
+                wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
+                               assertCanAcceptContainerWrites(opCtx));
+            }
+
             result = container_write::insert(opCtx,
                                              ru,
                                              _newInterface->getContainer(),
                                              keyString.getView(),
-                                             keyString.getTypeBitsView());
+                                             keyString.getTypeBitsView(),
+                                             wg);
             if (auto status = std::get<Status>(result);
                 insertDup && status.isOK() && onDuplicateKey) {
                 result = onDuplicateKey(coll, keyString);
@@ -943,7 +950,8 @@ private:
     bool _addKeyForCommit(OperationContext* opCtx,
                           RecoveryUnit& ru,
                           const CollectionPtr& coll,
-                          const key_string::View& key);
+                          const key_string::View& key,
+                          boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg);
 
     void _debugEnsureSorted(const Data& data);
 
@@ -1211,9 +1219,14 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         }
         auto keysInserted = writeConflictRetry(opCtx, "addingKey", _ns, [&] {
             WriteUnitOfWork wunit(opCtx);
+            boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg = boost::none;
+            if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
+                wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
+                               assertCanAcceptContainerWrites(opCtx));
+            }
             int64_t keysAdded{0};
             for (auto&& key : batch) {
-                if (_addKeyForCommit(opCtx, ru, *collection, key)) {
+                if (_addKeyForCommit(opCtx, ru, *collection, key, wg)) {
                     keysAdded++;
                 }
             }
@@ -1373,16 +1386,19 @@ void BulkBuilderImpl::releaseSorter() {
     _sorter.reset();
 }
 
-bool BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
-                                       RecoveryUnit& ru,
-                                       const CollectionPtr& coll,
-                                       const key_string::View& key) {
+bool BulkBuilderImpl::_addKeyForCommit(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const CollectionPtr& coll,
+    const key_string::View& key,
+    boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg) {
     if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
         auto status = container_write::insert(opCtx,
                                               ru,
                                               _iam->getSortedDataInterface()->getContainer(),
                                               key.getKeyAndRecordIdView(),
                                               key.getTypeBitsView(),
+                                              wg,
                                               _nonexistentKeyGuarantee);
         if (status == ErrorCodes::KeyExists) {
             // The key was already inserted by a previous bulk builder on this same container.

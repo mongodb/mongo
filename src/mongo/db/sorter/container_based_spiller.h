@@ -246,6 +246,15 @@ public:
             size == 0 ? std::span<const char>{} : std::span<const char>(buffer.buf(), size);
 
         WriteUnitOfWork wuow(&_opCtx);
+        if (!_writeableGuarantee) {
+            _writeableGuarantee.emplace(
+                container_write::CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(
+                    &_opCtx));
+            _ru.onCommit([this](OperationContext*, boost::optional<Timestamp>) {
+                _writeableGuarantee.reset();
+            });
+            _ru.onRollback([this](OperationContext*) { _writeableGuarantee.reset(); });
+        }
         _ru.onCommit([this, size](OperationContext*, boost::optional<Timestamp>) {
             // The container-based sorter does not compress in the sorter layer, so report the same
             // value for compressed and uncompressed bytes.
@@ -259,6 +268,7 @@ public:
                                                 _container,
                                                 _nextKey++,
                                                 value,
+                                                _writeableGuarantee,
                                                 container_write::NonexistentKeyGuarantee{}));
         if (size > 0) {
             this->_checksumCalculator.addUncommittedData(buffer.buf(), size);
@@ -311,6 +321,7 @@ private:
     int64_t _rangeStartKey;
     int64_t _lastAddedSize = 0;
     bool _uncommittedChecksum = false;
+    boost::optional<container_write::CanAcceptContainerWritesGuarantee> _writeableGuarantee;
 };
 
 template <typename Key, typename Value>

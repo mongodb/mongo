@@ -99,8 +99,13 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
         invariant(rs.keyFormat() == KeyFormat::Long);
         IntegerKeyedContainer& container =
             std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
+        boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg;
 
         for (size_t i = 0; i < toInsert.size(); ++i) {
+            if (!wg) {
+                wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
+                               assertCanAcceptContainerWrites(opCtx));
+            }
             auto& doc = toInsert[i];
             const auto& rid = rids[i];
             auto status =
@@ -109,6 +114,7 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                                         container,
                                         rid.getLong(),
                                         std::span<const char>(doc.objdata(), doc.objsize()),
+                                        wg,
                                         container_write::NonexistentKeyGuarantee{});
             if (!status.isOK())
                 return status;
@@ -327,15 +333,21 @@ Status SideWritesTracker::drainWritesIntoIndex(
 
         // Delete documents from the side table as soon as they have been inserted into the
         // index. This ensures that no key is ever inserted twice and no keys are skipped.
+        boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg;
         for (const auto& recordId : recordsAddedToIndex) {
             if (primaryDrivenIndexBuildEnabled) {
+                if (!wg) {
+                    wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
+                                   assertCanAcceptContainerWrites(opCtx));
+                }
                 IntegerKeyedContainer& container =
                     std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer())
                         .get();
                 auto status = container_write::remove(opCtx,
                                                       *shard_role_details::getRecoveryUnit(opCtx),
                                                       container,
-                                                      recordId.getLong());
+                                                      recordId.getLong(),
+                                                      wg);
                 if (!status.isOK()) {
                     return status;
                 }

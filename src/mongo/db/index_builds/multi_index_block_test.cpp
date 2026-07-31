@@ -2033,6 +2033,7 @@ TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
                                           iam->getSortedDataInterface()->getContainer(),
                                           keys.begin()->getView(),
                                           keys.begin()->getTypeBitsView(),
+                                          boost::none,
                                           container_write::NonexistentKeyGuarantee{}));
         wuow.commit();
     }

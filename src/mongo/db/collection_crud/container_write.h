@@ -27,6 +27,27 @@ namespace mongo::container_write {
 struct NonexistentKeyGuarantee {};
 
 /**
+ * A trivially copyable class that callers pass to container_write methods to guarantee that the
+ * caller has already asserted that it is possible to write to containers. This enables a
+ * performance optimization of avoiding the need to repeatedly assert on each container write
+ * operation.
+ */
+class CanAcceptContainerWritesGuarantee {
+public:
+    /**
+     * Asserts that container write support is enabled and that the node can accept writes for
+     * containers. Validating this createds CanAcceptContainerWritesGuarantee which can be passed
+     * into container_write operations, allowing them to skip re-asserting on each successive
+     * container write operation in a batch.
+     */
+    [[nodiscard]] static CanAcceptContainerWritesGuarantee assertCanAcceptContainerWrites(
+        OperationContext* opCtx);
+
+private:
+    CanAcceptContainerWritesGuarantee() = default;  // Creation must pass through the factory.
+};
+
+/**
  * Inserts into the given container and logs the operation in the oplog. If nkg is provided, the
  * caller guarantees the key does not already exist; otherwise, the insert will be rejected if the
  * key exists.
@@ -36,6 +57,7 @@ Status insert(OperationContext* opCtx,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none,
               boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
 
 /**
@@ -48,6 +70,7 @@ Status insert(OperationContext* opCtx,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none,
               boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
 
 /**
@@ -58,7 +81,8 @@ Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
               int64_t key,
-              std::span<const char> value);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 /**
  * Updates the value at the given key in the container and logs the operation in the oplog.
@@ -68,7 +92,8 @@ Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
               std::span<const char> key,
-              std::span<const char> value);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 /**
  * Removes from the given container and logs the operation in the oplog.
@@ -76,7 +101,8 @@ Status update(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
-              int64_t key);
+              int64_t key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 /**
  * Removes from the given container and logs the operation in the oplog.
@@ -84,6 +110,7 @@ Status remove(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
-              std::span<const char> key);
+              std::span<const char> key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 }  // namespace mongo::container_write
