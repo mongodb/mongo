@@ -14,8 +14,9 @@ def _generate_certificates(ctx):
     # cryptography's native _rust.abi3.so fails with "invalid ELF header".
     python_path = py_exec_import_paths(ctx, ctx.attr.py_libs)
 
-    # Write the cert definitions to a temporary file, which mkcert.py will read from.
-    certfile = ctx.actions.declare_file("." + ctx.label.name + ".certs.json")
+    # Materialize the cert definitions as a public output so tests and other consumers can use the
+    # exact input passed to mkcert.py.
+    certfile = ctx.actions.declare_file(ctx.attr.certs_json_name)
     ctx.actions.write(
         output = certfile,
         content = ctx.attr.certs_def,
@@ -87,13 +88,14 @@ def _generate_certificates(ctx):
         mnemonic = "CertificateGenerator",
     )
 
-    return [DefaultInfo(files = depset(outputs))]
+    return [DefaultInfo(files = depset(outputs + [certfile]))]
 
 generate_certificates = rule(
     implementation = _generate_certificates,
     attrs = {
         "static_inputs": attr.label_list(mandatory = True, allow_files = True, doc = "Static input files required to generate certificates."),
         "certs_def": attr.string(mandatory = True, doc = "Definitions for all certificates."),
+        "certs_json_name": attr.string(mandatory = True, doc = "Name of the materialized certificate definitions JSON output."),
         "srcs": attr.label_list(
             doc = "The input files of this rule.",
             allow_files = True,

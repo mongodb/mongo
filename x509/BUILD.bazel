@@ -8,6 +8,7 @@ package(default_visibility = ["//visibility:public"])
 generate_certificates(
     name = "generate_main_certificates",
     certs_def = main_certs_def,
+    certs_json_name = "main_certs.json",
     static_inputs = glob(["static/**"]),
 )
 

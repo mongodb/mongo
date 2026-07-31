@@ -45,7 +45,6 @@ resmoke_suite_test(
         "//jstests/noPassthrough/libs:net.bindIp_localhost.yaml",
         "//jstests/noPassthrough/libs:net.max_incoming_connections.yaml",
         "//jstests/noPassthrough/libs/configExpand:reflect",
-        "//jstests/noPassthrough/libs/x509:main_certs.json",
         "//jstests/noPassthrough/network/libs:net.max_incoming_connections_rate_limiter.yaml",
         "//jstests/noPassthrough/observability/libs:otel_http_server",
         "//jstests/noPassthrough/query:external_data_source.bson",
