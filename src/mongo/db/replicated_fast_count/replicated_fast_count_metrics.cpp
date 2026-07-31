@@ -30,6 +30,21 @@ auto& isRunningGauge = MetricsService::instance().createInt64Gauge(
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.isRunning",
                                                 .role = ClusterRole::None}});
 
+// Per-thread isRunning gauges. Useful for identifying if a thread has independently died.
+auto& tailerIsRunningGauge = MetricsService::instance().createInt64Gauge(
+    MetricNames::kReplicatedFastCountTailerIsRunning,
+    "1 if the oplog tailer thread is running, 0 otherwise",
+    MetricUnit::kBoolean,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.isRunning", .role = ClusterRole::None}});
+
+auto& flusherIsRunningGauge = MetricsService::instance().createInt64Gauge(
+    MetricNames::kReplicatedFastCountFlusherIsRunning,
+    "1 if the flusher thread is running, 0 otherwise",
+    MetricUnit::kBoolean,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.flusher.isRunning", .role = ClusterRole::None}});
+
 // Flushes persist fast count information to the oplog and occur during checkpointing,
 // shutdown, etc. The total number of flush attempts = flushSuccessCounter + flushFailureCounter.
 auto& flushSuccessCounter = MetricsService::instance().createInt64Counter(
@@ -46,12 +61,32 @@ auto& flushFailureCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.flush.failureCount", .role = ClusterRole::None}});
 
+auto& flushRetriedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountFlushRetriedCount,
+    "Total write-conflict retries during flushes",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.flush.retriedCount", .role = ClusterRole::None}});
+
 auto& flushTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
     MetricNames::kReplicatedFastCountFlushTimeMsTotal,
     "Total flush duration in milliseconds across all replicated fast count flushes",
     MetricUnit::kMilliseconds,
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.flushTime.total",
                                                 .role = ClusterRole::None}});
+auto& tailerFailureCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountTailerFailureCount,
+    "Total unexpected exceptions handled in the oplog tailer thread",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.failureCount", .role = ClusterRole::None}});
+
+auto& tailerRetriedScanCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountTailerRetriedScanCount,
+    "Total write-conflict retries during oplog tailer scans",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.retriedScanCount", .role = ClusterRole::None}});
 
 // The total number of documents written during flushes.
 auto& flushedDocsTotalCounter = MetricsService::instance().createInt64Counter(
@@ -108,8 +143,28 @@ void setIsRunning(bool running) {
     isRunningGauge.set(running ? 1 : 0);
 }
 
+void setTailerIsRunning(bool running) {
+    tailerIsRunningGauge.set(running ? 1 : 0);
+}
+
+void setFlusherIsRunning(bool running) {
+    flusherIsRunningGauge.set(running ? 1 : 0);
+}
+
 void incrementFlushFailureCount() {
     flushFailureCounter.add(1);
+}
+
+void incrementTailerFailureCount() {
+    tailerFailureCounter.add(1);
+}
+
+void incrementRetriedFlushCount() {
+    flushRetriedCounter.add(1);
+}
+
+void incrementRetriedTailerScanCount() {
+    tailerRetriedScanCounter.add(1);
 }
 
 void incrementInsertCount() {

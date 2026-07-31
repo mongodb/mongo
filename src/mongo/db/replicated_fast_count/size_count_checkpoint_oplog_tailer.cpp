@@ -4,12 +4,14 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -28,8 +30,12 @@ std::shared_ptr<CappedInsertNotifier> acquireInsertNotifier(OperationContext* op
 void bufferNewOplogEntries(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
     RecoveryUnit* ru(shard_role_details::getRecoveryUnit(opCtx));
 
+    size_t scanAttempts = 0;
     writeConflictRetry(
         opCtx, *ru, "sizeCountOplogTailerScan", NamespaceString::kRsOplogNamespace, [&] {
+            if (scanAttempts++ > 0) {
+                incrementRetriedTailerScanCount();
+            }
             const AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
             tassert(12101803, "oplog collection not found", oplog);
             const auto cursor = oplog->getRecordStore()->getCursor(opCtx, *ru);
@@ -40,6 +46,13 @@ void bufferNewOplogEntries(OperationContext* opCtx, SizeCountCheckpointBuffer& b
 }
 
 void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
+    LOGV2(13215701, "SizeCountCheckpointOplogTailer thread started");
+    setTailerIsRunning(true);
+    ON_BLOCK_EXIT([] {
+        setTailerIsRunning(false);
+        LOGV2(13215702, "SizeCountCheckpointOplogTailer thread exiting");
+    });
+
     std::shared_ptr<CappedInsertNotifier> notifier;
 
     while (true) {
@@ -58,12 +71,12 @@ void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
                 ErrorCodes::isShutdownError(ex.code())) {
-                LOGV2_DEBUG(12917802,
-                            2,
-                            "SizeCountCheckpointOplogTailer interrupted",
-                            "error"_attr = ex.toStatus());
+                LOGV2(12917802,
+                      "SizeCountCheckpointOplogTailer interrupted",
+                      "error"_attr = ex.toStatus());
                 return;
             }
+            incrementTailerFailureCount();
             LOGV2_WARNING(12917803,
                           "Unexpected exception handled in SizeCountCheckpointOplogTailer::run()",
                           "error"_attr = ex.toStatus());

@@ -31,7 +31,11 @@ SizeCountCheckpointFlusher::SizeCountCheckpointFlusher(SizeCountStore* sizeCount
     : _sizeCountStore(sizeCountStore), _timestampStore(timestampStore) {}
 
 void SizeCountCheckpointFlusher::run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
+    LOGV2(13215703, "SizeCountCheckpointFlusher thread started");
+    setFlusherIsRunning(true);
     ON_BLOCK_EXIT([&] {
+        setFlusherIsRunning(false);
+        LOGV2(13215704, "SizeCountCheckpointFlusher thread exiting");
         std::lock_guard lk(_mutex);
         _flushRequested = false;
     });
@@ -48,10 +52,9 @@ void SizeCountCheckpointFlusher::run(OperationContext* opCtx, SizeCountCheckpoin
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
                 ex.code() == ErrorCodes::NotWritablePrimary) {
-                LOGV2_DEBUG(12917804,
-                            2,
-                            "SizeCountCheckpointFlusher interrupted due to replication state",
-                            "error"_attr = ex.toStatus());
+                LOGV2(12917804,
+                      "SizeCountCheckpointFlusher interrupted due to replication state",
+                      "error"_attr = ex.toStatus());
                 return;
             } else {
                 incrementFlushFailureCount();
@@ -110,7 +113,11 @@ size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
     }
 
     size_t entryWriteCount = 0;
+    size_t flushAttempts = 0;
     writeConflictRetry(opCtx, "flush", NamespaceString::kDefaultOplogCollectionNamespace, [&] {
+        if (flushAttempts++ > 0) {
+            incrementRetriedFlushCount();
+        }
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
 
         // Source of truth for the last durable checkpoint, replacing batch.startAfter.

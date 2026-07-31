@@ -80,6 +80,8 @@ void SizeCountCheckpointCoordinator::startup(ServiceContext* service) {
                 "SizeCountCheckpointFlusher thread already started",
                 !_flushThread.joinable());
 
+        LOGV2(13215700, "SizeCountCheckpointCoordinator spawning tailer and flusher threads");
+
         _tailerThread = stdx::thread([this, service] { _runTailerThread(service); });
         _flushThread = stdx::thread([this, service] { _runFlushThread(service); });
     }
