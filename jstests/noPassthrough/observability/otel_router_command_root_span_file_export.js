@@ -7,12 +7,12 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {getAllSpans} from "jstests/noPassthrough/observability/libs/otel_traces_file_export_helpers.js";
-
-function isRootSpan(span) {
-    const parent = span.parentSpanId;
-    return !parent || /^0*$/.test(parent);
-}
+import {
+    enableFullSampling,
+    getAllSpans,
+    getEffectiveTraceDir,
+    isRootSpan,
+} from "jstests/noPassthrough/observability/libs/otel_traces_file_export_helpers.js";
 
 describe("OTel router command root span file export", function () {
     before(function () {
@@ -22,6 +22,7 @@ describe("OTel router command root span file export", function () {
             rs: {nodes: 1},
             mongosOptions: {
                 setParameter: {
+                    openTelemetryTracingFileFlushCount: 1,
                     opentelemetryTraceDirectory: MongoRunner.toRealPath("mongos_test_traces"),
                     openTelemetryTracingBatchExportIntervalMillis: 500,
                     featureFlagOtelTraceSampling: true,
@@ -29,28 +30,12 @@ describe("OTel router command root span file export", function () {
             },
         });
 
-        // Set the sampling config via setParameter rather than on the command line, which
-        // stringifies values and breaks the numeric types the sampling config expects (e.g., doubles).
-        assert.commandWorked(
-            this.st.s.adminCommand({
-                setParameter: 1,
-                openTelemetryTracingSampling: {
-                    defaultSampling: {
-                        samplingFactor: 1.0,
-                        tokenBucketRateLimit: {refillRate: 1000000, maxTokens: NumberInt(1000000)},
-                    },
-                },
-            }),
-        );
+        enableFullSampling(this.st.s, {defaultSpans: true});
 
         this.db = this.st.s.getDB("test");
 
-        // Determine the directory the mongos is actually exporting traces to, since resmoke may
-        // override the value we set above.
-        const res = assert.commandWorked(
-            this.st.s.adminCommand({getParameter: 1, opentelemetryTraceDirectory: 1}),
-        );
-        this.traceDir = res.opentelemetryTraceDirectory;
+        // We can't use the trace dir above since it could be overwritten by resmoke.
+        this.traceDir = getEffectiveTraceDir(this.st.s);
         assert(this.traceDir, "mongos has no opentelemetryTraceDirectory configured");
     });
 

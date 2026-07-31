@@ -35,7 +35,7 @@ describe("openTelemetryTracingHttpExportHeaders", function () {
             });
 
             // A standalone mongod does not sample commands by default, so force-sample ping.
-            enableFullSampling(this.mongod, ["ping"]);
+            enableFullSampling(this.mongod, {spanNames: ["ping"]});
 
             // Generate a few root spans to export. The empty $traceCtx keeps the mongod the trace
             // entry point (the shell otherwise auto-injects a parent context).

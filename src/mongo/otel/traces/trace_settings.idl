@@ -56,6 +56,29 @@ server_parameters:
         redact: false
         default: 1000
         validator: {gte: 1}
+    openTelemetryTracingFileFlushCount:
+        description: >-
+            The number of exported span records the file exporter buffers before flushing them to
+            the trace file. Spans are not readable by other processes until a flush happens, so
+            lower this when a reader needs to observe spans promptly. Only applies to the file
+            exporter.
+        set_at: startup
+        cpp_varname: gOpenTelemetryTracingFileFlushCount
+        cpp_vartype: int
+        redact: false
+        default: 256
+        validator: {gte: 1}
+    openTelemetryTracingFileFlushIntervalMillis:
+        description: >-
+            The maximum time in milliseconds the file exporter buffers exported span records before
+            flushing them to the trace file, regardless of openTelemetryTracingFileFlushCount.
+            Only applies to the file exporter.
+        set_at: startup
+        cpp_varname: gOpenTelemetryTracingFileFlushIntervalMillis
+        cpp_vartype: int
+        redact: false
+        default: 30000
+        validator: {gte: 1}
     openTelemetryTracingMaxBatchSize:
         description: >-
             The maximum number of spans to export in a single batch. Must be less than or equal to

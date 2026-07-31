@@ -95,6 +95,9 @@ StatusWith<std::unique_ptr<TracerProviderService>> createFileTracerProviderServi
     opentelemetry::exporter::otlp::OtlpFileExporterOptions opts;
     opentelemetry::exporter::otlp::OtlpFileClientFileSystemOptions sysOpts;
     sysOpts.file_pattern = fmt::format("{}/{}-{}-%Y%m%d-trace.jsonl", directory, name, pid);
+    sysOpts.flush_count = static_cast<std::size_t>(gOpenTelemetryTracingFileFlushCount);
+    sysOpts.flush_interval = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::milliseconds(gOpenTelemetryTracingFileFlushIntervalMillis));
     opts.backend_options = std::move(sysOpts);
 
     auto exporter = opentelemetry::exporter::otlp::OtlpFileExporterFactory::Create(opts);
