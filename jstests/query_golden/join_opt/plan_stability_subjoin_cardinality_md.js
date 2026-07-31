@@ -14,7 +14,7 @@ import {
     joinPlanToString,
     newlineBeforeEachStage,
 } from "jstests/query_golden/libs/pretty_printers.js";
-import {populateTPCHDataset} from "jstests/libs/query/tpch_dataset.js";
+import {withTPCHDataset} from "jstests/libs/query/tpch_dataset.js";
 import {commands} from "jstests/query_golden/test_inputs/plan_stability_pipelines_tpch_fuzzed.js";
 
 // Report only subjoins with cardinality estimates that differ from the actual cardinality
@@ -531,16 +531,16 @@ function checkCommandEstimates(db, command) {
     }
 }
 
-const tpch = populateTPCHDataset("0.1");
-
-for (const command of commands) {
-    try {
-        checkCommandEstimates(tpch, command);
-    } catch (e) {
-        if (e instanceof UnsupportedQueryError) {
-            print(e.message);
-        } else {
-            throw e;
+withTPCHDataset("0.1", (tpch) => {
+    for (const command of commands) {
+        try {
+            checkCommandEstimates(tpch, command);
+        } catch (e) {
+            if (e instanceof UnsupportedQueryError) {
+                print(e.message);
+            } else {
+                throw e;
+            }
         }
     }
-}
+});

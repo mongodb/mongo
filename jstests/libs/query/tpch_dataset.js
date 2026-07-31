@@ -14,7 +14,7 @@ import {checkPauseAfterPopulate} from "jstests/libs/query_optimization/pause_aft
  * In evergreen, tasks such as `query_golden_join_optimization_plan_stability`
  * make sure the prerequisites are already in place.
  */
-export function populateTPCHDataset(scale) {
+function populateTPCHDataset(scale) {
     const mr = new Mongorestore();
     const dbName = jsTestName();
 
@@ -38,12 +38,44 @@ export function populateTPCHDataset(scale) {
         assert.commandWorked(tpchDb.runCommand({compact: collName}));
     });
 
-    // Increase determinism in the WT on-disk files (which have an effect on join costing)
-    // by preventing further writes.
-    assert.commandWorked(tpchDb.adminCommand({setParameter: 1, syncdelay: 0}));
-    assert.commandWorked(tpchDb.adminCommand({fsync: 1, lock: true}));
-
     checkPauseAfterPopulate();
 
     return tpchDb;
+}
+
+/**
+ * Execute a callback with the TPCH dataset populated and the syncdelay set to 0 and fsync locked.
+ * These are set to increase determinism in the WT on-disk files (which have an effect on join costing)
+ * by preventing further writes.
+ * @param {string} scale - The scale of the TPCH dataset to populate.
+ * @param {Function} callback - The callback to execute, passed the populated TPCH database as an argument.
+ * @returns {any} The result of the callback.
+ */
+export function withTPCHDataset(scale, callback) {
+    const tpchDb = populateTPCHDataset(scale);
+    // get the current syncdelay value
+    const currentSyncdelay = assert.commandWorked(
+        tpchDb.adminCommand({getParameter: 1, syncdelay: 1}),
+    ).syncdelay;
+    // set syncdelay to 0
+    assert.commandWorked(tpchDb.adminCommand({setParameter: 1, syncdelay: 0}));
+    let fsyncLocked = false;
+    try {
+        // acquire the fsync lock
+        assert.commandWorked(tpchDb.adminCommand({fsync: 1, lock: true}));
+        fsyncLocked = true;
+        return callback(tpchDb);
+    } finally {
+        try {
+            // release the fsync lock
+            if (fsyncLocked) {
+                assert.commandWorked(tpchDb.adminCommand({fsyncUnlock: 1}));
+            }
+        } finally {
+            // restore the original syncdelay value
+            assert.commandWorked(
+                tpchDb.adminCommand({setParameter: 1, syncdelay: currentSyncdelay}),
+            );
+        }
+    }
 }

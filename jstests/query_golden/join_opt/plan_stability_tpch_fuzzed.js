@@ -10,9 +10,9 @@
  */
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {commands} from "jstests/query_golden/test_inputs/plan_stability_pipelines_tpch_fuzzed.js";
-import {populateTPCHDataset} from "jstests/libs/query/tpch_dataset.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {runPlanStabilityCommands} from "jstests/query_golden/libs/plan_stability_utils.js";
+import {withTPCHDataset} from "jstests/libs/query/tpch_dataset.js";
 
 if (!checkSbeRestrictedOrFullyEnabled(db)) {
     jsTest.log.info("Skipping the test because Join Optimization only applies to SBE.");
@@ -26,7 +26,8 @@ if (isSlowBuild(db)) {
 
 jsTest.log.info("See README.plan_stability.join_opt.md for more information.");
 
-const tpch = populateTPCHDataset("0.1");
-runPlanStabilityCommands(tpch, commands);
+withTPCHDataset("0.1", (tpch) => {
+    runPlanStabilityCommands(tpch, commands);
+});
 
 jsTest.log.info("See README.plan_stability.join_opt.md for more information.");
