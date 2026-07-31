@@ -389,6 +389,8 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmCanceled) {
     ASSERT_FALSE(alarmHasFired);
 
     source.cancel();
+    ASSERT_TRUE(future.isReady());
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(&net());
@@ -396,10 +398,6 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmCanceled) {
         net().advanceTime(deadline);
         ASSERT_FALSE(alarmHasFired);
     }
-
-    // The future won't be ready until we actually advance the clock due to how cancellation works
-    // in NetworkInterfaceMock
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(NetworkInterfaceMockTest, CancelTokenBeforeSchedulingCommand) {

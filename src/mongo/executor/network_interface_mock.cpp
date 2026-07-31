@@ -221,19 +221,26 @@ SemiFuture<void> NetworkInterfaceMock::setAlarm(const Date_t when, const Cancell
 
     lk.unlock();
 
+    // Resolve the alarm here instead of leaving it for the network thread to clean up. The network
+    // thread only advances when a test drives it, so a thread that cancels an alarm and then waits
+    // on it would block forever if the promise were resolved by runReadyNetworkOperations().
     token.onCancel().unsafeToInlineFuture().getAsync([this, id](Status status) {
         if (!status.isOK()) {
             return;
         }
 
-        std::lock_guard lk(_mutex);
-
+        std::unique_lock lk(_mutex);
         auto it = _alarmsById.find(id);
         if (it == _alarmsById.end()) {
             return;
         }
 
-        _canceledAlarms.insert(id);
+        auto alarm = std::move(it->second->second);
+        _alarms.erase(it->second);
+        _alarmsById.erase(it);
+
+        lk.unlock();
+        alarm.cancel();
     });
 
     return std::move(future).semi();
@@ -692,97 +699,69 @@ void NetworkInterfaceMock::signalWorkAvailable() {
 }
 
 void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(std::unique_lock<std::mutex>& lk) {
-    // Repeat until the executor produces no new work. A single pass is not enough: the executor
-    // may cancel alarms (populating _canceledAlarms) during its turn, and those need a second pass
-    // to drain. The loop exits as soon as neither _canceledAlarms nor a pending executor wake-up
-    // is left over after an executor turn.
-    do {
-        while (!_alarms.empty() && _now_inlock(lk) >= _alarms.begin()->first) {
-            AlarmInfo alarm = std::move(_alarms.begin()->second);
-            _alarms.erase(_alarms.begin());
-            _alarmsById.erase(alarm.id);
-            auto wasCanceled = _canceledAlarms.erase(alarm.id);
+    while (!_alarms.empty() && _now_inlock(lk) >= _alarms.begin()->first) {
+        AlarmInfo alarm = std::move(_alarms.begin()->second);
+        _alarms.erase(_alarms.begin());
+        _alarmsById.erase(alarm.id);
 
-            // If the handle isn't canceled, then run it
-            if (!wasCanceled) {
-                lk.unlock();
-                alarm.promise.emplaceValue();
-                lk.lock();
-            } else {
-                lk.unlock();
-                alarm.cancel();
-                lk.lock();
-            }
-        }
+        lk.unlock();
+        alarm.promise.emplaceValue();
+        lk.lock();
+    }
 
-        while (!_canceledAlarms.empty()) {
-            auto id = *_canceledAlarms.begin();
-            _canceledAlarms.erase(_canceledAlarms.begin());
-            auto it = _alarmsById[id];
-            AlarmInfo alarm = std::move(it->second);
-            _alarms.erase(it);
-            _alarmsById.erase(id);
-
-            lk.unlock();
-            alarm.cancel();
-            lk.lock();
-        }
-
-        while (!_responses.empty() && _now_inlock(lk) >= _responses.front().when) {
-            invariant(_currentlyRunning == kNetworkThread);
-            auto response = std::exchange(_responses.front(), {});
-            _responses.pop_front();
-            _waitingToRunMask |= kExecutorThread;
-
-            auto noi = response.noi;
-
-            LOGV2(5440602,
-                  "Processing response",
-                  "when"_attr = response.when,
-                  "request"_attr = noi->getRequest(),
-                  "response"_attr = response.response);
-
-            if (_metadataHook && response.response.isOK()) {
-                _metadataHook->readReplyMetadata(noi->getRequest().opCtx, response.response.data)
-                    .transitional_ignore();
-            }
-
-            // The NetworkInterface can receive multiple responses for a particular request (e.g.
-            // cancellation and a 'true' scheduled response). But each request can only have one
-            // logical response. This choice of the one logical response is mediated by the
-            // _isFinished field of the NetworkOperation; whichever response sets this first via
-            // NetworkOperation::fulfillResponse wins. NetworkOperation::fulfillResponse returns
-            // `true` if the given response was accepted by the NetworkOperation as its sole logical
-            // response.
-            //
-            // We care about this here because we only want to increment the counters for operations
-            // succeeded/failed for the responses that are actually used.
-            Status localResponseStatus = response.response.status;
-            bool noiUsedThisResponse = noi->fulfillResponse_inlock(lk, std::move(response));
-            if (noiUsedThisResponse) {
-                _counters.sent++;
-                if (localResponseStatus.isOK()) {
-                    _counters.succeeded++;
-                } else if (ErrorCodes::isCancellationError(localResponseStatus)) {
-                    _counters.canceled++;
-                } else {
-                    _counters.failed++;
-                }
-            }
-        }
-
+    while (!_responses.empty() && _now_inlock(lk) >= _responses.front().when) {
         invariant(_currentlyRunning == kNetworkThread);
-        if (!(_waitingToRunMask & kExecutorThread)) {
-            return;
+        auto response = std::exchange(_responses.front(), {});
+        _responses.pop_front();
+        _waitingToRunMask |= kExecutorThread;
+
+        auto noi = response.noi;
+
+        LOGV2(5440602,
+              "Processing response",
+              "when"_attr = response.when,
+              "request"_attr = noi->getRequest(),
+              "response"_attr = response.response);
+
+        if (_metadataHook && response.response.isOK()) {
+            _metadataHook->readReplyMetadata(noi->getRequest().opCtx, response.response.data)
+                .transitional_ignore();
         }
-        _shouldWakeExecutorCondition.notify_one();
-        _currentlyRunning = kNoThread;
-        while (!_isNetworkThreadRunnable_inlock(lk)) {
-            _shouldWakeNetworkCondition.wait(lk);
+
+        // The NetworkInterface can receive multiple responses for a particular request (e.g.
+        // cancellation and a 'true' scheduled response). But each request can only have one logical
+        // response. This choice of the one logical response is mediated by the _isFinished field of
+        // the NetworkOperation; whichever response sets this first via
+        // NetworkOperation::fulfillResponse wins. NetworkOperation::fulfillResponse returns `true`
+        // if the given response was accepted by the NetworkOperation as its sole logical response.
+        //
+        // We care about this here because we only want to increment the counters for operations
+        // succeeded/failed for the responses that are actually used.
+        Status localResponseStatus = response.response.status;
+        bool noiUsedThisResponse = noi->fulfillResponse_inlock(lk, std::move(response));
+        if (noiUsedThisResponse) {
+            _counters.sent++;
+            if (localResponseStatus.isOK()) {
+                _counters.succeeded++;
+            } else if (ErrorCodes::isCancellationError(localResponseStatus)) {
+                _counters.canceled++;
+            } else {
+                _counters.failed++;
+            }
         }
-        _currentlyRunning = kNetworkThread;
-        _waitingToRunMask &= ~kNetworkThread;
-    } while (!_canceledAlarms.empty());
+    }
+
+    invariant(_currentlyRunning == kNetworkThread);
+    if (!(_waitingToRunMask & kExecutorThread)) {
+        return;
+    }
+    _shouldWakeExecutorCondition.notify_one();
+    _currentlyRunning = kNoThread;
+    while (!_isNetworkThreadRunnable_inlock(lk)) {
+        _shouldWakeNetworkCondition.wait(lk);
+    }
+    _currentlyRunning = kNetworkThread;
+    _waitingToRunMask &= ~kNetworkThread;
 }
 
 bool NetworkInterfaceMock::hasReadyNetworkOperations() {
