@@ -24,6 +24,7 @@
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -953,6 +954,8 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfulWithRefresh) {
     unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
+    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
+        "featureFlagAuthoritativeShardsDDL", false);
     runReshardingToCompletion();
 }
 
@@ -1693,6 +1696,8 @@ TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierInvokedOnRecovery) {
 TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierSkippedOnRecoveryWithoutFeatureFlag) {
     unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
+    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
+        "featureFlagAuthoritativeShardsDDL", false);
 
     runReshardingToCompletionWithFailoverAt(CoordinatorStateEnum::kPreparingToDonate);
     ASSERT_EQ(externalState()->getCausalityBarrierInvokeCount(), 0);
@@ -1910,6 +1915,8 @@ TEST_F(ReshardingCoordinatorServiceTest,
     // Force the legacy path so establishAllDonorsAsParticipants is called.
     unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
+    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
+        "featureFlagAuthoritativeShardsDDL", false);
 
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kPreparingToDonate,
                                         kEstablishAllDonorsAsParticipants);
@@ -1920,6 +1927,8 @@ TEST_F(ReshardingCoordinatorServiceTest,
     // Force the legacy path so kEstablishAllRecipientsAsParticipants is called.
     unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
+    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
+        "featureFlagAuthoritativeShardsDDL", false);
 
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kPreparingToDonate,
                                         kEstablishAllRecipientsAsParticipants);
@@ -1928,6 +1937,8 @@ TEST_F(ReshardingCoordinatorServiceTest,
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringCloning) {
     unittest::ServerParameterGuard noCloneNoRefreshFeatureFlagController(
         "featureFlagReshardingCloneNoRefresh", false);
+    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
+        "featureFlagAuthoritativeShardsDDL", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kCloning,
                                         kTellAllRecipientsToRefresh);
 }
@@ -1935,12 +1946,16 @@ TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringCloning) {
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringApplying) {
     unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
+    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
+        "featureFlagAuthoritativeShardsDDL", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kApplying, kTellAllDonorsToRefresh);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringBlockingWrites) {
     unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
+    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
+        "featureFlagAuthoritativeShardsDDL", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kBlockingWrites,
                                         kTellAllDonorsToRefresh);
 }
@@ -2471,7 +2486,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingFailsWithIllegalOperationWhen
         coordinator->getCompletionFuture().get(opCtx), DBException, ErrorCodes::IllegalOperation);
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, CreatingNewCoordinatorDuringFcvTransitionIsRejected) {
+void simulateFcvTransitionInProgress() {
     // Simulate an in-progress FCV downgrade by giving the in-memory FCV document a transition
     // phase.
     // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals
@@ -2482,10 +2497,80 @@ TEST_F(ReshardingCoordinatorServiceTest, CreatingNewCoordinatorDuringFcvTransiti
     fcvDoc.setPreviousVersion(multiversion::GenericFCV::kLatest);
     fcvDoc.setPhase(SetFCVPhaseEnum::kStart);
     serverGlobalParams.mutableFCV.setVersionFromFCVDocument(fcvDoc);
+}
+
+void restoreStableFcv() {
+    FeatureCompatibilityVersionDocument fcvDoc;
+    // (Generic FCV reference): Required test only setup.
+    fcvDoc.setVersion(multiversion::GenericFCV::kLatest);
+    serverGlobalParams.mutableFCV.setVersionFromFCVDocument(fcvDoc);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, CreatingNewCoordinatorDuringFcvTransitionIsRejected) {
+    simulateFcvTransitionInProgress();
 
     // A brand-new resharding operation reaches the create path and must be rejected while the
     // transition is in progress.
     ASSERT_THROWS_CODE(initializeAndGetCoordinator(), DBException, ErrorCodes::CommandNotSupported);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, ConflictingReshardingOpPrecedesFcvTransitionRejection) {
+    auto stateTransitionsGuard = std::make_unique<PauseDuringStateTransitions>(
+        controller(), defaultReshardingCompletionStates());
+    auto coordinator = initializeAndGetCoordinator();
+
+    simulateFcvTransitionInProgress();
+
+    // An active resharding operation conflicts before the FCV transition check is reached.
+    ASSERT_THROWS_WITH_CHECK(
+        initializeAndGetCoordinator(
+            UUID::gen(), _originalNss, _tempNss, _newShardKey, UUID::gen(), _oldShardKey),
+        DBException,
+        [&](const DBException& ex) {
+            ASSERT_EQ(ex.code(),
+                      ErrorCodes::ReshardingCoordinatorServiceConflictingOperationInProgress);
+            ASSERT_EQ(ex.extraInfo<ReshardingCoordinatorServiceConflictingOperationInProgressInfo>()
+                          ->getInstance(),
+                      coordinator);
+        });
+
+    restoreStableFcv();
+    runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
+}
+
+using ReshardingCoordinatorServiceTestDeathTest = ReshardingCoordinatorServiceTest;
+
+DEATH_TEST_REGEX_F(ReshardingCoordinatorServiceTestDeathTest,
+                   CreatingNewCoordinatorWithInconsistentFeatureFlagsIsRejected,
+                   "Tripwire assertion.*13237401") {
+    // Disabling one no-refresh flag leaves the pinned-version flag set in an inconsistent state.
+    unittest::ServerParameterGuard initNoRefreshFlag{"featureFlagReshardingInitNoRefresh", false};
+    (void)initializeAndGetCoordinator();
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       ConflictingReshardingOpPrecedesInconsistentFeatureFlagCheck) {
+    auto stateTransitionsGuard = std::make_unique<PauseDuringStateTransitions>(
+        controller(), defaultReshardingCompletionStates());
+    auto coordinator = initializeAndGetCoordinator();
+
+    unittest::ServerParameterGuard initNoRefreshFlag{"featureFlagReshardingInitNoRefresh", false};
+
+    // An active resharding operation conflicts before the feature-flag consistency check is
+    // reached.
+    ASSERT_THROWS_WITH_CHECK(
+        initializeAndGetCoordinator(
+            UUID::gen(), _originalNss, _tempNss, _newShardKey, UUID::gen(), _oldShardKey),
+        DBException,
+        [&](const DBException& ex) {
+            ASSERT_EQ(ex.code(),
+                      ErrorCodes::ReshardingCoordinatorServiceConflictingOperationInProgress);
+            ASSERT_EQ(ex.extraInfo<ReshardingCoordinatorServiceConflictingOperationInProgressInfo>()
+                          ->getInstance(),
+                      coordinator);
+        });
+
+    runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
 }
 
 }  // namespace

@@ -18,7 +18,7 @@ const ns = dbName + "." + collName;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 
-function runCase(fromFCV, toFCV) {
+function runCase(fromFCV, toFCV, failPoint) {
     jsTest.log("Running FCV transition case from " + fromFCV + " to " + toFCV);
 
     assert.commandWorked(
@@ -28,9 +28,8 @@ function runCase(fromFCV, toFCV) {
     assert(st.s.getDB(dbName).getCollection(collName).drop());
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {a: 1}}));
 
-    // Pause setFCV after the in-memory FCV has flipped to the target version but before the final
-    // write that clears the persisted transition phase.
-    const fp = configureFailPoint(configPrimary, "hangBeforeFinalizingFCV");
+    // Pause setFCV at the failpoint provided by the test case.
+    const fp = configureFailPoint(configPrimary, failPoint);
     const fcvThread = new Thread(
         function (host, version) {
             const conn = new Mongo(host);
@@ -62,9 +61,15 @@ function runCase(fromFCV, toFCV) {
     );
 }
 
-// Downgrade direction.
-runCase(latestFCV, lastLTSFCV);
-// Upgrade direction.
-runCase(lastLTSFCV, latestFCV);
+// Downgrade direction, hang after the in-memory FCV has flipped to the target version but before
+// the final write that clears the persisted transition phase.
+runCase(latestFCV, lastLTSFCV, "hangBeforeFinalizingFCV");
+// Upgrade direction, hang after the in-memory FCV has flipped to the target version but before
+// the final write that clears the persisted transition phase.
+runCase(lastLTSFCV, latestFCV, "hangBeforeFinalizingFCV");
+// Downgrade direction, hang after the FCV is switched to kDowngrading.
+runCase(latestFCV, lastLTSFCV, "hangWhileDowngrading");
+// Upgrade direction, hang after the FCV is switched to kUpgrading.
+runCase(lastLTSFCV, latestFCV, "hangWhileUpgrading");
 
 st.stop();
