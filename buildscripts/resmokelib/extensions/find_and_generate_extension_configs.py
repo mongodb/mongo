@@ -26,7 +26,10 @@ def build_mongot_dynamic_options(mongot_host: str) -> dict:
     resmoke.
     """
     return {
+        # 9.0 is migrating mongotHost -> mongotUri. Set both so the config works on
+        # extension builds that read either field until mongotHost is fully removed.
         "mongotHost": mongot_host,
+        "mongotUri": mongot_host,
         "metricsFilePath": os.path.join(get_conf_out_dir(), f"mongot_{uuid.uuid4().hex}.prom"),
     }
 

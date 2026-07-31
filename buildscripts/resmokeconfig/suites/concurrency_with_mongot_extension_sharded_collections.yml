@@ -104,7 +104,7 @@ executor:
         featureFlagExtensionsApiSignatureValidation: true
         featureFlagVectorSearchExtension: true
         featureFlagExtensionsInsideHybridSearch: true
-        featureFlagSearchExtension: false # TODO SERVER-130636: flip to true once the $search extension is ready.
+        featureFlagSearchExtension: true
     mongod_options:
       keyFile: *keyFile
       set_parameters:
@@ -113,7 +113,7 @@ executor:
         featureFlagExtensionsApiSignatureValidation: true
         featureFlagVectorSearchExtension: true
         featureFlagExtensionsInsideHybridSearch: true
-        featureFlagSearchExtension: false # TODO SERVER-130636: flip to true once the $search extension is ready.
+        featureFlagSearchExtension: true
         featureFlagEgressGrpcForSearch: true
         useGrpcForSearch: 1
         skipAuthenticationToMongot: true
