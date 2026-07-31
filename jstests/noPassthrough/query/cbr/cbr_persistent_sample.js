@@ -492,6 +492,61 @@ try {
             db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: false}),
         );
     }
+
+    {
+        jsTest.log.info("Testing a multi-page persistent sample is loaded and used");
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySamplingCEMethod: "random",
+                internalQuerySamplingCEMethodForPersistentSamples: "random",
+                internalQuerySamplingBySequentialScan: false,
+                internalQuerySamplingByStrides: false,
+            }),
+        );
+
+        // Each doc is ~50 KB, so the full sample will total over 16 MB and must split across pages.
+        const docSize = 50 * 1024;
+        const numDocs = kSampleSize;
+
+        coll.drop();
+        PersistentSamplesUtils.dropSamplesColl(db);
+
+        const docs = PersistentSamplesUtils.makeDocsOfTotalSize(numDocs, docSize * numDocs);
+
+        assert.commandWorked(coll.insertMany(docs));
+
+        assert.commandWorked(
+            db.runCommand({
+                analyze: collName,
+                mode: "sample",
+                samplingMethod: "random",
+                sampleSize: kSampleSize,
+            }),
+        );
+
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "random",
+            requestedSampleSize: kSampleSize,
+            actualSampleSize: kSampleSize,
+            expectedNumPages: 2,
+        });
+
+        // The estimator must reassemble every page of the persisted sample and use it for CE.
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
+        assert.eq(meta.sampleTechnique, "fullCollScan", "expected fullCollScan technique", {meta});
+        assert.eq(
+            meta.sampleDocCount,
+            kSampleSize,
+            "expected docCount to match the sample size persisted with analyze",
+            {meta},
+        );
+
+        coll.drop();
+        PersistentSamplesUtils.dropSamplesColl(db);
+    }
 } finally {
     setPlanRankerConfig(db, prevPlanRankerConfig);
     PersistentSamplesUtils.setPersistentSamplesConfig(db, prevSamplingConfig);

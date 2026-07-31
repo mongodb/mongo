@@ -126,6 +126,29 @@ export function assertSamplesCollClustered(db) {
     );
 }
 
+// Create a BSON object of exactly the given size
+export function makeDocOfSize(targetBytes, id = 0) {
+    let doc = {_id: id, pad: ""};
+    const overhead = Object.bsonsize(doc); // size with empty pad string
+    doc.pad = "x".repeat(targetBytes - overhead);
+    assert.eq(Object.bsonsize(doc), targetBytes);
+    return doc;
+}
+
+// Returns an array of `numDocs` documents whose BSON sizes sum to exactly `totalBytes`.
+export function makeDocsOfTotalSize(numDocs, totalBytes) {
+    let docSize = Math.floor(totalBytes / numDocs);
+    const docs = [];
+    for (let i = 0; i < numDocs; ++i) {
+        if (i === numDocs - 1) {
+            // Ensure the cumulative size is exactly totalBytes.
+            docSize += totalBytes % numDocs;
+        }
+        docs.push(makeDocOfSize(docSize, /*id*/ i));
+    }
+    return docs;
+}
+
 // Returns the expected _id object for a sample document. The field order here must mirror
 // ce::PersistentSampleId in persistent_sample.idl in order to successfully match the _id object.
 // samplingType is "random" or "chunk"; sampleSize is the sample count encoded in the _id.
@@ -157,10 +180,9 @@ export function getExpectedId(
     return id;
 }
 
-// Returns a sample document in system.stats.samples for the test collection.
+// Returns the single sample page document matching the given _id.
 export function getSampleDoc(samplesColl, expectedId) {
     const results = samplesColl.find({_id: expectedId}).toArray();
-    // TODO SERVER-130448: allow more than one doc here once a sample can span multiple pages.
     assert.eq(
         results.length,
         1,
@@ -169,36 +191,39 @@ export function getSampleDoc(samplesColl, expectedId) {
     return results[0];
 }
 
-// Asserts exactly one sample doc exists for this collection with the correct _id, size, and docs
-// array length. Returns the doc for additional assertions by the caller.
-// sampledCollName: name of collection analyze was run on
-// mode: the analyze command mode (expected to be "sample").
-// samplingMethod: the method used to generate the sample.
-// requestedSampleSize: expected sample size encoded in the _id.
-// actualSampleSize: expected doc.sampleSize value and length of doc.docs array.
-// expectedSchemaVersion: what version document we expect to find
-// numChunks: expected number of chunks encoded in _id and numChunks field. Expected null if samplingMethod != chunk
-// expectedFields: optional list of field names every sampled doc must have. Cursory shape check
-//                 that the sampling pipeline preserved fields from the source docs.
-export function verifySampleDoc(
+// Returns a query filter that matches every page of a single sample
+export function getSampleLookupFilter(
+    uuid,
+    samplingType,
+    sampleSize,
+    expectedSchemaVersion = kPersistentSampleSchemaVersion,
+    numChunks = null,
+) {
+    const id = getExpectedId(uuid, samplingType, sampleSize, expectedSchemaVersion, numChunks);
+    return idToLookupFilter(id);
+}
+
+// Validates a full persisted sample, which may be split across multiple pages.
+export function validatePersistentSample(
     db,
     {
         sampledCollName,
-        mode,
         samplingMethod,
         requestedSampleSize,
         actualSampleSize,
         expectedSchemaVersion = kPersistentSampleSchemaVersion,
         numChunks = null,
         expectedFields = [],
+        expectedNumPages = 1,
     },
 ) {
-    assert.eq("sample", mode, "verifySampleDoc only applies to mode 'sample'");
+    // The sampling method specified in the analyze command may be overridden by test-only knobs.
+    samplingMethod = getExpectedSamplingMethod(db, samplingMethod);
 
     const samplesColl = getSamplesColl(db);
     const sampledCollUuid = getCollUUID(db, sampledCollName);
 
-    const expectedId = getExpectedId(
+    const filter = getSampleLookupFilter(
         sampledCollUuid,
         samplingMethod,
         requestedSampleSize,
@@ -206,38 +231,141 @@ export function verifySampleDoc(
         numChunks,
     );
 
-    const doc = getSampleDoc(samplesColl, expectedId);
-    assert.neq(null, doc, "Expected to find a sample doc, got null");
+    const pages = samplesColl.find(filter).toArray();
 
-    // Check that _id, samplingMethod, sampleSize, and schemaVersion all match expected values.
-    assert.docEq(
-        expectedId,
-        doc[sampleDocFieldNames.idField],
-        `Expected: ${sampleDocFieldNames.idField} = ${tojson(expectedId)}. Sample doc: ${tojson(doc)}`,
+    assert.eq(pages.length, expectedNumPages, "unexpected number of sample pages", {
+        filter,
+        numPages: pages.length,
+    });
+
+    let totalDocs = 0;
+    for (let i = 0; i < pages.length; ++i) {
+        const page = pages[i];
+        validateSamplePage(page, {
+            sampledCollUuid,
+            samplingMethod,
+            requestedSampleSize,
+            actualSampleSize,
+            expectedSchemaVersion,
+            numChunks,
+            expectedFields,
+            pageNo: i,
+        });
+        totalDocs += page[sampleDocFieldNames.docsField].length;
+    }
+
+    assertPagesShareMetadata(pages);
+
+    validateSampledDocCount(samplingMethod, totalDocs, actualSampleSize, numChunks, {filter});
+
+    return pages;
+}
+
+/**
+ * Private helpers
+ */
+
+// Converts _id object into dotted-path query filter to match all pages of a sample
+function idToLookupFilter(id) {
+    const idField = sampleDocFieldNames.idField;
+    const filter = {};
+    for (const subField of Object.keys(id)) {
+        if (subField === sampleDocFieldNames.pageNoField) {
+            continue;
+        }
+        filter[`${idField}.${subField}`] = id[subField];
+    }
+    return filter;
+}
+
+function validateSamplePage(
+    page,
+    {
+        sampledCollUuid,
+        samplingMethod,
+        requestedSampleSize,
+        actualSampleSize,
+        expectedSchemaVersion,
+        numChunks = null,
+        expectedFields = [],
+        pageNo,
+    },
+) {
+    assert.neq(null, page, "Expected to find a sample page, got null");
+
+    const expectedId = getExpectedId(
+        sampledCollUuid,
+        samplingMethod,
+        requestedSampleSize,
+        expectedSchemaVersion,
+        numChunks,
+        pageNo,
     );
+    const sampleId = page[sampleDocFieldNames.idField];
+
+    assert.docEq(expectedId, sampleId, `Unexpected ${sampleDocFieldNames.idField}`, {expectedId});
     assert.eq(
         samplingMethod,
-        doc[sampleDocFieldNames.samplingMethodField],
-        `Expected: ${sampleDocFieldNames.samplingMethodField} = ${samplingMethod}. Sample doc: ${tojson(doc)}`,
+        page[sampleDocFieldNames.samplingMethodField],
+        "Unexpected samplingMethod",
+        {sampleId},
     );
     assert.eq(
         requestedSampleSize,
-        doc[sampleDocFieldNames.sampleSizeField],
-        `Expected: ${sampleDocFieldNames.sampleSizeField} = ${requestedSampleSize}. Sample doc: ${tojson(doc)}`,
+        page[sampleDocFieldNames.sampleSizeField],
+        "Unexpected sampleSize",
+        {sampleId},
     );
     assert.eq(
         expectedSchemaVersion,
-        doc[sampleDocFieldNames.schemaVersionField],
-        `Expected: ${sampleDocFieldNames.schemaVersionField} = ${expectedSchemaVersion}. Sample doc: ${tojson(doc)}`,
+        page[sampleDocFieldNames.schemaVersionField],
+        "Unexpected schemaVersion",
+        {sampleId},
     );
+    if (numChunks !== null) {
+        assert.eq(numChunks, page[sampleDocFieldNames.numChunksField], "Unexpected numChunks", {
+            sampleId,
+        });
+    }
 
-    // The number of persisted docs depends on the method used to generate the sample.
+    // Verify that every sampled doc contains the expected fields from the source collection.
+    const pageDocs = page[sampleDocFieldNames.docsField];
+    for (const sampledDoc of pageDocs) {
+        for (const field of expectedFields) {
+            assert(
+                sampledDoc.hasOwnProperty(field),
+                `Sampled doc missing expected field '${field}'`,
+                {sampleId, field},
+            );
+        }
+    }
+
+    // A single page can never hold more docs than the whole sample, and a persisted page should
+    // never be empty when the sample itself is non-empty.
+    assert.lte(
+        pageDocs.length,
+        actualSampleSize,
+        "a page cannot contain more docs than the total sample size",
+        {
+            sampleId,
+            pageDocs: pageDocs.length,
+            actualSampleSize,
+        },
+    );
+    if (actualSampleSize > 0) {
+        assert.gte(pageDocs.length, 1, "persisted sample page is unexpectedly empty", {sampleId});
+    }
+}
+
+// Checks that the total number of docs in a sample is reasonable given the sampling method.
+function validateSampledDocCount(samplingMethod, docsCount, actualSampleSize, numChunks, attr) {
     if (samplingMethod == "random" || samplingMethod == "seqScan") {
         // These techniques persist an exact, deterministic count of documents.
         assert.eq(
             actualSampleSize,
-            doc[sampleDocFieldNames.docsField].length,
-            `Value of size field and length of docs array don't match. Sample doc: ${tojson(doc)}`,
+            docsCount,
+            "sampleSize and sampled docs count don't match",
+            attr,
         );
     } else if (samplingMethod == "chunk") {
         // When using chunk sampling, actual num docs sampled might be lower than the parameter passed to `analyze`
@@ -245,17 +373,17 @@ export function verifySampleDoc(
         // and whether the random cursors fall close to the end of the collection. In the worst case, every random
         // cursor falls on the last document in the collection which means every chunk only has 1 document, so the
         // entire sample only has numChunks documents
-        assert.between(
-            doc[sampleDocFieldNames.numChunksField],
-            doc[sampleDocFieldNames.docsField].length,
-            actualSampleSize,
-            `Expected: ${sampleDocFieldNames.sampleSizeField} <= ${actualSampleSize}. Sample doc: ${tojson(doc)}`,
-        );
-
-        assert.eq(
+        assert.neq(
+            null,
             numChunks,
-            doc[sampleDocFieldNames.numChunksField],
-            `Expected ${sampleDocFieldNames.numChunksField} = ${numChunks}. Sample doc: ${tojson(doc)}`,
+            "numChunks must be provided to validate a chunk-sampled count",
+            attr,
+        );
+        assert.between(
+            numChunks,
+            docsCount,
+            actualSampleSize,
+            `Expected sampled docs count in [${numChunks}, ${actualSampleSize}]`,
         );
     } else {
         assert.eq(
@@ -267,27 +395,58 @@ export function verifySampleDoc(
         // at the requested sample size, so only an upper bound can be asserted.
         assert.between(
             0,
-            doc[sampleDocFieldNames.docsField].length,
+            docsCount,
             actualSampleSize,
-            `Expected docs array length in [0, ${actualSampleSize}]. Sample doc: ${tojson(doc)}`,
+            `Expected sampled docs count in [0, ${actualSampleSize}]`,
         );
     }
+}
 
-    // Verify that every sampled doc contains the expected fields from the source collection
-    for (const sampledDoc of doc[sampleDocFieldNames.docsField]) {
-        for (const field of expectedFields) {
-            assert(
-                sampledDoc.hasOwnProperty(field),
-                `Sampled doc missing expected field '${field}'. Sampled doc: ${tojson(sampledDoc)}`,
+// Checks that every page of a sample carries identical metadata
+function assertPagesShareMetadata(pages) {
+    if (pages.length <= 1) {
+        return;
+    }
+
+    const metaFields = [
+        sampleDocFieldNames.uuidField,
+        sampleDocFieldNames.samplingMethodField,
+        sampleDocFieldNames.sampleSizeField,
+        sampleDocFieldNames.numChunksField,
+        sampleDocFieldNames.schemaVersionField,
+        sampleDocFieldNames.createdAtField,
+        // Only compare fields present on the first page (e.g. numChunks is absent for non-chunk
+        // samples).
+    ].filter((field) => pages[0][field] !== undefined);
+
+    const firstId = pages[0][sampleDocFieldNames.idField];
+    const firstIdSansPageNo = idWithoutPageNo(firstId);
+    for (let i = 1; i < pages.length; ++i) {
+        const page = pages[i];
+        const pageId = page[sampleDocFieldNames.idField];
+
+        assert.docEq(
+            firstIdSansPageNo,
+            idWithoutPageNo(pageId),
+            "page _id differs across pages (ignoring pageNo)",
+            {firstId, pageId},
+        );
+        for (const field of metaFields) {
+            assert.docEq(
+                {[field]: pages[0][field]},
+                {[field]: page[field]},
+                `page metadata field '${field}' differs across pages`,
+                {pageNo: pageId[sampleDocFieldNames.pageNoField]},
             );
         }
     }
-    return doc;
 }
 
-/**
- * Private helpers
- */
+function idWithoutPageNo(id) {
+    const copy = Object.assign({}, id);
+    delete copy[sampleDocFieldNames.pageNoField];
+    return copy;
+}
 
 // Mirror of C++ getZScore() in sampling_estimator_impl.cpp.
 function getZScore(ci) {

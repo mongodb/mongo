@@ -129,6 +129,10 @@ selector:
     # Analyze is not supported on time-series collections.
     - jstests/core/timeseries/**/*.js
 
+    # Analyze cannot support sampling max size documents because the persisted sample docs must reserve room for metadata.
+    - jstests/core/query/bson_size_limit.js
+    - jstests/core/query/max_doc_size.js
+
   exclude_with_any_tags:
     # Parallel shells don't load the override, so their inserts are untracked and leave non-empty
     # unanalyzed namespaces.

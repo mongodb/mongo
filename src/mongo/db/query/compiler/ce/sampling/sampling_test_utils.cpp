@@ -12,6 +12,8 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 
+#include <string>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::ce {
@@ -631,6 +633,12 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
     }
     merged.appendElements(overrides);
     return merged.obj();
+}
+
+BSONObj makeSizedDoc(int id, size_t sizeBytes) {
+    const size_t overhead = static_cast<size_t>(BSON("_id" << id << "pad" << "").objsize());
+    const size_t padLen = sizeBytes > overhead ? sizeBytes - overhead : 0;
+    return BSON("_id" << id << "pad" << std::string(padLen, 'x'));
 }
 
 }  // namespace mongo::ce

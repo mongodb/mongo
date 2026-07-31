@@ -323,4 +323,10 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  int schemaVersion = kPersistentSampleSchemaVersion,
                                  BSONObj overrides = BSONObj(),
                                  int pageNo = 0);
+
+/**
+ * Build a BSON document of size `sizeBytes`, or at minimum the size of the BSON overhead of the
+ * field names if `sizeBytes` is less than that.
+ */
+BSONObj makeSizedDoc(int id, size_t sizeBytes);
 }  // namespace mongo::ce

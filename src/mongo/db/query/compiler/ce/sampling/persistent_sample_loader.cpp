@@ -30,6 +30,50 @@
 
 namespace mongo::ce {
 
+namespace {
+/**
+ * Maximum overhead a single object element could add to an open BSON array:
+ *  - 1 byte for the element type
+ *  - 1 byte for the field name's NUL terminator
+ *  - 1 byte per digit of the max possible array index.
+ */
+const int kArrayElementMaxOverheadBytes =
+    2 + static_cast<int>(std::to_string(BSONObjMaxUserSize / BSONObj::kMinBSONLength).length());
+
+/**
+ * Trailing bytes required close a page's open `docs` array and its enclosing object.
+ * 1 EOO byte per open scope.
+ */
+constexpr int kBytesToClosePage = 2;
+
+/**
+ * Appends every field of a sample page document except the `docs` array, leaving `builder` ready
+ * for the caller to append that array.
+ */
+void appendSamplePageMetadata(BSONObjBuilder& builder,
+                              const UUID& collectionUuid,
+                              SamplingTechniqueEnum method,
+                              size_t sampleSize,
+                              boost::optional<int> numChunks,
+                              int pageNo,
+                              Date_t createdAt) {
+    const BSONObj docId =
+        makePersistentSampleIdObj(collectionUuid, method, sampleSize, numChunks, pageNo);
+
+    builder.append(PersistentSampleDoc::k_idFieldName, docId);
+    builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collectionUuid.toString());
+    builder.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
+    builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, createdAt);
+    builder.append(PersistentSampleDoc::kSampleSizeFieldName, static_cast<long long>(sampleSize));
+    builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(method));
+    if (method == SamplingTechniqueEnum::kChunk) {
+        builder.append(PersistentSampleDoc::kNumChunksFieldName, *numChunks);
+    }
+}
+
+
+}  // namespace
+
 BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
                                   SamplingTechniqueEnum method,
                                   size_t sampleSize,
@@ -56,6 +100,84 @@ BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
     }
     id.setPageNo(pageNo);
     return id.toBSON();
+}
+
+std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
+                                                  SamplingTechniqueEnum method,
+                                                  size_t sampleSize,
+                                                  boost::optional<int> numChunks,
+                                                  const std::vector<BSONObj>& sample,
+                                                  Date_t createdAt) {
+    std::vector<BSONObj> pages;
+
+    size_t docIdx = 0;
+    int pageNo = 0;
+    do {
+        BSONObjBuilder builder;
+        appendSamplePageMetadata(
+            builder, collectionUuid, method, sampleSize, numChunks, pageNo, createdAt);
+        BSONArrayBuilder docsArr(builder.subarrayStart(PersistentSampleDoc::kDocsFieldName));
+
+        int docsOnPage = 0;
+        while (docIdx < sample.size()) {
+            const BSONObj& doc = sample[docIdx];
+
+            // Calculate the maximum size the page could be after adding this document.
+            const int projectedSize =
+                builder.len() + doc.objsize() + kArrayElementMaxOverheadBytes + kBytesToClosePage;
+
+            if (docsOnPage == 0) {
+                // A document that cannot fit on a page by itself can never be persisted.
+                uassert(12980001,
+                        str::stream()
+                            << "Single sampled document of " << doc.objsize()
+                            << " bytes is too large to persist on a sample page (assembled page "
+                               "would be "
+                            << projectedSize << " bytes, exceeding the maximum BSON size of "
+                            << BSONObjMaxUserSize << " bytes)",
+                        projectedSize <= BSONObjMaxUserSize);
+            } else if (projectedSize > BSONObjMaxUserSize) {
+                // This doc does not fit on the current page; leave it for the next one.
+                break;
+            }
+
+            docsArr.append(doc);
+            ++docsOnPage;
+            ++docIdx;
+        }
+
+        docsArr.done();
+        BSONObj page = builder.obj();
+        tassert(13044800,
+                str::stream() << "Assembled sample page of " << page.objsize()
+                              << " bytes exceeds the maximum BSON size of " << BSONObjMaxUserSize
+                              << " bytes",
+                page.objsize() <= BSONObjMaxUserSize);
+        pages.push_back(std::move(page));
+        ++pageNo;
+    } while (docIdx < sample.size());
+
+    return pages;
+}
+
+BSONObj makePersistentSampleAllPagesLookupFilter(const UUID& collectionUuid,
+                                                 SamplingTechniqueEnum method,
+                                                 size_t sampleSize,
+                                                 boost::optional<int> numChunks) {
+    const BSONObj id = makePersistentSampleIdObj(collectionUuid, method, sampleSize, numChunks);
+
+    BSONObjBuilder predicate;
+    predicate.appendAs(id[PersistentSampleId::kCollectionUuidFieldName],
+                       persistentSampleIdField(PersistentSampleId::kCollectionUuidFieldName));
+    predicate.appendAs(id[PersistentSampleId::kSamplingMethodFieldName],
+                       persistentSampleIdField(PersistentSampleId::kSamplingMethodFieldName));
+    predicate.appendAs(id[PersistentSampleId::kSampleSizeFieldName],
+                       persistentSampleIdField(PersistentSampleId::kSampleSizeFieldName));
+    if (numChunks) {
+        predicate.appendAs(id[PersistentSampleId::kNumChunksFieldName],
+                           persistentSampleIdField(PersistentSampleId::kNumChunksFieldName));
+    }
+    return predicate.obj();
 }
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {

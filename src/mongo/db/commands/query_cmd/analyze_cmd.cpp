@@ -12,6 +12,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
@@ -36,15 +37,20 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/version_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -150,12 +156,12 @@ void runSampleMode(OperationContext* opCtx,
     auto* tickSource = opCtx->getServiceContext()->getTickSource();
     auto startTicks = tickSource->getTicks();
 
-    uassert(
-        ErrorCodes::CommandNotSupported,
-        "The analyze command with sampling mode requires featureFlagPersistentStats to be enabled",
-        feature_flags::gFeatureFlagPersistentStats.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    uassert(ErrorCodes::CommandNotSupported,
+            "The analyze command with sampling mode requires featureFlagPersistentStats to be "
+            "enabled",
+            feature_flags::gFeatureFlagPersistentStats.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // 'samplingMethod' is optional on the command. Default to the
     // persistent-sample read path's method (internalQuerySamplingCEMethodForPersistentSamples).
@@ -165,14 +171,14 @@ void runSampleMode(OperationContext* opCtx,
 
     boost::optional<ce::SamplingTechniqueEnum> actualSamplingMethod;
     boost::optional<UUID> collUUID;
-    BSONArrayBuilder docsArr;
+    std::vector<BSONObj> docsArr;
     size_t sampleSize;
     // Tracks the actual number of docs persisted for server status metric on successful upsert.
     size_t docsPersistedCount = 0;
 
     {
-        // Acquire the collection to read metadata and run the sampling estimator. The acquisition
-        // must remain live for the duration of sampling.
+        // Acquire the collection to read metadata and run the sampling estimator. The
+        // acquisition must remain live for the duration of sampling.
         auto coll = acquireCollectionMaybeLockFree(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
@@ -208,8 +214,8 @@ void runSampleMode(OperationContext* opCtx,
 
         MultipleCollectionAccessor collections(coll);
 
-        // Use kOnTheFlySample to force collection of a new sample rather than attempting to read an
-        // existing one.
+        // Use kOnTheFlySample to force collection of a new sample rather than attempting to
+        // read an existing one.
         // TODO SERVER-127210: Investigate if this is the right yield policy to ensure we sample
         // from a consistent snapshot.
         ce::SamplingEstimatorImpl estimator(opCtx,
@@ -224,16 +230,13 @@ void runSampleMode(OperationContext* opCtx,
                                             SamplingSourceEnum::kOnTheFlySample);
         estimator.generateSample(ce::NoProjection{});
 
-        // Append a copy of each document to the array to persist in the sample doc.
-        const auto& sample = estimator.getSample();
-        for (const auto& doc : sample) {
-            docsArr.append(doc);
-        }
-        docsPersistedCount = sample.size();
+        // Copy the sample so it outlives the estimator and can be persisted.
+        docsArr = estimator.getSample();
+        docsPersistedCount = docsArr.size();
 
         // Store the sampling method that was actually used (which may differ from
-        // requestedSamplingMethod when test-only knobs like internalQuerySamplingBySequentialScan
-        // are enabled).
+        // requestedSamplingMethod when test-only knobs like
+        // internalQuerySamplingBySequentialScan are enabled).
         actualSamplingMethod = estimator.getSamplingMetadata().technique;
     }
 
@@ -243,8 +246,9 @@ void runSampleMode(OperationContext* opCtx,
             actualSamplingMethod);
 
     // A full collection scan is performed whenever sample size is >= collection size regardless
-    // of requested sampling method, so the value persisted in the sample doc should still reflect
-    // the requested method in this case. Otherwise it should reflect the actual method used.
+    // of requested sampling method, so the value persisted in the sample doc should still
+    // reflect the requested method in this case. Otherwise it should reflect the actual method
+    // used.
     ce::SamplingTechniqueEnum samplingMethodToPersist =
         *actualSamplingMethod == ce::SamplingTechniqueEnum::kFullCollScan
         ? ce::SamplingEstimatorImpl::samplingMethodToTechnique(requestedSamplingMethod)
@@ -254,27 +258,7 @@ void runSampleMode(OperationContext* opCtx,
         numChunksOpt = boost::none;
     }
 
-    const BSONObj docId =
-        ce::makePersistentSampleIdObj(*collUUID, samplingMethodToPersist, sampleSize, numChunksOpt);
-
-    // Build the sample document using IDL field name constants to guarantee the stored document
-    // matches the schema expected by PersistentSampleLoader.
-    BSONObjBuilder sampleDocBuilder;
-    sampleDocBuilder.append(ce::PersistentSampleDoc::k_idFieldName, docId);
-    sampleDocBuilder.append(ce::PersistentSampleDoc::kCollectionUuidFieldName,
-                            collUUID->toString());
-    sampleDocBuilder.append(ce::PersistentSampleDoc::kSchemaVersionFieldName,
-                            ce::kPersistentSampleSchemaVersion);
-    sampleDocBuilder.appendDate(ce::PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
-    sampleDocBuilder.append(ce::PersistentSampleDoc::kSampleSizeFieldName,
-                            static_cast<long long>(sampleSize));
-    sampleDocBuilder.append(ce::PersistentSampleDoc::kSamplingMethodFieldName,
-                            idlSerialize(samplingMethodToPersist));
-    if (samplingMethodToPersist == ce::SamplingTechniqueEnum::kChunk) {
-        sampleDocBuilder.append(ce::PersistentSampleDoc::kNumChunksFieldName, *numChunksOpt);
-    }
-    sampleDocBuilder.append(ce::PersistentSampleDoc::kDocsFieldName, docsArr.arr());
-    BSONObj sampleDoc = sampleDocBuilder.obj();
+    const Date_t createdAt = Date_t::now();
 
     // Create a clustered collection for persistent sample.
     const NamespaceString samplesNss = NamespaceStringUtil::deserialize(
@@ -289,17 +273,47 @@ void runSampleMode(OperationContext* opCtx,
         uassertStatusOK(createCollectionStatus);
     }
 
-    DBDirectClient client(opCtx);
+    // Serialize the sample into one or more page documents
+    std::vector<BSONObj> pageDocs = ce::makePersistentSamplePageDocs(
+        *collUUID, samplingMethodToPersist, sampleSize, numChunksOpt, docsArr, createdAt);
+    std::vector<InsertStatement> inserts;
+    inserts.reserve(pageDocs.size());
+    for (auto& pageDoc : pageDocs) {
+        inserts.emplace_back(std::move(pageDoc));
+    }
 
-    // Upsert into system.stats.samples.
-    BSONObj updateResult;
-    client.runCommand(nss.dbName(),
-                      BSON("update" << NamespaceString::kStatsSamplesCollectionName << "updates"
-                                    << BSON_ARRAY(BSON("q" << BSON("_id" << docId) << "u"
-                                                           << sampleDoc << "upsert" << true))),
-                      updateResult);
+    const BSONObj existingSampleLookupFilter = ce::makePersistentSampleAllPagesLookupFilter(
+        *collUUID, samplingMethodToPersist, sampleSize, numChunksOpt);
 
-    uassertStatusOK(getStatusFromCommandResult(updateResult));
+    // Atomically insert the sample docs/replace the existing sample if one exists.
+    writeConflictRetry(opCtx, "analyzePersistSample", samplesNss, [&] {
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, samplesNss, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+        uassert(12844400,
+                str::stream() << "Sample collection " << samplesNss.toStringForErrorMsg()
+                              << " does not exist",
+                collection.exists());
+
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+
+        // Remove all existing pages of any prior sample.
+        deleteObjects(
+            opCtx, collection, existingSampleLookupFilter, false /*justOne*/, true /*god*/);
+
+        // Insert the new sample.
+        uassertStatusOK(collection_internal::insertDocuments(opCtx,
+                                                             collection.getCollectionPtr(),
+                                                             inserts.begin(),
+                                                             inserts.end(),
+                                                             nullptr /*opDebug*/));
+
+        wuow.commit();
+    });
+
+    // Increment metrics
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
     analyzeMicros.increment(durationMicros);
     analyzeMicrosHistogram.increment(durationCount<Microseconds>(durationMicros));

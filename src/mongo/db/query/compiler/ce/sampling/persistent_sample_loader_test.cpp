@@ -7,8 +7,12 @@
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -89,6 +93,35 @@ TEST(MakePersistentSampleIdObj, DifferentConfigurationsProduceDifferentIds) {
     ASSERT_BSONOBJ_NE(randomId, differentSizeId);
     ASSERT_BSONOBJ_NE(chunkId, differentChunksId);
     ASSERT_BSONOBJ_NE(randomId, differentPageId);
+}
+
+// ── makePersistentSampleAllPagesLookupFilter ─────────────────────────────────────────────────────
+
+TEST(makePersistentSampleAllPagesLookupFilter, MatchesIdentitySubFieldsButNotPageNo) {
+    const UUID uuid = UUID::gen();
+    const auto predicate = makePersistentSampleAllPagesLookupFilter(
+        uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+
+    ASSERT_EQ(UUID::parse(
+                  predicate[persistentSampleIdField(PersistentSampleId::kCollectionUuidFieldName)]),
+              uuid);
+    ASSERT_EQ(
+        predicate[persistentSampleIdField(PersistentSampleId::kSamplingMethodFieldName)].str(),
+        "random");
+    ASSERT_EQ(
+        predicate[persistentSampleIdField(PersistentSampleId::kSampleSizeFieldName)].numberLong(),
+        384);
+    ASSERT_TRUE(predicate[persistentSampleIdField(PersistentSampleId::kNumChunksFieldName)].eoo());
+    ASSERT_TRUE(predicate[persistentSampleIdField(PersistentSampleId::kPageNoFieldName)].eoo());
+}
+
+TEST(makePersistentSampleAllPagesLookupFilter, IncludesNumChunksForChunkTechnique) {
+    const UUID uuid = UUID::gen();
+    const auto predicate = makePersistentSampleAllPagesLookupFilter(
+        uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
+    ASSERT_EQ(
+        predicate[persistentSampleIdField(PersistentSampleId::kNumChunksFieldName)].numberInt(),
+        10);
 }
 
 // ── parsePersistentSample ─────────────────────────────────────────────────────────────────────
@@ -515,6 +548,131 @@ TEST(ReassemblePersistentSample, PreservesChunkNumChunks) {
     ASSERT_TRUE(sample.getNumChunks().has_value());
     ASSERT_EQUALS(sample.getNumChunks().value(), 1);
     ASSERT_EQUALS(sample.getDocs().size(), 2u);
+}
+
+// ── makePersistentSamplePageDocs
+// ───────────────────────────────────────────────────────────────
+
+std::vector<BSONObj> makeRandomSamplePageDocs(const std::vector<BSONObj>& sample,
+                                              size_t sampleSize) {
+    return makePersistentSamplePageDocs(UUID::gen(),
+                                        SamplingTechniqueEnum::kRandom,
+                                        sampleSize,
+                                        /*numChunks=*/boost::none,
+                                        sample,
+                                        Date_t::now());
+}
+
+TEST(MakePersistentSamplePageDocs, OversizedSingleDocFails) {
+    std::vector<BSONObj> sample{
+        makeSizedDoc(0, 1024),
+        makeSizedDoc(1, BSONObjMaxUserSize),
+        makeSizedDoc(2, 1024),
+    };
+    ASSERT_THROWS_CODE(makeRandomSamplePageDocs(sample, sample.size()), DBException, 12980001);
+}
+
+TEST(MakePersistentSamplePageDocs, LargeDocJustUnderMaxFitsOnOwnPage) {
+    // A doc just under the BSON size limit should still land on its own page.
+    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 4096)};
+    const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+    ASSERT_EQ(pages.size(), 1u);
+    ASSERT_LT(pages[0].objsize(), BSONObjMaxUserSize);
+}
+
+TEST(MakePersistentSamplePageDocs, EmptySampleProducesSingleEmptyPage) {
+    const auto pages = makeRandomSamplePageDocs({}, /*sampleSize=*/10);
+    ASSERT_EQ(pages.size(), 1u);
+    auto swParsed = parsePersistentSample(pages[0]);
+    ASSERT_OK(swParsed.getStatus());
+    ASSERT_EQ(swParsed.getValue().getDocs().size(), 0u);
+}
+
+TEST(MakePersistentSamplePageDocs, PagesAreNumberedSequentiallyFromZero) {
+    constexpr int kNumDocs = 40;
+    std::vector<BSONObj> sample;
+    for (int i = 0; i < kNumDocs; ++i) {
+        sample.push_back(makeSizedDoc(i, 1 * 1024 * 1024));
+    }
+    const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
+    ASSERT_GTE(pages.size(), 3u);
+    for (size_t pageNo = 0; pageNo < pages.size(); ++pageNo) {
+        auto swParsed = parsePersistentSample(pages[pageNo]);
+        ASSERT_OK(swParsed.getStatus());
+        ASSERT_EQ(swParsed.getValue().get_id().getPageNo(), static_cast<int>(pageNo));
+        ASSERT_LT(pages[pageNo].objsize(), BSONObjMaxUserSize);
+    }
+}
+
+TEST(MakePersistentSamplePageDocs, ManySmallDocsStayUnderBsonMax) {
+    constexpr int kNumDocs = 30000;
+    std::vector<BSONObj> sample;
+    sample.reserve(kNumDocs);
+    for (int i = 0; i < kNumDocs; ++i) {
+        // ~1.1KB each: total ~33MB, forcing multiple pages of ~15k docs each.
+        sample.push_back(makeSizedDoc(i, 1152));
+    }
+    const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
+    ASSERT_GTE(pages.size(), 3u);
+    for (const auto& page : pages) {
+        ASSERT_LTE(page.objsize(), BSONObjMaxUserSize);
+    }
+}
+
+TEST(MakePersistentSamplePageDocs, RoundTripsAllDocsAcrossPages) {
+    constexpr int kNumDocs = 5000;
+    std::vector<BSONObj> sample;
+    sample.reserve(kNumDocs);
+    for (int i = 0; i < kNumDocs; ++i) {
+        sample.push_back(makeSizedDoc(i, 4096));
+    }
+    const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
+    ASSERT_GTE(pages.size(), 2u);
+
+    auto swReassembled = reassemblePersistentSample(pages);
+    ASSERT_OK(swReassembled.getStatus());
+    ASSERT_EQ(swReassembled.getValue().getDocs().size(), static_cast<size_t>(kNumDocs));
+}
+
+TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
+    const UUID uuid = UUID::gen();
+    const Date_t now = Date_t::now();
+    std::vector<BSONObj> sample{BSON("a" << 1), BSON("a" << 2)};
+
+    const auto pages = makePersistentSamplePageDocs(
+        uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, sample, now);
+    ASSERT_EQ(pages.size(), 1u);
+
+    auto swParsed = parsePersistentSample(pages[0]);
+    ASSERT_OK(swParsed.getStatus());
+    const PersistentSampleDoc& parsed = swParsed.getValue();
+    ASSERT_EQ(parsed.getSampleSize(), 1000);
+    ASSERT(parsed.getSamplingMethod() == SamplingTechniqueEnum::kRandom);
+    ASSERT_EQ(parsed.get_id().getPageNo(), 0);
+    ASSERT_EQ(parsed.getDocs().size(), 2u);
+    ASSERT_EQ(parsed.getDocs()[0]["a"].numberInt(), 1);
+}
+
+TEST(MakePersistentSamplePageDocs, ProducesParseableChunkSampleDoc) {
+    const UUID uuid = UUID::gen();
+    const Date_t now = Date_t::now();
+    std::vector<BSONObj> sample{BSON("a" << 1), BSON("a" << 2)};
+    const boost::optional<int> numChunks{4};
+
+    const auto pages = makePersistentSamplePageDocs(
+        uuid, SamplingTechniqueEnum::kChunk, 1000, numChunks, sample, now);
+    ASSERT_EQ(pages.size(), 1u);
+
+    auto swParsed = parsePersistentSample(pages[0]);
+    ASSERT_OK(swParsed.getStatus());
+    const PersistentSampleDoc& parsed = swParsed.getValue();
+    ASSERT(parsed.getSamplingMethod() == SamplingTechniqueEnum::kChunk);
+    ASSERT_TRUE(parsed.getNumChunks().has_value());
+    ASSERT_EQ(parsed.getNumChunks().value(), numChunks.value());
+    ASSERT_EQ(parsed.get_id().getPageNo(), 0);
+    ASSERT_EQ(parsed.getDocs().size(), 2u);
+    ASSERT_EQ(parsed.getDocs()[0]["a"].numberInt(), 1);
+    ASSERT_EQ(parsed.getDocs()[1]["a"].numberInt(), 2);
 }
 
 }  // namespace

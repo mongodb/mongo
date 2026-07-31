@@ -76,9 +76,8 @@ insertDocs(20);
         sampleSize: 10,
         samplingMethod: "random",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "random",
         requestedSampleSize: 10,
         actualSampleSize: 10,
@@ -97,9 +96,8 @@ insertDocs(20);
         sampleSize: 100,
         samplingMethod: "random",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "random",
         requestedSampleSize: 100,
         actualSampleSize: 20,
@@ -133,10 +131,8 @@ insertDocs(20);
 
     // Re-running analyze against an already-clustered samples collection must be a no-op create.
     runAnalyze(analyzeCmd);
-    // verifySampleDoc() asserts count == 1, confirming the re-run upserted rather than inserted.
-    const secondDoc = PersistentSamplesUtils.verifySampleDoc(db, {
+    const secondPages = PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "random",
         requestedSampleSize: 10,
         actualSampleSize: 10,
@@ -144,7 +140,7 @@ insertDocs(20);
         expectedFields: sourceDocFields,
     });
     assert.gt(
-        secondDoc[PersistentSamplesUtils.sampleDocFieldNames.createdAtField],
+        secondPages[0][PersistentSamplesUtils.sampleDocFieldNames.createdAtField],
         firstCreatedAt,
         "timestamp should be later on second run of same analyze command",
     );
@@ -161,9 +157,8 @@ assert.commandWorked(db.createCollection(collName));
         sampleSize: 10,
         samplingMethod: "random",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "random",
         requestedSampleSize: 10,
         actualSampleSize: 0,
@@ -188,9 +183,8 @@ cleanup();
 insertDocs(500);
 {
     runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "random",
         requestedSampleSize: defaultSampleSize,
         actualSampleSize: defaultSampleSize,
@@ -204,9 +198,8 @@ cleanup();
 insertDocs(50);
 {
     runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "random",
         requestedSampleSize: defaultSampleSize,
         actualSampleSize: 50,
@@ -231,9 +224,8 @@ insertDocs(20);
         samplingMethod: "chunk",
         numChunks: 5,
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "chunk",
         requestedSampleSize: sampleSize,
         actualSampleSize: sampleSize,
@@ -254,9 +246,8 @@ insertDocs(20);
         sampleSize: sampleSize,
         samplingMethod: "chunk",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "chunk",
         requestedSampleSize: sampleSize,
         actualSampleSize: sampleSize,
@@ -284,9 +275,8 @@ insertDocs(20);
             sampleSize: 10,
         }),
     );
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "random",
         requestedSampleSize: 10,
         actualSampleSize: 10,
@@ -316,9 +306,8 @@ insertDocs(20);
                 sampleSize: 10,
             }),
         );
-        PersistentSamplesUtils.verifySampleDoc(db, {
+        PersistentSamplesUtils.validatePersistentSample(db, {
             sampledCollName: collName,
-            mode: "sample",
             samplingMethod: "chunk",
             requestedSampleSize: 10,
             actualSampleSize: 10,
@@ -425,33 +414,6 @@ assert.commandFailedWithCode(
 db[tsCollName].drop();
 
 // =============================================================================
-// BSON document size limit
-// =============================================================================
-
-// analyze should fail when sampled docs exceed the 16 MB BSON size limit.
-cleanup();
-{
-    // Five documents at ~4 MB each accumulate to ~20 MB in the docs array, which exceeds
-    // BSONObjMaxInternalSize (~16 MB) when building the persisted sample BSON document.
-    const bigPayload = "x".repeat(4 * 1024 * 1024);
-    assert.commandWorked(
-        coll.insertMany(Array.from({length: 5}, (_, i) => ({_id: i, payload: bigPayload}))),
-    );
-
-    // sampleSize 5 == numRecords so all five documents are sampled deterministically.
-    assert.commandFailedWithCode(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 5,
-            samplingMethod: "random",
-        }),
-        10334, // BSONObjectTooLarge
-        "analyze should fail when the accumulated sample docs exceed the 16 MB BSON limit",
-    );
-}
-
-// =============================================================================
 // Test-only sampling modes override specified samplingMethod
 // =============================================================================
 
@@ -471,9 +433,8 @@ insertDocs(20);
         sampleSize: sampleSize,
         samplingMethod: "chunk",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "seqScan",
         requestedSampleSize: sampleSize,
         actualSampleSize: sampleSize,
@@ -493,9 +454,8 @@ insertDocs(20);
         sampleSize: sampleSize,
         samplingMethod: "random",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "seqScan",
         requestedSampleSize: sampleSize,
         actualSampleSize: sampleSize,
@@ -518,9 +478,8 @@ insertDocs(20);
         sampleSize: sampleSize,
         samplingMethod: "random",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "seqScan",
         requestedSampleSize: sampleSize,
         actualSampleSize: sampleSize,
@@ -545,9 +504,8 @@ insertDocs(20);
         sampleSize: sampleSize,
         samplingMethod: "chunk",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "strides",
         requestedSampleSize: sampleSize,
         actualSampleSize: sampleSize,
@@ -567,9 +525,8 @@ insertDocs(20);
         sampleSize: sampleSize,
         samplingMethod: "random",
     });
-    PersistentSamplesUtils.verifySampleDoc(db, {
+    PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
-        mode: "sample",
         samplingMethod: "strides",
         requestedSampleSize: sampleSize,
         actualSampleSize: sampleSize,
