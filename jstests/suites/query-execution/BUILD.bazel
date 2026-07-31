@@ -1640,6 +1640,9 @@ resmoke_suite_test(
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     deps = [
