@@ -260,11 +260,12 @@ void CursorStage::recordPlanSummaryStats() {
 bool CursorStage::pullDataFromExecutor(OperationContext* opCtx) {
     PlanExecutor::ExecState state;
     Document resultObj;
+    auto* exec = _sharedState->exec.get();
 
-    while ((state = _sharedState->exec->getNextDocument(resultObj)) == PlanExecutor::ADVANCED) {
+    while ((state = exec->getNextDocument(resultObj)) == PlanExecutor::ADVANCED) {
         boost::optional<BSONObj> resumeToken;
         if (_resumeTrackingType == ResumeTrackingType::kNonOplog)
-            resumeToken = _sharedState->exec->getPostBatchResumeToken();
+            resumeToken = exec->getPostBatchResumeToken();
         _currentBatch.enqueue(transformDoc(std::move(resultObj)), std::move(resumeToken));
 
         // As long as we're waiting for inserts, we shouldn't do any batching at this level we
