@@ -55,7 +55,6 @@ include:
   ### Uncomment when using this file for a release branch. ###
   - filename: etc/evergreen_yml_components/variants/release/release.yml
 
-  - filename: src/mongo/db/modules/atlas/atlas_release.yml
   # - filename: etc/evergreen_yml_components/variants/amazon/streams/streams_release.yml
 
 parameters:

@@ -3333,7 +3333,7 @@ string_flag(
 
 bool_flag(
     name = "build_atlas",
-    build_setting_default = True,
+    build_setting_default = False,
 )
 
 config_setting(
