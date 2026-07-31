@@ -1203,6 +1203,60 @@ TEST(SplitMatchExpression,
     ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$eq: 1}}"));
 }
 
+TEST(SplitMatchExpression, ShouldNotSplitPredicateOnAncestorOfDottedRename) {
+    // A rename onto the dotted path "a.b.c" materializes "a" and "a.b" as objects if they were
+    // missing, so a predicate on either of them cannot be pushed ahead of the rename.
+    for (auto&& dependentPredicate : {fromjson("{a: {$type: 'object'}}"),
+                                      fromjson("{'a.b': {$type: 'object'}}"),
+                                      fromjson("{$expr: {$eq: [{$type: '$a.b'}, 'object']}}")}) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(dependentPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a.b.c", "x"}};
+        auto [splitOutExpr, residualExpr] =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+        ASSERT_FALSE(splitOutExpr.get()) << dependentPredicate;
+        ASSERT_TRUE(residualExpr.get()) << dependentPredicate;
+    }
+}
+
+TEST(SplitMatchExpression, ShouldSplitPredicateOnNonAncestorOfDottedRename) {
+    // Neither "a.z" nor "b" is an ancestor of the new name "a.b.c", so these predicates are
+    // unaffected by the rename and can be pushed ahead of it.
+    for (auto&& independentPredicate :
+         {fromjson("{'a.z': {$type: 'object'}}"), fromjson("{b: {$type: 'object'}}")}) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(independentPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a.b.c", "x"}};
+        auto [splitOutExpr, residualExpr] =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+        ASSERT_TRUE(splitOutExpr.get()) << independentPredicate;
+        ASSERT_FALSE(residualExpr.get()) << independentPredicate;
+    }
+}
+
+TEST(SplitMatchExpression, ShouldStillSplitAndRenamePredicateOnDescendantOfDottedRename) {
+    // A predicate on the renamed path itself, or on a descendant of it, is still splittable with a
+    // rename applied.
+    BSONObj matchPredicate = fromjson("{'a.b.c.d': 1}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a.b.c", "x"}};
+    auto [splitOutExpr, residualExpr] =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson("{'x.d': {$eq: 1}}"));
+    ASSERT_FALSE(residualExpr.get());
+}
+
 TEST(SplitMatchExpression, ShouldMoveElemMatchObjectAcrossRename) {
     BSONObj matchPredicate = fromjson("{a: {$elemMatch: {b: 3}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
