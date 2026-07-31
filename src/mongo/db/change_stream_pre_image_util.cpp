@@ -52,19 +52,20 @@ boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
 }  // namespace
 
 bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx) {
-    // First check persistence provider.
-    if (const auto& rss = rss::ReplicatedStorageService::get(opCtx);
-        rss.getPersistenceProvider().shouldUseReplicatedTruncates()) {
-        return true;
-    }
-
-    // Next check feature flag value.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return shouldUseReplicatedTruncatesForPreImages(opCtx, fcvSnapshot);
 }
 
 bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx,
                                               const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
+    // First check the persistence provider. Some providers (e.g. disaggregated storage) always
+    // require replicated truncates, independent of the FCV-gated feature flag.
+    if (const auto& rss = rss::ReplicatedStorageService::get(opCtx);
+        rss.getPersistenceProvider().shouldUseReplicatedTruncates()) {
+        return true;
+    }
+
+    // Next check the feature flag value against the provided FCV snapshot.
     return feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions
         .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx), fcvSnapshot);
 }
