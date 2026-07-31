@@ -32,6 +32,12 @@ filters:
   - "authoritative_metadata_clone_failover.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "authoritative_metadata_historical_snapshot_read.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "authoritative_metadata_historical_owner_removed.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "authoritative_shard_retries_nonauthoritative_ddl_after_ddl_lock.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

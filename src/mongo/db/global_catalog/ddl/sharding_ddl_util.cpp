@@ -977,8 +977,14 @@ void cloneAuthoritativeCollectionMetadataToShards(
             str::stream() << "The collection " << nss.toStringForErrorMsg() << " is not tracked",
             cm.hasRoutingTable());
     std::set<ShardId> shardIds;
-    cm.getAllShardIds(&shardIds);
-
+    if (cm.isUnsplittable()) {
+        // We can just target the data shard, since the collection's single chunk can't be moved.
+        cm.getAllShardIds(&shardIds);
+    } else {
+        // For sharded collections, target all shards to cover current and historical chunk owners.
+        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        shardIds.insert(allShardIds.begin(), allShardIds.end());
+    }
     // The DB primary must always know that a collection is tracked, even when it owns no chunks.
     shardIds.insert(primaryShardId);
 
