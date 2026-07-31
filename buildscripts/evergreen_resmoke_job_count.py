@@ -107,6 +107,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
     ],
     "rhel8-debug-aubsan-classic-engine": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-all-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
+    "rhel8-debug-aubsan-non-rollback-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-roll-back-incremental-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-x86": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-arm64": _AUBSAN_TASK_FACTOR_OVERRIDES,
