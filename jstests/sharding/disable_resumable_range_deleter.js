@@ -137,6 +137,8 @@ jsTest.log("Test Case: Enable/disable the range deleter via the server parameter
         startClean: false,
         setParameter: {disableResumableRangeDeleter: true},
     });
+    // Wait for the restarted shard to elect a primary before moveChunk needs to target it.
+    st.rs1.getPrimary();
 
     // Create range deletion tasks on shard0 and shard1.
     createRangeDeletionTask(st, st.shard0, st.shard2.shardName, chunkOnShard0);
