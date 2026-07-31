@@ -689,6 +689,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherTxnAnalysisError) {
     std::pair<WriteOp, Status> opWithError = std::make_pair(WriteOp(request, 2), error);
     ASSERT_EQ(result2.opsWithErrors[0], opWithError);
     ASSERT_FALSE(result2.transientTxnError);
+    ASSERT_FALSE(result2.hasTransientTxnError());
 
     // Try again, but this time, with a transient txn error.
     WriteOpProducer transientProducer(request);
@@ -697,7 +698,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherTxnAnalysisError) {
     analyzer = WriteOpAnalyzerMock({
         {0, Analysis{kSingleShard, {nss0Shard0}}},
         {1, Analysis{kSingleShard, {nss1Shard1}}},
-        {2, StatusWith<Analysis>(error)},
+        {2, StatusWith<Analysis>(transientError)},
     });
     routingCtx = RoutingContext::createSynthetic({});
     auto transitentBatcher =
@@ -715,11 +716,12 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherTxnAnalysisError) {
     result2 = transitentBatcher.getNextBatch(opCtx, *routingCtx);
     ASSERT_TRUE(result2.batch.isEmptyBatch());
     ASSERT_EQ(result2.opsWithErrors.size(), 1);
-    opWithError = std::make_pair(WriteOp(request, 2), error);
+    opWithError = std::make_pair(WriteOp(request, 2), transientError);
     ASSERT_EQ(result2.opsWithErrors[0], opWithError);
 
     // The OrderedBatcher does distinguish between transient txn errors and other errors.
-    ASSERT_FALSE(result2.transientTxnError);
+    ASSERT_TRUE(result2.transientTxnError);
+    ASSERT_TRUE(result2.hasTransientTxnError());
 }
 
 TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherSkipsDoneBatches) {
@@ -1626,6 +1628,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherTxnAnalysisErro
     std::pair<WriteOp, Status> opWithError = std::make_pair(WriteOp(request, 2), error);
     ASSERT_EQ(result.opsWithErrors[0], opWithError);
     ASSERT_FALSE(result.transientTxnError);
+    ASSERT_FALSE(result.hasTransientTxnError());
 
     WriteOpProducer transientProducer(request);
     const Status transientError(ErrorCodes::PreparedTransactionInProgress,
@@ -1649,8 +1652,8 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherTxnAnalysisErro
     opWithError = std::make_pair(WriteOp(request, 2), transientError);
     ASSERT_EQ(result.opsWithErrors[0], opWithError);
 
-    // The UnorderedBatcher doesn't distinguish between transient txn errors and other errors.
-    ASSERT_FALSE(result.transientTxnError);
+    ASSERT_TRUE(result.transientTxnError);
+    ASSERT_TRUE(result.hasTransientTxnError());
 }
 
 TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSkipsDoneBatches) {

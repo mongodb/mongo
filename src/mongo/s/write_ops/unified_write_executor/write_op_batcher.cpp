@@ -505,7 +505,12 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                             "Aborting write command due to error in transaction",
                             "error"_attr = redact(swAnalysis.getStatus()));
 
-                return {WriteBatch{}, std::move(opsWithErrors)};
+                const bool transientTxnError =
+                    isTransientTransactionError(swAnalysis.getStatus().code(),
+                                                /*hasWriteConcernError*/ false,
+                                                /*isCommitOrAbort*/ false);
+
+                return {WriteBatch{}, std::move(opsWithErrors), transientTxnError};
             }
 
             // Retry on target error once if possible.
