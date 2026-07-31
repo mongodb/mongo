@@ -827,6 +827,10 @@ review.
     configurations. (The `requires_fcv_yy` tag is enforced as of
     [SERVER-55858](https://jira.mongodb.org/browse/SERVER-55858)). See the
     [Feature Flag Test Tagging](#feature-flag-test-tagging) section for more details.
+    - Exception: for a test in an explicit multiversion suite (e.g. a test in
+      `jstests/multiVersion`), only remove the `featureFlagXX` tag. Do not add `requires_fcv_yy` -
+      those tests run in no other suite, so the tag stops the test from running anywhere. If the
+      test needs newer binaries, check the binary version inside the test instead.
   - After this point the feature flag is used for FCV gating to make upgrade/downgrade safe.
 
 - Removing the feature flag
@@ -1214,6 +1218,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
   with `multiversion_incompatible`
 - Once the feature flag is enabled by default, you should remove the `featureFlagXX` tag from the
   test. However, you must keep the `requires_fcv_yy` tags.
+  - Tests in explicit multiversion suites (e.g. tests in `jstests/multiVersion`) must not carry a
+    `requires_fcv_yy` tag at all, since they run in no other suite and the tag would exclude them
+    from every run. Check the binary version inside the test instead.
 - Test configurations that are incompatible with the feature enabled should have a comment next to
   the tag describing exactly why the test is incompatible to minimize the chance of test coverage
   gaps.
@@ -1360,4 +1367,6 @@ types of suites.
 - Feature flags should never be enabled in the period of time after branch cut but before FCV
   constants have been upgraded to the next version.
 - In general, tag tests that depend on a feature flag with `featureFlagXX` and `requires_fcv_yy`
-  tags, where `yy` is the FCV that the feature flag is/will be enabled by default on.
+  tags, where `yy` is the FCV that the feature flag is/will be enabled by default on. Tests in
+  explicit multiversion suites (e.g. tests in `jstests/multiVersion`) are the exception: they must
+  not carry a `requires_fcv_yy` tag, which would exclude them from every run.

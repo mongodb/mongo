@@ -1,5 +1,6 @@
 """FCV and Server binary version constants used for multiversion testing."""
 
+import functools
 import glob
 import http
 import os
@@ -8,6 +9,7 @@ from subprocess import DEVNULL, STDOUT, call, check_output
 
 import requests
 import structlog
+import yaml
 from retry import retry
 
 import buildscripts.resmokelib.config as _config
@@ -175,6 +177,36 @@ REQUIRES_FCV_TAG_LATEST = version_constants.get_latest_tag()
 REQUIRES_FCV_TAG = version_constants.get_fcv_tag_list()
 
 REQUIRES_FCV_TAGS_LESS_THAN_LATEST = version_constants.get_fcv_tags_less_than_latest()
+
+EXPLICIT_MULTIVERSION_SUITE_FILE = os.path.join(
+    "buildscripts", "resmokeconfig", "suites", "multiversion.yml"
+)
+
+
+@functools.cache
+def get_explicit_multiversion_tests() -> frozenset[str]:
+    """Get the tests selected by the roots of the explicit multiversion suite.
+
+    These tests explicitly pick the binary versions they run against and set up their own
+    mixed-version topologies, unlike the implicit multiversion suites, where the fixture supplies
+    the old binaries and the tests also run in a single-version suite. Because they run in no
+    single-version suite, a `REQUIRES_FCV_TAG` tag on one of them excludes it from every suite. The
+    multiversion_auth and feature_flag_multiversion suites select from the same roots, so this
+    suite covers them too.
+    """
+    with open(os.path.join(_config.RESMOKE_ROOT, EXPLICIT_MULTIVERSION_SUITE_FILE)) as fh:
+        roots = yaml.safe_load(fh)["selector"]["roots"]
+    return frozenset(
+        test
+        for root in roots
+        for test in glob.glob(root, root_dir=_config.RESMOKE_ROOT, recursive=True)
+    )
+
+
+def is_explicit_multiversion_test(test: str) -> bool:
+    """Return True if the test only runs in an explicit multiversion suite."""
+    return test in get_explicit_multiversion_tests()
+
 
 # Generate evergreen project names for all FCVs less than latest.
 EVERGREEN_PROJECTS = ["mongodb-mongo-master"]

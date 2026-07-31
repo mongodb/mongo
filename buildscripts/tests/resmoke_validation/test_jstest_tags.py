@@ -7,10 +7,26 @@ from typing import Optional
 
 from buildscripts.idl.gen_all_feature_flag_list import get_all_feature_flags_turned_on_by_default
 from buildscripts.resmokelib.multiversionconstants import (
+    REQUIRES_FCV_TAG,
     REQUIRES_FCV_TAG_LATEST,
     REQUIRES_FCV_TAGS_LESS_THAN_LATEST,
+    is_explicit_multiversion_test,
 )
 from buildscripts.resmokelib.utils import jscomment
+
+# Tests that already carried an always-excluded requires_fcv tag when this rule was added. They
+# are not running in any suite. Do not add to this list.
+# TODO(SERVER-128742): Remove these tags and make the tests pass in the multiversion suites.
+EXPLICIT_MULTIVERSION_FCV_TAG_ALLOWLIST = {
+    "jstests/multiVersion/genericBinVersion/server-catalog-and-routing/replica_set_to_csrs_promotion_startup_flag.js",
+    "jstests/multiVersion/genericChangeStreams/change_stream_v2_fcv_upgrade_downgrade.js",
+    "jstests/multiVersion/genericChangeStreams/change_streams_timeseries_fcv_upgrade_downgrade.js",
+    "jstests/multiVersion/genericChangeStreams/set_feature_compatibility_version_triggers_change_streams_retargeting.js",
+    "jstests/multiVersion/genericSetFCVUsage/fcv_core/set_fcv_automatic_dryRun.js",
+    "jstests/multiVersion/genericSetFCVUsage/fcv_core/set_fcv_dry_run_mode.js",
+    "jstests/multiVersion/genericSetFCVUsage/migration_pending_recovery_drained_on_auth_shards_fcv_transition.js",
+    "jstests/multiVersion/genericSetFCVUsage/priority_port_downgrade_checks.js",
+}
 
 
 class JstestTagRule:
@@ -56,6 +72,26 @@ class RequiresFcvTagRule(JstestTagRule):
         return tag.startswith("requires_fcv_") and tag not in self.allowed_tags
 
 
+class ExplicitMultiversionRequiresFcvTagRule(JstestTagRule):
+    def __init__(self):
+        super().__init__(
+            failure_message=(
+                "The following tests never run anywhere. They only run in the explicit "
+                "multiversion suites, which Evergreen always invokes with "
+                f"`--excludeWithAnyTags={REQUIRES_FCV_TAG}`. Remove the tag; to require newer "
+                "binaries, check the binary version inside the test instead"
+            )
+        )
+        self.disallowed_tags = set(REQUIRES_FCV_TAG.split(","))
+
+    def _tag_failed(self, file: str, tag: str) -> bool:
+        return (
+            tag in self.disallowed_tags
+            and is_explicit_multiversion_test(file)
+            and file not in EXPLICIT_MULTIVERSION_FCV_TAG_ALLOWLIST
+        )
+
+
 class TestJstestTags(unittest.TestCase):
     def test_jstest_tags(self):
         os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
@@ -64,6 +100,7 @@ class TestJstestTags(unittest.TestCase):
         tag_rules = [
             FeatureFlagIncompatibleTagRule(),
             RequiresFcvTagRule(),
+            ExplicitMultiversionRequiresFcvTagRule(),
         ]
 
         for pattern in globs:
