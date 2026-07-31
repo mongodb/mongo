@@ -47,8 +47,7 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
-// IWYU pragma: no_include "syscall.h"
-// IWYU pragma: no_include "cxxabi.h"
+#include <sys/syscall.h>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

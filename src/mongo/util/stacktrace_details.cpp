@@ -13,6 +13,7 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <sys/syscall.h>
 
 namespace mongo::stacktrace_details {
 namespace {
