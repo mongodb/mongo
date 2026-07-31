@@ -143,9 +143,12 @@ public:
     Timestamp getOldestTimestamp() const final {
         return {};
     };
-    void setStepDownTimestamp(Timestamp stepDownTimestamp) override {}
+    void setStepDownTimestamp(Timestamp stepDownTimestamp) override {
+        _stepDownTimestamp = stepDownTimestamp;
+        ++_setStepDownTimestampCount;
+    }
     Timestamp getStepDownTimestamp() const override {
-        return {};
+        return _stepDownTimestamp;
     }
     void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) final {}
@@ -329,6 +332,10 @@ public:
         return _operations;
     }
 
+    int getSetStepDownTimestampCount() const {
+        return _setStepDownTimestampCount;
+    }
+
 private:
     bool _isInLeaderMode = false;
     uint64_t _lastSetMaterializedLsn = 0;
@@ -336,6 +343,8 @@ private:
     Timestamp _lastSetOldestTimestamp;
     bool _lastSetOldestTimestampForce = false;
     Timestamp _stableTimestamp;
+    Timestamp _stepDownTimestamp;
+    int _setStepDownTimestampCount = 0;
     std::vector<std::string> _operations;
 };
 
