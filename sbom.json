@@ -3,14 +3,28 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:2d7fbf85-c8b6-4f90-9966-70da88224a36",
-  "version": 12,
+  "version": 13,
   "metadata": {
-    "timestamp": "2026-07-17T16:26:17Z",
+    "timestamp": "2026-07-27T20:41:34Z",
     "lifecycles": [
       {
         "phase": "pre-build"
       }
     ],
+    "tools": {
+      "services": [
+        {
+          "name": "Endor Labs Inc",
+          "version": "v1.7.1076"
+        }
+      ]
+    },
+    "supplier": {
+      "name": "MongoDB, Inc.",
+      "url": [
+        "https://mongodb.com"
+      ]
+    },
     "component": {
       "type": "application",
       "bom-ref": "pkg:github/mongodb/mongo@master",
@@ -56,20 +70,6 @@
         {
           "url": "https://github.com/mongodb/mongo",
           "type": "vcs"
-        }
-      ]
-    },
-    "supplier": {
-      "name": "MongoDB, Inc.",
-      "url": [
-        "https://mongodb.com"
-      ]
-    },
-    "tools": {
-      "services": [
-        {
-          "name": "Endor Labs Inc",
-          "version": "v1.7.1060"
         }
       ]
     }
@@ -1049,7 +1049,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/google/googletest@1.17.0",
+      "bom-ref": "pkg:github/google/googletest@v1.17.0",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1071,7 +1071,7 @@
       ],
       "copyright": "Copyright 2008, Google Inc. All rights reserved.",
       "cpe": "cpe:2.3:a:google:google_test:1.17.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/google/googletest@1.17.0",
+      "purl": "pkg:github/google/googletest@v1.17.0",
       "externalReferences": [
         {
           "url": "https://github.com/google/googletest.git",
@@ -1588,7 +1588,7 @@
       "name": "Prometheus Client Library for Modern C++",
       "version": "1.2.2",
       "description": "This library aims to enable Metrics-Driven Development for C++ services. It implements the Prometheus Data Model, a powerful abstraction on which to collect and expose metrics.",
-      "scope": "excluded",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1972,14 +1972,14 @@
       },
       "author": "OpenJS Foundation",
       "group": "nodejs",
-      "name": "node",
+      "name": "node GetStringWidth function",
       "version": "22.1.0",
       "description": "A modified version of the GetStringWidth function from Node.js, originating from the https://github.com/joyent/node repository.",
-      "scope": "excluded",
+      "scope": "required",
       "licenses": [
         {
           "license": {
-            "id": "ISC"
+            "id": "MIT"
           }
         }
       ],
@@ -1998,7 +1998,12 @@
           }
         ]
       },
-      "properties": []
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -2608,12 +2613,6 @@
   ],
   "dependencies": [
     {
-      "ref": "pkg:github/mongodb/mongo-c-driver@2.3.0",
-      "dependsOn": [
-        "pkg:github/madler/zlib@1.3.2"
-      ]
-    },
-    {
       "ref": "pkg:github/mongodb/mongo@master",
       "dependsOn": [
         "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source",
@@ -2637,7 +2636,7 @@
         "pkg:github/fmtlib/fmt@11.2.0",
         "pkg:github/google/benchmark@v1.5.2",
         "pkg:github/google/fuzztest@2025-07-28",
-        "pkg:github/google/googletest@1.17.0",
+        "pkg:github/google/googletest@v1.17.0",
         "pkg:github/google/re2@2025-08-05",
         "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
         "pkg:github/google/snappy@1.1.10",
@@ -2657,6 +2656,7 @@
         "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
         "pkg:github/pcre2project/pcre2@pcre2-10.40",
         "pkg:github/protocolbuffers/protobuf@v6.31.1",
+        "pkg:github/jupp0r/prometheus-cpp@v1.2.2",
         "pkg:github/rnpgp/rnp@v0.18.1",
         "pkg:github/roaringbitmap/croaring@v3.0.1",
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
@@ -2666,6 +2666,12 @@
         "pkg:github/wiredtiger/wiredtiger@12.0.0",
         "pkg:pypi/ocspbuilder@0.10.2",
         "pkg:pypi/ocspresponder@0.5.0"
+      ]
+    },
+    {
+      "ref": "pkg:github/mongodb/mongo-c-driver@2.3.0",
+      "dependsOn": [
+        "pkg:github/madler/zlib@1.3.2"
       ]
     },
     {
@@ -2760,7 +2766,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/googletest@1.17.0",
+      "ref": "pkg:github/google/googletest@v1.17.0",
       "dependsOn": []
     },
     {

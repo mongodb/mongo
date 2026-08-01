@@ -51,11 +51,11 @@ a notice will be included in
 | [Mozilla Firefox ESR]                                | MPL-2.0                                        | 140.11.0esr                              |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                                  | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [nlohmann/json]                                      | MIT                                            | 3.11.3                                   | ✗                    |                                 |
-| [node]                                               | ISC                                            | 22.1.0                                   |                      |                                 |
+| [node GetStringWidth function]                       | MIT                                            | 22.1.0                                   |                      | ✗                               |
 | [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.24.0                                   | ✗                    |                                 |
 | [opentelemetry-proto]                                | Apache-2.0                                     | 1.3.2                                    | ✗                    |                                 |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception              | 10.40                                    |                      | ✗                               |
-| [Prometheus Client Library for Modern C++]           | MIT                                            | 1.2.2                                    |                      |                                 |
+| [Prometheus Client Library for Modern C++]           | MIT                                            | 1.2.2                                    |                      | ✗                               |
 | [Protobuf]                                           | BSD-3-Clause                                   | 6.31.1                                   |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                                            | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                                     | 0.5.0                                    |                      |                                 |
@@ -111,7 +111,7 @@ a notice will be included in
 [libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
 [nlohmann/json]: https://github.com/nlohmann/json.git
-[node]: https://nodejs.org/
+[node GetStringWidth function]: https://nodejs.org/
 [opentelemetry-cpp]: https://github.com/open-telemetry/opentelemetry-cpp.git
 [opentelemetry-proto]: https://github.com/open-telemetry/opentelemetry-proto
 [pypi/ocspbuilder]: https://pypi.org/project/ocspbuilder/
