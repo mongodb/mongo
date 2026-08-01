@@ -31,7 +31,6 @@ if (getBuildInfo().buildEnvironment.target_os !== "linux") {
 // buffer, and assertions read the on-disk log instead.
 const kNodeOpts = {landlock: "true", useLogFiles: true};
 
-// Structured-log IDs from src/mongo/db/landlock.cpp.
 const kIdRuleApplied = 13118805; // one path rule granted (attr lists the rights)
 const kIdRulesetApplied = 13118812; // sandbox fully enforced
 const kIdRulesetCreateFailed = 13118806; // kernel lacks/disables Landlock; best-effort continue

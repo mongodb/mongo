@@ -17,14 +17,11 @@
 // deliberately confined to landlock.cpp: callers describe what they need with
 // the LandlockFilesystemRule factories below and never handle raw rights.
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
-#include <memory>
 #include <string>
-#include <utility>
 
 #if defined(__linux__)
 
@@ -109,6 +106,12 @@ public:
      */
     static StatusWith<std::unique_ptr<LandlockRuleset>> create();
 
+    /**
+     * Returns the uAPI names of the filesystem rights in `mask` that
+     * are directly cross-referenceable against <linux/landlock.h>.
+     */
+    static std::vector<std::string_view> fsAccessRightNames(uint64_t mask);
+
     LandlockRuleset(const LandlockRuleset&) = delete;
     LandlockRuleset& operator=(const LandlockRuleset&) = delete;
     LandlockRuleset(LandlockRuleset&&) = delete;
@@ -158,6 +161,11 @@ private:
     const uint64_t _handledFsAccess;
     bool _restricted = false;
 };
+
+// Probe the running kernel's Landlock ABI version, via landlock_create_ruleset(2)'s
+// LANDLOCK_CREATE_RULESET_VERSION query -- the documented feature-detection
+// call. Fails when the kernel lacks Landlock (pre-5.13) or has it disabled in its LSM stack.
+StatusWith<long> landlockAbiVersion();
 
 }  // namespace mongo
 
