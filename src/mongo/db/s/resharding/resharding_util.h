@@ -662,6 +662,20 @@ bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetada
                                 const FCVGatedFeatureFlag& flag);
 
 /**
+ * Returns true if 'fcv' matches the FCV snapshotted in 'metadata' when the resharding operation
+ * started. Coordinator documents written before the startingFCV field existed are treated as
+ * matching kLastLTS and kLastContinuous, since they can only have been created on an older binary.
+ */
+bool isFCVTheSame(const CommonReshardingMetadata& metadata,
+                  const multiversion::FeatureCompatibilityVersion& fcv);
+
+/**
+ * Returns the FCV snapshotted in 'metadata' as a human readable string, or "uninitialized" if the
+ * document does not have one.
+ */
+std::string getStartingFCVString(const CommonReshardingMetadata& metadata);
+
+/**
  * Chooses the index hint for the covered clone-count aggregation run against a donor's source
  * collection.
  */
