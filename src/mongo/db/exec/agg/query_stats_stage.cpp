@@ -224,10 +224,15 @@ boost::optional<Document> QueryStatsStage::toDocument(
         //  tests do on purpose. The query shape reported here can be bigger than the original query
         //  due to hmac application or other format changes. So this is not a concerning failure
         //  mode.
+        //  - Error code 10071200 occurs when a query referencing the $$CLUSTER_TIME system
+        //  variable errored on a standalone node, since it is unavailable outside of replica
+        //  sets/sharded clusters. Re-parsing later on the same standalone node reliably hits the
+        //  same restriction. TODO SERVER-132688: Remove this exclusion.
         if ((kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) &&
             ex.code() != ErrorCodes::QueryFeatureNotAllowed &&
             ex.code() != ErrorCodes::BSONObjectTooLarge &&
-            ex.code() != 16490 /* Document grew too large - before hitting BSON */) {
+            ex.code() != 16490 /* Document grew too large - before hitting BSON */ &&
+            ex.code() != 10071200 /* $$CLUSTER_TIME unavailable in standalone mode */) {
             auto keyString = std::to_string(hash);
             uasserted(Status{
                 QueryStatsFailedToRecordInfo(

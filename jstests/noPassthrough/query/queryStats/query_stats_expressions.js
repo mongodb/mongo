@@ -2,6 +2,7 @@
  * Test that queryStats works properly for a find command that uses agg expressions and produces the
  * proper query shape without issues during re-parsing.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
@@ -116,7 +117,16 @@ function makeAggCmd(pipeline, collName = coll.getName()) {
         3041704,
     );
     let queryStats = getQueryStats(conn);
-    assert.eq(queryStats.length, 0, `Expected no entries but got ${tojson(queryStats)}`);
+
+    // When 'featureFlagQueryStatsErrors' is enabled, these failures are recorded as errored
+    // executions, meaning three entries (for the three distinct query shapes) are expected.
+    const errorsRecorded = FeatureFlagUtil.isEnabled(testDB, "QueryStatsErrors");
+    const expectedNumEntries = errorsRecorded ? 3 : 0;
+    assert.eq(
+        queryStats.length,
+        expectedNumEntries,
+        `Expected ${expectedNumEntries} entries but got ${tojson(queryStats)}`,
+    );
 }
 
 // Tests that $queryStats stage does not fail with a re-parse error for a pipeline with $getField

@@ -50,6 +50,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -2507,6 +2508,18 @@ void HandleRequest::completeOperation(DbResponse& response) {
         auto ldapCumulativeOperationsStats = LDAPCumulativeOperationStats::get();
         if (ldapCumulativeOperationsStats) {
             ldapCumulativeOperationsStats->recordOpStats(ldapOperationStatsSnapshot);
+        }
+    }
+
+    const auto& errInfo = currentOp.debug().errInfo;
+    if (!errInfo.isOK()) {
+        try {
+            collectQueryStatsMongodReadErrored(opCtx, errInfo.code());
+        } catch (const DBException& ex) {
+            LOGV2_DEBUG(13192400,
+                        2,
+                        "Failed to collect query stats for an errored operation",
+                        "error"_attr = redact(ex));
         }
     }
 }

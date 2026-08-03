@@ -318,10 +318,8 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
                       std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalStats) {
     toUpdate.latestSeenTimestamp = Date_t::now();
 
-    // Without 'featureFlagQueryStatsErrors', only successful executions reached this point
-    // since operations that invoke collectQueryStatsMongod() call updateStatistics(). Now, the
-    // collectQueryStatsMongodErrored() hook allows errored snapshots to arrive here too. Currently,
-    // we deliberately do not record the standard metrics for them.
+    // 'featureFlagQueryStatsErrors' allows for errored snapshots arrive here. Errored snapshots
+    // carry partial metrics, so they are dropped.
     if (snapshot.isErrored()) {
         if (feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()) {
             toUpdate.recordErrorCode(snapshot.errorCode);

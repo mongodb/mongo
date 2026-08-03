@@ -113,6 +113,8 @@ export function verifyMetrics(batch) {
  * @param conn - connection to database
  * @param {object} options {
  *  {String} collName - name of collection
+ *  {String} - commandName - optional argument that restricts the lookup to a single command, e.g.
+ *     "find" or "aggregate"
  *  {object} - extraMatch - optional argument that can be used to filter the pipeline
  * }
  */
@@ -137,6 +139,8 @@ export function getLatestQueryStatsEntry(
  * @param conn - connection to database
  * @param {object} options {
  *  {String} collName - name of collection
+ *  {String} - commandName - optional argument that restricts the lookup to a single command, e.g.
+ *     "find" or "aggregate"
  *  {object} - extraMatch - optional argument that can be used to filter the pipeline
  *  {object} - customSort - optional custom sort order - otherwise sorted by 'key' just to be
  * deterministic.
@@ -151,6 +155,9 @@ export function getQueryStats(
     let match = {"key.client.application.name": kShellApplicationName, ...options.extraMatch};
     if (options.collName) {
         match["key.queryShape.cmdNs.coll"] = options.collName;
+    }
+    if (options.commandName) {
+        match["key.queryShape.command"] = options.commandName;
     }
     const result = conn.adminCommand({
         aggregate: 1,
@@ -800,7 +807,10 @@ export function runCommandAndValidateQueryStats({
 }) {
     const testDB = coll.getDB();
     const result = assert.commandWorked(testDB.runCommand(commandObj));
-    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
+    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {
+        collName: coll.getName(),
+        commandName,
+    });
 
     assert.eq(entry.key.queryShape.command, commandName);
     const kApplicationName = "MongoDB Shell";

@@ -1,0 +1,231 @@
+/**
+ * Tests that $queryStats records errors per query shape, including a counter of errored executions
+ * and an LRU-bounded errors array of {code, codeName, count, latestSeenTimestamp}.
+ *
+ * Right now, only non-cursor mongod read errors are supported for query stats error collection.
+ * Errors should be recorded for find/aggregate that error during the first batch and
+ * count/distinct, which are inherently non-cursor.
+ *
+ * @tags: [featureFlagQueryStatsErrors, featureFlagQueryStatsCountDistinct]
+ */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {
+    getLatestQueryStatsEntry,
+    getQueryStatsServerParameters,
+    resetQueryStatsStore,
+} from "jstests/libs/query/query_stats_utils.js";
+
+const kPlanExecutorFailCode = 4382101;
+const kPlanExecutorFailCodeName = `Location${kPlanExecutorFailCode}`;
+
+function queryStatsOptions() {
+    const options = getQueryStatsServerParameters();
+    options.setParameter.featureFlagQueryStatsErrors = true;
+    options.setParameter.featureFlagQueryStatsCountDistinct = true;
+    return options;
+}
+
+function errorCountByName(metrics, codeName) {
+    const match = metrics?.errors.find((e) => e.codeName === codeName);
+    return match?.count ?? 0;
+}
+
+// Asserts the invariants for a shape that has only ever errored.
+function assertOnlyErroredEntry(
+    metrics,
+    {execCountErrored, codeName, codeCount},
+    errorDescription,
+) {
+    // Errored executions are counted only by 'execCountErrored', so a shape that has only ever
+    // errored leaves 'execCount' at 0.
+    assert.eq(0, metrics.execCount, `${errorDescription}: execCount`, {metrics});
+    assert.eq(execCountErrored, metrics.execCountErrored, `${errorDescription}: execCountErrored`, {
+        metrics,
+    });
+    assert(metrics.hasOwnProperty("errors"), `${errorDescription}: missing errors`, {metrics});
+    assert.eq(1, metrics.errors.length, `${errorDescription}: expected one error bucket`, {
+        metrics,
+    });
+    assert.eq(codeCount, errorCountByName(metrics, codeName), `${errorDescription}: error count`, {
+        metrics,
+    });
+    // An errored execution must not contribute timing samples.
+    assert.eq(
+        0,
+        metrics.totalExecMicros.sum,
+        `${errorDescription}: standard query stats metrics not recorded`,
+        {
+            metrics,
+        },
+    );
+}
+
+/**
+ * On mongod, the following is asserted:
+ *  - A successful execution leaves 'execCountErrored' at 0 and omits the 'errors' array,
+ *  - An execution error bumps 'execCountErrored', records the code in 'errors', and does
+ *    not fold partial timing into the aggregates,
+ *  - errored executions are counted only by 'execCountErrored', leaving 'execCount' for
+ *    executions that recorded standard metrics,
+ *  - Repeated errors on the same shape accumulate on the same entry,
+ * for both execution-time throws (using planExecutorAlwaysFails) and deadline kills (hang failpoint
+ * and short maxTimeMS). Aggregate and distinct lack a post-registration hang failpoint, so only
+ * execution-time throws are covered.
+ */
+describe("query stats errored", function () {
+    let conn, testDB, coll;
+
+    before(function () {
+        conn = MongoRunner.runMongod(queryStatsOptions());
+        testDB = conn.getDB("test");
+        coll = testDB[jsTestName()];
+        coll.drop();
+        assert.commandWorked(
+            coll.insert([
+                {_id: 0, a: 1},
+                {_id: 1, a: 2},
+                {_id: 2, a: 3},
+            ]),
+        );
+    });
+
+    beforeEach(function () {
+        resetQueryStatsStore(conn, "1MB");
+    });
+
+    after(function () {
+        MongoRunner.stopMongod(conn);
+    });
+
+    function getLatestQueryStatsMetrics() {
+        const entry = getLatestQueryStatsEntry(conn, {collName: coll.getName()});
+        assert(entry.hasOwnProperty("metrics"), "missing metrics", {entry});
+        return entry.metrics;
+    }
+
+    it("does not record errored fields on a successful execution", function () {
+        assert.eq(2, coll.find({a: {$gte: 2}}).itcount());
+        const metrics = getLatestQueryStatsMetrics();
+        assert.eq(1, metrics.execCount, "execCount", {metrics});
+        assert.eq(0, metrics.execCountErrored, "execCountErrored", {metrics});
+        assert(!metrics.hasOwnProperty("errors"), "unexpected errors array", {metrics});
+    });
+
+    it("keeps successful timing when the same shape later errors", function () {
+        const filter = {mixed: {$gte: 0}};
+        assert.commandWorked(testDB.runCommand({find: coll.getName(), filter}));
+        const timingAfterSuccess = getLatestQueryStatsMetrics().totalExecMicros.sum;
+        assert.gt(timingAfterSuccess, 0, "success should record timing");
+
+        // The same shape now errors, recording on the same entry.
+        const fp = configureFailPoint(testDB, "planExecutorAlwaysFails");
+        try {
+            assert.commandFailedWithCode(
+                testDB.runCommand({find: coll.getName(), filter}),
+                kPlanExecutorFailCode,
+            );
+        } finally {
+            fp.off();
+        }
+
+        const metrics = getLatestQueryStatsMetrics();
+        assert.eq(1, metrics.execCount, "execCount", {metrics});
+        assert.eq(1, metrics.execCountErrored, "execCountErrored", {metrics});
+        assert.eq(1, errorCountByName(metrics, kPlanExecutorFailCodeName), "error count", {
+            metrics,
+        });
+        assert.eq(timingAfterSuccess, metrics.totalExecMicros.sum, "timing changed", {metrics});
+    });
+
+    it("records execution-time errors for each non-cursor read command", function () {
+        // 'planExecutorAlwaysFails' makes the plan executor throw during getNext, so the key is
+        // still live on OpDebug when the operation completes with an error, and the shape is stable
+        // across runs.
+        const execErrorCases = [
+            {name: "find", cmd: {find: coll.getName(), filter: {findErr: {$gte: 0}}}},
+            {
+                name: "aggregate",
+                cmd: {
+                    aggregate: coll.getName(),
+                    pipeline: [{$match: {aggErr: {$gte: 0}}}],
+                    cursor: {},
+                },
+            },
+            {name: "count", cmd: {count: coll.getName(), query: {countErr: {$gte: 0}}}},
+            {name: "distinct", cmd: {distinct: coll.getName(), key: "distinctErr"}},
+        ];
+
+        const fp = configureFailPoint(testDB, "planExecutorAlwaysFails");
+        try {
+            for (const {name, cmd} of execErrorCases) {
+                assert.commandFailedWithCode(
+                    testDB.runCommand(cmd),
+                    kPlanExecutorFailCode,
+                    `expected ${name} to error`,
+                );
+                assertOnlyErroredEntry(
+                    getLatestQueryStatsMetrics(),
+                    {
+                        execCountErrored: 1,
+                        codeName: kPlanExecutorFailCodeName,
+                        codeCount: 1,
+                    },
+                    `${name} first error`,
+                );
+
+                // Running the same erroring shape again increments both counters.
+                assert.commandFailedWithCode(
+                    testDB.runCommand(cmd),
+                    kPlanExecutorFailCode,
+                    `expected ${name} to error again`,
+                );
+                assertOnlyErroredEntry(
+                    getLatestQueryStatsMetrics(),
+                    {
+                        execCountErrored: 2,
+                        codeName: kPlanExecutorFailCodeName,
+                        codeCount: 2,
+                    },
+                    `${name} second error`,
+                );
+            }
+        } finally {
+            fp.off();
+        }
+    });
+
+    it("records deadline kills for find and count", function () {
+        // Only commands with a post-registration hang failpoint.
+        const deadlineCases = [
+            {
+                name: "find",
+                failPoint: "waitInFindBeforeMakingBatch",
+                cmd: {find: coll.getName(), filter: {findTimeout: {$lte: 100}}, maxTimeMS: 500},
+            },
+            {
+                name: "count",
+                failPoint: "hangBeforeCollectionCount",
+                cmd: {count: coll.getName(), query: {countTimeout: {$lte: 100}}, maxTimeMS: 500},
+            },
+        ];
+        for (const {name, failPoint, cmd} of deadlineCases) {
+            const fp = configureFailPoint(testDB, failPoint, {shouldCheckForInterrupt: true});
+            try {
+                assert.commandFailedWithCode(
+                    testDB.runCommand(cmd),
+                    ErrorCodes.MaxTimeMSExpired,
+                    `${name} should have been killed by its deadline`,
+                );
+            } finally {
+                fp.off();
+            }
+
+            assertOnlyErroredEntry(
+                getLatestQueryStatsMetrics(),
+                {execCountErrored: 1, codeName: "MaxTimeMSExpired", codeCount: 1},
+                `${name} deadline kill`,
+            );
+        }
+    });
+});

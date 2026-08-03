@@ -97,7 +97,10 @@ const testCases = [
 ];
 
 function assertPipelineField(conn, expectedPipeline) {
-    const entry = getLatestQueryStatsEntry(conn, {collName: collName});
+    const entry = getLatestQueryStatsEntry(conn, {
+        collName: collName,
+        commandName: "aggregate",
+    });
     const statsPipeline = getValueAtPath(entry, "key.queryShape.pipeline");
     assert.eq(statsPipeline, expectedPipeline);
 }
