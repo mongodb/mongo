@@ -159,7 +159,14 @@ Timestamp computeTruncationBound(OperationContext* opCtx) {
                     .findPersistedTimestampStoreTs(opCtx)
                     .value_or(Timestamp::min());
             });
-        return std::min(persistedTs, ts);
+        if (persistedTs < ts) {
+            LOGV2(13258300,
+                  "Using replicated size and count persisted timestamp as exclusive oplog "
+                  "truncation bound",
+                  "persistedTs"_attr = persistedTs,
+                  "pinnedOplogTs"_attr = ts);
+            return persistedTs;
+        }
     }
     return ts;
 }
