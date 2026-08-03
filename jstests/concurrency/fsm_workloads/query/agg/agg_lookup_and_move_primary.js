@@ -100,10 +100,20 @@ export const $config = (function () {
 
             const toShard = this.shards[Random.randInt(this.shards.length)];
 
+            // When running in add/remove shard suites, we may encounter ShardNotFound errors if
+            // the shard chosen above is removed or ConflictingOperationInProgress errors if the
+            // add/removeShard hook runs a concurrent movePrimary operation.
+            const acceptedErrorCodes = TestData.hasRandomShardsAddedRemoved
+                ? [ErrorCodes.ShardNotFound, ErrorCodes.ConflictingOperationInProgress]
+                : [];
+
             jsTestLog("Executing movePrimary to shard: " + toShard);
             retryOnRetryableError(
                 () => {
-                    assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: toShard}));
+                    assert.commandWorkedOrFailedWithCode(
+                        db.adminCommand({movePrimary: db.getName(), to: toShard}),
+                        acceptedErrorCodes,
+                    );
                 },
                 10 /* numRetries */,
                 100 /* sleepMs */,
