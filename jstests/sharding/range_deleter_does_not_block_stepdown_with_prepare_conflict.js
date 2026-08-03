@@ -54,7 +54,20 @@ st.refreshCatalogCacheForNs(st.s, ns);
 
 // Wait for the MaxKey orphan guard to finish classifying tasks before preparing the transaction, so
 // the range deletion below and not the MaxKey classification read meets the prepare conflict.
-checkLog.containsJson(st.rs0.getPrimary(), 13018004);
+//
+// Poll the durable completion marker rather than the log. The guard logs once when the
+// range deleter starts at step-up during ShardingTest setup. In suites where the setup is
+// slow, the entry is evicted before this point and the wait is never satisfied.
+// persistBlockedTasks() writes 'blockedTasks' before that log line, so its presence marks the same event.
+assert.soon(
+    () =>
+        st.rs0
+            .getPrimary()
+            .getDB("config")
+            .maxKeyOrphanScanState.findOne({_id: "scanState", blockedTasks: {$exists: true}}) !==
+        null,
+    "MaxKey orphan guard did not finish classifying range-deletion tasks",
+);
 
 // Insert a doc into the chunk still owned by the donor shard in a transaction then prepare the
 // transaction so readers of that doc will enter a prepare conflict retry loop.
