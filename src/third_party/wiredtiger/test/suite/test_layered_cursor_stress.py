@@ -58,6 +58,9 @@
 #  - Test tombstone-prefixed values (to cover __wt_clayered_deleted encode/decode).
 #  - Add operations with overwrite on/off.
 #  - Add setting bounds to cursors.
+#
+# FIXME-WT-18209: extend this test to cover async step-down, subsuming the randomized coverage in
+# test_layered_async_stepdown02.
 
 import math, os, random
 from dataclasses import dataclass, field
