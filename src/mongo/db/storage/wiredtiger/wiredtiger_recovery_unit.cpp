@@ -135,8 +135,8 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
 
         // After a successful commit, publish all tables created in this transaction so that
         // they will be included in checkpoints at or after the commit schema epoch.
-        for (const auto& table : _createdTables) {
-            kvEngine->publishIdent(*this, table, schemaEpoch);
+        for (const auto& uri : _createdTables) {
+            kvEngine->publishIdent(*this, uri, schemaEpoch);
         }
     }
 

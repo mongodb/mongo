@@ -2339,6 +2339,11 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
         return;
     }
 
+    // The stable timestamp cannot move backwards when schema epochs are in use
+    if (force && _usesSchemaEpochs) {
+        invariant(stableTimestamp >= prevStable);
+    }
+
     // Communicate to WiredTiger what the "stable timestamp" is. Timestamp-aware checkpoints
     // will only persist to disk transactions committed with a timestamp earlier than the
     // "stable timestamp".
@@ -2360,6 +2365,11 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
             "force=true,oldest_timestamp={0:x},durable_timestamp={0:x},stable_timestamp={0:x}", ts);
     } else {
         stableTSConfigString = fmt::format("stable_timestamp={:x}", ts);
+    }
+    if (_usesSchemaEpochs && gFeatureFlagEnableSchemaEpochs.isEnabled()) {
+        fmt::format_to(std::back_inserter(stableTSConfigString),
+                       ",stable_disaggregated_schema_epoch={:x}",
+                       _provider.getSchemaEpochForTimestamp(stableTimestamp));
     }
     invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString.c_str()), nullptr);
 
@@ -2661,12 +2671,19 @@ void WiredTigerKVEngine::unpinAllDurableTimestamp(uint64_t ts) {
 }
 
 void WiredTigerKVEngine::publishIdent(WiredTigerRecoveryUnit& ru,
-                                      std::string_view ident,
+                                      const std::string& uri,
                                       uint64_t schemaEpoch) {
-    // TODO: SERVER-122163: Call WT session->publish_at_schema_epoch(uri, schemaEpoch) when the API
-    // is available.
-    LOGV2_DEBUG(
-        11928700, 1, "publishIdent", "ident"_attr = ident, "schemaEpoch"_attr = schemaEpoch);
+    LOGV2_DEBUG(11928700, 1, "publishIdent", "uri"_attr = uri, "schemaEpoch"_attr = schemaEpoch);
+    if (!gFeatureFlagEnableSchemaEpochs.isEnabled()) {
+        return;
+    }
+
+    auto* session = ru.getSessionNoTxn();
+    invariant(session);
+    invariantWTOK(
+        session->publish(uri.c_str(),
+                         fmt::format("disaggregated=(schema_epoch={:x})", schemaEpoch).c_str()),
+        *session);
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {

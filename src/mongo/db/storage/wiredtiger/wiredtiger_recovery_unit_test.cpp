@@ -1283,7 +1283,7 @@ public:
 
     MOCK_METHOD(void,
                 publishIdent,
-                (WiredTigerRecoveryUnit & ru, std::string_view ident, uint64_t schemaEpoch),
+                (WiredTigerRecoveryUnit & ru, const std::string& uri, uint64_t schemaEpoch),
                 (override));
 
     MOCK_METHOD(void, pinAllDurableTimestamp, (uint64_t ts), (override));

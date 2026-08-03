@@ -210,7 +210,7 @@ public:
     }
 
     void publishIdent(WiredTigerRecoveryUnit& ru,
-                      std::string_view ident,
+                      const std::string& uri,
                       uint64_t schemaEpoch) override {
         MONGO_UNREACHABLE;
     }

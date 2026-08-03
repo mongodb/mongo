@@ -123,6 +123,7 @@ public:
     WRAPPED_WT_SESSION_METHOD(log_flush)
     WRAPPED_WT_SESSION_METHOD(open_cursor)
     WRAPPED_WT_SESSION_METHOD(prepare_transaction)
+    WRAPPED_WT_SESSION_METHOD(publish)
     WRAPPED_WT_SESSION_METHOD(query_timestamp)
     WRAPPED_WT_SESSION_METHOD(reset)
     WRAPPED_WT_SESSION_METHOD(reconfigure)

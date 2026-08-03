@@ -324,7 +324,7 @@ public:
      * schemaEpoch.
      */
     virtual void publishIdent(WiredTigerRecoveryUnit& ru,
-                              std::string_view ident,
+                              const std::string& uri,
                               uint64_t schemaEpoch) = 0;
 
 protected:
@@ -603,7 +603,7 @@ public:
     void pinAllDurableTimestamp(uint64_t ts) override;
     void unpinAllDurableTimestamp(uint64_t ts) override;
     void publishIdent(WiredTigerRecoveryUnit& ru,
-                      std::string_view ident,
+                      const std::string& uri,
                       uint64_t schemaEpoch) override;
 
     bool usesSchemaEpochs() const override {
