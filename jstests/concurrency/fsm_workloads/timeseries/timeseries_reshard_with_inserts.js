@@ -36,22 +36,32 @@ export const $config = (function () {
         shardKey: shardKeys[0],
         reshardingCount: 0,
         numDocsPerInsert: 250,
-        originalValidationParams: null,
+        originalValidationParamsByHost: null,
     };
 
-    function setReshardingServerParameters(cluster, params) {
-        const previous = {};
+    // Sets the parameters returned by 'paramsForHost' on every config and shard node, and
+    // returns the previous values keyed by host.
+    function setReshardingServerParameters(cluster, paramsForHost) {
+        const previousByHost = {};
         const apply = (adminDb) => {
-            for (const [name, value] of Object.entries(params)) {
+            const host = adminDb.getMongo().host;
+            // Config nodes are also shard nodes on config shard clusters, so skip if params have already been applied.
+            if (Object.hasOwn(previousByHost, host)) {
+                return;
+            }
+
+            const previous = {};
+            for (const [name, value] of Object.entries(paramsForHost(host))) {
                 const res = assert.commandWorked(
                     adminDb.adminCommand({setParameter: 1, [name]: value}),
                 );
                 previous[name] = res.was;
             }
+            previousByHost[host] = previous;
         };
         cluster.executeOnConfigNodes(apply);
         cluster.executeOnMongodNodes(apply);
-        return previous;
+        return previousByHost;
     }
 
     function generateMetaFieldValueForInitialInserts(range) {
@@ -134,8 +144,11 @@ export const $config = (function () {
     };
 
     function teardown(_db, _collName, cluster) {
-        if (data.originalValidationParams !== null) {
-            setReshardingServerParameters(cluster, data.originalValidationParams);
+        if (data.originalValidationParamsByHost !== null) {
+            setReshardingServerParameters(
+                cluster,
+                (host) => data.originalValidationParamsByHost[host] ?? {},
+            );
         }
     }
 
@@ -156,9 +169,9 @@ export const $config = (function () {
                 reshardingCriticalSectionTimeoutMillis: 30 * 60 * 1000,
                 reshardingVerificationDeltaWaitRemainingCriticalSectionPercent: 1,
             };
-            data.originalValidationParams = setReshardingServerParameters(
+            data.originalValidationParamsByHost = setReshardingServerParameters(
                 cluster,
-                validationParamsUnderStepdowns,
+                () => validationParamsUnderStepdowns,
             );
         }
 
