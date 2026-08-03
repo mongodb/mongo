@@ -152,16 +152,20 @@ MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
-namespace {
-
-MONGO_INITIALIZER(WiredTigerRegisterWriteConflictFailPoints)(InitializerContext*) {
-    registerWriteConflictForWritesFactory(kWiredTigerEngineName, [](FailPoint::ModeOptions mode) {
+void registerWiredTigerWriteConflictFailPoints(std::string_view engineName) {
+    registerWriteConflictForWritesFactory(engineName, [](FailPoint::ModeOptions mode) {
         return std::make_unique<FailPointEnableBlock>(&WTWriteConflictException, std::move(mode));
     });
-    registerWriteConflictForReadsFactory(kWiredTigerEngineName, [](FailPoint::ModeOptions mode) {
+    registerWriteConflictForReadsFactory(engineName, [](FailPoint::ModeOptions mode) {
         return std::make_unique<FailPointEnableBlock>(&WTWriteConflictExceptionForReads,
                                                       std::move(mode));
     });
+}
+
+namespace {
+
+MONGO_INITIALIZER(WiredTigerRegisterWriteConflictFailPoints)(InitializerContext*) {
+    registerWiredTigerWriteConflictFailPoints(kWiredTigerEngineName);
 }
 
 }  // namespace

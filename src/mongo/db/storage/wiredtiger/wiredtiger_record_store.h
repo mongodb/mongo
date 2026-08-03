@@ -695,4 +695,9 @@ private:
 // WT failpoint to throw write conflict exceptions randomly
 extern FailPoint WTWriteConflictException;
 extern FailPoint WTWriteConflictExceptionForReads;
+
+/**
+ * Registers the fail points above as the write conflict fail points for 'engineName'.
+ */
+void registerWiredTigerWriteConflictFailPoints(std::string_view engineName);
 }  // namespace mongo
