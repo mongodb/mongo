@@ -1594,7 +1594,7 @@ Status WiredTigerUtil::createTable(WiredTigerRecoveryUnit& ru,
             !ru.readOnly());
 
     invariant(ru.inUnitOfWork());
-    auto& session = *ru.getSessionNoTxn();
+    auto& session = *ru.getSession();
     LOGV2(51780, "create table", "uri"_attr = uri, "config"_attr = config);
     const auto status = wtRCToStatus(session.create(uri, config), session);
     if (status.isOK()) {

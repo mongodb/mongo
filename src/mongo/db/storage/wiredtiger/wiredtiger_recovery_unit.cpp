@@ -153,7 +153,7 @@ void WiredTigerRecoveryUnit::_commit(boost::optional<Timestamp> commitTime) {
     bool notifyDone = !_prepareTimestamp.isNull();
     if (_session && _isActive()) {
         auto* kvEngine = _connection->getKVEngine();
-        if (!_createdTables.empty() && kvEngine->usesSchemaEpochs()) {
+        if (!_createdTables.empty() && kvEngine && kvEngine->usesSchemaEpochs()) {
             // In disaggregated storage mode, if this transaction created tables and has a
             // timestamp, pin all_durable before committing to prevent stable from advancing past
             // our commit timestamp before we can publish the tables.
@@ -179,6 +179,8 @@ void WiredTigerRecoveryUnit::_commit(boost::optional<Timestamp> commitTime) {
         } else {
             _txnClose(true);
         }
+    } else {
+        invariant(_createdTables.empty());
     }
     _setState(State::kCommitting);
 
