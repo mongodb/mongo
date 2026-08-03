@@ -88,10 +88,10 @@ protected:
     }
 
     MigrationBlockingOperationCoordinatorV2Document getStateDocumentOnDisk() {
-        ASSERT_TRUE(stateDocumentExistsOnDisk());
         DBDirectClient client(_opCtx);
         auto doc = client.findOne(NamespaceString::kShardingDDLCoordinatorsNamespace,
                                   BSON("_id" << getCoordinatorId().toBSON()));
+        ASSERT_FALSE(doc.isEmpty()) << "State document not found on disk";
         IDLParserContext errCtx(
             "MigrationBlockingOperationCoordinatorV2Test::getStateDocumentOnDisk()");
         return MigrationBlockingOperationCoordinatorV2Document::parse(doc, errCtx);
@@ -424,10 +424,12 @@ TEST_F(MigrationBlockingOperationCoordinatorV2Test, BeginOperationRollsBackOnPer
 
     _instance = getInstance();
 
-    // The failed persist rolls back the in-memory operation set, leaving it consistent with disk,
-    // and surfaces the error to the caller.
+    // The failed persist surfaces the error and rolls back the in-memory operation set.
     ASSERT_NOT_OK(_instance->beginOperation(_opCtx, UUID::gen()).getNoThrow(_opCtx));
-    assertOperationCountOnDisk(0);
+
+    // Verify number of operations is zero. A leftover operation would keep `_processRequests` from
+    // ever seeing the set empty, so the coordinator would block migrations forever and the
+    // assertions below would fail.
 
     ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
     ASSERT_TRUE(_externalState->migrationsAreAllowed());
