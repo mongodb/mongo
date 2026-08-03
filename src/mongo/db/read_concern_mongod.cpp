@@ -69,6 +69,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeLinearizableReadConcern);
 MONGO_FAIL_POINT_DEFINE(hangInWaitForLastStableRecoveryTimestampLoop);
+MONGO_FAIL_POINT_DEFINE(failSnapshotReads);
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
 /**
@@ -325,6 +326,9 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
         if (!replCoord->getSettings().isReplSet()) {
             return {ErrorCodes::NotAReplicaSet,
                     "node needs to be a replica set member to use readConcern: snapshot"};
+        }
+        if (MONGO_unlikely(failSnapshotReads.shouldFail())) {
+            return {ErrorCodes::SnapshotUnavailable, "failSnapshotReads failpoint is on"};
         }
     }
 

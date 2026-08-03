@@ -15,6 +15,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {checkLog} from "src/mongo/shell/check_log.js";
 
 const st = new ShardingTest({});
 const mongos = st.s;
@@ -2048,6 +2049,43 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(
         mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
     );
+    assertNoInconsistencies();
+    db.dropDatabase();
+})();
+
+(function testTransientSnapshotReadsErrorsDoNotBubbleUp() {
+    const db = getNewDb();
+
+    jsTest.log("Executing testTransientSnapshotReadsErrorsDoNotBubbleUp");
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        mongos.adminCommand({shardCollection: db.coll.getFullName(), key: {x: 1}}),
+    );
+
+    const allNodes = [st.configRS, ...st.getAllShards()].flatMap((rs) => rs.nodes);
+    const failPoints = allNodes.map((node) =>
+        configureFailPoint(node, "failSnapshotReads", {}, {times: 2}),
+    );
+
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
+    assert.eq(0, inconsistencies.length, {inconsistencies});
+
+    const retriedOnSomeNode = allNodes.some((node) =>
+        checkLog.checkContainsOnceJson(node, 13217503),
+    );
+    assert(retriedOnSomeNode, "Expected a metadata consistency check retry to be logged");
+
+    inconsistencies = checkMetadataConsistency(db);
+    assert.eq(0, inconsistencies.length, {inconsistencies});
+
+    inconsistencies = checkMetadataConsistency(db.coll);
+    assert.eq(0, inconsistencies.length, {inconsistencies});
+
+    failPoints.forEach((fp) => fp.off());
+
     assertNoInconsistencies();
     db.dropDatabase();
 })();

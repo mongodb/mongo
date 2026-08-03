@@ -247,22 +247,20 @@ void _checkBucketCollectionInconsistencies(
 std::vector<ChunkType> getChunksFromGlobalCatalog(OperationContext* opCtx,
                                                   const CollectionType& coll,
                                                   const ShardId& shardId) {
-    auto chunksStatus = Grid::get(opCtx)->catalogClient()->getChunks(
-        opCtx,
-        BSON(ChunkType::collectionUUID()
-             << coll.getUuid() << "$or"
-             << BSON_ARRAY(BSON(ChunkType::shard(shardId.toString()))
-                           << BSON("history.shard" << shardId.toString()))),
-        BSON(ChunkType::min() << 1),
-        boost::none,
-        nullptr,
-        coll.getEpoch(),
-        coll.getTimestamp(),
-        getReadConcernForConfigServer(opCtx, repl::ReadConcernArgs::kSnapshot));
-
-    uassertStatusOK(chunksStatus.getStatus());
-
-    return chunksStatus.getValue();
+    return snapshotUnavailableRetry(opCtx, "getChunksFromGlobalCatalog", [&] {
+        return uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
+            opCtx,
+            BSON(ChunkType::collectionUUID()
+                 << coll.getUuid() << "$or"
+                 << BSON_ARRAY(BSON(ChunkType::shard(shardId.toString()))
+                               << BSON("history.shard" << shardId.toString()))),
+            BSON(ChunkType::min() << 1),
+            boost::none,
+            nullptr,
+            coll.getEpoch(),
+            coll.getTimestamp(),
+            getReadConcernForConfigServer(opCtx, repl::ReadConcernArgs::kSnapshot)));
+    });
 }
 
 struct CatalogRelaxedAggregateChunkInfo {
@@ -398,7 +396,8 @@ bool hasChunksFromDurableShardCatalog(OperationContext* opCtx,
     chunkFindOp.setFilter(
         BSON(ChunkType::collectionUUID() << uuid << ChunkType::shard(shardId.toString())));
     chunkFindOp.setSort(BSON(ChunkType::min() << 1));
-    auto chunkCursor = client.find(std::move(chunkFindOp));
+    auto chunkCursor = snapshotUnavailableRetry(
+        opCtx, "hasChunksFromDurableShardCatalog", [&] { return client.find(chunkFindOp); });
     return chunkCursor->more();
 }
 
@@ -409,7 +408,8 @@ bool hasAnyChunksFromDurableShardCatalog(OperationContext* opCtx, const UUID& uu
     FindCommandRequest chunkFindOp{NamespaceString::kConfigShardCatalogChunksNamespace};
     chunkFindOp.setFilter(BSON(ChunkType::collectionUUID() << uuid));
     chunkFindOp.setSort(BSON(ChunkType::min() << 1));
-    auto chunkCursor = client.find(std::move(chunkFindOp));
+    auto chunkCursor = snapshotUnavailableRetry(
+        opCtx, "hasAnyChunksFromDurableShardCatalog", [&] { return client.find(chunkFindOp); });
     return chunkCursor->more();
 }
 
@@ -460,7 +460,8 @@ boost::optional<std::vector<ChunkType>> readChunksFromDurableShardCatalog(
     FindCommandRequest chunkFindOp{NamespaceString::kConfigShardCatalogChunksNamespace};
     chunkFindOp.setFilter(BSON(ChunkType::collectionUUID() << coll.getUuid()));
     chunkFindOp.setSort(BSON(ChunkType::min() << 1));
-    auto chunkCursor = client.find(std::move(chunkFindOp));
+    auto chunkCursor = metadata_consistency_util::snapshotUnavailableRetry(
+        opCtx, "readChunksFromDurableShardCatalog", [&] { return client.find(chunkFindOp); });
 
     std::vector<ChunkType> chunks;
     while (chunkCursor->more()) {
@@ -2248,6 +2249,14 @@ stdx::unordered_set<NamespaceString> getCollectionsUnderCriticalSection(
 
 }  // namespace
 
+void logSnapshotUnavailableRetry(std::string_view checkName, size_t attempt, const Status& status) {
+    LOGV2(13217503,
+          "Retrying metadata consistency check after SnapshotUnavailable error",
+          "check"_attr = checkName,
+          "attempt"_attr = attempt,
+          "error"_attr = redact(status));
+}
+
 MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
     if (nss.isAdminDB()) {
         return MetadataConsistencyCommandLevelEnum::kClusterLevel;
@@ -2875,7 +2884,10 @@ std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* 
     DBDirectClient client{opCtx};
     // We need to read at snapshot readConcern, set it in the opCtx for DBDirectClient.
     const auto scopedReadConcern = setSnapshotReadConcernIfNeeded(opCtx);
-    const auto chunksCursor = _getCollectionChunksCursor(&client, collection);
+    const auto chunksCursor =
+        metadata_consistency_util::snapshotUnavailableRetry(opCtx, "checkChunksConsistency", [&] {
+            return _getCollectionChunksCursor(&client, collection);
+        });
 
     const auto& uuid = collection.getUuid();
     const auto& nss = collection.getNss();

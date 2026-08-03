@@ -81,8 +81,11 @@ std::vector<MetadataInconsistencyItem> getHiddenCollectionsInconsistencies(
     AggregateCommandRequest hiddenCollAggRequest{NamespaceString::kConfigsvrCollectionsNamespace,
                                                  rawPipelineStages};
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto rawHiddenColls = catalogClient->runCatalogAggregation(
-        opCtx, hiddenCollAggRequest, {repl::ReadConcernLevel::kSnapshotReadConcern});
+    auto rawHiddenColls = metadata_consistency_util::snapshotUnavailableRetry(
+        opCtx, "getHiddenCollectionsInconsistencies", [&] {
+            return catalogClient->runCatalogAggregation(
+                opCtx, hiddenCollAggRequest, {repl::ReadConcernLevel::kSnapshotReadConcern});
+        });
 
     std::vector<MetadataInconsistencyItem> inconsistencies;
     inconsistencies.reserve(rawHiddenColls.size());
