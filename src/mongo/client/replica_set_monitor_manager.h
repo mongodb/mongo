@@ -196,7 +196,7 @@ private:
     // Needs to be after `_taskExecutor`, so that it will be destroyed before the `_taskExecutor`.
     ReplicaSetMonitorsMap _monitors;
 
-    int _numMonitorsCreated;
+    int _numMonitorsCreated{0};
 
     void _setupTaskExecutorAndStats(WithLock);
 
