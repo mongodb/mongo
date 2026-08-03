@@ -2041,11 +2041,16 @@ void ExecCommandDatabase::_commandExec() {
 
             const bool waitedForInitialized = _awaitShardingInitializedIfNeeded(ex.toStatus());
 
+            // TODO (SERVER-98118): remove once 9.0 becomes last LTS. Note that the service entry
+            // point never retries operations that are run in a DBDirectClient, hence the exclusion
+            // here. Callers that may hit this error via dbDirectClient handle their own retries.
+            const bool shouldRetryDueToFCVTransition =
+                ex.code() == ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition &&
+                !opCtx->getClient()->isInDirectClient();
+
             const bool errorMayBeRetried =
                 staleExceptionIsRetryable == shard_role_loop::CanRetry::YES ||
-                waitedForInitialized ||
-                // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-                ex.code() == ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition;
+                waitedForInitialized || shouldRetryDueToFCVTransition;
 
             if (errorMayBeRetried && canRetryCommand(ex.toStatus())) {
                 _resetLockerStateAfterShardingUpdate(opCtx);

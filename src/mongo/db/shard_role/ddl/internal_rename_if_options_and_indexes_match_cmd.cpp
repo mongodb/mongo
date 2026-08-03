@@ -29,6 +29,8 @@
 #include <string>
 #include <vector>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 namespace mongo {
 namespace {
 
@@ -61,27 +63,46 @@ public:
                 // No need to acquire additional locks in a non-sharded environment
                 _internalRun(opCtx, fromNss, toNss, originalIndexes, collectionOptions);
             } else {
-                // Sharded environment. Run the _shardsvrRenameCollection command, which will use
-                // the RenameCollectionCoordinator.
-                RenameCollectionRequest renameCollectionRequest(toNss);
-                renameCollectionRequest.setDropTarget(true);
-                renameCollectionRequest.setExpectedIndexes(originalIndexes);
-                renameCollectionRequest.setExpectedCollectionOptions(collectionOptions);
-                // TODO: SERVER-81975 (PM-1931) remove this once we enable support for $out to
-                // sharded collections.
-                renameCollectionRequest.setTargetMustNotBeSharded(true);
+                auto runCommand = [&]() {
+                    // Sharded environment. Run the _shardsvrRenameCollection command, which will
+                    // use the RenameCollectionCoordinator.
+                    RenameCollectionRequest renameCollectionRequest(toNss);
+                    renameCollectionRequest.setDropTarget(true);
+                    renameCollectionRequest.setExpectedIndexes(originalIndexes);
+                    renameCollectionRequest.setExpectedCollectionOptions(collectionOptions);
+                    // TODO: SERVER-81975 (PM-1931) remove this once we enable support for $out to
+                    // sharded collections.
+                    renameCollectionRequest.setTargetMustNotBeSharded(true);
 
-                ShardsvrRenameCollection shardsvrRenameCollectionRequest(fromNss);
-                shardsvrRenameCollectionRequest.setRenameCollectionRequest(renameCollectionRequest);
+                    ShardsvrRenameCollection shardsvrRenameCollectionRequest(fromNss);
+                    shardsvrRenameCollectionRequest.setRenameCollectionRequest(
+                        renameCollectionRequest);
 
-                // _shardsvrRenameCollection requires majority write concern.
-                generic_argument_util::setMajorityWriteConcern(shardsvrRenameCollectionRequest);
+                    // _shardsvrRenameCollection requires majority write concern.
+                    generic_argument_util::setMajorityWriteConcern(shardsvrRenameCollectionRequest);
 
-                DBDirectClient client(opCtx);
-                BSONObj cmdResult;
-                client.runCommand(
-                    fromNss.dbName(), shardsvrRenameCollectionRequest.toBSON(), cmdResult);
-                uassertStatusOK(getStatusFromCommandResult(cmdResult));
+                    DBDirectClient client(opCtx);
+                    BSONObj cmdResult;
+                    client.runCommand(
+                        fromNss.dbName(), shardsvrRenameCollectionRequest.toBSON(), cmdResult);
+                    uassertStatusOK(getStatusFromCommandResult(cmdResult));
+                };
+
+                // We do one retry here on DDLCoordinatorMustRetryDueToFCVTransition to match the
+                // service entry point's behavior. This isn't handled in the service entry point
+                // for this command because it's run in a DBDirectClient.
+                // TODO (SERVER-98118): remove retry logic once 9.0 becomes last LTS.
+                try {
+                    runCommand();
+                } catch (
+                    const ExceptionFor<ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition>& e) {
+                    LOGV2_OPTIONS(13265501,
+                                  {logv2::LogComponent::kSharding},
+                                  "Retrying InternalRenameIfOptionsAndIndexesMatchCmd due to "
+                                  "FCV transition",
+                                  "error"_attr = redact(e));
+                    runCommand();
+                }
             }
         }
 
