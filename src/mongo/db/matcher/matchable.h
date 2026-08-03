@@ -16,6 +16,8 @@
 
 namespace mongo {
 
+struct DepsTracker;
+
 /**
  * TODO SERVER-114832 Break audit dependency on this class.
  */
@@ -26,6 +28,13 @@ public:
     virtual ~MatchableDocument() {}
 
     virtual BSONObj toBSON() const = 0;
+
+    /**
+     * @return the source Document, if any
+     */
+    virtual boost::optional<const Document&> getSourceDocument() const {
+        return boost::none;
+    }
 
     /**
      * The newly returned ElementIterator is allowed to keep a pointer to path.
@@ -100,6 +109,27 @@ private:
     BSONObj _obj;
     mutable BSONElementIterator _iterator;
     mutable bool _iteratorUsed;
+};
+
+/**
+ * Wraps up a `Document` as a `MatchableDocument`.
+ */
+class DocumentMatchableDocument : public BSONMatchableDocument {
+public:
+    DocumentMatchableDocument(const Document& doc,
+                              const DepsTracker& dependencies,
+                              bool knownUniqueFields);
+
+    boost::optional<const Document&> getSourceDocument() const override {
+        return _doc;
+    }
+
+private:
+    static BSONObj toBSON(const Document& doc,
+                          const DepsTracker& dependencies,
+                          bool knownUniqueFields);
+
+    const Document& _doc;
 };
 
 /**

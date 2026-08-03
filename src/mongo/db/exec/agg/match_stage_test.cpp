@@ -6,6 +6,7 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -151,6 +152,49 @@ TEST_F(MatchStageTest, ExplainOutputOmitsExpressionEvaluationPeakMemoryBytesWhen
 
     auto explain = stage->getExplainOutput();
     ASSERT(explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
+}
+
+MATCHER_P(DocumentsEq, expectDocs, "") {
+    const auto actualDocs = arg;
+    auto cmp = [](auto expectDocs, auto actualDocs) {
+        for (size_t i = 0; i < expectDocs.size() && i < actualDocs.size(); i++) {
+            if (DocumentComparator().evaluate(expectDocs[i] != actualDocs[i])) {
+                return false;
+            }
+        }
+        return expectDocs.size() == actualDocs.size();
+    };
+    return cmp(expectDocs, actualDocs);
+}
+
+TEST_F(MatchStageTest, ExprOperatorCanEvaluateMetaExpression) {
+    auto docWithStreamMeta = [](auto docarg, auto sortKey) {
+        MutableDocument doc{Document(docarg)};
+        doc.metadata().setSortKey(Value(sortKey), true);
+        return doc.freeze();
+    };
+
+    const BSONObj expr =
+        fromjson(R"({ $expr: { $eq: [{ $meta: "sortKey" }, [{"source": "foo"}] ] } })");
+    auto matcher = DocumentSourceMatch::create(expr, getExpCtx());
+    auto matchStage = exec::agg::buildStage(matcher);
+    const auto docs = std::vector<Document>{
+        docWithStreamMeta(fromjson(R"({"_id": 0})"), fromjson(R"({"source": "foo"})")),
+        docWithStreamMeta(fromjson(R"({"_id": 1})"), fromjson(R"({"source": "bar"})")),
+        docWithStreamMeta(fromjson(R"({"_id": 2})"), fromjson(R"({"source": "foo"})"))};
+
+    auto mockSource = exec::agg::MockStage::createForTest(docs, getExpCtx());
+    exec::agg::MockStage::setSource_forTest(matchStage, mockSource.get());
+
+    std::vector<Document> outDocs;
+    for (auto r = matchStage->getNext(); !r.isEOF(); r = matchStage->getNext()) {
+        if (r.isAdvanced()) {
+            outDocs.push_back(r.releaseDocument());
+        }
+    }
+
+    const std::vector<Document> expectDocs = {docs[0], docs[2]};
+    ASSERT_DOCUMENTS_EQ(expectDocs, outDocs);
 }
 
 }  // namespace

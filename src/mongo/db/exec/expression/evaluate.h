@@ -750,8 +750,10 @@ inline Value evaluate(const ExpressionCompare& expr,
                       Variables* variables,
                       const EvaluationContext& ctx) {
     const auto& children = expr.getChildren();
-    int cmp = expr.getExpressionContext()->getValueComparator().compare(
-        children[0]->evaluate(root, variables, ctx), children[1]->evaluate(root, variables, ctx));
+
+    const auto lhs = children[0]->evaluate(root, variables, ctx);
+    const auto rhs = children[1]->evaluate(root, variables, ctx);
+    int cmp = expr.getExpressionContext()->getValueComparator().compare(lhs, rhs);
 
     // Make cmp one of 1, 0, or -1.
     if (cmp == 0) {

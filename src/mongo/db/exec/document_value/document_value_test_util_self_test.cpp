@@ -65,5 +65,85 @@ TEST(DocumentValueTestUtilSelfTest, ValueGTE) {
     ASSERT_VALUE_GTE(Value("bar"sv), Value("bar"sv));
 }
 
+TEST(DocumentValueTestUtilSelfTest, MatcherDocumentsEq) {
+    const std::vector<Document> docs({
+        Document({{"foo"sv, "bar"sv}}),
+        Document({{"quux"sv, "grault"sv}}),
+    });
+    const std::vector<Document> docs_eq({
+        Document({{"foo"sv, "bar"sv}}),
+        Document({{"quux"sv, "grault"sv}}),
+    });
+    const std::vector<Document> docs_longer({Document({{"foo"sv, "bar"sv}}),
+                                             Document({{"quux"sv, "grault"sv}}),
+                                             Document({{"gub"sv, "slub"sv}})});
+    const std::vector<Document> docs_swapped({
+        Document({{"quux"sv, "grault"sv}}),
+        Document({{"foo"sv, "bar"sv}}),
+    });
+
+    const auto match_docs = unittest::detail::DocumentsEq(docs);
+    ASSERT_TRUE(testing::Matches(match_docs)(docs));
+    ASSERT_TRUE(testing::Matches(match_docs)(docs_eq));
+    ASSERT_FALSE(testing::Matches(match_docs)(docs_longer));
+    ASSERT_FALSE(testing::Matches(match_docs)(docs_swapped));
+
+    const auto match_eq = unittest::detail::DocumentsEq(docs_eq);
+    ASSERT_TRUE(testing::Matches(match_eq)(docs));
+    ASSERT_TRUE(testing::Matches(match_eq)(docs_eq));
+    ASSERT_FALSE(testing::Matches(match_eq)(docs_longer));
+    ASSERT_FALSE(testing::Matches(match_eq)(docs_swapped));
+
+    const auto match_longer = unittest::detail::DocumentsEq(docs_longer);
+    ASSERT_FALSE(testing::Matches(match_longer)(docs));
+    ASSERT_FALSE(testing::Matches(match_longer)(docs_eq));
+    ASSERT_TRUE(testing::Matches(match_longer)(docs_longer));
+    ASSERT_FALSE(testing::Matches(match_longer)(docs_swapped));
+
+    const auto match_swapped = unittest::detail::DocumentsEq(docs_swapped);
+    ASSERT_FALSE(testing::Matches(match_swapped)(docs));
+    ASSERT_FALSE(testing::Matches(match_swapped)(docs_eq));
+    ASSERT_FALSE(testing::Matches(match_swapped)(docs_longer));
+    ASSERT_TRUE(testing::Matches(match_swapped)(docs_swapped));
+}
+
+TEST(DocumentValueUtilSelfTest, AssertDocumentsComparison) {
+    const std::vector<Document> docs({
+        Document({{"foo"sv, "bar"sv}}),
+        Document({{"quux"sv, "grault"sv}}),
+    });
+    const std::vector<Document> docs_eq({
+        Document({{"foo"sv, "bar"sv}}),
+        Document({{"quux"sv, "grault"sv}}),
+    });
+    const std::vector<Document> docs_longer({Document({{"foo"sv, "bar"sv}}),
+                                             Document({{"quux"sv, "grault"sv}}),
+                                             Document({{"gub"sv, "slub"sv}})});
+    const std::vector<Document> docs_swapped({
+        Document({{"quux"sv, "grault"sv}}),
+        Document({{"foo"sv, "bar"sv}}),
+    });
+
+    ASSERT_DOCUMENTS_EQ(docs, docs);
+    ASSERT_DOCUMENTS_EQ(docs, docs_eq);
+    ASSERT_DOCUMENTS_NE(docs, docs_longer);
+    ASSERT_DOCUMENTS_NE(docs, docs_swapped);
+
+    ASSERT_DOCUMENTS_EQ(docs_eq, docs);
+    ASSERT_DOCUMENTS_EQ(docs_eq, docs_eq);
+    ASSERT_DOCUMENTS_NE(docs_eq, docs_longer);
+    ASSERT_DOCUMENTS_NE(docs_eq, docs_swapped);
+
+    ASSERT_DOCUMENTS_NE(docs_longer, docs);
+    ASSERT_DOCUMENTS_NE(docs_longer, docs_eq);
+    ASSERT_DOCUMENTS_EQ(docs_longer, docs_longer);
+    ASSERT_DOCUMENTS_NE(docs_longer, docs_swapped);
+
+    ASSERT_DOCUMENTS_NE(docs_swapped, docs);
+    ASSERT_DOCUMENTS_NE(docs_swapped, docs_eq);
+    ASSERT_DOCUMENTS_NE(docs_swapped, docs_longer);
+    ASSERT_DOCUMENTS_EQ(docs_swapped, docs_swapped);
+}
+
 }  // namespace
 }  // namespace mongo

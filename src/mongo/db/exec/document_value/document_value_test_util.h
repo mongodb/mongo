@@ -9,6 +9,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/unittest/unittest.h"
 
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -31,6 +32,15 @@
 #define ASSERT_DOCUMENT_GT(a, b) _ASSERT_DOCVAL_COMPARISON(DocumentGT, a, b)
 #define ASSERT_DOCUMENT_GTE(a, b) _ASSERT_DOCVAL_COMPARISON(DocumentGTE, a, b)
 #define ASSERT_DOCUMENT_NE(a, b) _ASSERT_DOCVAL_COMPARISON(DocumentNE, a, b)
+
+/**
+ * Use to compare two collections which are convertible to `std::span<const Document>` under the
+ * default DocumentComparator in unit tests.
+ */
+#define ASSERT_DOCUMENTS_EQ(expectDocs, actualDocs) \
+    ASSERT_THAT(actualDocs, ::mongo::unittest::detail::DocumentsEq(expectDocs))
+#define ASSERT_DOCUMENTS_NE(expectDocs, actualDocs) \
+    ASSERT_THAT(actualDocs, ::testing::Not(::mongo::unittest::detail::DocumentsEq(expectDocs)))
 
 /**
  * Document/Value comparison utility macro. Do not use directly.
@@ -65,6 +75,23 @@ _DECLARE_DOCVAL_CMP_FUNC(Document, GT);
 _DECLARE_DOCVAL_CMP_FUNC(Document, GTE);
 _DECLARE_DOCVAL_CMP_FUNC(Document, NE);
 #undef _DECLARE_DOCVAL_CMP_FUNC
+
+namespace detail {
+
+MATCHER_P(DocumentsEq, expectDocs, "") {
+    const auto actualDocs = arg;
+    auto cmp = [](std::span<const Document> expectDocs, std::span<const Document> actualDocs) {
+        for (size_t i = 0; i < expectDocs.size() && i < actualDocs.size(); i++) {
+            if (DocumentComparator().evaluate(expectDocs[i] != actualDocs[i])) {
+                return false;
+            }
+        }
+        return expectDocs.size() == actualDocs.size();
+    };
+    return cmp(expectDocs, actualDocs);
+}
+
+}  // namespace detail
 
 }  // namespace unittest
 }  // namespace mongo
