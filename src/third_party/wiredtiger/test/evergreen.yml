@@ -141,8 +141,13 @@ functions:
               EXTRA_ARGS="--download-url https://mongodbtoolchain.build.10gen.cc/toolchain/rhel80-zseries/x86_64/mongodbtoolchain-${MDB_TOOLCHAIN_REV}.tar.gz"
           fi
 
+          # The pinned toolchain tarball sources a script that it does not contain.
+          # pipefail preserves the installer's real exit status.
+          # FIXME-WT-18153: Remove this filter once the toolchain has been fixed.
+          set -o pipefail
           curl -fsSL https://s3.amazonaws.com/mongodbtoolchain.build.10gen.cc/installer.sh \
-              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" $EXTRA_ARGS
+              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" $EXTRA_ARGS 2>&1 \
+              | sed -E '/scripts\/installer\.sh: No such file or directory/d; /return: can only .return. from a function or sourced script/d'
 
   # Since Bazel (currently used in SCons) uses EngFlow's remote execution system instead of icecream,
   # additional credentials need to be setup to maintain efficient compilation speed.
@@ -1606,7 +1611,6 @@ variables:
       - name: make-check-test
       # Use a special version of unit-test for macOS that checks for Python version consistency.
       - name: unit-test-macos
-      - name: unit-test-hook-disagg-leader-macos
       - name: fops
       - name: memory-model-test-mac
         batchtime: 40320 # 28 days
@@ -6923,18 +6927,29 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tags: ["pull_request"]
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan !.unit_test_xsan"
+    - name: >-
+        .pull_request
+        !.pull_request_compilers
+        !.unit_test_tsan
+        !.unit_test_xsan
+        !.unit_test_disagg
+        !format-stress-test-disagg-leader-pull-request-1
+        !format-stress-test-disagg-leader-pull-request-2
+        !format-stress-test-disagg-switch-pull-request-1
+        !format-stress-test-disagg-switch-pull-request-2
+        !format-stress-test-disagg-follower-pull-request
+        !format-stress-test-disagg-leader-tsan
+        !format-stress-test-disagg-switch-tsan
+        !unit-test-hook-disagg-follower
+        !unit-test-hook-disagg-follower-table
     - name: ".lint"
     - name: ".unit_test_long"
       distros: ubuntu2004-large
     - name: compile
-    - name: compile-develop
-    - name: compatibility-test-against-develop
     - name: doc-compile
     - name: make-check-test
     - name: configure-combinations
     - name: unit-test-zstd
-    - name: unit-test-hook-disagg-leader-key-provider
     - name: unit-test-hook-parallel-checkpoint
     - name: unit-test-hook-tiered
     - name: unit-test-hook-tiered-with-delays
@@ -6948,8 +6963,6 @@ buildvariants:
     - name: long-test
       distros: ubuntu2004-large
     - name: unit-test-extra-long
-      distros: ubuntu2004-large
-    - name: unit-test-hook-disagg-leader-extra-long
       distros: ubuntu2004-large
     - name: static-wt-build-test
     - name: format-smoke-test
@@ -6965,10 +6978,6 @@ buildvariants:
     - name: model-test-long-with-coverage
       batchtime: 1440 # once a day
     - name: model-test-long-random-config
-      batchtime: 1440 # once a day
-    - name: model-test-long-disagg
-      batchtime: 1440 # once a day
-    - name: model-test-long-random-config-disagg
       batchtime: 1440 # once a day
     - name: csuite-long-running
       batchtime: 1440 # once a day
@@ -6997,23 +7006,34 @@ buildvariants:
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
   tags: ["pull_request", "sanitizer"]
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan !syscall-linux !format-mirror-test"
+    - name: >-
+        .pull_request
+        !.pull_request_compilers
+        !.python
+        !.tiered_unittest
+        !csuite-wt12015-backup-corruption-test
+        !.unit_test_tsan
+        !syscall-linux
+        !format-mirror-test
+        !.unit_test_disagg
+        !format-stress-test-disagg-leader-pull-request-1
+        !format-stress-test-disagg-leader-pull-request-2
+        !format-stress-test-disagg-switch-pull-request-1
+        !format-stress-test-disagg-switch-pull-request-2
+        !format-stress-test-disagg-follower-pull-request
+        !format-stress-test-disagg-leader-tsan
+        !format-stress-test-disagg-switch-tsan
+        !unit-test-hook-disagg-follower
+        !unit-test-hook-disagg-follower-table
     - name: examples-c-test
     - name: format-asan-smoke-test
     - name: model-test-long
       batchtime: 1440 # once a day
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
-    - name: model-test-long-disagg
-      batchtime: 1440 # once a day
-    - name: model-test-long-random-config-disagg
-      batchtime: 1440 # once a day
     - name: live-restore-long
     - name: ".stress-test-asan"
-    - name: ".stress-test-disagg"
-      distros: ubuntu2004-large
     - name: ".unit_test_xsan"
-    - name: ".unit_test_disagg"
     - name: ".unit_test_long"
 
 # FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
@@ -7036,25 +7056,12 @@ buildvariants:
     - name: examples-c-test
     - name: unit-test-tsan
       distros: ubuntu2004-large
-    - name: unit-test-hook-disagg-leader-tsan
-      distros: ubuntu2004-large
-    - name: unit-test-hook-disagg-follower-tsan
-      distros: ubuntu2004-large
     # FIXME-WT-16309: Remove TSAN-specific jobs once the common tag works
     - name: unit-test-hook-parallel-checkpoint-tsan
-    - name: format-stress-test-disagg-leader-tsan
-      distros: ubuntu2004-large
-    - name: format-stress-test-disagg-switch-tsan
-      distros: ubuntu2004-large
     - name: format-stress-test-tsan
       distros: ubuntu2004-large
-    # FIXME-WT-16309: Enable the common test format tag for TSAN
-    # - name: ".stress-test-disagg"
-    #   distros: ubuntu2004-large
     - name: generate-tsan-metric
-    - name: generate-tsan-metric-disagg
     - name: generate-tsan-metric-timestamp
-    - name: generate-tsan-metric-disagg-timestamp
     - name: tsan-playground-test
 
 # Very minimal set without any extensions
@@ -7135,9 +7142,6 @@ buildvariants:
     - name: examples-c-production-disable-shared-test
     - name: examples-c-production-disable-static-test
     - name: format-stress-pull-request-test
-    - name: format-stress-test-disagg-leader-pull-request-1
-    - name: format-stress-test-disagg-follower-pull-request
-    - name: format-stress-test-disagg-switch-pull-request-1
     - name: make-check-test
       distros: ubuntu2004-large
     - name: cppsuite-default-all
@@ -7156,8 +7160,6 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
-      distros: ubuntu2004-large
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
     - name: schema-abort-predictable-test
@@ -7180,7 +7182,6 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
     - name: checkpoint-stress-test-tiered
     - name: precise-checkpoint-stress-test-tiered
     - name: format-abort-recovery-stress-test
@@ -7216,8 +7217,6 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-extra-long
-      distros: rhel80-large
-    - name: unit-test-hook-disagg-leader-extra-long
       distros: rhel80-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
@@ -7349,9 +7348,6 @@ buildvariants:
       distros: ubuntu2004-arm64-large
     - name: format-smoke-test
     - name: format-stress-pull-request-test
-    - name: format-stress-test-disagg-leader-pull-request-1
-    - name: format-stress-test-disagg-follower-pull-request
-    - name: format-stress-test-disagg-switch-pull-request-1
     - name: long-test
       distros: ubuntu2004-arm64-large
     - name: make-check-test
@@ -7362,17 +7358,11 @@ buildvariants:
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
     - name: model-unit-test
-    - name: model-test-long-disagg
-      batchtime: 1440 # once a day
-    - name: model-test-long-random-config-disagg
-      batchtime: 1440 # once a day
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
       distros: ubuntu2004-arm64-large
     - name: unit-test
     - name: unit-test-extra-long
-      distros: ubuntu2004-arm64-large
-    - name: unit-test-hook-disagg-leader-extra-long
       distros: ubuntu2004-arm64-large
     - name: unit-test-zstd
     - name: wtperf-test
@@ -7406,7 +7396,21 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan !.unit_test_xsan"
+    - name: >-
+        .pull_request
+        !.pull_request_compilers
+        !.unit_test_tsan
+        !.unit_test_xsan
+        !.unit_test_disagg
+        !format-stress-test-disagg-leader-pull-request-1
+        !format-stress-test-disagg-leader-pull-request-2
+        !format-stress-test-disagg-switch-pull-request-1
+        !format-stress-test-disagg-switch-pull-request-2
+        !format-stress-test-disagg-follower-pull-request
+        !format-stress-test-disagg-leader-tsan
+        !format-stress-test-disagg-switch-tsan
+        !unit-test-hook-disagg-follower
+        !unit-test-hook-disagg-follower-table
     - name: compile
     - name: make-check-test
     - name: unit-test
@@ -7462,8 +7466,6 @@ buildvariants:
     - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
-    - name: ".stress-test-disagg"
-      distros: ubuntu2004-large
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
 
@@ -7481,7 +7483,6 @@ buildvariants:
     - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
-    - name: ".stress-test-disagg"
     - name: format-abort-recovery-stress-test
 
 - name: ubuntu2004-nonstandalone
@@ -7496,12 +7497,24 @@ buildvariants:
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
     unit_test_variant_args: "--hook nonstandalone"
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan !.unit_test_xsan"
+    - name: >-
+        .pull_request
+        !.pull_request_compilers
+        !.unit_test_tsan
+        !.unit_test_xsan
+        !.unit_test_disagg
+        !format-stress-test-disagg-leader-pull-request-1
+        !format-stress-test-disagg-leader-pull-request-2
+        !format-stress-test-disagg-switch-pull-request-1
+        !format-stress-test-disagg-switch-pull-request-2
+        !format-stress-test-disagg-follower-pull-request
+        !format-stress-test-disagg-leader-tsan
+        !format-stress-test-disagg-switch-tsan
+        !unit-test-hook-disagg-follower
+        !unit-test-hook-disagg-follower-table
     - name: compile
     - name: make-check-test
     - name: unit-test-extra-long
-      distros: ubuntu2004-large
-    - name: unit-test-hook-disagg-leader-extra-long
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test"
 
@@ -7520,8 +7533,6 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
-      distros: ubuntu2004-large
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours
@@ -7546,8 +7557,6 @@ buildvariants:
       distros: ubuntu2004-test
     - name: format-abort-recovery-stress-test
       distros: ubuntu2004-test
-    - name: ".stress-test-disagg"
-      distros: ubuntu2004-large
     - name: make-check-test
     - name: unit-test
 
@@ -7569,13 +7578,10 @@ buildvariants:
     - name: unit-test
       distros: ubuntu2004-arm64-small
     - name: unit-test-extra-long
-    - name: unit-test-hook-disagg-leader-extra-long
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
-    - name: format-stress-disagg-leader-long-running
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours
@@ -7599,15 +7605,9 @@ buildvariants:
       distros: ubuntu2004-arm64-large
     - name: format-abort-recovery-stress-test
       distros: ubuntu2004-arm64-large
-    - name: ".stress-test-disagg"
-      distros: ubuntu2004-arm64-large
-    - name: format-stress-disagg-leader-long-running
-      distros: ubuntu2004-arm64-large
     - name: make-check-test
     - name: unit-test
     - name: unit-test-extra-long
-      distros: ubuntu2004-arm64-large
-    - name: unit-test-hook-disagg-leader-extra-long
       distros: ubuntu2004-arm64-large
 
 - name: amazon2023-arm64-release-nonstandalone
@@ -7629,15 +7629,9 @@ buildvariants:
       distros: amazon2023.3-arm64-large
     - name: format-abort-recovery-stress-test
       distros: amazon2023.3-arm64-large
-    - name: ".stress-test-disagg"
-      distros: amazon2023.3-arm64-large
-    - name: format-stress-disagg-leader-long-running
-      distros: amazon2023.3-arm64-large
     - name: make-check-test
     - name: unit-test
     - name: unit-test-extra-long
-      distros: amazon2023.3-arm64-large
-    - name: unit-test-hook-disagg-leader-extra-long
       distros: amazon2023.3-arm64-large
 
 - name: amazon2023-arm64-nonstandalone
@@ -7658,13 +7652,10 @@ buildvariants:
     - name: unit-test
       distros: amazon2023.3-arm64-small
     - name: unit-test-extra-long
-    - name: unit-test-hook-disagg-leader-extra-long
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
-    - name: format-stress-disagg-leader-long-running
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours
@@ -7712,9 +7703,6 @@ buildvariants:
       distros: amazon2023.3-arm64-large
     - name: format-smoke-test
     - name: format-stress-pull-request-test
-    - name: format-stress-test-disagg-leader-pull-request-1
-    - name: format-stress-test-disagg-follower-pull-request
-    - name: format-stress-test-disagg-switch-pull-request-1
     - name: long-test
       distros: amazon2023.3-arm64-large
     - name: make-check-test
@@ -7727,17 +7715,11 @@ buildvariants:
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
     - name: model-unit-test
-    - name: model-test-long-disagg
-      batchtime: 1440 # once a day
-    - name: model-test-long-random-config-disagg
-      batchtime: 1440 # once a day
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
       distros: amazon2023.3-arm64-large
     - name: unit-test
     - name: unit-test-extra-long
-      distros: amazon2023.3-arm64-large
-    - name: unit-test-hook-disagg-leader-extra-long
       distros: amazon2023.3-arm64-large
     - name: unit-test-zstd
     - name: wtperf-test
@@ -7761,7 +7743,6 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
     - name: schema-abort-predictable-test
@@ -7791,23 +7772,34 @@ buildvariants:
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
     ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.unit_test_xsan !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan !syscall-linux"
+    - name: >-
+        .pull_request
+        !.pull_request_compilers
+        !.unit_test_xsan
+        !.python
+        !.tiered_unittest
+        !csuite-wt12015-backup-corruption-test
+        !.unit_test_tsan
+        !syscall-linux
+        !.unit_test_disagg
+        !format-stress-test-disagg-leader-pull-request-1
+        !format-stress-test-disagg-leader-pull-request-2
+        !format-stress-test-disagg-switch-pull-request-1
+        !format-stress-test-disagg-switch-pull-request-2
+        !format-stress-test-disagg-follower-pull-request
+        !format-stress-test-disagg-leader-tsan
+        !format-stress-test-disagg-switch-tsan
+        !unit-test-hook-disagg-follower
+        !unit-test-hook-disagg-follower-table
     - name: examples-c-test
     - name: format-asan-smoke-test
     - name: model-test-long
       batchtime: 1440 # once a day
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
-    - name: model-test-long-disagg
-      batchtime: 1440 # once a day
-    - name: model-test-long-random-config-disagg
-      batchtime: 1440 # once a day
     - name: live-restore-long
     - name: ".stress-test-asan"
-    - name: ".stress-test-disagg"
-      distros: amazon2023.3-arm64-large
     - name: ".unit_test"
-    - name: ".unit_test_disagg"
     - name: ".unit_test_long"
 
 # FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
@@ -7827,27 +7819,23 @@ buildvariants:
   tasks:
     - name: compile
     - name: examples-c-test
-    - name: .unit_test_tsan
+    - name: >-
+        .unit_test_tsan
+        !unit-test-hook-disagg-follower-tsan
+        !unit-test-hook-disagg-leader-tsan-bucket00
+        !unit-test-hook-disagg-leader-tsan-bucket01
+        !unit-test-hook-disagg-leader-tsan-bucket02
+        !unit-test-hook-disagg-leader-tsan-bucket03
+        !unit-test-hook-disagg-leader-tsan-bucket04
     # FIXME-WT-16066 Remove unit test tsan once we incorporate TSAN environment variable setting into run.py
     - name: unit-test-tsan
       distros: amazon2023.3-arm64-large
-    - name: unit-test-hook-disagg-leader-tsan
-      distros: amazon2023.3-arm64-large
     # FIXME-WT-16309: Remove TSAN-specific jobs once the common tag works
-    - name: format-stress-test-disagg-leader-tsan
-      distros: amazon2023.3-arm64-large
-    - name: format-stress-test-disagg-switch-tsan
-      distros: amazon2023.3-arm64-large
     - name: unit-test-hook-parallel-checkpoint-tsan
     - name: format-stress-test-tsan
       distros: amazon2023.3-arm64-large
-    # FIXME-WT-16309: Enable the common test format tag for TSAN
-    # - name: ".stress-test-disagg"
-    #   distros: amazon2023.3-arm64-large
     - name: generate-tsan-metric
-    - name: generate-tsan-metric-disagg
     - name: generate-tsan-metric-timestamp
-    - name: generate-tsan-metric-disagg-timestamp
 
 # FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
 # Investigate whether a similar thing could happen for MSAN.
@@ -7906,9 +7894,6 @@ buildvariants:
     - name: examples-c-production-disable-shared-test
     - name: examples-c-production-disable-static-test
     - name: format-stress-pull-request-test
-    - name: format-stress-test-disagg-leader-pull-request-1
-    - name: format-stress-test-disagg-follower-pull-request
-    - name: format-stress-test-disagg-switch-pull-request-1
     - name: make-check-test
       distros: amazon2023.3-arm64-large
     - name: cppsuite-default-all
@@ -7928,7 +7913,6 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours
