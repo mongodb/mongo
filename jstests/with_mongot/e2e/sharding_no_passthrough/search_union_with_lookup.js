@@ -223,5 +223,80 @@ describe("$search in $lookup and $unionWith across topologies", function () {
                 assert.eq(Number(doc.matches[0].meta.count.total), 4, {doc});
             }
         });
+
+        // $unionWith does not touch its sub-pipeline until the outer side is drained, so a
+        // batchSize of 0 defers the sub-pipeline's first shard dispatch to a getMore -- a
+        // different operation than the one that planned it. The feature-flag values stamped onto
+        // those outbound requests come from the getMore's IFRContext, so unless that context is
+        // restored from the cursor, the shards plan the sub-pipeline under different flag values
+        // than the merge half was planned with and the metadata cursor goes missing.
+        it(`$$SEARCH_META in $unionWith first pulled on a getMore: ${tc.name}`, function () {
+            const results = tc.base
+                .aggregate(
+                    [
+                        {$project: {_id: 1, localField: 1}},
+                        {
+                            $unionWith: {
+                                coll: tc.search.getName(),
+                                pipeline: [
+                                    {$search: cakeQuery},
+                                    {$project: {_id: 1, meta: "$$SEARCH_META"}},
+                                ],
+                            },
+                        },
+                    ],
+                    {batchSize: 0},
+                )
+                .toArray();
+
+            assert.eq(results.length, 7, {results});
+
+            const baseDocsSeen = results.filter((d) => d.hasOwnProperty("localField"));
+            const searchDocsSeen = results.filter((d) => d.hasOwnProperty("meta"));
+
+            assert.eq(baseDocsSeen.length, 3, {baseDocsSeen});
+            assert.eq(searchDocsSeen.length, 4, {searchDocsSeen});
+
+            assertArrayEq({
+                actual: searchDocsSeen.map((d) => d._id),
+                expected: tc.expectedSearchIds,
+            });
+
+            for (const doc of searchDocsSeen) {
+                assert.eq(Number(doc.meta.count.total), 4, {doc});
+            }
+        });
+
+        // $lookup defers its sub-pipeline differently than $unionWith: the constructor builds only
+        // an introspection pipeline, and the sub-pipeline is not desugared until the first input
+        // document reaches LookUpStage::buildPipeline. A batchSize of 0 pushes that first document
+        // to a getMore, so the extension stage -- and the IFR kickback it raises -- is first
+        // created on an operation that has no aggregate retry loop above it.
+        it(`$$SEARCH_META in $lookup first pulled on a getMore: ${tc.name}`, function () {
+            const results = tc.base
+                .aggregate(
+                    [
+                        {$project: {_id: 1}},
+                        {
+                            $lookup: {
+                                from: tc.search.getName(),
+                                pipeline: [
+                                    {$search: cakeQuery},
+                                    {$project: {_id: 1, meta: "$$SEARCH_META"}},
+                                ],
+                                as: "matches",
+                            },
+                        },
+                    ],
+                    {batchSize: 0},
+                )
+                .toArray();
+
+            assert.eq(results.length, 3, {results});
+            for (const doc of results) {
+                assert.gt(doc.matches.length, 0, {doc});
+                assert.eq(Number(doc.matches[0].meta.count.total), 4, {doc});
+            }
+        });
     }
 });

@@ -16,6 +16,9 @@ namespace mongo {
 template <typename Derived>
 class LiteParsedDocumentSourceNestedPipelines : public LiteParsedDocumentSourceDefault<Derived> {
 public:
+    // TODO SERVER-132721: Remove constructors that don't accept LiteParserOptions. Derived classes
+    // may require the ifr context, and failure to pass the options means we incorrectly assume a
+    // null IFR context.
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
                                             std::vector<OwnedLiteParsedPipeline> pipelines)
@@ -35,11 +38,26 @@ public:
           _resolvedBackingNss(_foreignNss ? ResolvedNamespace{*_foreignNss, {}}
                                           : ResolvedNamespace{}) {}
 
+    // TODO SERVER-132721: Remove constructors that don't accept LiteParserOptions. Derived classes
+    // may require the ifr context, and failure to pass the options means we incorrectly assume a
+    // null IFR context.
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
                                             boost::optional<OwnedLiteParsedPipeline> pipeline)
         : LiteParsedDocumentSourceNestedPipelines(
               originalBson, std::move(foreignNss), std::vector<OwnedLiteParsedPipeline>{}) {
+        if (pipeline)
+            _pipelines.emplace_back(std::move(pipeline.value()));
+    }
+
+    LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
+                                            const LiteParserOptions& options,
+                                            boost::optional<NamespaceString> foreignNss,
+                                            boost::optional<OwnedLiteParsedPipeline> pipeline)
+        : LiteParsedDocumentSourceNestedPipelines(originalBson,
+                                                  options,
+                                                  std::move(foreignNss),
+                                                  std::vector<OwnedLiteParsedPipeline>{}) {
         if (pipeline)
             _pipelines.emplace_back(std::move(pipeline.value()));
     }

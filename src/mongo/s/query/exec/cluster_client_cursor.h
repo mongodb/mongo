@@ -6,6 +6,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -203,6 +204,17 @@ public:
      * Returns whether the originating command was a rawData operation.
      */
     virtual bool getRawData() const = 0;
+
+    /**
+     * Returns a fresh clone of the IFR context under which this cursor's **execution** plan was
+     * built. Installed onto each getMore's OperationContext so remote dispatch uses the same
+     * feature-flag values, including any flag disabled by an IFR kickback retry.
+     *
+     * A clone is returned rather than the cursor's own context so that callers cannot mutate the
+     * pinned state, and because the cursor's context carries a memoized egress serialization from
+     * the originating operation which a new OperationContext must not inherit.
+     */
+    virtual std::shared_ptr<IncrementalFeatureRolloutContext> cloneIfrContext() const = 0;
 
     /**
      * Returns the creation date of the cursor.

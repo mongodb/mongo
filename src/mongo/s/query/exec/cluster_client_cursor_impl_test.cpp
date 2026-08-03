@@ -7,7 +7,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_tester/mock_version_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -17,6 +20,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/version.h"
 
 #include <utility>
 
@@ -424,6 +429,88 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreAPIParameters) {
     ASSERT_EQ("2", *storedAPIParams.getAPIVersion());
     ASSERT_TRUE(*storedAPIParams.getAPIStrict());
     ASSERT_TRUE(*storedAPIParams.getAPIDeprecationErrors());
+}
+
+TEST_F(ClusterClientCursorImplTest, ShouldStorePinnedIfrContext) {
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+
+    auto& flag = feature_flags::gFeatureFlagReleaseForTest;
+    flag.setForServerParameter(true);
+    auto ifrContext = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT(ifrContext->getSavedFlagValue(flag));
+    ifrContext->disableFlag(flag);
+
+    ClusterClientCursorParams params(NamespaceString::createNamespaceString_forTest("test"),
+                                     APIParameters(),
+                                     boost::none /* ReadPreferenceSetting */,
+                                     boost::none /* repl::ReadConcernArgs */,
+                                     OperationSessionInfoFromClient());
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(), std::move(mockStage), std::move(params), boost::none);
+
+    // The cursor pins the flag values from the creating operation, and hands back an independent
+    // clone so callers cannot mutate the pinned state.
+    auto cloned = cursor.cloneIfrContext();
+    ASSERT_NE(ifrContext, cloned);
+    ASSERT_FALSE(cloned->getSavedFlagValue(flag));
+    ASSERT_NE(cloned, cursor.cloneIfrContext());
+}
+
+TEST_F(ClusterClientCursorImplTest, EachGetMoreGetsIndependentIfrContextClone) {
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+
+    auto& pinnedFlag = feature_flags::gFeatureFlagReleaseForTest;
+    auto& otherFlag = feature_flags::gFeatureFlagInDevelopmentForTest;
+    pinnedFlag.setForServerParameter(true);
+    otherFlag.setForServerParameter(true);
+
+    // The originating operation pins 'pinnedFlag' off, as an IFR kickback retry would.
+    auto originatingIfrContext = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    originatingIfrContext->disableFlag(pinnedFlag);
+
+    ClusterClientCursorParams params(NamespaceString::createNamespaceString_forTest("test"),
+                                     APIParameters(),
+                                     boost::none /* ReadPreferenceSetting */,
+                                     boost::none /* repl::ReadConcernArgs */,
+                                     OperationSessionInfoFromClient());
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(), std::move(mockStage), std::move(params), boost::none);
+
+    // First getMore: install the cursor's pinned state onto a fresh OperationContext.
+    auto firstGetMoreClient = getServiceContext()->getService()->makeClient("getMore1");
+    auto firstGetMoreOpCtx = firstGetMoreClient->makeOperationContext();
+    auto firstIfrContext = cursor.cloneIfrContext();
+    ASSERT_NE(originatingIfrContext, firstIfrContext);
+    IncrementalFeatureRolloutContext::set(firstGetMoreOpCtx.get(), firstIfrContext);
+    ASSERT_EQ(firstIfrContext, IncrementalFeatureRolloutContext::get(firstGetMoreOpCtx.get()));
+    ASSERT_FALSE(firstIfrContext->getSavedFlagValue(pinnedFlag));
+
+    // Mutate the first getMore's context the way its own execution would: disable a flag and
+    // memoize the egress serialization by dispatching to a shard.
+    const query_tester::MockVersionInfo mockVersionInfo;
+    VersionInfoInterface::enable(&mockVersionInfo);
+    ON_BLOCK_EXIT([] { VersionInfoInterface::enable(nullptr); });
+
+    firstIfrContext->disableFlag(otherFlag);
+    BSONObjBuilder bob;
+    firstIfrContext->appendToEgressMetadata(&bob);
+    ASSERT(firstIfrContext->hasCachedEgressMetadataForTest());
+
+    // Neither the cursor's own context nor the originating operation's saw those mutations.
+    ASSERT(originatingIfrContext->getSavedFlagValue(otherFlag));
+
+    // Second getMore: another distinct clone, still carrying the pinned state and free of the
+    // first getMore's mutations and of its cached egress payload, so it can be installed on a new
+    // OperationContext.
+    auto secondGetMoreClient = getServiceContext()->getService()->makeClient("getMore2");
+    auto secondGetMoreOpCtx = secondGetMoreClient->makeOperationContext();
+    auto secondIfrContext = cursor.cloneIfrContext();
+    ASSERT_NE(firstIfrContext, secondIfrContext);
+    ASSERT_FALSE(secondIfrContext->getSavedFlagValue(pinnedFlag));
+    ASSERT(secondIfrContext->getSavedFlagValue(otherFlag));
+    ASSERT_FALSE(secondIfrContext->hasCachedEgressMetadataForTest());
+    IncrementalFeatureRolloutContext::set(secondGetMoreOpCtx.get(), secondIfrContext);
+    ASSERT_EQ(secondIfrContext, IncrementalFeatureRolloutContext::get(secondGetMoreOpCtx.get()));
 }
 
 TEST_F(ClusterClientCursorImplTest, IsEOF) {

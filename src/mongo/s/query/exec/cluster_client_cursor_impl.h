@@ -116,6 +116,8 @@ public:
 
     bool getRawData() const final;
 
+    std::shared_ptr<IncrementalFeatureRolloutContext> cloneIfrContext() const final;
+
     Date_t getCreatedDate() const final;
 
     Date_t getLastUseDate() const final;
@@ -206,6 +208,9 @@ private:
 
     // Whether the originating command was a rawData operation.
     bool _rawData = false;
+    // The IFR context this cursor's plan was built under. Restored onto each getMore's
+    // OperationContext so remote dispatch stamps the same flag values the plan was planned with.
+    std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
 
     // The time the cursor was created.
     Date_t _createdDate;

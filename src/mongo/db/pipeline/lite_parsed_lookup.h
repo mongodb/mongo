@@ -120,6 +120,7 @@ public:
                                                    const LiteParserOptions& options);
 
     LiteParsedLookUp(const BSONElement& spec,
+                     const LiteParserOptions& options,
                      NamespaceString foreignNss,
                      boost::optional<OwnedLiteParsedPipeline> pipeline,
                      std::vector<BSONObj> rawPipeline,

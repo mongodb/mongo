@@ -520,6 +520,13 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     // Restore rawData onto the opCtx.
     isRawDataOperation(opCtx) = cursor->getRawData();
 
+    // Restore the IFR context that this cursor's plan was built under. The feature-flag values
+    // stamped onto outbound shard requests come from this opCtx decoration (see
+    // ClientMetadataPropagationEgressHook::writeRequestMetadata), not from the pipeline's
+    // ExpressionContext. The GetMore should retain IFR flag values as dictated by the router's
+    // outbound request.
+    IncrementalFeatureRolloutContext::set(opCtx, cursor->cloneIfrContext());
+
     auto apiParamsFromClient = APIParameters::get(opCtx);
     uassert(
         ErrorCodes::APIMismatchError,

@@ -103,6 +103,10 @@ public:
         return false;
     }
 
+    std::shared_ptr<IncrementalFeatureRolloutContext> cloneIfrContext() const final {
+        return _ifrContext->clone();
+    }
+
     Date_t getCreatedDate() const final;
 
     Date_t getLastUseDate() const final;
@@ -172,6 +176,9 @@ private:
     std::uint64_t _nBatchesReturned = 0;
 
     APIParameters _apiParameters = APIParameters();
+
+    std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext =
+        std::make_shared<IncrementalFeatureRolloutContext>();
 };
 
 }  // namespace mongo
