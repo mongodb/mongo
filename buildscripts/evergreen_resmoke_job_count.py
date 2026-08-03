@@ -155,6 +155,14 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
             "factor": 0.25,
         },
     ],
+    "amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-sharded-clusters": [
+        # Restrict this suite to a single resmoke job to avoid running out of memory under
+        # {A,UB}SAN on this variant.
+        {
+            "task": r"disagg_sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.*",
+            "factor": 0.02,
+        },
+    ],
     "enterprise-windows-all-feature-flags-required": [{"task": "noPassthrough", "factor": 0.5}],
     "enterprise-windows-all-feature-flags-non-essential": [
         {"task": "noPassthrough", "factor": 0.5}
@@ -381,7 +389,7 @@ def main():
         type=float,
         default=1.0,
         help=(
-            "Job factor to use as a mulitplier with the number of CPUs. Defaults" " to %(default)s."
+            "Job factor to use as a mulitplier with the number of CPUs. Defaults to %(default)s."
         ),
     )
     parser.add_argument(
@@ -398,7 +406,7 @@ def main():
     parser.add_argument(
         "--outFile",
         dest="outfile",
-        help=("File to write configuration to. If" " unspecified no file is generated."),
+        help=("File to write configuration to. If unspecified no file is generated."),
     )
 
     options = parser.parse_args()

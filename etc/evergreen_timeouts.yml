@@ -43,6 +43,8 @@ overrides:
       exec_timeout: 210 # 3.5 hours
     - task: .*_disagg_override$
       exec_timeout: 210 # 3.5 hours
+    - task: disagg_repl_jscore_passthrough.*
+      exec_timeout: 210 # 3.5 hours
 
   amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-sharded-clusters:
     - task: ^disagg_.*
