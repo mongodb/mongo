@@ -150,6 +150,22 @@ DEATH_TEST_F(VerifyValidationHashDeathTest, MismatchedHashFasserts, "12851600") 
     std::ignore = runOpSteadyState(op);
 }
 
+TEST_F(VerifyValidationHashTest, InsertWithNestedArraysMatchingHashAppliesCleanly) {
+    const RecordId rid(1);
+    const BSONObj doc =
+        BSON("_id" << 1 << "tags" << BSON_ARRAY("a" << "b") << "items"
+                   << BSON_ARRAY(BSON("sku" << 1 << "qty" << 5)
+                                 << BSON("sku" << 2 << "qty" << BSON_ARRAY(1 << 2))));
+    const int64_t hash = computeDocValidationHash(doc);
+
+    OplogEntry op =
+        makeInsertOplogEntryWithRecordIdAndHash(nextOpTime(), _nss, _uuid, doc, rid, hash);
+    ASSERT_OK(runOpSteadyState(op));
+
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+    ASSERT_BSONOBJ_EQ(doc, *documentAtRecordId(_opCtx.get(), _nss, rid));
+}
+
 TEST_F(VerifyValidationHashTest, GroupedInsertsMatchingHashAppliesCleanly) {
     const RecordId rid1(1);
     const RecordId rid2(2);
@@ -196,7 +212,7 @@ TEST_F(VerifyValidationHashTest, DeleteMatchingHashAppliesCleanly) {
         nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, hash);
     ASSERT_OK(runOpSteadyState(op));
 
-    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
 
 DEATH_TEST_F(VerifyValidationHashDeathTest, DeleteMismatchedHashFasserts, "12851600") {
@@ -273,7 +289,7 @@ TEST_F(VerifyValidationHashTest, UpdateWrongHashInInitialSyncModeIsIgnored) {
         nextOpTime(), _nss, BSON("_id" << 1), postImage, rid, wrongHash);
     ASSERT_OK(runOpInitialSync(op));
 
-    EXPECT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
     ASSERT_BSONOBJ_EQ(postImage, *documentAtRecordId(_opCtx.get(), _nss, rid));
 }
 
@@ -540,23 +556,6 @@ protected:
 
 using TransactionValidationHashDeathTest = TransactionValidationHashTest;
 
-TEST_F(TransactionValidationHashTest, TransactionUpdateMatchingHashAppliesCleanly) {
-    const RecordId rid(1);
-    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, preImage, rid);
-
-    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
-    ASSERT_OK(
-        runTransactionSteadyState({makeInnerOp(OpTypeEnum::kUpdate,
-                                               postImage,
-                                               BSON("_id" << 1),
-                                               rid,
-                                               computeUpdateValidationHash(preImage, postImage))}));
-
-    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-    ASSERT_BSONOBJ_EQ(postImage, *documentAtRecordId(_opCtx.get(), _nss, rid));
-}
-
 // An insert, an update and a delete batched into one transaction, each carrying its own hash.
 TEST_F(TransactionValidationHashTest, TransactionMixedCrudMatchingHashesApplyCleanly) {
     const RecordId updateRid(1);
@@ -588,8 +587,10 @@ TEST_F(TransactionValidationHashTest, TransactionMixedCrudMatchingHashesApplyCle
                      deleteRid,
                      computeDocValidationHash(deleteDoc))}));
 
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, updateRid));
     ASSERT_BSONOBJ_EQ(updatePostImage, *documentAtRecordId(_opCtx.get(), _nss, updateRid));
-    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, deleteRid));
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, deleteRid));
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, insertRid));
     ASSERT_BSONOBJ_EQ(insertDoc, *documentAtRecordId(_opCtx.get(), _nss, insertRid));
 }
 
@@ -604,6 +605,29 @@ DEATH_TEST_F(TransactionValidationHashDeathTest,
     const int64_t wrongHash = computeUpdateValidationHash(preImage, postImage) ^ 0x1;
     std::ignore = runTransactionSteadyState(
         {makeInnerOp(OpTypeEnum::kUpdate, postImage, BSON("_id" << 1), rid, wrongHash)});
+}
+
+DEATH_TEST_F(TransactionValidationHashDeathTest,
+             TransactionInsertMismatchedHashFasserts,
+             "12851600") {
+    const RecordId rid(1);
+    const BSONObj insertDoc = BSON("_id" << 1 << "x" << 100);
+    const int64_t wrongHash = computeDocValidationHash(insertDoc) ^ 0x1;
+
+    std::ignore = runTransactionSteadyState(
+        {makeInnerOp(OpTypeEnum::kInsert, insertDoc, boost::none, rid, wrongHash)});
+}
+
+DEATH_TEST_F(TransactionValidationHashDeathTest,
+             TransactionDeleteMismatchedHashFasserts,
+             "12851600") {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    const int64_t wrongHash = computeDocValidationHash(doc) ^ 0x1;
+    std::ignore = runTransactionSteadyState(
+        {makeInnerOp(OpTypeEnum::kDelete, BSON("_id" << 1), boost::none, rid, wrongHash)});
 }
 
 // A batched write tagged kApplyOpsAppliedSeparately. The inner ops keep their own hashes, so the
@@ -632,7 +656,9 @@ TEST_F(TransactionValidationHashTest, BatchedWriteUpdatesMatchingHashesApplyClea
                                                computeUpdateValidationHash(preImage2, postImage2))},
                                   MultiOplogEntryType::kApplyOpsAppliedSeparately));
 
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid1));
     ASSERT_BSONOBJ_EQ(postImage1, *documentAtRecordId(_opCtx.get(), _nss, rid1));
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid2));
     ASSERT_BSONOBJ_EQ(postImage2, *documentAtRecordId(_opCtx.get(), _nss, rid2));
 }
 
@@ -657,6 +683,7 @@ TEST_F(TransactionValidationHashTest, BatchedWriteUpdateOfEarlierInsertMatchingH
                      computeUpdateValidationHash(insertedDoc, postImage))},
         MultiOplogEntryType::kApplyOpsAppliedAtomically));
 
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
     ASSERT_BSONOBJ_EQ(postImage, *documentAtRecordId(_opCtx.get(), _nss, rid));
 }
 
@@ -670,6 +697,32 @@ DEATH_TEST_F(TransactionValidationHashDeathTest, BatchedWriteMismatchedHashFasse
     std::ignore = runTransactionSteadyState(
         {makeInnerOp(OpTypeEnum::kUpdate, postImage, BSON("_id" << 1), rid, wrongHash)},
         MultiOplogEntryType::kApplyOpsAppliedSeparately);
+}
+
+TEST_F(TransactionValidationHashTest, BatchedWriteInsertAndDeleteMatchingHashesApplyCleanly) {
+    const RecordId deleteRid(1);
+    const RecordId insertRid(2);
+
+    const BSONObj deleteDoc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, deleteDoc, deleteRid);
+
+    const BSONObj insertDoc = BSON("_id" << 2 << "x" << 200);
+
+    ASSERT_OK(runTransactionSteadyState({makeInnerOp(OpTypeEnum::kInsert,
+                                                     insertDoc,
+                                                     boost::none,
+                                                     insertRid,
+                                                     computeDocValidationHash(insertDoc)),
+                                         makeInnerOp(OpTypeEnum::kDelete,
+                                                     BSON("_id" << 1),
+                                                     boost::none,
+                                                     deleteRid,
+                                                     computeDocValidationHash(deleteDoc))},
+                                        MultiOplogEntryType::kApplyOpsAppliedSeparately));
+
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, deleteRid));
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, insertRid));
+    ASSERT_BSONOBJ_EQ(insertDoc, *documentAtRecordId(_opCtx.get(), _nss, insertRid));
 }
 
 /**
@@ -711,15 +764,19 @@ protected:
 
 using PreparedTransactionValidationHashDeathTest = PreparedTransactionValidationHashTest;
 
-TEST_F(PreparedTransactionValidationHashTest, PreparedTransactionMatchingHashesApplyCleanly) {
+TEST_F(PreparedTransactionValidationHashTest,
+       PreparedTransactionMixedCrudMatchingHashesApplyCleanly) {
     const RecordId updateRid(1);
-    const RecordId insertRid(2);
+    const RecordId deleteRid(2);
+    const RecordId insertRid(3);
 
     const BSONObj updatePreImage = BSON("_id" << 1 << "x" << 100);
+    const BSONObj deleteDoc = BSON("_id" << 2 << "x" << 200);
     insertDocumentAtRecordId(_opCtx.get(), _nss, updatePreImage, updateRid);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, deleteDoc, deleteRid);
 
     const BSONObj updatePostImage = BSON("_id" << 1 << "x" << 200);
-    const BSONObj insertDoc = BSON("_id" << 2 << "y" << 5);
+    const BSONObj insertDoc = BSON("_id" << 3 << "y" << 5);
 
     ASSERT_OK(runPreparedTransactionSteadyState(
         {makeInnerOp(OpTypeEnum::kUpdate,
@@ -731,15 +788,23 @@ TEST_F(PreparedTransactionValidationHashTest, PreparedTransactionMatchingHashesA
                      insertDoc,
                      boost::none,
                      insertRid,
-                     computeDocValidationHash(insertDoc))}));
+                     computeDocValidationHash(insertDoc)),
+         makeInnerOp(OpTypeEnum::kDelete,
+                     BSON("_id" << 2),
+                     boost::none,
+                     deleteRid,
+                     computeDocValidationHash(deleteDoc))}));
 
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, updateRid));
     ASSERT_BSONOBJ_EQ(updatePostImage, *documentAtRecordId(_opCtx.get(), _nss, updateRid));
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, deleteRid));
+    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, insertRid));
     ASSERT_BSONOBJ_EQ(insertDoc, *documentAtRecordId(_opCtx.get(), _nss, insertRid));
 }
 
 // A wrong hash on an inner op should be fatal, rather than the check being skipped.
 DEATH_TEST_F(PreparedTransactionValidationHashDeathTest,
-             PreparedTransactionMismatchedHashFasserts,
+             PreparedTransactionUpdateMismatchedHashFasserts,
              "12851600") {
     const RecordId rid(1);
     const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
@@ -749,6 +814,29 @@ DEATH_TEST_F(PreparedTransactionValidationHashDeathTest,
     const int64_t wrongHash = computeUpdateValidationHash(preImage, postImage) ^ 0x1;
     std::ignore = runPreparedTransactionSteadyState(
         {makeInnerOp(OpTypeEnum::kUpdate, postImage, BSON("_id" << 1), rid, wrongHash)});
+}
+
+DEATH_TEST_F(PreparedTransactionValidationHashDeathTest,
+             PreparedTransactionInsertMismatchedHashFasserts,
+             "12851600") {
+    const RecordId rid(1);
+    const BSONObj insertDoc = BSON("_id" << 1 << "x" << 100);
+    const int64_t wrongHash = computeDocValidationHash(insertDoc) ^ 0x1;
+
+    std::ignore = runPreparedTransactionSteadyState(
+        {makeInnerOp(OpTypeEnum::kInsert, insertDoc, boost::none, rid, wrongHash)});
+}
+
+DEATH_TEST_F(PreparedTransactionValidationHashDeathTest,
+             PreparedTransactionDeleteMismatchedHashFasserts,
+             "12851600") {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    const int64_t wrongHash = computeDocValidationHash(doc) ^ 0x1;
+    std::ignore = runPreparedTransactionSteadyState(
+        {makeInnerOp(OpTypeEnum::kDelete, BSON("_id" << 1), boost::none, rid, wrongHash)});
 }
 
 }  // namespace
