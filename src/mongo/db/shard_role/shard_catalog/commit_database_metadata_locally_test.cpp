@@ -203,6 +203,46 @@ TEST_F(CommitDatabaseMetadataLocallyTest, CommitCreateIsIdempotent) {
               2);
 }
 
+TEST_F(CommitDatabaseMetadataLocallyTest, DropClearsUnownedAndUntrackedCollectionMetadata) {
+    const auto dbType = makeDatabaseType();
+    commitCreate(dbType);
+
+    const auto unownedNss = NamespaceString::createNamespaceString_forTest(kDbName, "unowned");
+    createTestCollection(operationContext(), unownedNss);
+    {
+        auto scopedCsr =
+            CollectionShardingRuntime::acquireExclusive(operationContext(), unownedNss);
+        scopedCsr->setCollectionMetadata(operationContext(),
+                                         CollectionMetadata::UNTRACKED(),
+                                         CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+    }
+
+    const auto untrackedNss = NamespaceString::createNamespaceString_forTest(kDbName, "untracked");
+    createTestCollection(operationContext(), untrackedNss);
+    {
+        auto scopedCsr =
+            CollectionShardingRuntime::acquireExclusive(operationContext(), untrackedNss);
+        scopedCsr->setCollectionMetadata(operationContext(),
+                                         CollectionMetadata::UNTRACKED(),
+                                         CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+    }
+
+    dropDatabase();
+
+    {
+        // A stale, UNOWNED classification left over from before this shard became the DB primary
+        // must be cleared so a fresh recovery can classify the collection correctly.
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), unownedNss);
+        ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+    {
+        // A stale, UNTRACKED classification left over from before this shard stopped being the DB
+        // primary must be cleared so a fresh recovery can classify the collection correctly.
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), untrackedNss);
+        ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+}
+
 TEST_F(CommitDatabaseMetadataLocallyTest, DropDeletesMetadataAndClearsDSR) {
     const auto dbType = makeDatabaseType();
 

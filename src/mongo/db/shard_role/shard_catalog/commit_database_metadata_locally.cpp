@@ -147,11 +147,11 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
         opCtx, dbName, DropDatabaseMetadataOplogEntry{dbNameStr, dbName}.toBSON());
     writeDatabaseMetadataOplogEntry(opCtx, oplogEntry, "dropDatabaseMetadata");
 
-    // Update DSR in primary node.
-    {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-        scopedDsr->clearDbMetadata(opCtx);
-    }
+    // Apply the entry on this (primary) node through the same op observer hook used to apply it
+    // on secondaries, so the DSR update and any stale collection metadata clearing stay in sync
+    // between the two paths.
+    opCtx->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(
+        opCtx, repl::OplogEntry(oplogEntry.toBSON()));
 
     ShardingStatistics::get(opCtx)
         .databaseShardingMetadataStatistics.registerLocalDatabaseMetadataDrop();

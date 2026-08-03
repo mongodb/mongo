@@ -795,10 +795,9 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
 
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
         if (scopedCsr->getCurrentMetadataIfKnown() && scopedCsr->isUnowned()) {
-            LOGV2_DEBUG(12932800,
-                        2,
-                        "Clearing collection metadata after createDatabase metadata commit",
-                        logAttrs(nss));
+            LOGV2_INFO(12932800,
+                       "Clearing collection metadata after createDatabase metadata commit",
+                       logAttrs(nss));
 
             scopedCsr->clearCollectionMetadata(opCtx);
         }
@@ -821,8 +820,29 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
 
     LOGV2_DEBUG(12920501, 1, "Applying dropDatabaseMetadata oplog entry", logAttrs(dbName));
 
-    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->clearDbMetadata(opCtx);
+    {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->clearDbMetadata(opCtx);
+    }
+
+    // Untracked/unowned collections need their metadata dropped since this shard no longer owns any
+    // collection data. Tracked collections do not need their state cleared out because the drop
+    // database coordinator already takes care of them. The only other DDL that issues a
+    // dropDatabase oplog entry is movePrimary which doesn't invalidate tracked collections but must
+    // invalidate untracked collections.
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        if (nss.dbName() != dbName) {
+            continue;
+        }
+
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        if (const auto cm = scopedCsr->getCurrentMetadataIfKnown(); cm && !cm->hasRoutingTable()) {
+            LOGV2_INFO(13247700,
+                       "Clearing collection metadata after dropDatabase metadata commit",
+                       logAttrs(nss));
+            scopedCsr->clearCollectionMetadata(opCtx, true /* collIsDropped */);
+        }
+    }
 }
 
 void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opCtx,
