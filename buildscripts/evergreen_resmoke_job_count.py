@@ -43,6 +43,10 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
     {"task": r"noPassthrough", "factor": 0.25},
     {
+        "task": r"replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough.*",
+        "factor": 0.20,
+    },
+    {
         "task": r"replica_sets_reconfig_terminate_primary_jscore_passthrough_priority_ports",
         "factor": 0.20,
     },
