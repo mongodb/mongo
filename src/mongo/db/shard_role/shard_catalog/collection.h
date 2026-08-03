@@ -318,11 +318,53 @@ public:
             // Document failed schema validation; action is reflected in the result field.
             kSchemaViolation,
             // Timeseries bucket failed strict consistency check; action is in the result field.
+            // bucketViolation carries the specific failure mode.
             kTimeseriesSchemaViolation,
+        };
+
+        // Specific failure mode when reason == kTimeseriesSchemaViolation.
+        enum class BucketConsistencyViolation {
+            kNone,
+            // control.version is not 1, 2, or 3.
+            kBadVersion,
+            // Embedded timestamp in _id doesn't match control.min timestamp.
+            kIdTimestampMismatch,
+            // Bucket time span exceeds collection's bucketMaxSpanSeconds.
+            kTimeSpanTooLarge,
+            // control.min.time is not aligned to the fixed-bucket boundary.
+            kMinTimeNotRounded,
+            // Duplicate field detected in bucket data.
+            kDuplicateField,
+            // Number of data fields doesn't match number of control.min/max fields.
+            kFieldCountMismatch,
+            // Expected field is absent from control.min or control.max.
+            kMissingField,
+            // The collection's time field is absent from the bucket's data object.
+            kMissingTimeField,
+            // control.count has an unexpected or invalid integer representation.
+            kBadControlCount,
+            // Uncompressed data indexes are not consecutively increasing from 0.
+            kIndexNotIncreasing,
+            // An uncompressed data index exceeds the measurement count.
+            kIndexOutOfRange,
+            // An uncompressed data index is negative or non-numerical.
+            kIndexBadValue,
+            // Observed data min or max doesn't match control.min or control.max.
+            kMinMaxMismatch,
+            // Compressed column data field has wrong BSON type (expected binData).
+            kBadDataType,
+            // Compressed column data field has wrong binData subtype (expected Column).
+            kBadBinDataSubtype,
+            // Decompressed column element count doesn't match control.count.
+            kCountMismatch,
+            // Exception thrown accessing BSON fields (missing required field, wrong type,
+            // or malformed compressed column data).
+            kInvalidBsonData,
         };
 
         SchemaValidationResult result;
         NonComplianceReason reason;
+        BucketConsistencyViolation bucketViolation = BucketConsistencyViolation::kNone;
     };
     virtual std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const = 0;

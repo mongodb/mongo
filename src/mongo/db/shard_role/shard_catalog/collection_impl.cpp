@@ -602,19 +602,21 @@ std::pair<Collection::DocumentValidationResult, Status> CollectionImpl::checkVal
     }
 
     // Strict validation for bucket documents in timeseries collections
-    try {
-        timeseries::validateBucketConsistency(this, document);
-        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
-    } catch (DBException& ex) {
+    {
+        using BCV = DVR::BucketConsistencyViolation;
+        const BCV violation = timeseries::validateBucketConsistency(this, document);
+        if (violation == BCV::kNone) {
+            return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
+        }
         // For strict timeseries validation we ensure that we only return kError or kErrorAndLog.
         const SVR svr = validationActionOrDefault(_metadata->options.validationAction) ==
                 ValidationActionEnum::errorAndLog
             ? SVR::kErrorAndLog
             : SVR::kError;
-        return {DVR{svr, NCR::kTimeseriesSchemaViolation},
+        return {DVR{svr, NCR::kTimeseriesSchemaViolation, violation},
                 Status(doc_validation_error::DocumentValidationFailureInfo(document),
-                       ex.toStatus().toString())};
-    };
+                       "Time-series bucket document failed consistency check")};
+    }
 }
 
 Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,

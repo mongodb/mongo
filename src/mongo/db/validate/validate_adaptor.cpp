@@ -127,14 +127,85 @@ const char* _describeDocumentValidationResult(Collection::DocumentValidationResu
                        "with 'errorAndLog' validation action. Check logs for log id 5363500.";
             return "Detected one or more documents not compliant with the collection's schema "
                    "with 'error' validation action. Check logs for log id 5363500.";
-        case NCR::kTimeseriesSchemaViolation:
-            if (cvr.result == SVR::kErrorAndLog)
-                return "Detected one or more time-series bucket documents not compliant with "
-                       "time-series specifications with 'errorAndLog' validation action. Check "
-                       "logs for log id 11634800.";
-            return "Detected one or more time-series bucket documents not compliant with "
-                   "time-series specifications with 'error' validation action. Check logs for "
-                   "log id 11634800.";
+        case NCR::kTimeseriesSchemaViolation: {
+            using BCV = Collection::DocumentValidationResult::BucketConsistencyViolation;
+            switch (cvr.bucketViolation) {
+                case BCV::kNone:
+                    return cvr.result == SVR::kErrorAndLog
+                        ? "Detected one or more time-series bucket documents not compliant with "
+                          "time-series specifications with 'errorAndLog' validation action. Check "
+                          "logs for log id 11634800."
+                        : "Detected one or more time-series bucket documents not compliant with "
+                          "time-series specifications with 'error' validation action. Check logs "
+                          "for log id 11634800.";
+                case BCV::kBadVersion:
+                    return "Detected one or more time-series bucket documents with an invalid "
+                           "'control.version' field (expected 1, 2, or 3). Check logs for log id "
+                           "11634800.";
+                case BCV::kIdTimestampMismatch:
+                    return "Detected one or more time-series bucket documents where the timestamp "
+                           "embedded in '_id' does not match 'control.min' timestamp. Check logs "
+                           "for log id 11634800.";
+                case BCV::kTimeSpanTooLarge:
+                    return "Detected one or more time-series bucket documents whose time span "
+                           "between 'control.min' and 'control.max' exceeds the collection's "
+                           "bucketMaxSpanSeconds. Check logs for log id 11634800.";
+                case BCV::kMinTimeNotRounded:
+                    return "Detected one or more time-series bucket documents where "
+                           "'control.min' time is not aligned to the fixed-bucket boundary. "
+                           "Check logs for log id 11634800.";
+                case BCV::kDuplicateField:
+                    return "Detected one or more time-series bucket documents containing a "
+                           "duplicate field in the data object. Check logs for log id 11634800.";
+                case BCV::kFieldCountMismatch:
+                    return "Detected one or more time-series bucket documents where the number of "
+                           "data fields does not match the number of 'control.min' or "
+                           "'control.max' fields. Check logs for log id 11634800.";
+                case BCV::kMissingField:
+                    return "Detected one or more time-series bucket documents with a data field "
+                           "that has no corresponding entry in 'control.min' or 'control.max'. "
+                           "Check logs for log id 11634800.";
+                case BCV::kMissingTimeField:
+                    return "Detected one or more time-series bucket documents where the "
+                           "collection's time field is absent from the 'data' object. Check logs "
+                           "for log id 11634800.";
+                case BCV::kBadControlCount:
+                    return "Detected one or more time-series bucket documents with an invalid "
+                           "'control.count' value. Check logs for log id 11634800.";
+                case BCV::kIndexNotIncreasing:
+                    return "Detected one or more time-series bucket documents with data field "
+                           "indexes that are not consecutively increasing from 0. Check logs for "
+                           "log id 11634800.";
+                case BCV::kIndexOutOfRange:
+                    return "Detected one or more time-series bucket documents with a data field "
+                           "index that exceeds the measurement count. Check logs for log id "
+                           "11634800.";
+                case BCV::kIndexBadValue:
+                    return "Detected one or more time-series bucket documents with a negative or "
+                           "non-numerical data field index. Check logs for log id 11634800.";
+                case BCV::kMinMaxMismatch:
+                    return "Detected one or more time-series bucket documents where the observed "
+                           "data min or max does not match 'control.min' or 'control.max'. Check "
+                           "logs for log id 11634800.";
+                case BCV::kBadDataType:
+                    return "Detected one or more time-series bucket documents with a compressed "
+                           "data field of unexpected BSON type (expected binData). Check logs for "
+                           "log id 11634800.";
+                case BCV::kBadBinDataSubtype:
+                    return "Detected one or more time-series bucket documents with a compressed "
+                           "data field of unexpected binData subtype (expected Column). Check logs "
+                           "for log id 11634800.";
+                case BCV::kCountMismatch:
+                    return "Detected one or more time-series bucket documents where the "
+                           "decompressed column element count does not match 'control.count'. "
+                           "Check logs for log id 11634800.";
+                case BCV::kInvalidBsonData:
+                    return "Detected one or more time-series bucket documents with missing "
+                           "required fields, unexpected field types, or malformed compressed "
+                           "column data. Check logs for log id 11634800.";
+            }
+            MONGO_UNREACHABLE;
+        }
     }
     MONGO_UNREACHABLE;
 }

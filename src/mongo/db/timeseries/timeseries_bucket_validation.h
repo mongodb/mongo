@@ -10,9 +10,12 @@
 [[MONGO_MOD_PUBLIC]];
 
 namespace mongo::timeseries {
+
+using BucketConsistencyViolation = Collection::DocumentValidationResult::BucketConsistencyViolation;
+
 /**
- * Performs strict validation of a timeseries bucket document.
- * Throws an exception on any validation failure
+ * Performs strict validation of a timeseries bucket document. Returns kNone on success or a
+ * specific BucketConsistencyViolation indicating the first detected failure.
  *
  * The strict validation validates the following properties:
  * - Bucket schema adheres to specification depending on bucket version.
@@ -30,33 +33,25 @@ namespace mongo::timeseries {
  * - Min/max time for dates outside of normal range.
  * - v3 bucket sortedness
  */
-void validateBucketConsistency(const Collection* collection, const BSONObj& bucketDoc);
+BucketConsistencyViolation validateBucketConsistency(const Collection* collection,
+                                                     const BSONObj& bucketDoc);
 
-/**
- * TODO SERVER-122862: Use in validation command
- */
-void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
-                               const OID& id,
-                               const BSONObj& controlMin,
-                               bool criticalValidationOnly);
+BucketConsistencyViolation validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
+                                                     const OID& id,
+                                                     const BSONObj& controlMin,
+                                                     bool criticalValidationOnly);
 
-/**
- * TODO SERVER-122862: Use in validation command
- */
-void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
-                            const BSONObj& controlMin,
-                            const BSONObj& controlMax,
-                            bool criticalValidationOnly);
+BucketConsistencyViolation validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
+                                                  const BSONObj& controlMin,
+                                                  const BSONObj& controlMax,
+                                                  bool criticalValidationOnly);
 
-/**
- * TODO SERVER-122862: Use in validation command
- */
-void validateBucketData(const TimeseriesOptions& timeseriesOptions,
-                        const CollatorInterface* collator,
-                        int bucketVersion,
-                        BSONElement controlCount,
-                        const BSONObj& controlMin,
-                        const BSONObj& controlMax,
-                        const BSONObj& data,
-                        bool criticalValidationOnly);
+BucketConsistencyViolation validateBucketData(const TimeseriesOptions& timeseriesOptions,
+                                              const CollatorInterface* collator,
+                                              int bucketVersion,
+                                              BSONElement controlCount,
+                                              const BSONObj& controlMin,
+                                              const BSONObj& controlMax,
+                                              const BSONObj& data,
+                                              bool criticalValidationOnly);
 }  // namespace mongo::timeseries

@@ -8,6 +8,7 @@
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 
 #include <charconv>
 #include <string_view>
@@ -15,11 +16,15 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::timeseries {
+
+using BCV = BucketConsistencyViolation;
+
 namespace {
 /**
- * Performs a rate limited log of an exception. Maximum 10 logs every 10 seconds are allowed.
+ * Performs a rate limited log of a validation failure. Maximum 10 logs every 10 seconds are
+ * allowed.
  */
-void logExceptionRateLimited(const DBException& ex) {
+void logViolationRateLimited(BCV violation, std::string_view reason) {
     // Atomics to implement lockless log rate limiting
     static Atomic<int64_t> lastLogTime{std::numeric_limits<int64_t>::min()};
     static Atomic<int64_t> numErrorsSinceAdvanceLogTime{0};
@@ -42,8 +47,40 @@ void logExceptionRateLimited(const DBException& ex) {
         LOGV2_WARNING(11898500,
                       "Strict timeseries bucket validation failed",
                       "total"_attr = total,
-                      "error"_attr = ex);
+                      "violation"_attr = static_cast<int>(violation),
+                      "reason"_attr = reason);
     }
+}
+
+/**
+ * Returns true if 'ex' is one of the errors that a corrupt bucket document is expected to produce,
+ * and which therefore may be reported as kInvalidBsonData. Anything else (interruption, resource
+ * exhaustion, a programming error, ...) is unrelated to the contents of the bucket and must be
+ * propagated rather than reported as corruption.
+ *
+ * The expected errors are:
+ *  - 10065/13111: BSONElement accessors (.Obj(), .Date(), .OID()) on an absent or wrong-typed
+ *    field.
+ *  - 12602100/12602101: FlatBSON/MinMax rejecting a duplicate field name.
+ *  - InvalidBSON/InvalidBSONColumn and the 90956xx range: malformed compressed column data, thrown
+ *    by BSONColumn decompression and by the bsoncolumn::count()/minmax() expressions.
+ */
+bool isExpectedBucketCorruptionError(const DBException& ex) {
+    const auto code = static_cast<int32_t>(ex.code());
+    switch (code) {
+        case 10065:
+        case 13111:
+        case 12602100:
+        case 12602101:
+            return true;
+        default:
+            break;
+    }
+    if (ex.code() == ErrorCodes::InvalidBSON || ex.code() == ErrorCodes::InvalidBSONColumn) {
+        return true;
+    }
+    // Assertion codes reserved for the bsoncolumn expression implementations.
+    return code >= 9095600 && code <= 9095699;
 }
 
 /**
@@ -62,12 +99,12 @@ int _idxInt(std::string_view idx) {
 /**
  * Validates an uncompressed column against expected min/max.
  */
-void _validateUncompressedMinMax(std::string_view fieldName,
-                                 BSONElement data,
-                                 BSONElement min,
-                                 BSONElement max,
-                                 int maxCount,
-                                 const CollatorInterface* collator) {
+BCV _validateUncompressedMinMax(std::string_view fieldName,
+                                BSONElement data,
+                                BSONElement min,
+                                BSONElement max,
+                                int maxCount,
+                                const CollatorInterface* collator) {
     // The MinMax type calculates min/max for both scalars and nested objects where the results
     // needs to be a merged element-wise min/max.
     tracking::Context trackingContext;
@@ -78,166 +115,139 @@ void _validateUncompressedMinMax(std::string_view fieldName,
     for (const auto& metric : data.Obj()) {
         auto idx = _idxInt(metric.fieldNameStringData());
 
-        uassert(ErrorCodes::BadValue,
-                fmt::format("The index '{}' in time-series bucket data field '{}' is "
-                            "not in increasing order",
-                            metric.fieldNameStringData(),
-                            fieldName),
-                idx > prevIdx);
-
-        uassert(ErrorCodes::BadValue,
-                fmt::format("The index '{}' in time-series bucket data field '{}' is "
-                            "out of range",
-                            metric.fieldNameStringData(),
-                            fieldName),
-                idx <= maxCount);
-
-        uassert(ErrorCodes::BadValue,
-                fmt::format("The index '{}' in time-series bucket data field '{}' is "
-                            "negative or non-numerical",
-                            metric.fieldNameStringData(),
-                            fieldName),
-                idx >= 0);
+        if (idx <= prevIdx) {
+            return BCV::kIndexNotIncreasing;
+        }
+        if (idx > maxCount) {
+            return BCV::kIndexOutOfRange;
+        }
+        if (idx < 0) {
+            return BCV::kIndexBadValue;
+        }
 
         minmax.update(metric.wrap(fieldName), boost::none, collator);
         prevIdx = idx;
     }
 
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Incorrect column data min for field '{}'. Data min '{}' is different "
-                        "than control.min '{}'.",
-                        fieldName,
-                        minmax.min().toString(),
-                        min.wrap().toString()),
-            minmax.min().woCompare(min.wrap(),
-                                   /*ordering=*/BSONObj(),
-                                   BSONObj::ComparisonRules::kConsiderFieldName |
-                                       BSONObj::ComparisonRules::kIgnoreFieldOrder,
-                                   collator) == 0);
+    if (minmax.min().woCompare(min.wrap(),
+                               /*ordering=*/BSONObj(),
+                               BSONObj::ComparisonRules::kConsiderFieldName |
+                                   BSONObj::ComparisonRules::kIgnoreFieldOrder,
+                               collator) != 0) {
+        return BCV::kMinMaxMismatch;
+    }
 
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Incorrect column data max for field '{}'. Data min '{}' is different "
-                        "than control.max '{}'.",
-                        fieldName,
-                        minmax.max().toString(),
-                        max.wrap().toString()),
-            minmax.max().woCompare(max.wrap(),
-                                   /*ordering=*/BSONObj(),
-                                   BSONObj::ComparisonRules::kConsiderFieldName |
-                                       BSONObj::ComparisonRules::kIgnoreFieldOrder,
-                                   collator) == 0);
+    if (minmax.max().woCompare(max.wrap(),
+                               /*ordering=*/BSONObj(),
+                               BSONObj::ComparisonRules::kConsiderFieldName |
+                                   BSONObj::ComparisonRules::kIgnoreFieldOrder,
+                               collator) != 0) {
+        return BCV::kMinMaxMismatch;
+    }
+
+    return BCV::kNone;
 }
 
 /**
  * Validates a compressed column against expected count and min/max.
  */
-void _validateCompressedMinMax(boost::intrusive_ptr<BSONElementStorage>& allocator,
-                               std::string_view fieldName,
-                               BSONElement data,
-                               BSONElement min,
-                               BSONElement max,
-                               int expectedCount,
-                               const CollatorInterface* collator,
-                               bool criticalValidationOnly) {
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Invalid bucket data type. Expected binData, but got {}.", data.type()),
-            data.type() == BSONType::binData);
+BCV _validateCompressedMinMax(boost::intrusive_ptr<BSONElementStorage>& allocator,
+                              std::string_view fieldName,
+                              BSONElement data,
+                              BSONElement min,
+                              BSONElement max,
+                              int expectedCount,
+                              const CollatorInterface* collator,
+                              bool criticalValidationOnly) {
+    if (data.type() != BSONType::binData) {
+        return BCV::kBadDataType;
+    }
 
     int len = 0;
     const char* binary = data.binData(len);
     BinDataType type = data.binDataType();
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Invalid bucket data binData subtype. Expected 7, but got {}.", type),
-            type == BinDataType::Column);
+    if (type != BinDataType::Column) {
+        return BCV::kBadBinDataSubtype;
+    }
 
     // Disable remaining validation if critical-only is set.
     if (criticalValidationOnly) {
-        return;
+        return BCV::kNone;
     }
 
-    // All columns should have the count as stored in the control object.
-    size_t cnt = bsoncolumn::count(binary, len);
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Incorrect column data count for field '{}'. Expected {}, but found {}.",
-                        fieldName,
-                        expectedCount,
-                        cnt),
-            expectedCount == static_cast<int>(cnt));
-
-    // Scalar types can use a basic BSON ordering to calculate min/max. However objects/arrays
-    // stores element-wise min/max in the control block where the data is merged from the entire
-    // column content.
-    if (min.type() == BSONType::object || min.type() == BSONType::array ||
-        max.type() == BSONType::object || max.type() == BSONType::array) {
-        tracking::Context trackingContext;
-        timeseries::bucket_catalog::MinMax minmax{trackingContext};
-
-        // Decompress the column and calculate element-wise merged min/max for this column.
-        for (auto&& elem : BSONColumn(binary, len)) {
-            if (!elem.eoo()) {
-                minmax.update(elem.wrap(fieldName), boost::none, collator);
-            }
+    try {
+        // All columns should have the count as stored in the control object.
+        size_t cnt = bsoncolumn::count(binary, len);
+        if (expectedCount != static_cast<int>(cnt)) {
+            return BCV::kCountMismatch;
         }
 
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Incorrect column data min for field '{}'. Data min '{}' is different "
-                            "than control.min '{}'.",
-                            fieldName,
-                            minmax.min().toString(),
-                            min.wrap().toString()),
-                minmax.min().woCompare(min.wrap(),
+        // Scalar types can use a basic BSON ordering to calculate min/max. However objects/arrays
+        // stores element-wise min/max in the control block where the data is merged from the entire
+        // column content.
+        if (min.type() == BSONType::object || min.type() == BSONType::array ||
+            max.type() == BSONType::object || max.type() == BSONType::array) {
+            tracking::Context trackingContext;
+            timeseries::bucket_catalog::MinMax minmax{trackingContext};
+
+            // Decompress the column and calculate element-wise merged min/max for this column.
+            for (auto&& elem : BSONColumn(binary, len)) {
+                if (!elem.eoo()) {
+                    minmax.update(elem.wrap(fieldName), boost::none, collator);
+                }
+            }
+
+            if (minmax.min().woCompare(min.wrap(),
                                        /*ordering=*/BSONObj(),
                                        BSONObj::ComparisonRules::kConsiderFieldName |
                                            BSONObj::ComparisonRules::kIgnoreFieldOrder,
-                                       collator) == 0);
+                                       collator) != 0) {
+                return BCV::kMinMaxMismatch;
+            }
 
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Incorrect column data max for field '{}'. Data min '{}' is different "
-                            "than control.max '{}'.",
-                            fieldName,
-                            minmax.max().toString(),
-                            max.wrap().toString()),
-                minmax.max().woCompare(max.wrap(),
+            if (minmax.max().woCompare(max.wrap(),
                                        /*ordering=*/BSONObj(),
                                        BSONObj::ComparisonRules::kConsiderFieldName |
                                            BSONObj::ComparisonRules::kIgnoreFieldOrder,
-                                       collator) == 0);
+                                       collator) != 0) {
+                return BCV::kMinMaxMismatch;
+            }
+        } else {
+            // Scalar types can use a fast-path to calculate min/max from the compressed column
+            // directly without materializing the entire content.
+            auto [minElem, maxElem] = bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(
+                binary, len, allocator, collator);
 
-    } else {
-        // Scalar types can use a fast-path to calculate min/max from the compressed column directly
-        // without materializing the entire content.
-        auto minmaxElems = bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(
-            binary, len, allocator, collator);
+            if (minElem.woCompare(min, BSONObj::ComparisonRules::kIgnoreFieldOrder, collator) !=
+                0) {
+                return BCV::kMinMaxMismatch;
+            }
 
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Incorrect column data min for field '{}'. Data min '{}' is different "
-                            "than control.min '{}'.",
-                            fieldName,
-                            minmaxElems.first.toString(),
-                            min.toString()),
-                minmaxElems.first.woCompare(
-                    min, BSONObj::ComparisonRules::kIgnoreFieldOrder, collator) == 0);
-
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Incorrect column data max for field '{}'. Data min '{}' is different "
-                            "than control.max '{}'.",
-                            fieldName,
-                            minmaxElems.second.toString(),
-                            max.toString()),
-                minmaxElems.second.woCompare(
-                    max, BSONObj::ComparisonRules::kIgnoreFieldOrder, collator) == 0);
+            if (maxElem.woCompare(max, BSONObj::ComparisonRules::kIgnoreFieldOrder, collator) !=
+                0) {
+                return BCV::kMinMaxMismatch;
+            }
+        }
+    } catch (const DBException& ex) {
+        if (!isExpectedBucketCorruptionError(ex)) {
+            throw;
+        }
+        return BCV::kInvalidBsonData;
     }
+
+    return BCV::kNone;
 }
 
 /**
  * Validates an uncompressed time column against bucket _id, bucket time span and expected min/max.
- * Returns the element count.
+ * Stores the element count in *outCount on success.
  */
-int _validateUncompressedTimeField(const TimeseriesOptions& timeseriesOptions,
+BCV _validateUncompressedTimeField(const TimeseriesOptions& timeseriesOptions,
                                    BSONElement data,
                                    BSONElement min,
                                    BSONElement max,
-                                   const CollatorInterface* collator) {
+                                   const CollatorInterface* collator,
+                                   int* outCount) {
     tracking::Context trackingContext;
     timeseries::bucket_catalog::MinMax minmax{trackingContext};
 
@@ -245,14 +255,9 @@ int _validateUncompressedTimeField(const TimeseriesOptions& timeseriesOptions,
     for (const auto& metric : data.Obj()) {
         // Checks that indices are consecutively increasing numbers starting from 0.
         auto idx = _idxInt(metric.fieldNameStringData());
-
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Time-series time field '{}' is not in consecutively increasing order. "
-                            "Got index '{}' when '{}' is expected.",
-                            metric.fieldNameStringData(),
-                            idx,
-                            cnt),
-                idx == cnt);
+        if (idx != cnt) {
+            return BCV::kIndexNotIncreasing;
+        }
 
         minmax.update(metric.wrap(timeseriesOptions.getTimeField()), boost::none, collator);
         ++cnt;
@@ -277,120 +282,117 @@ int _validateUncompressedTimeField(const TimeseriesOptions& timeseriesOptions,
         ? max.Date() >= minmax.max().getField(timeseriesOptions.getTimeField()).Date()
         : max.Date() == minmax.max().getField(timeseriesOptions.getTimeField()).Date();
 
-    uassert(
-        ErrorCodes::BadValue,
-        fmt::format("Mismatch between time-series control and observed min or max for field {}. "
-                    "Control had min {} and max {}, but observed data had min {} and max {}.",
-                    timeseriesOptions.getTimeField(),
-                    min.toString(),
-                    max.toString(),
-                    minmax.min().toString(),
-                    minmax.max().toString()),
-        minTimestampsMatch && maxTimestampsMatch);
+    if (!minTimestampsMatch || !maxTimestampsMatch) {
+        return BCV::kMinMaxMismatch;
+    }
 
-    return cnt;
+    *outCount = cnt;
+    return BCV::kNone;
 }
 
 /**
  * Validates a compressed time column against bucket _id, bucket time span, expected count and
  * min/max.
  */
-void _validateCompressedTimeField(boost::intrusive_ptr<BSONElementStorage>& allocator,
-                                  const TimeseriesOptions& timeseriesOptions,
-                                  BSONElement data,
-                                  BSONElement min,
-                                  BSONElement max,
-                                  int expectedCount,
-                                  const CollatorInterface* collator,
-                                  bool criticalValidationOnly) {
+BCV _validateCompressedTimeField(boost::intrusive_ptr<BSONElementStorage>& allocator,
+                                 const TimeseriesOptions& timeseriesOptions,
+                                 BSONElement data,
+                                 BSONElement min,
+                                 BSONElement max,
+                                 int expectedCount,
+                                 const CollatorInterface* collator,
+                                 bool criticalValidationOnly) {
     int len = 0;
     const char* binary = data.binData(len);
     BinDataType type = data.binDataType();
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Invalid bucket data binData subtype. Expected 7, but got {}.", type),
-            type == BinDataType::Column);
+    if (type != BinDataType::Column) {
+        return BCV::kBadBinDataSubtype;
+    }
 
     // Disable remaining validation if critical-only is set.
     if (criticalValidationOnly) {
-        return;
+        return BCV::kNone;
     }
 
-    size_t cnt = bsoncolumn::count(binary, len);
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Incorrect column data count for field '{}'. Expected {}, but found {}.",
-                        timeseriesOptions.getTimeField(),
-                        expectedCount,
-                        cnt),
-            expectedCount == static_cast<int>(cnt));
+    try {
+        size_t cnt = bsoncolumn::count(binary, len);
+        if (expectedCount != static_cast<int>(cnt)) {
+            return BCV::kCountMismatch;
+        }
 
-    // Time field is always a scalar so we can use fast BSON comparison to calculate min/max.
-    auto minmaxElems =
-        bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(binary, len, allocator, collator);
+        // Time field is always a scalar so we can use fast BSON comparison to calculate min/max.
+        auto [minElem, maxElem] = bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(
+            binary, len, allocator, collator);
 
-    // With measurement-level deletes (deletes with non-metafield filters) it is possible
-    // that the earliest measurements got deleted. Since we keep the bucket's minTime
-    // unchanged in that case, we cannot rely on the minTime always corresponding with what
-    // the actual minimum measurement time is. We can, however, rely on the fact that the
-    // rounded time of the earliest measurement is at greater than or equal to the
-    // control.min time-field.
-    auto minTimestampsMatch =
-        timeseries::roundTimestampToGranularity(minmaxElems.first.Date(), timeseriesOptions) >=
-        timeseries::roundTimestampToGranularity(min.Date(), timeseriesOptions);
-    // For the maximum check, if we had measurements that were pre-1970 (the lower end of
-    // the extended range check), it is possible that the control.max value gets rounded up
-    // to the epoch and is greater than the observed maximum timestamp. In the case where
-    // the control.min is earlier than the epoch, we should relax the check.
-    auto maxTimestampsMatch = (minmaxElems.first.Date() < Date_t())
-        ? max.Date() >= minmaxElems.second.Date()
-        : max.Date() == minmaxElems.second.Date();
+        // With measurement-level deletes (deletes with non-metafield filters) it is possible
+        // that the earliest measurements got deleted. Since we keep the bucket's minTime
+        // unchanged in that case, we cannot rely on the minTime always corresponding with what
+        // the actual minimum measurement time is. We can, however, rely on the fact that the
+        // rounded time of the earliest measurement is at greater than or equal to the
+        // control.min time-field.
+        auto minTimestampsMatch =
+            timeseries::roundTimestampToGranularity(minElem.Date(), timeseriesOptions) >=
+            timeseries::roundTimestampToGranularity(min.Date(), timeseriesOptions);
+        // For the maximum check, if we had measurements that were pre-1970 (the lower end of
+        // the extended range check), it is possible that the control.max value gets rounded up
+        // to the epoch and is greater than the observed maximum timestamp. In the case where
+        // the control.min is earlier than the epoch, we should relax the check.
+        auto maxTimestampsMatch = (minElem.Date() < Date_t()) ? max.Date() >= maxElem.Date()
+                                                              : max.Date() == maxElem.Date();
 
-    uassert(
-        ErrorCodes::BadValue,
-        fmt::format("Mismatch between time-series control and observed min or max for field {}. "
-                    "Control had min {} and max {}, but observed data had min {} and max {}.",
-                    timeseriesOptions.getTimeField(),
-                    min.toString(),
-                    max.toString(),
-                    minmaxElems.first.toString(),
-                    minmaxElems.second.toString()),
-        minTimestampsMatch && maxTimestampsMatch);
+        if (!minTimestampsMatch || !maxTimestampsMatch) {
+            return BCV::kMinMaxMismatch;
+        }
+    } catch (const DBException& ex) {
+        if (!isExpectedBucketCorruptionError(ex)) {
+            throw;
+        }
+        return BCV::kInvalidBsonData;
+    }
+
+    return BCV::kNone;
 }
 
 /**
  * Validates an uncompressed bucket data object.
  */
-void _validateUncompressedBucketData(const TimeseriesOptions& timeseriesOptions,
-                                     const CollatorInterface* collator,
-                                     const StringDataMap<BSONElement>& dataFields,
-                                     const StringDataMap<BSONElement>& controlMinFields,
-                                     const StringDataMap<BSONElement>& controlMaxFields,
-                                     bool criticalValidationOnly) {
+BCV _validateUncompressedBucketData(const TimeseriesOptions& timeseriesOptions,
+                                    const CollatorInterface* collator,
+                                    const StringDataMap<BSONElement>& dataFields,
+                                    const StringDataMap<BSONElement>& controlMinFields,
+                                    const StringDataMap<BSONElement>& controlMaxFields,
+                                    bool criticalValidationOnly) {
     auto it = dataFields.find(timeseriesOptions.getTimeField());
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Field '{}' is missing from control.max", timeseriesOptions.getTimeField()),
-            it != dataFields.end());
+    if (it == dataFields.end()) {
+        return BCV::kMissingTimeField;
+    }
     BSONElement time = it->second;
 
     it = controlMinFields.find(timeseriesOptions.getTimeField());
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Field '{}' is missing from control.min", timeseriesOptions.getTimeField()),
-            it != controlMinFields.end());
+    if (it == controlMinFields.end()) {
+        return BCV::kMissingField;
+    }
     BSONElement min = it->second;
 
     it = controlMaxFields.find(timeseriesOptions.getTimeField());
-    uassert(ErrorCodes::BadValue,
-            fmt::format("Field '{}' is missing from control.max", timeseriesOptions.getTimeField()),
-            it != controlMaxFields.end());
+    if (it == controlMaxFields.end()) {
+        return BCV::kMissingField;
+    }
     BSONElement max = it->second;
 
     // Disable remaining validation if critical-only is set.
     if (criticalValidationOnly) {
-        return;
+        return BCV::kNone;
     }
 
     // Validate the time column first, we use this to discover the count to validate the other
     // columns with.
-    int count = _validateUncompressedTimeField(timeseriesOptions, time, min, max, collator);
+    int count = 0;
+    if (auto v =
+            _validateUncompressedTimeField(timeseriesOptions, time, min, max, collator, &count);
+        v != BCV::kNone) {
+        return v;
+    }
 
     for (auto&& data : dataFields) {
         // Time field is already validated.
@@ -399,78 +401,91 @@ void _validateUncompressedBucketData(const TimeseriesOptions& timeseriesOptions,
         }
 
         it = controlMinFields.find(data.first);
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Field '{}' is missing from control.min", data.first),
-                it != controlMinFields.end());
-        BSONElement min = it->second;
+        if (it == controlMinFields.end()) {
+            return BCV::kMissingField;
+        }
+        BSONElement dataMin = it->second;
 
         it = controlMaxFields.find(data.first);
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Field '{}' is missing from control.max", data.first),
-                it != controlMaxFields.end());
-        BSONElement max = it->second;
+        if (it == controlMaxFields.end()) {
+            return BCV::kMissingField;
+        }
+        BSONElement dataMax = it->second;
 
-        // Validate this data field.
-        _validateUncompressedMinMax(data.first, data.second, min, max, count, collator);
+        if (auto v = _validateUncompressedMinMax(
+                data.first, data.second, dataMin, dataMax, count, collator);
+            v != BCV::kNone) {
+            return v;
+        }
     }
+
+    return BCV::kNone;
 }
 
 /**
- * Validates an uncompressed bucket data object.
+ * Validates a compressed bucket data object.
  */
-void _validateCompressedBucketData(const TimeseriesOptions& timeseriesOptions,
-                                   const CollatorInterface* collator,
-                                   const int bucketVersion,
-                                   const int bucketCount,
-                                   const StringDataMap<BSONElement>& dataFields,
-                                   const StringDataMap<BSONElement>& controlMinFields,
-                                   const StringDataMap<BSONElement>& controlMaxFields,
-                                   bool criticalValidationOnly) {
+BCV _validateCompressedBucketData(const TimeseriesOptions& timeseriesOptions,
+                                  const CollatorInterface* collator,
+                                  const int bucketVersion,
+                                  const int bucketCount,
+                                  const StringDataMap<BSONElement>& dataFields,
+                                  const StringDataMap<BSONElement>& controlMinFields,
+                                  const StringDataMap<BSONElement>& controlMaxFields,
+                                  bool criticalValidationOnly) {
     boost::intrusive_ptr allocator{new BSONElementStorage()};
     for (auto&& data : dataFields) {
         auto it = controlMinFields.find(data.first);
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Field '{}' is missing from control.min", data.first),
-                it != controlMinFields.end());
+        if (it == controlMinFields.end()) {
+            return BCV::kMissingField;
+        }
         BSONElement min = it->second;
 
         it = controlMaxFields.find(data.first);
-        uassert(ErrorCodes::BadValue,
-                fmt::format("Field '{}' is missing from control.max", data.first),
-                it != controlMaxFields.end());
+        if (it == controlMaxFields.end()) {
+            return BCV::kMissingField;
+        }
         BSONElement max = it->second;
 
+        BCV v;
         if (data.first == timeseriesOptions.getTimeField()) {
-            _validateCompressedTimeField(allocator,
-                                         timeseriesOptions,
-                                         data.second,
-                                         min,
-                                         max,
-                                         bucketCount,
-                                         collator,
-                                         criticalValidationOnly);
+            v = _validateCompressedTimeField(allocator,
+                                             timeseriesOptions,
+                                             data.second,
+                                             min,
+                                             max,
+                                             bucketCount,
+                                             collator,
+                                             criticalValidationOnly);
         } else {
-            _validateCompressedMinMax(allocator,
-                                      data.first,
-                                      data.second,
-                                      min,
-                                      max,
-                                      bucketCount,
-                                      collator,
-                                      criticalValidationOnly);
+            v = _validateCompressedMinMax(allocator,
+                                          data.first,
+                                          data.second,
+                                          min,
+                                          max,
+                                          bucketCount,
+                                          collator,
+                                          criticalValidationOnly);
+        }
+        if (v != BCV::kNone) {
+            return v;
         }
     }
+
+    return BCV::kNone;
 }
 
 }  // namespace
 
 
-void validateBucketConsistency(const Collection* collection, const BSONObj& bucketDoc) {
+BCV validateBucketConsistency(const Collection* collection, const BSONObj& bucketDoc) {
+    const bool criticalValidationOnly = gTimeseriesLessStrictBucketValidator.load();
     OID bucketId;
+    // BSON field accessors (.OID(), .Obj(), .Date(), etc.) throw DBException when a field is
+    // absent or the wrong type. We catch such structural errors here and report them as
+    // corruption; any other error is rethrown rather than misreported as a bad bucket.
     try {
-        bool criticalValidationOnly = gTimeseriesLessStrictBucketValidator.load();
-        // First perform some basic schema validation and extract elements to validate more
-        // thoroughly.
+        // Extract top-level fields first so bucketId is available for error logging.
         bucketId = bucketDoc[timeseries::kBucketIdFieldName].OID();
 
         const auto& timeseriesOptions = collection->getTimeseriesOptions().value();
@@ -485,39 +500,69 @@ void validateBucketConsistency(const Collection* collection, const BSONObj& buck
         if (version != timeseries::kTimeseriesControlUncompressedVersion &&
             version != timeseries::kTimeseriesControlCompressedSortedVersion &&
             version != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
-            uasserted(
-                ErrorCodes::BadValue,
-                fmt::format("Invalid value for 'control.version'. Expected 1, 2, or 3, but got {}.",
-                            version));
+            logViolationRateLimited(
+                BCV::kBadVersion,
+                fmt::format("Invalid value for 'control.version'. Expected 1, 2, or 3, but got {}. "
+                            "Bucket _id: {}",
+                            version,
+                            bucketId.toString()));
+            return BCV::kBadVersion;
         }
 
-        // Perform the actual validation
-        validateBucketIdTimestamp(timeseriesOptions, bucketId, min, criticalValidationOnly);
+        // Perform the actual validation. BSON accessor calls inside sub-functions (e.g.
+        // .Date() on the time field) are also covered by the outer catch.
+        auto checkAndLog = [&](BCV violation, std::string_view context) -> BCV {
+            if (violation != BCV::kNone) {
+                logViolationRateLimited(
+                    violation, fmt::format("{}. Bucket _id: {}", context, bucketId.toString()));
+            }
+            return violation;
+        };
 
-        validateBucketTimeSpan(timeseriesOptions, min, max, criticalValidationOnly);
+        if (auto v = checkAndLog(
+                validateBucketIdTimestamp(timeseriesOptions, bucketId, min, criticalValidationOnly),
+                "validateBucketIdTimestamp");
+            v != BCV::kNone) {
+            return v;
+        }
 
-        validateBucketData(timeseriesOptions,
-                           collection->getDefaultCollator(),
-                           version,
-                           control[timeseries::kBucketControlCountFieldName],
-                           min,
-                           max,
-                           data,
-                           criticalValidationOnly);
-    } catch (DBException& ex) {
-        // Catch any validation error and attach extra context to be able to debug validation errors
-        // or remediate corrupt buckets
-        ex.addContext(fmt::format("Bucket _id: {}", bucketId.toString()));
-        // Perform logging of occurances. This is rate limited to protect against malicious use.
-        logExceptionRateLimited(ex);
-        throw;
+        if (auto v = checkAndLog(
+                validateBucketTimeSpan(timeseriesOptions, min, max, criticalValidationOnly),
+                "validateBucketTimeSpan");
+            v != BCV::kNone) {
+            return v;
+        }
+
+        if (auto v =
+                checkAndLog(validateBucketData(timeseriesOptions,
+                                               collection->getDefaultCollator(),
+                                               version,
+                                               control[timeseries::kBucketControlCountFieldName],
+                                               min,
+                                               max,
+                                               data,
+                                               criticalValidationOnly),
+                            "validateBucketData");
+            v != BCV::kNone) {
+            return v;
+        }
+    } catch (const DBException& ex) {
+        if (!isExpectedBucketCorruptionError(ex)) {
+            throw;
+        }
+        logViolationRateLimited(
+            BCV::kInvalidBsonData,
+            fmt::format("{}. Bucket _id: {}", ex.toStatus().reason(), bucketId.toString()));
+        return BCV::kInvalidBsonData;
     }
+
+    return BCV::kNone;
 }
 
-void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
-                               const OID& id,
-                               const BSONObj& controlMin,
-                               bool criticalValidationOnly) {
+BCV validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
+                              const OID& id,
+                              const BSONObj& controlMin,
+                              bool criticalValidationOnly) {
     // Ensure the time field exists
     const std::string_view timeField = timeseriesOptions.getTimeField();
 
@@ -529,18 +574,16 @@ void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
     // minTimestamp matches the embedded timestamp.
     if (minTimestamp != oidEmbeddedTimestamp &&
         !timeseries::dateOutsideStandardRange(minTimestamp) && !criticalValidationOnly) {
-        uasserted(ErrorCodes::BadValue,
-                  str::stream() << "Mismatch between the embedded timestamp "
-                                << oidEmbeddedTimestamp.toString()
-                                << " in the time-series bucket '_id' field and the timestamp "
-                                << minTimestamp.toString() << " in 'control.min' field.");
+        return BCV::kIdTimestampMismatch;
     }
+
+    return BCV::kNone;
 }
 
-void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
-                            const BSONObj& controlMin,
-                            const BSONObj& controlMax,
-                            bool criticalValidationOnly) {
+BCV validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
+                           const BSONObj& controlMin,
+                           const BSONObj& controlMax,
+                           bool criticalValidationOnly) {
     auto minTimestamp = controlMin[timeseriesOptions.getTimeField()].Date();
     // Only 'minTimestamp' needs to be checked for extended range here: the sole check gated by
     // 'fixedBucketingEnabled' below just validates that 'control.min' is aligned to the fixed
@@ -550,88 +593,81 @@ void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
     auto maxTimestamp = controlMax[timeseriesOptions.getTimeField()].Date();
     auto bucketMaxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
     if (maxTimestamp - minTimestamp >= Seconds(*bucketMaxSpanSeconds) && !criticalValidationOnly) {
-        uasserted(ErrorCodes::BadValue,
-                  str::stream() << "Time span of measurements in the bucket is too large. "
-                                << "The difference between control.max and control.min is "
-                                << (maxTimestamp - minTimestamp).toString()
-                                << ", but the maximum allowed span is " << bucketMaxSpanSeconds
-                                << " seconds.");
+        return BCV::kTimeSpanTooLarge;
     }
 
     // Enforce that control.min time is aligned to the fixed bucket boundary when the
     // fixed-bucketing optimization is enabled.
     if (fixedBucketingEnabled && !criticalValidationOnly) {
         auto expectedMinTimestamp = roundTimestampToGranularity(minTimestamp, timeseriesOptions);
-        uassert(ErrorCodes::BadValue,
-                fmt::format("control.min.{} is not rounded to expected boundary when "
-                            "fixed-bucketing is enabled. Expected {}, but got {}.",
-                            timeseriesOptions.getTimeField(),
-                            minTimestamp.toString(),
-                            expectedMinTimestamp.toString()),
-                minTimestamp == expectedMinTimestamp);
+        if (minTimestamp != expectedMinTimestamp) {
+            return BCV::kMinTimeNotRounded;
+        }
     }
+
+    return BCV::kNone;
 }
 
-void validateBucketData(const TimeseriesOptions& timeseriesOptions,
-                        const CollatorInterface* collator,
-                        int bucketVersion,
-                        BSONElement controlCount,
-                        const BSONObj& controlMin,
-                        const BSONObj& controlMax,
-                        const BSONObj& data,
-                        bool criticalValidationOnly) {
+BCV validateBucketData(const TimeseriesOptions& timeseriesOptions,
+                       const CollatorInterface* collator,
+                       int bucketVersion,
+                       BSONElement controlCount,
+                       const BSONObj& controlMin,
+                       const BSONObj& controlMax,
+                       const BSONObj& data,
+                       bool criticalValidationOnly) {
 
-    // Builds a hash map for the fields to avoid repeated traversals.
-    auto buildFieldTable = [](StringDataMap<BSONElement>& table, const BSONObj& fields) {
+    // Builds a hash map for the fields to avoid repeated traversals. Returns kNone on success or
+    // kDuplicateField if a field name appears more than once.
+    auto buildFieldTable = [](StringDataMap<BSONElement>& table, const BSONObj& fields) -> BCV {
         for (const auto& field : fields) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "Duplicate field '" << field.fieldNameStringData()
-                                  << "' detected in bucket.",
-                    table.try_emplace(field.fieldNameStringData(), field).second);
+            if (!table.try_emplace(field.fieldNameStringData(), field).second) {
+                return BCV::kDuplicateField;
+            }
         }
+        return BCV::kNone;
     };
 
     StringDataMap<BSONElement> dataFields;
     StringDataMap<BSONElement> controlMinFields;
     StringDataMap<BSONElement> controlMaxFields;
-    buildFieldTable(dataFields, data);
-    buildFieldTable(controlMinFields, controlMin);
-    buildFieldTable(controlMaxFields, controlMax);
+    if (auto v = buildFieldTable(dataFields, data); v != BCV::kNone) {
+        return v;
+    }
+    if (auto v = buildFieldTable(controlMinFields, controlMin); v != BCV::kNone) {
+        return v;
+    }
+    if (auto v = buildFieldTable(controlMaxFields, controlMax); v != BCV::kNone) {
+        return v;
+    }
 
     // Checks that the number of 'control.min' and 'control.max' fields agrees with number of 'data'
     // fields.
     if (dataFields.size() != controlMinFields.size() ||
         controlMinFields.size() != controlMaxFields.size()) {
-        uasserted(
-            ErrorCodes::BadValue,
-            fmt::format("Mismatch between the number of time-series control fields and the number "
-                        "of data fields. Control had {} min fields and {} max fields, but observed "
-                        "data had {} fields.",
-                        controlMinFields.size(),
-                        controlMaxFields.size(),
-                        dataFields.size()));
-    };
+        return BCV::kFieldCountMismatch;
+    }
 
     if (bucketVersion == timeseries::kTimeseriesControlUncompressedVersion) {
-        _validateUncompressedBucketData(timeseriesOptions,
-                                        collator,
-                                        dataFields,
-                                        controlMinFields,
-                                        controlMaxFields,
-                                        criticalValidationOnly);
+        return _validateUncompressedBucketData(timeseriesOptions,
+                                               collator,
+                                               dataFields,
+                                               controlMinFields,
+                                               controlMaxFields,
+                                               criticalValidationOnly);
     } else {
         int count = controlCount.numberInt();
-        uassert(ErrorCodes::BadValue,
-                "Unexpected control.count value, undefined integer representation",
-                count == controlCount.safeNumberInt());
-        _validateCompressedBucketData(timeseriesOptions,
-                                      collator,
-                                      bucketVersion,
-                                      count,
-                                      dataFields,
-                                      controlMinFields,
-                                      controlMaxFields,
-                                      criticalValidationOnly);
+        if (count != controlCount.safeNumberInt()) {
+            return BCV::kBadControlCount;
+        }
+        return _validateCompressedBucketData(timeseriesOptions,
+                                             collator,
+                                             bucketVersion,
+                                             count,
+                                             dataFields,
+                                             controlMinFields,
+                                             controlMaxFields,
+                                             criticalValidationOnly);
     }
 }
 }  // namespace mongo::timeseries
