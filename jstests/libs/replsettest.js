@@ -5,6 +5,7 @@ import {
     featureFlagMandatesReplicatedTruncates,
     persistenceProviderRequiresReplicatedTruncates,
 } from "jstests/libs/query/replicated_truncates_utils.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 /* global retryOnRetryableError */
 
@@ -1526,13 +1527,12 @@ export class ReplSetTest {
                 // When latest is not equal to last-continuous, the transition to last-continuous is
                 // not allowed. Setting fromConfigServer allows us to bypass this restriction and
                 // test last-continuous.
-                assert.commandWorked(
-                    this.getPrimary().adminCommand({
-                        setFeatureCompatibilityVersion: fcv,
-                        fromConfigServer: true,
-                        confirm: true,
-                    }),
-                );
+                // Startup system index builds (e.g. config.transactions, config.system.sessions)
+                // can still be in flight here and hold a stale operation FCV, which makes setFCV
+                // fail with BackgroundOperationInProgressForNamespace. Retry until they drain.
+                setFCVWithRetryOnBackgroundOpInProgress(this.getPrimary(), fcv, {
+                    fromConfigServer: true,
+                });
                 checkFCV(this.getPrimary().getDB("admin"), fcv);
 
                 // The server has a practice of adding a reconfig as part of upgrade/downgrade logic

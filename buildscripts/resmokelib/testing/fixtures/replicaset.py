@@ -395,12 +395,82 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # nodes are subsequently added to the set, since such nodes cannot set their FCV to
             # "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
             # nodes of different binary versions to the replica set.
-            client.admin.command(
-                {
-                    "setFeatureCompatibilityVersion": self.fcv,
-                    "fromConfigServer": True,
-                }
-            )
+            #
+            # An in-flight index build that has pinned a stale Operation FCV will cause setFCV to
+            # fail with BackgroundOperationInProgressForNamespace (12587). Retry until the build
+            # drains; index builds are short-lived at fixture-setup time.
+            #
+            # A previous transition that stopped while cleaning up internal server metadata blocks
+            # any transition in the opposite direction (7428200 if a downgrade stopped, 10778001 if
+            # an upgrade did). The server only accepts continuing in the interrupted direction, so
+            # drive the FCV document's targetVersion to completion and then retry ours.
+            _BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE = 12587
+            _INCOMPLETE_TRANSITION_CODES = (7428200, 10778001)
+            _SET_FCV_RETRY_TIMEOUT_SECS = 5 * 60
+            _SET_FCV_RETRY_INTERVAL_SECS = 0.2
+            start_time = time.monotonic()
+            while True:
+                try:
+                    client.admin.command(
+                        {
+                            "setFeatureCompatibilityVersion": self.fcv,
+                            "fromConfigServer": True,
+                        }
+                    )
+                    break
+                except pymongo.errors.OperationFailure as err:
+                    if (
+                        err.code != _BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE
+                        and err.code not in _INCOMPLETE_TRANSITION_CODES
+                    ):
+                        raise
+                    elapsed = time.monotonic() - start_time
+                    if elapsed > _SET_FCV_RETRY_TIMEOUT_SECS:
+                        raise pymongo.errors.OperationFailure(
+                            f"setFeatureCompatibilityVersion({self.fcv}) still failing after"
+                            f" {elapsed:.1f}s: {err}",
+                            code=err.code,
+                        )
+                    if err.code in _INCOMPLETE_TRANSITION_CODES:
+                        fcv_doc = client.admin["system.version"].find_one(
+                            {"_id": "featureCompatibilityVersion"}
+                        )
+                        pending_fcv = (fcv_doc or {}).get("targetVersion")
+                        if pending_fcv is None:
+                            raise
+                        self.logger.info(
+                            "Completing an interrupted FCV transition to %s before retrying"
+                            " setFeatureCompatibilityVersion(%s) (%.1fs elapsed): %s",
+                            pending_fcv,
+                            self.fcv,
+                            elapsed,
+                            err,
+                        )
+                        try:
+                            client.admin.command(
+                                {
+                                    "setFeatureCompatibilityVersion": pending_fcv,
+                                    "fromConfigServer": True,
+                                }
+                            )
+                        except pymongo.errors.OperationFailure as completion_err:
+                            # Best effort: the retry below observes the same incomplete-transition
+                            # error and tries again.
+                            self.logger.info(
+                                "Failed to complete the interrupted FCV transition to %s: %s",
+                                pending_fcv,
+                                completion_err,
+                            )
+                    else:
+                        self.logger.info(
+                            "Retrying setFeatureCompatibilityVersion(%s) after"
+                            " BackgroundOperationInProgressForNamespace (%.1fs elapsed): %s",
+                            self.fcv,
+                            elapsed,
+                            err,
+                        )
+                    time.sleep(_SET_FCV_RETRY_INTERVAL_SECS)
+
             # Force a checkpoint on the primary past the FCV transition before any mixed-version
             # node joins. A node that initial syncs copies the sync source's last checkpoint; if
             # that checkpoint predates the FCV transition it crashes because it observes an FCV

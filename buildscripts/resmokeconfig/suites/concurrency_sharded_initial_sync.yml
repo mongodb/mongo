@@ -71,6 +71,14 @@ selector:
 
     # Applying operation on feature compatibility version document not supported in initial sync
 
+    # This workload tolerates setFCV failures (CannotDowngrade, and
+    # BackgroundOperationInProgressForNamespace via handleRandomSetFCVErrors) that abort the
+    # transition after the transitional FCV has already been replicated, leaving the cluster in a
+    # 'downgrading' state. A node syncing from a source in that state fasserts with 40088, "Sync
+    # source had unsafe feature compatibility version", which kills the initial sync node and
+    # leaves the set without a primary.
+    - jstests/concurrency/fsm_workloads/index_builds/create_index_fcv_downgrade.js
+
     # Resharding cannot succeed on a node which undergoes initial sync because initial sync
     # does not preserve the ability to read at the cloneTimestamp in the past
     - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_with_resharding.js

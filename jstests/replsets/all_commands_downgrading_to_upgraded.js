@@ -17,6 +17,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {isServerSideJavaScriptEnabled} from "jstests/libs/js_engine_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const name = jsTestName();
@@ -2098,9 +2099,10 @@ let runTest = function (conn, adminDB, fixture) {
         runAllCommands(command, test, conn, fixture);
     }
 
-    assert.commandWorked(
-        conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-    );
+    // A two-phase index build run during the commands loop may still have its async coordinator
+    // thread alive with a stale operation FCV, causing setFCV's drain barrier to reject the
+    // transition with BackgroundOperationInProgressForNamespace. Retry until the thread exits.
+    setFCVWithRetryOnBackgroundOpInProgress(conn, latestFCV);
 
     jsTestLog("Running all commands after upgrading back to the latest FCV");
     commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);
