@@ -61,12 +61,9 @@ class PoolForHost {
     PoolForHost& operator=(const PoolForHost&) = delete;
 
 public:
-    // Sentinel value indicating pool has no cleanup limit
-    static const int kPoolSizeUnlimited;
-
     friend class DBConnectionPool;
 
-    PoolForHost();
+    PoolForHost() = default;
     ~PoolForHost();
 
     /**
@@ -208,6 +205,10 @@ public:
     void shutdown();
 
 private:
+    // Sentinel value indicating pool has no cleanup limit
+    static constexpr int kPoolSizeUnlimited{-1};
+    static constexpr int kDefaultMaxInUse{std::numeric_limits<int>::max()};
+
     struct StoredConnection {
         StoredConnection(std::unique_ptr<DBClientBase> c);
 
@@ -226,27 +227,27 @@ private:
     };
 
     std::string _hostName;
-    double _socketTimeoutSecs;
+    double _socketTimeoutSecs{0.0};
     std::stack<StoredConnection> _pool;
 
-    int64_t _created;
-    uint64_t _minValidCreationTimeMicroSec;
-    ConnectionString::ConnectionType _type;
+    int64_t _created{0};
+    uint64_t _minValidCreationTimeMicroSec{0};
+    ConnectionString::ConnectionType _type{ConnectionString::ConnectionType::kInvalid};
 
     // The maximum number of connections we'll save in the pool
-    int _maxPoolSize;
+    int _maxPoolSize{kPoolSizeUnlimited};
 
     // The maximum number of connections allowed to be in-use in this pool
-    int _maxInUse;
+    int _maxInUse{kDefaultMaxInUse};
 
     // The number of currently active connections from this pool
-    int _checkedOut;
+    int _checkedOut{0};
 
     // The number of connections that we did not reuse because they went bad.
-    int _badConns;
+    int _badConns{0};
 
     // Whether our parent DBConnectionPool object is in destruction
-    bool _parentDestroyed;
+    bool _parentDestroyed{false};
 
     // Time it took for the last connection to be established
     Milliseconds _connTime;
@@ -255,7 +256,7 @@ private:
 
     stdx::condition_variable _cv;
 
-    Atomic<bool> _inShutdown;
+    Atomic<bool> _inShutdown{false};
 };
 
 class [[MONGO_MOD_OPEN]] DBConnectionHook {
@@ -400,6 +401,8 @@ public:
     void shutdown();
 
 private:
+    static constexpr int kDefaultIdleTimeout{std::numeric_limits<int>::max()};
+
     class Detail;
 
     DBConnectionPool(DBConnectionPool& p);
@@ -424,19 +427,19 @@ private:
     typedef std::map<PoolKey, PoolForHost, poolKeyCompare> PoolMap;  // servername -> pool
 
     mutable std::mutex _mutex;
-    std::string _name;
+    std::string _name{"dbconnectionpool"};
 
     // The maximum number of connections we'll save in the pool per-host
     // PoolForHost::kPoolSizeUnlimited is a sentinel value meaning "no limit"
     // 0 effectively disables the pool
-    int _maxPoolSize;
+    int _maxPoolSize{PoolForHost::kPoolSizeUnlimited};
 
-    int _maxInUse;
-    Minutes _idleTimeout;
+    int _maxInUse{PoolForHost::kDefaultMaxInUse};
+    Minutes _idleTimeout{kDefaultIdleTimeout};
 
     PoolMap _pools;
 
-    Atomic<bool> _inShutdown;
+    Atomic<bool> _inShutdown{false};
 
     // pointers owned by me, right now they leak on shutdown
     // _hooks itself also leaks because it creates a shutdown race condition

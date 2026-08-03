@@ -54,9 +54,6 @@
 namespace mongo {
 
 namespace {
-const int kDefaultIdleTimeout = std::numeric_limits<int>::max();
-const int kDefaultMaxInUse = std::numeric_limits<int>::max();
-
 auto makeDuration(double secs) {
     return Milliseconds(static_cast<Milliseconds::rep>(1000 * secs));
 }
@@ -75,17 +72,6 @@ using std::string;
 using std::vector;
 
 // ------ PoolForHost ------
-
-PoolForHost::PoolForHost()
-    : _created(0),
-      _minValidCreationTimeMicroSec(0),
-      _type(ConnectionString::ConnectionType::kInvalid),
-      _maxPoolSize(kPoolSizeUnlimited),
-      _maxInUse(kDefaultMaxInUse),
-      _checkedOut(0),
-      _badConns(0),
-      _parentDestroyed(false),
-      _inShutdown(false) {}
 
 PoolForHost::~PoolForHost() {
     clear();
@@ -336,17 +322,7 @@ public:
 
 // ------ DBConnectionPool ------
 
-const int PoolForHost::kPoolSizeUnlimited(-1);
-
-DBConnectionPool::DBConnectionPool()
-    : _name("dbconnectionpool"),
-      _maxPoolSize(PoolForHost::kPoolSizeUnlimited),
-      _maxInUse(kDefaultMaxInUse),
-      _idleTimeout(kDefaultIdleTimeout),
-      _inShutdown(false),
-      _hooks(new list<DBConnectionHook*>())
-
-{}
+DBConnectionPool::DBConnectionPool() : _hooks(new list<DBConnectionHook*>()) {}
 
 void DBConnectionPool::shutdown() {
     if (!_inShutdown.swap(true)) {
