@@ -742,7 +742,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
                                 repl::OpTypeEnum::kUpdate,
                                 BSON("$invalidOperator" << BSON("x" << 1)),
-                                BSON("_id" << 1)));
+                                BSON("_id" << 3)));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
