@@ -10,6 +10,7 @@
 
 #include "wiredtiger.h"
 #include "wt_internal.h"
+#include "../wrappers/mock_session.h"
 
 /*
  * Unit tests for config-related functions.

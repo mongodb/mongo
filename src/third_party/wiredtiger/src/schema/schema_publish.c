@@ -80,7 +80,7 @@ __wt_schema_publish(WT_SESSION_IMPL *session, const char *uri, const char *cfg[]
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
 
-    WT_ASSERT_NO_SCHEMA_OP_DURING_ROLE_TRANSITION(session);
+    WT_ASSERT_NO_SCHEMA_OP_DURING_STEP_UP(session);
 
     WT_ERR(__wt_config_gets(session, cfg, "disaggregated.schema_epoch", &cval));
     if (cval.len > 0) {

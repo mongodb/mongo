@@ -32,6 +32,7 @@ variables:
     - name: prefetch-off-verify
     - name: prefetch-on-verify
     - name: perf-disagg-many-tables-follower-startup
+    - name: perf-disagg-many-tables-follower-update
 
 # Build variants that need to be run only on the develop branch.
 buildvariants:

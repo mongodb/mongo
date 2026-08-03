@@ -375,20 +375,19 @@ __wt_tret_error_ok(int *pret, int a, int e)
     } while (0)
 
 /*
- * WT_ASSERT_NO_SCHEMA_OP_DURING_ROLE_TRANSITION --
- *	Application threads must not run schema operations during a role transition, because
- *	role transition code concurrently modifies layered-table state. Internal sessions perform
- *	the transition and are exempt.
+ * WT_ASSERT_NO_SCHEMA_OP_DURING_STEP_UP --
+ *	Application threads must not run schema operations during a step-up, because step-up code
+ *	concurrently modifies layered-table state. Step-down holds the schema lock, so schema
+ *	operations serialize with it instead. Internal sessions perform the transition and are
+ *	exempt.
  *
- * FIXME-WT-17880: Remove the "role transition" assertions once we have asynchronous
- * step-up/step-down.
+ * FIXME-WT-18240: Remove the assertion once we have asynchronous step-up.
  */
-#define WT_ASSERT_NO_SCHEMA_OP_DURING_ROLE_TRANSITION(session)                            \
-    WT_ASSERT_ALWAYS(session,                                                             \
-      !F_ISSET_ATOMIC_32(                                                                 \
-        S2C(session), WT_CONN_RECONFIGURING_STEP_UP | WT_CONN_RECONFIGURING_STEP_DOWN) || \
-        F_ISSET(session, WT_SESSION_INTERNAL),                                            \
-      "schema operation performed during role transition")
+#define WT_ASSERT_NO_SCHEMA_OP_DURING_STEP_UP(session)                   \
+    WT_ASSERT_ALWAYS(session,                                            \
+      !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECONFIGURING_STEP_UP) || \
+        F_ISSET(session, WT_SESSION_INTERNAL),                           \
+      "schema operation performed during step-up")
 
 /*
  * WT_ERR_ASSERT --

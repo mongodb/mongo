@@ -1609,6 +1609,12 @@ variables:
 # the number of runs adjusted to provide approximately six hours of testing.
 #########################################################################################
 
+  - &format-stress-idle-timeout
+    command: timeout.update
+    params:
+      # If the task does not produce any output for this amount of time, it will be terminated.
+      timeout_secs: 10800 # 3 hours
+
   - &format-stress-test
     exec_timeout_secs: 25200
     commands:
@@ -1623,6 +1629,7 @@ variables:
   - &format-stress-asan-ppc-test
     exec_timeout_secs: 25200
     commands:
+      - *format-stress-idle-timeout
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
@@ -1637,6 +1644,7 @@ variables:
   - &format-stress-asan-test
     exec_timeout_secs: 25200
     commands:
+      - *format-stress-idle-timeout
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
@@ -1649,6 +1657,7 @@ variables:
   - &race-condition-stress-asan-test
     exec_timeout_secs: 25200
     commands:
+      - *format-stress-idle-timeout
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
@@ -6277,6 +6286,30 @@ tasks:
       - func: "upload stats to evergreen"
         vars:
           test-name: disagg_many_tables_follower_startup_perf.py
+
+    ##################################################
+    # Performance Tests for disagg follower update   #
+    ##################################################
+
+  - name: perf-disagg-many-tables-follower-update
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          test_type: workgen
+          exec_path: ${python_binary|python3}
+          perf-test-path: ../../../bench/workgen/runner
+          perf-test-name: disagg_many_tables_follower_update_perf.py
+          maxruns: 1
+          wtarg: -ops ['"reconfigure_update_pickup_ms", "disagg_apply_checkpoint_meta_ms"'] -args '["--num-tables", "10000", "--num-pickups", "5", "--warmup-pickups", "1"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: disagg_many_tables_follower_update_perf.py
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: disagg_many_tables_follower_update_perf.py
 
     ###########################################
     # Performance Tests for log consolidation #

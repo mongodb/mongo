@@ -398,9 +398,10 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
      * backup or the checkpoint LSN. Otherwise we want the minimum of the last log file written to
      * disk and the checkpoint LSN.
      */
-    min_lognum = backup_file == 0 ?
-      WT_MIN(__wt_lsn_file(&log->ckpt_lsn), __wt_lsn_file(&log->sync_lsn)) :
-      WT_MIN(__wt_lsn_file(&log->ckpt_lsn), backup_file);
+    uint32_t ckpt_file = __wt_lsn_file(&log->ckpt_lsn);
+    uint32_t sync_file = __wt_lsn_file(&log->sync_lsn);
+
+    min_lognum = backup_file == 0 ? WT_MIN(ckpt_file, sync_file) : WT_MIN(ckpt_file, backup_file);
 
     __wt_readlock(session, &conn->log_mgr.debug_log_retention_lock);
 
@@ -425,7 +426,11 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
             min_lognum = log->fileid - (conn->debug.log_cnt + 1);
         else
             min_lognum = WT_MIN(log->fileid - (conn->debug.log_cnt + 1), min_lognum);
-    }
+    } else
+        /*
+         * Checkpoint log must maintain, violation is always data loss.
+         */
+        WT_ASSERT(session, min_lognum <= ckpt_file);
 
     __wt_readunlock(session, &conn->log_mgr.debug_log_retention_lock);
 #ifdef HAVE_DIAGNOSTIC

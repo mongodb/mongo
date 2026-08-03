@@ -604,6 +604,137 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __cursor_search_prepared_failed --
+ *     Report what is known about a failed search for a prepared operation's key. The assertion that
+ *     follows loses the process, so gather enough state to tell a key that genuinely went missing
+ *     apart from a search that failed for an unrelated reason, such as a cache stall or a failed
+ *     read of the page the key lives on. Best effort: never fail the caller.
+ */
+static void
+__cursor_search_prepared_failed(WT_CURSOR_BTREE *cbt, int search_ret)
+{
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_ITEM(tmp);
+    WT_ERROR_INFO *err_info;
+    WT_EVICT *evict;
+    WT_ITEM *key;
+    WT_SESSION_IMPL *session;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+    WT_TXN_OP *op;
+    WT_TXN_SHARED *txn_shared;
+    uint32_t i, op_key_matches, op_tree_matches;
+    char ts_string[4][WT_TS_INT_STRING_SIZE];
+    const char *key_string;
+
+    session = CUR2S(cbt);
+    btree = CUR2BT(cbt);
+    conn = S2C(session);
+    cache = conn->cache;
+    evict = conn->evict;
+    err_info = &session->err_info;
+    key = &cbt->iface.key;
+    txn = session->txn;
+    txn_global = &conn->txn_global;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
+    op_key_matches = op_tree_matches = 0;
+    key_string = "[unavailable]";
+
+    if (btree->type == BTREE_ROW && __wt_scr_alloc(session, 0, &tmp) == 0)
+        key_string = __wt_buf_set_printable(session, key->data, key->size, false, tmp);
+
+    __wt_errx(session,
+      "prepared resolution failed to position on a key: search returned %d (%s), table %s (id "
+      "%" PRIu32 ", type %d), key %s, size %" WT_SIZET_FMT ", recno %" PRIu64,
+      search_ret, __wt_session_strerror(&session->iface, search_ret), btree->dhandle->name,
+      btree->id, (int)btree->type, key_string, key->size, cbt->iface.recno);
+
+    /*
+     * The last error carries the reason a cache stall or a conflict turned into a rollback, which
+     * is what distinguishes a search failure that has nothing to do with the key's existence.
+     */
+    __wt_errx(session,
+      "prepared resolution failure: last error %d, sub-level error %d, error message: %s",
+      err_info->err, err_info->sub_level_err,
+      err_info->err_msg == NULL ? "[none]" : err_info->err_msg);
+
+    __wt_errx(session,
+      "prepared resolution failure: shared txn id %" PRIu64 ", pinned id %" PRIu64
+      ", isolation %d, txn flags %#" PRIx32 ", mod count %" PRIu32,
+      __wt_atomic_load_uint64_v_relaxed(&txn_shared->id),
+      __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id), (int)txn->isolation, txn->flags,
+      txn->mod_count);
+
+    __wt_errx(session,
+      "prepared resolution failure: time point id %" PRIu64 ", prepared id %" PRIu64
+      ", prepare ts %s, commit ts %s, durable ts %s, rollback ts %s, time point flags %#" PRIx8,
+      txn->time_point.id, txn->time_point.prepared_id,
+      __wt_timestamp_to_string(txn->time_point.prepare_timestamp, ts_string[0]),
+      __wt_timestamp_to_string(txn->time_point.commit_timestamp, ts_string[1]),
+      __wt_timestamp_to_string(txn->time_point.durable_timestamp, ts_string[2]),
+      __wt_timestamp_to_string(txn->time_point.rollback_timestamp, ts_string[3]),
+      txn->time_point.flags);
+
+    /*
+     * Whether the oldest id and the oldest timestamp have moved past this transaction bounds what
+     * else could have decided its updates were no longer needed.
+     */
+    __wt_errx(session,
+      "prepared resolution failure: global oldest id %" PRIu64 ", current id %" PRIu64
+      ", oldest ts %s, pinned ts %s, stable ts %s, checkpoint %s",
+      __wt_atomic_load_uint64_v_relaxed(&txn_global->oldest_id),
+      __wt_atomic_load_uint64_v_relaxed(&txn_global->current),
+      __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
+      __wt_timestamp_to_string(txn_global->pinned_timestamp, ts_string[1]),
+      __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string[2]),
+      txn_global->checkpoint_running ? "running" : "idle");
+
+    __wt_errx(session,
+      "prepared resolution failure: cache wait %" PRIu64 "us, session cache max wait %" PRIu64
+      "us, connection cache max wait %" PRIu64 "us, eviction stuck %s, cache bytes in use %" PRIu64
+      " of %" PRIu64 ", dirty bytes %" PRIu64,
+      session->cache_wait_us, session->cache_max_wait_us, evict->cache_max_wait_us,
+      __wt_evict_cache_stuck(session) ? "yes" : "no", __wt_cache_bytes_inuse(cache),
+      conn->cache_size, __wt_cache_dirty_inuse(cache));
+
+    /*
+     * Count the operations in the modify list that target this key: more than one means the key is
+     * being resolved twice, which the repeated key flag set at prepare is supposed to prevent.
+     */
+    for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
+        if (op->btree != btree)
+            continue;
+        ++op_tree_matches;
+
+        if (op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW) {
+            /* Only compare keys we can compare: a collated compare needs a session pointer. */
+            if (btree->collator != NULL || __wt_lex_compare(&op->u.op_row.key, key) != 0)
+                continue;
+        } else if (op->type == WT_TXN_OP_BASIC_COL || op->type == WT_TXN_OP_INMEM_COL) {
+            if (op->u.op_col.recno != cbt->iface.recno)
+                continue;
+        } else
+            continue;
+
+        ++op_key_matches;
+        __wt_errx(session,
+          "prepared resolution failure: operation %" PRIu32
+          " targets this key, type %d, flags "
+          "%#" PRIx32 ", repeated key %s, update %s",
+          i, (int)op->type, op->flags, F_ISSET(op, WT_TXN_OP_KEY_REPEATED) ? "yes" : "no",
+          op->u.op_upd == NULL ? "cleared" : "set");
+    }
+    __wt_errx(session,
+      "prepared resolution failure: %" PRIu32 " operations target this key, %" PRIu32
+      " target this table",
+      op_key_matches, op_tree_matches);
+
+    __wt_scr_free(session, &tmp);
+}
+
+/*
  * __wt_btcur_search_prepared --
  *     Search and return exact matching records only.
  */
@@ -632,10 +763,13 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
     F_CLR(&cbt->iface, WT_CURSTD_KEY_ONLY);
     /*
      * The following assertion relies on the fact that for every prepared update there must be an
-     * associated key and we only resolve the same key once.
+     * associated key and we only resolve the same key once. The search can also fail for reasons
+     * unrelated to the key's existence, so report the state that tells the two apart.
      */
-    WT_ASSERT_ALWAYS(
-      CUR2S(cursor), ret == 0, "A valid key must exist when resolving prepared updates.");
+    if (ret != 0)
+        __cursor_search_prepared_failed(cbt, ret);
+    WT_ASSERT_ALWAYS(CUR2S(cursor), ret == 0,
+      "A valid key must exist when resolving prepared updates, search returned %d", ret);
     /* Get any uncommitted update from the in-memory page. */
     switch (btree->type) {
     case BTREE_ROW:

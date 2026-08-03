@@ -30,17 +30,19 @@
 #   Verify how schema operations on layered tables behave during a role transition, against both
 #   step-up (follower->leader) and step-down (leader->follower):
 #     - Schema ops that take only the schema lock (create, and drop with checkpoint_wait=false) can
-#       race the transition, so they hit the "ongoing role-transition" guard and abort the process.
+#       race a step-up, so they hit the "ongoing step-up" guard and abort the process. A step-down
+#       holds the schema lock for the whole transition, so the same ops serialize against it and
+#       never abort.
 #     - Schema ops that take the checkpoint lock first (truncate, verify, and drop with
 #       checkpoint_wait=true) are serialized against the transition by that lock - it is held for
 #       the whole step up/down - so they never observe the transition and do not abort.
 #     - Opening a statistics cursor acquires the schema lock to open a data handle, but a handle
-#       open is not a schema operation, so it is allowed during a transition and must not abort.
+#       open is not a schema operation, so it is allowed during a step-up and must not abort.
 #
 #   Each scenario runs in a subprocess, so that the expected aborts are caught as a
 #   non-zero exit code without killing the test runner.
 #
-#   FIXME-WT-17880: Remove this test once we have asynchronous step-up/step-down.
+#   FIXME-WT-18240: Remove the step-up abort scenarios once we have asynchronous step-up.
 
 import signal, threading, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -150,7 +152,9 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
             'test_layered_stepup12.test_layered_stepup12.subprocess_race',
             silent=True,
             scenario=self.scenario_name)
-        if self.expect_abort:
+        # Only a step-up aborts racing schema-lock-only ops; a step-down holds the schema lock,
+        # so they serialize against the transition instead.
+        if self.expect_abort and self.target_role == 'leader':
             self.assertEqual(rc, -signal.SIGABRT,
                 f'expected process to abort (rc={-signal.SIGABRT}) but got rc={rc}')
         else:

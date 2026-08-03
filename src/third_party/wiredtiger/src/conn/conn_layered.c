@@ -1164,11 +1164,11 @@ __disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
 }
 
 /*
- * __disagg_step_down --
- *     Step down to the follower mode.
+ * __disagg_step_down_int --
+ *     Step down to the follower mode. The session must hold the checkpoint and schema locks.
  */
 static int
-__disagg_step_down(WT_SESSION_IMPL *session)
+__disagg_step_down_int(WT_SESSION_IMPL *session)
 {
     struct timespec tsp;
     WT_DECL_RET;
@@ -1177,9 +1177,9 @@ __disagg_step_down(WT_SESSION_IMPL *session)
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     WT_CONNECTION_IMPL *conn = S2C(session);
-    F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
     WT_STAT_CONN_SET(session, disagg_step_down_in_progress, 1);
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
 
     __wt_verbose_debug1(
       session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "Stepping down to the follower mode");
@@ -1243,7 +1243,34 @@ __disagg_step_down(WT_SESSION_IMPL *session)
 
 err:
     WT_STAT_CONN_SET(session, disagg_step_down_in_progress, 0);
-    F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
+    return (ret);
+}
+
+/*
+ * __disagg_step_down --
+ *     Step down to the follower mode on a dedicated internal session.
+ */
+static int
+__disagg_step_down(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *internal_session;
+
+    /*
+     * The default session calling this function is shared between threads: it must not open data
+     * handles, and because lock ownership is tracked in per-session flags, it must not hold locks
+     * across the step-down either.
+     */
+    WT_RET(
+      __wt_open_internal_session(S2C(session), "disagg-step-down", false, 0, 0, &internal_session));
+
+    /*
+     * The schema lock serializes application schema operations against the step-down, which clears
+     * the shared metadata queue and changes layered-table state underneath them.
+     */
+    WT_WITH_CHECKPOINT_LOCK(internal_session,
+      WT_WITH_SCHEMA_LOCK(internal_session, ret = __disagg_step_down_int(internal_session)));
+    WT_TRET(__wt_session_close_internal(internal_session));
     return (ret);
 }
 
@@ -1353,7 +1380,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     } else if (was_leader && !leader) {
         /* Leader step-down. */
         time_start = __wt_clock(session);
-        WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_step_down(session));
+        ret = __disagg_step_down(session);
         time_stop = __wt_clock(session);
         WT_ERR_MSG_CHK(session, ret, "Failed to step down to the follower role");
         WT_STAT_CONN_SET(session, disagg_step_down_time, WT_CLOCKDIFF_MS(time_stop, time_start));
