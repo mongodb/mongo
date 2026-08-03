@@ -352,23 +352,18 @@ jstestfuzz_generate(
     ],
     npm_command = "agg-expr-fuzzer",
     num_generated_files = 400,
-    target_compatible_with = select(
-        {
-            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
-        },
-    ),
 )
 
 resmoke_suite_test(
     name = "aggregation_expression_optimization_fuzzer",
     srcs = [":aggregation_expression_optimization_fuzzer_tests"],
     config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
-    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 20,
     tags = [
         "aggfuzzer",
         "ci-release-critical",
         "incompatible_development_variant",
-        "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",
     ],
@@ -393,23 +388,18 @@ jstestfuzz_generate(
     ],
     npm_command = "agg-fuzzer",
     num_generated_files = 400,
-    target_compatible_with = select(
-        {
-            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
-        },
-    ),
 )
 
 resmoke_suite_test(
     name = "aggregation_optimization_fuzzer",
     srcs = [":aggregation_optimization_fuzzer_tests"],
     config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
-    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 50,
     tags = [
         "aggfuzzer",
         "ci-release-critical",
         "incompatible_development_variant",
-        "incompatible_with_bazel_remote_test",
         "optimization",
         "random_name",
         "require_npm",

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Wrapper for the jstestfuzz_generate Bazel rule. Invokes the upstream
-# jstestfuzz npm script in a local checkout and collects its .js output into
-# the rule's declared output directory.
+# Wrapper for the jstestfuzz_generate Bazel rule. Runs jstestfuzz's npm script
+# (via a hermetic, rule-provided node) against the jstestfuzz checkout and
+# collects its .js output into the rule's declared output directory.
 #
 # All flags are passed by the rule; positional/extra jstestfuzz args follow
 # the literal '--' separator.
@@ -24,12 +24,15 @@ cleanup() {
 trap cleanup EXIT
 
 out_dir=""
-jstestfuzz_root=""
+bundle=""
+npm_cli=""
+js_tests_dir=""
 npm_command=""
 num_generated_files=""
 branch=""
 use_es_modules=0
 seed=""
+seed_offset=0
 volatile_status=""
 
 while [[ $# -gt 0 ]]; do
@@ -38,8 +41,16 @@ while [[ $# -gt 0 ]]; do
         out_dir=$2
         shift 2
         ;;
-    --jstestfuzz-root)
-        jstestfuzz_root=$2
+    --bundle)
+        bundle=$2
+        shift 2
+        ;;
+    --npm-cli)
+        npm_cli=$2
+        shift 2
+        ;;
+    --js-tests-dir)
+        js_tests_dir=$2
         shift 2
         ;;
     --npm-command)
@@ -62,6 +73,10 @@ while [[ $# -gt 0 ]]; do
         seed=$2
         shift 2
         ;;
+    --seed-offset)
+        seed_offset=$2
+        shift 2
+        ;;
     --volatile-status)
         volatile_status=$2
         shift 2
@@ -78,7 +93,7 @@ while [[ $# -gt 0 ]]; do
 done
 extra_args=("$@")
 
-for required in out_dir jstestfuzz_root npm_command num_generated_files; do
+for required in out_dir bundle npm_cli npm_command num_generated_files; do
     if [[ -z "${!required}" ]]; then
         echo "jstestfuzz_run.sh: --${required//_/-} is required" >&2
         exit 2
@@ -88,29 +103,33 @@ done
 # Make paths absolute before any cd so they stay valid.
 exec_root=$PWD
 out_dir_abs=$exec_root/$out_dir
-jstestfuzz_root_abs=$exec_root/$jstestfuzz_root
+npm_cli_abs=$exec_root/$npm_cli
+[[ -n "$js_tests_dir" ]] && js_tests_dir=$exec_root/$js_tests_dir
 
-# When the repository rule used a pre-existing checkout (Evergreen module or
-# local clone), individual files in jstestfuzz_root_abs are symlinks to the
-# real checkout.  TypeScript (ts-node) resolves tsconfig extends paths relative
-# to the real file location, not the symlink, so node_modules must be installed
-# there too.  Detect this case and run npm from the real checkout directory,
-# mirroring the old evergreen jstestfuzz_run.sh which always cd'd to src/jstestfuzz.
-jstestfuzz_run_dir=$jstestfuzz_root_abs
-if [[ -L "$jstestfuzz_root_abs/package.json" ]]; then
-    jstestfuzz_run_dir=$(dirname "$(realpath "$jstestfuzz_root_abs/package.json")")
-fi
+node_bin_abs=${npm_cli_abs%/lib/node_modules/npm/bin/npm-cli.js}/bin
+export PATH=$node_bin_abs:$PATH
 
-# Upstream npm_run.sh derives npm_config_cache from $TMP; if unset it falls back
-# to /npm_cache (root-owned). Point it at a writable per-action location.
+# Unpack the prepared jstestfuzz checkout into a writable per-action dir. Using a
+# tarball preserves node_modules' .bin/* symlinks.
+jstestfuzz_run_dir=$scratch/jstestfuzz
+mkdir -p "$jstestfuzz_run_dir"
+npm_root=${npm_cli_abs%/bin/npm-cli.js}
+node -e 'require(process.argv[1]).x({file: process.argv[2], cwd: process.argv[3], sync: true})' \
+    "$npm_root/node_modules/tar" "$exec_root/$bundle" "$jstestfuzz_run_dir"
+
 export TMP=${TMP:-${TMPDIR:-/tmp}}
 export TMPDIR=$TMP
+export HOME=$scratch
+export npm_config_cache=$scratch/npm_cache
+export npm_config_offline=true
+export npm_config_update_notifier=false
+export npm_config_fund=false
 
 # git_repository strips .git/ after fetch, but jstestfuzz's file_namer.ts calls
 # `git rev-parse --short=4 HEAD` to derive output-filename prefixes. The
 # preserved SHA was captured by patch_cmds in MODULE.bazel; shim git so that
 # one call returns the right answer. All other git invocations pass through.
-sha_file=$jstestfuzz_root_abs/.jstestfuzz_commit_sha
+sha_file=$jstestfuzz_run_dir/.jstestfuzz_commit_sha
 if [[ -f "$sha_file" ]]; then
     sha=$(tr -d '[:space:]' <"$sha_file")
     real_git=$(command -v git || echo /usr/bin/git)
@@ -140,41 +159,32 @@ if [[ -z "$seed" ]]; then
         seed=$RANDOM
     fi
 fi
+# Sharded generation: each shard derives its own seed from the base seed so a
+# fixed base seed stays reproducible per shard, and the seed embedded in every
+# generated filename keeps shard outputs collision-free.
+if ! [[ "$seed" =~ ^-?[0-9]+$ ]]; then
+    echo "jstestfuzz_run.sh: seed must be an integer, got '$seed'" >&2
+    exit 2
+fi
+if ! [[ "$seed_offset" =~ ^-?[0-9]+$ ]]; then
+    echo "jstestfuzz_run.sh: seed-offset must be an integer, got '$seed_offset'" >&2
+    exit 2
+fi
+seed=$((seed + seed_offset))
 
 mkdir -p "$out_dir_abs"
 
-# Run jstestfuzz inside its checkout. Outputs land in jstestfuzz/out/ (the
-# upstream default); we move them into the bazel-declared output dir at the end.
-upstream_out=$jstestfuzz_run_dir/out
-rm -rf "$upstream_out"
-mkdir -p "$upstream_out"
-
-cmd=(./src/scripts/npm_run.sh "$npm_command" --
+cmd=(node "$npm_cli_abs" run "$npm_command" --
     --numGeneratedFiles "$num_generated_files"
     --branch "$branch"
-    --seed "$seed")
+    --seed "$seed"
+    --out "$out_dir_abs")
+if [[ -n "$js_tests_dir" ]]; then
+    cmd+=(--jsTestsDir "$js_tests_dir")
+fi
 if [[ $use_es_modules -eq 1 ]]; then
     cmd+=(--useEsModules)
 fi
-
-# jstestfuzz commands that read templates from the workspace's jstests/ take a
-# --jsTestsDir argument; others (e.g. resharding-fuzzer) don't accept it, so it
-# is passed explicitly per target via extra_args only where needed.
-#
-# extra_args are set statically in BUILD files, but jstestfuzz runs from its
-# checkout (a cd below) while the workspace jstests/ lives under the exec root.
-# So a relative --jsTestsDir value is resolved against the exec root here (it's
-# reachable because we run unsandboxed); absolute values pass through unchanged.
-for i in "${!extra_args[@]}"; do
-    a=${extra_args[$i]}
-    if [[ "$a" == "--jsTestsDir" && $((i + 1)) -lt ${#extra_args[@]} ]]; then
-        v=${extra_args[$((i + 1))]}
-        [[ "$v" == /* ]] || extra_args[$((i + 1))]=$exec_root/$v
-    elif [[ "$a" == --jsTestsDir=* ]]; then
-        v=${a#--jsTestsDir=}
-        [[ "$v" == /* ]] || extra_args[$i]=--jsTestsDir=$exec_root/$v
-    fi
-done
 cmd+=("${extra_args[@]}")
 
 (
@@ -183,12 +193,11 @@ cmd+=("${extra_args[@]}")
 ) >>"$log" 2>&1
 
 shopt -s nullglob
-generated=("$upstream_out"/*.js)
+generated=("$out_dir_abs"/*.js)
 if [[ ${#generated[@]} -eq 0 ]]; then
-    echo "jstestfuzz_run.sh: jstestfuzz produced no .js files in $upstream_out" >&2
+    echo "jstestfuzz_run.sh: jstestfuzz produced no .js files in $out_dir_abs" >&2
     exit 1
 fi
-mv "${generated[@]}" "$out_dir_abs/"
 
 # Record the seed so it can be inspected and used to reproduce tests
 echo "$seed" >"$out_dir_abs/.jstestfuzz_seed"
@@ -196,6 +205,6 @@ echo "$seed" >"$out_dir_abs/.jstestfuzz_seed"
 # Record the upstream jstestfuzz commit alongside the seed. Both are needed
 # to reproduce: same seed + different jstestfuzz code = different tests.
 # fetch_remote_test_results.sh harvests this and pins it via --repo_env=JSTESTFUZZ_COMMIT=.
-if [[ -f "$jstestfuzz_root_abs/.jstestfuzz_commit_sha" ]]; then
-    cp "$jstestfuzz_root_abs/.jstestfuzz_commit_sha" "$out_dir_abs/.jstestfuzz_commit_sha"
+if [[ -f "$jstestfuzz_run_dir/.jstestfuzz_commit_sha" ]]; then
+    cp "$jstestfuzz_run_dir/.jstestfuzz_commit_sha" "$out_dir_abs/.jstestfuzz_commit_sha"
 fi

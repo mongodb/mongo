@@ -651,9 +651,6 @@ jstestfuzz_generate(
     ],
     npm_command = "resharding-fuzzer",
     num_generated_files = 50,
-    target_compatible_with = select({
-        "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
-    }),
 )
 
 resmoke_suite_test(
@@ -661,7 +658,6 @@ resmoke_suite_test(
     srcs = [":resharding_fuzzer_idempotency_tests"],
     config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
     tags = [
-        "incompatible_with_bazel_remote_test",  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
         "non_deterministic",
         "random_name",
         "require_npm",
@@ -669,6 +665,7 @@ resmoke_suite_test(
     ],
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )
@@ -693,26 +690,24 @@ jstestfuzz_generate(
     ],
     npm_command = "resharding-fuzzer",
     num_generated_files = 50,
-    target_compatible_with = select({
-        "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
-    }),
 )
 
 resmoke_suite_test(
     name = "resharding_timeseries_fuzzer",
     srcs = [":resharding_timeseries_fuzzer_tests"],
     config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
+    shard_count = 10,
     tags = [
         "ci-default",
         "feature_flag_guarded",
         "incompatible_disaggregated_storage",
-        "incompatible_with_bazel_remote_test",  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup
         "random_name",
         "require_npm",
         "requires_all_feature_flags",
     ],
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )

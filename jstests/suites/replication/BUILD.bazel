@@ -1254,22 +1254,16 @@ jstestfuzz_generate(
     name = "initial_sync_fuzzer_sanity_patch_tests",
     npm_command = "initsync-fuzzer",
     num_generated_files = 2,
-    target_compatible_with = select(
-        {
-            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
-        },
-    ),
 )
 
 resmoke_suite_test(
     name = "initial_sync_fuzzer_sanity_patch",
     srcs = [":initial_sync_fuzzer_sanity_patch_tests"],
     config = "//buildscripts/resmokeconfig:suites/initial_sync_fuzzer.yml",
-    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
     tags = [
         "ci-default",
         "incompatible_disaggregated_storage",
-        "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",
     ],
@@ -1317,22 +1311,16 @@ jstestfuzz_generate(
     name = "rollback_fuzzer_sanity_patch_tests",
     npm_command = "rollback-fuzzer",
     num_generated_files = 2,
-    target_compatible_with = select(
-        {
-            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
-        },
-    ),
 )
 
 resmoke_suite_test(
     name = "rollback_fuzzer_sanity_patch",
     srcs = [":rollback_fuzzer_sanity_patch_tests"],
     config = "//buildscripts/resmokeconfig:suites/rollback_fuzzer.yml",
-    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
     tags = [
         "ci-default",
         "incompatible_disaggregated_storage",
-        "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",
         "rollbackfuzzer",
@@ -1340,5 +1328,6 @@ resmoke_suite_test(
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
     ],
 )

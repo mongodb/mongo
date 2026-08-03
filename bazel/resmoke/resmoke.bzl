@@ -130,7 +130,7 @@ def _resmoke_config_impl(ctx):
             ]
         ctx.actions.write(test_list_file, "\n".join(test_list))
 
-        deps = depset([test_list_file, base_config_file] + ctx.files.srcs, transitive = [python.files] + generator_deps)
+        deps = depset([test_list_file, base_config_file], transitive = [python.files] + generator_deps)
 
         args = [
             "bazel/resmoke/resmoke_config_generator.py",

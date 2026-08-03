@@ -237,3 +237,32 @@ sh_binary(
     srcs = ["jstestfuzz_run.sh"],
     visibility = ["//visibility:public"],
 )
+
+# Node.js 16.18.1 runtime (jstestfuzz's pinned version), selected for the
+# execution platform. Only Linux runtimes are bundled, so key the selects on
+# os:linux + cpu and fail fast with a clear message on any other platform
+# rather than silently pulling a Linux node distribution.
+_NODE16 = {
+    "//bazel/config:linux_aarch64": "@nodejs16_linux_arm64",
+    "//bazel/config:linux_x86_64": "@nodejs16_linux_amd64",
+}
+
+_NODE16_NO_MATCH_ERROR = "jstestfuzz generation requires a Linux aarch64/x86_64 execution platform."
+
+alias(
+    name = "jstestfuzz_npm_cli",
+    actual = select(
+        {setting: repo + "//:npm_bin" for setting, repo in _NODE16.items()},
+        no_match_error = _NODE16_NO_MATCH_ERROR,
+    ),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "jstestfuzz_node_files",
+    actual = select(
+        {setting: repo + "//:npm_files" for setting, repo in _NODE16.items()},
+        no_match_error = _NODE16_NO_MATCH_ERROR,
+    ),
+    visibility = ["//visibility:public"],
+)

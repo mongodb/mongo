@@ -183,7 +183,7 @@ failure with identical binaries.
 
 ## jstestfuzz_generate
 
-Generates a directory of randomized `.js` test files by invoking the
+Generates randomized `.js` test files by invoking the
 [10gen/jstestfuzz](https://github.com/10gen/jstestfuzz) generator, and feeds them into a
 `resmoke_suite_test` via `srcs`.
 
@@ -212,14 +212,15 @@ resmoke_suite_test(
 
 **ATTRIBUTES**
 
-| Name                | Description                                                                                                                                                 | Type            | Mandatory | Default        |
-| :------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------- | :-------- | :------------- |
-| name                | A unique name for this target.                                                                                                                              | Name            | required  |                |
-| num_generated_files | How many `.js` test files to emit. Forwarded to jstestfuzz as `--numGeneratedFiles`.                                                                        | Integer         | required  |                |
-| seed                | Fixed seed for this target. Overrides `--//bazel/resmoke:jstestfuzz_seed` when set. Leave empty to use the flag (random per build by default).              | String          | optional  | `""`           |
-| npm_command         | The npm script in jstestfuzz's `package.json` to run (e.g. `jstestfuzz`, `agg-fuzzer`, `query-fuzzer`, `update-fuzzer`, `rollback-fuzzer`).                 | String          | optional  | `"jstestfuzz"` |
-| use_es_modules      | Pass `--useEsModules` to jstestfuzz. Required for npm commands other than the default `jstestfuzz`.                                                         | Boolean         | optional  | `False`        |
-| extra_args          | Additional CLI flags forwarded to jstestfuzz (e.g. `['--jsTestsDir', 'jstests']`). Relative `--jsTestsDir` values are resolved against the Bazel exec root. | List of strings | optional  | `[]`           |
+| Name                | Description                                                                                                                                                                                                                      | Type            | Mandatory | Default        |
+| :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------- | :-------- | :------------- |
+| name                | A unique name for this target.                                                                                                                                                                                                   | Name            | required  |                |
+| num_generated_files | How many `.js` test files to emit (across all shards). Forwarded to jstestfuzz as `--numGeneratedFiles`.                                                                                                                         | Integer         | required  |                |
+| shard_count         | Number of parallel generation actions to fan out to; each produces ~`num_generated_files/shard_count` files into its own output directory using seed `base_seed + shard_index`. `0` auto-shards at ~15 files per shard.          | Integer         | optional  | `0`            |
+| seed                | Fixed seed for this target. Overrides `--//bazel/resmoke:jstestfuzz_seed` when set. Leave empty to use the flag (random per build by default).                                                                                   | String          | optional  | `""`           |
+| npm_command         | The npm script in jstestfuzz's `package.json` to run (e.g. `jstestfuzz`, `agg-fuzzer`, `query-fuzzer`, `update-fuzzer`, `rollback-fuzzer`).                                                                                      | String          | optional  | `"jstestfuzz"` |
+| js_tests            | The template corpus passed to jstestfuzz as `--jsTestsDir`. Defaults to `None` (no corpus, `--jsTestsDir` omitted); set to `//jstests:all_subpackage_javascript_files` or a subtree for commands that mutate an existing corpus. | Label           | optional  | `None`         |
+| extra_args          | Additional CLI flags forwarded verbatim to jstestfuzz (e.g. `['--opType', 'moveCollection']`).                                                                                                                                   | List of strings | optional  | `[]`           |
 
 ### Reproducing a failure
 

@@ -1467,10 +1467,7 @@ resmoke_suite_test(
 
 jstestfuzz_generate(
     name = "jstestfuzz_tests",
-    extra_args = [
-        "--jsTestsDir",
-        "jstests",
-    ],
+    js_tests = "//jstests:all_subpackage_javascript_files",
     npm_command = "jstestfuzz",
     num_generated_files = 75,
 )
@@ -1480,7 +1477,7 @@ resmoke_suite_test(
     srcs = [":jstestfuzz_tests"],
     config = "//buildscripts/resmokeconfig:suites/jstestfuzz.yml",
     resmoke_args = [
-        "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'",
+        "--mongodSetParameters={logComponentVerbosity: {command: 2}}",
     ],
     shard_count = 5,
     tags = [
@@ -1765,25 +1762,20 @@ jstestfuzz_generate(
     ],
     npm_command = "agg-fuzzer",
     num_generated_files = 1400,
-    target_compatible_with = select(
-        {
-            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
-        },
-    ),
 )
 
 resmoke_suite_test(
     name = "aggregation_blockprocessing_fuzzer",
     srcs = [":aggregation_blockprocessing_fuzzer_tests"],
     config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
-    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 50,
     tags = [
         "aggfuzzer",
         "blockprocessing",
         "ci-release-critical",
         "common",
         "incompatible_development_variant",
-        "incompatible_with_bazel_remote_test",
         "no_debug_mode",
         "random_name",
         "require_npm",
@@ -1809,25 +1801,20 @@ jstestfuzz_generate(
     ],
     npm_command = "agg-fuzzer",
     num_generated_files = 400,
-    target_compatible_with = select(
-        {
-            "//conditions:default": ["@platforms//:incompatible"],  # Concurrent jstestfuzz_generate actions clobber each other's ts-node setup, SERVER-131293
-        },
-    ),
 )
 
 resmoke_suite_test(
     name = "aggregation_wildcard_fuzzer",
     srcs = [":aggregation_wildcard_fuzzer_tests"],
     config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
-    resmoke_args = ["--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"],
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 50,
     tags = [
         "aggfuzzer",
         "ci-release-critical",
         "common",
         "incompatible_debug_mode",
         "incompatible_development_variant",
-        "incompatible_with_bazel_remote_test",
         "random_name",
         "require_npm",
         "wildcard",

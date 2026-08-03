@@ -13,16 +13,12 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 _BUILD_FILE_CONTENT = """\
 package(default_visibility = ["//visibility:public"])
 
+# The whole prepared checkout (sources + installed node_modules + compiled
+# grammars + .jstestfuzz_commit_sha) as a single tarball. A tarball (rather
+# than a glob filegroup) because node_modules contains symlinks.
 filegroup(
-    name = "sources",
-    srcs = glob(
-        include = ["**/*"],
-        exclude = [
-            "node_modules/**",
-            "out/**",
-        ],
-        allow_empty = True,
-    ),
+    name = "bundle",
+    srcs = ["jstestfuzz_bundle.tar"],
 )
 """
 
@@ -37,7 +33,18 @@ def _jstestfuzz_repository_impl(module_ctx):
         # Preserves the fetched commit before git_repository strips .git/, since some
         # consumers (e.g. jstestfuzz's file_namer.ts) shell out to `git rev-parse HEAD`
         # at runtime.
-        patch_cmds = ["git rev-parse HEAD > .jstestfuzz_commit_sha"],
+        patch_cmds = [
+            "git rev-parse HEAD > .jstestfuzz_commit_sha",
+            "export TMP=${TMP:-${TMPDIR:-/tmp}}; export TMPDIR=$TMP; " +
+            "python3 src/scripts/npm_run.py compile",
+            # Bundle the prepared checkout into a single tarball (symlinks
+            # preserved) that jstestfuzz_generate ships and unpacks per action.
+            # Exclude .git and the node runtime download (node comes from the
+            # bazel toolchain); exclude the bundle itself.
+            "tar cf jstestfuzz_bundle.tar " +
+            "--exclude=./.git --exclude=./node-v[0-9]* --exclude=./out " +
+            "--exclude=./jstestfuzz_bundle.tar .",
+        ],
     )
 
 jstestfuzz_repository = module_extension(

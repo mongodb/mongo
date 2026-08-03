@@ -466,7 +466,7 @@
     },
     "//bazel/repository_rules:jstestfuzz_repository.bzl%jstestfuzz_repository": {
       "general": {
-        "bzlTransitiveDigest": "xxuA12RU5C2X5DLMRWlYmgSK1WCcShYhrrTrT4VjPLE=",
+        "bzlTransitiveDigest": "fWIp91dfr9+kScoAejIhlAHI5dZATVijfdWxmKZNO+w=",
         "usagesDigest": "hfv5GZCbjEm9mqVjqsLkZAo40qQLmsIZVIL6T+or5E4=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -481,9 +481,11 @@
               "remote": "https://github.com/10gen/jstestfuzz.git",
               "branch": "master",
               "commit": "",
-              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nfilegroup(\n    name = \"sources\",\n    srcs = glob(\n        include = [\"**/*\"],\n        exclude = [\n            \"node_modules/**\",\n            \"out/**\",\n        ],\n        allow_empty = True,\n    ),\n)\n",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\n# The whole prepared checkout (sources + installed node_modules + compiled\n# grammars + .jstestfuzz_commit_sha) as a single tarball. A tarball (rather\n# than a glob filegroup) because node_modules contains symlinks.\nfilegroup(\n    name = \"bundle\",\n    srcs = [\"jstestfuzz_bundle.tar\"],\n)\n",
               "patch_cmds": [
-                "git rev-parse HEAD > .jstestfuzz_commit_sha"
+                "git rev-parse HEAD > .jstestfuzz_commit_sha",
+                "export TMP=${TMP:-${TMPDIR:-/tmp}}; export TMPDIR=$TMP; python3 src/scripts/npm_run.py compile",
+                "tar cf jstestfuzz_bundle.tar --exclude=./.git --exclude=./node-v[0-9]* --exclude=./out --exclude=./jstestfuzz_bundle.tar ."
               ]
             }
           }

@@ -132,6 +132,15 @@ load("@aspect_rules_js//js:toolchains.bzl", "DEFAULT_NODE_VERSION", "rules_js_re
 
 rules_js_register_toolchains(node_version = DEFAULT_NODE_VERSION)
 
+load("@rules_nodejs//nodejs:repositories.bzl", "nodejs_register_toolchains")
+
+# Node.js runtime pinned to jstestfuzz's .nvmrc version (16.18.1).
+nodejs_register_toolchains(
+    name = "nodejs16",
+    node_version = "16.18.1",
+    register = False,
+)
+
 load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
 
 npm_translate_lock(
