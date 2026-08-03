@@ -154,12 +154,12 @@ resmoke_suite_test(
         "//jstests/libs:key2",
         "//jstests/libs/config_files:set_replsetname.json",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
     ],
     shard_count = 40,
     tags = [
         "ci-release-critical",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
         "requires_large_host",

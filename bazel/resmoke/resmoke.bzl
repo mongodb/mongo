@@ -200,6 +200,18 @@ def _resolve_suite_srcs(config):
 
     return None
 
+# Python helper programs included in every suite's data (see default_data below).
+# jstests spawn these as subprocesses through RESMOKE_PYTHON, so their PyInfo
+# imports have to reach PYTHONPATH via _collect_python_imports — being in
+# default_data alone only puts the sources in runfiles, not their dependencies'
+# import paths. Kept as a separate list so both uses stay in sync.
+_DEFAULT_PYTHON_DATA = [
+    "//jstests/ocsp/lib:ocsp_mock",
+    "//jstests/sharding/libs:proxy_protocol_server",
+    "//jstests/ssl:tls_enumerator",
+    "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
+]
+
 def _dep_target_name(dep):
     """Extract the target name from a label string, e.g. '//pkg:name' → 'name'."""
     if ":" in dep:
@@ -289,8 +301,9 @@ def resmoke_suite_test(
     _collect_python_imports(
         name = python_imports_target,
         data = select({
-            "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
-            "//conditions:default": data,
+            "//bazel/resmoke:skip_deps_for_cquery_enabled": _DEFAULT_PYTHON_DATA,
+            "//conditions:default": _DEFAULT_PYTHON_DATA +
+                                    [d for d in data if d not in _DEFAULT_PYTHON_DATA],
         }),
         tags = ["manual"],
     )
@@ -333,7 +346,7 @@ def resmoke_suite_test(
         "//conditions:default": [],
     })
 
-    default_data = [
+    default_data = _DEFAULT_PYTHON_DATA + [
         generated_config,
         python_imports_target,
         "//bazel/resmoke:resmoke_mongo_version",
@@ -386,7 +399,6 @@ def resmoke_suite_test(
         "//jstests/noPassthrough/memory_tracking:all_javascript_files",
         "//jstests/noPassthrough/rs_endpoint/lib:all_subpackage_javascript_files",
         "//jstests/ocsp/lib:all_javascript_files",
-        "//jstests/ocsp/lib:ocsp_mock",
         "//jstests/query_golden/libs:all_javascript_files",
         "//jstests/query_golden/test_inputs:all_javascript_files",
         "//jstests/query_golden/expected_output:expected_output",
@@ -397,8 +409,6 @@ def resmoke_suite_test(
         "//jstests/sharding/libs:all_javascript_files",
         "//jstests/sharding/libs:last_lts_mongod_commands.js",
         "//jstests/sharding/libs:last_lts_mongos_commands.js",
-        "//jstests/sharding/libs:proxy_protocol_server",
-        "//jstests/ssl:tls_enumerator",
         "//jstests/ssl/libs:all_javascript_files",
         "//jstests/with_mongot:keyfile_for_testing",
         "//jstests/with_mongot/search_mocked/lib:all_javascript_files",
@@ -412,7 +422,6 @@ def resmoke_suite_test(
         "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:ekf2",
         "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:all_files",
         "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:all_subpackage_javascript_files",
-        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
         "//src/mongo/db/modules/enterprise/jstests/external_auth_aws/lib:all_javascript_files",
         "//src/mongo/db/modules/enterprise/jstests/hot_backups/libs:all_javascript_files",
         "//src/mongo/db/modules/enterprise/jstests/live_restore/libs:all_javascript_files",

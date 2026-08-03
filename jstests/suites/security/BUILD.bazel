@@ -483,11 +483,17 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "ese",
     config = "//buildscripts/resmokeconfig:suites/ese.yml",
-    shard_count = 4,
+    data = [
+        "//jstests/ssl/libs",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_encrypt",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_manage_key",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:badekf",
+        "//x509:generate_main_certificates",
+    ],
     tags = [
         "ci-release-critical",
         "encrypt",
-        "incompatible_with_bazel_remote_test",  # Needs kmip_server.py, for which rules_poetry does not properly handle PyKMIP from git.
         "patch_build",
         "requires_replicated_fast_count_recovery",
     ],
@@ -497,7 +503,10 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/encryptdb:mongodecrypt",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
     ],
 )
 

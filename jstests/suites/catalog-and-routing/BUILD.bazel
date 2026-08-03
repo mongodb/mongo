@@ -645,11 +645,13 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "replica_sets_with_priority_ports",
     config = "//buildscripts/resmokeconfig:suites/replica_sets_with_priority_ports.yml",
+    data = [
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
+    ],
     shard_count = 50,
     tags = [
         "ci-default",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
         "requires_replicated_fast_count_recovery",

@@ -295,12 +295,14 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "replica_sets_execution_control_with_prioritization",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_execution_control_with_prioritization.yml",
+    data = [
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
+    ],
     shard_count = 50,
     tags = [
         "ci-default",
         "execution_control_with_prioritization",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "replica_sets",
         "requires_replicated_fast_count_recovery",
         "resources:cpu:2",
