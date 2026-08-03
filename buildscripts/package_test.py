@@ -710,6 +710,50 @@ def validate_top_level_directory(tar_name: str):
         )
 
 
+def validate_no_remote_cache_or_execution(bep_json_path: str) -> None:
+    """Validate that the build did not use remote cache or remote execution.
+
+    Parses a Bazel Build Event Protocol (BEP) JSON file and checks that
+    --remote_executor was empty/unset and --modify_execution_info=.*=+no-cache
+    was set. The remote cache endpoint may still be configured (needed by the
+    remote downloader for artifact caching) as long as action caching is disabled.
+    """
+    logging.info(
+        "Validating no remote cache or execution in BEP file: %s", bep_json_path
+    )
+    with open(bep_json_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            event = json.loads(line)
+            if "optionsParsed" not in event.get("id", {}):
+                continue
+            cmd_line = event.get("optionsParsed", {}).get("cmdLine", [])
+            remote_executor = ""
+            has_no_cache = False
+            for opt in cmd_line:
+                if opt.startswith("--remote_executor="):
+                    remote_executor = opt[len("--remote_executor=") :]
+                elif opt.startswith("--modify_execution_info=") and "no-cache" in opt:
+                    has_no_cache = True
+            if remote_executor:
+                raise Exception(
+                    f"Build used remote execution: --remote_executor={remote_executor}. "
+                    "Release builds must not use remote execution."
+                )
+            if not has_no_cache:
+                raise Exception(
+                    "Build did not disable action caching. "
+                    "Release builds must set --modify_execution_info=.*=+no-cache."
+                )
+            logging.info(
+                "Validated: no remote cache or remote execution detected in BEP"
+            )
+            return
+    raise Exception(f"No optionsParsed event found in BEP file: {bep_json_path}")
+
+
 arches: Set[str] = set()
 oses: Set[str] = set()
 editions: Set[str] = set()
@@ -796,6 +840,13 @@ branch_test_parser.add_argument(
     help="Evergreen build ID. If provided, the packages URL will be fetched "
     "from the Evergreen API (required for private artifacts).",
     default=None,
+)
+branch_test_parser.add_argument(
+    "--bep-json-file",
+    type=str,
+    help="Path to a Bazel Build Event Protocol JSON file. "
+    "Validates that no remote cache or remote execution was used to build the binaries.",
+    required=True,
 )
 args = parser.parse_args()
 
@@ -944,6 +995,12 @@ if args.command == "branch":
 
                 if p.returncode != 0:
                     raise Exception("GDB process exited non-zero!")
+
+    if (
+        os.environ.get("is_patch") != "true"
+        or os.environ.get("is_release", "false") != "false"
+    ):
+        validate_no_remote_cache_or_execution(args.bep_json_file)
 
 # If os is None we only want to do the tests specified in the arguments
 if args.command == "release":

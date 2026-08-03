@@ -156,7 +156,9 @@ RELEASE_FLAG="$(bazel_evergreen_shutils::maybe_release_flag)"
 bazel_evergreen_shutils::ensure_server_and_print_pid "$BAZEL_BINARY"
 
 # Build flags line
-ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} $RELEASE_FLAG ${patch_compile_flags:-}"
+BEP_FULL="build_events_full.json"
+BEP_OUT="build_events.json"
+ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} $RELEASE_FLAG ${patch_compile_flags:-} --build_event_json_file=${BEP_FULL}"
 echo "${ALL_FLAGS}" > .bazel_build_flags
 
 set +o errexit
@@ -164,6 +166,14 @@ set +o errexit
 bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
   build ${ALL_FLAGS} ${targets}
 RET=$?
+
+# Extract just the optionsParsed event from the full BEP JSON.
+# This single line (~few KB) is all package_test.py needs to verify
+# that remote cache and remote execution were not used.
+if [[ -f "${BEP_FULL}" ]]; then
+  grep '"optionsParsed"' "${BEP_FULL}" > "${BEP_OUT}" || true
+  rm -f "${BEP_FULL}"
+fi
 
 set -o errexit
 

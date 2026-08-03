@@ -400,12 +400,12 @@ common:macos -c dbg
 # Remote execution and caching is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the --config=local option
 
-# Enable remote build execution:
-common:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
+# Disable remote execution on Windows and MacOS (they cannot reach the engflow cluster):
 common:windows --remote_executor=
 common:macos --remote_executor=
 
-# Enable remote cache (also necessary for remote build execution):
+# Enable remote build execution and caching:
+common --remote_executor=grpcs://sodalite.cluster.engflow.com
 common --experimental_remote_downloader=grpcs://sodalite.cluster.engflow.com
 common --remote_cache=grpcs://sodalite.cluster.engflow.com
 common --bes_backend=grpcs://sodalite.cluster.engflow.com
@@ -459,18 +459,13 @@ common:no-remote-exec --remote_executor=
 common:no-remote-exec --jobs=auto
 common:no-remote-exec --//bazel/config:local_build=True
 
-# Disable remote execution and caching for public releases
+# Disable remote execution for public releases but keep remote downloader for artifact caching
 --config=public-release
 common:public-release --remote_executor=
-common:public-release --experimental_remote_downloader=
-common:public-release --remote_cache=
-common:public-release --bes_backend=
-common:public-release --bes_results_url=
-common:public-release --tls_client_certificate=
-common:public-release --tls_client_key=
-common:public-release --remote_cache_compression=false
-common:public-release --grpc_keepalive_time=0s
-common:public-release --legacy_important_outputs
+common:public-release --remote_instance_name=release
+common:public-release --bes_instance_name=release
+common:public-release --remote_upload_local_results=false
+common:public-release --modify_execution_info=.*=+no-cache
 common:public-release --//bazel/config:release=True
 common:public-release --//bazel/config:local_build=True
 common:public-release --stamp
