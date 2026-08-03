@@ -193,7 +193,11 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
             [this, anchor = shared_from_this(), token](OperationContext* opCtx) {
                 LOGV2(
                     12894207, "MoveRangeCoordinator executing kMigrate", getCoordinatorLogAttrs());
-                uassert(ErrorCodes::InterruptedDueToReplStateChange,
+
+                // The MigrationSourceManager doesn't support resuming a chunk migration after a
+                // primary failover (new term). If this is not the first execution, abort so the
+                // caller can retry the migration from scratch.
+                uassert(ErrorCodes::RetriableRemoteCommandFailure,
                         "MoveRangeCoordinator interrupted during data transfer",
                         _firstExecution);
 
@@ -215,10 +219,15 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
                 LOGV2(12795314,
                       "MoveRangeCoordinator executing kEnterCriticalSection",
                       getCoordinatorLogAttrs());
-                uassert(ErrorCodes::InterruptedDueToReplStateChange,
+
+                // The MigrationSourceManager doesn't support resuming a chunk migration after a
+                // primary failover (new term). If this is not the first execution, abort so the
+                // caller can retry the migration from scratch.
+                uassert(ErrorCodes::RetriableRemoteCommandFailure,
                         "MoveRangeCoordinator interrupted before entering the commit critical "
                         "section",
                         _firstExecution);
+
                 tassert(12795311,
                         "Migrate and enterCriticalSection must only run during the same term",
                         _migrationAttempt.has_value());
