@@ -16,7 +16,7 @@ ReshardingRecipientPostCloningDeltaCollector::ReshardingRecipientPostCloningDelt
     ReshardingCoordinatorDocument coordinatorDoc,
     std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
     CancellationToken abortToken,
-    std::unique_ptr<HierarchicalCancelableOperationContextFactory> cancelableOpCtxFactory)
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> cancelableOpCtxFactory)
     : _coordinatorDoc(std::move(coordinatorDoc)),
       _externalState(std::move(externalState)),
       _abortToken(std::move(abortToken)),

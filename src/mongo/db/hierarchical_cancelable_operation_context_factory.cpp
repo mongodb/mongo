@@ -7,30 +7,28 @@ namespace mongo {
 
 HierarchicalCancelableOperationContextFactory::HierarchicalCancelableOperationContextFactory(
     CancellationToken parentCancelToken, ExecutorPtr executor)
-    : _cancelSource{parentCancelToken},
+    : _parentFactory{nullptr},
+      _cancelSource{parentCancelToken},
       _cancelToken{_cancelSource.token()},
       _executor{std::move(executor)},
       _hierarchyDepth{0} {}
 
 HierarchicalCancelableOperationContextFactory::HierarchicalCancelableOperationContextFactory(
-    CancellationToken parentCancelToken, ExecutorPtr executor, int hierarchyDepth)
-    : _cancelSource{parentCancelToken},
+    std::shared_ptr<const HierarchicalCancelableOperationContextFactory> parentFactory,
+    CancellationToken parentCancelToken,
+    ExecutorPtr executor,
+    int hierarchyDepth)
+    : _parentFactory{std::move(parentFactory)},
+      _cancelSource{parentCancelToken},
       _cancelToken{_cancelSource.token()},
       _executor{std::move(executor)},
       _hierarchyDepth{hierarchyDepth} {}
 
-std::unique_ptr<HierarchicalCancelableOperationContextFactory>
-HierarchicalCancelableOperationContextFactory::createChild() {
-    return std::unique_ptr<HierarchicalCancelableOperationContextFactory>(
-        new HierarchicalCancelableOperationContextFactory(
-            _cancelToken, _executor, _hierarchyDepth + 1));
-}
-
 std::shared_ptr<HierarchicalCancelableOperationContextFactory>
-HierarchicalCancelableOperationContextFactory::createSharedChild() {
+HierarchicalCancelableOperationContextFactory::createChild() {
     return std::shared_ptr<HierarchicalCancelableOperationContextFactory>(
         new HierarchicalCancelableOperationContextFactory(
-            _cancelToken, _executor, _hierarchyDepth + 1));
+            shared_from_this(), _cancelToken, _executor, _hierarchyDepth + 1));
 }
 
 CancelableOperationContext HierarchicalCancelableOperationContextFactory::makeOperationContext(

@@ -31,7 +31,7 @@ public:
         ReshardingCoordinatorDocument coordinatorDoc,
         std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
         CancellationToken abortToken,
-        std::unique_ptr<HierarchicalCancelableOperationContextFactory> cancelableOpCtxFactory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> cancelableOpCtxFactory);
 
     /**
      * Starts the asynchronous task to fetch the document count delta from each recipient shard.
@@ -52,7 +52,7 @@ private:
     const ReshardingCoordinatorDocument _coordinatorDoc;
     const std::shared_ptr<ReshardingCoordinatorExternalState> _externalState;
     const CancellationToken _abortToken;
-    const std::unique_ptr<HierarchicalCancelableOperationContextFactory> _cancelableOpCtxFactory;
+    const std::shared_ptr<HierarchicalCancelableOperationContextFactory> _cancelableOpCtxFactory;
 
     SharedPromise<std::map<ShardId, int64_t>> _completionPromise;
 };

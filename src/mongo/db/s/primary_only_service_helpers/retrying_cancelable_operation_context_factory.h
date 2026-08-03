@@ -23,14 +23,14 @@ public:
         ExecutorPtr executor,
         RetryabilityPredicate isRetryable = kDefaultRetryabilityPredicate)
         : _isRetryable{std::move(isRetryable)},
-          _factory{std::make_unique<HierarchicalCancelableOperationContextFactory>(
+          _factory{std::make_shared<HierarchicalCancelableOperationContextFactory>(
               std::move(cancelToken), std::move(executor))} {}
 
     template <typename BodyCallable>
     decltype(auto) withAutomaticRetry(BodyCallable&& body) const {
         // Create a NEW child for each retry scope. Using shared_ptr allows the child
         // to be captured by value in multiple lambdas within the future chain.
-        auto child = _factory->createSharedChild();
+        auto child = _factory->createChild();
         return WithAutomaticRetry(
             [child, body = std::forward<BodyCallable>(body)]() { return body(child); },
             _isRetryable);
@@ -44,7 +44,7 @@ public:
     template <typename BodyCallable>
     decltype(auto) withAutomaticRetryExtending(BodyCallable&& body,
                                                RetryabilityPredicate additionalPredicate) const {
-        auto child = _factory->createSharedChild();
+        auto child = _factory->createChild();
         return WithAutomaticRetry(
             [child, body = std::forward<BodyCallable>(body)]() { return body(child); },
             [base = _isRetryable, extra = std::move(additionalPredicate)](const Status& s) {
@@ -54,7 +54,7 @@ public:
 
 private:
     RetryabilityPredicate _isRetryable;
-    std::unique_ptr<HierarchicalCancelableOperationContextFactory> _factory;
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> _factory;
 };
 
 }  // namespace primary_only_service_helpers

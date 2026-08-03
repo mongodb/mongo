@@ -70,7 +70,7 @@ public:
             std::move(doc),
             std::move(externalState),
             abortToken,
-            std::make_unique<HierarchicalCancelableOperationContextFactory>(
+            std::make_shared<HierarchicalCancelableOperationContextFactory>(
                 abortToken, executorForCancellation()));
     }
 };
