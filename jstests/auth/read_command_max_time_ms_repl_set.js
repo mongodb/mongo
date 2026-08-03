@@ -44,14 +44,14 @@ const regularUserDB = regularUserConn.getSiblingDB(dbName);
 
 // A long running query without maxTimeMS specified will succeed.
 assert.commandWorked(
-    regularUserDB.runCommand({find: collName, filter: {$where: "sleep(1000); return true;"}}),
+    regularUserDB.runCommand({find: collName, filter: {$where: "sleep(100); return true;"}}),
 );
 
 // A long running query with a small maxTimeMS specified will fail.
 assert.commandFailedWithCode(
     regularUserDB.runCommand({
         find: collName,
-        filter: {$where: "sleep(1000); return true;"},
+        filter: {$where: "sleep(100); return true;"},
         maxTimeMS: 1,
     }),
     ErrorCodes.MaxTimeMSExpired,
@@ -64,7 +64,7 @@ assert.commandWorked(
 
 // The read command fails even without specifying a maxTimeMS option.
 assert.commandFailedWithCode(
-    regularUserDB.runCommand({find: collName, filter: {$where: "sleep(1000); return true;"}}),
+    regularUserDB.runCommand({find: collName, filter: {$where: "sleep(100); return true;"}}),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -73,7 +73,7 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     regularUserDB.runCommand({
         find: collName,
-        filter: {$where: "sleep(1000); return true;"},
+        filter: {$where: "sleep(100); return true;"},
         maxTimeMS: 50000,
     }),
 );
@@ -82,7 +82,7 @@ assert.commandWorked(
 assert.commandWorked(
     regularUserDB.runCommand({
         update: collName,
-        updates: [{q: {$where: "sleep(1000); return true;"}, u: {$inc: {a: 1}}}],
+        updates: [{q: {$where: "sleep(100); return true;"}, u: {$inc: {a: 1}}}],
     }),
 );
 
@@ -96,7 +96,7 @@ rst.getSecondaries().forEach((secondary) => {
     assert.commandFailedWithCode(
         regularUserDBSecondary.runCommand({
             find: collName,
-            filter: {$where: "sleep(1000); return true;"},
+            filter: {$where: "sleep(100); return true;"},
         }),
         ErrorCodes.MaxTimeMSExpired,
     );
@@ -106,7 +106,7 @@ rst.getSecondaries().forEach((secondary) => {
     assert.commandWorked(
         regularUserDBSecondary.runCommand({
             find: collName,
-            filter: {$where: "sleep(1000); return true;"},
+            filter: {$where: "sleep(100); return true;"},
             maxTimeMS: 50000,
         }),
     );
