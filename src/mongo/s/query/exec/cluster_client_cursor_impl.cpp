@@ -80,6 +80,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lsid(lsid),
       _opCtx(opCtx),
       _rawData(isRawDataOperation(opCtx)),
+      _ifrContext(IncrementalFeatureRolloutContext::get(opCtx)),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
@@ -110,6 +111,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lsid(lsid),
       _opCtx(opCtx),
       _rawData(isRawDataOperation(opCtx)),
+      _ifrContext(IncrementalFeatureRolloutContext::get(opCtx)),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
@@ -388,6 +390,10 @@ boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() con
 
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {
     return _params.apiParameters;
+}
+
+std::shared_ptr<IncrementalFeatureRolloutContext> ClusterClientCursorImpl::cloneIfrContext() const {
+    return _ifrContext->clone();
 }
 
 boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreference() const {

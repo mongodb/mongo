@@ -173,6 +173,7 @@ mongo_cc_unit_test(
         ":router_exec_stage",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/auth:saslauth",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_request",
         "//src/mongo/db/query:query_test_service_context",
