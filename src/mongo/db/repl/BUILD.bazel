@@ -2300,6 +2300,18 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_benchmark(
+    name = "internode_validation_hash_bm",
+    srcs = [
+        "internode_validation_hash_bm.cpp",
+    ],
+    tags = ["repl_bm"],
+    deps = [
+        ":internode_validation_hash_utils",
+        "//src/mongo/db/shard_role:service_context_non_d",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "oplog_entry_bm",
     srcs = [
         "oplog_entry_bm.cpp",
@@ -2320,6 +2332,7 @@ mongo_cc_benchmark(
     ],
     tags = ["repl_bm"],
     deps = [
+        ":internode_validation_hash_utils",
         ":repl_coordinator_impl",
         ":repl_coordinator_interface",
         ":replication_consistency_markers_impl",
@@ -2342,8 +2355,11 @@ mongo_cc_benchmark(
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/update:update_common",
+        "//src/mongo/db/update:update_document_diff",
         "//src/mongo/transport:session_manager",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:periodic_runner_factory",
     ],
 )

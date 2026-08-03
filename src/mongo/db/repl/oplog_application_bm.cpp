@@ -20,6 +20,8 @@
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -56,11 +58,14 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
+#include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -277,6 +282,20 @@ BSONObj makeDoc(int idx) {
     return BSON("_id" << OID::gen() << "value" << idx);
 }
 
+// Documents for the update and delete validation-hash benchmarks. 'payload' pads the document to
+// the desired size, since hashing cost is proportional to objsize(). 'n' is the field the update
+// benchmark modifies.
+BSONObj makeValidationHashDoc(const OID& id, int idx, int n, const std::string& payload) {
+    BSONObjBuilder builder;
+    builder.append("_id", id);
+    builder.append("value", idx);
+    builder.append("n", n);
+    if (!payload.empty()) {
+        builder.append("d", payload);
+    }
+    return builder.obj();
+}
+
 BSONObj lsidObjGen() {
     return BSON(
         "id" << UUID::gen() << "uid"
@@ -297,6 +316,92 @@ public:
                                                  << "ts" << Timestamp(1, idx) << "t" << term1 << "v"
                                                  << 2 << "wall" << Date_t::now()));
         }
+    }
+
+    // Builds insert entries carrying a replicated RecordId and a hash over
+    // the inserted document. useRecordIdsReplicated() must have been called first.
+    // `docPayloadBytes` pads each document, since hashing cost is proportional to document size.
+    void createValidationHashBatch(int size, int docPayloadBytes = 0) {
+        invariant(_recordIdsReplicated);
+        const long long term1 = 1;
+        const std::string payload(docPayloadBytes, 'x');
+        for (int idx = 0; idx < size; ++idx) {
+            BSONObj doc = docPayloadBytes > 0
+                ? BSON("_id" << OID::gen() << "value" << idx << "d" << payload)
+                : makeDoc(idx);
+            BSONObjBuilder builder;
+            builder.appendElements(BSON("op" << "i"
+                                             << "ns"
+                                             << "foo.bar"
+                                             << "ui" << _foobarUUID << "o" << doc << "ts"
+                                             << Timestamp(1, idx) << "t" << term1 << "v" << 2
+                                             << "wall" << Date_t::now()));
+            RecordId(static_cast<int64_t>(idx) + 1).serializeToken("rid", &builder);
+            builder.append("m", BSON("h" << repl::computeDocValidationHash(doc)));
+            _oplogEntries.emplace_back(builder.obj());
+        }
+    }
+
+    // Builds update entries carrying a replicated RecordId and the XOR of the pre- and post-image
+    // hashes, and registers the pre-images to be seeded into the collection by reset().
+    void createValidationHashUpdateBatch(int size, int docPayloadBytes = 0) {
+        invariant(_recordIdsReplicated);
+        const long long term1 = 1;
+        const std::string payload(docPayloadBytes, 'x');
+        _seedDocs.reserve(_seedDocs.size() + size);
+        for (int idx = 0; idx < size; ++idx) {
+            const OID id = OID::gen();
+            const BSONObj preImage = makeValidationHashDoc(id, idx, 0, payload);
+            const BSONObj postImage = makeValidationHashDoc(id, idx, 1, payload);
+            const auto diff = doc_diff::computeOplogDiff(preImage, postImage, 0 /* padding */);
+            invariant(diff);
+
+            BSONObjBuilder builder;
+            builder.appendElements(BSON(
+                "op" << "u"
+                     << "ns"
+                     << "foo.bar"
+                     << "ui" << _foobarUUID << "o" << update_oplog_entry::makeDeltaOplogEntry(*diff)
+                     << "o2" << BSON("_id" << id) << "ts" << Timestamp(1, idx) << "t" << term1
+                     << "v" << 2 << "wall" << Date_t::now()));
+            RecordId(static_cast<int64_t>(idx) + 1).serializeToken("rid", &builder);
+            builder.append("m",
+                           BSON("h" << repl::computeUpdateValidationHash(preImage, postImage)));
+            _oplogEntries.emplace_back(builder.obj());
+            _seedDocs.emplace_back(preImage);
+        }
+    }
+
+    // Builds delete entries carrying a replicated RecordId and a hash over the pre-image, and
+    // registers those pre-images to be seeded into the collection by reset().
+    void createValidationHashDeleteBatch(int size, int docPayloadBytes = 0) {
+        invariant(_recordIdsReplicated);
+        const long long term1 = 1;
+        const std::string payload(docPayloadBytes, 'x');
+        _seedDocs.reserve(_seedDocs.size() + size);
+        for (int idx = 0; idx < size; ++idx) {
+            const OID id = OID::gen();
+            const BSONObj preImage = makeValidationHashDoc(id, idx, 0, payload);
+
+            BSONObjBuilder builder;
+            builder.appendElements(BSON("op" << "d"
+                                             << "ns"
+                                             << "foo.bar"
+                                             << "ui" << _foobarUUID << "o" << BSON("_id" << id)
+                                             << "ts" << Timestamp(1, idx) << "t" << term1 << "v"
+                                             << 2 << "wall" << Date_t::now()));
+            RecordId(static_cast<int64_t>(idx) + 1).serializeToken("rid", &builder);
+            builder.append("m", BSON("h" << repl::computeDocValidationHash(preImage)));
+            _oplogEntries.emplace_back(builder.obj());
+            _seedDocs.emplace_back(preImage);
+        }
+    }
+
+    // Sets recordIdsReplicated:true on the next reset(). Requires
+    // featureFlagRecordIdsReplicated to be enabled by the caller. Must be called before
+    // createValidationHashBatch(), which asserts on it.
+    void useRecordIdsReplicated() {
+        _recordIdsReplicated = true;
     }
 
     void createRetryableBatch(int size, int statementsPerTxnNumber) {
@@ -480,17 +585,31 @@ public:
             auto storageInterface = repl::StorageInterface::get(opCtx);
 
             // Create collection 'foo.bar' with one secondary index `value_1` on an integer field.
-            uassertStatusOK(createCollectionForApplyOps(opCtxRaii.get(),
-                                                        _foobarNs.dbName(),
-                                                        _foobarUUID,
-                                                        BSON("create" << _foobarNs.coll()),
-                                                        allowRename));
+            BSONObj createCmd = _recordIdsReplicated
+                ? BSON("create" << _foobarNs.coll() << "recordIdsReplicated" << true)
+                : BSON("create" << _foobarNs.coll());
+            uassertStatusOK(createCollectionForApplyOps(
+                opCtxRaii.get(), _foobarNs.dbName(), _foobarUUID, createCmd, allowRename));
             uassertStatusOK(storageInterface->createIndexesOnEmptyCollection(
                 opCtx,
                 _foobarNs,
                 {BSON("v" << 2 << "name"
                           << "value_1"
                           << "key" << BSON("value" << 1))}));
+
+            // Seed the documents that the update and delete batches target, at the RecordIds those
+            // entries carry. This is done directly rather than by applying an insert batch so that
+            // the setup an update/delete benchmark pays stays as small as possible.
+            if (!_seedDocs.empty()) {
+                std::vector<InsertStatement> inserts;
+                inserts.reserve(_seedDocs.size());
+                for (std::size_t idx = 0; idx < _seedDocs.size(); ++idx) {
+                    InsertStatement stmt(_seedDocs[idx]);
+                    stmt.replicatedRecordId = RecordId(static_cast<int64_t>(idx) + 1);
+                    inserts.emplace_back(std::move(stmt));
+                }
+                uassertStatusOK(storageInterface->insertDocuments(opCtx, _foobarNs, inserts));
+            }
 
             // Create 'config.transactions' for transactions.
             uassertStatusOK(storageInterface->createCollection(
@@ -534,7 +653,10 @@ private:
     TestServiceContext* _testSvcCtx;
 
     std::vector<BSONObj> _oplogEntries;
+    // Documents inserted by reset() before the batch is applied.
+    std::vector<BSONObj> _seedDocs;
     UUID _foobarUUID;
+    bool _recordIdsReplicated = false;
     NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"sv);
     repl::OplogApplierBatcher::BatchLimits _batchLimits{std::numeric_limits<std::size_t>::max(),
                                                         std::numeric_limits<std::size_t>::max()};
@@ -562,6 +684,70 @@ void BM_TestInserts(benchmark::State& state) {
     fixture.createBatch(state.range(0));
     runBMTest(testSvcCtx, fixture, state);
 }
+
+enum class ValidationHashOpType { kInsert, kUpdate, kDelete };
+
+// Applies a batch of oplog entries carrying per-document validation hashes. The 'hashEnabled'
+// argument selects whether featureFlagContinuousInternodeValidationPerDocument is on.
+void runValidationHashBMTest(benchmark::State& state, ValidationHashOpType opType) {
+    const int batchSize = state.range(0);
+    const int docPayloadBytes = state.range(1);
+    const bool hashEnabled = state.range(2) != 0;
+
+    unittest::ServerParameterGuard recordIdsReplicated("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard validation("featureFlagContinuousInternodeValidationPerDocument",
+                                              hashEnabled);
+    TestServiceContext testSvcCtx;
+    Fixture fixture(&testSvcCtx);
+    fixture.useRecordIdsReplicated();
+    switch (opType) {
+        case ValidationHashOpType::kInsert:
+            fixture.createValidationHashBatch(batchSize, docPayloadBytes);
+            break;
+        case ValidationHashOpType::kUpdate:
+            fixture.createValidationHashUpdateBatch(batchSize, docPayloadBytes);
+            break;
+        case ValidationHashOpType::kDelete:
+            fixture.createValidationHashDeleteBatch(batchSize, docPayloadBytes);
+            break;
+    }
+    runBMTest(testSvcCtx, fixture, state);
+}
+
+// Shared configuration for all of the validation-hash benchmarks: the batch size is scaled down as
+// the document size grows so that each configuration applies a comparable number of bytes.
+void validationHashBMConfig(benchmark::internal::Benchmark* bm) {
+    static constexpr std::pair<int, int> kBatchSizeAndDocBytes[] = {{32 * 1000, 512},
+                                                                    {16 * 1000, 4096},
+                                                                    {2 * 1000, 32768},
+                                                                    {256, 256 * 1024},
+                                                                    {128, 1024 * 1024}};
+    for (int hashEnabled : {0, 1}) {
+        for (auto [batchSize, docBytes] : kBatchSizeAndDocBytes) {
+            bm->Args({batchSize, docBytes, hashEnabled});
+        }
+    }
+    bm->ArgNames({"batchSize", "docBytes", "hashEnabled"})
+        ->UseManualTime()
+        ->MeasureProcessCPUTime()
+        ->Unit(benchmark::kMillisecond);
+}
+
+void BM_TestInsertsValidationHash(benchmark::State& state) {
+    runValidationHashBMTest(state, ValidationHashOpType::kInsert);
+}
+
+void BM_TestUpdatesValidationHash(benchmark::State& state) {
+    runValidationHashBMTest(state, ValidationHashOpType::kUpdate);
+}
+
+void BM_TestDeletesValidationHash(benchmark::State& state) {
+    runValidationHashBMTest(state, ValidationHashOpType::kDelete);
+}
+
+BENCHMARK(BM_TestInsertsValidationHash)->Apply(validationHashBMConfig);
+BENCHMARK(BM_TestUpdatesValidationHash)->Apply(validationHashBMConfig);
+BENCHMARK(BM_TestDeletesValidationHash)->Apply(validationHashBMConfig);
 
 void BM_TestRetryableInserts(benchmark::State& state) {
     TestServiceContext testSvcCtx;
