@@ -13,6 +13,8 @@
  *   does_not_support_transactions,
  *   # Implicit sharding makes the timeseries a regular collection.
  *   assumes_no_implicit_collection_creation_on_get_collection,
+ *   # bulkWrite introduced in 8.0.
+ *   requires_fcv_80,
  * ]
  */
 const adminDB = db.getSiblingDB("admin");
