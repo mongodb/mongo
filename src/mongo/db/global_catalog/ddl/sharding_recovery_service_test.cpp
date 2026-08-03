@@ -4,11 +4,18 @@
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_chunk_range.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -26,23 +33,31 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_critical_section_document_gen.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/tick_source_mock.h"
 
+#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -54,6 +69,35 @@
 
 namespace mongo {
 namespace {
+
+const std::string kShardKey = "_id";
+const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
+
+// Builds tracked (sharded) filtering metadata for the given namespace.
+CollectionMetadata makeShardedMetadata(const NamespaceString& nss,
+                                       UUID uuid = UUID::gen(),
+                                       ShardId chunkShardId = ShardId("other"),
+                                       ShardId collectionShardId = ShardId("0")) {
+    const OID epoch = OID::gen();
+    const Timestamp timestamp(Date_t::now());
+    auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
+    auto chunk =
+        ChunkType(uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), chunkShardId);
+    CurrentChunkManager cm(ShardServerTestFixture::makeStandaloneRoutingTableHistory(
+        RoutingTableHistory::makeNew(nss,
+                                     uuid,
+                                     kShardKeyPattern,
+                                     false /* unsplittable */,
+                                     nullptr,
+                                     false,
+                                     epoch,
+                                     timestamp,
+                                     boost::none /* timeseriesFields */,
+                                     boost::none /* reshardingFields */,
+                                     true,
+                                     {std::move(chunk)})));
+    return CollectionMetadata(std::move(cm), collectionShardId);
+}
 
 class ShardingRecoveryServiceTest : public ShardServerTestFixture {
 public:
@@ -1076,8 +1120,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
         writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -1094,8 +1138,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
         writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -1112,8 +1156,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -1132,8 +1176,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
         writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -1150,8 +1194,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
         writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -1168,11 +1212,236 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
+}
+
+// Installs filtering metadata and allowChunkOperations flag on a couple of collections. Both CSR
+// and DSR are backed by durable shard-catalog collections. Then simulates a replication rollback
+// carrying the given 'rollbackNamespaces' and 'rollbackCommandCounts' and asserts the resulting
+// in-memory state.
+//
+// The DDL protocol first writes to durable shard-catalog, then updates the in-memory state
+// through oplog c entries. We simulate the rollback between the shard-catalog write and the c
+// entry. The rollback reverses the oplog c entry.
+// Hence, in-memory DSR version and allowChunkOperations flag are seeded to differ from the disk
+// (with a stale version). Post-rollback this helps distinguish a genuine rebuild from an untouched
+// state.
+//
+// The post-rollback state is governed by two independent booleans:
+//   - 'resetCsr': whether the CSR filtering metadata was cleared. Recovery resets every CSR or
+//   none.
+//   - 'recoveryTriggered': whether recovery actually ran, which governs whether the DSR and the
+//     allowChunkOperations flag were rebuilt from disk.
+//
+// 'resetCsr' can only be true when 'recoveryTriggered' is true; the converse need not hold. (e.g.
+// when the CSR reset is disabled by a server parameter).
+void clearFilteringMetadataOnRecoveryTestHelper(OperationContext* opCtx,
+                                                const std::set<NamespaceString>& rollbackNamespaces,
+                                                const StringMap<long long>& rollbackCommandCounts,
+                                                bool resetCsr,
+                                                bool recoveryTriggered) {
+    // Two collections in a single database, each fully backed by durable shard-catalog collections.
+    // The installed collection namespace are arbitrary, but must be different to assert that every
+    // CSR is reset or none.
+    const auto nssX = NamespaceString::createNamespaceString_forTest("RecoverDB", "CollX");
+    const auto nssY = NamespaceString::createNamespaceString_forTest("RecoverDB", "CollY");
+    const auto dbName = nssX.dbName();
+    const auto shardId = ShardingState::get(opCtx)->shardId();
+
+    // Stale in-memory version vs newer on-disk version.
+    const DatabaseVersion staleVersion{UUID::gen(), Timestamp(10, 1)};
+    const DatabaseVersion diskVersion{UUID::gen(), Timestamp(20, 1)};
+
+    // Back both collections with durable shard-catalog.
+    {
+        DBDirectClient client(opCtx);
+
+        // config.shard.catalog.databases holds the newer version.
+        client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                      DatabaseType{dbName, shardId, diskVersion}.toBSON());
+
+        for (const auto& nss : {nssX, nssY}) {
+            const auto collUuid = UUID::gen();
+            const OID epoch = OID::gen();
+            const Timestamp collTimestamp(Date_t::now());
+
+            // config.shard.catalog.collections: allowChunkOperations=false.
+            CollectionType diskColl{
+                nss, epoch, collTimestamp, Date_t::now(), collUuid, kShardKeyPattern};
+            diskColl.setAllowChunkOperations(false);
+            client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                          diskColl.toBSON());
+        }
+    }
+
+    // Install in-memory filtering metadata and allowChunkOperations=true on both collections so a
+    // rebuild from the disk value (false) is observable.
+    for (const auto& nss : {nssX, nssY}) {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->setCollectionMetadata(opCtx, makeShardedMetadata(nss));
+        scopedCsr->setAllowChunkOperations(true);
+    }
+
+    // Install a stale in-memory DSR version for the database.
+    {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->setDbMetadata(opCtx, DatabaseType{dbName, shardId, staleVersion});
+    }
+
+    // Simulate a replication rollback carrying the given namespaces and command counts.
+    ShardingRecoveryService::get(opCtx)->onReplicationRollback(
+        opCtx, rollbackNamespaces, rollbackCommandCounts);
+
+    // Recovery resets every CSR or none; assert the same filtering-metadata outcome for both.
+    for (const auto& nss : {nssX, nssY}) {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+        const auto metadata = csr->getCurrentMetadataIfKnown();
+        ASSERT((resetCsr && !metadata) || (!resetCsr && metadata && metadata->isSharded()));
+    }
+
+    // The DSR is rebuilt from disk iff recovery ran: its version matches the newer on-disk version
+    // when recovery ran, and stays at the stale in-memory version otherwise.
+    {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kReadOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
+        const auto version = scopedDsr->getDbVersion(opCtx);
+        ASSERT_TRUE(version);
+        ASSERT_EQ(*version, recoveryTriggered ? diskVersion : staleVersion);
+        ASSERT_EQ(scopedDsr->getDbPrimaryShard(opCtx), boost::optional<ShardId>(shardId));
+    }
+
+    // The allowChunkOperations flag is rebuilt from disk (false) iff recovery ran; otherwise it
+    // keeps its in-memory value (true). Asserted for both collections.
+    for (const auto& nss : {nssX, nssY}) {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+        ASSERT_EQ(scopedCsr->allowChunkOperations(), !recoveryTriggered);
+    }
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForInvalidateCollectionMetadata) {
+    // A rolled-back invalidateCollectionMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"invalidateCollectionMetadata", 1}},
+                                               true /* resetCsr */,
+                                               true /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForUpdateCollectionMetadata) {
+    // A rolled-back updateCollectionMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"updateCollectionMetadata", 1}},
+                                               true /* resetCsr */,
+                                               true /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForCreateDatabaseMetadata) {
+    // A rolled-back createDatabaseMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"createDatabaseMetadata", 1}},
+                                               true /* resetCsr */,
+                                               true /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForDropDatabaseMetadata) {
+    // A rolled-back dropDatabaseMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"dropDatabaseMetadata", 1}},
+                                               true /* resetCsr */,
+                                               true /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForSetAllowChunkOperations) {
+    // A rolled-back setAllowChunkOperations 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"setAllowChunkOperations", 1}},
+                                               true /* resetCsr */,
+                                               true /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetCollectionShardingRuntimesWhenParameterDisabled) {
+    // Disable the CSR reset during recovery.
+    unittest::ServerParameterGuard guard("clearCollectionShardingRuntimesOnRecovery", false);
+
+    // Even though invalidateCollectionMetadata was rolled back, the server parameter overrides the
+    // behavior and the CSRs are not reset. Recovery still runs, so the DSR and allowChunkOperations
+    // flag are rebuilt from disk.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"invalidateCollectionMetadata", 1}},
+                                               false /* resetCsr */,
+                                               true /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetShardingStateWhenCommandCountIsZero) {
+    // A command count of zero must not trigger recovery.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"invalidateCollectionMetadata", 0}},
+                                               false /* resetCsr */,
+                                               false /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetShardingStateForUnrelatedCommands) {
+    // Synthetic CRUD keys are not CSR-maintenance commands and must not trigger recovery.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {} /* rollbackNamespaces */,
+                                               {{"insert", 3}, {"update", 2}},
+                                               false /* resetCsr */,
+                                               false /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetShardingStateForUserCollectionNamespace) {
+    // A rolled-back user-collection namespace is not a trigger namespace, so on its own it resets
+    // nothing.
+    const auto nssA = NamespaceString::createNamespaceString_forTest("TestDB", "CollA");
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {nssA},
+                                               {} /* rollbackCommandCounts */,
+                                               false /* resetCsr */,
+                                               false /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryResetsShardingStateForCommandDespiteUserCollectionNamespace) {
+    // The user-collection namespace is inert; the rolled-back invalidateCollectionMetadata 'c'
+    // entry is what triggers the (global) reset of all CSRs.
+    const auto nssA = NamespaceString::createNamespaceString_forTest("TestDB", "CollA");
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {nssA},
+                                               {{"invalidateCollectionMetadata", 1}},
+                                               true /* resetCsr */,
+                                               true /* recoveryTriggered */);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback, RecoveryResetsShardingStateForTriggerNamespace) {
+    // A rolled-back trigger namespace resets all CSRs even without any command counts.
+    clearFilteringMetadataOnRecoveryTestHelper(
+        operationContext(),
+        {NamespaceString::kConfigShardCatalogCollectionsNamespace},
+        {} /* rollbackCommandCounts */,
+        true /* resetCsr */,
+        true /* recoveryTriggered */);
 }
 
 TEST_F(ShardingRecoveryServiceTestOnPrimary, CallbackInvokedWhenCollLockContended) {

@@ -15,6 +15,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -80,6 +81,11 @@ CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
                 chunkElem.Obj(), coll->getEpoch(), coll->getTimestamp())));
         }
     }
+
+    // Record how many chunks this recovery read from the on-disk shard catalog.
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerDiskRecoveryChunksRead(
+            static_cast<long long>(chunks.size()));
 
     auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
         if (auto collation = coll->getDefaultCollation(); !collation.isEmpty()) {

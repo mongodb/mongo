@@ -314,3 +314,13 @@ server_parameters:
         cpp_varname: skipRangeDeletionForMaxKeyChunks
         default: true
         redact: false
+
+    clearCollectionShardingRuntimesOnRecovery:
+        description: >-
+            When enabled, rollback recovery clears the in-memory CollectionShardingRuntime filtering
+            metadata. When disabled, the filtering metadata is left untouched during rollback recovery.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gClearCollectionShardingRuntimesOnRecovery
+        default: true
+        redact: false

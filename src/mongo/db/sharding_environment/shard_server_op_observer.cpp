@@ -743,7 +743,8 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
 
 void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
                                                   const RollbackObserverInfo& rbInfo) {
-    ShardingRecoveryService::get(opCtx)->onReplicationRollback(opCtx, rbInfo.rollbackNamespaces);
+    ShardingRecoveryService::get(opCtx)->onReplicationRollback(
+        opCtx, rbInfo.rollbackNamespaces, rbInfo.rollbackCommandCounts);
 }
 
 void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,

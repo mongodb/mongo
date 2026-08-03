@@ -10,6 +10,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 #include <functional>
 #include <set>
@@ -159,7 +160,8 @@ public:
      * Recovers the in-memory sharding state from disk in case of rollback.
      */
     void onReplicationRollback(OperationContext* opCtx,
-                               const std::set<NamespaceString>& rollbackNamespaces);
+                               const std::set<NamespaceString>& rollbackNamespaces,
+                               const StringMap<long long>& rollbackCommandCounts);
 
     /**
      * Recovers the in-memory sharding state from disk when either initial sync or startup recovery
@@ -171,8 +173,11 @@ private:
     /**
      * This method is called to reset the states before recover (mirror the state on disk to
      * memory). It must be called before the recover functions.
+     *
+     * When 'clearCollectionShardingRuntimes' is false, the CollectionShardingRuntime filtering
+     * metadata is left untouched.
      */
-    void _resetInMemoryStates(OperationContext* opCtx);
+    void _resetInMemoryStates(OperationContext* opCtx, bool clearCollectionShardingRuntimes = true);
 
     /**
      * This method is called when we have to mirror the state on disk of the recoverable critical
