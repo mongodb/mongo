@@ -105,7 +105,15 @@ assert.commandWorked(primaryColl.insert({a: 3}, {writeConcern: {w: "majority"}})
 
 function stepUpNode(rst, newPrimary, liveSecondaries) {
     rst.awaitReplication(null, null, liveSecondaries);
-    assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
+    // A candidate's real election can legitimately fail even after its dry run succeeds (e.g. the
+    // responding node grants the vote but then loses it to a concurrent stepdown before it can
+    // persist the LastVote document -- see the "spoiled vote" comment in
+    // ReplicationCoordinatorImpl::processReplSetRequestVotes). Retry like ReplSetTest.stepUp()
+    // does, instead of failing the whole test on this known, transient race (SERVER-132633).
+    assert.soonNoExcept(() => {
+        assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
+        return true;
+    });
     assert.eq(rst.getPrimary(), newPrimary);
     // Waiting for the background step-up writes here means they won't interfere with the next
     // step-up.  We await their replication as part of the awaitReplication before stepping up.
