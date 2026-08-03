@@ -67,7 +67,16 @@ jsTest.log("The Database version is not affected by collection version changes")
 }
 
 jsTest.log("getDatabaseVersion returns an updated value after performing movePrimary op");
-assert.commandWorked(db.adminCommand({movePrimary: kDbName, to: anotherShard}));
+const res = db.adminCommand({movePrimary: kDbName, to: anotherShard});
+// TODO SERVER-98118: Remove this exclusion since we've banned movePrimary during 9.0 FCV transitions.
+if (!TestData.isRunningFCVUpgradeDowngradeSuite) {
+    assert.commandWorked(res);
+} else {
+    assert.commandWorkedOrFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
+    if (res.code === ErrorCodes.ConflictingOperationInProgress) {
+        quit();
+    }
+}
 const uponPrimaryMoved = getDatabaseVersionResponse(kDbName);
 assert.eq(anotherShard, uponPrimaryMoved.primaryShard);
 assert.eq(uponPrimaryMoved.dbVersion.uuid, uponDatabaseCreated.dbVersion.uuid);

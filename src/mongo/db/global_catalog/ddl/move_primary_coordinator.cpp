@@ -232,17 +232,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 logChange(opCtx, "start");
 
                 // TODO (SERVER-98118): Remove once 9.0 is last-lts.
-                sharding_ddl_util::assertRecipientSupportsAuthoritativeMetadataForMovePrimary(
+                sharding_ddl_util::assertShardsAreNotInFCVTransitionsForMovePrimary(
                     opCtx, _doc.getToShardId(), _doc.getAuthoritativeMetadataAccessLevel());
-
-                if (_doc.getAuthoritativeMetadataAccessLevel() ==
-                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    cloneAuthoritativeDatabaseMetadata(opCtx);
-
-                    // The per-shard authoritative metadata cloning DDL may have raced with this
-                    // movePrimary and skipped this DB, so clone the collection metadata ourselves.
-                    cloneAuthoritativeCollectionsMetadata(opCtx, executor, token);
-                }
 
                 ScopeGuard unblockWritesLegacyOnExit([&] {
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
@@ -294,8 +285,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 const auto preCommitDbVersion = *_doc.getDatabaseVersion();
                 const auto thisShardId = ShardingState::get(opCtx)->shardId();
 
-                if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                if (_doc.getAuthoritativeMetadataAccessLevel() ==
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed) {
                     commitCollectionsMetadataToShards(opCtx, executor, token);
                 }
 
@@ -309,8 +300,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 auto dbMetadata = getPostCommitDatabaseMetadata(opCtx);
                 assertChangedMetadataOnConfig(opCtx, dbMetadata, preCommitDbVersion);
 
-                if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                if (_doc.getAuthoritativeMetadataAccessLevel() ==
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed) {
                     commitDbMetadataToShards(opCtx, dbMetadata.getVersion(), executor, token);
                 }
 
@@ -768,8 +759,8 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
         return;
     }
 
-    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
-        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() ==
+        AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed;
 
     // Make a copy of this container since `getNewSession` changes the coordinator document.
     const auto collectionsToClone = *_doc.getCollectionsToClone();
@@ -785,48 +776,6 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
             true /* fromMigrate */,
             true /* dropSystemCollections */,
             !isAuthoritative /* forceLegacyRefresh */);
-    }
-}
-
-void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx) const {
-    auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto dbMetadata = catalogClient->getDatabase(opCtx, _dbName, repl::ReadConcernArgs::kMajority);
-
-    const auto thisShardId = ShardingState::get(opCtx)->shardId();
-
-    tassert(10162501,
-            fmt::format("Expecting to have fetched database metadata from a database which "
-                        "this shard owns. DatabaseName: {}. Database primary shard: {}. "
-                        "This shard: {}",
-                        _dbName.toStringForErrorMsg(),
-                        dbMetadata.getPrimary().toString(),
-                        thisShardId.toString()),
-            thisShardId == dbMetadata.getPrimary());
-
-    shard_catalog_commit::commitCreateDatabaseMetadataLocally(
-        opCtx, dbMetadata, true /* fromClone */);
-}
-
-void MovePrimaryCoordinator::cloneAuthoritativeCollectionsMetadata(
-    OperationContext* opCtx,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token) {
-    const auto thisShardId = ShardingState::get(opCtx)->shardId();
-    const auto trackedColls = Grid::get(opCtx)->catalogClient()->getCollections(
-        opCtx, _dbName, repl::ReadConcernArgs::kMajority);
-
-    // movePrimary holds the database DDL lock in MODE_X, so no collection can be dropped or
-    // untracked concurrently and no per-collection DDL lock is needed. This shard is still the
-    // primary, so pass it as the shard that must always carry an entry.
-    for (const auto& coll : trackedColls) {
-        sharding_ddl_util::cloneAuthoritativeCollectionMetadataToShards(
-            opCtx,
-            coll.getNss(),
-            thisShardId,
-            [&] { return getNewSession(opCtx); },
-            _doc.getAuthoritativeMetadataAccessLevel(),
-            executor,
-            token);
     }
 }
 

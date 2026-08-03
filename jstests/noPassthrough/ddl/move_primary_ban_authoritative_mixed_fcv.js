@@ -11,6 +11,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, config: 1});
@@ -68,6 +69,43 @@ assert(coll.drop());
 assertNoShardCatalogEntry(st.shard0);
 assertNoShardCatalogEntry(st.shard1);
 
+assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+assert.eq(st.shard1.shardName, st.s.getDB("config").databases.findOne({_id: dbName}).primary);
+
+// movePrimary must also be rejected when the recipient shard is mid-upgrade. Here the whole cluster
+// starts at lastLTS and an upgrade is paused so the donor (shard0) has completed to latest (fully
+// authoritative) while the recipient (shard1) is parked in the transitional kUpgrading FCV. Since
+// the recipient is still in an FCV transition, movePrimary must be refused.
+assert.commandWorked(
+    st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
+assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+
+// Pause the recipient (shard1) inside _runUpgrade, before it persists the fully-upgraded FCV, so it
+// stays at kUpgrading while the donor (shard0) completes the upgrade to latest.
+const hangUpgradeFp = configureFailPoint(st.rs1.getPrimary(), "hangWhileUpgrading");
+const awaitUpgrade = startParallelShell(
+    funWithArgs(function (targetFCV) {
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+        );
+    }, latestFCV),
+    st.s.port,
+);
+hangUpgradeFp.wait();
+
+try {
+    assert.commandFailedWithCode(
+        st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}),
+        ErrorCodes.ConflictingOperationInProgress,
+    );
+    assert.eq(st.shard0.shardName, st.s.getDB("config").databases.findOne({_id: dbName}).primary);
+} finally {
+    hangUpgradeFp.off();
+    awaitUpgrade();
+}
+
+// Once the upgrade completes, movePrimary is allowed again.
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 assert.eq(st.shard1.shardName, st.s.getDB("config").databases.findOne({_id: dbName}).primary);
 

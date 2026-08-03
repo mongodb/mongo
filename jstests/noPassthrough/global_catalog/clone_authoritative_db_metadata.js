@@ -181,18 +181,6 @@ function validateCloningDDLWithConcurrentOperation(dbName, op) {
 }
 
 {
-    jsTest.log("Validate concurrent movePrimary when running the cloning DDL");
-
-    const dbName = "staleDb";
-    const db = st.s.getDB(dbName);
-
-    const movePrimary = () =>
-        assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
-
-    validateCloningDDLWithConcurrentOperation(dbName, movePrimary);
-}
-
-{
     jsTest.log("Validate concurrent dropDatabase when running the cloning DDL");
 
     const dbName = "droppedDb";
