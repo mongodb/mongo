@@ -100,9 +100,8 @@ export function getSamplesColl(db) {
 }
 
 export function dropSamplesColl(db) {
-    // TODO SERVER-124350. Drop the samples collection without this hack.
     // This is needed because system collections are special and need to be whitelisted for dropping individually.
-    // Not whitelisting it here since we're expecting this to happen at SERVER-124350.
+    // Not whitelisting it since we don't expect customers to ever drop the collection themselves.
     assert.commandWorked(
         db.adminCommand({
             applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {drop: samplesCollName}}],
