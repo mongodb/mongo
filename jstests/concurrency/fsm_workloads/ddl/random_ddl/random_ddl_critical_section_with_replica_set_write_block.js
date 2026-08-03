@@ -441,12 +441,18 @@ export const $config = (function () {
             jsTest.log.info("Running compact", {coll: `${db.getName()}.${collName_}`});
             // compact is not allowed through mongos; it must run directly against a shard node. It
             // rewrites on-disk data, so it can race with a write block. The collection may not exist
-            // on the chosen shard, so NamespaceNotFound is tolerated.
+            // on the chosen shard, so NamespaceNotFound is tolerated. Storage providers without
+            // compaction support (e.g. disaggregated storage) reject the command outright with
+            // CommandNotSupported, which is tolerated too.
             this.withRandomShardAdmin(db, (adminDB) => {
                 const shardDB = adminDB.getSiblingDB(db.getName());
                 assert.commandWorkedOrFailedWithCode(
                     shardDB.runCommand({compact: collName_, force: true}),
-                    [...kWriteBlockIgnorableCodes, ErrorCodes.NamespaceNotFound],
+                    [
+                        ...kWriteBlockIgnorableCodes,
+                        ErrorCodes.NamespaceNotFound,
+                        ErrorCodes.CommandNotSupported,
+                    ],
                 );
             });
         },
