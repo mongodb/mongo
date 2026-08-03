@@ -632,10 +632,13 @@ public:
     HistoricalCatalogIdTracker& catalogIdTracker();
 
     /**
-     * Resets the HistoricalCatalogIdTracker to an empty state. This is necessary for FCBIS, as
-     * leaking tracker state across storage changes can lead to incorrect behavior.
+     * Resets the HistoricalCatalogIdTracker to an empty state and seeds the oldest timestamp
+     * maintained. Resetting the state is necessary for FCBIS, as leaking tracker state across
+     * storage changes can lead to incorrect behavior. Setting the oldest timestamp maintained is
+     * necessary for both FCBIS and startup, as the tracker needs to know at which timestamp the
+     * storage engine is initialized.
      */
-    void resetCatalogIdTracker();
+    void resetCatalogIdTracker(Timestamp oldest);
 
     class BatchedCollectionWrite;
 

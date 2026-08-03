@@ -126,14 +126,20 @@ void initializeCollectionCatalog(OperationContext* opCtx,
     // may be out-of-order for the collection catalog managing this namespace.
     const Timestamp minValidTs = stableTs ? *stableTs : Timestamp::min();
     CollectionCatalog::write(opCtx, [&minValidTs, mode](CollectionCatalog& catalog) {
-        // The HistoricalCatalogIdTracker can track the catalogId of collections across rollbacks as
-        // long as we prune the history of catalogIds that are no longer valid, but must be reset on
-        // storage changes. On startup, it is already empty.
-        if (mode == InitMode::kStorageChange) {
-            catalog.resetCatalogIdTracker();
+        if (mode == InitMode::kStorageChange || mode == InitMode::kStartup) {
+            // At startup the tracker is already empty, but on storage change the tracker must be
+            // reset to avoid leaking state from a different storage. In both cases, we need to seed
+            // the oldest maintained timestamp with stableTs (or Timestamp::min). Without seeding
+            // this the tracker would forever cause unnecessary durable catalog scans for PIT
+            // lookups of non-existing namespaces.
+            catalog.resetCatalogIdTracker(minValidTs);
         } else if (mode == InitMode::kRollback) {
-            // Let the CollectionCatalog know that we are maintaining timestamps from minValidTs
+            // The HistoricalCatalogIdTracker can track the catalogId of collections across
+            // rollbacks as long as we prune the history of catalogIds that are no longer valid. Let
+            // the tracker know that we are maintaining timestamps from minValidTs.
             catalog.catalogIdTracker().rollback(minValidTs);
+        } else {
+            MONGO_UNREACHABLE;
         }
     });
 
@@ -2948,7 +2954,7 @@ HistoricalCatalogIdTracker& CollectionCatalog::catalogIdTracker() {
     return _catalogIdTracker;
 }
 
-void CollectionCatalog::resetCatalogIdTracker() {
-    _catalogIdTracker = HistoricalCatalogIdTracker();
+void CollectionCatalog::resetCatalogIdTracker(Timestamp oldest) {
+    _catalogIdTracker = HistoricalCatalogIdTracker(oldest);
 }
 }  // namespace mongo
