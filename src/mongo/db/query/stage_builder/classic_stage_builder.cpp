@@ -62,6 +62,11 @@
 namespace mongo::stage_builder {
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
+//
+// A failed index lookup below uasserts. Planning can yield between choosing a solution and building
+// it (e.g. during CBR sampling), so an index may be dropped by the time we look it up. That is a
+// DDL race so we kill the query. Lookup is by ident, not name, so an index recreated under the same
+// name during the yield also fails rather than being silently substituted.
 std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* root) {
     auto* const expCtx = _cq.getExpCtxRaw();
 
@@ -265,9 +270,15 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.addDistMeta = node->addDistMeta;
 
                 invariant(collectionPtr);
-                const auto twoDIndex = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, node->index.identifier.catalogName);
-                invariant(twoDIndex);
+                const auto* twoDIndex = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, node->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << node->index.toString(),
+                        twoDIndex);
 
                 return std::make_unique<GeoNear2DStage>(
                     params, expCtx, _ws, _collection, twoDIndex);
@@ -283,9 +294,15 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.addDistMeta = node->addDistMeta;
 
                 invariant(collectionPtr);
-                const auto s2Index = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, node->index.identifier.catalogName);
-                invariant(s2Index);
+                const auto* s2Index = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, node->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << node->index.toString(),
+                        s2Index);
 
                 return std::make_unique<GeoNear2DSphereStage>(
                     params, expCtx, _ws, _collection, s2Index);
@@ -308,10 +325,13 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 tassert(5432200, "collection object is not provided", collectionPtr);
                 auto catalog = collectionPtr->getIndexCatalog();
                 tassert(5432201, "index catalog is unavailable", catalog);
-                auto entry = catalog->findIndexByName(_opCtx, node->index.identifier.catalogName);
-                tassert(5432202,
-                        str::stream() << "no index named '" << node->index.identifier.catalogName
-                                      << "' found in catalog",
+                const auto* entry = catalog->findIndexByIdent(
+                    _opCtx, node->index.indexCatalogEntryStorage->getIdent());
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << node->index.toString(),
                         entry);
                 auto fam = static_cast<const FTSAccessMethod*>(entry->accessMethod());
                 tassert(5432203, "access method for index is not defined", fam);
@@ -350,9 +370,15 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
                 invariant(collectionPtr);
-                auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, dn->index.identifier.catalogName);
-                tassert(8862201, "Index descriptor cannot be null", descriptor);
+                const auto* entry = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, dn->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << dn->index.toString(),
+                        entry);
 
                 std::unique_ptr<ShardFiltererImpl> shardFilterer;
                 if (dn->isShardFiltering) {
@@ -369,7 +395,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 // We use the node's internal name, keyPattern and multikey details here. For $**
                 // indexes, these may differ from the information recorded in the index's
                 // descriptor.
-                DistinctParams params{descriptor,
+                DistinctParams params{entry,
                                       dn->index.identifier.catalogName,
                                       dn->index.keyPattern,
                                       dn->index.multikeyPaths,
@@ -389,14 +415,20 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 const CountScanNode* csn = static_cast<const CountScanNode*>(root);
 
                 invariant(collectionPtr);
-                auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, csn->index.identifier.catalogName);
-                tassert(8862200, "Index descriptor cannot be null", descriptor);
+                const auto* entry = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, csn->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << csn->index.toString(),
+                        entry);
 
                 // We use the node's internal name, keyPattern and multikey details here. For
                 // $** indexes, these may differ from the information recorded in the index's
                 // descriptor.
-                CountScanParams params{descriptor,
+                CountScanParams params{entry,
                                        csn->index.identifier.catalogName,
                                        csn->index.keyPattern,
                                        csn->index.multikeyPaths,

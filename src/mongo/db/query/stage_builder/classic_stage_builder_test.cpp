@@ -9,6 +9,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -87,6 +88,22 @@ public:
     }
 
     /**
+     * Builds a collection whose index catalog holds a single index with the given name and key
+     * pattern. As in 'IndexCatalogMock', the index's ident is its name.
+     */
+    std::unique_ptr<Collection> makeCollectionWithIndex(std::string indexName, const BSONObj& kp) {
+        auto indexCatalog = std::make_unique<IndexCatalogMock>();
+        IndexSpec spec;
+        spec.version(1).name(std::move(indexName)).addKeys(kp);
+        indexCatalog->createIndexEntry(
+            _opCtx.get(),
+            nullptr /*collection*/,
+            IndexDescriptor(IndexNames::findPluginName(kp), spec.toBSON()),
+            CreateIndexEntryFlags::kNone);
+        return std::make_unique<CollectionMock>(UUID::gen(), kNss, std::move(indexCatalog));
+    }
+
+    /**
      * A helper to repeatedly call work() until the stage returns a PlanStage::IS_EOF state and
      * returns the resulting documents as a vector of BSONObj.
      */
@@ -126,25 +143,29 @@ private:
 };
 
 namespace {
-// Builds an IndexEntry whose indexCatalogEntryStorage has the given ident.
-IndexEntry buildIndexEntryWithIdent(const BSONObj& kp, std::string_view ident) {
+// Builds an IndexEntry whose indexCatalogEntryStorage has the given ident. The index plugin (and
+// so the descriptor's access method) is derived from the key pattern.
+IndexEntry buildIndexEntryWithIdent(const BSONObj& kp,
+                                    std::string_view ident,
+                                    std::string indexName = "a_1") {
     IndexSpec spec;
-    spec.version(1).name("a_1").addKeys(kp);
+    spec.version(1).name(indexName).addKeys(kp);
+    const std::string pluginName = IndexNames::findPluginName(kp);
     auto mockEntry =
         std::make_shared<IndexCatalogEntryMock>(nullptr,
                                                 CollectionPtr{},
                                                 std::string(ident),
-                                                IndexDescriptor(IndexNames::BTREE, spec.toBSON()),
+                                                IndexDescriptor(pluginName, spec.toBSON()),
                                                 false /* isFrozen */);
     IndexEntry entry{kp,
-                     IndexNames::nameToType(IndexNames::findPluginName(kp)),
+                     IndexNames::nameToType(pluginName),
                      IndexConfig::kLatestIndexVersion,
                      false,
                      {},
                      {},
                      false,
                      false,
-                     CoreIndexInfo::Identifier("a_1"),
+                     CoreIndexInfo::Identifier(std::move(indexName)),
                      {},
                      nullptr,
                      std::move(mockEntry)};
@@ -232,6 +253,116 @@ TEST_F(ClassicStageBuilderTest, DroppedAndReplacedIndexThrowsQueryPlanKilled) {
     auto idxScan = std::make_unique<IndexScanNode>(
         kNss, buildIndexEntryWithIdent(BSON("a" << 1), "original-ident"));
     ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(idxScan))),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+// Same ident-based check as for STAGE_IXSCAN, but for STAGE_DISTINCT_SCAN. The catalog holds an
+// index named "a_1" with ident "a_1", while the plan refers to ident "original-ident".
+TEST_F(ClassicStageBuilderTest, DistinctScanDroppedAndReplacedIndexThrowsQueryPlanKilled) {
+    auto distinct = std::make_unique<DistinctNode>(
+        kNss, buildIndexEntryWithIdent(BSON("a" << 1), "original-ident"));
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(distinct))),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+// As above, but with an empty catalog so that neither name nor ident lookup can succeed.
+TEST_F(ClassicStageBuilderTest, DistinctScanDroppedIndexThrowsQueryPlanKilled) {
+    auto emptyCollection =
+        std::make_unique<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
+    auto distinct = std::make_unique<DistinctNode>(
+        kNss, buildIndexEntryWithIdent(BSON("a" << 1), "original-ident"));
+    ASSERT_THROWS_CODE(
+        buildPlanStage(makeQuerySolution(std::move(distinct)), emptyCollection.get()),
+        DBException,
+        ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ClassicStageBuilderTest, CountScanDroppedAndReplacedIndexThrowsQueryPlanKilled) {
+    auto count = std::make_unique<CountScanNode>(
+        kNss, buildIndexEntryWithIdent(BSON("a" << 1), "original-ident"));
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(count))),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ClassicStageBuilderTest, CountScanDroppedIndexThrowsQueryPlanKilled) {
+    auto emptyCollection =
+        std::make_unique<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
+    auto count = std::make_unique<CountScanNode>(
+        kNss, buildIndexEntryWithIdent(BSON("a" << 1), "original-ident"));
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(count)), emptyCollection.get()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+// The geo and text plans below each come in two flavors: the index is gone from the catalog
+// altogether, and the index was recreated under the same name but with a different ident. The
+// latter is what makes the ident-based lookup necessary: a name-based lookup would find the
+// replacement index and build a stage over the wrong index.
+TEST_F(ClassicStageBuilderTest, GeoNear2DDroppedIndexThrowsQueryPlanKilled) {
+    auto emptyCollection =
+        std::make_unique<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
+    auto geoNear = std::make_unique<GeoNear2DNode>(
+        kNss, buildIndexEntryWithIdent(BSON("loc" << "2d"), "original-ident", "loc_2d"));
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(geoNear)), emptyCollection.get()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ClassicStageBuilderTest, GeoNear2DDroppedAndReplacedIndexThrowsQueryPlanKilled) {
+    auto collection = makeCollectionWithIndex("loc_2d", BSON("loc" << "2d"));
+    auto geoNear = std::make_unique<GeoNear2DNode>(
+        kNss, buildIndexEntryWithIdent(BSON("loc" << "2d"), "original-ident", "loc_2d"));
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(geoNear)), collection.get()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ClassicStageBuilderTest, GeoNear2DSphereDroppedIndexThrowsQueryPlanKilled) {
+    auto emptyCollection =
+        std::make_unique<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
+    auto geoNear = std::make_unique<GeoNear2DSphereNode>(
+        kNss,
+        buildIndexEntryWithIdent(BSON("loc" << "2dsphere"), "original-ident", "loc_2dsphere"));
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(geoNear)), emptyCollection.get()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ClassicStageBuilderTest, GeoNear2DSphereDroppedAndReplacedIndexThrowsQueryPlanKilled) {
+    auto collection = makeCollectionWithIndex("loc_2dsphere", BSON("loc" << "2dsphere"));
+    auto geoNear = std::make_unique<GeoNear2DSphereNode>(
+        kNss,
+        buildIndexEntryWithIdent(BSON("loc" << "2dsphere"), "original-ident", "loc_2dsphere"));
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(geoNear)), collection.get()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ClassicStageBuilderTest, TextMatchDroppedIndexThrowsQueryPlanKilled) {
+    auto emptyCollection =
+        std::make_unique<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
+    auto textMatch = std::make_unique<TextMatchNode>(
+        kNss,
+        buildIndexEntryWithIdent(BSON("txt" << "text"), "original-ident", "txt_text"),
+        std::make_unique<fts::FTSQueryImpl>(),
+        false /* wantTextScore */);
+    ASSERT_THROWS_CODE(
+        buildPlanStage(makeQuerySolution(std::move(textMatch)), emptyCollection.get()),
+        DBException,
+        ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ClassicStageBuilderTest, TextMatchDroppedAndReplacedIndexThrowsQueryPlanKilled) {
+    auto collection = makeCollectionWithIndex("txt_text", BSON("txt" << "text"));
+    auto textMatch = std::make_unique<TextMatchNode>(
+        kNss,
+        buildIndexEntryWithIdent(BSON("txt" << "text"), "original-ident", "txt_text"),
+        std::make_unique<fts::FTSQueryImpl>(),
+        false /* wantTextScore */);
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(textMatch)), collection.get()),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
 }
