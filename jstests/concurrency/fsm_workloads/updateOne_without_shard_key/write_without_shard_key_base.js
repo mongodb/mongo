@@ -333,30 +333,34 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             collection = db[collName];
         }
 
-        let res;
-        if (updateType === 0 /* Update operator document */) {
-            const update = {[this.secondaryDocField]: newValue};
-            res = collection.updateOne(query, {$set: update});
-        } else {
-            /* Aggregation pipeline update */
-            const update = {[this.secondaryDocField]: newValue};
-            res = collection.updateOne(query, [{$set: update}]);
-        }
-        assert.commandWorked(res);
+        try {
+            let res;
+            if (updateType === 0 /* Update operator document */) {
+                const update = {[this.secondaryDocField]: newValue};
+                res = collection.updateOne(query, {$set: update});
+            } else {
+                /* Aggregation pipeline update */
+                const update = {[this.secondaryDocField]: newValue};
+                res = collection.updateOne(query, [{$set: update}]);
+            }
+            assert.commandWorked(res);
 
-        if (containsMatchedDocs) {
-            assert.contains(res.matchedCount, uweEnabled ? [1, 2] : [1], query);
-        } else {
-            assert.eq(res.matchedCount, 0, res);
-        }
+            if (containsMatchedDocs) {
+                assert.contains(res.matchedCount, uweEnabled ? [1, 2] : [1], query);
+            } else {
+                assert.eq(res.matchedCount, 0, res);
+            }
 
-        assert.contains(res.modifiedCount, uweEnabled ? [0, 1, 2] : [0, 1], res);
+            assert.contains(res.modifiedCount, uweEnabled ? [0, 1, 2] : [0, 1], res);
 
-        // In case the modification results in no change to the document, matched may be higher
-        // than modified.
-        assert.gte(res.matchedCount, res.modifiedCount, res);
-        if (session) {
-            session.endSession();
+            // In case the modification results in no change to the document, matched may be higher
+            // than modified.
+            assert.gte(res.matchedCount, res.modifiedCount, res);
+        } finally {
+            // Always end the session, even if the write throws an error.
+            if (session) {
+                session.endSession();
+            }
         }
     };
 
@@ -693,36 +697,40 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             collection = db[collName];
         }
 
-        // Used for validation after running the write operation.
-        const containsMatchedDocs = collection.findOne(query) != null;
-        const numMatchedDocsBefore = collection.countDocuments(query);
+        try {
+            // Used for validation after running the write operation.
+            const containsMatchedDocs = collection.findOne(query) != null;
+            const numMatchedDocsBefore = collection.countDocuments(query);
 
-        jsTestLog(
-            "deleteOneWithId state running with query: " +
-                tojson(query) +
-                "\n" +
-                "containsMatchedDocs: " +
-                containsMatchedDocs +
-                "\n" +
-                "numMatchedDocsBefore: " +
-                numMatchedDocsBefore,
-        );
+            jsTestLog(
+                "deleteOneWithId state running with query: " +
+                    tojson(query) +
+                    "\n" +
+                    "containsMatchedDocs: " +
+                    containsMatchedDocs +
+                    "\n" +
+                    "numMatchedDocsBefore: " +
+                    numMatchedDocsBefore,
+            );
 
-        let res = assert.commandWorked(collection.deleteOne(query));
+            let res = assert.commandWorked(collection.deleteOne(query));
 
-        const numMatchedDocsAfter = collection.countDocuments(query);
+            const numMatchedDocsAfter = collection.countDocuments(query);
 
-        if (containsMatchedDocs) {
-            assert.eq(res.deletedCount, 1, res);
-            assert.eq(numMatchedDocsAfter, numMatchedDocsBefore - 1);
-        } else {
-            assert.eq(res.deletedCount, 0, res);
+            if (containsMatchedDocs) {
+                assert.eq(res.deletedCount, 1, res);
+                assert.eq(numMatchedDocsAfter, numMatchedDocsBefore - 1);
+            } else {
+                assert.eq(res.deletedCount, 0, res);
 
-            // The count should both be 0.
-            assert.eq(numMatchedDocsAfter, numMatchedDocsBefore);
-        }
-        if (session) {
-            session.endSession();
+                // The count should both be 0.
+                assert.eq(numMatchedDocsAfter, numMatchedDocsBefore);
+            }
+        } finally {
+            // Always end the session, even if the write throws an error.
+            if (session) {
+                session.endSession();
+            }
         }
         jsTestLog("Finished deleteOneWithId state");
     };
