@@ -41,8 +41,8 @@ public:
     static EgressResponseRateLimiter& get(ServiceContext* svcCtx);
 
     /**
-     * Paces the caller until an egress-response token is available. The queue is unbounded, so this
-     * never denies the caller; it always returns.
+     * Throttles the caller until an egress-response token is available. When the queue
+     * is at capacity the call bypasses the queue and returns immediately (fail-open).
      */
     Status throttle(Interruptible* interruptible, ClockSource* clockSrc);
 
@@ -50,6 +50,11 @@ public:
      * Adjusts the refresh rate and burst capacity of the underlying rate limiter.
      */
     void updateRateParameters(double refreshRatePerSec, double burstCapacitySecs);
+
+    /**
+     * Sets the maximum number of egress responses that may be queued waiting for a token.
+     */
+    void updateMaxQueueDepth(std::int64_t maxQueueDepth);
 
     /**
      * Called automatically when the egressResponseRateLimiterRatePerSec server parameter changes.
@@ -61,6 +66,12 @@ public:
      * changes.
      */
     [[MONGO_MOD_PRIVATE]] static Status onUpdateBurstCapacitySecs(double burstCapacitySecs);
+
+    /**
+     * Called automatically when the egressResponseRateLimiterMaxQueueDepth server parameter
+     * changes.
+     */
+    [[MONGO_MOD_PRIVATE]] static Status onUpdateMaxQueueDepth(std::int64_t maxQueueDepth);
 
     /**
      * Reports the egress response rate limiter metrics.

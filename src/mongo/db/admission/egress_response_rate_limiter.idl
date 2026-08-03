@@ -39,3 +39,18 @@ server_parameters:
             expr: std::numeric_limits<double>::max()
         validator: {gt: 0}
         redact: false
+
+    egressResponseRateLimiterMaxQueueDepth:
+        description: >-
+            The maximum number of egress responses that may be queued waiting for a token when
+            the egress response rate limit is exceeded. Responses that arrive when the queue is
+            at capacity bypass the queue and are sent immediately (fail-open), preserving the
+            invariant that a rejection reply is never dropped. A value of 0 disables queueing.
+        set_at: [startup, runtime]
+        cpp_varname: gEgressResponseRateLimiterMaxQueueDepth
+        cpp_vartype: Atomic<long long>
+        on_update: EgressResponseRateLimiter::onUpdateMaxQueueDepth
+        default:
+            expr: std::numeric_limits<long long>::max()
+        validator: {gte: 0}
+        redact: false

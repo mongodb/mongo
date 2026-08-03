@@ -331,6 +331,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

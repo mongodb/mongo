@@ -10,8 +10,6 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/util/decorable.h"
 
-#include <limits>
-
 namespace mongo {
 namespace admission {
 
@@ -49,7 +47,7 @@ EgressResponseRateLimiter::EgressResponseRateLimiter()
     : _rateLimiter{
           static_cast<double>(gEgressResponseRateLimiterRatePerSec.load()),
           gEgressResponseRateLimiterBurstCapacitySecs.load(),
-          std::numeric_limits<int64_t>::max(),
+          gEgressResponseRateLimiterMaxQueueDepth.load(),
           std::string(kRateLimiterName),
           RateLimiter::Options{.metricsRecorder = std::make_unique<RateLimiterOtelMetricsRecorder>(
                                    egressResponseRateLimiterSpec())}} {}
@@ -61,7 +59,8 @@ EgressResponseRateLimiter& EgressResponseRateLimiter::get(ServiceContext* svcCtx
 Status EgressResponseRateLimiter::throttle(Interruptible* interruptible, ClockSource* clockSrc) {
     auto token = _rateLimiter.acquireToken();
     if (!token) {
-        // Unreachable in v1 (unbounded queue); keep a defensive no-op for safety.
+        // Fail open: we must always send the response, even if the queue is at capacity.
+        // Dropping it would corrupt the connection and hang the client.
         return Status::OK();
     }
 
@@ -71,6 +70,10 @@ Status EgressResponseRateLimiter::throttle(Interruptible* interruptible, ClockSo
 void EgressResponseRateLimiter::updateRateParameters(double refreshRatePerSec,
                                                      double burstCapacitySecs) {
     _rateLimiter.updateRateParameters(refreshRatePerSec, burstCapacitySecs);
+}
+
+void EgressResponseRateLimiter::updateMaxQueueDepth(std::int64_t maxQueueDepth) {
+    _rateLimiter.setMaxQueueDepth(maxQueueDepth);
 }
 
 Status EgressResponseRateLimiter::onUpdateRatePerSec(std::int32_t refreshRatePerSec) {
@@ -86,6 +89,13 @@ Status EgressResponseRateLimiter::onUpdateBurstCapacitySecs(double burstCapacity
     if (auto* client = Client::getCurrent()) {
         get(client->getServiceContext())
             .updateRateParameters(gEgressResponseRateLimiterRatePerSec.load(), burstCapacitySecs);
+    }
+    return Status::OK();
+}
+
+Status EgressResponseRateLimiter::onUpdateMaxQueueDepth(std::int64_t maxQueueDepth) {
+    if (auto* client = Client::getCurrent()) {
+        get(client->getServiceContext()).updateMaxQueueDepth(maxQueueDepth);
     }
     return Status::OK();
 }
