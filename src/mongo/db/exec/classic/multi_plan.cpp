@@ -129,7 +129,7 @@ auto& multiPlannerAllPlansHitMemoryLimitTotal =
 
 /**
  * Aggregation of the total number of times multiplanning chose the winning plan. With the
- * introduction of automaticCE mode, this may differ from the number of times multiplanning is
+ * introduction of the mixed plan ranker, this may differ from the number of times multiplanning is
  * invoked.
  */
 auto& multiPlannerChoseWinningPlan =

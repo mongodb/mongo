@@ -1,5 +1,5 @@
 /**
- * Tests the serverStatus metrics for AutomaticCE plan selection under the
+ * Tests the serverStatus metrics for plan selection under the mixed plan ranker and the
  * EstimateRankingEffort strategy.
  *
  * Verifies all query.cbr.* and query.multiPlanner.* metrics under mixed plan ranking mode with the

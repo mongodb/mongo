@@ -1327,7 +1327,7 @@ server_parameters:
     internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice:
         description: >-
             The minimum ratio by which the cost of CBR should be better than the remaining
-            multi-planning cost while choosing between them during AutomaticCE.
+            multi-planning cost while choosing between them under the mixed plan ranker.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice"
         cpp_vartype: Atomic<double>

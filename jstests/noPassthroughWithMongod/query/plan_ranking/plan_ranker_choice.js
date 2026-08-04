@@ -1,6 +1,6 @@
 /**
  * Verifies which plan ranker (the cost-based ranker, CBR, or the multi-planner, MP) produces the
- * winning plan, and the reason, across the AutomaticCE plan-ranking strategies:
+ * winning plan, and the reason, across the mixed plan-ranking strategies:
  *   - EstimateRankingEffort:     after a brief MP estimation trial, CBR is chosen when it is
  *                                estimated cheaper than finishing MP.
  *   - NoMultiplanningResults:    CBR is engaged only when MP produced no results within its
@@ -131,13 +131,13 @@ assert.commandWorked(
     }),
 );
 try {
-    // The implementation of AutomaticCE with a cost-based choice of the plan ranker
+    // The implementation of the mixed plan ranker with a cost-based choice of the plan ranker
     // considers 5 different cases. Each of these cases is listed below and tested.
 
     // PLEASE MAKE SURE TO TEST ALL CASES, AND TO MATCH THE NUMBERS HERE WITH THE
     // ENUMERATION OF CASES IN THE CODE.
 
-    // (1) AutomaticCE chooses MP because of EOF or full batch
+    // (1) The mixed plan ranker chooses MP because of EOF or full batch
     // 1.1 EOF small collection
     checkRanker({
         qID: "1.1.1",
@@ -219,7 +219,7 @@ try {
         reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
     });
 
-    // (2) "AutomaticCE chooses MP because plan contains inestimable node(s)"
+    // (2) "The mixed plan ranker chooses MP because plan contains inestimable node(s)"
     // $text creates inestimable TEXT stages but also forces the text index, so a plain conjunction
     // would produce only one plan. Using $or lets branches be planned independently: the $text
     // branch uses the text index while other branches have competing index choices, giving us
@@ -300,7 +300,7 @@ try {
     // candidate plans, so it runs the brief MP estimation trial to compare MP against CBR) but a
     // plan contains an inestimable node. A '$near' predicate forces a GEO_NEAR_2DSPHERE stage,
     // which neither the exact CE used to estimate MP nor CBR can estimate, so estimateAllPlans()
-    // fails and AutomaticCE falls back to MP. Uses a dedicated geo collection so the shared 'f1..'
+    // fails and the mixed plan ranker falls back to MP. Uses a dedicated geo collection so the shared 'f1..'
     // collections (and the finely-tuned productivity cases) are left untouched.
     {
         const geoColl = db[collName("geo")];
@@ -339,7 +339,7 @@ try {
         reason: PlanRankerReason.kInestimableNode,
     });
 
-    // (3) AutomaticCE chooses CBR because of very low productivity
+    // (3) The mixed plan ranker chooses CBR because of very low productivity
     checkRanker({
         qID: "3.1",
         cName: "20k",
@@ -374,7 +374,7 @@ try {
         reason: PlanRankerReason.kCbrCheaperThanMp,
     });
 
-    // (4) AutomaticCE chooses MP because the required improvement is not achievable
+    // (4) The mixed plan ranker chooses MP because the required improvement is not achievable
     // Make this test more stable by increasing the required ratio - it works with the default but
     // sometimes the ratio may occasionally get better.
     const prevRatio = assert.commandWorked(
@@ -397,7 +397,7 @@ try {
         }),
     );
 
-    // (5) AutomaticCE chooses CBR because it is cheaper than MP
+    // (5) The mixed plan ranker chooses CBR because it is cheaper than MP
     checkRanker({
         qID: "5.1",
         cName: "20k",

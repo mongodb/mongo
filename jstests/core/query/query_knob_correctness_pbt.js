@@ -48,7 +48,8 @@ const excludeKnobs = [
      * {
      * 	"internalQueryPlannerEnableHashIntersection" : true,
      * 	"featureFlagCostBasedRanker": true,
-     * 	"internalQueryCBRCEMode" : "automaticCE"
+     * 	"internalQueryPlanRanker" : "mixed",
+     * 	"internalQueryCBRCEMode" : "samplingCE"
      * }
      */
     "internalQueryCBRCEMode",

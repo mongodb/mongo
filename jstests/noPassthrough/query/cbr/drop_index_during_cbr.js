@@ -118,8 +118,9 @@ import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
         runTestHelper(planRanker, autoStrategy, `testColl.find(${tojson(andFilter)}).toArray()`);
 
         // Rooted $or: subplanning path. kSamplingCE calls generateSample() directly from
-        // SubplanStage::pickBestPlan. kAutomaticCE delegates branch selection to the multiplanner
-        // instead, so generateSample() is not reached on this path and this test does not apply.
+        // SubplanStage::pickBestPlan. The mixed plan ranker delegates branch selection to the
+        // multiplanner instead, so generateSample() is not reached on this path and this test does
+        // not apply.
         if (planRanker === "costBased") {
             const orFilter = {$or: [{a: {$gte: 14999}}, {b: {$gte: 14999}}]};
             runTestHelper(planRanker, autoStrategy, `testColl.find(${tojson(orFilter)}).toArray()`);
