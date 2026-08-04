@@ -143,13 +143,9 @@ TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryIssuerWithFwdSlash) {
     ASSERT_EQ(defaultMetadata, metadata);
 }
 
-TEST_F(OAuthDiscoveryFactoryFixture, AllEndpointsMustBeSecure) {
+TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
     auto defaultMetadata = makeDefaultMetadata();
 
-    // Every URL advertised in the discovery document must be secure (https, or localhost under
-    // test). A malicious server must not be able to direct the client to make plaintext requests
-    // to an arbitrary host, even for endpoints the server itself does not use (e.g. the token and
-    // device authorization endpoints, which are followed by the client).
     for (const auto& field : defaultMetadata.toBSON()) {
         BSONObj splicedMetadata = [&] {
             BSONObjBuilder builder;
@@ -165,8 +161,40 @@ TEST_F(OAuthDiscoveryFactoryFixture, AllEndpointsMustBeSecure) {
             {200, {}, splicedMetadata.jsonString()});
         OAuthDiscoveryFactory factory(std::move(client));
 
-        ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
+        // Only the issuer and jwks_uri are dereferenced by the server, so only they must be secure
+        // at parse time; the remaining endpoints are validated by the client at point of use
+        // (SERVER-89723).
+        if (field.fieldName() == "jwks_uri"sv || field.fieldName() == "issuer"sv) {
+            ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
+        } else {
+            OAuthAuthorizationServerMetadata precomputedMetadata =
+                OAuthAuthorizationServerMetadata::parse(splicedMetadata,
+                                                        IDLParserContext("metadata"));
+            ASSERT_EQ(precomputedMetadata, factory.acquire("https://idp.example"));
+        }
     }
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, EndpointsMayBeURNs) {
+    // Kubernetes-style issuers advertise URNs for endpoints they do not support; the discovery
+    // document must still parse so the server can reach the jwks_uri (SERVER-89723, HELP-97856).
+    auto defaultMetadata = makeDefaultMetadata();
+    BSONObj splicedMetadata = [&] {
+        BSONObjBuilder builder;
+        builder.append("authorization_endpoint", "urn:kubernetes:programmatic_authorization");
+        builder.appendElementsUnique(defaultMetadata.toBSON());
+        return builder.obj();
+    }();
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
+        {200, {}, splicedMetadata.jsonString()});
+    OAuthDiscoveryFactory factory(std::move(client));
+
+    OAuthAuthorizationServerMetadata precomputedMetadata =
+        OAuthAuthorizationServerMetadata::parse(splicedMetadata, IDLParserContext("metadata"));
+    ASSERT_EQ(precomputedMetadata, factory.acquire("https://idp.example"));
 }
 
 TEST_F(OAuthDiscoveryFactoryFixture, EndpointMayBeInsecureLocalhostUnderTest) {

@@ -96,6 +96,8 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     const auth::OIDCMechanismServerStep1& serverReply,
     std::string_view principalName) {
     auto deviceAuthorizationEndpoint = discoveryReply.getDeviceAuthorizationEndpoint().get();
+    uassertStatusOK(HttpClient::endpointIsSecure(deviceAuthorizationEndpoint)
+                        .withContext("device authorization endpoint in discovery document"));
 
     auto clientId = serverReply.getClientId();
     uassert(ErrorCodes::BadValue,
@@ -289,6 +291,8 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(std::string_view input,
         uassert(ErrorCodes::BadValue,
                 "Missing token endpoint in server reply",
                 tokenEndpoint && !tokenEndpoint->empty());
+        uassertStatusOK(HttpClient::endpointIsSecure(*tokenEndpoint)
+                            .withContext("token endpoint in discovery document"));
 
         // Cache the token endpoint for potential reuse during the refresh flow.
         oidcClientGlobalParams.oidcTokenEndpoint = std::string{*tokenEndpoint};
