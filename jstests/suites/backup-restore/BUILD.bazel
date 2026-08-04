@@ -16,6 +16,7 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "backup_restore",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/backup_restore.yml",
     data = [
         "//buildscripts/resmokeconfig:suites/concurrency_replication_for_backup_restore.yml",
@@ -38,7 +39,6 @@ resmoke_suite_test(
         "misc_js",
         "requires_execution_on_windows_patch_build",
         "requires_replicated_fast_count_recovery",
-        "resources:cpu:2",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],

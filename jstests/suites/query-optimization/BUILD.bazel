@@ -36,6 +36,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_disabled_optimization",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_disabled_optimization.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",

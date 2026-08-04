@@ -59,6 +59,7 @@ mongo_cc_library(
 
 mongo_cc_unit_test(
     name = "db_sorter_test",
+    size = "large",
     srcs = [
         "container_based_spiller_test.cpp",
         "file_test.cpp",
@@ -67,7 +68,6 @@ mongo_cc_unit_test(
         "sorter_test.cpp",
     ],
     tags = [
-        "cpu:2",
         "mongo_unittest_second_group",
         "server-external-sorter",
     ],

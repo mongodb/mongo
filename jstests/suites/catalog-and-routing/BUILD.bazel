@@ -17,6 +17,7 @@ load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DA
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_with_balancer",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer.yml",
     data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
     shard_count = 20,
@@ -27,7 +28,6 @@ resmoke_suite_test(
         "incompatible_debug_mode",
         "large",
         "read_concern_maj",
-        "resources:cpu:2",
         "sharded",
     ],
     target_compatible_with = select({
@@ -45,6 +45,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_jscore_passthrough_with_balancer",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_balancer.yml",
     data = [
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
@@ -55,7 +56,6 @@ resmoke_suite_test(
         "ci-release-critical",
         "common",
         "jscore",
-        "resources:cpu:2",
         "sharding",
     ],
     deps = [
@@ -97,6 +97,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "transitioning_replica_sets_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/transitioning_replica_sets_jscore_passthrough.yml",
     data = [
         "//buildscripts/resmokeconfig:matrix_suites/mappings/transitioning_replica_sets_jscore_passthrough.yml",
@@ -110,7 +111,6 @@ resmoke_suite_test(
         "incompatible_debug_mode",
         "large",
         "replica_sets",
-        "resources:cpu:2",
         "san",
     ],
     deps = [
@@ -136,11 +136,11 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_and_add_remove_shard",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_and_add_remove_shard.yml",
     shard_count = 50,
     tags = [
         "ci-default",
-        "resources:cpu:2",
         "unsplittable_collections",
     ],
     deps = [
@@ -182,6 +182,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_causal_consistency",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_causal_consistency.yml",
     shard_count = 20,
     tags = [
@@ -189,7 +190,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "non_live_record",
-        "resources:cpu:2",
         "sharded",
     ],
     deps = [
@@ -201,6 +201,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_causal_consistency_and_balancer",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_causal_consistency_and_balancer.yml",
     shard_count = 20,
     tags = [
@@ -208,7 +209,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "non_live_record",
-        "resources:cpu:2",
         "sharded",
     ],
     deps = [
@@ -220,6 +220,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard.yml",
     shard_count = 40,
     tags = [
@@ -228,7 +229,6 @@ resmoke_suite_test(
         "incompatible_debug_mode",
         "no_debug_mode",
         "non_live_record",
-        "resources:cpu:2",
         "sharded",
     ],
     deps = [
@@ -240,6 +240,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_with_balancer_and_config_transitions",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer_and_config_transitions.yml",
     shard_count = 20,
     tags = [
@@ -247,7 +248,6 @@ resmoke_suite_test(
         "concurrency",
         "no_debug_mode",
         "non_live_record",
-        "resources:cpu:2",
         "sharded",
     ],
     deps = [
@@ -259,6 +259,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard.yml",
     shard_count = 20,
     tags = [
@@ -267,7 +268,6 @@ resmoke_suite_test(
         "kill_terminate",
         "no_debug_mode",
         "non_live_record",
-        "resources:cpu:2",
         "sharded",
         "stepdowns",
     ],
@@ -280,6 +280,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "fcv_upgrade_downgrade_replica_sets_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/fcv_upgrade_downgrade_replica_sets_jscore_passthrough.yml",
     shard_count = 20,
     tags = [
@@ -325,6 +326,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_jscore_passthrough_priority_ports",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_priority_ports.yml",
     shard_count = 40,
     tags = [
@@ -408,6 +410,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "replica_sets_reconfig_jscore_passthrough_priority_ports",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_reconfig_jscore_passthrough_priority_ports.yml",
     shard_count = 20,
     tags = [
@@ -548,6 +551,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_multi_stmt_txn",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_multi_stmt_txn.yml",
     shard_count = 50,
     tags = [
@@ -555,7 +559,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "large",
-        "resources:cpu:2",
         "sharded",
     ],
     deps = [
@@ -567,6 +570,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_multi_stmt_txn_with_balancer",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_multi_stmt_txn_with_balancer.yml",
     shard_count = 50,
     tags = [
@@ -574,7 +578,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "large",
-        "resources:cpu:2",
         "sharded",
     ],
     deps = [
@@ -586,6 +589,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard.yml",
     shard_count = 50,
     tags = [
@@ -595,7 +599,6 @@ resmoke_suite_test(
         "large",
         "no_debug_mode",
         "non_live_record",
-        "resources:cpu:2",
         "sharded",
         "stepdowns",
     ],
@@ -608,6 +611,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_with_stepdowns",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_with_stepdowns.yml",
     shard_count = 50,
     tags = [
@@ -616,7 +620,6 @@ resmoke_suite_test(
         "incompatible_debug_mode",
         "large",
         "requires_replicated_fast_count_recovery",
-        "resources:cpu:2",
         "sharded",
         "stepdowns",
     ],
@@ -735,6 +738,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_with_config_shard",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_with_config_shard.yml",
     shard_count = 50,
     tags = [
@@ -744,7 +748,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "read_concern_maj",
-        "resources:cpu:2",
         "sharded",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
@@ -763,6 +766,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_with_balancer_and_config_shard",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_with_balancer_and_config_shard.yml",
     shard_count = 33,
     tags = [
@@ -772,7 +776,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "read_concern_maj",
-        "resources:cpu:2",
         "sharded",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
@@ -825,12 +828,12 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "fcv_upgrade_downgrade_sharding_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/fcv_upgrade_downgrade_sharding_jscore_passthrough.yml",
     shard_count = 49,
     tags = [
         "ci-default",
         "requires_replicated_fast_count_recovery",
-        "resources:cpu:2",
         "sharding",
     ],
     deps = [

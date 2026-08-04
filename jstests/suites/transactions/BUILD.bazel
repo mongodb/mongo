@@ -38,6 +38,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_replication_multi_stmt_txn",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_replication_multi_stmt_txn.yml",
     data = CONCURRENCY_DATA,
     shard_count = 20,

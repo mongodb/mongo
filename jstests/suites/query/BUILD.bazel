@@ -16,6 +16,7 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "aggregation",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
@@ -34,6 +35,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_auth",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_auth.yml",
     data = [
         "//jstests/libs:authTestsKey",
@@ -59,6 +61,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_read_concern_majority_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_read_concern_majority_passthrough.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
@@ -68,7 +71,6 @@ resmoke_suite_test(
         "aggregation",
         "ci-release-critical",
         "read_write_concern",
-        "resources:cpu:2",
     ],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -82,6 +84,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_sharded_collections_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_sharded_collections_passthrough.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
@@ -91,7 +94,6 @@ resmoke_suite_test(
         "aggregation",
         "ci-release-critical",
         "common",
-        "resources:cpu:2",
         "sharded",
     ],
     target_compatible_with = select({

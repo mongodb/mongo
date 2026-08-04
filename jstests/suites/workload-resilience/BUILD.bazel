@@ -17,6 +17,7 @@ load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
 
 resmoke_suite_test(
     name = "concurrency_replication_execution_control_with_prioritization",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_replication_execution_control_with_prioritization.yml",
     shard_count = 50,
     tags = [
@@ -54,6 +55,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_jscore_passthrough_rate_limited",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/multi_shard_multi_stmt_txn_jscore_passthrough_rate_limited.yml",
     shard_count = 50,
     tags = [
@@ -63,7 +65,6 @@ resmoke_suite_test(
         "multi_shard",
         "multi_stmt",
         "requires_replicated_fast_count_recovery",
-        "resources:cpu:2",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -195,6 +196,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_jscore_passthrough_with_balancer_rate_limited",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_balancer_rate_limited.yml",
     data = [
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
@@ -206,7 +208,6 @@ resmoke_suite_test(
         "common",
         "ingress_request_rate_limited",
         "jscore",
-        "resources:cpu:2",
         "sharding",
     ],
     deps = [
@@ -239,6 +240,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_rate_limited",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_sharded_replication_rate_limited.yml",
     shard_count = 50,
     tags = [
@@ -248,7 +250,6 @@ resmoke_suite_test(
         "incompatible_debug_mode",
         "ingress_request_rate_limited",
         "read_concern_maj",
-        "resources:cpu:2",
         "sharded",
     ],
     target_compatible_with = select({
@@ -266,6 +267,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_execution_control_with_prioritization",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_execution_control_with_prioritization.yml",
     data = [
         "//jstests/sharding/libs:proxy_protocol_server",
@@ -277,7 +279,6 @@ resmoke_suite_test(
         "execution_control_with_prioritization",
         "incompatible_with_bazel_remote_test",  # Even with 50 shards, some shards frequently time out
         "requires_replicated_fast_count_recovery",
-        "resources:cpu:2",
         "sharding",
     ],
     target_compatible_with = select({
@@ -294,6 +295,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "replica_sets_execution_control_with_prioritization",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_execution_control_with_prioritization.yml",
     data = [
         "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
@@ -305,7 +307,6 @@ resmoke_suite_test(
         "incompatible_debug_mode",
         "replica_sets",
         "requires_replicated_fast_count_recovery",
-        "resources:cpu:2",
         "san",
     ],
     deps = [
@@ -318,6 +319,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "no_passthrough_execution_control_with_prioritization",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_execution_control_with_prioritization.yml",
     shard_count = 50,
     tags = [
@@ -328,7 +330,6 @@ resmoke_suite_test(
         "misc_js",
         "requires_execution_on_windows_patch_build",
         "requires_replicated_fast_count_recovery",
-        "resources:cpu:2",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
@@ -346,6 +347,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_execution_control_with_prioritization",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_sharded_replication_execution_control_with_prioritization.yml",
     shard_count = 50,
     tags = [
@@ -355,7 +357,6 @@ resmoke_suite_test(
         "execution_control_with_prioritization",
         "incompatible_debug_mode",
         "read_concern_maj",
-        "resources:cpu:2",
         "sharded",
     ],
     target_compatible_with = select({

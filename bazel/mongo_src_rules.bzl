@@ -897,7 +897,7 @@ def mongo_cc_test(
         bazel.
     """
 
-    exec_properties = exec_properties | test_exec_properties(tags)
+    exec_properties = exec_properties | test_exec_properties(kwargs.get("size", "medium"))  # medium is the bazel default size for all tests
 
     _mongo_cc_binary_and_test(
         name,

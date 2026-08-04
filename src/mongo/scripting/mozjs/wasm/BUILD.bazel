@@ -263,7 +263,6 @@ embed_binary_rc(
 
 mongo_cc_unit_test(
     name = "wasm_scope_test_invocation",
-    size = "large",
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_invocation.cpp",
@@ -291,7 +290,6 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "wasm_scope_test_type_handling",
-    size = "large",
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_type_handling.cpp",
@@ -318,7 +316,6 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "wasm_scope_test_lifecycle",
-    size = "large",
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_lifecycle.cpp",
@@ -345,7 +342,6 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "wasm_scope_test_memory_limits",
-    size = "large",
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_memory_limits.cpp",
@@ -372,7 +368,6 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "wasm_scope_test_error_handling",
-    size = "large",
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_error_handling.cpp",
@@ -399,7 +394,6 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "wasm_scope_test_concurrency",
-    size = "large",
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_concurrency.cpp",
@@ -427,7 +421,6 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "wasm_scope_security_test",
-    size = "large",
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/scope:scope_test_security.cpp",
@@ -480,7 +473,6 @@ mongo_cc_library(
 
 mongo_cc_unit_test(
     name = "wasmtime_engine_killop_proxy_test",
-    size = "large",
     timeout = "long",
     srcs = [
         "wasmtime_engine_killop_proxy_test.cpp",

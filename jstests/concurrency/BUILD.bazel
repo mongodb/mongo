@@ -15,6 +15,7 @@ all_subpackage_javascript_files()
 
 resmoke_suite_test(
     name = "concurrency_simultaneous",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_simultaneous.yml",
     data = CONCURRENCY_DATA,
     shard_count = 15,
@@ -23,7 +24,6 @@ resmoke_suite_test(
         "common",
         "concurrency",
         "random_name",
-        "resources:cpu:2",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],

@@ -128,6 +128,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "timeseries_write_pbt_fixed_seed",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/timeseries_write_pbt.yml",
     data = [
         "//jstests/write_path/timeseries/pbt:all_subpackage_javascript_files",
@@ -200,6 +201,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "auth_primary_driven_index_builds",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/auth_primary_driven_index_builds.yml",
     shard_count = 4,
     tags = [
@@ -207,7 +209,6 @@ resmoke_suite_test(
         "ci-default",
         "incompatible_with_bazel_remote_test",  # commands_builtin_roles_sharded.js times out after 16 minutes.
         "primary_driven_index_builds",
-        "resources:cpu:2",
     ],
     deps = [
         "//src/mongo/db:mongod",
