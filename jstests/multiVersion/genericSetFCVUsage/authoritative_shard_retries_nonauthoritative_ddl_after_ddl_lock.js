@@ -26,7 +26,7 @@ describe("authoritative shard retries non-authoritative DDL", () => {
 
     beforeEach(() => {
         db = st.s.getDB("test");
-        db.dropDatabase();
+        assert.commandWorked(db.dropDatabase());
         assert.commandWorked(
             st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
