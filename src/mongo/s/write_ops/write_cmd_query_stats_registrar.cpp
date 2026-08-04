@@ -19,6 +19,22 @@
 namespace mongo::query_stats {
 using namespace std::literals::string_view_literals;
 
+bool WriteCmdQueryStatsRegistrar::requestIncludesQueryStatsMetrics(const WriteCommandRef& cmdRef) {
+    if (!cmdRef.isBatchWriteCommand()) {
+        return false;
+    }
+    const auto& batchRequest = cmdRef.getBatchedCommandRequest();
+    if (batchRequest.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
+        return bool(batchRequest.getInsertRequest().getIncludeQueryStatsMetrics());
+    }
+    for (int opIndex = 0; opIndex < static_cast<int>(cmdRef.getNumOps()); ++opIndex) {
+        if (cmdRef.getOp(opIndex).getIncludeQueryStatsMetricsForOpIndex()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 namespace {
 
 bool shouldSkipWriteOpQueryStats(const boost::optional<EncryptionInformation>& encryptionInfo) {

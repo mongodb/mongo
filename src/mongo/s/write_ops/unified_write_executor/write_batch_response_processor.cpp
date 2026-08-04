@@ -7,6 +7,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -14,6 +15,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/assert_util.h"
@@ -135,6 +137,13 @@ void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
         LOGV2_DEBUG(
             10411404, 4, "re-enqueuing ops that didn't complete", "ops"_attr = opsStream.str());
     }
+}
+
+// Returns true if this operation runs under a server-spawned internal transaction (a child
+// session).
+bool isInternalTransaction(OperationContext* opCtx) {
+    const auto& lsid = opCtx->getLogicalSessionId();
+    return lsid && isChildSession(*lsid);
 }
 
 void aggregateQueryStatsMetrics(OperationContext* opCtx, const WriteBatchResponse& response) {
@@ -1427,10 +1436,12 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
         resp.setWriteConcernError(new WriteConcernErrorDetail{totalWcError->toStatus()});
     }
 
-    // Append query stats metrics if the command is forwarded from router (the current node is a
-    // primary shard) such that router can receive and aggregate the metrics there.
-    // Otherwise, ignore if the current node is a router.
-    if (opCtx->isCommandForwardedFromRouter()) {
+    // Echo metrics when the request asks for them and comes from a trusted source -- a command
+    // forwarded from another router, or a write inside a server-spawned internal transaction. Today
+    // the only internal transaction that carries the flag is a retryable time-series update
+    // re-dispatch, so echoing when the flag is set is safe.
+    if ((opCtx->isCommandForwardedFromRouter() || isInternalTransaction(opCtx)) &&
+        query_stats::WriteCmdQueryStatsRegistrar::requestIncludesQueryStatsMetrics(_cmdRef)) {
         auto& opDebug = CurOp::get(opCtx)->debug();
         resp.setQueryStatsMetrics(opDebug.gatherQueryStatsMetricsForBatchWrites());
     }

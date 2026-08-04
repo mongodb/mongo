@@ -42,6 +42,14 @@ public:
                                         bool skipRegistration = false);
 
     /**
+     * Returns true if 'cmdRef' carries a request for remote query stats metrics, i.e. a parent
+     * router stamped 'includeQueryStatsMetrics' (inserts) or 'includeQueryStatsMetricsForOpIndex'
+     * (updates/deletes) on the command. This is the read side of the fields set by
+     * 'setIncludeQueryStatsMetrics*IfRequested'.
+     */
+    static bool requestIncludesQueryStatsMetrics(const WriteCommandRef& cmdRef);
+
+    /**
      * Sets 'includeQueryStatsMetrics' in 'insertRequest' to request shard-side execution metrics
      * when the router has registered the insert for query stats collection.
      */
