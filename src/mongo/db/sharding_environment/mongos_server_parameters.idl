@@ -68,7 +68,8 @@ server_parameters:
     loadBalancerPort:
         description: >-
             The port over which proxied connections using the Proxy Protocol may be made.
-            A value of 0 disables the port entirely.
+            A value of 0 disables the port entirely. Access to this port MUST be restricted to
+            trusted hosts (the load balancer or reverse proxy).
         set_at: [startup]
         cpp_vartype: AtomicWord<int>
         cpp_varname: "loadBalancerPort"
