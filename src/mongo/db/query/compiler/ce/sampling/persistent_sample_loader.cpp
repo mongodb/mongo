@@ -5,6 +5,8 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -324,6 +326,20 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
     return std::move(reassembled);
 }
 
+namespace {
+// Histogram of pages read to reassemble a loaded persistent sample. Bounds are 1 to 32 pages.
+auto& persistentSamplePagesReadHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{
+        "query.sampling.persistentSample.histograms.pagesRead"}
+         .bind(HistogramServerStatusMetric::pow(6, 1, 2));
+
+// How old the sample was, at the moment it was read. Bounds are 1 second to ~388 days.
+auto& persistentSampleAgeAtReadHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{
+        "query.sampling.persistentSample.histograms.sampleAgeAtReadMillis"}
+         .bind(HistogramServerStatusMetric::pow(26, 1000, 2));
+}  // namespace
+
 StatusWith<PersistentSampleDoc> PersistentSampleLoader::tryLoad(
     OperationContext* opCtx,
     const DatabaseName& dbName,
@@ -384,7 +400,18 @@ StatusWith<PersistentSampleDoc> PersistentSampleLoader::tryLoad(
         return ex.toStatus();
     }
 
-    return reassemblePersistentSample(std::move(pages));
+    // PagesRead recorded only on success.
+    const size_t pagesRead = pages.size();
+    auto reassembled = reassemblePersistentSample(std::move(pages));
+    if (reassembled.isOK()) {
+        persistentSamplePagesReadHistogram.increment(pagesRead);
+        const Date_t now = Date_t::now();
+        const Date_t createdAt = reassembled.getValue().getCreatedAt();
+        // A sample stamped in the future normalized to 0 rather than a negative value.
+        const Milliseconds age = now > createdAt ? now - createdAt : Milliseconds(0);
+        persistentSampleAgeAtReadHistogram.increment(durationCount<Milliseconds>(age));
+    }
+    return reassembled;
 }
 
 }  // namespace mongo::ce

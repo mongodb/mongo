@@ -88,6 +88,19 @@ auto& analyzeMicrosHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"commands.analyze.histograms.micros"}.bind(
         HistogramServerStatusMetric::pow(11, 256, 4));
 
+// Histogram of pages persisted per analyze run. Bounds are 1 to 32 pages.
+auto& analyzePagesHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.analyze.sample.histograms.pages"}.bind(
+        HistogramServerStatusMetric::pow(6, 1, 2));
+
+// Bytes persisted per analyze run, summed across all pages. Total and per-run. Bounds are 256
+// bytes to ~268 MB.
+auto& analyzeTotalBytesPersisted =
+    *MetricBuilder<Counter64>{"query.analyze.sample.totalBytesPersisted"};
+auto& analyzeBytesPersistedHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.analyze.sample.histograms.bytesPersisted"}
+         .bind(HistogramServerStatusMetric::pow(11, 256, 4));
+
 StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                                                        std::string_view collection,
                                                        std::string_view keyPath,
@@ -276,9 +289,12 @@ void runSampleMode(OperationContext* opCtx,
     // Serialize the sample into one or more page documents
     std::vector<BSONObj> pageDocs = ce::makePersistentSamplePageDocs(
         *collUUID, samplingMethodToPersist, sampleSize, numChunksOpt, docsArr, createdAt);
+    const size_t pagesPersisted = pageDocs.size();
+    size_t totalBytesPersisted = 0;
     std::vector<InsertStatement> inserts;
     inserts.reserve(pageDocs.size());
     for (auto& pageDoc : pageDocs) {
+        totalBytesPersisted += pageDoc.objsize();
         inserts.emplace_back(std::move(pageDoc));
     }
 
@@ -335,6 +351,10 @@ void runSampleMode(OperationContext* opCtx,
             // not keep track/update in server metrics since count will always be 0.
             break;
     }
+
+    analyzePagesHistogram.increment(pagesPersisted);
+    analyzeTotalBytesPersisted.incrementRelaxed(totalBytesPersisted);
+    analyzeBytesPersistedHistogram.increment(totalBytesPersisted);
 }
 
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {

@@ -31,6 +31,11 @@ describe("persistent sample serverStatus metrics", function () {
     // Both commands.analyze.histograms.micros and query.sampling.persistentSample.histograms.
     // loadMicros use HistogramServerStatusMetric::pow(11, 256, 4).
     const kMicrosHistogramBounds = histogramPowBounds(11, 256, 4);
+    // query.analyze.sample.histograms.{pages} and query.sampling.persistentSample.histograms.
+    // {pagesRead} use pow(6, 1, 2)
+    const kPagesHistogramBounds = histogramPowBounds(6, 1, 2);
+    // query.analyze.sample.histograms.bytesPersisted uses pow(11, 256, 4).
+    const kBytesHistogramBounds = histogramPowBounds(11, 256, 4);
 
     before(function () {
         conn = MongoRunner.runMongod({setParameter: {featureFlagPersistentStats: true}});
@@ -378,5 +383,209 @@ describe("persistent sample serverStatus metrics", function () {
             "commands.analyze.rejected should be unaffected (analyze can't be rejected by query settings)",
             {before, afterFailure},
         );
+    });
+
+    // Sums the exact BSON size of every persisted page.
+    function sumPageBytes(pages) {
+        return pages.reduce((total, page) => total + Object.bsonsize(page), 0);
+    }
+
+    it("records a single-page sample in the pages and bytes metrics", function () {
+        const before = getAnalyzeMetrics(db);
+
+        assert.commandWorked(
+            db.runCommand({
+                analyze: collName,
+                mode: "sample",
+                samplingMethod: "random",
+                sampleSize: kSampleSize,
+            }),
+        );
+
+        const after = getAnalyzeMetrics(db);
+
+        const pages = PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "random",
+            requestedSampleSize: kSampleSize,
+            actualSampleSize: kSampleSize,
+            expectedFields: ["a"],
+            expectedNumPages: 1,
+        });
+
+        assert.eq(
+            sumHistogramBucketCounts(after.histograms.pages),
+            sumHistogramBucketCounts(before.histograms.pages) + 1,
+            "pages histogram should gain one observation",
+            {before, after},
+        );
+        assertHistogramBoundaries(after.histograms.pages, kPagesHistogramBounds);
+
+        const totalBytes = sumPageBytes(pages);
+        assert.eq(
+            after.totalBytesPersisted,
+            before.totalBytesPersisted + totalBytes,
+            "totalBytesPersisted should increase by the summed size of the persisted pages",
+            {before, after, totalBytes},
+        );
+        assert.eq(
+            sumHistogramBucketCounts(after.histograms.bytesPersisted),
+            sumHistogramBucketCounts(before.histograms.bytesPersisted) + 1,
+            "bytesPersisted histogram should gain one observation",
+            {before, after},
+        );
+        assertHistogramBoundaries(after.histograms.bytesPersisted, kBytesHistogramBounds);
+    });
+
+    it("records pagesRead for a single-page read-path load", function () {
+        assert.commandWorked(
+            db.runCommand({
+                analyze: collName,
+                mode: "sample",
+                samplingMethod: "random",
+                sampleSize: kSampleSize,
+            }),
+        );
+
+        const before = getPersistentSampleMetrics(db);
+
+        const explain = coll.find({a: {$gte: 0}}).explain();
+        assert(isCollscan(db, getWinningPlanFromExplain(explain)), "expected a COLLSCAN plan", {
+            explain,
+        });
+
+        const after = getPersistentSampleMetrics(db);
+
+        assert.eq(after.hits, before.hits + 1, "the load should be a persisted-sample hit", {
+            before,
+            after,
+        });
+        assert.eq(
+            sumHistogramBucketCounts(after.histograms.pagesRead),
+            sumHistogramBucketCounts(before.histograms.pagesRead) + 1,
+            "pagesRead histogram should gain one observation",
+            {before, after},
+        );
+        assertHistogramBoundaries(after.histograms.pagesRead, kPagesHistogramBounds);
+    });
+
+    it("records sampleAgeAtReadMillis for a persisted read-path load", function () {
+        assert.commandWorked(
+            db.runCommand({
+                analyze: collName,
+                mode: "sample",
+                samplingMethod: "random",
+                sampleSize: kSampleSize,
+            }),
+        );
+
+        const before = getPersistentSampleMetrics(db);
+
+        const explain = coll.find({a: {$gte: 0}}).explain();
+        assert(isCollscan(db, getWinningPlanFromExplain(explain)), "expected a COLLSCAN plan", {
+            explain,
+        });
+
+        const after = getPersistentSampleMetrics(db);
+
+        assert.eq(after.hits, before.hits + 1, "the load should be a persisted-sample hit", {
+            before,
+            after,
+        });
+        assert.eq(
+            sumHistogramBucketCounts(after.histograms.sampleAgeAtReadMillis),
+            sumHistogramBucketCounts(before.histograms.sampleAgeAtReadMillis) + 1,
+            "sampleAgeAtReadMillis histogram should gain one observation",
+            {before, after},
+        );
+    });
+
+    describe("multi-page samples", function () {
+        const largeCollName = collName + "_large";
+        let largeColl;
+
+        before(function () {
+            largeColl = db[largeCollName];
+            // Persisted sample >16 mb is forced to span more than one page.
+            const docBytes = 50 * 1024;
+            const docs = PersistentSamplesUtils.makeDocsOfTotalSize(
+                kSampleSize,
+                docBytes * kSampleSize,
+            );
+            assert.commandWorked(largeColl.insertMany(docs));
+        });
+
+        // Persists a sample from the large collection and returns its page documents ordered by
+        // pageNo.
+        function persistMultiPageSample() {
+            assert.commandWorked(
+                db.runCommand({
+                    analyze: largeCollName,
+                    mode: "sample",
+                    samplingMethod: "random",
+                    sampleSize: kSampleSize,
+                }),
+            );
+            const pages = PersistentSamplesUtils.getSamplesColl(db)
+                .find()
+                .sort({"_id.pageNo": 1})
+                .toArray();
+            assert.gt(pages.length, 1, "setup should persist a multi-page sample", {
+                numPages: pages.length,
+            });
+            return pages;
+        }
+
+        it("records a multi-page sample in the pages and bytes metrics", function () {
+            const before = getAnalyzeMetrics(db);
+            const pages = persistMultiPageSample();
+            const after = getAnalyzeMetrics(db);
+
+            assert.eq(
+                sumHistogramBucketCounts(after.histograms.pages),
+                sumHistogramBucketCounts(before.histograms.pages) + 1,
+                "pages histogram should gain one observation",
+                {before, after},
+            );
+            assertHistogramBoundaries(after.histograms.pages, kPagesHistogramBounds);
+
+            const totalBytes = sumPageBytes(pages);
+            assert.eq(
+                after.totalBytesPersisted,
+                before.totalBytesPersisted + totalBytes,
+                "totalBytesPersisted should increase by the summed size of every persisted page",
+                {before, after, totalBytes},
+            );
+            assert.eq(
+                sumHistogramBucketCounts(after.histograms.bytesPersisted),
+                sumHistogramBucketCounts(before.histograms.bytesPersisted) + 1,
+                "bytesPersisted histogram should gain one observation",
+                {before, after},
+            );
+            assertHistogramBoundaries(after.histograms.bytesPersisted, kBytesHistogramBounds);
+        });
+
+        it("records pagesRead for a multi-page read-path load", function () {
+            const pages = persistMultiPageSample();
+            const before = getPersistentSampleMetrics(db);
+            const explain = largeColl.find({pad: {$gte: ""}}).explain();
+            assert(isCollscan(db, getWinningPlanFromExplain(explain)), "expected a COLLSCAN plan", {
+                explain,
+            });
+
+            const after = getPersistentSampleMetrics(db);
+
+            assert.eq(after.hits, before.hits + 1, "the load should be a persisted-sample hit", {
+                before,
+                after,
+            });
+            assert.eq(
+                sumHistogramBucketCounts(after.histograms.pagesRead),
+                sumHistogramBucketCounts(before.histograms.pagesRead) + 1,
+                "pagesRead histogram should gain one observation",
+                {before, after},
+            );
+            assertHistogramBoundaries(after.histograms.pagesRead, kPagesHistogramBounds);
+        });
     });
 });
