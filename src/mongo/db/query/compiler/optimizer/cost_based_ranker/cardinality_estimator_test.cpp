@@ -408,6 +408,17 @@ TEST(CardinalityEstimator, NoHistogramForPath) {
     ASSERT(!ceRes.isOK() && ceRes.getStatus().code() == ErrorCodes::HistogramCEFailure);
 }
 
+// Under histogramCE, a non-sargable leaf predicate (e.g. $size, $bitsAllSet) cannot be estimated.
+TEST(CardinalityEstimator, UnsupportedMatchExpressionFallsBack) {
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({"a"}, 1000.0));
+    for (const auto& query : {fromjson("{a: {$size: 2}}"), fromjson("{a: {$bitsAllSet: [1]}}")}) {
+        auto plan = makeCollScanPlan(parse(query));
+        const auto ceRes = getPlanCE(*plan, collInfo, QueryCBRCEModeEnum::kHistogramCE);
+        ASSERT(!ceRes.isOK() && ceRes.getStatus().code() == ErrorCodes::UnsupportedCbrNode)
+            << "expected UnsupportedCbrNode for " << query << ", got " << ceRes.getStatus();
+    }
+}
+
 TEST(CardinalityEstimator, HistogramConjunctionOverMultikey) {
     BSONObj query = fromjson("{a: {$gt: 1, $lt: 5}}");
     auto plan = makeCollScanPlan(parse(query));
