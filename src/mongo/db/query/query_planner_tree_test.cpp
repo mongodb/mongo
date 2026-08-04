@@ -845,6 +845,61 @@ TEST_F(QueryPlannerTest, TooManyToExplode) {
         "{pattern: {a: 1, b: 1, c:1, d:1}}}}}}}");
 }
 
+// The number of index scans explodeForSort would create is the product of the per-field point
+// counts. When that product overflows size_t it can wrap to a small value (e.g. 65536^4 == 2^64
+// == 0), bypassing the maxScansToExplode guard. We cap the scan count to prevent this and fall
+// back to a blocking sort.
+TEST_F(QueryPlannerTest, ExplodeScanCountDoesNotOverflow) {
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1));
+
+    // Each of the four leading fields gets a $in of 65536 (== 2^16) points. The product of the
+    // four point counts is 2^16^4 == 2^64, which wraps to 0 in size_t.
+    BSONObjBuilder queryBob;
+    for (StringData field : {"a"_sd, "b"_sd, "c"_sd, "d"_sd}) {
+        BSONObjBuilder fieldBob(queryBob.subobjStart(field));
+        BSONArrayBuilder inArr(fieldBob.subarrayStart("$in"));
+        for (int i = 0; i < 65536; ++i) {
+            inArr.append(i);
+        }
+    }
+
+    runQuerySortProj(queryBob.obj(), BSON("e" << 1), BSONObj());
+
+    // The planner must cap here: a collection scan with a blocking sort, and a single index scan
+    // with a blocking sort. Crucially, no mergeSort.
+    assertNumSolutions(2U);
+    assertSolutionExists(R"(
+        {
+            sort: {
+                pattern: {e: 1},
+                limit: 0,
+                type: 'simple',
+                node: {
+                    cscan: {dir: 1}
+                }
+            }
+        }
+    )");
+    assertSolutionExists(R"(
+        {
+            fetch: {
+                node: {
+                    sort: {
+                        pattern: {e: 1},
+                        limit: 0,
+                        type: 'default',
+                        node: {
+                            ixscan: {
+                                pattern: {a: 1, b: 1, c: 1, d: 1, e: 1}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )");
+}
+
 // SERVER-13618: test that exploding scans for sort works even
 // if we must reverse the scan direction.
 TEST_F(QueryPlannerTest, ExplodeMustReverseScans) {
