@@ -307,7 +307,9 @@ let testCases = {
         command: {aggregate: coll, pipeline: [{$match: {x: 1}}, {$out: "out"}], cursor: {}},
         checkReadConcern: true,
         checkWriteConcern: true,
-        // TODO SERVER-119827: Remove this once the issue is fixed.
+        // An aggregation may fail with QueryPlanKilled if the targeted collection is created
+        // concurrently while the aggregation is running. This is expected behavior by design
+        // (see SERVER-119827).
         expectedErrors: [ErrorCodes.QueryPlanKilled],
     },
     analyze: {skip: "TODO SERVER-67772"},
@@ -1329,7 +1331,6 @@ function runScenario(
         // Run the command.
         let res = conn.getDB("db" in test ? test.db : db).runCommand(actualCmd);
 
-        // TODO SERVER-119827: Remove expectedErrors check once the issue is fixed.
         if (!test.expectedErrors) {
             assert.commandWorked(res);
         } else {
