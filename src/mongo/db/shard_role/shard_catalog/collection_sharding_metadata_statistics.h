@@ -24,6 +24,7 @@ public:
                        _countPostRecoveryWaitsResolvedByVersionChange.get());
         builder.append("totalPostRecoveryWaitMillis", _totalPostRecoveryWaitMillis.get());
         builder.append("totalDiskRecoveryMillis", _totalDiskRecoveryMillis.get());
+        builder.append("totalDiskRecoveryChunksRead", _totalDiskRecoveryChunksRead.get());
         builder.append("countInvalidateCollectionMetadataOplogEntriesApplied",
                        _countInvalidateCollectionMetadataOplogEntriesApplied.get());
         builder.append("countInvalidateCollectionMetadataOplogEntriesForDroppedCollections",
@@ -73,6 +74,10 @@ public:
 
     void registerDiskRecoveryMillis(long long millis) {
         _totalDiskRecoveryMillis.incrementRelaxed(millis);
+    }
+
+    void registerDiskRecoveryChunksRead(long long numChunks) {
+        _totalDiskRecoveryChunksRead.incrementRelaxed(numChunks);
     }
 
     void registerInvalidateCollectionMetadataOplogEntryApplied(bool forDroppedCollection) {
@@ -131,6 +136,8 @@ private:
     Counter64 _totalPostRecoveryWaitMillis;
     // Wall-clock time spent in on-disk recovery (snapshot wait + drain + install).
     Counter64 _totalDiskRecoveryMillis;
+    // Total chunks read from the on-disk shard catalog across all disk recoveries.
+    Counter64 _totalDiskRecoveryChunksRead;
     // invalidateCollectionMetadata ('c') oplog entries applied on replication secondaries.
     Counter64 _countInvalidateCollectionMetadataOplogEntriesApplied;
     // Subset of the above for dropped/untracked collection clears.
