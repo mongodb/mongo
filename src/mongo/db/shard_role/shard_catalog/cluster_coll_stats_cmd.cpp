@@ -185,14 +185,14 @@ void appendTimeseriesInfoToResult(const std::map<std::string, long long>& cluste
  * metrics in the "shards" field and cluster metrics using the provided matcher.
  */
 void appendFilteredResults(BSONObjBuilder& inputResultBuilder,
-                           const BSONObj& completeResult,
+                           const BSONObj& unfilteredResult,
                            const PathMatcherNode& matcher) {
     // Filter and append cluster metrics.
     BSONObjBuilder filtered;
-    metrics_filtering_util::appendPaths(filtered, completeResult, matcher);
+    metrics_filtering_util::appendPaths(filtered, unfilteredResult, matcher);
 
     // Filter and append per-shard metrics.
-    const auto& shardsObj = completeResult.getField("shards").Obj();
+    const auto& shardsObj = unfilteredResult.getField("shards").Obj();
     BSONObjBuilder filteredShards;
     for (const auto& shardElement : shardsObj) {
         BSONObjBuilder filteredShardResponse;
@@ -501,7 +501,7 @@ public:
         if (success && requireFiltering) {
             const auto& matcher =
                 metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kCollStats);
-            appendFilteredResults(inputResultBuilder, tmpResultBuilder->asTempObj(), matcher);
+            appendFilteredResults(inputResultBuilder, tmpResultBuilder->obj(), matcher);
         }
 
         return success;

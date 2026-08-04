@@ -14,6 +14,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/database_name_util.h"
 #include "mongo/db/dbcommands_gen.h"
+#include "mongo/db/metrics_filtering_util.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/service_context.h"
@@ -114,6 +116,35 @@ void aggregateResults(const DBStatsCommand& cmd,
     output.appendNumber("fsTotalSize", fsTotalSize);
 }
 
+/**
+ * Filters and appends results when metrics filtering is enabled. Filters both the per-shard
+ * metrics in the "raw" field and cluster metrics using the provided matcher.
+ */
+void appendFilteredResults(BSONObjBuilder& inputResultBuilder,
+                           const BSONObj& unfilteredResult,
+                           const PathMatcherNode& matcher) {
+    // Filter and append per-shard metrics in the "raw" field.
+    if (unfilteredResult.hasField("raw")) {
+        auto rawElement = unfilteredResult.getObjectField("raw");
+        BSONObjBuilder rawBuilder(inputResultBuilder.subobjStart("raw"));
+        for (const auto& elem : rawElement) {
+            auto shardResponse = elem.embeddedObject();
+            // Only filter successful responses. Pass through error responses unchanged.
+            if (shardResponse["ok"].trueValue()) {
+                BSONObjBuilder filteredBuilder;
+                metrics_filtering_util::appendPaths(filteredBuilder, shardResponse, matcher);
+                rawBuilder.append(elem.fieldName(), filteredBuilder.obj());
+            } else {
+                rawBuilder.append(elem.fieldName(), shardResponse);
+            }
+        }
+        rawBuilder.doneFast();
+    }
+
+    // Filter and append cluster metrics.
+    metrics_filtering_util::appendPaths(inputResultBuilder, unfilteredResult, matcher);
+}
+
 class CmdDBStats final : public BasicCommandWithRequestParser<CmdDBStats> {
 public:
     using Request = DBStatsCommand;
@@ -150,9 +181,22 @@ public:
                               const DatabaseName& dbName,
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
-                              BSONObjBuilder& output) final {
+                              BSONObjBuilder& inputResultBuilder) final {
         const auto& cmd = requestParser.request();
         uassert(ErrorCodes::BadValue, "Scale must be greater than zero", cmd.getScale() > 0);
+
+        // If filtering is required by the metrics policy, append the metrics to a temporary result
+        // builder and filter them at the end. Otherwise, append directly to the input result
+        // builder to avoid additional costs in the non-filtering case.
+        auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+        bool requireFiltering = metricsPolicyManager.requiresFiltering(
+            MetricsCategoryEnum::kDbStats, opCtx, /*forceFiltered=*/false);
+
+        boost::optional<BSONObjBuilder> tmpResultBuilder;
+        if (requireFiltering) {
+            tmpResultBuilder.emplace();
+        }
+        BSONObjBuilder& output = requireFiltering ? *tmpResultBuilder : inputResultBuilder;
 
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
@@ -167,6 +211,15 @@ public:
 
         output.append("db", DatabaseNameUtil::serialize(dbName, cmd.getSerializationContext()));
         aggregateResults(cmd, appendResult.successResponses, output);
+
+        // If filtering is required, we appended the metrics to a temporary result builder.
+        // Now extract and append only the ones matching the allowlist to the input result builder.
+        if (requireFiltering) {
+            const auto& matcher =
+                metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kDbStats);
+            appendFilteredResults(inputResultBuilder, tmpResultBuilder->obj(), matcher);
+        }
+
         return true;
     }
 
