@@ -82,6 +82,8 @@ public:
             // If we see a document with an array-valued field, it must have been inserted
             // after planning.
             if (elt.element().type() == BSONType::array) {
+                // TODO(SERVER-132305): This can be removed after we switch to using the
+                // PathArrayness api.
                 uasserted(
                     ErrorCodes::QueryPlanKilled,
                     str::stream()
