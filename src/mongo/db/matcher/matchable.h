@@ -125,9 +125,12 @@ public:
     }
 
 private:
-    static BSONObj toBSON(const Document& doc,
-                          const DepsTracker& dependencies,
-                          bool knownUniqueFields);
+    // Named distinctly from the inherited 'BSONMatchableDocument::toBSON()' virtual: a member
+    // declared here would hide it, since name lookup does not form an overload set across class
+    // scopes.
+    static BSONObj documentToBSON(const Document& doc,
+                                  const DepsTracker& dependencies,
+                                  bool knownUniqueFields);
 
     const Document& _doc;
 };

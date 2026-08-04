@@ -10,8 +10,8 @@ namespace mongo {
 
 namespace {
 // Upper bound on the document size (in bytes) for which the 'match against the whole trivially
-// convertible document' fast path (see DocumentMatchableDocument::toBSON) is used. Bounds the cost
-// of the matcher's linear field scan over fields the predicate does not need.
+// convertible document' fast path (see DocumentMatchableDocument::documentToBSON) is used. Bounds
+// the cost of the matcher's linear field scan over fields the predicate does not need.
 constexpr int kWholeDocumentMatchMaxSizeBytes = 16 * 1024;
 }  // namespace
 
@@ -24,14 +24,14 @@ BSONMatchableDocument::~BSONMatchableDocument() {}
 DocumentMatchableDocument::DocumentMatchableDocument(const Document& doc,
                                                      const DepsTracker& dependencies,
                                                      bool knownUniqueFields)
-    : BSONMatchableDocument(toBSON(doc, dependencies, knownUniqueFields)), _doc(doc) {}
+    : BSONMatchableDocument(documentToBSON(doc, dependencies, knownUniqueFields)), _doc(doc) {}
 
 // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
 // only serialize the fields we need to do the match. Specify BSONObj::LargeSizeTrait so
 // that matching against a large document mid-pipeline does not throw a BSON max-size error.
-BSONObj DocumentMatchableDocument::toBSON(const Document& doc,
-                                          const DepsTracker& dependencies,
-                                          bool knownUniqueFields) {
+BSONObj DocumentMatchableDocument::documentToBSON(const Document& doc,
+                                                  const DepsTracker& dependencies,
+                                                  bool knownUniqueFields) {
     if (dependencies.needWholeDocument) {
         return doc.toBson<BSONObj::LargeSizeTrait>();
     }
