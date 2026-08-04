@@ -31,6 +31,7 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # Utilities: wt create
+@wttest.skip_for_hook("disagg", "wt create is not supported in disaggregated storage mode")
 class test_util03(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
     tablename = f'{test_name}.a'
@@ -69,6 +70,7 @@ class test_util03(wttest.WiredTigerTestCase, suite_subprocess):
             self.fail('table should be empty')
         cursor.close()
 
+@wttest.skip_for_hook("disagg", "wt create is not supported in disaggregated storage mode")
 class test_util03_import(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util03.a'
     nentries = 1000

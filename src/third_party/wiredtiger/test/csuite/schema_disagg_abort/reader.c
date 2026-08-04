@@ -52,7 +52,7 @@ thread_reader_run(void *arg)
 
     SCHEMA_EVENT ev;
     bool running = true;
-    while (running && !__wt_atomic_load_bool(&state->reader_stop)) {
+    while (running && workload_active(state, STAGE_READER)) {
         if (!pipe_wait_readable(src_fd))
             continue;
         if (!pipe_event_read(src_fd, &ev)) {
@@ -68,6 +68,8 @@ thread_reader_run(void *arg)
         case EVENT_CREATE:
         case EVENT_DROP:
         case EVENT_INSERT:
+        case EVENT_PUBLISH_CREATE:
+        case EVENT_PUBLISH_DROP:
             workload_enqueue(state, &ev);
             break;
         case EVENT_CKPT:
@@ -87,6 +89,10 @@ thread_reader_run(void *arg)
             __wt_atomic_store_bool(&state->handover_received, true);
             running = false;
             break;
+        case EVENT_NONE:
+            /* Never emitted; a zeroed event means the framing lost its way. */
+            testutil_die(
+              EINVAL, "Node %" PRIu32 ": empty event read from the source pipe", cfg->node_id);
         }
     }
 
@@ -115,15 +121,14 @@ node_reader_start(WORKLOAD_STATE *state)
 }
 
 /*
- * node_reader_stop --
- *     Stop and join the reader thread, if one is running.
+ * node_reader_join --
+ *     Join the reader thread, if one is running. The stage it exits on is the caller's to set.
  */
 void
-node_reader_stop(WORKLOAD_STATE *state)
+node_reader_join(void)
 {
     if (!reader_started)
         return;
-    __wt_atomic_store_bool(&state->reader_stop, true);
     testutil_check(__wt_thread_join(NULL, &reader_thr));
     reader_started = false;
 }

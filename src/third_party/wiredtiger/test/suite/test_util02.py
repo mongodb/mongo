@@ -33,6 +33,7 @@ from wtdataset import ComplexDataSet
 from wtscenario import make_scenarios
 
 # Utilities: wt load
+@wttest.skip_for_hook("disagg", "wt load is not supported in disaggregated storage mode")
 class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt load
@@ -164,6 +165,7 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
 
 # test_load_commandline --
 #       Test the command-line processing.
+@wttest.skip_for_hook("disagg", "wt load is not supported in disaggregated storage mode")
 class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
     uri = "table:command_line"
 

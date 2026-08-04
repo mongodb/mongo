@@ -31,6 +31,7 @@ from suite_subprocess import suite_subprocess
 import wttest
 
 # Utilities: wt alter
+@wttest.skip_for_hook("disagg", "wt alter is not supported in disaggregated storage mode")
 class test_util15(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
     tablename = f'{test_name}.a'

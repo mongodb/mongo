@@ -48,8 +48,12 @@ $TEST_WRAPPER "$test_bin" -b "$build_dir" -r l -t 10 -T 2 -u 4 -h WT_TEST.schema
 $TEST_WRAPPER "$test_bin" -b "$build_dir" -r f -t 10 -T 2 -h WT_TEST.schema_disagg_abort.f
 $TEST_WRAPPER "$test_bin" -b "$build_dir" -r f -s 6 -t 18 -T 2 -h WT_TEST.schema_disagg_abort.fs
 
-# Single-node role switches every 5 seconds, ending gracefully.
+# Single-node role switches every 5 seconds, ending gracefully; each swap is a graceful step-down
+# followed by a step-up over the node's own checkpoint.
 $TEST_WRAPPER "$test_bin" -b "$build_dir" -r l -s 5 -t 20 -T 2 -h WT_TEST.schema_disagg_abort.ls
+
+# The same, killed mid-run, so a crash can land next to a step-down.
+$TEST_WRAPPER "$test_bin" -b "$build_dir" -r l -s 5 -k 12 -t 20 -T 2 -h WT_TEST.schema_disagg_abort.lsk
 
 # Single-node crash: kill the lone node mid-run.
 $TEST_WRAPPER "$test_bin" -b "$build_dir" -r l -k 8 -t 10 -T 2 -h WT_TEST.schema_disagg_abort.lk

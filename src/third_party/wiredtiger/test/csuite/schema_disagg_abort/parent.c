@@ -201,11 +201,10 @@ reap_child(SUBPROC *proc, SUBPROC_STATUS want_status, int want_code)
     SUBPROC_STATUS status;
 
     for (uint32_t waited = 0; (status = subproc_poll(proc, &code)) == SUBPROC_RUNNING; ++waited) {
-        if (waited >= MAX_STARTUP) {
+        if (waited >= MAX_WAIT) {
             subproc_kill(proc);
             (void)subproc_wait(proc, &code);
-            testutil_die(
-              ETIMEDOUT, "%s did not terminate within %d seconds", proc->who, MAX_STARTUP);
+            testutil_die(ETIMEDOUT, "%s did not terminate within %d seconds", proc->who, MAX_WAIT);
         }
         sleep(1);
     }
@@ -239,7 +238,7 @@ direct_switch(const TEST_CONFIG *cfg, SUBPROC children[SUBPROC_SLOTS], int *cur_
 
     char done_name[64];
     testutil_snprintf(done_name, sizeof(done_name), SWITCH_DONE_FMT, gen);
-    wait_for_sentinel(cfg, children, done_name, 4 * MAX_STARTUP);
+    wait_for_sentinel(cfg, children, done_name, 4 * MAX_WAIT);
 
     /* Live nodes swapped roles; a dead slot leaves its new role vacant. */
     *cur_leaderp = follower_alive ? follower : -1;
@@ -297,9 +296,9 @@ run_children(TEST_CONFIG *cfg, const char *self_path)
      * pickup follows promptly once a checkpoint exists. A lone follower has nothing to wait for.
      */
     if (cfg->with_leader)
-        wait_for_sentinel(cfg, children, LEADER_READY_FILE, 4 * MAX_STARTUP);
+        wait_for_sentinel(cfg, children, LEADER_READY_FILE, 4 * MAX_WAIT);
     if (nnodes == 2)
-        wait_for_sentinel(cfg, children, FOLLOWER_READY_FILE, MAX_STARTUP);
+        wait_for_sentinel(cfg, children, FOLLOWER_READY_FILE, MAX_WAIT);
 
     int cur_leader = cfg->with_leader ? 0 : -1;
     int cur_follower = nnodes == 2 ? 1 : (cfg->with_follower ? 0 : -1);

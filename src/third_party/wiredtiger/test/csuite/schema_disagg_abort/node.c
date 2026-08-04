@@ -62,13 +62,13 @@ workload_counter_advance(WORKLOAD_STATE *state, uint64_t v)
 }
 
 /*
- * workload_running --
- *     The condition every phase loop runs on: true until the phase is directed to quiesce.
+ * workload_active --
+ *     The condition a phase loop runs on: true until the shutdown has reached the caller's stage.
  */
 bool
-workload_running(WORKLOAD_STATE *state)
+workload_active(WORKLOAD_STATE *state, uint32_t stage)
 {
-    return (!__wt_atomic_load_bool(&state->stop_phase));
+    return (__wt_atomic_load_uint32(&state->stop_stage) < stage);
 }
 
 /*
@@ -226,7 +226,7 @@ workload_enqueue(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev)
     testutil_assert(ev->thread_id < state->nth_workers);
 
     EVENT_QUEUE *q = &state->workers[ev->thread_id].evq;
-    while (!evq_push(q, ev) && workload_running(state))
+    while (!evq_push(q, ev) && workload_active(state, STAGE_WORKERS))
         __wt_sleep(0, WT_THOUSAND);
 }
 
@@ -263,7 +263,7 @@ workload_drain_barrier(WORKLOAD_STATE *state)
     for (uint32_t t = 0; t < state->nth_workers; t++)
         while (
           (!evq_empty(&state->workers[t].evq) || __wt_atomic_load_bool(&state->workers[t].busy)) &&
-          workload_running(state))
+          workload_active(state, STAGE_WORKERS))
             __wt_sleep(0, WT_THOUSAND);
 }
 
@@ -304,7 +304,7 @@ thread_ts_run(void *arg)
 {
     WORKLOAD_STATE *state = arg;
 
-    while (workload_running(state)) {
+    while (workload_active(state, STAGE_TS)) {
         /*
          * The single frontier serves both axes: everything at or below it is published and
          * committed, and any commit below it lands in a table created (and published) at a lower
@@ -345,9 +345,7 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     state->leads = as_leader;
     /* A leader feeds itself; so does a follower with no peer. Snapshot it: peer_alive can flip. */
     state->generates = as_leader || !cfg->peer_alive;
-    state->stop_phase = false;
-    state->reader_stop = false;
-    state->generator_stop = false;
+    state->stop_stage = STAGE_NONE;
     state->handover_received = false;
     /* Start gated: the timestamp thread republishes the connection's durable epoch immediately. */
     state->ckpt_covered_ts = 0;
@@ -384,19 +382,23 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
 
 /*
  * workload_stop --
- *     Quiesce and join all of the phase's threads, in dependency order. The generator goes first if
- *     the phase had one, while the reader still drains the self-pipe it may be blocked on; the
- *     reader next, while the workers are still consuming; then the workers drain what the reader
- *     delivered before exiting.
+ *     Quiesce and join the phase's threads, walking the shutdown stages in order. A draining worker
+ *     needing a checkpoint takes one itself, so nothing here has to outlive it but the timestamp
+ *     thread, which bounds what those checkpoints cover.
  */
 void
 workload_stop(WORKLOAD_STATE *state)
 {
-    node_generator_stop(state);
-    node_reader_stop(state);
+    __wt_atomic_store_uint32(&state->stop_stage, STAGE_GENERATOR);
+    node_generator_join();
 
-    __wt_atomic_store_bool(&state->stop_phase, true);
+    __wt_atomic_store_uint32(&state->stop_stage, STAGE_READER);
+    node_reader_join();
+
+    __wt_atomic_store_uint32(&state->stop_stage, STAGE_WORKERS);
     node_workers_join(state);
+
+    __wt_atomic_store_uint32(&state->stop_stage, STAGE_TS);
     testutil_check(__wt_thread_join(NULL, &ts_thr));
 }
 

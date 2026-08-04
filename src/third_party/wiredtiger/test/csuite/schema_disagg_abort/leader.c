@@ -7,9 +7,9 @@
  */
 
 /*
- * Leader role: the two ends of a leadership term. Stepping down makes the term's tail durable,
- * releases the page log's single writer slot by closing the connection, and hands the term over to
- * the peer; stepping up is a reconfigure that continues the previous term's counter.
+ * Leader role: the two ends of a leadership term, both in-place reconfigures. Stepping down makes
+ * the term's tail durable, releases the page log's single writer slot, and hands the term over to
+ * the peer; stepping up continues the previous term's counter.
  *
  * Everything a running leader does (generating, executing, and relaying events, checkpointing) is
  * the generic engine in node.c with role->leads set.
@@ -37,8 +37,8 @@ leader_checkpoint(
     if (covered == 0) {
         struct timespec now;
         __wt_epoch(NULL, &now);
-        if (WT_TIMEDIFF_SEC(now, ckpt->phase_start) > MAX_STARTUP)
-            testutil_die(ETIMEDOUT, "stable timestamp not set after %d seconds", MAX_STARTUP);
+        if (WT_TIMEDIFF_SEC(now, ckpt->phase_start) > MAX_OP_WAIT)
+            testutil_die(ETIMEDOUT, "stable timestamp not set after %d seconds", MAX_OP_WAIT);
         return;
     }
 
@@ -62,11 +62,11 @@ leader_checkpoint(
 
 /*
  * leader_leave --
- *     Step down: take a final checkpoint so the term's tail is durable, close the connection before
- *     the peer steps up (the page log allows one writer), then hand the term over - a checkpoint
- *     event first, so the peer picks up the final checkpoint through the normal path, then the
- *     switch event carrying the term's final counter value, which it must continue from. Without a
- *     live peer there is nothing to send: this node continues both sides of the swap itself.
+ *     Step down: take the step-down checkpoint so the term's tail is durable, reconfigure into the
+ *     follower role before the peer steps up (the page log allows one writer), then hand the term
+ *     over - a checkpoint event first, so the peer picks that checkpoint up through the normal
+ *     path, then the switch event carrying the term's final counter value, which it must continue
+ *     from. Without a live peer there is nothing to send: this node continues both sides itself.
  */
 static void
 leader_leave(WORKLOAD_STATE *state, uint64_t final_counter)
@@ -76,17 +76,18 @@ leader_leave(WORKLOAD_STATE *state, uint64_t final_counter)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /*
-     * The term is quiesced and fully drained: everything it allocated is committed and published.
-     * Advance the stable frontier over all of it before the final checkpoint - the timestamp
-     * thread's periodic advance can miss the drain's last burst, and publishes above the final
-     * checkpoint's stable epoch would be lost with the closed connection.
+     * The term is quiesced and drained, so its counter is the step-down boundary: nothing more will
+     * be committed or published. The checkpoint has to land on that boundary exactly - WiredTiger
+     * asserts it at the role change - and has to carry the epoch with it, since the step-down
+     * clears the shared metadata queue and loses any publish left behind.
      */
-    if (final_counter != 0)
+    if (final_counter != 0) {
+        set_ts(conn, "step_down_timestamp", final_counter);
         set_frontier(conn, final_counter);
+    }
     testutil_check(session->checkpoint(session, "use_timestamp=true"));
     testutil_check(session->close(session, NULL));
-    testutil_check(conn->close(conn, "debug=(skip_checkpoint=true)"));
-    state->conn = NULL;
+    testutil_check(conn->reconfigure(conn, "disaggregated=(role=follower)"));
 
     SCHEMA_EVENT ev = {0};
     ev.type = EVENT_CKPT;

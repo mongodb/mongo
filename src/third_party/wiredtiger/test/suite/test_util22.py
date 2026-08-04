@@ -32,6 +32,8 @@ from helper import compare_files
 
 
 # Check that wt correctly processes the help option and that it handles invalid options correctly.
+@wttest.skip_for_hook("disagg",
+    "iterates every wt subcommand; most are not supported in disaggregated storage mode")
 class test_util22(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = ''
 

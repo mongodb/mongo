@@ -251,6 +251,7 @@ INCR
 INIT
 INMEM
 INPROGRESS
+INSERT's
 INSN
 INTL
 INTRINSICS
@@ -417,6 +418,7 @@ RDNOLOCK
 RDONLY
 RDWR
 READGEN
+README
 READONLY
 REALLOC
 RECNO
@@ -553,6 +555,7 @@ UnmapViewOfFile
 Unmount
 Unpositioned
 Unreferenced
+Unvalued
 Uryyb
 VARCHAR
 VLCS
@@ -758,6 +761,7 @@ cX
 cacheable
 calc
 calloc
+cancelling
 cas
 catfmt
 cb
@@ -848,6 +852,7 @@ cppsuite
 cpu
 cpuid
 crc
+create's
 createsets
 crypto
 cryptobad
@@ -1211,6 +1216,7 @@ inlock
 inmem
 inmemory
 inorder
+insertable
 insertedp
 inserters
 instantiation
@@ -1650,6 +1656,7 @@ reproducibility
 requeue
 resizable
 ret
+retryable
 reverify
 revint
 rf
@@ -1771,6 +1778,7 @@ struct
 structs
 su
 subcommand
+subcommands
 subconfig
 subconfigs
 subconfiguration
@@ -1905,12 +1913,14 @@ underflowed
 underflowing
 underflows
 underfull
+unemitted
 unencoded
 unencrypted
 unesc
 unescape
 unescaped
 unflatten
+unflushed
 ungated
 unhandled
 unicode
@@ -1939,6 +1949,7 @@ unspawned
 unsynchronised
 unterminated
 untyped
+unvalued
 unvisited
 unwedge
 up's

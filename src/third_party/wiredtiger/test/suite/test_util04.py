@@ -31,6 +31,7 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
 # Utilities: wt drop
+@wttest.skip_for_hook("disagg", "wt drop is not supported in disaggregated storage mode")
 class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
     tablename = f'{test_name}.a'

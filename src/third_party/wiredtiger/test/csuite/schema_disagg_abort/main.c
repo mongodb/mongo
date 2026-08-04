@@ -55,6 +55,18 @@ query_ts(WT_CONNECTION *conn, const char *name)
 }
 
 /*
+ * set_ts --
+ *     Set one of the connection's timestamps from an integer.
+ */
+void
+set_ts(WT_CONNECTION *conn, const char *name, uint64_t ts)
+{
+    char config[64];
+    testutil_snprintf(config, sizeof(config), "%s=%" PRIx64, name, ts);
+    testutil_check(conn->set_timestamp(conn, config));
+}
+
+/*
  * set_frontier --
  *     Move the connection's frontier - the oldest and stable timestamps and the stable schema epoch
  *     - to one allocator value. The three always advance together: a single counter feeds both the

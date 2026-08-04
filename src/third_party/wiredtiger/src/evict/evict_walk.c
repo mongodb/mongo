@@ -292,7 +292,9 @@ __evict_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree, uint32
         bytes_dirty = __wt_atomic_load_uint64_relaxed(&btree->bytes_dirty_intl) +
           __wt_atomic_load_uint64_relaxed(&btree->bytes_dirty_leaf);
         if (__wt_cache_bytes_plus_overhead(cache, bytes_dirty) >
-          (uint64_t)(0.5 * evict->eviction_dirty_target * bytes_max) / 100)
+          (uint64_t)(0.5 * __wt_atomic_load_double_relaxed(&evict->eviction_dirty_target) *
+            bytes_max) /
+            100)
             return (true);
     }
     if (LF_ISSET(WT_EVICT_CACHE_UPDATES) &&
@@ -819,8 +821,9 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
 
         if (F_ISSET(conn->evict, WT_EVICT_CACHE_DIRTY)) {
             WT_IGNORE_RET(__wt_evict_dirty_needed(session, &pct_dirty));
-            high_pressure = (pct_dirty >
-              (conn->evict->eviction_dirty_trigger * WT_DIRTY_PAGE_LOW_PRESSURE_THRESHOLD));
+            high_pressure =
+              (pct_dirty > (__wt_atomic_load_double_relaxed(&conn->evict->eviction_dirty_trigger) *
+                             WT_DIRTY_PAGE_LOW_PRESSURE_THRESHOLD));
         }
 
         if (!high_pressure && F_ISSET(conn->evict, WT_EVICT_CACHE_UPDATES)) {

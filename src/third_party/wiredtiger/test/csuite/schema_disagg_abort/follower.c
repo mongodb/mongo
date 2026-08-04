@@ -18,9 +18,13 @@
  * follower_pick_up_checkpoint --
  *     Fetch the latest complete checkpoint from the page log and apply it to the follower
  *     connection. Writes the ready sentinel after the first successful pickup.
+ *
+ * Skip a checkpoint already adopted: a lone follower has no leader producing new ones, and a
+ *     leader's checkpoint writes nothing when nothing changed.
  */
 static void
-follower_pick_up_checkpoint(WT_SESSION *session, WT_PAGE_LOG *page_log, bool *picked_up)
+follower_pick_up_checkpoint(
+  WORKLOAD_STATE *state, WT_SESSION *session, WT_PAGE_LOG *page_log, bool *picked_up)
 {
     WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS ckpt_args = {0};
 
@@ -29,12 +33,18 @@ follower_pick_up_checkpoint(WT_SESSION *session, WT_PAGE_LOG *page_log, bool *pi
         return;
     testutil_check(ret);
 
+    if (ckpt_args.checkpoint_lsn == state->adopted_ckpt_lsn) {
+        free(ckpt_args.checkpoint_metadata.mem);
+        return;
+    }
+
     WT_CONNECTION *conn = session->connection;
     char meta_config[4096];
     testutil_snprintf(meta_config, sizeof(meta_config), "disaggregated=(checkpoint_meta=\"%.*s\")",
       (int)ckpt_args.checkpoint_metadata.size, (const char *)ckpt_args.checkpoint_metadata.data);
     testutil_check(conn->reconfigure(conn, meta_config));
     free(ckpt_args.checkpoint_metadata.mem);
+    state->adopted_ckpt_lsn = ckpt_args.checkpoint_lsn;
 
     if (!*picked_up) {
         testutil_sentinel(NULL, FOLLOWER_READY_FILE);
@@ -60,7 +70,7 @@ follower_adopt_latest(WORKLOAD_STATE *state)
     testutil_check(conn->get_page_log(conn, "palite", &page_log));
 
     bool picked_up = true; /* No ready sentinel: this is not the initial pickup. */
-    follower_pick_up_checkpoint(session, page_log, &picked_up);
+    follower_pick_up_checkpoint(state, session, page_log, &picked_up);
 
     testutil_check(page_log->terminate(page_log, NULL));
     testutil_check(session->close(session, NULL));
@@ -82,18 +92,17 @@ follower_leave(WORKLOAD_STATE *state, uint64_t final_counter)
 
 /*
  * follower_enter --
- *     Step down: the connection was closed to release the page log's writer slot, so reopen it in
- *     the follower role and put it back in the epoch world.
+ *     This method is called when the node enters the follower role.
  */
 static void
 follower_enter(WORKLOAD_STATE *state, uint64_t final_counter)
 {
-    node_open(state->cfg, node_role_follower.name, &state->conn);
+    /* This node produced its checkpoints rather than adopting them; nothing to skip. */
+    state->adopted_ckpt_lsn = 0;
 
     /*
-     * The reopened connection starts outside the epoch world, and this node keeps publishing the
-     * operations it applies for the new leader, so restore the frontier at the term's final counter
-     * value. Everything the new leader relays was allocated above it.
+     * This node keeps publishing the operations it applies for the new leader, so its frontier must
+     * cover the whole term. Everything the new leader relays was allocated above it.
      */
     set_frontier(state->conn, final_counter);
 }
@@ -111,7 +120,7 @@ follower_checkpoint(
     WT_UNUSED(ev); /* A follower adopts what the page log holds; the event is only the trigger. */
 
     workload_drain_barrier(state);
-    follower_pick_up_checkpoint(session, ckpt->page_log, &ckpt->picked_up);
+    follower_pick_up_checkpoint(state, session, ckpt->page_log, &ckpt->picked_up);
 }
 
 const NODE_ROLE node_role_follower = {"follower", "debug=(skip_checkpoint=true)", false,

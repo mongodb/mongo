@@ -79,14 +79,14 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
       session, &(evict->eviction_trigger), "eviction trigger", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_target", &cval));
-    evict->eviction_dirty_target = (double)cval.val;
+    double dirty_target = (double)cval.val;
     WT_RET(__evict_config_abs_to_pct(
-      session, &(evict->eviction_dirty_target), "eviction dirty target", conn->cache_size, shared));
+      session, &dirty_target, "eviction dirty target", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_trigger", &cval));
-    evict->eviction_dirty_trigger = (double)cval.val;
-    WT_RET(__evict_config_abs_to_pct(session, &(evict->eviction_dirty_trigger),
-      "eviction dirty trigger", conn->cache_size, shared));
+    double dirty_trigger = (double)cval.val;
+    WT_RET(__evict_config_abs_to_pct(
+      session, &dirty_trigger, "eviction dirty trigger", conn->cache_size, shared));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_updates_target", &cval));
     evict->eviction_updates_target = (double)cval.val;
@@ -105,31 +105,29 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
       "eviction checkpoint target", conn->cache_size, shared));
 
     /* Check for invalid configurations and automatically fix them to suitable values. */
-    if (evict->eviction_dirty_target > evict->eviction_target) {
+    if (dirty_target > evict->eviction_target) {
         WT_CONFIG_DEBUG(session,
           "config eviction_dirty_target=%f cannot exceed eviction_target=%f. Setting "
           "eviction_dirty_target to %f.",
-          evict->eviction_dirty_target, evict->eviction_target, evict->eviction_target);
-        evict->eviction_dirty_target = evict->eviction_target;
+          dirty_target, evict->eviction_target, evict->eviction_target);
+        dirty_target = evict->eviction_target;
     }
 
-    if (evict->eviction_checkpoint_target > 0 &&
-      evict->eviction_checkpoint_target < evict->eviction_dirty_target) {
+    if (evict->eviction_checkpoint_target > 0 && evict->eviction_checkpoint_target < dirty_target) {
         WT_CONFIG_DEBUG(session,
           "config eviction_checkpoint_target=%f cannot be less than eviction_dirty_target=%f. "
           "Setting "
           "eviction_checkpoint_target to %f.",
-          evict->eviction_checkpoint_target, evict->eviction_dirty_target,
-          evict->eviction_dirty_target);
-        evict->eviction_checkpoint_target = evict->eviction_dirty_target;
+          evict->eviction_checkpoint_target, dirty_target, dirty_target);
+        evict->eviction_checkpoint_target = dirty_target;
     }
 
-    if (evict->eviction_dirty_trigger > evict->eviction_trigger) {
+    if (dirty_trigger > evict->eviction_trigger) {
         WT_CONFIG_DEBUG(session,
           "config eviction_dirty_trigger=%f cannot exceed eviction_trigger=%f. Setting "
           "eviction_dirty_trigger to %f.",
-          evict->eviction_dirty_trigger, evict->eviction_trigger, evict->eviction_trigger);
-        evict->eviction_dirty_trigger = evict->eviction_trigger;
+          dirty_trigger, evict->eviction_trigger, evict->eviction_trigger);
+        dirty_trigger = evict->eviction_trigger;
     }
 
     bool precise_checkpoint = F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT);
@@ -146,14 +144,14 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
             WT_CONFIG_DEBUG(session,
               "config eviction_updates_target (%f) cannot be zero. Setting "
               "to eviction_dirty_target (%f) for precise checkpoint.",
-              evict->eviction_updates_target, evict->eviction_dirty_target);
-            evict->eviction_updates_target = evict->eviction_dirty_target;
+              evict->eviction_updates_target, dirty_target);
+            evict->eviction_updates_target = dirty_target;
         } else {
             WT_CONFIG_DEBUG(session,
               "config eviction_updates_target (%f) cannot be zero. Setting "
               "to 50%% of eviction_dirty_target (%f).",
-              evict->eviction_updates_target, evict->eviction_dirty_target / 2);
-            evict->eviction_updates_target = evict->eviction_dirty_target / 2;
+              evict->eviction_updates_target, dirty_target / 2);
+            evict->eviction_updates_target = dirty_target / 2;
         }
     }
 
@@ -166,19 +164,18 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
          * in cache, but handle cases where non-default dirty configurations would cause updates
          * target to exceed the trigger value with an asymmetric formula.
          */
-        if (precise_checkpoint &&
-          evict->eviction_dirty_trigger / 2 < evict->eviction_updates_target) {
+        if (precise_checkpoint && dirty_trigger / 2 < evict->eviction_updates_target) {
             WT_CONFIG_DEBUG(session,
               "config eviction_updates_trigger (%f) cannot be zero. Setting "
               "to eviction_dirty_trigger (%f) for precise checkpoint.",
-              updates_trigger, evict->eviction_dirty_trigger);
-            updates_trigger = evict->eviction_dirty_trigger;
+              updates_trigger, dirty_trigger);
+            updates_trigger = dirty_trigger;
         } else {
             WT_CONFIG_DEBUG(session,
               "config eviction_updates_trigger (%f) cannot be zero. Setting "
               "to 50%% of eviction_dirty_trigger (%f).",
-              updates_trigger, evict->eviction_dirty_trigger / 2);
-            updates_trigger = evict->eviction_dirty_trigger / 2;
+              updates_trigger, dirty_trigger / 2);
+            updates_trigger = dirty_trigger / 2;
         }
     }
 
@@ -194,14 +191,19 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
     /* The target size must be lower than the trigger size or we will never get any work done. */
     if (evict->eviction_target >= evict->eviction_trigger)
         WT_RET_MSG(session, EINVAL, "eviction target must be lower than the eviction trigger");
-    if (evict->eviction_dirty_target >= evict->eviction_dirty_trigger)
+    if (dirty_target >= dirty_trigger)
         WT_RET_MSG(
           session, EINVAL, "eviction dirty target must be lower than the eviction dirty trigger");
     if (evict->eviction_updates_target >= updates_trigger)
         WT_RET_MSG(session, EINVAL,
           "eviction updates target must be lower than the eviction updates trigger");
 
-    /* Store the value back to eviction updates trigger after we have validated it. */
+    /*
+     * Store the validated dirty target/trigger and updates trigger back atomically: they can be
+     * read concurrently by eviction, checkpoint, and connection close.
+     */
+    __wt_atomic_store_double_relaxed(&evict->eviction_dirty_target, dirty_target);
+    __wt_atomic_store_double_relaxed(&evict->eviction_dirty_trigger, dirty_trigger);
     __wt_atomic_store_double_relaxed(&evict->eviction_updates_trigger, updates_trigger);
     return (0);
 }

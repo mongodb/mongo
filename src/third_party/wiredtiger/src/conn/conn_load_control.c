@@ -41,8 +41,9 @@ __conn_load_control_configure(WT_SESSION_IMPL *session)
     /* Calculate max accepted for both read and write */
     __wt_atomic_store_uint64_relaxed(
       &load_control->read_load_max, (uint64_t)(bytes_max * evict->eviction_trigger / 100.0));
-    __wt_atomic_store_uint64_relaxed(
-      &load_control->write_load_max, (uint64_t)(bytes_max * evict->eviction_dirty_trigger / 100.0));
+    __wt_atomic_store_uint64_relaxed(&load_control->write_load_max,
+      (uint64_t)(bytes_max * __wt_atomic_load_double_relaxed(&evict->eviction_dirty_trigger) /
+        100.0));
 
     return;
 }

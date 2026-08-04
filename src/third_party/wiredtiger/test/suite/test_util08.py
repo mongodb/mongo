@@ -30,6 +30,7 @@ from suite_subprocess import suite_subprocess
 import wttest
 
 # Utilities: wt copyright
+@wttest.skip_for_hook("disagg", "wt copyright is not supported in disaggregated storage mode")
 class test_util08(wttest.WiredTigerTestCase, suite_subprocess):
     def test_copyright(self):
         """

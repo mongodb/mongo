@@ -664,7 +664,9 @@ __wti_evict_hs_dirty(WT_SESSION_IMPL *session)
 
     return (__wt_cache_bytes_plus_overhead(
               cache, __wt_atomic_load_uint64_relaxed(&cache->bytes_hs_dirty)) >=
-      ((uint64_t)(conn->evict->eviction_dirty_trigger * bytes_max) / 100));
+      ((uint64_t)(__wt_atomic_load_double_relaxed(&conn->evict->eviction_dirty_trigger) *
+         bytes_max) /
+        100));
 }
 
 /*
