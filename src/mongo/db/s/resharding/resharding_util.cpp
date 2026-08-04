@@ -771,19 +771,6 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     }
 
     if (isEnabledWithPinnedVersion(forwardableMetadata, feature_flags::gAuthoritativeShardsDDL)) {
-        uassert(ErrorCodes::ReshardCollectionInterruptedDueToFCVChange,
-                "Resharding with authoritative shards requires shard refreshes to be disabled; "
-                "this can occur during FCV transitions. Retry after the FCV transition completes.",
-                isEnabledWithPinnedVersion(forwardableMetadata,
-                                           resharding::gFeatureFlagReshardingCloneNoRefresh) &&
-                    isEnabledWithPinnedVersion(forwardableMetadata,
-                                               resharding::gFeatureFlagReshardingInitNoRefresh) &&
-                    isEnabledWithPinnedVersion(
-                        forwardableMetadata,
-                        resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites) &&
-                    isEnabledWithPinnedVersion(
-                        forwardableMetadata,
-                        resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable));
         auto authoritativeLevel =
             isEnabledWithPinnedVersion(forwardableMetadata, feature_flags::gAuthoritativeShardsCRUD)
             ? ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed
