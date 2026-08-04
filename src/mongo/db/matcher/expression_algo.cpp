@@ -1268,6 +1268,22 @@ OrderedPathSet makeIndependent(OrderedPathSet testSet, const OrderedPathSet& toR
     return testSet;
 }
 
+/**
+ * Returns true if any of 'dependencies' is an ancestor of the new name of one of 'renames'.
+ * Dependency must be on a strict prefix, not the full path.
+ */
+static bool dependencyIsPrefixOfRename(const OrderedPathSet& dependencies,
+                                       const StringMap<std::string>& renames) {
+    for (const auto& [newPath, _] : renames) {
+        for (const auto& dep : dependencies) {
+            if (isPathPrefixOf(dep, newPath)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 template <typename E, typename... Args>
 requires ConstTraverseMatchExpression<E, Args...> || MutableTraverseMatchExpression<E, Args...>
 bool isIndependentOfImpl(E&& expr,
@@ -1307,6 +1323,10 @@ bool isIndependentOfImpl(E&& expr,
     dependency_analysis::addDependencies(&expr, &depsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
     if (depsTracker.needRandomGenerator || depsTracker.needWholeDocument) {
+        return false;
+    }
+
+    if (dependencyIsPrefixOfRename(depsTracker.fields, renames)) {
         return false;
     }
 
@@ -1378,14 +1398,15 @@ ShouldSplitExprResult exprDependenceAnalysisHelper(boost::intrusive_ptr<Expressi
         return ShouldSplitExprResult{};
     }
 
+    // A dotted path rename materializes the missing ancestors of its new name, so it is not value
+    // preserving with respect to those ancestors. For instance, if the expression depends on "a"
+    // but "a.b" is the result of a rename, then this expression is not independent.
+    if (dependencyIsPrefixOfRename(deps.fields, renames)) {
+        return ShouldSplitExprResult{};
+    }
+
     // Analyze renames. If any of the renames are equal to or a prefix of a dependency, a rename is
     // required.
-    //
-    // If in the future we add support for complex renames where the new name contains multiple path
-    // components (as in the rename mapping "a.b" -> "c"), then this code will need to be enhanced
-    // to handle the case where the renamed path is deeper than the dependency. For instance, if the
-    // expression depends on "a" but "a.b" is the result of a rename, then the expression cannot be
-    // split out.
     bool requiresRename = false;
     for (const auto& dep : deps.fields) {
         for (const auto& [renamedPath, _] : renames) {
@@ -1479,6 +1500,12 @@ bool isOnlyDependentOnImpl(E&& expr,
     dependency_analysis::addDependencies(&expr, &exprDepsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
     if (exprDepsTracker.needRandomGenerator) {
+        return false;
+    }
+
+    // A dotted path rename materializes the missing ancestors of its new name, so match expressions
+    // that depend on an ancestor of a dotted path rename can't be safely split out.
+    if (dependencyIsPrefixOfRename(exprDepsTracker.fields, renames)) {
         return false;
     }
 

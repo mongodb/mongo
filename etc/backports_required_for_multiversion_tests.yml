@@ -217,6 +217,8 @@ last-lts:
       ticket: SERVER-90173
     - test_file: jstests/aggregation/group_with_acc_n_to_distinct_scan.js
       ticket: SERVER-90017
+    - test_file: jstests/aggregation/optimization/do_not_push_match_past_rename_onto_dotted_path.js
+      ticket: SERVER-132414
     - test_file: jstests/aggregation/optimization/elemmatch_deps.js
       ticket: SERVER-112844
     - test_file: jstests/aggregation/optimization/match_swapping_renamed_fields.js
