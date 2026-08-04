@@ -736,13 +736,13 @@ private:
     struct AdditiveResourceStats {
         /**
          * Add stats that have accrued before unstashing the Locker and Recovery Unit for a
-         * transaction. Does not add timeQueuedForTickets, which is handled separately.
+         * transaction. Does not add timeQueuedForAdmission, which is handled separately.
          */
         void addForUnstash(const AdditiveResourceStats& other);
 
         /**
          * Subtract stats that have accrued on this transaction's Locker and Recovery Unit since
-         * unstashing. Does not subtract timeQueuedForTickets, which is handled separately.
+         * unstashing. Does not subtract timeQueuedForAdmission, which is handled separately.
          */
         void subtractForStash(const AdditiveResourceStats& other);
 
@@ -757,9 +757,9 @@ private:
         Microseconds cumulativeLockWaitTime{0};
 
         /**
-         * Total time spent queued for tickets.
+         * Total time spent queued for admission, summed across every admission gate.
          */
-        Microseconds timeQueuedForTickets{0};
+        Microseconds timeQueuedForAdmission{0};
 
         /**
          * Total time spent queued for flow control tickets.
@@ -781,8 +781,7 @@ private:
     /**
      * Collects and returns additive resource stats
      */
-    AdditiveResourceStats getAdditiveResourceStats(
-        const boost::optional<ExecutionAdmissionContext>& admCtx);
+    AdditiveResourceStats getAdditiveResourceStats();
 
     void _initializeResourceStatsBaseIfNecessary() {
         if (!_resourceStatsBase) {

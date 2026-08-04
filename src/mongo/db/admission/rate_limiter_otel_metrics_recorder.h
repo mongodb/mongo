@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/base/counter.h"
 #include "mongo/db/admission/rate_limiter_metrics_events.h"
 #include "mongo/db/admission/rate_limiter_metrics_recorder.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -74,6 +75,7 @@ public:
     int64_t exemptedAdmissions() const override;
     int64_t attemptedAdmissions() const override;
     boost::optional<double> averageTimeQueuedMicros() const override;
+    int64_t totalTimeQueuedMicros() const override;
     double tokensAcquired() const override;
     double tokensAvailable() const override;
     int64_t currentQueueDepth() const override;
@@ -116,6 +118,7 @@ private:
     Atomic<int64_t> _queueDepthCounter{0};
     Atomic<double> _tokensAvailable{0};
     MovingAverage _averageTimeQueuedMicros{0.2};
+    Counter64 _totalTimeQueuedMicros;
 };
 
 }  // namespace mongo::admission

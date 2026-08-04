@@ -126,6 +126,8 @@ void RateLimiterOtelMetricsRecorder::record(const RateLimiterMetricsRecorderEven
                 const auto avg = _averageTimeQueuedMicros.addSample(typedEvent.sample);
                 _averageTimeQueuedMicrosGauge->set(avg);
                 _timeQueuedMicrosHistogram->record(static_cast<int64_t>(typedEvent.sample));
+            } else if constexpr (std::is_same_v<TypedEvent, TimeQueuedMicros>) {
+                _totalTimeQueuedMicros.incrementRelaxed(typedEvent.micros);
             } else if constexpr (std::is_same_v<TypedEvent, TokensAcquired>) {
                 _tokensAcquiredCounter->add(typedEvent.tokens);
             } else if constexpr (std::is_same_v<TypedEvent, TokensAvailable>) {
@@ -169,6 +171,10 @@ boost::optional<double> RateLimiterOtelMetricsRecorder::averageTimeQueuedMicros(
     return MONGO_unlikely(isNoopGauge(_averageTimeQueuedMicrosGauge))
         ? boost::none
         : _averageTimeQueuedMicros.get();
+}
+
+int64_t RateLimiterOtelMetricsRecorder::totalTimeQueuedMicros() const {
+    return _totalTimeQueuedMicros.get();
 }
 
 double RateLimiterOtelMetricsRecorder::tokensAcquired() const {

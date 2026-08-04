@@ -75,6 +75,7 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
                                                                   "authorization",
                                                                   "LDAPOperations",
                                                                   "flowControl",
+                                                                  "queues",
                                                                   "writeConcern",
                                                                   "storage",
                                                                   "ok",

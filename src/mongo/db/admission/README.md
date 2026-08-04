@@ -209,6 +209,7 @@ The following metrics were introduced to `serverStatus`:
     "successfulAdmissions": 1000,
     "attemptedAdmissions": 1100,
     "averageTimeQueuedMicros": 10,
+    "totalTimeQueuedMicros": 10000,
     "totalAvailableTokens": 0,
 }
 
@@ -333,6 +334,10 @@ The following `serverStatus` metrics are emitted by the `IngressRequestRateLimit
 - `interruptedInQueue`: the number of queued requests interrupted before admission.
 - `averageTimeQueuedMicros`: moving average queue wait time for successfully admitted queued
   requests.
+- `totalTimeQueuedMicros`: cumulative wait measured by the callers themselves, which for gates with
+  an admission context is exactly the per-operation queueing time reported in curOp, the slow query
+  log and the profiler. The average above is derived instead from the nap the token bucket planned,
+  so the two do not have to agree.
 - `totalAvailableTokens`: the current capacity of the underlying token bucket.
 
 # Egress Response Rate Limiting

@@ -14,6 +14,9 @@
 #include "mongo/util/system_tick_source.h"
 
 namespace mongo {
+
+class AdmissionContext;
+
 namespace [[MONGO_MOD_PUBLIC]] admission {
 
 /**
@@ -44,6 +47,7 @@ public:
         // to perform the necessary std::exchange.
         DeferredToken(DeferredToken&& other) noexcept
             : _impl(std::exchange(other._impl, nullptr)),
+              _admCtx(other._admCtx),
               _numTokens(other._numTokens),
               _timeEnqueued(other._timeEnqueued),
               _napTime(other._napTime) {}
@@ -62,9 +66,13 @@ public:
          * Waits until the pre-reserved token slot becomes valid, or until the opCtx is
          * interrupted. For ready deferred tokens, this method returns immediately.
          *
+         * Callers that reserve a slot before the operation exists (like the
+         * IngressRequestRateLimiter) supply the admission context here rather than at
+         * acquireToken(). It is an error to supply one in both places.
+         *
          * Must be called exactly once, the deferred token is consumed on return.
          */
-        Status get(OperationContext* opCtx) &&;
+        Status get(OperationContext* opCtx, AdmissionContext* admCtx = nullptr) &&;
 
         /**
          * Overload that drives the wait through an arbitrary Interruptible and ClockSource rather
@@ -84,11 +92,13 @@ public:
         friend class RateLimiter;
 
         DeferredToken(RateLimiterPrivate* impl,
+                      AdmissionContext* admCtx,
                       double numTokens,
                       Milliseconds timeEnqueued,
                       Milliseconds napTime);
 
         RateLimiterPrivate* _impl{nullptr};
+        AdmissionContext* _admCtx{nullptr};
         double _numTokens{1.0};
         Milliseconds _timeEnqueued{0};
         Milliseconds _napTime{0};
@@ -134,15 +144,25 @@ public:
      * either ready (the token was immediately available) or queued (the token was not immediately
      * available and the caller must wait for the slot to become valid).
      *
+     * Passing the admission context of the gate this limiter implements binds it to the slot, so
+     * that the operation is marked as queued here for as long as it is held waiting on that slot.
+     * That is what curOp, the slow query log and the profiler report, and what this limiter counts
+     * as its queueing time. Passing none is for gates that have no admission context to mark, such
+     * as connection establishment: their wait is still timed, just off this limiter's own clock.
+     *
      * Returns boost::none if no tokens are available and the max queue depth is exceeded.
      */
-    boost::optional<DeferredToken> acquireToken(double numTokensToConsume = 1.0);
+    boost::optional<DeferredToken> acquireToken(AdmissionContext* admCtx = nullptr,
+                                                double numTokensToConsume = 1.0);
 
     /**
      * Convenience method that acquires a token and blocks until it is ready. This is equivalent to
-     * calling acquireToken() and then get(opCtx) on the returned deferred token.
+     * calling acquireToken(admCtx) and then get(opCtx) on the returned deferred token.
      */
-    Status acquireToken(OperationContext* opCtx, double numTokensToConsume = 1.0);
+    Status acquireToken(OperationContext* opCtx,
+                        AdmissionContext* admCtx = nullptr,
+                        double numTokensToConsume = 1.0);
+    Status acquireToken(OperationContext* opCtx, double numTokensToConsume);
 
     /**
      * Attempts to acquire a token without queuing. Returns false if the rate limit and the burst

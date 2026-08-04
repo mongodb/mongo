@@ -5,6 +5,8 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #include <string_view>
 
@@ -15,6 +17,8 @@ using namespace std::literals::string_view_literals;
 static constexpr std::string_view kNormalString = "normal"sv;
 static constexpr std::string_view kLowString = "low"sv;
 static constexpr std::string_view kExemptString = "exempt"sv;
+
+MONGO_FAIL_POINT_DEFINE(sleepInWaitingForAdmissionGuard);
 }  // namespace
 
 AdmissionContext::AdmissionContext(const AdmissionContext& other)
@@ -123,6 +127,11 @@ WaitingForAdmissionGuard::WaitingForAdmissionGuard(AdmissionContext* admCtx, Tic
     invariant(_admCtx->_startQueueingTime.swap(_tickSource->getTicks()) ==
               AdmissionContext::kNotQueueing);
     _admCtx->_startQueueingTime.notifyAll();
+
+    // When enabled, sleep for data["ms"] milliseconds while this context is marked as queueing so
+    // the injected wait is attributed to whichever admission gate constructed this guard.
+    sleepInWaitingForAdmissionGuard.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
 }
 
 WaitingForAdmissionGuard::~WaitingForAdmissionGuard() {

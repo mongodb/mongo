@@ -3,6 +3,8 @@
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
+#include "mongo/db/admission/ingress_request_admission_context.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -80,6 +82,30 @@ void addTicketQueueTime(AdmissionContext* admCtx,
     executionTime += waitForTickets;
 }
 
+// Records finished admissions with queueing time at the ingress and execution gates. The other two
+// gates are deliberately left untouched, so the reporting paths are also exercised for queues the
+// operation never waited at.
+void recordQueueingAtIngressAndExecution(OperationContext* opCtx,
+                                         TickSourceMock<Microseconds>* tickSource) {
+    auto* ingressAdmCtx = &IngressAdmissionContext::get(opCtx);
+    ingressAdmCtx->setAdmission_forTest(5);
+    auto* executionAdmCtx = &ExecutionAdmissionContext::get(opCtx);
+    executionAdmCtx->setAdmission_forTest(7);
+
+    Milliseconds executionTime{0};
+    addTicketQueueTime(ingressAdmCtx, tickSource, executionTime, Milliseconds(2));
+    addTicketQueueTime(executionAdmCtx, tickSource, executionTime, Milliseconds(5));
+}
+
+// The breakdown the queues primed above should be reported as. Note that a queue with no admissions
+// is rendered as an empty sub-object rather than left out.
+BSONObj expectedQueueStatsForIngressAndExecution() {
+    return BSON("execution" << BSON("admissions" << 7 << "totalTimeQueuedMicros" << 5000)
+                            << "ingress"
+                            << BSON("admissions" << 5 << "totalTimeQueuedMicros" << 2000)
+                            << "ingress_request" << BSONObj() << "writeThrottle" << BSONObj());
+}
+
 TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     auto opCtx = makeOperationContext();
     auto curop = CurOp::get(*opCtx);
@@ -135,6 +161,45 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     // This wait time should be excluded from workingTimeMillis.
     ASSERT_EQ(curop->debug().workingTimeMillis,
               executionTime - waitForTickets - waitForFlowControlTicket - waitForLocks);
+}
+
+TEST_F(CurOpStatsTest, WorkingMillisAccountsForEveryAdmissionQueue) {
+    auto opCtx = makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    auto* executionAdmCtx = &ExecutionAdmissionContext::get(opCtx.get());
+    auto* ingressRequestAdmCtx = &IngressRequestAdmissionContext::get(opCtx.get());
+    auto* ingressAdmCtx = &IngressAdmissionContext::get(opCtx.get());
+    auto* writeThrottleAdmCtx = &WriteThrottlerAdmissionContext::get(opCtx.get());
+
+    Milliseconds executionTime = Milliseconds(512);
+    Milliseconds waitForExecutionTickets = Milliseconds(3);
+    Milliseconds waitForIngressRequestTickets = Milliseconds(5);
+    Milliseconds waitForIngressTickets = Milliseconds(6);
+    Milliseconds waitForWriteThrottleTickets = Milliseconds(7);
+
+    advanceTime(Milliseconds{100});
+    curop->setTickSource_forTest(tickSource());
+
+    curop->ensureStarted();
+    advanceTime(executionTime);
+    curop->done();
+    ASSERT_EQ(duration_cast<Milliseconds>(curop->elapsedTimeExcludingPauses()), executionTime);
+
+    // Add queue wait at each of the four registry admission gates.
+    addTicketQueueTime(executionAdmCtx, tickSource(), executionTime, waitForExecutionTickets);
+    addTicketQueueTime(
+        ingressRequestAdmCtx, tickSource(), executionTime, waitForIngressRequestTickets);
+    addTicketQueueTime(ingressAdmCtx, tickSource(), executionTime, waitForIngressTickets);
+    addTicketQueueTime(
+        writeThrottleAdmCtx, tickSource(), executionTime, waitForWriteThrottleTickets);
+
+    curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+
+    // workingMillis must exclude the wait at every gate, not just the ExecutionAdmissionContext.
+    ASSERT_EQ(curop->debug().workingTimeMillis,
+              executionTime - waitForExecutionTickets - waitForIngressRequestTickets -
+                  waitForIngressTickets - waitForWriteThrottleTickets);
 }
 
 TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
@@ -478,11 +543,46 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
         << BSON("admissions" << 7 << "totalTimeQueuedMicros" << 5000 << "isHoldingTicket" << false)
         << "ingress"
         << BSON("admissions" << 5 << "totalTimeQueuedMicros" << 2000 << "isHoldingTicket" << false)
+        << "ingress_request"
+        << BSON("admissions" << 0 << "totalTimeQueuedMicros" << 0 << "isHoldingTicket" << false)
         << "writeThrottle"
         << BSON("admissions" << 0 << "totalTimeQueuedMicros" << 0 << "isHoldingTicket" << false));
 
     ASSERT_BSONOBJ_EQ(currentQueue, expectedCurrentQueue);
     ASSERT_BSONOBJ_EQ_UNORDERED(queueStats, expectedQueueStats);
+}
+
+TEST_F(CurOpStatsTest, ProfilerEntryReportsAdmissionQueueStats) {
+    auto opCtx = makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->setTickSource_forTest(tickSource());
+
+    recordQueueingAtIngressAndExecution(opCtx.get(), tickSource());
+
+    // The profiler entry is meant to be a superset of the slow query log line, which reports this
+    // same per-gate breakdown.
+    BSONObjBuilder builder;
+    SingleThreadedLockStats lockStats;
+    curop->debug().append(opCtx.get(), lockStats, {}, {}, 0, true /*omitCommand*/, builder);
+
+    ASSERT_BSONOBJ_EQ_UNORDERED(builder.done().getObjectField("queues"),
+                                expectedQueueStatsForIngressAndExecution());
+}
+
+TEST_F(CurOpStatsTest, ProfileFilterCanMatchOnAdmissionQueueStats) {
+    auto opCtx = makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->setTickSource_forTest(tickSource());
+
+    recordQueueingAtIngressAndExecution(opCtx.get(), tickSource());
+
+    // Whatever the profiler records has to be reachable from a profile filter as well, which
+    // evaluates against the document staged here rather than against the one append() builds.
+    auto makeDoc = OpDebug::appendStaged(opCtx.get(), {"queues"}, false /*needWholeDocument*/);
+    BSONObj staged = makeDoc(OpDebug::AppendArgs{opCtx.get(), curop->debug(), *curop});
+
+    ASSERT_BSONOBJ_EQ_UNORDERED(staged.getObjectField("queues"),
+                                expectedQueueStatsForIngressAndExecution());
 }
 
 TEST(CurOpTest, DelinquentInterruptChecksNotDoubleCounted) {

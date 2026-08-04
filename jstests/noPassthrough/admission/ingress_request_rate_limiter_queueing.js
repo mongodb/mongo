@@ -5,6 +5,12 @@
  * @tags: [requires_fcv_80]
  */
 
+import {
+    AdmissionQueue,
+    getOperationsInQueue,
+    waitForOperationToEnterQueue,
+    waitForOperationToLeaveQueue,
+} from "jstests/libs/admission/queues.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {
     getRateLimiterStats,
@@ -62,13 +68,7 @@ function disableFractionalRateOverride(exemptConn) {
 }
 
 function getQueuedOpsWithComment(exemptConn, comment) {
-    return exemptConn
-        .getDB("admin")
-        .aggregate([
-            {$currentOp: {allUsers: true, localOps: true}},
-            {$match: {"command.comment": comment, "currentQueue.name": "ingress"}},
-        ])
-        .toArray();
+    return getOperationsInQueue(exemptConn.getDB("admin"), comment, AdmissionQueue.IngressRequest);
 }
 
 function countQueuedOpsWithComment(exemptConn, comment) {
@@ -76,21 +76,11 @@ function countQueuedOpsWithComment(exemptConn, comment) {
 }
 
 function waitForQueuedOp(exemptConn, comment) {
-    let queuedOp;
-    assert.soonRetryOnNetworkErrors(
-        () => {
-            const ops = getQueuedOpsWithComment(exemptConn, comment);
-            if (ops.length === 0) {
-                return false;
-            }
-            queuedOp = ops[0];
-            return true;
-        },
-        "expected the queued request to appear in $currentOp with currentQueue.name == 'ingress'",
-        30000,
-        200,
+    return waitForOperationToEnterQueue(
+        exemptConn.getDB("admin"),
+        comment,
+        AdmissionQueue.IngressRequest,
     );
-    return queuedOp;
 }
 
 /** Kills all queued ops and waits for the ingress queue to fully drain. */
@@ -152,28 +142,30 @@ function testCurrentOpAndServerStatusReportIngressQueue(conn, exemptConn) {
         // path so we can deterministically observe it in $currentOp and in serverStatus.
         t.start();
 
-        // (1) $currentOp must surface the queued op as being in the "ingress" queue and report
-        // operation-level queue-time stats under queues.ingress.
+        // (1) $currentOp must surface the queued op as being in the IRRL queue and report
+        // operation-level queue-time stats under that queue.
         const queuedOp = waitForQueuedOp(exemptConn, kComment);
         assert.eq(
             queuedOp.currentQueue.name,
-            "ingress",
-            "queued op should report 'ingress' as currentQueue.name",
+            AdmissionQueue.IngressRequest,
+            "queued op should report '" + AdmissionQueue.IngressRequest + "' as currentQueue.name",
             {
                 op: queuedOp,
             },
         );
         assert(
-            queuedOp.queues && queuedOp.queues.ingress,
-            "queued op should include queues.ingress metrics",
+            queuedOp.queues && queuedOp.queues[AdmissionQueue.IngressRequest],
+            "queued op should include queues." + AdmissionQueue.IngressRequest + " metrics",
             {
                 op: queuedOp,
             },
         );
         assert.gte(
-            queuedOp.queues.ingress.totalTimeQueuedMicros,
+            queuedOp.queues[AdmissionQueue.IngressRequest].totalTimeQueuedMicros,
             queuedOp.currentQueue.timeQueuedMicros,
-            "queues.ingress.totalTimeQueuedMicros should include at least currentQueue.timeQueuedMicros",
+            "queues." +
+                AdmissionQueue.IngressRequest +
+                ".totalTimeQueuedMicros should include at least currentQueue.timeQueuedMicros",
             {op: queuedOp},
         );
 
@@ -220,7 +212,9 @@ function testCurrentOpAndServerStatusReportIngressQueue(conn, exemptConn) {
             {before, after},
         );
 
-        // (3) serverStatus.queues.ingress should keep exposing ingress queue stats fields.
+        // (3) serverStatus.queues.ingress should keep exposing ingress queue stats fields. This
+        // section belongs to the IngressAdmissionController's ticket holder, not to the IRRL, so it
+        // is only checked for shape and monotonicity here.
         const statusWithQueuedOp = exemptConn.getDB("admin").serverStatus();
 
         const queuesIngress = statusWithQueuedOp.queues
@@ -647,6 +641,83 @@ function resetTestState(exemptConn) {
     );
 }
 
+// ---------------------------------------------------------------------------
+// Test: once the IRRL admits a queued request, the operation keeps the measured wait and records
+//       an admission against the ingress_request queue.
+// ---------------------------------------------------------------------------
+function testAdmittedOpRecordsIrrlQueueStats(conn, exemptConn) {
+    enableFractionalRateOverride(exemptConn, 1);
+    assert.commandWorked(
+        exemptConn.adminCommand({
+            setParameter: 1,
+            ingressRequestAdmissionMaxQueueDepth: 5,
+            ingressRequestAdmissionBurstCapacitySecs: 1,
+            ingressRequestRateLimiterEnabled: true,
+        }),
+    );
+
+    // Empty the bucket so the measured request cannot be admitted straight away. Connection setup
+    // happens while unauthenticated and is exempt, so only this find consumes the token.
+    assert.commandWorked(
+        makeAuthConn(conn.host).getDB("test").runCommand({find: "col", filter: {}}),
+    );
+
+    // Hold the request open after it has been admitted and executed. Its admission is over by then,
+    // so $currentOp shows what the completed admission recorded rather than a live snapshot.
+    const kComment = "testAdmittedOpRecordsIrrlQueueStats";
+    assert.commandWorked(
+        exemptConn.adminCommand({
+            configureFailPoint: "waitAfterCommandFinishesExecution",
+            mode: "alwaysOn",
+            data: {comment: kComment},
+        }),
+    );
+
+    const t = new Thread(
+        async function (host, maxTimeMS, comment) {
+            const {makeAuthConn} = await import(
+                "jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js"
+            );
+            const c = makeAuthConn(host);
+            return c.getDB("test").runCommand({find: "col", filter: {}, maxTimeMS, comment});
+        },
+        conn.host,
+        kQueuedFindMaxTimeMS,
+        kComment,
+    );
+
+    let queue;
+    try {
+        t.start();
+        const admittedOp = waitForOperationToLeaveQueue(exemptConn.getDB("admin"), kComment);
+        queue = admittedOp.queues[AdmissionQueue.IngressRequest];
+    } finally {
+        assert.commandWorked(
+            exemptConn.adminCommand({
+                configureFailPoint: "waitAfterCommandFinishesExecution",
+                mode: "off",
+            }),
+        );
+        t.join();
+    }
+    assert.commandWorked(t.returnData(), "the queued request should have been admitted");
+
+    assert.gte(
+        queue.admissions,
+        1,
+        "an admitted request should record an admission against the " +
+            AdmissionQueue.IngressRequest +
+            " queue",
+        {queue},
+    );
+    assert.gt(
+        queue.totalTimeQueuedMicros,
+        0,
+        "the wait the request spent queued at the IRRL should be retained after admission",
+        {queue},
+    );
+}
+
 const kTopologies = [
     {name: "standalone", runner: runTestStandalone},
     {name: "replset", runner: runTestReplSet},
@@ -673,3 +744,12 @@ for (const {name, runner} of kTopologies) {
         }
     });
 }
+
+// This one depends on a token bucket that refills slowly enough for a single request to observably
+// queue and then be admitted, which the multi-node topologies' background traffic disturbs, so it
+// runs on a standalone only.
+jsTest.log("Running testAdmittedOpRecordsIrrlQueueStats on topology: standalone");
+runTestStandalone({startupParams: kSlowRateBurstOneParams, auth: true}, (conn, exemptConn) => {
+    resetTestState(exemptConn);
+    testAdmittedOpRecordsIrrlQueueStats(conn, exemptConn);
+});

@@ -94,11 +94,7 @@ void WriteThrottler::admitOperation(OperationContext* opCtx, int64_t cost) {
     int64_t remaining = cost;
     while (remaining > 0) {
         const int64_t chunk = std::min(remaining, kMaxAdmissionTokenChunk);
-        {
-            WaitingForAdmissionGuard admissionGuard(&admCtx,
-                                                    opCtx->getServiceContext()->getTickSource());
-            uassertStatusOK(_rateLimiter->acquireToken(opCtx, static_cast<double>(chunk)));
-        }
+        uassertStatusOK(_rateLimiter->acquireToken(opCtx, &admCtx, static_cast<double>(chunk)));
         remaining -= chunk;
     }
 

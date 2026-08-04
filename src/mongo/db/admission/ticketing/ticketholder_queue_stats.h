@@ -19,7 +19,7 @@ namespace mongo {
  */
 class [[MONGO_MOD_PUBLIC]] TicketHolderQueueStats {
 public:
-    enum class QueueType { Ingress, Execution, WriteThrottle };
+    enum class QueueType { Ingress, IngressRequest, Execution, WriteThrottle };
 
     TicketHolderQueueStats() = default;
 
@@ -41,14 +41,23 @@ public:
      */
     void add(const TicketHolderQueueStats& otherQueueStats);
 
-    static std::map<TicketHolderQueueStats::QueueType,
-                    std::function<AdmissionContext*(OperationContext*)>>
-    getQueueMetricsRegistry();
+    using QueueMetricsRegistry =
+        std::map<QueueType, std::function<AdmissionContext*(OperationContext*)>>;
+
+    /**
+     * Maps each admission queue to the context the gate guarding it records into. Populated once at
+     * startup and never mutated afterwards, so the reference stays valid for the life of the
+     * process. Returning it by reference matters: CurOp walks the registry on the per-operation
+     * path, where copying it would allocate a map node per queue for every operation.
+     */
+    static const QueueMetricsRegistry& getQueueMetricsRegistry();
 
     static std::string queueTypeToString(QueueType queueType) {
         switch (queueType) {
             case QueueType::Ingress:
                 return "ingress";
+            case QueueType::IngressRequest:
+                return "ingress_request";
             case QueueType::Execution:
                 return "execution";
             case QueueType::WriteThrottle:

@@ -39,6 +39,11 @@ struct AverageTimeQueuedMicros {
     double sample;
 };
 
+/* Event carrying the time a caller actually spent held at this limiter */
+struct TimeQueuedMicros {
+    int64_t micros;
+};
+
 /* Event when tokens are acquired */
 struct TokensAcquired {
     double tokens;
@@ -58,6 +63,7 @@ using RateLimiterMetricsRecorderEvent = std::variant<AttemptedAdmission,
                                                      InterruptedInQueue,
                                                      ExemptedAdmission,
                                                      AverageTimeQueuedMicros,
+                                                     TimeQueuedMicros,
                                                      TokensAcquired,
                                                      TokensAvailable>;
 

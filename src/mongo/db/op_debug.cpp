@@ -778,6 +778,9 @@ void OpDebug::append(OperationContext* opCtx,
         b.appendNumber("cpuNanos", durationCount<Nanoseconds>(cpuTime));
     }
 
+    // Extract admission and execution control queueing stats from AdmissionContext stored on opCtx
+    b.append("queues", TicketHolderQueueStats(opCtx).toBson());
+
     // millis/micros should always be present for any operation
     b.appendNumber(
         "millis",
@@ -1205,6 +1208,10 @@ std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationConte
         if (args.op.cpuTime >= Nanoseconds::zero()) {
             b.appendNumber(field, durationCount<Nanoseconds>(args.op.cpuTime));
         }
+    });
+
+    addIfNeeded("queues", [](auto field, auto args, auto& b) {
+        b.append(field, TicketHolderQueueStats(args.opCtx).toBson());
     });
 
     // millis and durationMillis are the same thing. This is one of the few inconsistencies between

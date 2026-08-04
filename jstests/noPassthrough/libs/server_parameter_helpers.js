@@ -9,11 +9,22 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
  * connection to retrieve the current setting of that server parameter.
  */
 export function getParameter(conn, field) {
+    return getParameters(conn, [field])[field];
+}
+
+/**
+ * Retrieves the current setting of every server parameter named in 'fields' with a single
+ * getParameter call, and returns them keyed by parameter name. The result can be passed straight
+ * back to setParameters to restore the originals.
+ */
+export function getParameters(conn, fields) {
     let q = {getParameter: 1};
-    q[field] = 1;
+    for (const field of fields) {
+        q[field] = 1;
+    }
 
     let ret = assert.commandWorked(conn.getDB("admin").runCommand(q));
-    return ret[field];
+    return Object.fromEntries(fields.map((field) => [field, ret[field]]));
 }
 
 /**

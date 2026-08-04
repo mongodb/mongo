@@ -13,6 +13,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/util:fail_point",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
@@ -66,6 +67,7 @@ mongo_cc_library(
         ":admission_context",
         "//src/mongo/db:server_base",
         "//src/mongo/db/admission:ingress_admission_control",
+        "//src/mongo/db/admission:ingress_request_admission_context",
         "//src/mongo/db/admission:write_throttler_admission_context",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
     ],

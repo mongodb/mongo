@@ -32,6 +32,7 @@ public:
     int64_t exemptedAdmissions() const override;
     int64_t attemptedAdmissions() const override;
     boost::optional<double> averageTimeQueuedMicros() const override;
+    int64_t totalTimeQueuedMicros() const override;
     double tokensAcquired() const override;
     double tokensAvailable() const override;
     int64_t currentQueueDepth() const override;
@@ -45,6 +46,7 @@ private:
     Counter64 _exemptedAdmissions;
     Counter64 _attemptedAdmissions;
     MovingAverage _averageTimeQueuedMicros{0.2};
+    Counter64 _totalTimeQueuedMicros;
     Atomic<double> _tokensAcquired;
     Atomic<double> _tokensAvailable;
 };
