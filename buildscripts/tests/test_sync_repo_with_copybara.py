@@ -5528,6 +5528,123 @@ class TestMainWorkflow(unittest.TestCase):
             self.assertIn("HEAD", symbolic_ref_command)
             self.assertIn("refs/heads/copybara_sync_source_v8_2", symbolic_ref_command)
 
+    def test_advertise_source_mirror_commits_makes_ancestor_shas_resolvable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            source_dir = tmpdir_path / "source"
+            mirror_dir = tmpdir_path / "source mirror.git"
+            source_dir.mkdir()
+
+            check_git_probe_command(["init"], source_dir)
+            check_git_probe_command(["symbolic-ref", "HEAD", "refs/heads/master"], source_dir)
+            check_git_probe_command(
+                ["config", "--local", "user.email", "test@example.com"], source_dir
+            )
+            check_git_probe_command(["config", "--local", "user.name", "Test User"], source_dir)
+            check_git_probe_command(["config", "--local", "commit.gpgsign", "false"], source_dir)
+
+            (source_dir / "test.txt").write_text("baseline")
+            check_git_probe_command(["add", "test.txt"], source_dir)
+            check_git_probe_command(["commit", "-m", "baseline"], source_dir)
+            baseline_sha = run_git_probe_command(["rev-parse", "HEAD"], source_dir).stdout.strip()
+
+            (source_dir / "test.txt").write_text("pending")
+            check_git_probe_command(["commit", "-am", "pending"], source_dir)
+            pending_sha = run_git_probe_command(["rev-parse", "HEAD"], source_dir).stdout.strip()
+
+            check_git_probe_command(
+                ["clone", "--bare", str(source_dir), str(mirror_dir)], tmpdir_path
+            )
+            mirror_url = mirror_dir.as_uri()
+            self.assertEqual(
+                run_git_probe_command(["ls-remote", mirror_url, baseline_sha], tmpdir_path).stdout,
+                "",
+            )
+
+            sync = sync_repo_with_copybara.PreparedBranchSync(
+                branch="master",
+                source_ref="copybara_sync_source_master",
+                config_sha="local",
+                workflow_name="prod_master",
+                config_file=tmpdir_path / "copy.bara.sky",
+                preview_dir=tmpdir_path / "preview",
+                docker_command=("echo", "copybara"),
+                source_mirror_dir=mirror_dir,
+                copybara_source_url=mirror_url,
+            )
+
+            sync_repo_with_copybara.advertise_source_mirror_commits(
+                sync,
+                [baseline_sha, pending_sha],
+            )
+
+            for source_sha in (baseline_sha, pending_sha):
+                advertised = run_git_probe_command(
+                    ["ls-remote", mirror_url, source_sha], tmpdir_path
+                )
+                self.assertEqual(advertised.returncode, 0)
+                self.assertEqual(
+                    advertised.stdout.strip(),
+                    f"{source_sha}\trefs/heads/copybara_sync_resolvable/{source_sha}",
+                )
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.advertise_source_mirror_commits")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.find_destination_branch_start_point")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.clone_source_repo_for_commit_discovery")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
+    def test_list_pending_source_commits_advertises_baseline_and_pending_commits(
+        self,
+        mock_run_command,
+        _mock_clone_source_repo,
+        mock_find_destination_branch_start_point,
+        mock_advertise_source_mirror_commits,
+    ):
+        sync = sync_repo_with_copybara.PreparedBranchSync(
+            branch="master",
+            source_ref="copybara_sync_source_master",
+            config_sha="local",
+            workflow_name="prod_master",
+            config_file=Path("/tmp/copy.bara.sky"),
+            preview_dir=Path("/tmp/preview"),
+            docker_command=("echo", "copybara"),
+            source_mirror_dir=Path("/tmp/source-mirror.git"),
+            copybara_source_url="file:///tmp/source-mirror.git",
+            copybara_config=sync_repo_with_copybara.CopybaraConfig(
+                source=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url="/tmp/source-mirror.git",
+                    repo_name="10gen/mongo",
+                    branch="copybara_sync_source_master",
+                    ref="copybara_sync_source_master",
+                ),
+                destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url="https://example.com/destination.git",
+                    repo_name="mongodb/mongo",
+                    branch="master",
+                ),
+            ),
+        )
+        baseline_sha = "a" * 40
+        pending_sha = "b" * 40
+        mock_find_destination_branch_start_point.return_value = (
+            sync_repo_with_copybara.MatchingCommit(
+                source_commit=baseline_sha,
+                destination_commit="c" * 40,
+            )
+        )
+        mock_run_command.side_effect = [
+            "",
+            f"{pending_sha}\0Test User <test@example.com>\0"
+            f"2026-05-01T00:00:00+00:00\0Subject for {pending_sha}\0",
+        ]
+
+        pending_commits = sync_repo_with_copybara.list_pending_source_commits(sync)
+
+        self.assertEqual(pending_commits, [make_source_commit(pending_sha)])
+        mock_advertise_source_mirror_commits.assert_called_once_with(
+            sync,
+            [baseline_sha, pending_sha],
+        )
+
     @patch("buildscripts.copybara.sync_repo_with_copybara.rewrite_copybara_config")
     @patch("buildscripts.copybara.sync_repo_with_copybara.get_copybara_tokens")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
