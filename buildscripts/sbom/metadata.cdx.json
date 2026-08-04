@@ -3552,6 +3552,54 @@
           "value": "Server Security"
         }
       ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/cyan4973/xxhash@{{VERSION}}",
+      "supplier": {
+        "name": "Yann Collet",
+        "url": [
+          "https://xxhash.com/"
+        ]
+      },
+      "author": "Yann Collet",
+      "group": "cyan4973",
+      "name": "xxHash",
+      "version": "{{VERSION}}",
+      "description": "xxHash is an extremely fast non-cryptographic hash algorithm, working at RAM speed limits.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "copyright": "xxHash Library Copyright (c) 2012-2021 Yann Collet. All rights reserved.",
+      "purl": "pkg:github/cyan4973/xxhash@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/Cyan4973/xxHash.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/xxhash"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/xxhash/scripts/import.sh"
+        }
+      ]
     }
   ],
   "dependencies": [

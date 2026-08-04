@@ -163,6 +163,9 @@ filters:
   - "wiredtiger":
     approvers:
       - 10gen/storage-engines
+  - "xxhash":
+    approvers:
+      - 10gen/server-collection-write-path
   - "yaml-cpp":
     approvers:
       - 10gen/server-security

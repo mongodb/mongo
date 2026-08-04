@@ -1,0 +1,19 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# dist/xxh_x86dispatch.c is intentionally not built. It provides runtime SSE2/AVX2
+# dispatch and requires per-file -mavx2 style flags; the default xxhash.c build
+# already selects vector width at compile time.
+mongo_cc_library(
+    name = "xxhash",
+    srcs = [
+        "dist/xxhash.c",
+    ],
+    hdrs = [
+        "dist/xxhash.h",
+    ],
+    includes = [
+        "dist",
+    ],
+)
