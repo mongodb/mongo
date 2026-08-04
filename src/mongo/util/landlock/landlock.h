@@ -6,8 +6,8 @@
 // Landlock self-sandboxing for mongod and mongos (Linux only).
 //
 // Landlock is a Linux LSM that lets an unprivileged process irreversibly drop
-// its own ambient filesystem rights. When enabled via --landlock
-// (security.landlock.enabled), the server declares the set of path hierarchies it
+// its own ambient filesystem rights. When enabled via --landlockMode
+// (security.landlock.mode), the server declares the set of path hierarchies it
 // legitimately needs at startup (e.g. dbPath read-write, system libraries
 // read-only) and the kernel denies every other filesystem access for the
 // lifetime of the process and its descendants.

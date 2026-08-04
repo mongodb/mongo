@@ -66,19 +66,57 @@
 
 namespace mongo {
 namespace {
+// How hard the server tries to sandbox itself (security.landlock.mode).
+//
+// kEnforce and kBestEffort both apply the strongest ruleset the running
+// kernel's Landlock ABI supports, and differ only in what happens when
+// Landlock is not available:
+// kEnforce - server exits immediately,
+// kBestEffort - server starts unsandboxed.
+enum class LandlockMode { kDisabled, kBestEffort, kEnforce };
+
+StatusWith<LandlockMode> parseLandlockMode(const std::string& value) {
+    if (str::equalCaseInsensitive(value, "disabled")) {
+        return LandlockMode::kDisabled;
+    }
+    if (str::equalCaseInsensitive(value, "bestEffort")) {
+        return LandlockMode::kBestEffort;
+    }
+    if (str::equalCaseInsensitive(value, "enforce")) {
+        return LandlockMode::kEnforce;
+    }
+    return Status(ErrorCodes::BadValue,
+                  str::stream() << "security.landlock.mode expects 'enforce', 'bestEffort' or "
+                                   "'disabled'; got '"
+                                << value << "'");
+}
+
+// The canonical spelling, for reporting the mode back through serverStatus.
+std::string_view landlockModeName(LandlockMode mode) {
+    switch (mode) {
+        case LandlockMode::kDisabled:
+            return "disabled";
+        case LandlockMode::kBestEffort:
+            return "bestEffort";
+        case LandlockMode::kEnforce:
+            return "enforce";
+    }
+    MONGO_UNREACHABLE;
+}
+
 // Back the "landlock" serverStatus section (see LandlockServerStatusSection):
-// whether the sandbox option is enabled, the Landlock ABI version probed from
-// the running kernel (0 when the kernel lacks Landlock or has it disabled),
-// both reported even when the sandbox option is off, whether the sandbox is
-// actually enforced ("active"), and the filesystem access-right masks the
-// enforced ruleset handles and had to degrade (meaningful only while active).
+// the sandbox mode in effect, the Landlock ABI version probed from the running
+// kernel (0 when the kernel lacks Landlock or has it disabled), both reported
+// even when the sandbox is disabled, whether the sandbox is actually enforced
+// ("active"), and the filesystem access-right masks the enforced ruleset
+// handles and had to degrade (meaningful only while active).
 //
 // Deliberately not atomic: written once, from the single-threaded
 // EnableLandlockSandbox startup initializer, before any thread that could read
 // them (command threads serving serverStatus) is spawned -- thread creation
 // establishes the necessary happens-before. Must become atomic if enforcement
 // ever moves out of single-threaded startup.
-bool gLandlockEnabled = false;
+LandlockMode gLandlockMode = LandlockMode::kDisabled;
 int gLandlockAbi = 0;
 bool gLandlockActive = false;
 uint64_t gLandlockHandledFsAccess = 0;
@@ -104,12 +142,7 @@ namespace {
 //
 // The lexical form is computed first because it doubles as the fallback.
 // Canonicalization touches the filesystem and, unlike absolute(), can fail: an
-// intermediate directory this process cannot traverse, a symlink loop. That
-// must not be fatal -- nothing catches an exception on the way out of the
-// policy, and initializeLandlock() is documented to leave the process
-// unsandboxed rather than die -- so a failure degrades to the un-normalized
-// path, leaving symlink resolution to the kernel, which resolves it when the
-// rule is added anyway.
+// intermediate directory this process cannot traverse, a symlink loop.
 boost::filesystem::path canonicalStartupPath(const std::string& path) {
     const auto absolutePath = boost::filesystem::absolute(path, serverGlobalParams.cwd);
     boost::system::error_code ec;
@@ -293,18 +326,18 @@ std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
 }
 
 /**
- * Builds the server's ruleset and enforces it. Best-effort by design: on any
- * failure this logs a warning and leaves the process unsandboxed rather than
- * enforcing an incomplete policy that would break the server.
+ * Builds the server's ruleset and enforces it. Never enforces an incomplete
+ * policy: either the whole policy applies or the process dies.
+ *
+ * Only called once the caller has established that this host supports Landlock,
+ * so every failure here means the sandbox was available and could not be
+ * applied -- a bug in the policy, or a filesystem that defeats it.
  */
 void initializeLandlock() {
     auto swRuleset = LandlockRuleset::create();
     if (!swRuleset.isOK()) {
-        LOGV2_WARNING(13118806,
-                      "Failed to create Landlock ruleset; continuing without filesystem "
-                      "sandboxing",
-                      "error"_attr = swRuleset.getStatus());
-        return;
+        LOGV2_FATAL(
+            13118806, "Failed to create Landlock ruleset", "error"_attr = swRuleset.getStatus());
     }
     auto& ruleset = *swRuleset.getValue();
 
@@ -320,11 +353,10 @@ void initializeLandlock() {
             continue;
         }
         if (Status status = ruleset.addPathRule(rule); !status.isOK()) {
-            LOGV2_WARNING(13118809,
-                          "Failed to add Landlock rule; continuing without filesystem sandboxing",
-                          "path"_attr = rule.path(),
-                          "error"_attr = status);
-            return;
+            LOGV2_FATAL(13118809,
+                        "Failed to add Landlock rule",
+                        "path"_attr = rule.path(),
+                        "error"_attr = status);
         }
     }
 
@@ -336,10 +368,7 @@ void initializeLandlock() {
     }
 
     if (Status status = ruleset.restrictSelf(); !status.isOK()) {
-        LOGV2_FATAL(13118811,
-                    "Failed to enforce Landlock ruleset; continuing without filesystem "
-                    "sandboxing",
-                    "error"_attr = status);
+        LOGV2_FATAL(13118811, "Failed to enforce Landlock ruleset", "error"_attr = status);
     }
 
     gLandlockActive = true;
@@ -362,8 +391,8 @@ void initializeLandlock() {
           "degradedRights"_attr = LandlockRuleset::fsAccessRightNames(ruleset.degradedFsAccess()));
 }
 
-// Applies the Landlock sandbox if the operator enabled it via --landlock /
-// security.landlock.enabled (default: disabled while this is a POC).
+// Applies the Landlock sandbox as directed by --landlockMode /
+// security.landlock.mode (default: disabled).
 //
 // Runs after the known file-touching initializers (ServerLogRedirection opens
 // the log and backtrace files; ForkServer reopens the standard streams and
@@ -376,28 +405,59 @@ MONGO_INITIALIZER_GENERAL(EnableLandlockSandbox,
                           ("default"))
 (InitializerContext*) {
     const auto& params = optionenvironment::startupOptionsParsed;
-    bool enabled = false;
-    if (params.count("security.landlock.enabled")) {
-        enabled = params["security.landlock.enabled"].as<bool>();
+    if (auto value = params["security.landlock.mode"]; !value.isEmpty()) {
+        gLandlockMode = uassertStatusOK(parseLandlockMode(value.as<std::string>()));
     }
-    gLandlockEnabled = enabled;
+
+    // Probed even when disabled, so monitoring can tell a host that could enforce
+    // the sandbox from one that never could.
     const auto swAbi = landlockAbiVersion();
     gLandlockAbi = swAbi.isOK() ? static_cast<int>(swAbi.getValue()) : 0;
-    if (!enabled) {
-        LOGV2(13118814, "Skipping Landlock initialization: sandboxing is not enabled");
+
+    if (gLandlockMode == LandlockMode::kDisabled) {
+        LOGV2_WARNING(13118814, "Skipping Landlock initialization: sandboxing is not enabled");
         return;
     }
 
+    // A failed probe means this host cannot enforce Landlock at all: no support in
+    // the kernel (ENOSYS), the LSM left out of the boot-time stack (EOPNOTSUPP).
+    // A host without Landlock never reaches initializeLandlock() at all.
+    if (!swAbi.isOK()) {
+        if (gLandlockMode == LandlockMode::kEnforce) {
+            LOGV2_ERROR(13253500,
+                        "Refusing to start: this host cannot enforce the Landlock filesystem "
+                        "sandbox and security.landlock.mode requires it",
+                        "mode"_attr = landlockModeName(gLandlockMode),
+                        "error"_attr = swAbi.getStatus());
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "security.landlock.mode is '" << landlockModeName(gLandlockMode)
+                          << "' but this host cannot enforce the Landlock filesystem "
+                             "sandbox: "
+                          << swAbi.getStatus().reason());
+        }
+        // best effort run server without Landlock
+        LOGV2_WARNING(13253501,
+                      "Continuing without Landlock filesystem sandboxing: this host cannot "
+                      "enforce it, so the server's filesystem access is unrestricted",
+                      "mode"_attr = landlockModeName(gLandlockMode),
+                      "error"_attr = swAbi.getStatus());
+        return;
+    }
+
+    // Landlock is available here. A failure from this point is the policy failing to apply,
+    // which is fatal rather than something a mode gets to tolerate.
     initializeLandlock();
 }
 
 // Read-only diagnostic for monitoring and tests:
 //
-//   enabled:              the security.landlock.enabled option
+//   mode:                 the security.landlock.mode option ("enforce",
+//                         "bestEffort" or "disabled")
 //   active:               whether the sandbox is actually enforced
 //   abiVersion:           Landlock ABI probed from the running kernel (0 when
 //                         the kernel lacks Landlock or has it disabled),
-//                         reported even when the sandbox option is off
+//                         reported even when the sandbox is disabled
 //   handledAccessRights:  rights the enforced ruleset denies by default,
 //                         per rule type ("fs"); present only when active
 //   degradedAccessRights: requested rights this kernel's ABI cannot restrict,
@@ -412,7 +472,7 @@ public:
 
     BSONObj generateSection(OperationContext*, const BSONElement&) const override {
         BSONObjBuilder builder;
-        builder.append("enabled", gLandlockEnabled);
+        builder.append("mode", landlockModeName(gLandlockMode));
         builder.append("active", gLandlockActive);
         builder.append("abiVersion", gLandlockAbi);
         if (gLandlockActive) {

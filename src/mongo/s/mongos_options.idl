@@ -42,13 +42,15 @@ configs:
         description: "Enable javascript execution"
         arg_vartype: Bool
         source: [yaml]
-    "security.landlock.enabled":
-        description:
-            "Enable Landlock self-sandboxing, restricting the server's filesystem
-            access at startup to a least-privilege set of paths. Linux only."
-        short_name: landlock
-        arg_vartype: Bool
-        default: false
+    "security.landlock.mode":
+        description: >-
+            Landlock self-sandboxing mode, restricting the server's filesystem access at
+            startup to a least-privilege set of paths. Alternatives are 'enforce' (refuse to
+            start when the running kernel cannot enforce the sandbox), 'bestEffort' (start
+            unsandboxed when it cannot) and 'disabled' (skip Landlock entirely). Linux only.
+        short_name: landlockMode
+        arg_vartype: String
+        default: "disabled"
         source: [cli, yaml]
         condition:
             preprocessor: "defined(__linux__)"
