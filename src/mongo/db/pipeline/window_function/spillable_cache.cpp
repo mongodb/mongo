@@ -97,6 +97,15 @@ void SpillableCache::clear() {
 }
 
 void SpillableCache::writeBatchToDisk(std::vector<Record>& records) {
+    // A single document can exceed 'kMaxWriteSize' on its own, since intermediate documents in a
+    // pipeline may reach BSONObjMaxInternalSize, so the batching in spillToDisk() can reach a flush
+    // with nothing accumulated. Passing an empty record vector to RecordStore::insertRecords trips
+    // a fatal invariant, so drop the write here, at the single point where every batch reaches the
+    // record store.
+    if (records.empty()) {
+        return;
+    }
+
     // By passing a vector of null timestamps, these inserts are not timestamped individually, but
     // rather with the timestamp of the owning operation. We don't care about the timestamps.
     std::vector<Timestamp> timestamps(records.size());
@@ -142,6 +151,9 @@ void SpillableCache::spillToDisk() {
     for (auto& memoryTokenWithDoc : _memCache) {
         auto bsonDoc = memoryTokenWithDoc.value().toBson();
         size_t objSize = bsonDoc.objsize();
+        // A document larger than 'kMaxWriteSize' finds this check true with nothing accumulated and
+        // is then written as a batch of one, deliberately exceeding 'kMaxWriteSize' but staying
+        // within BSONObjMaxInternalSize. writeBatchToDisk() drops the resulting empty write.
         if (records.size() == 1000 || batchSize + objSize > kMaxWriteSize) {
             writeBatchToDisk(records);
             records.clear();

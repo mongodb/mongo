@@ -210,5 +210,63 @@ TEST_F(SpillableCacheTest, CanInsertLargeDocuments) {
     _expCtx->allowDiskUse = false;
 }
 
+// Returns a document that serializes to more than SpillableCache::kMaxWriteSize on its own, while
+// staying below BSONObjMaxInternalSize so the record store can still store it. The string is as
+// large as Document's RCString allows, strictly less than 16MB, and the BSON field overhead carries
+// the enclosing object past the batch limit. The assertions pin both bounds, since the margin over
+// the limit is only a few dozen bytes.
+BSONObj makeOversizedObj(int id) {
+    // Built once and shared by both callers. The buffer then stays alive until the test binary
+    // exits, which is the trade for not rebuilding ~16MB per call.
+    static const std::string oversizedStr(SpillableCache::kMaxWriteSize - 1, 'x');
+    BSONObj obj = BSON("_id" << id << "longStr" << oversizedStr);
+    ASSERT_GT(static_cast<size_t>(obj.objsize()), SpillableCache::kMaxWriteSize);
+    ASSERT_LT(obj.objsize(), BSONObjMaxInternalSize);
+    return obj;
+}
+
+TEST_F(SpillableCacheTest, CanSpillSingleDocumentLargerThanMaxWriteSize) {
+    _expCtx->allowDiskUse = true;
+    // Tiny memory limit so the first insert forces a spill.
+    auto cache = createSpillableCache(1024);
+    // The oversized document is the only one in the cache, so the batch is empty when the size
+    // check fires. Before the fix this wrote an empty batch and aborted the server.
+    auto obj = makeOversizedObj(0);
+    cache->addDocument(Document(obj));
+    ASSERT_TRUE(cache->usedDisk());
+    auto doc = cache->getDocumentById(0);
+    // Compare StringData views rather than getString()/String(), which would each copy ~16MB.
+    ASSERT_EQ(doc["longStr"].getStringData(), obj["longStr"].valueStringData());
+    ASSERT_EQ(doc["_id"].getInt(), 0);
+    cache->finalize();
+    _expCtx->allowDiskUse = false;
+}
+
+TEST_F(SpillableCacheTest, CanSpillDocumentLargerThanMaxWriteSizeSurroundedBySmallDocuments) {
+    _expCtx->allowDiskUse = true;
+    auto cache = createSpillableCache(1024);
+    // Covers the complementary path, where the size check fires with a non-empty batch. This passes
+    // without the fix. The small document stays within the memory limit on its own, so it is still
+    // in the cache when the oversized document forces the spill and the two share a batch.
+    auto oversizedObj = makeOversizedObj(1);
+    cache->addDocument(Document(BSON("_id" << 0 << "longStr"
+                                           << "small")));
+    ASSERT_FALSE(cache->usedDisk());
+    cache->addDocument(Document(oversizedObj));
+    cache->addDocument(Document(BSON("_id" << 2 << "longStr"
+                                           << "small")));
+    ASSERT_TRUE(cache->usedDisk());
+    // Hold each Document in a local: the StringData views below borrow from it, and comparing views
+    // rather than getString()/String() avoids copying ~16MB.
+    for (int i = 0; i < 3; ++i) {
+        auto doc = cache->getDocumentById(i);
+        ASSERT_EQ(doc["_id"].getInt(), i);
+        ASSERT_EQ(doc["longStr"].getStringData(),
+                  i == 1 ? oversizedObj["longStr"].valueStringData() : "small"_sd);
+    }
+    cache->finalize();
+    _expCtx->allowDiskUse = false;
+}
+
 }  // namespace
 }  // namespace mongo

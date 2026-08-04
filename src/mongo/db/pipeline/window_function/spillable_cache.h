@@ -105,6 +105,12 @@ public:
         return _usedDisk;
     }
 
+    // When spilling to disk, only write batches smaller than 16MB. A single document that exceeds
+    // this on its own is written as a batch of one, so a batch is bounded by
+    // BSONObjMaxInternalSize rather than by this value. Public so that tests can size documents
+    // against the real limit instead of a copy of it.
+    static constexpr size_t kMaxWriteSize = 16 * 1024 * 1024;
+
     /**
      * Returns the id of the last document inserted.
      */
@@ -145,9 +151,6 @@ private:
     // The id of the next document to be added. Zero refers to the first document added to the
     // cache.
     int _nextIndex = 0;
-
-    // When spilling to disk, only write batches smaller than 16MB.
-    static constexpr size_t kMaxWriteSize = 16 * 1024 * 1024;
 
     // Be able to report that disk was used after the cache has been finalized.
     bool _usedDisk = false;
