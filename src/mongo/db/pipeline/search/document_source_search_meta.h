@@ -52,6 +52,8 @@ public:
         return kStageName.rawData();
     }
 
+    Value serialize(const SerializationOptions& opts) const override;
+
     /**
      * This is the first stage in the pipeline, but we need to gather responses from all shards in
      * order to set $$SEARCH_META appropriately.

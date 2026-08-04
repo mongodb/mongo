@@ -125,6 +125,14 @@ DocumentSource::GetNextResult DocumentSourceSearchMeta::getNextAfterSetup() {
     return GetNextResult::makeEOF();
 }
 
+Value DocumentSourceSearchMeta::serialize(const SerializationOptions& opts) const {
+    // For query stats, serialize the mongot query as a single anonymized object.
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged || opts.transformIdentifiers) {
+        return Value(Document{{getSourceName(), opts.serializeLiteral(getSearchQuery())}});
+    }
+    return DocumentSourceInternalSearchMongotRemote::serialize(opts);
+}
+
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     mongot_cursor::throwIfNotRunningWithMongotHostConfigured(expCtx);
