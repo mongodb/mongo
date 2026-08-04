@@ -35,7 +35,7 @@ export function handleRandomSetFCVErrors(e, targetFCV) {
         );
         return true;
     }
-    if (e.code === 8531600) {
+    if (e.code === 8531600 || e.code === 8531601) {
         // The existing FCV document could not be found because of a retryable error during
         // stepdown.
         jsTestLog({
