@@ -412,6 +412,11 @@ public:
         int numNamespaces = 0;
         // Number of $lookup stages that remained in the non-join-reorderable query suffix.
         int numLookupsInSuffix = 0;
+        // Number of suffix document sources we were able to lower into SBE after the
+        // join-optimizable prefix.
+        int numSuffixSourcesPushedToSbe = 0;
+        // Number of "residual" document sources that had to execute in classic DocumentSource land.
+        int numResidualClassicSources = 0;
         // Number of nodes in the join graph. Note: this is the same as the number of $lookup stages
         // that were pushed down into the join-reorderable query prefix.
         int numJoinGraphNodes = 0;

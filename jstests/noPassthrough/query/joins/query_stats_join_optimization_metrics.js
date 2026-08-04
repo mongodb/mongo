@@ -45,6 +45,8 @@ seed(items, 100);
 const kPerQueryMetrics = {
     numNamespaces: 3,
     numLookupsInSuffix: 0,
+    numSuffixSourcesPushedToSbe: 0,
+    numResidualClassicSources: 0,
     numJoinGraphNodes: 3,
     numSyntacticEdges: 2,
     numInferredEdges: 0,
@@ -204,6 +206,34 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
     assert(joinMetrics);
     // The third run does not enumerate.
     assertJoinMetrics(joinMetrics, 3, 2);
+}
+
+{
+    // The plan cache key ignores the pipeline suffix, so this variant could hit the cache and skip
+    // suffix pushdown (TODO SERVER-130469). Disable the cache to keep the metrics deterministic.
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinPlanCache: false}));
+
+    // Validate that we correctly count pushed down vs classic stages.
+    const suffixPipeline = [
+        ...pipeline,
+        {$group: {_id: "$b", n: {$sum: 1}}},
+        {$_internalInhibitOptimization: {}},
+        {$match: {n: {$gte: 0}}},
+    ];
+
+    // Update expected metrics to reflect this.
+    kPerQueryMetrics.numSuffixSourcesPushedToSbe = 1;
+    kPerQueryMetrics.numResidualClassicSources = 2;
+
+    assert.eq(orders.aggregate(suffixPipeline, {cursor: {batchSize: 100000}}).itcount(), 10);
+
+    const stats = getQueryStats(conn, {collName: orders.getName()});
+    const matching = stats.filter((s) => tojson(s.key.queryShape).includes("$group"));
+    assert.eq(1, matching.length, "expected exactly one query shape with a $group", {stats});
+
+    const joinMetrics = matching[0].metrics.supplementalMetrics.JoinOptimization;
+    assert(joinMetrics);
+    assertJoinMetrics(joinMetrics, 1, 1);
 }
 
 MongoRunner.stopMongod(conn);

@@ -23,6 +23,8 @@ public:
         : SupplementalStatsEntry(SupplementalMetricType::JoinOptimization),
           numNamespaces(metrics.numNamespaces),
           numLookupsInSuffix(metrics.numLookupsInSuffix),
+          numSuffixSourcesPushedToSbe(metrics.numSuffixSourcesPushedToSbe),
+          numResidualClassicSources(metrics.numResidualClassicSources),
           numJoinGraphNodes(metrics.numJoinGraphNodes),
           numSyntacticEdges(metrics.numSyntacticEdges),
           numInferredEdges(metrics.numInferredEdges),
@@ -69,6 +71,8 @@ public:
 
     AggregatedMetric<int64_t> numNamespaces;
     AggregatedMetric<int64_t> numLookupsInSuffix;
+    AggregatedMetric<int64_t> numSuffixSourcesPushedToSbe;
+    AggregatedMetric<int64_t> numResidualClassicSources;
     AggregatedMetric<int64_t> numJoinGraphNodes;
     AggregatedMetric<int64_t> numSyntacticEdges;
     AggregatedMetric<int64_t> numInferredEdges;

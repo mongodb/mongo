@@ -333,6 +333,17 @@ lowerToSbePlanStageTree(OperationContext* opCtx,
     return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
 }
 
+/**
+ * Records how much of the non-join-reorderable pipeline suffix was lowered into SBE versus how much
+ * remains to be executed as DocumentSources.
+ */
+void recordSuffixLoweringMetrics(const Pipeline* suffix,
+                                 size_t numPushedToSbe,
+                                 OpDebug::JoinOptimizationMetrics& metrics) {
+    metrics.numSuffixSourcesPushedToSbe = numPushedToSbe;
+    metrics.numResidualClassicSources = suffix ? suffix->getSources().size() : 0;
+}
+
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     OperationContext* opCtx,
     const JoinPlanCacheKey& cacheKey,
@@ -351,6 +362,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
         winnerSoln->setRoot(std::move(qsn));
 
         // TODO SERVER-130469: Pushdown SBE eligible suffix.
+        recordSuffixLoweringMetrics(model.getSuffix(), 0 /* numPushedToSbe */, metrics);
         auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
                                                                            model.getGraph(),
                                                                            yieldPolicy,
@@ -599,6 +611,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 .plannerOptions = QueryPlannerParams::DEFAULT,
             }));
 
+        // 'attachPipelineStages()' prepends the SBE-eligible suffix stages onto
+        // 'prefix.cqPipeline()', so its size is exactly the number of stages we lowered.
+        const size_t numPushed = prefix.cqPipeline().size();
+
         if (!prefix.cqPipeline().empty()) {
             QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
                 .opCtx = opCtx,
@@ -620,6 +636,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         // so they are not executed twice (once in SBE and again in classic). Only the remaining
         // stages in suffix will be executed in classic.
         finalizePipelineStages(suffix, &prefix);
+
+        recordSuffixLoweringMetrics(suffix, numPushed, metrics);
+    } else {
+        recordSuffixLoweringMetrics(suffix, 0 /* numPushedToSbe */, metrics);
     }
 
     // Test hook: all sampling and join reordering is complete at this point.

@@ -142,6 +142,8 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
     m1.joinOptimizable = true;
     m1.numNamespaces = 5;
     m1.numLookupsInSuffix = 3;
+    m1.numSuffixSourcesPushedToSbe = 2;
+    m1.numResidualClassicSources = 1;
     m1.numJoinGraphNodes = 4;
     m1.numSyntacticEdges = 3;
     m1.numInferredEdges = 1;
@@ -177,6 +179,8 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "joinOptimizable": {"true": 1, "false": 0},
                 "numNamespaces": {"sum": 5, "max": 5, "min": 5, "sumOfSquares": {"$numberDecimal":"25"}},
                 "numLookupsInSuffix": {"sum": 3, "max": 3, "min": 3, "sumOfSquares": {"$numberDecimal":"9"}},
+                "numSuffixSourcesPushedToSbe": {"sum": 2, "max": 2, "min": 2, "sumOfSquares": {"$numberDecimal":"4"}},
+                "numResidualClassicSources": {"sum": 1, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"1"}},
                 "numJoinGraphNodes": {"sum": 4, "max": 4, "min": 4, "sumOfSquares": {"$numberDecimal":"16"}},
                 "numSyntacticEdges": {"sum": 3, "max": 3, "min": 3, "sumOfSquares": {"$numberDecimal":"9"}},
                 "numInferredEdges": {"sum": 1, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"1"}},
@@ -210,6 +214,8 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
     m2.joinOptimizable = false;
     m2.numNamespaces = 2;
     m2.numLookupsInSuffix = 1;
+    m2.numSuffixSourcesPushedToSbe = 0;
+    m2.numResidualClassicSources = 3;
     m2.numJoinGraphNodes = 2;
     m2.numSyntacticEdges = 1;
     m2.numInferredEdges = 0;
@@ -232,6 +238,8 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "joinOptimizable": {"true": 1, "false": 1},
                 "numNamespaces": {"sum": 7, "max": 5, "min": 2, "sumOfSquares": {"$numberDecimal":"29"}},
                 "numLookupsInSuffix": {"sum": 4, "max": 3, "min": 1, "sumOfSquares": {"$numberDecimal":"10"}},
+                "numSuffixSourcesPushedToSbe": {"sum": 2, "max": 2, "min": 0, "sumOfSquares": {"$numberDecimal":"4"}},
+                "numResidualClassicSources": {"sum": 4, "max": 3, "min": 1, "sumOfSquares": {"$numberDecimal":"10"}},
                 "numJoinGraphNodes": {"sum": 6, "max": 4, "min": 2, "sumOfSquares": {"$numberDecimal":"20"}},
                 "numSyntacticEdges": {"sum": 4, "max": 3, "min": 1, "sumOfSquares": {"$numberDecimal":"10"}},
                 "numInferredEdges": {"sum": 1, "max": 1, "min": 0, "sumOfSquares": {"$numberDecimal":"1"}},

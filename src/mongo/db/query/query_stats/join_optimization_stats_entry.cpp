@@ -19,6 +19,8 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
     joinOptimizable.appendTo(metricsEntryBuilder, "joinOptimizable");
     numNamespaces.appendTo(metricsEntryBuilder, "numNamespaces");
     numLookupsInSuffix.appendTo(metricsEntryBuilder, "numLookupsInSuffix");
+    numSuffixSourcesPushedToSbe.appendTo(metricsEntryBuilder, "numSuffixSourcesPushedToSbe");
+    numResidualClassicSources.appendTo(metricsEntryBuilder, "numResidualClassicSources");
     numJoinGraphNodes.appendTo(metricsEntryBuilder, "numJoinGraphNodes");
     numSyntacticEdges.appendTo(metricsEntryBuilder, "numSyntacticEdges");
     numInferredEdges.appendTo(metricsEntryBuilder, "numInferredEdges");
@@ -68,6 +70,8 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
     joinOptimizable.falseCount += updateVal->joinOptimizable.falseCount;
     numNamespaces.combine(updateVal->numNamespaces);
     numLookupsInSuffix.combine(updateVal->numLookupsInSuffix);
+    numSuffixSourcesPushedToSbe.combine(updateVal->numSuffixSourcesPushedToSbe);
+    numResidualClassicSources.combine(updateVal->numResidualClassicSources);
     numJoinGraphNodes.combine(updateVal->numJoinGraphNodes);
     numSyntacticEdges.combine(updateVal->numSyntacticEdges);
     numInferredEdges.combine(updateVal->numInferredEdges);
