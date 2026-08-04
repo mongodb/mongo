@@ -21,6 +21,9 @@ namespace mongo {
 namespace {
 
 using IndexVersion = IndexDescriptor::IndexVersion;
+using namespace std::literals::string_view_literals;
+
+using index_key_validate::validateIndexName;
 using index_key_validate::validateKeyPattern;
 
 /**
@@ -30,6 +33,23 @@ std::set<IndexVersion> getSupportedIndexVersions() {
     return {IndexVersion::kV1, IndexVersion::kV2};
 }
 
+TEST(IndexKeyValidateTest, IndexNameOrdinaryNamesSucceed) {
+    ASSERT_OK(validateIndexName("_id_"));
+    ASSERT_OK(validateIndexName("a_1"));
+    ASSERT_OK(validateIndexName("my index"));
+}
+
+TEST(IndexKeyValidateTest, IndexNameEmptyFails) {
+    ASSERT_EQ(validateIndexName(""), ErrorCodes::CannotCreateIndex);
+}
+
+TEST(IndexKeyValidateTest, IndexNameWithEmbeddedNullByteFails) {
+    ASSERT_EQ(validateIndexName("\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(validateIndexName("\0\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(validateIndexName("\0trailing"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(validateIndexName("leading\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(validateIndexName("embedded\0null"sv), ErrorCodes::CannotCreateIndex);
+}
 
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallPositiveIntSucceeds) {
     for (auto indexVersion : getSupportedIndexVersions()) {

@@ -54,6 +54,14 @@ extern const std::map<std::string_view, std::set<IndexType>> kNonDeprecatedAllow
 Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion);
 
 /**
+ * Checks that 'name' is usable as an index name. An index name must be non-empty and must not
+ * contain an embedded null byte.
+ *
+ * This applies to both regular indexes and the implicit index of a clustered collection.
+ */
+Status validateIndexName(std::string_view name);
+
+/**
  * Validates the index specification 'indexSpec' and returns an equivalent index specification that
  * has any missing attributes filled in. If the index specification is malformed, then an error
  * status is returned.

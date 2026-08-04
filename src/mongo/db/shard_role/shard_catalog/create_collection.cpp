@@ -101,13 +101,8 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
     }
 
     if (const auto& name = spec.getName()) {
-        if (name->find('\0') != std::string::npos) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "The clusteredIndex name cannot contain NUL bytes");
-        }
-
-        if (name->empty()) {
-            return Status(ErrorCodes::CannotCreateIndex, "The clusteredIndex name cannot be empty");
+        if (auto status = index_key_validate::validateIndexName(*name); !status.isOK()) {
+            return status.withContext("Invalid clusteredIndex name");
         }
     }
 

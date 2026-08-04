@@ -299,6 +299,18 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
     return Status::OK();
 }
 
+Status validateIndexName(std::string_view name) {
+    if (name.find('\0') != std::string::npos) {
+        return Status(ErrorCodes::CannotCreateIndex, "index name cannot contain NUL bytes");
+    }
+
+    if (name.empty()) {
+        return Status(ErrorCodes::CannotCreateIndex, "index name cannot be empty");
+    }
+
+    return Status::OK();
+}
+
 BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec) {
     auto appendIndexSpecFn = [](const BSONElement& indexSpecElem, BSONObjBuilder* builder) {
         builder->append(indexSpecElem);

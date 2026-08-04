@@ -268,6 +268,48 @@ BSONObj resultToBSON(const ValidateResults& vr) {
     return builder.obj();
 }
 
+/**
+ * Bypasses 'create' validation that would reject an invalid index name to inject an invalid name.
+ */
+NamespaceString createClusteredCollectionWithIndexName(OperationContext* opCtx,
+                                                       repl::StorageInterface* storageInterface,
+                                                       std::string_view indexName) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.clustered");
+
+    ClusteredIndexSpec indexSpec;
+    indexSpec.setKey(BSON("_id" << 1));
+    indexSpec.setUnique(true);
+    indexSpec.setName(std::string{indexName});
+
+    CollectionOptions options;
+    options.clusteredIndex =
+        ClusteredCollectionInfo(std::move(indexSpec), false /* legacyFormat */);
+    ASSERT_OK(storageInterface->createCollection(opCtx, nss, options));
+    return nss;
+}
+
+TEST_F(CollectionValidationTest, ValidateClusteredIndexNameWithEmbeddedNulByte) {
+    auto opCtx = operationContext();
+    const auto nss =
+        createClusteredCollectionWithIndexName(opCtx, storageInterface(), "leading\0trailing"sv);
+    foregroundValidate(
+        nss, opCtx, {.valid = true, .numRecords = 0, .numErrors = 0, .numWarnings = 1});
+}
+
+TEST_F(CollectionValidationTest, ValidateClusteredIndexNameEmpty) {
+    auto opCtx = operationContext();
+    const auto nss = createClusteredCollectionWithIndexName(opCtx, storageInterface(), ""sv);
+    foregroundValidate(
+        nss, opCtx, {.valid = true, .numRecords = 0, .numErrors = 0, .numWarnings = 1});
+}
+
+TEST_F(CollectionValidationTest, ValidateClusteredIndexNameValid) {
+    auto opCtx = operationContext();
+    const auto nss =
+        createClusteredCollectionWithIndexName(opCtx, storageInterface(), "myClusteredIndex"sv);
+    foregroundValidate(
+        nss, opCtx, {.valid = true, .numRecords = 0, .numErrors = 0, .numWarnings = 0});
+}
 
 // Verify that calling validate() on an empty collection with different validation levels returns an
 // OK status.

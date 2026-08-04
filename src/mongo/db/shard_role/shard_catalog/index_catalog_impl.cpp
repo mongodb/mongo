@@ -945,12 +945,10 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     if (nameElem.type() != BSONType::string)
         return Status(ErrorCodes::CannotCreateIndex, "index name must be specified as a string");
 
-    const std::string_view name = nameElem.valueStringData();
-    if (name.find('\0') != std::string::npos)
-        return Status(ErrorCodes::CannotCreateIndex, "index name cannot contain NUL bytes");
-
-    if (name.empty())
-        return Status(ErrorCodes::CannotCreateIndex, "index name cannot be empty");
+    if (auto status = index_key_validate::validateIndexName(nameElem.valueStringData());
+        !status.isOK()) {
+        return status;
+    }
 
     const BSONObj key = spec.getObjectField("key");
     const Status keyStatus = index_key_validate::validateKeyPattern(key, indexVersion);

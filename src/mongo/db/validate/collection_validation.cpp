@@ -450,6 +450,22 @@ void _validateCatalogEntry(OperationContext* opCtx,
                           << "collection options are not valid for storage: " << options.toBSON());
     }
 
+    // A clustered collection's implicit index is not an IndexCatalog entry, so the loop over the
+    // index catalog below never sees it and cannot validate its name. Check the validity of its
+    // name here.
+    if (const auto& clusteredIndex = options.clusteredIndex) {
+        if (const auto& clusteredIndexName = clusteredIndex->getIndexSpec().getName()) {
+            Status nameStatus = index_key_validate::validateIndexName(*clusteredIndexName);
+            if (!nameStatus.isOK()) {
+                results->addWarning(
+                    fmt::format("The clustered index name is not valid: {}. To remediate, migrate "
+                                "the data and drop the collection since clustered indexes cannot "
+                                "be independently dropped.",
+                                nameStatus.reason()));
+            }
+        }
+    }
+
     const auto& indexCatalog = collection->getIndexCatalog();
     auto indexIt = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kAll);
 
