@@ -27,6 +27,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -121,6 +122,16 @@ public:
                            std::span<const char> key,
                            std::span<const char> value) final;
 
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           int64_t key,
+                           std::span<const std::span<const char>> vals) final;
+
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           std::span<const std::span<const char>> keys,
+                           std::span<const char> value) final;
+
     void onContainerUpdate(OperationContext* opCtx,
                            std::string_view ident,
                            int64_t key,
@@ -136,6 +147,10 @@ public:
     void onContainerDelete(OperationContext* opCtx,
                            std::string_view ident,
                            std::span<const char> key) final;
+
+    void onContainerDelete(OperationContext* opCtx,
+                           std::string_view ident,
+                           std::span<const std::span<const char>> keys) final;
 
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,

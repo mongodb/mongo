@@ -24,7 +24,7 @@ namespace mongo::repl {
 class [[MONGO_MOD_PUBLIC]] ContainerKey {
 public:
     ContainerKey() : _key(int64_t{0}) {}
-    explicit ContainerKey(std::vector<std::span<const char>> key) : _key(std::move(key)) {}
+    explicit ContainerKey(std::vector<std::span<const char>> keys) : _key(std::move(keys)) {}
     explicit ContainerKey(int64_t key) : _key(key) {}
     explicit ContainerKey(std::span<const char> key) : _key(key) {}
 
@@ -75,6 +75,8 @@ public:
     static ContainerVal parse(const BSONElement& elem);
 
     void serialize(std::string_view fieldName, BSONObjBuilder* builder) const;
+
+    size_t count() const;
 
     bool isBytesVal() const {
         return std::holds_alternative<std::span<const char>>(_data);

@@ -94,6 +94,37 @@ public:
                            std::span<const char> key,
                            std::span<const char> value) override {}
 
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           std::span<const std::span<const char>> keys,
+                           std::span<const char> value) override {
+        // Defer to the single-op in a loop, which may be overridden
+        for (auto key : keys) {
+            onContainerInsert(opCtx, ident, key, value);
+        }
+    }
+
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           int64_t base,
+                           std::span<const std::span<const char>> vals) override {
+        // Early exit empty values
+        if (vals.empty()) {
+            return;
+        }
+        // Check for overflow, overflow::add returns true if overflow occurred
+        int64_t maxKey;
+        massert(13064500,
+                "record id overflowed in batched insert",
+                !overflow::add(base, static_cast<int64_t>(vals.size() - 1), &maxKey));
+
+        // Defer to the single-op in a loop, which may be overridden
+        for (size_t i = 0; i < vals.size(); ++i) {
+            onContainerInsert(opCtx, ident, base + i, vals[i]);
+        }
+    }
+
+
     void onContainerUpdate(OperationContext* opCtx,
                            std::string_view ident,
                            int64_t key,
@@ -109,6 +140,15 @@ public:
     void onContainerDelete(OperationContext* opCtx,
                            std::string_view ident,
                            std::span<const char> key) override {}
+
+    void onContainerDelete(OperationContext* opCtx,
+                           std::string_view ident,
+                           std::span<const std::span<const char>> keys) override {
+        // Defer to the single-op in a loop, which may be overridden
+        for (auto key : keys) {
+            onContainerDelete(opCtx, ident, key);
+        }
+    }
 
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,

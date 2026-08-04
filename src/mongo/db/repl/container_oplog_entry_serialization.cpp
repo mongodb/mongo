@@ -129,6 +129,16 @@ std::span<const char> ContainerKey::getBytesKey() const {
     return assertedGet<std::span<const char>>(_key);
 }
 
+size_t ContainerVal::count() const {
+    // Provides a count of values wrapped, can be used to determine if any value is needed when
+    // serializing into an oplog object.
+    OverloadedVisitor visitor(
+        [](std::span<const std::span<const char>> data) -> size_t { return data.size(); },
+        [](std::span<const char> data) -> size_t { return data.size() > 0 ? 1ULL : 0ULL; });
+
+    return std::visit(visitor, _data);
+}
+
 ContainerVal ContainerVal::parse(const BSONElement& elem) {
     switch (elem.type()) {
         case BSONType::array:

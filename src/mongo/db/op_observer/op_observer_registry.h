@@ -293,6 +293,26 @@ public:
         }
     }
 
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           std::span<const std::span<const char>> keys,
+                           std::span<const char> value) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerInsert(opCtx, ident, keys, value);
+        }
+    }
+
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           int64_t key,
+                           std::span<const std::span<const char>> vals) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerInsert(opCtx, ident, key, vals);
+        }
+    }
+
     void onContainerUpdate(OperationContext* opCtx,
                            std::string_view ident,
                            int64_t key,
@@ -317,6 +337,15 @@ public:
         ReservedTimes times{opCtx};
         for (auto&& observer : _observers) {
             observer->onContainerDelete(opCtx, ident, key);
+        }
+    }
+
+    void onContainerDelete(OperationContext* opCtx,
+                           std::string_view ident,
+                           std::span<const std::span<const char>> keys) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerDelete(opCtx, ident, keys);
         }
     }
 

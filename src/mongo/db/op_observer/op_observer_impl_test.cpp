@@ -7780,6 +7780,300 @@ TEST_F(OpObserverTest, OnContainerInsert) {
     ASSERT_EQ(std::string(entry2ValueBinData, entry2ValueBinDataLength), value2);
 }
 
+TEST_F(OpObserverTest, OnContainerInsertRange) {
+    // TODO SERVER-130660 Remove check for enable
+    unittest::ServerParameterGuard batchedContainerWritesEnabled{
+        "featureFlagBatchedContainerWrites", true};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    static constexpr int64_t startKey = 100;
+    // Backing storage for the non-owning value views; must outlive the onContainerInsert() call.
+    const std::string value0 = "a";
+    const std::string value1 = "bb";
+    const std::string value2 = "ccc";
+    const std::vector<std::span<const char>> vals{
+        std::span<const char>{value0.data(), value0.size()},
+        std::span<const char>{value1.data(), value1.size()},
+        std::span<const char>{value2.data(), value2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(opCtx.get(), ident, startKey, vals);
+
+    // A range insert produces a single oplog entry covering the contiguous key range.
+    const auto entries = getNOplogEntries(opCtx.get(), 1);
+    const auto entry = assertGet(OplogEntry::parse(entries[0]));
+
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+    // "o": { "k": <NumberLong startKey>, "v": [BinData(value0), BinData(value1), BinData(value2)] }
+    const auto o = entry.getObject();
+    ASSERT_EQ(o.nFields(), 2);
+
+    const auto k = o["k"];
+    ASSERT_EQ(k.type(), BSONType::numberLong);
+    ASSERT_EQ(k.numberLong(), startKey);
+
+    const auto v = o["v"];
+    ASSERT_EQ(v.type(), BSONType::array);
+    const std::vector<std::string> expected{value0, value1, value2};
+    const auto arr = v.Array();
+    ASSERT_EQ(arr.size(), expected.size());
+    for (size_t i = 0; i < arr.size(); ++i) {
+        EXPECT_EQ(arr[i].type(), BSONType::binData);
+        EXPECT_EQ(arr[i].binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = arr[i].binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
+// TODO SERVER-130660 Remove feature disabled test
+TEST_F(OpObserverTest, OnContainerInsertRangeFeatureFlagDisabled) {
+    unittest::ServerParameterGuard batchedContainerWritesDisabled{
+        "featureFlagBatchedContainerWrites", false};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident";
+    static constexpr int64_t startKey = 100;
+    const std::string value0 = "a";
+    const std::string value1 = "bb";
+    const std::string value2 = "ccc";
+    const std::vector<std::span<const char>> vals{
+        std::span<const char>{value0.data(), value0.size()},
+        std::span<const char>{value1.data(), value1.size()},
+        std::span<const char>{value2.data(), value2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(opCtx.get(), ident, startKey, vals);
+
+    // With the feature disabled we must not emit the array format; instead each value produces its
+    // own scalar oplog entry across the contiguous key range.
+    const auto entries = getNOplogEntries(opCtx.get(), 3);
+    const std::vector<std::string> expected{value0, value1, value2};
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto entry = assertGet(OplogEntry::parse(entries[i]));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+        EXPECT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+        const auto o = entry.getObject();
+        EXPECT_EQ(o.nFields(), 2);
+
+        const auto k = o["k"];
+        EXPECT_EQ(k.type(), BSONType::numberLong);
+        EXPECT_EQ(k.numberLong(), startKey + static_cast<int64_t>(i));
+
+        const auto v = o["v"];
+        EXPECT_EQ(v.type(), BSONType::binData);
+        EXPECT_EQ(v.binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = v.binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
+TEST_F(OpObserverTest, OnContainerInsertKeyArray) {
+    // TODO SERVER-130660 Remove check for enable
+    unittest::ServerParameterGuard batchedContainerWritesEnabled{
+        "featureFlagBatchedContainerWrites", true};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    // Backing storage for the non-owning key views; must outlive the onContainerInsert() call.
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+    const std::string value;
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(
+        opCtx.get(), ident, keys, std::span<const char>{value.data(), value.size()});
+
+    // An array-keyed insert produces a single oplog entry carrying the key array.
+    const auto entries = getNOplogEntries(opCtx.get(), 1);
+    const auto entry = assertGet(OplogEntry::parse(entries[0]));
+
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+    // "o": { "k": [BinData(key0), BinData(key1), BinData(key2)] }
+    const auto o = entry.getObject();
+    ASSERT_EQ(o.nFields(), 1) << o;
+
+    const auto k = o["k"];
+    ASSERT_EQ(k.type(), BSONType::array) << k;
+    const std::vector<std::string> expected{key0, key1, key2};
+    const auto arr = k.Array();
+    ASSERT_EQ(arr.size(), expected.size());
+    for (size_t i = 0; i < arr.size(); ++i) {
+        EXPECT_EQ(arr[i].type(), BSONType::binData) << k;
+        EXPECT_EQ(arr[i].binDataType(), BinDataType::BinDataGeneral) << k;
+        int len;
+        const auto data = arr[i].binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]) << k;
+    }
+
+    ASSERT_TRUE(o["v"].eoo()) << o;
+}
+
+// TODO SERVER-130660 Remove feature disabled test
+TEST_F(OpObserverTest, OnContainerInsertKeyArrayFeatureFlagDisabled) {
+    unittest::ServerParameterGuard batchedContainerWritesDisabled{
+        "featureFlagBatchedContainerWrites", false};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+    const std::string value;
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(
+        opCtx.get(), ident, keys, std::span<const char>{value.data(), value.size()});
+
+    // With the feature disabled we must not emit the array format; instead each key produces its
+    // own scalar oplog entry, all sharing the same value.
+    const auto entries = getNOplogEntries(opCtx.get(), 3);
+    const std::vector<std::string> expected{key0, key1, key2};
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto entry = assertGet(OplogEntry::parse(entries[i]));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+        EXPECT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+        const auto o = entry.getObject();
+        EXPECT_EQ(o.nFields(), 2) << o;
+
+        {
+            const auto k = o["k"];
+            EXPECT_EQ(k.type(), BSONType::binData) << k;
+            EXPECT_EQ(k.binDataType(), BinDataType::BinDataGeneral) << k;
+            int klen;
+            const auto kdata = k.binData(klen);
+            EXPECT_EQ(std::string_view(kdata, klen), expected[i]) << k;
+        }
+
+        {
+            const auto v = o["v"];
+            EXPECT_EQ(v.type(), BSONType::binData) << v;
+            EXPECT_EQ(v.binDataType(), BinDataType::BinDataGeneral) << v;
+            int vlen;
+            const auto vdata = v.binData(vlen);
+            EXPECT_EQ(std::string_view(vdata, vlen), value) << v;
+        }
+    }
+}
+
+TEST_F(OpObserverTest, OnContainerDeleteKeyArray) {
+    // TODO SERVER-130660 Remove check for enable
+    unittest::ServerParameterGuard batchedContainerWritesEnabled{
+        "featureFlagBatchedContainerWrites", true};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    // Backing storage for the non-owning key views; must outlive the onContainerDelete() call.
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerDelete(opCtx.get(), ident, keys);
+
+    // An array-keyed delete produces a single oplog entry carrying the key array.
+    const auto entries = getNOplogEntries(opCtx.get(), 1);
+    const auto entry = assertGet(OplogEntry::parse(entries[0]));
+
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerDelete);
+    ASSERT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+    // "o": { "k": [BinData(key0), BinData(key1), BinData(key2)] }
+    const auto o = entry.getObject();
+    ASSERT_EQ(o.nFields(), 1);
+
+    const auto k = o["k"];
+    ASSERT_EQ(k.type(), BSONType::array);
+    const std::vector<std::string> expected{key0, key1, key2};
+    const auto arr = k.Array();
+    ASSERT_EQ(arr.size(), expected.size());
+    for (size_t i = 0; i < arr.size(); ++i) {
+        EXPECT_EQ(arr[i].type(), BSONType::binData);
+        EXPECT_EQ(arr[i].binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = arr[i].binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
+// TODO SERVER-130660 Remove feature disabled test
+TEST_F(OpObserverTest, OnContainerDeleteKeyArrayFeatureFlagDisabled) {
+    unittest::ServerParameterGuard batchedContainerWritesDisabled{
+        "featureFlagBatchedContainerWrites", false};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerDelete(opCtx.get(), ident, keys);
+
+    // With the feature disabled we must not emit the array format; instead each key produces its
+    // own scalar oplog entry.
+    const auto entries = getNOplogEntries(opCtx.get(), 3);
+    const std::vector<std::string> expected{key0, key1, key2};
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto entry = assertGet(OplogEntry::parse(entries[i]));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerDelete);
+        EXPECT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+        const auto o = entry.getObject();
+        EXPECT_EQ(o.nFields(), 1);
+
+        const auto k = o["k"];
+        EXPECT_EQ(k.type(), BSONType::binData);
+        EXPECT_EQ(k.binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = k.binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
 TEST_F(OpObserverTest, OnContainerDelete) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};

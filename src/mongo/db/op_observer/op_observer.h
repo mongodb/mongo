@@ -285,6 +285,16 @@ public:
                                    std::span<const char> key,
                                    std::span<const char> value) = 0;
 
+    virtual void onContainerInsert(OperationContext* opCtx,
+                                   std::string_view ident,
+                                   std::span<const std::span<const char>> keys,
+                                   std::span<const char> value) = 0;
+
+    virtual void onContainerInsert(OperationContext* opCtx,
+                                   std::string_view ident,
+                                   int64_t key,
+                                   std::span<const std::span<const char>> vals) = 0;
+
     virtual void onContainerUpdate(OperationContext* opCtx,
                                    std::string_view ident,
                                    int64_t key,
@@ -302,6 +312,10 @@ public:
     virtual void onContainerDelete(OperationContext* opCtx,
                                    std::string_view ident,
                                    std::span<const char> key) = 0;
+
+    virtual void onContainerDelete(OperationContext* opCtx,
+                                   std::string_view ident,
+                                   std::span<const std::span<const char>> keys) = 0;
 
     /**
      * Logs a no-op with "msgObj" in the o field into oplog.

@@ -3431,7 +3431,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                 // neither the key nor the value is ever an array here.
                 auto parsed = repl::ContainerUpdateOplogEntryO::parse(
                     o, IDLParserContext("ContainerUpdateOplogEntryO"));
-                invariant(!parsed.getValue().isArrayVal());
+                invariant(!parsed.getValue().isArrayVal() && !parsed.getKey().isArrayKey());
                 auto valSpan = parsed.getValue().data();
                 s = parsed.getKey().visit(OverloadedVisitor{
                     [&](const std::vector<std::span<const char>>&) -> Status { MONGO_UNREACHABLE; },

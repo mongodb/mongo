@@ -1401,14 +1401,37 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
 namespace {
 
-repl::ContainerKey toContainerKey(std::variant<int64_t, std::span<const char>> key) {
-    return std::visit([](auto k) { return repl::ContainerKey(k); }, key);
+// Returns true when the optimized batched container write format may be emitted.
+bool batchedContainerWritesEnabled(OperationContext* opCtx) {
+    return gFeatureFlagBatchedContainerWrites.isEnabledUseLastLTSFCVWhenUninitialized(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+// Builds the 'o' field of a container insert oplog entry.
+repl::ContainerInsertOplogEntryO makeContainerInsertO(OperationContext* opCtx,
+                                                      repl::ContainerKey key,
+                                                      repl::ContainerVal value) {
+    repl::ContainerInsertOplogEntryO insertO;
+    insertO.setKey(std::move(key));
+    if (batchedContainerWritesEnabled(opCtx)) {
+        // If the value is empty or an empty array of values, omit it.
+        if (value.count() > 0) {
+            insertO.setValue(std::move(value));
+        }
+    } else {
+        massert(13064501,
+                "value must be BinData unless batched writes are enabled",
+                value.isBytesVal());
+        insertO.setValue(std::move(value));
+    }
+    return insertO;
 }
 
 OpTimeBundle logContainerInsert(OperationContext* opCtx,
                                 std::string_view container,
-                                std::variant<int64_t, std::span<const char>> key,
-                                std::span<const char> value,
+                                repl::ContainerKey key,
+                                repl::ContainerVal value,
                                 OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     MutableOplogEntry entry;
@@ -1416,10 +1439,7 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
     entry.setNss(ns);
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerInsert);
-    repl::ContainerInsertOplogEntryO insertO;
-    insertO.setKey(toContainerKey(key));
-    insertO.setValue(repl::ContainerVal(value));
-    entry.setObject(insertO.toBSON());
+    entry.setObject(makeContainerInsertO(opCtx, std::move(key), std::move(value)).toBSON());
 
     OpTimeBundle opTime;
     opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
@@ -1430,8 +1450,8 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
 
 void _onContainerInsert(OperationContext* opCtx,
                         std::string_view ident,
-                        std::variant<int64_t, std::span<const char>> key,
-                        std::span<const char> value,
+                        repl::ContainerKey key,
+                        repl::ContainerVal value,
                         OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
@@ -1447,10 +1467,7 @@ void _onContainerInsert(OperationContext* opCtx,
         op.setTid(ns.tenantId());
         op.setNss(ns);
         op.setContainer(ident);
-        repl::ContainerInsertOplogEntryO insertO;
-        insertO.setKey(toContainerKey(key));
-        insertO.setValue(repl::ContainerVal(value));
-        op.setObject(insertO.toBSON());
+        op.setObject(makeContainerInsertO(opCtx, key, value).toBSON());
         return op;
     };
 
@@ -1482,7 +1499,7 @@ void _onContainerInsert(OperationContext* opCtx,
 
 OpTimeBundle logContainerDelete(OperationContext* opCtx,
                                 std::string_view container,
-                                std::variant<int64_t, std::span<const char>> key,
+                                repl::ContainerKey key,
                                 OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     MutableOplogEntry entry;
@@ -1491,7 +1508,7 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerDelete);
     repl::ContainerDeleteOplogEntryO deleteO;
-    deleteO.setKey(toContainerKey(key));
+    deleteO.setKey(key);
     entry.setObject(deleteO.toBSON());
 
     OpTimeBundle opTime;
@@ -1503,7 +1520,7 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
 
 void _onContainerDelete(OperationContext* opCtx,
                         std::string_view ident,
-                        std::variant<int64_t, std::span<const char>> key,
+                        repl::ContainerKey key,
                         OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
@@ -1520,7 +1537,7 @@ void _onContainerDelete(OperationContext* opCtx,
         op.setNss(ns);
         op.setContainer(ident);
         repl::ContainerDeleteOplogEntryO deleteO;
-        deleteO.setKey(toContainerKey(key));
+        deleteO.setKey(key);
         op.setObject(deleteO.toBSON());
         return op;
     };
@@ -1553,8 +1570,8 @@ void _onContainerDelete(OperationContext* opCtx,
 
 OpTimeBundle logContainerUpdate(OperationContext* opCtx,
                                 std::string_view container,
-                                std::variant<int64_t, std::span<const char>> key,
-                                std::span<const char> value,
+                                repl::ContainerKey key,
+                                repl::ContainerVal value,
                                 OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     MutableOplogEntry entry;
@@ -1563,7 +1580,7 @@ OpTimeBundle logContainerUpdate(OperationContext* opCtx,
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerUpdate);
     repl::ContainerUpdateOplogEntryO updateO;
-    updateO.setKey(toContainerKey(key));
+    updateO.setKey(key);
     updateO.setValue(repl::ContainerVal(value));
     updateO.setVersion(
         static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
@@ -1578,8 +1595,8 @@ OpTimeBundle logContainerUpdate(OperationContext* opCtx,
 
 void _onContainerUpdate(OperationContext* opCtx,
                         std::string_view ident,
-                        std::variant<int64_t, std::span<const char>> key,
-                        std::span<const char> value,
+                        repl::ContainerKey key,
+                        repl::ContainerVal value,
                         OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
@@ -1596,8 +1613,8 @@ void _onContainerUpdate(OperationContext* opCtx,
         op.setNss(ns);
         op.setContainer(ident);
         repl::ContainerUpdateOplogEntryO updateO;
-        updateO.setKey(toContainerKey(key));
-        updateO.setValue(repl::ContainerVal(value));
+        updateO.setKey(key);
+        updateO.setValue(value);
         updateO.setVersion(
             static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
         op.setObject(updateO.toBSON());
@@ -1636,40 +1653,104 @@ void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                                        std::string_view ident,
                                        int64_t key,
                                        std::span<const char> value) {
-    _onContainerInsert(opCtx, ident, key, value, *_operationLogger);
+    _onContainerInsert(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                                        std::string_view ident,
                                        std::span<const char> key,
                                        std::span<const char> value) {
-    _onContainerInsert(opCtx, ident, key, value, *_operationLogger);
+    _onContainerInsert(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
+}
+
+void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
+                                       std::string_view ident,
+                                       int64_t key,
+                                       std::span<const std::span<const char>> vals) {
+    if (batchedContainerWritesEnabled(opCtx) && vals.size() > 0) {
+        _onContainerInsert(opCtx,
+                           ident,
+                           repl::ContainerKey(key),
+                           repl::ContainerVal(std::vector(vals.begin(), vals.end())),
+                           *_operationLogger);
+    } else {
+        // TODO SERVER-130660 Remove fallback to key-by-key insert
+        for (size_t i = 0; i < vals.size(); ++i) {
+            _onContainerInsert(opCtx,
+                               ident,
+                               repl::ContainerKey(key + static_cast<int64_t>(i)),
+                               repl::ContainerVal(vals[i]),
+                               *_operationLogger);
+        }
+    }
+}
+
+void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
+                                       std::string_view ident,
+                                       std::span<const std::span<const char>> keys,
+                                       std::span<const char> value) {
+    if (batchedContainerWritesEnabled(opCtx) && keys.size() > 0) {
+        _onContainerInsert(opCtx,
+                           ident,
+                           repl::ContainerKey(std::vector(keys.begin(), keys.end())),
+                           repl::ContainerVal(value),
+                           *_operationLogger);
+    } else {
+        // TODO SERVER-130660 Remove fallback to key-by-key insert
+        for (auto key : keys) {
+            _onContainerInsert(opCtx,
+                               ident,
+                               repl::ContainerKey(key),
+                               repl::ContainerVal(value),
+                               *_operationLogger);
+        }
+    }
 }
 
 void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
                                        std::string_view ident,
                                        int64_t key,
                                        std::span<const char> value) {
-    _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
+    _onContainerUpdate(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
                                        std::string_view ident,
                                        std::span<const char> key,
                                        std::span<const char> value) {
-    _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
+    _onContainerUpdate(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
                                        std::string_view ident,
                                        int64_t key) {
-    _onContainerDelete(opCtx, ident, key, *_operationLogger);
+    _onContainerDelete(opCtx, ident, repl::ContainerKey(key), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
                                        std::string_view ident,
                                        std::span<const char> key) {
-    _onContainerDelete(opCtx, ident, key, *_operationLogger);
+    _onContainerDelete(opCtx, ident, repl::ContainerKey(key), *_operationLogger);
+}
+
+void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
+                                       std::string_view ident,
+                                       std::span<const std::span<const char>> keys) {
+    if (batchedContainerWritesEnabled(opCtx) && keys.size() > 0) {
+        _onContainerDelete(opCtx,
+                           ident,
+                           repl::ContainerKey(std::vector(keys.begin(), keys.end())),
+                           *_operationLogger);
+    } else {
+        // TODO SERVER-130660 Remove fallback to key-by-key insert
+        for (auto key : keys) {
+            _onContainerDelete(opCtx, ident, repl::ContainerKey(key), *_operationLogger);
+        }
+    }
 }
 
 void OpObserverImpl::onInternalOpMessage(

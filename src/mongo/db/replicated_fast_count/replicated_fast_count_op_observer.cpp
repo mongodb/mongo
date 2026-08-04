@@ -56,6 +56,23 @@ public:
         recordContainerWriteForFastCountTimestamp(opCtx, ident, value);
     }
 
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           std::span<const std::span<const char>> keys,
+                           std::span<const char> value) final {
+        recordContainerWriteForFastCountTimestamp(opCtx, ident, value);
+    }
+
+    void onContainerInsert(OperationContext* opCtx,
+                           std::string_view ident,
+                           int64_t base,
+                           std::span<const std::span<const char>> values) final {
+        if (!values.empty()) {
+            // All key-value pairs should have the same timestamp, use the last one for recording
+            recordContainerWriteForFastCountTimestamp(opCtx, ident, values.back());
+        }  // Else, no-op
+    }
+
     void onContainerUpdate(OperationContext* opCtx,
                            std::string_view ident,
                            int64_t key,

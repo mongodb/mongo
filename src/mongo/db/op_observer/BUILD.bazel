@@ -280,6 +280,21 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "op_observer_noop_test",
+    srcs = [
+        "op_observer_noop_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-storage-engine-integration",
+    ],
+    deps = [
+        ":op_observer",
+        "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "should_set_is_timeseries_field_test",
     srcs = [
         "should_set_is_timeseries_field_test.cpp",
