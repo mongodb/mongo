@@ -233,7 +233,7 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
         expCtx->ignoreFeatureInParserOrRejectAndThrow(opName, *entry.featureFlag);
     }
 
-    if (expCtx->getOperationContext()) {
+    if (expCtx->getOperationContext() && !expCtx->getIsReparsingRepresentativeQueryShape()) {
         assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
                                        opName,
                                        entry.allowedWithApiStrict,

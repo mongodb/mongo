@@ -239,6 +239,7 @@ void FindCmdShape::appendCmdSpecificShapeComponents(
     }
 
     // Slow path: we need to re-parse from our representative shapes.
+    expCtx->setIsReparsingRepresentativeQueryShape(true);
     auto request = uassertStatusOKWithContext(
         parsed_find_command::parse(
             expCtx,

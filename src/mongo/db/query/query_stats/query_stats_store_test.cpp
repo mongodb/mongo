@@ -31,6 +31,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1505,6 +1506,109 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
             "collectionType": "collection"
         })",
         shapified);  // NOLINT (test auto-update)
+}
+
+TEST_F(QueryStatsStoreTest, AggKeyWithInternalOnlyExpressionIsSerializableByExternalClient) {
+    // Because we now collect query stats for internal clients, we may end up trying to re-parse a
+    // pipeline using an internal-client-only expression (i.e '$_internalIndexKey') when collecting
+    // query stats. Collecting query stats is done via an external-client context, so we must not
+    // apply the internal-client restriction to the stored shape.
+    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    auto rawPipeline = {fromjson(R"({
+            $replaceRoot: {newRoot: {
+                k: {$_internalIndexKey: {doc: '$$ROOT', spec: {key: {a: 1}, name: 'a_1'}}}
+            }}
+        })")};
+    acr.setPipeline(rawPipeline);
+    // The default test client has no transport session, so it counts as internal and this initial
+    // parse is permitted.
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+
+    auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+        acr, acr.getNamespace(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+
+    // Assert the stored form explicitly, rather than relying on the constructor happening to
+    // serialize the pipeline. This is all the shape retains: the Pipeline built above is discarded,
+    // so what gets re-parsed below is this BSON and nothing else. Requesting the representative
+    // options returns that stored copy directly, without a re-parse.
+    auto stored = aggShape->toBson(
+        expCtx->getOperationContext(),
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+        SerializationContext::stateDefault());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT (test auto-update)
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "aggregate",
+            "pipeline": [
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "k": {
+                                "$_internalIndexKey": {
+                                    "doc": "$$ROOT",
+                                    "spec": {
+                                        "key": {
+                                            "a": 1
+                                        },
+                                        "name": "a_1"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        })",
+        stored);
+
+    auto aggKey = std::make_unique<AggKey>(
+        expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
+
+    // A client with a transport session and no internal tag is an external (user) client.
+    auto readClient = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    auto readOpCtx = readClient->makeOperationContext();
+    auto shapified =
+        aggKey->toBson(readOpCtx.get(),
+                       query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                       SerializationContext::stateDefault());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT (test auto-update)
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "command": "aggregate",
+                "pipeline": [
+                    {
+                        "$replaceRoot": {
+                            "newRoot": {
+                                "HASH<k>": {
+                                    "$_internalIndexKey": {
+                                        "doc": "$$ROOT",
+                                        "spec": {
+                                            "key": {
+                                                "a": 1
+                                            },
+                                            "name": "a_1"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "collectionType": "collection"
+        })",
+        shapified);
 }
 
 TEST_F(QueryStatsStoreTest,

@@ -51,6 +51,7 @@ void DistinctCmdShape::appendCmdSpecificShapeComponents(
             bob.append(DistinctCommandRequest::kQueryFieldName, components.representativeQuery);
         } else {
             auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID);
+            expCtx->setIsReparsingRepresentativeQueryShape(true);
             auto matchExpr = uassertStatusOK(
                 MatchExpressionParser::parse(components.representativeQuery,
                                              expCtx,

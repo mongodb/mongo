@@ -36,10 +36,6 @@
  *   # the timeseries CRUD passthrough's implicit timeseries collections would change the documents
  *   # that '$$ROOT' observes.
  *   exclude_from_timeseries_crud_passthrough,
- *   # With query stats enabled for internal clients, the recorded '$_internalIndexKey' query shape
- *   # cannot be re-parsed by the $queryStats reader (an external client), since the expression is
- *   # restricted to internal clients. Skip the RunQueryStats hook for this test.
- *   known_query_shape_computation_problem
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

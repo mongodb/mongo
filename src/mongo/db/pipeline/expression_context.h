@@ -737,6 +737,14 @@ public:
         _params.isParsingCollectionValidator = isParsingCollectionValidator;
     }
 
+    bool getIsReparsingRepresentativeQueryShape() const {
+        return _params.isReparsingRepresentativeQueryShape;
+    }
+
+    void setIsReparsingRepresentativeQueryShape(bool isReparsingRepresentativeQueryShape) {
+        _params.isReparsingRepresentativeQueryShape = isReparsingRepresentativeQueryShape;
+    }
+
     bool getIsProfileFilter() const {
         return _params.isProfileFilter;
     }
@@ -1256,6 +1264,9 @@ protected:
         bool isParsingViewDefinition = false;
         // True if this ExpressionContext is used to parse a collection validator expression.
         bool isParsingCollectionValidator = false;
+        // True if this ExpressionContext is used to re-parse an already-validated, server-stored
+        // query rather than a pipeline supplied directly by a client.
+        bool isReparsingRepresentativeQueryShape = false;
         // True if this ExpressionContext belongs to a profile filter. Like a collection validator,
         // a profile filter outlives the OperationContext it was parsed under.
         bool isProfileFilter = false;

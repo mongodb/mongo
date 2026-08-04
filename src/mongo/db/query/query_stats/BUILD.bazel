@@ -131,6 +131,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",
         "//src/mongo/db/query/query_stats/plan_shape_counters",
         "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:version_impl",
     ],
 )

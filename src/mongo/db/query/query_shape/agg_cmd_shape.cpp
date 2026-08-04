@@ -58,6 +58,7 @@ void AggCmdShape::appendCmdSpecificShapeComponents(
     // re-parse the pipeline from the initial request.
     expCtx->setInRouter(_inRouter);
     expCtx->addResolvedNamespaces(_components.involvedNamespaces);
+    expCtx->setIsReparsingRepresentativeQueryShape(true);
     auto reparsed = pipeline_factory::makePipeline(
         _components.representativePipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto serializedPipeline = reparsed->serializeToBson(opts);
