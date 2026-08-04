@@ -1,10 +1,10 @@
 import {describe, it} from "jstests/libs/mochalite.js";
 import {
-    getFlatSpansList,
+    getSpansWithResource,
     showsFullFanout,
 } from "jstests/noPassthrough/observability/libs/otel_traces_file_export_helpers.js";
 
-describe("getFlatSpansList", function () {
+describe("getSpansWithResource", function () {
     it("flattens spans across all resource and scope spans", function () {
         const record = {
             resourceSpans: [
@@ -13,17 +13,37 @@ describe("getFlatSpansList", function () {
             ],
         };
         assert.eq(
-            getFlatSpansList(record).map((s) => s.name),
+            getSpansWithResource(record).map((s) => s.name),
             ["a", "b", "c", "d"],
         );
     });
 
+    it("annotates each span with its resource attributes", function () {
+        const record = {
+            resourceSpans: [
+                {
+                    resource: {
+                        attributes: [
+                            {key: "service.name", value: {stringValue: "mongos"}},
+                            {key: "service.instance.id", value: {intValue: 1234}},
+                        ],
+                    },
+                    scopeSpans: [{spans: [{name: "a"}]}],
+                },
+                {scopeSpans: [{spans: [{name: "b"}]}]},
+            ],
+        };
+        const spans = getSpansWithResource(record);
+        assert.eq(spans[0].resource, {"service.name": "mongos", "service.instance.id": 1234});
+        assert.eq(spans[1].resource, {});
+    });
+
     it("returns an empty array for missing or empty structures", function () {
-        assert.eq(getFlatSpansList(undefined), []);
-        assert.eq(getFlatSpansList({}), []);
-        assert.eq(getFlatSpansList({resourceSpans: [{scopeSpans: [{spans: []}]}]}), []);
-        assert.eq(getFlatSpansList({resourceSpans: [{}]}), []);
-        assert.eq(getFlatSpansList({resourceSpans: [{scopeSpans: [{}]}]}), []);
+        assert.eq(getSpansWithResource(undefined), []);
+        assert.eq(getSpansWithResource({}), []);
+        assert.eq(getSpansWithResource({resourceSpans: [{scopeSpans: [{spans: []}]}]}), []);
+        assert.eq(getSpansWithResource({resourceSpans: [{}]}), []);
+        assert.eq(getSpansWithResource({resourceSpans: [{scopeSpans: [{}]}]}), []);
     });
 });
 

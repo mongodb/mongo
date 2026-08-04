@@ -30,34 +30,6 @@ function findTraceFiles(directory) {
 }
 
 /**
- * Returns all spans from an OTLP trace record as a flat array.
- * @param {Object} record - A raw OTLP JSON record.
- * @returns {Array<Object>} A flat array of span objects across all resource and scope spans.
- */
-export function getFlatSpansList(record) {
-    let spans = [];
-    for (const resourceSpan of record?.resourceSpans ?? []) {
-        for (const scopeSpan of resourceSpan.scopeSpans ?? []) {
-            for (const span of scopeSpan.spans ?? []) {
-                spans.push(span);
-            }
-        }
-    }
-    return spans;
-}
-
-/**
- * Returns all spans exported to the given trace directory as a flat array.
- * @param {string} directory - The directory path to search in.
- * @returns {Array<Object>} A flat array of every span found across all trace files.
- */
-export function getAllSpans(directory) {
-    return findTraceFiles(directory).flatMap((file) =>
-        readJsonlFile(file.name).flatMap(getFlatSpansList),
-    );
-}
-
-/**
  * Flattens an OTLP attribute value ({stringValue|intValue|boolValue|doubleValue}) to a JS value.
  */
 function otelAttributeValue(value) {
@@ -81,28 +53,53 @@ function getResourceAttributes(resourceSpan) {
 }
 
 /**
- * Returns all spans exported to the given trace directory, each annotated with a `resource` field
- * holding the resource attributes (e.g. `service.name`, `service.instance.id`) of the node that
- * emitted it. This lets callers attribute spans to a specific process even when multiple nodes
- * export into the same directory.
- * @param {string} directory - The directory path to search in.
+ * Returns the spans of one OTLP record (as written by either the file or the HTTP exporter), each
+ * annotated with a `resource` field holding the resource attributes (e.g. `service.name`,
+ * `service.instance.id`) of the node that emitted it. This lets callers attribute spans to a
+ * specific process even when multiple nodes export to the same destination.
+ * @param {Object} record - A raw OTLP JSON record.
  * @returns {Array<Object>} A flat array of spans, each with an added `resource` object.
  */
-function getAllSpansWithResource(directory) {
+export function getSpansWithResource(record) {
     const spans = [];
-    for (const file of findTraceFiles(directory)) {
-        for (const record of readJsonlFile(file.name)) {
-            for (const resourceSpan of record?.resourceSpans ?? []) {
-                const resource = getResourceAttributes(resourceSpan);
-                for (const scopeSpan of resourceSpan.scopeSpans ?? []) {
-                    for (const span of scopeSpan.spans ?? []) {
-                        spans.push(Object.assign({resource}, span));
-                    }
-                }
+    for (const resourceSpan of record?.resourceSpans ?? []) {
+        const resource = getResourceAttributes(resourceSpan);
+        for (const scopeSpan of resourceSpan.scopeSpans ?? []) {
+            for (const span of scopeSpan.spans ?? []) {
+                spans.push(Object.assign({}, span, {resource}));
             }
         }
     }
     return spans;
+}
+
+/**
+ * Removes spans that were seen more than once, e.g. because several nodes exported to the same
+ * destination and it was read once per node.
+ * @param {Array<Object>} spans
+ * @returns {Array<Object>}
+ */
+export function dedupeSpans(spans) {
+    const seen = new Set();
+    return spans.filter((span) => {
+        const key = span.traceId + "/" + span.spanId;
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
+/**
+ * Returns all spans exported to the given trace directory, each annotated with resource attributes.
+ * @param {string} directory - The directory path to search in.
+ * @returns {Array<Object>} A flat array of spans, each with an added `resource` object.
+ */
+function getAllSpansWithResource(directory) {
+    return findTraceFiles(directory).flatMap((file) =>
+        readJsonlFile(file.name).flatMap(getSpansWithResource),
+    );
 }
 
 /**
@@ -114,18 +111,7 @@ function getAllSpansWithResource(directory) {
  */
 export function readClusterSpans(conns) {
     const dirs = new Set(conns.map((conn) => getEffectiveTraceDir(conn)));
-    const seen = new Set();
-    const spans = [];
-    for (const dir of dirs) {
-        for (const span of getAllSpansWithResource(dir)) {
-            const key = span.traceId + "/" + span.spanId;
-            if (!seen.has(key)) {
-                seen.add(key);
-                spans.push(span);
-            }
-        }
-    }
-    return spans;
+    return dedupeSpans([...dirs].flatMap(getAllSpansWithResource));
 }
 
 /**
