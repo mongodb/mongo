@@ -64,6 +64,10 @@ SamplingEstimatorMap makeSamplingEstimators(
             // Generate a sample for the fields relevant to this join.
             // TODO SERVER-112233: figure out based on join predicates which fields exactly we need.
             estimator->generateSample(ce::ProjectionParams{ce::NoProjection{}});
+            ++metrics.numSamplingCalls;
+            if (estimator->getSamplingMetadata().isPersisted) {
+                ++metrics.numPersistentSamplesUsed;
+            }
             samplingEstimators.emplace(nss, std::move(estimator));
 
         } else {

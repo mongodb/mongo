@@ -9,12 +9,20 @@
 import {
     getQueryStats,
     getQueryStatsServerParameters,
+    resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 
 const params = getQueryStatsServerParameters();
 // Disable both join opt & join plan cache.
 params.setParameter.internalEnableJoinPlanCache = false;
 params.setParameter.internalEnableJoinOptimization = false;
+// Needed to materialize and consume a persistent sample below.
+// TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+params.setParameter.featureFlagPersistentStats = true;
+// A persisted sample is keyed by the requested sample size, so join optimization only reuses one if
+// it asks for exactly the size that was persisted.
+const kJoinSampleSize = 50;
+params.setParameter.internalJoinPlanSamplingSize = kJoinSampleSize;
 const conn = MongoRunner.runMongod(params);
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -37,6 +45,16 @@ function seed(coll, numDocs) {
 seed(orders, 100);
 seed(customers, 100);
 seed(items, 100);
+
+// Materialize a persistent sample for exactly one of the three collections.
+assert.commandWorked(
+    db.runCommand({
+        analyze: customers.getName(),
+        mode: "sample",
+        samplingMethod: "random",
+        sampleSize: kJoinSampleSize,
+    }),
+);
 
 // The per-query expected value of each join optimization counter for the pipeline below. The
 // pipeline yields a three-node join graph (orders, customers, items) with two syntactic equality
@@ -76,6 +94,15 @@ const kPerEnumerationMetrics = [
     "numJoinNodesRejectedByCost",
     "winningPlanCost",
 ];
+
+// Plan enumeration counters whose per-enumeration value is deterministic for a given pipeline.
+const kPerEnumerationExpectedMetrics = {
+    // One sample is generated per distinct namespace in the join graph.
+    numSamplingCalls: 3,
+    // Only 'customers' has a persisted sample to reuse.
+    numPersistentSamplesUsed: 1,
+    numUniqueIndexesUsedForNDV: 0,
+};
 
 // Timers recorded only on the enumeration path, i.e. only on a join plan cache miss. Like the
 // per-query timers, each covers enough work (sampling the collections, running CBR, walking the
@@ -133,6 +160,17 @@ function assertJoinMetrics(joinMetrics, updateCount, enumerationCount) {
         assert.gte(counter.max, 0, `counter '${name}' max`, {joinMetrics});
         assert.gte(counter.min, 0, `counter '${name}' min`, {joinMetrics});
         assert.lte(counter.min, counter.max, `counter '${name}' min vs max `, {joinMetrics});
+    }
+    for (const [name, perEnumeration] of Object.entries(kPerEnumerationExpectedMetrics)) {
+        const counter = joinMetrics[name];
+        assert(counter, `missing counter '${name}'`, {joinMetrics});
+        assert.eq(counter.sum, perEnumeration * enumerationCount, `counter '${name}' sum`, {
+            joinMetrics,
+        });
+        if (enumerationCount > 0) {
+            assert.eq(counter.max, perEnumeration, `counter '${name}' max`, {joinMetrics});
+            assert.eq(counter.min, perEnumeration, `counter '${name}' min`, {joinMetrics});
+        }
     }
 }
 
@@ -233,6 +271,40 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 
     const joinMetrics = matching[0].metrics.supplementalMetrics.JoinOptimization;
     assert(joinMetrics);
+    assertJoinMetrics(joinMetrics, 1, 1);
+}
+
+{
+    // Validate that we count the join edges whose NDV came from index uniqueness metadata. Run the
+    // same pipeline as above, but recreate one of the join key indexes as unique so that the optimizer can
+    // derive NDV from that metadata.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalEnableJoinOptimizationUseIndexUniqueness: true}),
+    );
+    for (const coll of [orders, customers, items]) {
+        assert.commandWorked(coll.dropIndex({a: 1, b: 1}));
+        assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
+        assert.commandWorked(coll.createIndex({b: 1}));
+    }
+
+    // This is the same query shape as the runs above, so clear the query stats store to get
+    // histograms that cover only the run below.
+    resetQueryStatsStore(conn, "10MB");
+
+    // Update expected metrics to reflect this: only the 'orders.a = customers.a' edge has a unique
+    // index covering its join key.
+    kPerQueryMetrics.numSuffixSourcesPushedToSbe = 0;
+    kPerQueryMetrics.numResidualClassicSources = 0;
+    kPerEnumerationExpectedMetrics.numUniqueIndexesUsedForNDV = 1;
+
+    assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+
+    const stats = getQueryStats(conn, {collName: orders.getName()});
+    assert.eq(1, stats.length, tojson(stats));
+
+    const joinMetrics = stats[0].metrics.supplementalMetrics.JoinOptimization;
+    assert(joinMetrics);
+    // Recreating the indexes invalidated the join plan cache, so this run enumerates again.
     assertJoinMetrics(joinMetrics, 1, 1);
 }
 

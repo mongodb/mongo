@@ -48,6 +48,9 @@ public:
                 AggregatedMetric<int64_t>(pe->numJoinNodesRejectedByCost),
                 AggregatedMetric<int64_t>(pe->numMemoizedNodes),
                 AggregatedMetric<double>(pe->winningPlanCost),
+                AggregatedMetric<int64_t>(pe->numSamplingCalls),
+                AggregatedMetric<int64_t>(pe->numPersistentSamplesUsed),
+                AggregatedMetric<int64_t>(pe->numUniqueIndexesUsedForNDV),
                 AggregatedMetric<int64_t>(pe->samplingTimeMicros),
                 AggregatedMetric<int64_t>(pe->cbrPlanningTimeMicros),
                 AggregatedMetric<int64_t>(pe->planEnumerationTimeMicros),
@@ -99,6 +102,9 @@ public:
         AggregatedMetric<int64_t> numJoinNodesRejectedByCost;
         AggregatedMetric<int64_t> numMemoizedNodes;
         AggregatedMetric<double> winningPlanCost;
+        AggregatedMetric<int64_t> numSamplingCalls;
+        AggregatedMetric<int64_t> numPersistentSamplesUsed;
+        AggregatedMetric<int64_t> numUniqueIndexesUsedForNDV;
         AggregatedMetric<int64_t> samplingTimeMicros;
         AggregatedMetric<int64_t> cbrPlanningTimeMicros;
         AggregatedMetric<int64_t> planEnumerationTimeMicros;

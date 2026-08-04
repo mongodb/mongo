@@ -52,6 +52,11 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
                                                                     "numJoinNodesRejectedByCost");
         planEnumerationMetrics->numMemoizedNodes.appendTo(metricsEntryBuilder, "numMemoizedNodes");
         planEnumerationMetrics->winningPlanCost.appendTo(metricsEntryBuilder, "winningPlanCost");
+        planEnumerationMetrics->numSamplingCalls.appendTo(metricsEntryBuilder, "numSamplingCalls");
+        planEnumerationMetrics->numPersistentSamplesUsed.appendTo(metricsEntryBuilder,
+                                                                  "numPersistentSamplesUsed");
+        planEnumerationMetrics->numUniqueIndexesUsedForNDV.appendTo(metricsEntryBuilder,
+                                                                    "numUniqueIndexesUsedForNDV");
         planEnumerationMetrics->samplingTimeMicros.appendTo(metricsEntryBuilder,
                                                             "samplingTimeMicros");
         planEnumerationMetrics->cbrPlanningTimeMicros.appendTo(metricsEntryBuilder,
@@ -101,6 +106,11 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
                 other.numJoinNodesRejectedByCost);
             planEnumerationMetrics->numMemoizedNodes.combine(other.numMemoizedNodes);
             planEnumerationMetrics->winningPlanCost.combine(other.winningPlanCost);
+            planEnumerationMetrics->numSamplingCalls.combine(other.numSamplingCalls);
+            planEnumerationMetrics->numPersistentSamplesUsed.combine(
+                other.numPersistentSamplesUsed);
+            planEnumerationMetrics->numUniqueIndexesUsedForNDV.combine(
+                other.numUniqueIndexesUsedForNDV);
             planEnumerationMetrics->samplingTimeMicros.combine(other.samplingTimeMicros);
             planEnumerationMetrics->cbrPlanningTimeMicros.combine(other.cbrPlanningTimeMicros);
             planEnumerationMetrics->planEnumerationTimeMicros.combine(

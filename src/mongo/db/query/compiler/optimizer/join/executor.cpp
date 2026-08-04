@@ -525,7 +525,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .samplingEstimators = &samplingEstimators,
                               .explain = expCtx->getExplain().has_value()};
 
-    JoinCardinalityEstimator cardEstimator(JoinCardinalityEstimator::make(ctx, samplingEstimators));
+    JoinCardinalityEstimator cardEstimator(
+        JoinCardinalityEstimator::make(ctx, samplingEstimators, peMetrics));
     JoinCostEstimatorImpl costEstimator(ctx, cardEstimator);
 
     // Inject delay for testing purposes (allows tests to verify optimizationTimeMillis is

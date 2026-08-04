@@ -462,6 +462,15 @@ public:
             int numMemoizedNodes = 0;
             // Cost of the best (winning) plan.
             double winningPlanCost = 0.0;
+            // Number of times we generated a sample during join optimization (one per distinct
+            // namespace in the join graph).
+            int numSamplingCalls = 0;
+            // Number of those samples that were served from a persistent sample rather than freshly
+            // scanned.
+            int numPersistentSamplesUsed = 0;
+            // Number of join edges whose NDV came from index uniqueness metadata instead of
+            // sampling.
+            int numUniqueIndexesUsedForNDV = 0;
 
             // Time spent acquiring samples for CE.
             int64_t samplingTimeMicros = 0;

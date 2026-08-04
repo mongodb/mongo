@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/op_debug.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
@@ -23,8 +24,10 @@ public:
     JoinCardinalityEstimator(const JoinReorderingContext& ctx, EdgeSelectivities edgeSelectivities);
     virtual ~JoinCardinalityEstimator() {};
 
-    static JoinCardinalityEstimator make(const JoinReorderingContext& ctx,
-                                         const SamplingEstimatorMap& samplingEstimators);
+    static JoinCardinalityEstimator make(
+        const JoinReorderingContext& ctx,
+        const SamplingEstimatorMap& samplingEstimators,
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
     /**
      * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling.
@@ -32,10 +35,13 @@ public:
     static cost_based_ranker::SelectivityEstimate joinPredicateSel(
         const JoinReorderingContext& ctx,
         const SamplingEstimatorMap& samplingEstimators,
-        const JoinEdge& edge);
+        const JoinEdge& edge,
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
     static EdgeSelectivities estimateEdgeSelectivities(
-        const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators);
+        const JoinReorderingContext& ctx,
+        const SamplingEstimatorMap& samplingEstimators,
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
     /**
      * Estimates the cardinality of a join plan over the given subset of nodes. This method

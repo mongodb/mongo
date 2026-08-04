@@ -40,10 +40,12 @@ JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& 
 }
 
 JoinCardinalityEstimator JoinCardinalityEstimator::make(
-    const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators) {
+    const JoinReorderingContext& ctx,
+    const SamplingEstimatorMap& samplingEstimators,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     Timer timer;
     auto edgeSelectivities =
-        JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators);
+        JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators, metrics);
     auto estimator = JoinCardinalityEstimator(ctx, std::move(edgeSelectivities));
     // Time the up-front edge selectivity estimation.
     estimator._estimationTimeMicros = timer.micros();
@@ -51,13 +53,15 @@ JoinCardinalityEstimator JoinCardinalityEstimator::make(
 }
 
 EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
-    const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators) {
+    const JoinReorderingContext& ctx,
+    const SamplingEstimatorMap& samplingEstimators,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     EdgeSelectivities edgeSelectivities;
     edgeSelectivities.reserve(ctx.joinGraph.numEdges());
     for (size_t edgeId = 0; edgeId < ctx.joinGraph.numEdges(); edgeId++) {
         const auto& edge = ctx.joinGraph.getEdge(edgeId);
         edgeSelectivities.push_back(
-            JoinCardinalityEstimator::joinPredicateSel(ctx, samplingEstimators, edge));
+            JoinCardinalityEstimator::joinPredicateSel(ctx, samplingEstimators, edge, metrics));
     }
     return edgeSelectivities;
 }
@@ -106,7 +110,8 @@ EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
 cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
     const JoinReorderingContext& ctx,
     const SamplingEstimatorMap& samplingEstimators,
-    const JoinEdge& edge) {
+    const JoinEdge& edge,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
 
     auto& leftNode = ctx.joinGraph.getNode(edge.left);
     auto& rightNode = ctx.joinGraph.getNode(edge.right);
@@ -144,8 +149,9 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
     // estimation for the "primary key".
     bool ndvFieldsAreUnique = ctx.uniqueFieldInfo.contains(primaryKeyNode.collectionName) &&
         fieldsAreUnique(fieldNames, ctx.uniqueFieldInfo.at(primaryKeyNode.collectionName));
-    CardinalityEstimate ndv = [&samplingEstimator, &fields, &ndvFieldsAreUnique]() {
+    CardinalityEstimate ndv = [&samplingEstimator, &fields, &ndvFieldsAreUnique, &metrics]() {
         if (ndvFieldsAreUnique) {
+            ++metrics.numUniqueIndexesUsedForNDV;
             return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
                                        EstimationSource::Metadata);
         }
