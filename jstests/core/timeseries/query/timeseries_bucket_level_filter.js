@@ -10,8 +10,8 @@
  *   cannot_run_during_upgrade_downgrade,
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
- *   # SBE "fetch" stage only available >= 8.3
- *   requires_fcv_83
+ *   # SBE previously returned incorrect results for $gt(e): MinKey queries
+ *   requires_fcv_90
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -173,6 +173,53 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
             expected: test.expectedResult,
             actual: coll.aggregate(test.pipeline).toArray(),
             extraErrorMsg: ` result of $match over data with missing field. Explain: ${tojson(
+                coll.explain().aggregate(test.pipeline),
+            )}`,
+        });
+    }
+})();
+
+// Test that a {$gte: MinKey} predicate (and its $expr comparison variants) over a field that is
+// entirely absent from a bucket does not incorrectly drop that bucket. MinKey is the only value
+// smaller than a missing field, so every document matches {$gte: MinKey}. When the field is missing
+// from all measurements, the bucket's 'control.max.<field>' is also missing.
+(function testMinKeyComparisonWithMissingField() {
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
+
+    // Neither measurement has the queried field 'x', so 'control.min.x'/'control.max.x' are absent.
+    const docs = [
+        {_id: 0, t: ISODate("2024-01-01T00:00:00Z"), m: 0},
+        {_id: 1, t: ISODate("2024-01-01T00:01:00Z"), m: 0},
+    ];
+    assert.commandWorked(coll.insertMany(docs));
+
+    // A trailing inclusion $project exercises the block-processing path in SBE.
+    const proj = {$project: {_id: 1}};
+    const all = [{_id: 0}, {_id: 1}];
+    const testCases = [
+        // Missing field is greater than MinKey, so these match every document.
+        {pipeline: [{$match: {x: {$gte: MinKey}}}, proj], expectedResult: all},
+        {pipeline: [{$match: {$expr: {$gte: ["$x", MinKey]}}}, proj], expectedResult: all},
+        {pipeline: [{$match: {$expr: {$gt: ["$x", MinKey]}}}, proj], expectedResult: all},
+        // Missing field is greater than MinKey, so these match nothing.
+        {pipeline: [{$match: {$expr: {$lt: ["$x", MinKey]}}}, proj], expectedResult: []},
+        {pipeline: [{$match: {$expr: {$lte: ["$x", MinKey]}}}, proj], expectedResult: []},
+        {pipeline: [{$match: {$expr: {$eq: ["$x", MinKey]}}}, proj], expectedResult: []},
+        // Missing field is less than MaxKey, so {$lt[e]: MaxKey} matches every document.
+        {pipeline: [{$match: {x: {$lt: MaxKey}}}, proj], expectedResult: all},
+        {pipeline: [{$match: {x: {$lte: MaxKey}}}, proj], expectedResult: all},
+        {pipeline: [{$match: {$expr: {$lt: ["$x", MaxKey]}}}, proj], expectedResult: all},
+        {pipeline: [{$match: {$expr: {$lte: ["$x", MaxKey]}}}, proj], expectedResult: all},
+    ];
+
+    for (const test of testCases) {
+        assertArrayEq({
+            expected: test.expectedResult,
+            actual: coll.aggregate(test.pipeline).toArray(),
+            extraErrorMsg: ` result of MinKey/MaxKey comparison over a missing field. Explain: ${tojson(
                 coll.explain().aggregate(test.pipeline),
             )}`,
         });

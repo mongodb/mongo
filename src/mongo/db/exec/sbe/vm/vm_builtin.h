@@ -311,6 +311,7 @@ enum class Builtin : uint16_t {
     // Start of 2 byte builtins.
     valueBlockExists = 256,
     valueBlockIsNullish,
+    valueBlockMqlComparisonRank,
     valueBlockTypeMatch,
     valueBlockIsTimezone,
     valueBlockFillEmpty,

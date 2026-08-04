@@ -110,6 +110,7 @@ struct Instruction {
         isMaxKey,
         isTimestamp,
         isKeyString,
+        mqlComparisonRank,
         typeMatchImm,
 
         function,

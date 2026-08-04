@@ -4514,19 +4514,17 @@ SbExpr generateExpressionCompare(StageBuilderState& state,
     // If either operand evaluates to "Nothing", then the entire operation expressed by
     // 'cmp' will also evaluate to "Nothing". MQL comparisons, however, treat "Nothing" as
     // if it is a value that is less than everything other than MinKey. (Notably, two
-    // expressions that evaluate to "Nothing" are considered equal to each other.) We also
-    // need to explicitly check for 'bsonUndefined' type because it is considered equal to
-    // "Nothing" according to MQL semantics.
-    auto generateExists = [&](SbLocalVar var) {
-        auto undefinedTypeMask = static_cast<int32_t>(getBSONTypeMask(BSONType::undefined));
-        return b.makeBinaryOp(
-            abt::Operations::And,
-            b.makeFunction(sbe::EFn::kExists, var),
-            b.makeFunction(sbe::EFn::kTypeMatch, var, b.makeInt32Constant(~undefinedTypeMask)));
-    };
-
-    auto nothingFallbackCmp =
-        b.makeBinaryOp(comparisonOperator, generateExists(lhsVar), generateExists(rhsVar));
+    // expressions that evaluate to "Nothing" are considered equal to each other, and
+    // 'bsonUndefined' is considered equal to "Nothing".)
+    //
+    // To reproduce that ordering when at least one operand is "Nothing", we compare each operand's
+    // "mqlComparisonRank": MinKey (0) < Nothing/missing/undefined (1) < any other value (2), and
+    // then apply the original comparison operator to those ranks. A plain existence check would be
+    // insufficient here: it maps MinKey to the same "exists" bucket as ordinary values, which would
+    // incorrectly report that "Nothing" is less than MinKey.
+    auto nothingFallbackCmp = b.makeBinaryOp(comparisonOperator,
+                                             b.makeFunction(sbe::EFn::kMqlComparisonRank, lhsVar),
+                                             b.makeFunction(sbe::EFn::kMqlComparisonRank, rhsVar));
 
     auto cmpWithFallback = b.makeFillEmpty(std::move(cmp), std::move(nothingFallbackCmp));
 

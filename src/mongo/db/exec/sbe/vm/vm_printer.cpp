@@ -216,6 +216,7 @@ public:
                 case Instruction::isRecordId:
                 case Instruction::isMinKey:
                 case Instruction::isMaxKey:
+                case Instruction::mqlComparisonRank:
                 case Instruction::isTimestamp: {
                     auto [popParam, moveFromParam, offsetParam] =
                         Instruction::Parameter::decodeParam(pcPointer);

@@ -1451,6 +1451,37 @@ TEST(VectorizerTest, ConvertIsTimezone) {
         *processed.expr);
 }
 
+TEST(VectorizerTest, ConvertMqlComparisonRank) {
+    auto tree1 = make<FunctionCall>("mqlComparisonRank", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "inputVar"sv,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+        tree1, bindings, boost::none);
+
+    // Without a block version of 'mqlComparisonRank', the "Nothing" fallback that
+    // generateExpressionCompare emits for comparison expressions would make the whole expression
+    // unvectorizable, silently disabling block processing for it (SERVER-131544).
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"valueBlockMqlComparisonRank\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
 TEST(VectorizerTest, ConvertBlockIf) {
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;

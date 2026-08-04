@@ -108,6 +108,45 @@ value::TagValueOwned ByteCode::builtinValueBlockIsNullish(ArityType arity) {
                                 value::bitcastFrom<value::ValueBlock*>(valueBlockOut.release()));
 }
 
+/*
+ * Given a ValueBlock as input, returns a ValueBlock of Int32 ranks describing each value's position
+ * relative to a missing value in the MQL comparison order: MinKey (0) < Nothing/missing/undefined
+ * (1) < any other value (2). This never produces Nothing, even for a Nothing input.
+ */
+value::TagValueOwned ByteCode::builtinValueBlockMqlComparisonRank(ArityType arity) {
+    tassert(13154401, "Unexpected arity value", arity == 1);
+    auto input = viewFromStack(0);
+
+    tassert(13154400,
+            "Expected argument to be of valueBlock type",
+            input.tag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(input.value);
+
+    auto rankOf = [](value::TypeTags tag) -> value::TagValueView {
+        return {value::TypeTags::NumberInt32,
+                value::bitcastFrom<int32_t>(ByteCode::mqlComparisonRank(tag))};
+    };
+
+    const auto rankOp = value::makeColumnOp<ColumnOpType::kMonotonic>(
+        [&](value::TypeTags tag, value::Value val) -> value::TagValueView { return rankOf(tag); },
+        [&](value::TypeTags inTag,
+            const value::Value* inVals,
+            value::TypeTags* outTags,
+            value::Value* outVals,
+            size_t count) {
+            // The rank depends only on the type tag, so a homogeneous input has a uniform rank.
+            auto [outTag, outVal] = rankOf(inTag);
+
+            std::fill(outTags, outTags + count, outTag);
+            std::fill(outVals, outVals + count, outVal);
+        });
+
+    auto valueBlockOut = valueBlockIn->map(rankOp);
+
+    return value::TagValueOwned(value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(valueBlockOut.release()));
+}
+
 /* This instruction takes as input a ValueBlock and a type mask and returns a ValueBlock indicating
  * whether each value in the ValueBlock is of the type defined by the type mask. If the value is
  * Nothing then Nothing is returned. If no type mask is provided, it returns a MonoBlock with

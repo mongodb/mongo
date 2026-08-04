@@ -328,6 +328,16 @@ public:
     class TopBottomArgsFromStack;
     class TopBottomArgsFromBlocks;
 
+    /**
+     * Ranks a value's position relative to a missing value in the MQL comparison order:
+     *
+     *   MinKey (0) < Nothing/missing/bsonUndefined (1) < any other value (2)
+     *
+     * 'bsonUndefined' shares its rank with Nothing because canonicalizeBSONType() maps both
+     * 'undefined' and 'eoo' to the same canonical type.
+     */
+    static int32_t mqlComparisonRank(value::TypeTags tag);
+
     static void aggDoubleDoubleSumImpl(value::Array* accumulator,
                                        value::TypeTags rhsTag,
                                        value::Value rhsValue);
@@ -978,6 +988,7 @@ private:
 
     value::TagValueOwned builtinValueBlockExists(ArityType arity);
     value::TagValueOwned builtinValueBlockIsNullish(ArityType arity);
+    value::TagValueOwned builtinValueBlockMqlComparisonRank(ArityType arity);
     value::TagValueOwned builtinValueBlockTypeMatch(ArityType arity);
     value::TagValueOwned builtinValueBlockIsTimezone(ArityType arity);
     value::TagValueMaybeOwned builtinValueBlockFillEmpty(ArityType arity);

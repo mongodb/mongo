@@ -245,6 +245,34 @@ TEST(ConstEvalTest, FoldRedundantExists) {
     ASSERT_EQ(constEval(exists)->getValueBool(), true);
 }
 
+TEST(ConstEvalTest, FoldMqlComparisonRank) {
+    // MinKey ranks below a missing value, which ranks below every other value. Note that a Nothing
+    // argument folds to a rank of 1 rather than to Nothing.
+    ABT minKey = make<FunctionCall>(
+        "mqlComparisonRank",
+        makeSeq(make<Constant>(sbe::value::TypeTags::MinKey, sbe::value::Value{0u})));
+    ASSERT_EQ(constEval(minKey)->getValueInt32(), 0);
+
+    ABT nothing = make<FunctionCall>("mqlComparisonRank", makeSeq(Constant::nothing()));
+    ASSERT_EQ(constEval(nothing)->getValueInt32(), 1);
+
+    ABT undefined = make<FunctionCall>(
+        "mqlComparisonRank",
+        makeSeq(make<Constant>(sbe::value::TypeTags::bsonUndefined, sbe::value::Value{0u})));
+    ASSERT_EQ(constEval(undefined)->getValueInt32(), 1);
+
+    ABT null = make<FunctionCall>("mqlComparisonRank", makeSeq(Constant::null()));
+    ASSERT_EQ(constEval(null)->getValueInt32(), 2);
+
+    ABT number = make<FunctionCall>("mqlComparisonRank", makeSeq(Constant::int32(29336)));
+    ASSERT_EQ(constEval(number)->getValueInt32(), 2);
+
+    ABT maxKey = make<FunctionCall>(
+        "mqlComparisonRank",
+        makeSeq(make<Constant>(sbe::value::TypeTags::MaxKey, sbe::value::Value{0u})));
+    ASSERT_EQ(constEval(maxKey)->getValueInt32(), 2);
+}
+
 TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
     ExpressionConstEval evaluator{nullptr};
 

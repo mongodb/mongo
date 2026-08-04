@@ -641,6 +641,17 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::FunctionCa
                         args[0].sourceCell};
                 }
                 break;
+            case sbe::EFn::kMqlComparisonRank:
+                if (arity == 1) {
+                    // Always returns an integer rank (0, 1 or 2), never Nothing, even where the
+                    // input block holds Nothing.
+                    return {makeABTFunction(sbe::EFn::kValueBlockMqlComparisonRank,
+                                            std::move(*args[0].expr)),
+                            TypeSignature::kBlockType.include(
+                                getTypeSignature(sbe::value::TypeTags::NumberInt32)),
+                            args[0].sourceCell};
+                }
+                break;
             case sbe::EFn::kMakeOwn:
                 // In block mode, ownership of values is not needed.
                 if (arity == 1) {

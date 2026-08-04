@@ -141,6 +141,7 @@ public:
     void appendIsMaxKey(Instruction::Parameter input);
     void appendIsTimestamp(Instruction::Parameter input);
     void appendIsKeyString(Instruction::Parameter input);
+    void appendMqlComparisonRank(Instruction::Parameter input);
     void appendTypeMatch(Instruction::Parameter input, uint32_t mask);
     void appendFunction(Builtin f, ArityType arity);
     void appendLabelJump(LabelId labelId);

@@ -303,7 +303,22 @@ TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithScalarParamet
 
 TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithUndefinedThrows) {
     BSONObj query = BSON("a" << BSONUndefined);
-    ASSERT_THROWS((EqualityMatchExpression{"a"sv, query["a"]}), DBException);
+    ASSERT_THROWS((GTEMatchExpression{"a"sv, query["a"]}), DBException);
+}
+
+TEST(MatchExpressionParameterizationVisitor, GTMatchExpressionWithUndefinedThrows) {
+    BSONObj query = BSON("a" << BSONUndefined);
+    ASSERT_THROWS((GTMatchExpression{"a"sv, query["a"]}), DBException);
+}
+
+TEST(MatchExpressionParameterizationVisitor, LTMatchExpressionWithUndefinedThrows) {
+    BSONObj query = BSON("a" << BSONUndefined);
+    ASSERT_THROWS((LTMatchExpression{"a"sv, query["a"]}), DBException);
+}
+
+TEST(MatchExpressionParameterizationVisitor, LTEMatchExpressionWithUndefinedThrows) {
+    BSONObj query = BSON("a" << BSONUndefined);
+    ASSERT_THROWS((LTEMatchExpression{"a"sv, query["a"]}), DBException);
 }
 
 TEST(MatchExpressionParameterizationVisitor, GTMatchExpressionWithScalarParameterSetsOneParamId) {
@@ -378,6 +393,50 @@ TEST(MatchExpressionParameterizationVisitor,
     expressions.emplace_back(std::make_unique<EqualityMatchExpression>("c"sv, Value(""sv)));
     expressions.emplace_back(std::make_unique<LTEMatchExpression>("d"sv, Value(""sv)));
     expressions.emplace_back(std::make_unique<GTEMatchExpression>("e"sv, Value(""sv)));
+
+    OrMatchExpression expr{std::move(expressions)};
+
+    MatchExpressionParameterizationVisitorContext context{};
+    walkExpression(&context, &expr);
+
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
+}
+
+/**
+ * MinKey and MaxKey must never be parameterized, for any comparison operator. The SBE stage builder
+ * folds a MinKey/MaxKey right-hand side into a different expression at build time (see
+ * generateComparisonExpr() in gen_filter.cpp: {$gte: MinKey} becomes the constant 'true', {$lt:
+ * MinKey} becomes 'false', and $gt/$lte become isMinKey() checks), so the value must be known when
+ * the plan is built. Parameterizing it would let such a plan be cached and then reused with an
+ * unrelated right-hand side bound to the parameter slot.
+ */
+TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithMinKeySetsNoParamIds) {
+    BSONObj query = BSON("a" << MINKEY);
+
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<LTEMatchExpression>("b"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<GTMatchExpression>("c"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<GTEMatchExpression>("d"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<EqualityMatchExpression>("e"sv, query["a"]));
+
+    OrMatchExpression expr{std::move(expressions)};
+
+    MatchExpressionParameterizationVisitorContext context{};
+    walkExpression(&context, &expr);
+
+    ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
+}
+
+TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithMaxKeySetsNoParamIds) {
+    BSONObj query = BSON("a" << MAXKEY);
+
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<LTEMatchExpression>("b"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<GTMatchExpression>("c"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<GTEMatchExpression>("d"sv, query["a"]));
+    expressions.emplace_back(std::make_unique<EqualityMatchExpression>("e"sv, query["a"]));
 
     OrMatchExpression expr{std::move(expressions)};
 

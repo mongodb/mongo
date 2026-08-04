@@ -5,6 +5,7 @@
 
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/util/assert_util.h"
@@ -488,6 +489,13 @@ void ExpressionConstEval::transport(abt::ABT& n,
                 } else {
                     swapAndUpdate(n, abt::Constant::nothing());
                 }
+            }
+            break;
+        case sbe::EFn::kMqlComparisonRank:
+            // We can simplify mqlComparisonRank(constant).
+            if (args.size() == 1 && args[0].is<abt::Constant>()) {
+                auto [tag, val] = args[0].cast<abt::Constant>()->get();
+                swapAndUpdate(n, abt::Constant::int32(sbe::vm::ByteCode::mqlComparisonRank(tag)));
             }
             break;
         case sbe::EFn::kTypeMatch:

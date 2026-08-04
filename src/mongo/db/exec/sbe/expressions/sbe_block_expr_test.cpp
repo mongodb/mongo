@@ -248,6 +248,154 @@ TEST_F(SBEBlockExpressionTest, BlockIsNullishTest) {
     assertBlockOfBool(result.tag(), result.value(), {true, false, false, true, true});
 }
 
+static std::pair<value::TypeTags, value::Value> makeMinKey() {
+    return {value::TypeTags::MinKey, value::Value{0u}};
+}
+
+static std::pair<value::TypeTags, value::Value> makeMaxKey() {
+    return {value::TypeTags::MaxKey, value::Value{0u}};
+}
+
+TEST_F(SBEBlockExpressionTest, BlockMqlComparisonRankTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto rankExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockMqlComparisonRank,
+                                               sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto compiledExpr = compileExpression(*rankExpr);
+
+    // MinKey ranks below Nothing/undefined, which in turn rank below every other value.
+    {
+        value::HeterogeneousBlock block;
+        block.push_back(makeMinKey());
+        block.push_back(makeNothing());
+        block.push_back(makeUndefined());
+        block.push_back(makeNull());
+        block.push_back(makeInt32(42));
+        block.push_back(makeMaxKey());
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+
+        assertBlockEq(result.tag(),
+                      result.value(),
+                      std::vector<std::pair<value::TypeTags, value::Value>>{makeInt32(0),
+                                                                            makeInt32(1),
+                                                                            makeInt32(1),
+                                                                            makeInt32(2),
+                                                                            makeInt32(2),
+                                                                            makeInt32(2)});
+    }
+
+    // MonoBlocks take the homogeneous fast path, which computes the rank once for the whole block.
+    for (auto&& [input, expectedRank] : std::vector<std::pair<TypedValue, int32_t>>{
+             {makeMinKey(), 0},
+             {makeNothing(), 1},
+             {makeUndefined(), 1},
+             {makeInt32(42), 2},
+         }) {
+        value::MonoBlock monoBlock(2, input.first, input.second);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+
+        assertBlockEq(result.tag(),
+                      result.value(),
+                      std::vector<std::pair<value::TypeTags, value::Value>>{
+                          makeInt32(expectedRank), makeInt32(expectedRank)});
+    }
+}
+
+// The rank operation is declared 'kMonotonic': rank never decreases as a value moves up the MQL
+// sort order (MinKey 0 < missing/undefined 1 < everything else 2). That lets
+// ValueBlock::mapMonotonicFastPath() derive the whole result from the block's bounds, without ever
+// materializing the values. An UnextractableTestBlock proves the fast path was taken rather than
+// merely producing the right answer: any call to extract() on it uasserts.
+TEST_F(SBEBlockExpressionTest, BlockMqlComparisonRankMonotonicFastPathTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto rankExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockMqlComparisonRank,
+                                               sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto compiledExpr = compileExpression(*rankExpr);
+
+    UnextractableTestBlock block;
+    block.push_back(makeInt32(1));
+    block.push_back(makeInt32(5));
+    block.push_back(makeInt32(9));
+    // Bounds sharing a type tag always share a rank, so the result is uniform. Note that the bounds
+    // may be loose (they need not appear in the block); any value between them has the same
+    // canonical type, and therefore the same rank.
+    block.setMin(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    block.setMax(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(9));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+
+    ASSERT_EQ(result.tag(), value::TypeTags::valueBlock);
+    ASSERT_TRUE(value::getValueBlock(result.value())->as<value::MonoBlock>())
+        << "the monotonic fast path must collapse the result to a MonoBlock";
+    assertBlockEq(result.tag(),
+                  result.value(),
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      makeInt32(2), makeInt32(2), makeInt32(2)});
+}
+
+// Cases where the monotonic fast path must bail out and rank each value individually. The
+// non-dense case is the important one: a block holding Nothing has values that rank below its
+// bounds, so collapsing it to a single rank would report missing values as ordinary ones.
+TEST_F(SBEBlockExpressionTest, BlockMqlComparisonRankMonotonicBailoutTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto rankExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockMqlComparisonRank,
+                                               sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto compiledExpr = compileExpression(*rankExpr);
+
+    // Not dense: the Nothing ranks 1 even though both bounds rank 2.
+    {
+        TestBlock block;
+        block.push_back(makeInt32(1));
+        block.push_back(makeNothing());
+        block.push_back(makeInt32(9));
+        block.setMin(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+        block.setMax(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(9));
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+
+        assertBlockEq(result.tag(),
+                      result.value(),
+                      std::vector<std::pair<value::TypeTags, value::Value>>{
+                          makeInt32(2), makeInt32(1), makeInt32(2)});
+    }
+
+    // Bounds with different type tags straddle a rank boundary, so no single rank applies.
+    {
+        TestBlock block;
+        block.push_back(makeMinKey());
+        block.push_back(makeUndefined());
+        block.push_back(makeInt32(5));
+        block.setMin(makeMinKey().first, makeMinKey().second);
+        block.setMax(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(9));
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+
+        assertBlockEq(result.tag(),
+                      result.value(),
+                      std::vector<std::pair<value::TypeTags, value::Value>>{
+                          makeInt32(0), makeInt32(1), makeInt32(2)});
+    }
+}
+
 TEST_F(SBEBlockExpressionTest, BlockTypeMatchInvalidMaskTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);

@@ -509,6 +509,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockExists";
         case Builtin::valueBlockIsNullish:
             return "valueBlockIsNullish";
+        case Builtin::valueBlockMqlComparisonRank:
+            return "valueBlockMqlComparisonRank";
         case Builtin::valueBlockFillEmpty:
             return "valueBlockFillEmpty";
         case Builtin::valueBlockFillEmptyBlock:
@@ -1111,6 +1113,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockExists(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockIsNullish:
             return builtinValueBlockIsNullish(arity).releaseToMaybeOwnedRaw();
+        case Builtin::valueBlockMqlComparisonRank:
+            return builtinValueBlockMqlComparisonRank(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockTypeMatch:
             return builtinValueBlockTypeMatch(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockIsTimezone:

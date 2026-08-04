@@ -590,6 +590,11 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool s
                 return evaluateTypeTest(
                     n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Timestamp));
             break;
+        case sbe::EFn::kMqlComparisonRank:
+            // Always returns an integer rank (0, 1 or 2); never Nothing, even for a Nothing input.
+            if (arity == 1)
+                return getTypeSignature(sbe::value::TypeTags::NumberInt32);
+            break;
         case sbe::EFn::kDateTrunc:
             // Always mark Nothing as a possible return type, as it can be reported due to invalid
             // arguments.

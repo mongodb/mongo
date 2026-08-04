@@ -21,6 +21,8 @@
 #
 last-patch:
   all:
+    - test_file: jstests/aggregation/expressions/comparison_missing_and_key_values.js
+      ticket: SERVER-131544
     - test_file: jstests/aggregation/optimization/do_not_push_match_past_rename_onto_dotted_path.js
       ticket: SERVER-132414
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
@@ -58,6 +60,8 @@ last-patch:
   suites: null
 last-continuous:
   all:
+    - test_file: jstests/aggregation/expressions/comparison_missing_and_key_values.js
+      ticket: SERVER-131544
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
@@ -183,6 +187,8 @@ last-lts:
       ticket: SERVER-92668
     - test_file: jstests/aggregation/bugs/server94212.js
       ticket: SERVER-94212
+    - test_file: jstests/aggregation/expressions/comparison_missing_and_key_values.js
+      ticket: SERVER-131544
     - test_file: jstests/aggregation/expressions/null_chars_string_input.js
       ticket: SERVER-95687
     - test_file: jstests/aggregation/expressions/reduce_overflow.js

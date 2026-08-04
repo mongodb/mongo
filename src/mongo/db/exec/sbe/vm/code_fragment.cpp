@@ -728,6 +728,10 @@ void CodeFragment::appendIsMaxKey(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isMaxKey, input);
 }
 
+void CodeFragment::appendMqlComparisonRank(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::mqlComparisonRank, input);
+}
+
 void CodeFragment::appendIsTimestamp(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isTimestamp, input);
 }

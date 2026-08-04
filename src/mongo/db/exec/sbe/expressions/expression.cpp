@@ -1081,6 +1081,8 @@ static stdx::unordered_map<EFn, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockExists, false}},
     {EFn::kValueBlockIsNullish,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockIsNullish, false}},
+    {EFn::kValueBlockMqlComparisonRank,
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockMqlComparisonRank, false}},
     {EFn::kValueBlockTypeMatch,
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockTypeMatch, false}},
     {EFn::kValueBlockIsTimezone,
@@ -1377,6 +1379,8 @@ static stdx::unordered_map<EFn, InstrFn> kInstrFunctions = {
     {EFn::kIsMaxKey, InstrFn{1, generator<1, &vm::CodeFragment::appendIsMaxKey>, false}},
     {EFn::kIsTimestamp, InstrFn{1, generator<1, &vm::CodeFragment::appendIsTimestamp>, false}},
     {EFn::kIsKeyString, InstrFn{1, generator<1, &vm::CodeFragment::appendIsKeyString>, false}},
+    {EFn::kMqlComparisonRank,
+     InstrFn{1, generator<1, &vm::CodeFragment::appendMqlComparisonRank>, false}},
     {EFn::kValueBlockApplyLambda,
      InstrFn{3, generatorLegacy<&vm::CodeFragment::appendValueBlockApplyLambda>, false}},
 };
