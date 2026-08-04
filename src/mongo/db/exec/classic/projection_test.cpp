@@ -162,7 +162,7 @@ public:
     // True if an operation-wide memory tracker was attached to the operation (i.e. some stage
     // created a memory tracker via OperationMemoryUsageTracker). Consumes the tracker.
     bool operationMemoryTrackerAttached() {
-        return static_cast<bool>(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx()));
+        return static_cast<bool>(OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx()));
     }
 
 private:

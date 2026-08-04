@@ -61,6 +61,17 @@ void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
  */
 bool hasReferenceToSearchMeta(const DocumentSource& ds);
 
+/**
+ * Opts the operation out of per-operation memory tracking, for $search queries that will expose a
+ * second, metadata cursor alongside the results cursor.
+ *
+ * This must be called before any subsequent stage in the pipeline is parsed, because some stages
+ * (e.g. $group) capture their memory tracker in the constructor and cannot be opted out
+ * retroactively.
+ */
+void excludeOperationMemoryTrackingForSecondaryMetadataCursor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 // TODO: Move this into $_internalDocumentResultsAndMetadata once $search is removed.
 /**
  * Returns true if the current stage can move past a search source stage to the shard side

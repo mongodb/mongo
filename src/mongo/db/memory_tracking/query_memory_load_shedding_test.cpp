@@ -208,7 +208,7 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, FastPathPrimesFirstCheckAfterCrossingLo
     auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
     auto* tracker = owned.get();
     tracker->add(1 << 20);  // tracked memory so the op is a real shedding candidate
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(owned));
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
 
     // Below the low mark: not shed, and the baseline is marked invalid.
     setPressureOverride(10);
@@ -241,7 +241,7 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, AlwaysShedFailpointBypassesTimingGates)
     markOperationQueryMemorySheddingEligible(opCtx);  // opt-in: stand in for a user-facing read
     auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
     owned->add(1 << 20);  // tracked memory so the op is a real shedding candidate
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(owned));
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
 
     // Arm the invalid-baseline sentinel via a below-mark check, so the next above-mark check would
     // otherwise be the non-shedding priming check.
@@ -274,8 +274,8 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, ZeroTrackedMemoryIsNeverShedEvenWhenFor
     OperationContext* opCtx = getExpCtx()->getOperationContext();
     markOperationQueryMemorySheddingEligible(opCtx);  // opt-in: stand in for a user-facing read
     auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
-                                                        std::move(owned));  // 0 tracked bytes
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx,
+                                                          std::move(owned));  // 0 tracked bytes
 
     // Well above the mark, with the failpoint forcing a shed: still not shed, because the operation
     // consumes no tracked memory.
@@ -307,7 +307,7 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, ShedIncrementsOtelOperationsShedCounter
     markOperationQueryMemorySheddingEligible(opCtx);  // opt-in: stand in for a user-facing read
     auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
     owned->add(1 << 20);  // tracked memory so the op is a real shedding candidate
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(owned));
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
 
     setPressureOverride(90);
     globalFailPointRegistry()
@@ -341,7 +341,7 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, WriteIntentLockedOperationIsNeverShed) 
     markOperationQueryMemorySheddingEligible(opCtx);  // opt-in: stand in for a user-facing read
     auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
     owned->add(1 << 20);  // tracked memory so the op is a real shedding candidate
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(owned));
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
 
     setPressureOverride(90);
     globalFailPointRegistry()
@@ -370,7 +370,7 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, ReadIntentLockedOperationIsStillShed) {
     markOperationQueryMemorySheddingEligible(opCtx);
     auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
     owned->add(1 << 20);
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(owned));
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
 
     setPressureOverride(90);
     globalFailPointRegistry()
@@ -396,7 +396,7 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, IneligibleOperationIsNeverShed) {
     auto* opCtx = getExpCtx()->getOperationContext();  // deliberately left ineligible
     auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
     owned->add(1 << 20);  // tracked memory: a candidate but for eligibility
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(owned));
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
 
     setPressureOverride(95);
     globalFailPointRegistry()

@@ -216,6 +216,12 @@ DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::create
         metadata = metaSpec;
     }
 
+    // We disable memory tracking for the two-cursor scenario, and must do it before the rest of
+    // the pipeline is parsed.
+    if (metadata.has_value() && params.getReturnCursor()) {
+        search_helpers::excludeOperationMemoryTrackingForSecondaryMetadataCursor(expCtx);
+    }
+
     auto stage = make_intrusive<DocumentSourceInternalDocumentResultsAndMetadata>(
         expCtx, std::move(sourceStage), std::move(metadata), params.getReturnCursor());
     if (const auto& plan = params.getShardedPlan()) {
