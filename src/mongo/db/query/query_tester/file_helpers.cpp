@@ -94,6 +94,15 @@ std::string discoverMongoRepoRoot() {
     boost::algorithm::trim_right(repoRoot);
     return repoRoot;
 }
+
+std::filesystem::path resolveSymlinks(const std::filesystem::path& path) {
+    auto ec = std::error_code{};
+    // weakly_canonical tolerates non-existent paths; fall back to the original on any error.
+    if (auto resolved = std::filesystem::weakly_canonical(path, ec); !ec) {
+        return resolved;
+    }
+    return path;
+}
 }  // namespace
 
 ConditionalColor applyBold() {
@@ -150,6 +159,11 @@ std::string getMongoRepoRoot() {
 std::string gitDiff(const std::filesystem::path& expected,
                     const std::filesystem::path& actual,
                     const DiffStyle diffStyle) {
+    // `git diff` compares symlinks by their target path rather than by the contents they point at.
+    // Under Bazel the expected .results files are runfiles symlinks into the source tree, so
+    // resolve both paths first to make sure we diff file contents.
+    const auto expectedResolved = resolveSymlinks(expected);
+    const auto actualResolved = resolveSymlinks(actual);
     const auto gitDiffCmd =
         (std::stringstream{}
          << "git"
@@ -165,8 +179,8 @@ std::string gitDiff(const std::filesystem::path& expected,
          << " --no-index "
          << (diffStyle == DiffStyle::kWord ? "--word-diff=color" : "--no-color")
          // Use character-based-diff when in non-CI mode for (hopefully) clearer diffs.
-         << (diffStyle == DiffStyle::kPlain ? "" : " --word-diff-regex=.") << " -U0 -- " << expected
-         << " " << actual << " 2>&1")
+         << (diffStyle == DiffStyle::kPlain ? "" : " --word-diff-regex=.") << " -U0 -- "
+         << expectedResolved << " " << actualResolved << " 2>&1")
             .str();
 
     // Need to ignore exit status because the implied --exit-code will return an error sttatus when

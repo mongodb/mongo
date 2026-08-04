@@ -1,5 +1,6 @@
 """The unittest.TestCase for QueryTester self-tests."""
 
+import os
 import sys
 
 from buildscripts.resmokelib import config as _config
@@ -25,7 +26,16 @@ class QueryTesterSelfTestCase(interface.ProcessTestCase):
         self.test_file = test_filenames[0]
 
     def _make_process(self):
-        program_options = {}
+        # The self-tests import their shared helpers as `testlib.test_utils`, relying on the
+        # directory containing the test file being on sys.path. Python normally prepends it
+        # automatically, but under Bazel rules_python sets PYTHONSAFEPATH=1, which disables that
+        # and is inherited by this subprocess. Put the directory on PYTHONPATH explicitly so the
+        # import works regardless of how resmoke was launched.
+        test_dir = os.path.dirname(os.path.abspath(self.test_file))
+        pythonpath = os.pathsep.join(
+            path for path in (test_dir, os.environ.get("PYTHONPATH")) if path
+        )
+        program_options = {"env_vars": {"PYTHONPATH": pythonpath}}
         interface.append_process_tracking_options(program_options, self._id)
         # Merge test and fixture environment variables into program_options
         self._merge_environment_variables(program_options)

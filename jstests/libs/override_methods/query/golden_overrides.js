@@ -1,8 +1,14 @@
+let captureEnabled = true;
+
 // Override print to output to both stdout and the golden file.
 // This affects everything that uses print: printjson, jsTestLog, etc.
 globalThis.print = (() => {
     const original = globalThis.print;
     return function print(...args) {
+        if (!captureEnabled) {
+            return original(...args);
+        }
+
         // Imitate GlobalInfo::Functions::print::call.
         let str = args.map((a) => (a == null ? "[unknown type]" : a)).join(" ");
 
@@ -26,3 +32,17 @@ globalThis.print = (() => {
 // Initialize `printGolden` to have the same behavior as `print`. This is needed to utilize markdown
 // support (i.e. pretty_md.js) in this golden test suite.
 globalThis.printGolden = globalThis.print;
+
+// Runs `fn` with printing left out of the golden file (it still goes to stdout). Use this around
+// code whose output depends on the environment rather than on the behavior under test, e.g. which
+// python interpreter was picked. Only defined in golden suites, so callers that also run outside
+// them must fall back to invoking `fn` directly.
+globalThis.withoutGoldenCapture = function (fn) {
+    const prevCaptureEnabled = captureEnabled;
+    captureEnabled = false;
+    try {
+        return fn();
+    } finally {
+        captureEnabled = prevCaptureEnabled;
+    }
+};

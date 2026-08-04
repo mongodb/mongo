@@ -220,7 +220,7 @@ bool readAndLoadCollFile(DBClientConnection* const conn,
                          const std::filesystem::path& filePath,
                          const bool createAllIndices,
                          const bool ignoreIndexFailures) {
-    auto collFile = std::fstream{filePath};
+    auto collFile = std::fstream{filePath, std::fstream::in};
     verifyFileStreamGood(collFile, filePath, "Failed to open file");
     // Read in indexes.
     readAndBuildOrSkipIndexes(

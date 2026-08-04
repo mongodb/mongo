@@ -274,9 +274,11 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_golden_classic",
     config = "//buildscripts/resmokeconfig:suites/query_golden_classic.yml",
+    data = [
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -304,14 +306,16 @@ resmoke_suite_test(
     name = "query_tester_self_test",
     config = "//buildscripts/resmokeconfig:suites/query_tester_self_test.yml",
     data = [
+        "//src/mongo/db/query/query_tester/tests/selfTests:self_test_data",
         "//src/mongo/db/query/query_tester/tests/selfTests/testlib:all_python_files",
     ],
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # Resolution of the `testlib` module fails: "ModuleNotFoundError: No module named 'testlib'"
+        "incompatible_with_bazel_remote_test",  # requires `git`
     ],
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
         "//src/mongo/shell:mongo",
     ],
 )
@@ -319,10 +323,12 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_golden_cbr_automatic_cost_choice",
     config = "//buildscripts/resmokeconfig:suites/query_golden_cbr_automatic_cost_choice.yml",
+    data = [
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
     tags = [
         "blocked_in_query_alias",
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -333,10 +339,12 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_golden_cbr_automatic_no_multiplanning_results",
     config = "//buildscripts/resmokeconfig:suites/query_golden_cbr_automatic_no_multiplanning_results.yml",
+    data = [
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
     tags = [
         "blocked_in_query_alias",
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -506,7 +514,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Tests fail with "Permission denied": Failed to open file
+        "incompatible_with_bazel_remote_test",  # requires `git`
         "requires_all_feature_flags",
     ],
     target_compatible_with = select({
