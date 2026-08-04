@@ -1765,6 +1765,22 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                AggregateCommandRequest& aggRequest,
                                                std::string_view reason) {
+    // The aggregation we're about to send out gets the readConcern from the owning opCtx and
+    // will preferably target secondaries. The aggregation expects to run from a timestamp inclusive
+    // of all the changes seen across all the shards. We can use the current majority commit
+    // timestamp on the dbPrimary since that is inclusive of all the previous DDL changes
+    // considering how all the DDL coordinators get deleted with a majority writeConcern and that
+    // timestamp is inclusive of all previous metadata changes.
+    const auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const auto snapshotTimestamp = replCoord->getCurrentCommittedSnapshotOpTime();
+    ScopedReadConcern scopedReadConcern{
+        opCtx,
+        repl::ReadConcernArgs{snapshotTimestamp.isNull()
+                                  ? boost::none
+                                  : boost::make_optional(LogicalTime{
+                                        snapshotTimestamp.getTimestamp()}) /* afterClusterTime */,
+                              repl::ReadConcernLevel::kLocalReadConcern}};
+
     const auto logMetadataInconsistency = [](const NamespaceString& nss,
                                              const DBException& exception) {
         LOGV2(8739100,
@@ -2623,6 +2639,7 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     std::vector<MetadataInconsistencyItem> indexIncons;
+
     for (const auto& coll : collections) {
         const auto& nss = coll.getNss();
 
