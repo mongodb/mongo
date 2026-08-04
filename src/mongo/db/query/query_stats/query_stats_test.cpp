@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/query_stats/query_stats.h"
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -294,6 +295,18 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
         ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
         ASSERT_EQ(limiter.getSamplingRate(), 0);
     }
+}
+
+TEST(QueryStatsKeyBsonValidation, AcceptsShallowKey) {
+    ASSERT_OK(validateQueryStatsKeyBson(BSON("queryShape" << BSON("command" << "find"))));
+}
+
+TEST(QueryStatsKeyBsonValidation, RejectsKeyTooDeepToBeWrappedInAReply) {
+    BSONObj deep = BSON("a" << 1);
+    for (std::uint32_t i = 1; i <= BSONDepth::getMaxDepthForUserStorage(); ++i) {
+        deep = BSON("a" << deep);
+    }
+    ASSERT_EQ(validateQueryStatsKeyBson(deep).code(), ErrorCodes::Overflow);
 }
 
 }  // namespace mongo::query_stats

@@ -4,6 +4,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
@@ -485,6 +486,23 @@ void registerRequestImpl(const OperationContext* opCtx,
 }
 
 }  // namespace
+
+Status validateQueryStatsKeyBson(const BSONObj& keyBson) {
+    // The 'keyBson' is expected to have structurally well-formed BSON by this point. Only its size
+    // and nesting depth remain to be checked.
+    dassert(validateBSON(keyBson));
+
+    if (auto status = keyBson.validateBSONObjSize(BSONObjMaxUserSize)
+                          .addContext("Query stats key exceeds maximum BSON size");
+        !status.isOK()) {
+        return status;
+    }
+
+    // validateBSONDepthForUserStorage enforces the user-storage depth limit, leaving enough buffer
+    // for server-added nesting when embedding 'keyBson' in a command reply.
+    return validateBSONDepthForUserStorage(keyBson).addContext(
+        "Query stats key is too deeply nested");
+}
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,

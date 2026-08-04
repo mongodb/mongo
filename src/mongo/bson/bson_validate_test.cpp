@@ -1648,5 +1648,45 @@ TEST(BSONValidateColumn, BSONColumnMemLimitInterleavedRestart) {
     ASSERT_EQ(validateBSON(column).code(), ErrorCodes::ExceededMemoryLimit);
 }
 
+/**
+ * Returns an object nested 'depth' levels deep, where a flat object is depth 1.
+ */
+BSONObj makeNestedObject(int depth) {
+    // Empty subdocuments don't count towards the depth level count so the innermost value is "1".
+    BSONObj obj = BSON("a" << 1);
+    for (int i = 1; i < depth; ++i) {
+        obj = BSON("a" << obj);
+    }
+    return obj;
+}
+
+TEST(BSONValidateDepthForUserStorage, AcceptsShallowObject) {
+    ASSERT_OK(validateBSONDepthForUserStorage(BSON("a" << BSON("b" << 1))));
+}
+
+TEST(BSONValidateDepthForUserStorage, AcceptsObjectAtTheLimit) {
+    ASSERT_OK(
+        validateBSONDepthForUserStorage(makeNestedObject(BSONDepth::getMaxDepthForUserStorage())));
+}
+
+TEST(BSONValidateDepthForUserStorage, RejectsObjectOneLevelPastTheLimit) {
+    const auto tooDeep = makeNestedObject(BSONDepth::getMaxDepthForUserStorage() + 1);
+
+    // This validation function only checks against the getMaxAllowableDepth() limit (ex: 200) which
+    // is greater than the getMaxDepthForUserStorage() (ex: 180) limit.
+    ASSERT_OK(validateBSON(tooDeep));
+    // This validation function checks against the getMaxDepthForUserStorage() limit (1 depth level
+    // less than what nested object created in this test is).
+    ASSERT_EQ(validateBSONDepthForUserStorage(tooDeep).code(), ErrorCodes::Overflow);
+}
+
+TEST(BSONValidateDepthForUserStorage, EmptySubobjectDoesNotCountTowardDepth) {
+    BSONObj obj = BSON("a" << BSONObj());
+    for (std::uint32_t i = 1; i < BSONDepth::getMaxDepthForUserStorage(); ++i) {
+        obj = BSON("a" << obj);
+    }
+    ASSERT_OK(validateBSONDepthForUserStorage(obj));
+}
+
 }  // namespace
 }  // namespace mongo

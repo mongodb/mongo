@@ -1027,4 +1027,33 @@ void uassertValidBSONFromJavaScript(const BSONObj& obj, std::string_view context
     }
 }
 
+Status validateBSONDepthForUserStorage(const BSONObj& obj) {
+    std::vector<BSONObjIterator> frames;
+    frames.reserve(16);
+    frames.emplace_back(obj);
+
+    while (!frames.empty()) {
+        const auto elem = frames.back().next();
+        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
+            auto subObj = elem.embeddedObject();
+            // Empty subdocuments do not count toward the depth of a document.
+            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage() &&
+                               !subObj.isEmpty())) {
+                // We're exactly at the limit, so descending to the next level would exceed
+                // the maximum depth.
+                return {ErrorCodes::Overflow,
+                        str::stream() << "object exceeds " << BSONDepth::getMaxDepthForUserStorage()
+                                      << " levels of nesting"};
+            }
+            frames.emplace_back(subObj);
+        }
+
+        if (!frames.back().more()) {
+            frames.pop_back();
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace mongo

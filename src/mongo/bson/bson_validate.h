@@ -66,4 +66,12 @@ Status validateBSONColumn(const char* buf,
 // ExceededMemoryLimit.
 void uassertValidBSONFromJavaScript(const BSONObj& obj, std::string_view context);
 
+/**
+ * Validates the nesting depth of 'obj', returning ErrorCodes::Overflow if it exceeds the depth
+ * limit getMaxDepthForUserStorage() sets. That limit is lower than the one validateBSON() enforces,
+ * because a depth level buffer is needed to account for the nesting the server adds when it embeds
+ * 'obj' in an oplog entry or a command reply.
+ */
+Status validateBSONDepthForUserStorage(const BSONObj& obj);
+
 }  // namespace mongo

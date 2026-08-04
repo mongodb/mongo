@@ -139,9 +139,8 @@ boost::optional<Document> QueryStatsStage::toDocument(
     const auto& key = queryStatsEntry.key;
     try {
         auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
-        // Skip entries that are over BSONObjMaxUserSize.
-        uassertStatusOK(queryStatsKey.validateBSONObjSize(BSONObjMaxUserSize)
-                            .addContext("Query stats key exceeds maximum BSON size"));
+        // Skip entries where the key is over BSONObjMaxUserSize or too deeply nested for the reply.
+        uassertStatusOK(query_stats::validateQueryStatsKeyBson(queryStatsKey));
         // We use the representative shape to generate the key and shape hashes. This avoids
         // returning duplicate hashes if we have bugs that cause two different representative shapes
         // to re-parse into the same debug shape.
@@ -228,11 +227,15 @@ boost::optional<Document> QueryStatsStage::toDocument(
         //  variable errored on a standalone node, since it is unavailable outside of replica
         //  sets/sharded clusters. Re-parsing later on the same standalone node reliably hits the
         //  same restriction. TODO SERVER-132688: Remove this exclusion.
+        //  - The Overflow error occurs when the shape is too deeply nested to be wrapped in the
+        //  reply, which some tests do on purpose. Skipping the entry is the intended behavior.
         if ((kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) &&
             ex.code() != ErrorCodes::QueryFeatureNotAllowed &&
-            ex.code() != ErrorCodes::BSONObjectTooLarge &&
-            ex.code() != 16490 /* Document grew too large - before hitting BSON */ &&
-            ex.code() != 10071200 /* $$CLUSTER_TIME unavailable in standalone mode */) {
+            ex.code() != ErrorCodes::BSONObjectTooLarge &&  // query shape too large
+            ex.code() != 10071200 &&              // $$CLUSTER_TIME unavailable in standalone mode
+            ex.code() != ErrorCodes::Overflow &&  // query shape too deeply nested
+            ex.code() != 16490                    // document grew too large - before hitting BSON
+        ) {
             auto keyString = std::to_string(hash);
             uasserted(Status{
                 QueryStatsFailedToRecordInfo(

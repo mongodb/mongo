@@ -169,6 +169,11 @@ void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      const std::function<std::unique_ptr<Key>(void)>& makeKey);
 
+/**
+ * Returns a non-OK status if 'keyBson' is too large or too deeply nested to embed in the
+ * $queryStats reply.
+ */
+Status validateQueryStatsKeyBson(const BSONObj& keyBson);
 
 /**
  * Register a write request. After performing write-relevant checks, it registers a write request

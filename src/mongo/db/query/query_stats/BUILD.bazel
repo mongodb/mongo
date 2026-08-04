@@ -35,6 +35,7 @@ mongo_cc_library(
     deps = [
         ":key",
         ":rate_limiting",
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/db:api_parameters",
         "//src/mongo/db:commands",
         "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts",
@@ -124,6 +125,7 @@ mongo_cc_unit_test(
     deps = [
         ":query_stats",
         ":write_key",
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",

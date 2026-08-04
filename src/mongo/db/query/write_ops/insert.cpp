@@ -4,7 +4,7 @@
 #include "mongo/db/query/write_ops/insert.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -27,42 +27,6 @@
 
 
 namespace mongo {
-namespace {
-
-/**
- * Validates the nesting depth of 'obj', returning a non-OK status if it exceeds the limit.
- */
-Status validateDepth(const BSONObj& obj) {
-    std::vector<BSONObjIterator> frames;
-    frames.reserve(16);
-    frames.emplace_back(obj);
-
-    while (!frames.empty()) {
-        const auto elem = frames.back().next();
-        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
-            auto subObj = elem.embeddedObject();
-            // Empty subdocuments do not count toward the depth of a document.
-            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage() &&
-                               !subObj.isEmpty())) {
-                // We're exactly at the limit, so descending to the next level would exceed
-                // the maximum depth.
-                return {ErrorCodes::Overflow,
-                        str::stream()
-                            << "cannot insert document because it exceeds "
-                            << BSONDepth::getMaxDepthForUserStorage() << " levels of nesting"};
-            }
-            frames.emplace_back(subObj);
-        }
-
-        if (!frames.back().more()) {
-            frames.pop_back();
-        }
-    }
-
-    return Status::OK();
-}
-}  // namespace
-
 StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
                                          const BSONObj& doc,
                                          bool bypassEmptyTsReplacement,
@@ -84,7 +48,8 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
                                                      << ". size in bytes: " << doc.objsize()
                                                      << ", max size: " << BSONObjMaxUserSize);
 
-        auto depthStatus = validateDepth(doc);
+        auto depthStatus =
+            validateBSONDepthForUserStorage(doc).addContext("cannot insert document");
         if (!depthStatus.isOK()) {
             return depthStatus;
         }
