@@ -335,17 +335,17 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: in_development
     featureFlagContinuousInternodeValidationPerDocument:
-        description: "Enable continuous internode validation per document for Atlas Infinite nodes."
+        description: "Enable continuous internode validation per document for DSC nodes."
         cpp_varname: gFeatureFlagContinuousInternodeValidationPerDocument
         default: false
         fcv_gated: true
     featureFlagContinuousInternodeValidationPerDocumentDurability:
-        description: "Enable 64-bit hash size for continuous internode validation per document on Atlas Infinite nodes."
+        description: "Enable 64-bit hash size for continuous internode validation per document on DSC nodes."
         cpp_varname: gFeatureFlagContinuousInternodeValidationPerDocumentDurability
         default: false
         fcv_gated: true
     featureFlagContinuousInternodeValidationPerCollection:
-        description: "Enable continuous internode validation per collection for Atlas Infinite nodes."
+        description: "Enable continuous internode validation per collection for DSC nodes."
         cpp_varname: gFeatureFlagContinuousInternodeValidationPerCollection
         default: false
         fcv_gated: true
