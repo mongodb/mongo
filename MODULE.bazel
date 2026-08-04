@@ -348,6 +348,10 @@ setup_evergreen_variables = use_repo_rule("//bazel/repository_rules:evergreen_va
 
 setup_evergreen_variables(name = "evergreen_variables")
 
+external_auth_aws_setup = use_repo_rule("//bazel/repository_rules:external_auth_aws_setup.bzl", "external_auth_aws_setup")
+
+external_auth_aws_setup(name = "external_auth_aws_setup")
+
 setup_pgo_data = use_repo_rule("//bazel/repository_rules:pgo_data.bzl", "setup_pgo_data")
 
 setup_pgo_data(name = "pgo_data")

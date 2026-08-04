@@ -515,7 +515,13 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "external_auth",
     config = "//buildscripts/resmokeconfig:suites/external_auth.yml",
+    data = [
+        "//jstests/ocsp/lib:ocsp_mock",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:sts_http_server",
+    ],
     resmoke_args = ["--excludeWithAnyTags=requires_domain_controller"],
+    shard_count = 4,
     tags = [
         "ci-release-critical",
         "incompatible_debian",
@@ -538,6 +544,12 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "external_auth_aws",
     config = "//buildscripts/resmokeconfig:suites/external_auth_aws.yml",
+    data = [
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:sts_http_server",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth_aws/lib:aws_assume_role",
+        "@external_auth_aws_setup//:aws_e2e_setup.json",
+    ],
     shard_count = 2,
     tags = [
         "ci-release-critical",
