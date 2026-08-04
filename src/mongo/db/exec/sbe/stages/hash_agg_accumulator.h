@@ -11,6 +11,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/util/modules.h"
@@ -22,6 +23,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+class CollatorInterface;
+
 namespace sbe {
 /**
  * Base class for the executable accumulator operators used by SBE's HashAggStage.
@@ -545,6 +548,61 @@ protected:
     void finalizePartialAggregate(value::TagValueOwned partialAggregate,
                                   value::AssignableSlotAccessor& result) const final;
 };
+
+/**
+ * Single-purpose implementation of the $minN/$maxN accumulators.
+ */
+template <AccumulatorMinMaxN::MinMaxSense S>
+class MinMaxNHashAggAccumulator : public SinglePurposeHashAggAccumulator {
+public:
+    MinMaxNHashAggAccumulator(value::SlotId outSlot,
+                              value::SlotId spillSlot,
+                              std::unique_ptr<EExpression> transformExpr,
+                              boost::optional<value::SlotId> collatorSlot,
+                              int64_t maxSize,
+                              int32_t memLimit)
+        : SinglePurposeHashAggAccumulator(
+              outSlot, spillSlot, std::move(transformExpr), collatorSlot),
+          _collatorSlot(collatorSlot),
+          _maxSize(maxSize),
+          _memLimit(memLimit) {}
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<MinMaxNHashAggAccumulator<S>>(
+            _outSlot, _spillSlot, _transformExpr->clone(), _collatorSlot, _maxSize, _memLimit);
+    }
+
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
+
+protected:
+    void singlePurposePrepare(CompileCtx& ctx) final;
+
+    void accumulateTransformedValue(value::TagValueMaybeOwned field,
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
+
+    void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
+                             value::MaterializedSingleRowAccessor& accumulatorState) const final;
+
+    void finalizePartialAggregate(value::TagValueOwned partialAggregate,
+                                  value::AssignableSlotAccessor& result) const final;
+
+    std::string getDebugName() const final {
+        return S == AccumulatorMinMaxN::MinMaxSense::kMin ? "_internalMinN" : "_internalMaxN";
+    }
+
+private:
+    CollatorInterface* getCollator() const;
+
+    boost::optional<value::SlotId> _collatorSlot;
+    value::SlotAccessor* _collatorAccessor = nullptr;
+    int64_t _maxSize;
+    int32_t _memLimit;
+    mutable int32_t _memUsage{};
+};
+
+using MinNHashAggAccumulator = MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMin>;
+using MaxNHashAggAccumulator = MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMax>;
 
 namespace size_estimator {
 inline size_t estimate(const std::unique_ptr<HashAggAccumulator>& accumulator) {

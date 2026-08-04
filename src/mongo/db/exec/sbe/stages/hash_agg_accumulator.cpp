@@ -8,15 +8,59 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 namespace mongo {
 namespace sbe {
+namespace {
+
+template <class Comparator>
+int32_t minMaxNInsert(value::Array* heap,
+                      size_t maxSize,
+                      int32_t memUsage,
+                      int32_t memLimit,
+                      const Comparator& comp,
+                      value::TagValueOwned field) {
+    auto& elems = heap->values();
+
+    auto addMemUsage = [&](int32_t memAdded) {
+        memUsage += memAdded;
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream()
+                    << "Accumulator used too much memory and spilling to disk cannot reduce memory "
+                       "consumption any further. Memory limit: "
+                    << memLimit << " bytes",
+                memUsage < memLimit);
+    };
+
+    if (heap->size() < maxSize) {
+        addMemUsage(value::getApproximateSize(field.tag(), field.value()));
+        heap->push_back(std::move(field));
+        std::push_heap(elems.begin(), elems.end(), comp);
+    } else {
+        auto heapRoot = elems.front();
+        if (comp(field.raw(), heapRoot)) {
+            addMemUsage(-value::getApproximateSize(heapRoot.first, heapRoot.second) +
+                        value::getApproximateSize(field.tag(), field.value()));
+            std::pop_heap(elems.begin(), elems.end(), comp);
+            heap->setAt(maxSize - 1, std::move(field));
+            std::push_heap(elems.begin(), elems.end(), comp);
+        }
+    }
+
+    return memUsage;
+}
+}  // namespace
+
 void CompiledHashAggAccumulator::prepare(CompileCtx& ctx,
                                          value::SlotAccessor* accumulatorAccessor) {
     if (_optionalInitializerExpr) {
@@ -588,5 +632,98 @@ void CountHashAggAccumulatorPartial::finalizePartialAggregate(
     // faster than expected.
     result.reset(vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagCount, valCount));
 }
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulator<S>::initialize(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
+    _memUsage = 0;
+
+    auto [heapTag, heapVal] = value::makeNewArray();
+    accumulatorState.reset(value::TagValueOwned::fromRaw(heapTag, heapVal));
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulator<S>::singlePurposePrepare(CompileCtx& ctx) {
+    if (_collatorSlot) {
+        _collatorAccessor = ctx.getAccessor(*_collatorSlot);
+    }
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+CollatorInterface* MinMaxNHashAggAccumulator<S>::getCollator() const {
+    if (!_collatorAccessor) {
+        return nullptr;
+    }
+    auto [colTag, colVal] = _collatorAccessor->getViewOfValue();
+    tassert(13199700, "Collator has unexpected type", colTag == value::TypeTags::collator);
+    return value::getCollatorView(colVal);
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulator<S>::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accumulatorState) const {
+    if (value::isNullish(field.tag())) {
+        return;
+    }
+
+    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
+    value::ValueCompare<less> comp{getCollator()};
+
+    auto [stateTag, stateVal] = accumulatorState.getViewOfValue();
+    auto* heap = value::getArrayView(stateVal);
+
+    _memUsage = minMaxNInsert(
+        heap, static_cast<size_t>(_maxSize), _memUsage, _memLimit, comp, field.moveToOwned());
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulator<S>::mergeRecoveredState(
+    value::TagValueMaybeOwned recoveredState,
+    value::MaterializedSingleRowAccessor& accumulatorState) const {
+    tassert(13199701,
+            "Expected recovered partial aggregate to have array type",
+            recoveredState.tag() == value::TypeTags::Array);
+    auto* recoveredHeap = value::getArrayView(recoveredState.value());
+
+    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
+    value::ValueCompare<less> comp{getCollator()};
+
+    auto [mergeStateTag, mergeStateVal] = accumulatorState.getViewOfValue();
+    tassert(13199705,
+            "Expected merge partial aggregate to have array type",
+            mergeStateTag == value::TypeTags::Array);
+    auto* mergeHeap = value::getArrayView(mergeStateVal);
+
+    _memUsage = 0;
+    for (const auto& elem : mergeHeap->values()) {
+        _memUsage += value::getApproximateSize(elem.first, elem.second);
+    }
+
+    for (size_t i = 0; i < recoveredHeap->size(); ++i) {
+        value::TagValueOwned field = recoveredHeap->swapAt(i, value::TypeTags::Null, 0);
+        _memUsage = minMaxNInsert(
+            mergeHeap, static_cast<size_t>(_maxSize), _memUsage, _memLimit, comp, std::move(field));
+    }
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulator<S>::finalizePartialAggregate(
+    value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
+    tassert(13199704,
+            "Expected partial aggregate to have array type before finalization",
+            partialAggregate.tag() == value::TypeTags::Array);
+
+    auto* heap = value::getArrayView(partialAggregate.value());
+
+    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
+    value::ValueCompare<less> comp{getCollator()};
+    std::sort_heap(heap->values().begin(), heap->values().end(), comp);
+
+    result.reset(std::move(partialAggregate));
+}
+
+template class MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMin>;
+template class MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMax>;
+
 }  // namespace sbe
 }  // namespace mongo
