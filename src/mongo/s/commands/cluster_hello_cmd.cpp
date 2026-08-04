@@ -37,6 +37,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -61,6 +63,7 @@
 #include "mongo/db/repl/hello_auth.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -71,6 +74,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -220,6 +224,33 @@ public:
                     clientTopologyVersion->getCounter() >= 0);
 
             uassert(51759, "maxAwaitTimeMS must be a non-negative integer", *maxAwaitTimeMS >= 0);
+
+            auto minWait = repl::minWaitForStreamingHelloMillis.load();
+            if (minWait > 0 && *maxAwaitTimeMS < minWait) {
+                auto* authSession = AuthorizationSession::get(opCtx->getClient());
+                if (!authSession || !authSession->isAuthenticated()) {
+                    bool willAbort = repl::abortStreamingHelloWithSmallTimeout.load();
+                    static auto& logSeverity = *new logv2::SeveritySuppressor{
+                        Seconds{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(3)};
+                    LOGV2_DEBUG(9830102,
+                                logSeverity().toInt(),
+                                "Pre-auth streamable hello with maxAwaitTimeMS below minimum; "
+                                "will reject with InvalidOptions if willAbort is true, otherwise "
+                                "will clamp maxAwaitTimeMS up to minWaitForStreamingHelloMillis",
+                                "maxAwaitTimeMS"_attr = *maxAwaitTimeMS,
+                                "minWaitForStreamingHelloMillis"_attr = minWait,
+                                "willAbort"_attr = willAbort);
+
+                    uassert(ErrorCodes::InvalidOptions,
+                            fmt::format("maxAwaitTimeMS of {} ms is below the minimum of {} ms",
+                                        *maxAwaitTimeMS,
+                                        minWait),
+                            !willAbort);
+
+                    // Clamp the effective timeout to the configured minimum.
+                    maxAwaitTimeMS = minWait;
+                }
+            }
 
             deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
                 Milliseconds(*maxAwaitTimeMS);

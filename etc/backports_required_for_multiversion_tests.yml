@@ -981,6 +981,8 @@ last-continuous:
     ticket: SERVER-131326
   - test_file: jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
     ticket: SERVER-131326
+  - test_file: jstests/noPassthrough/min_wait_streaming_hello_mongos.js
+    ticket: SERVER-132650
   suites: null
 last-lts:
   all:
@@ -2024,4 +2026,6 @@ last-lts:
     ticket: SERVER-131326
   - test_file: jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
     ticket: SERVER-131326
+  - test_file: jstests/noPassthrough/min_wait_streaming_hello_mongos.js
+    ticket: SERVER-132650
   suites: null
