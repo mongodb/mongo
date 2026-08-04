@@ -143,8 +143,9 @@ the client will notify the server of the user it is about to authenticate by inc
 `{saslSupportedMechs: [$listOfMechanisms]}` in the `hello` command's response.
 
 This allows clients to proceed with authentication by choosing an appropriate mechanism. The
-different named SASL mechanisms are listed below. If a mechanism can use a different storage method,
-the storage mechanism is listed as a sub-bullet below.
+different named SASL mechanisms are listed below. Mechanisms marked **(Enterprise)** are only
+available in MongoDB Enterprise builds. All other mechanisms are available in both the Community and
+Enterprise editions — Enterprise is a superset of Community and includes all Community features.
 
 - [**SCRAM-SHA-1**](https://tools.ietf.org/html/rfc5802)
   - See the section on `SCRAM-SHA-256` for details on `SCRAM`. `SCRAM-SHA-1` uses `SHA-1` for the
@@ -166,32 +167,26 @@ the storage mechanism is listed as a sub-bullet below.
     provided passwords before hashing, while for backward compatibility reasons, `SCRAM-SHA-1` does
     not.
 - [**PLAIN**](https://tools.ietf.org/html/rfc4616)
-  - The `PLAIN` mechanism involves two steps for authentication. First, the client concatenates a
-    message using the authorization id, the authentication id (also the username), and the password
-    for a user and sends it to the server. The server validates that the information is correct and
-    authenticates the user. For storage, the server hashes one copy using SHA-1 and another using
-    SHA-256 so that the password is not stored in plaintext. Even when using the PLAIN mechanism,
-    the same secrets as used for the SCRAM methods are stored and used for validation. The chief
-    difference between using PLAIN and SCRAM-SHA-256 (or SCRAM-SHA-1) is that using SCRAM provides
-    mutual authentication and avoids transmitting the password to the server. With PLAIN, it is less
-    difficult for a MitM attacker to compromise original credentials.
-  - **With local users**
-    - When the PLAIN mechanism is used with internal users, the user information is stored in the
-      [user collection](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.cpp#L56)
-      on the database. See [authorization](#authorization) for more information.
-  - **With Native LDAP**
-    - When the PLAIN mechanism uses `Native LDAP`, the credential information is sent to and
-      received from LDAP when creating and authorizing a user. The mongo server sends user
-      credentials over the wire to the LDAP server and the LDAP server requests a password. The
-      mongo server sends the password in plain text and LDAP responds with whether the password is
-      correct. Here the communication with the driver and the mongod is the same, but the storage
-      mechanism for the credential information is different.
-  - **With Cyrus SASL / saslauthd**
-    - When using saslauthd, the mongo server communicates with a process called saslauthd running on
-      the same machine. The saslauthd process has ways of communicating with many other servers,
-      LDAP servers included. Saslauthd works in the same way as Native LDAP except that the mongo
-      process communicates using unix domain sockets.
-- [**GSSAPI**](https://tools.ietf.org/html/rfc4752)
+  - The `PLAIN` mechanism sends the username and password to the server in plaintext (relying on TLS
+    for transport confidentiality). It provides no mutual authentication, making it more susceptible
+    to credential interception than SCRAM if TLS is not enforced. PLAIN has two distinct variants
+    depending on the user database:
+  - **With local users** (non-`$external` database): The server re-derives the SCRAM keying material
+    from the plaintext password using the stored salt and iteration count, then verifies that it
+    matches the stored key for the user in the local
+    [user collection](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.cpp#L56).
+  - **With `$external` users** _(Enterprise)_: The credentials are forwarded to an external
+    authentication backend. Two backends are supported:
+    - **Native LDAP**: The credentials are forwarded over the wire to an LDAP server, which
+      validates the password. MongoDB never stores the password; the LDAP server is the authority.
+      For authorization, if `ldapAuthzQueryTemplate` is set, MongoDB runs the LDAP query to retrieve
+      the user's group memberships and resolves them into roles; if it is not set, MongoDB looks up
+      a user document in `$external` whose name matches the authenticated LDAP DN and grants the
+      roles listed there. See [LDAP Authorization](#ldap-authorization) below.
+    - **Cyrus SASL / saslauthd**: The credentials are forwarded to a locally running `saslauthd`
+      process via a Unix domain socket. `saslauthd` can in turn delegate to LDAP or other backends.
+      This is functionally equivalent to Native LDAP from MongoDB's perspective.
+- [**GSSAPI**](https://tools.ietf.org/html/rfc4752) _(Enterprise)_
   - GSSAPI is an authentication mechanism that supports [Kerberos](https://web.mit.edu/kerberos/)
     authentication. GSSAPI is the communication method used to communicate with Kerberos servers and
     with clients. When initializing this auth mechanism, the server tries to acquire its credential
@@ -199,7 +194,9 @@ the storage mechanism is listed as a sub-bullet below.
     [`tryAcquireServerCredential`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
     If this is not approved, the server fasserts and the mechanism is not registered. On Windows,
     SChannel provides a `GSSAPI` library for the server to use. On other platforms, the Cyrus SASL
-    library is used to make calls to the KDC (Kerberos key distribution center).
+    library is used to make calls to the KDC (Kerberos key distribution center). Authorization roles
+    are always retrieved from the LDAP directory after authentication; there is no parameter to
+    redirect GSSAPI to internal authorization.
 - **MONGODB-X509**
 
   - As of 8.1.0, `MONGODB-X509` is an authentication mechanism that is available under SASL.
@@ -230,14 +227,48 @@ the storage mechanism is listed as a sub-bullet below.
        authenticated as that user in `$external`. Otherwise, authentication fails with
        ErrorCodes.UserNotFound.
 
+    When LDAP is enabled, X.509 authorization defaults to LDAP. The `useInternalAuthzForX509`
+    parameter (settable at startup and runtime) overrides this so that X.509 always uses internal
+    authorization regardless of whether LDAP is enabled. See
+    [LDAP Authorization](#ldap-authorization) and [X.509 Authorization](#x509-authorization) below.
+
+- **MONGODB-AWS** _(Enterprise)_
+
+  - `MONGODB-AWS` authenticates clients using AWS IAM credentials. The client presents an AWS
+    Signature Version 4 request signed with its access key and secret; the server verifies the
+    signature via the AWS STS API. No password is stored in MongoDB. The MongoDB username must match
+    the IAM ARN returned by STS for the authenticating identity (e.g.
+    `arn:aws:sts::123456789012:assumed-role/MyRole/mySession`). Authorization always uses the
+    internal backend — LDAP is never consulted for `MONGODB-AWS` even if LDAP authorization is
+    enabled. See
+    [src/mongo/db/modules/enterprise/src/sasl/README.md](../modules/enterprise/src/sasl/README.md)
+    for configuration and deployment examples.
+
+- **MONGODB-OIDC** _(Enterprise)_
+  - `MONGODB-OIDC` authenticates clients using OAuth 2.0 / OpenID Connect access tokens. The server
+    validates the token signature against the identity provider's published JWKS, then resolves
+    authorization either from claims embedded in the token (`useAuthorizationClaim=true`) or from a
+    local user document in `$external` (`useAuthorizationClaim=false`). LDAP is never consulted for
+    `MONGODB-OIDC`i even if LDAP authorization is enabled. See
+    [src/mongo/db/modules/enterprise/src/sasl/README.OIDC.md](../modules/enterprise/src/sasl/README.OIDC.md)
+    for the full protocol description, and
+    [src/mongo/db/modules/enterprise/src/sasl/README.md](../modules/enterprise/src/sasl/README.md)
+    for deployment examples.
+
 The specific properties that each SASL mechanism provides is outlined in this table below.
 
-|         | Mutual Auth | No Plain Text |
-| ------- | ----------- | ------------- |
-| SCRAM   | X           | X             |
-| PLAIN   |             |               |
-| GSS-API | X           | X             |
-| X509    | X           | X             |
+|              | Mutual Auth | No Plain Text | Edition        |
+| ------------ | ----------- | ------------- | -------------- |
+| SCRAM        | X           | X             | All editions   |
+| PLAIN        |             |               | All editions\* |
+| GSS-API      | X           | X             | Enterprise     |
+| MONGODB-X509 | X           | X             | All editions   |
+| MONGODB-AWS  |             | X             | Enterprise     |
+| MONGODB-OIDC |             | X             | Enterprise     |
+
+\* PLAIN for `$external` users (Native LDAP or Cyrus SASL / saslauthd backends) is Enterprise-only.
+PLAIN for local users (non-`$external` database, validated against SCRAM stored credentials) is
+available in all editions.
 
 ### Cluster Authentication
 
@@ -304,7 +335,7 @@ The only purpose of an arbiter is to participate in elections for replica set pr
 does not have a copy of data set, including system tables which contain user and role definitions,
 and therefore can not authenticate local users. It is possible to authenticate to arbiter using
 external authentication methods such as cluster authentication or x.509 authentication and acquire a
-role using [x.509 authorization](#x509azn).
+role using [x.509 authorization](#x509-authorization).
 
 It is also possible to connect to an arbiter with limited access using the
 [localhost auth bypass](#lhabp). If the localhost auth bypass is disabled using the
@@ -590,6 +621,12 @@ Collection names starting with `system.` on any database, or starting with `repl
 database are considered "special" and are not covered by the "Any normal collection" resource case.
 All other collections are considered `normal` collections.
 
+Additionally, the `config` and `local` databases are excluded from the "Any normal collection"
+resource case in their entirety, even for collections which are `normal` by the naming rules above
+(e.g. `config.changelog`, `local.me`). These databases hold special system collections which
+user-level administrators should not be able to manipulate, so they are only reachable via a
+database-specific or collection-specific resource pattern, or via `anyResource`.
+
 #### Role Authentication Restrictions
 
 Authentication restrictions defined on a role have the same meaning as those defined directly on
@@ -612,19 +649,19 @@ possibly narrow the scope of that `MatchType`. Most MatchTypes refer to some sto
 as a specific collection or database, however `kMatchClusterResource` refers to an entire host,
 replica set, or cluster.
 
-| MatchType                              | As encoded in a privilege doc                | Usage                                                                                                                                                         |
-| -------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kMatchNever`                          | _Unexpressable_                              | A base type only used internally to indicate that the privilege specified by the ResourcePattern can not match any real resource                              |
-| `kMatchClusterResource`                | `{ cluster : true }`                         | Commonly used with host and cluster management actions such as `ActionType::addShard`, `ActionType::setParameter`, or `ActionType::shutdown`.                 |
-| `kMatchAnyResource`                    | `{ anyResource: true }`                      | Matches all storage resources, even [non-normal namespaces](#normal-namespace) such as `db.system.views`.                                                     |
-| `kMatchAnyNormalResource`              | `{ db: '', collection: '' }`                 | Matches all [normal](#normal-namespace) storage resources. Used with [builtin role](builtin_roles.tpl.cpp) `readWriteAnyDatabase`.                            |
-| `kMatchDatabaseName`                   | `{ db: 'dbname', collection: '' }`           | Matches all [normal](#normal-namespace) storage resources for a specific named database. Used with [builtin role](builtin_roles.tpl.cpp) `readWrite`.         |
-| `kMatchCollectionName`                 | `{ db: '', collection: 'collname' }`         | Matches all storage resources, normal or not, which have the exact collection suffix '`collname`'. For example, to provide read-only access to `*.system.js`. |
-| `kMatchExactNamespace`                 | `{ db: 'dbname', collection: 'collname' }`   | Matches the exact namespace '`dbname`.`collname`'.                                                                                                            |
-| `kMatchAnySystemBucketResource`        | `{ db: '', system_buckets: '' }`             | Matches the namespace pattern `*.system.buckets.*`.                                                                                                           |
-| `kMatchAnySystemBucketInDBResource`    | `{ db: 'dbname', system_buckets: '' }`       | Matches the namespace pattern `dbname.system.buckets.*`.                                                                                                      |
-| `kMatchAnySystemBucketInAnyDBResource` | `{ db: '', system_buckets: 'suffix' }`       | Matches the namespace pattern `*.system.buckets.suffix`.                                                                                                      |
-| `kMatchExactSystemBucketResource`      | `{ db: 'dbname', system_buckets: 'suffix' }` | Matches the exact namespace `dbname.system.buckets.suffix`.                                                                                                   |
+| MatchType                              | As encoded in a privilege doc                | Usage                                                                                                                                                                                                               |
+| -------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kMatchNever`                          | _Unexpressible_                              | A base type only used internally to indicate that the privilege specified by the ResourcePattern can not match any real resource                                                                                    |
+| `kMatchClusterResource`                | `{ cluster : true }`                         | Commonly used with host and cluster management actions such as `ActionType::addShard`, `ActionType::setParameter`, or `ActionType::shutdown`.                                                                       |
+| `kMatchAnyResource`                    | `{ anyResource: true }`                      | Matches all storage resources, even [non-normal namespaces](#normal-namespace) such as `db.system.views`.                                                                                                           |
+| `kMatchAnyNormalResource`              | `{ db: '', collection: '' }`                 | Matches all [normal](#normal-namespace) storage resources, except those in the `config` and `local` databases, which are excluded entirely. Used with [builtin role](builtin_roles.tpl.cpp) `readWriteAnyDatabase`. |
+| `kMatchDatabaseName`                   | `{ db: 'dbname', collection: '' }`           | Matches all [normal](#normal-namespace) storage resources for a specific named database. Used with [builtin role](builtin_roles.tpl.cpp) `readWrite`.                                                               |
+| `kMatchCollectionName`                 | `{ db: '', collection: 'collname' }`         | Matches all storage resources, normal or not, which have the exact collection suffix '`collname`'. For example, to provide read-only access to `*.system.js`.                                                       |
+| `kMatchExactNamespace`                 | `{ db: 'dbname', collection: 'collname' }`   | Matches the exact namespace '`dbname`.`collname`'.                                                                                                                                                                  |
+| `kMatchAnySystemBucketResource`        | `{ db: '', system_buckets: '' }`             | Matches the namespace pattern `*.system.buckets.*`.                                                                                                                                                                 |
+| `kMatchAnySystemBucketInDBResource`    | `{ db: 'dbname', system_buckets: '' }`       | Matches the namespace pattern `dbname.system.buckets.*`.                                                                                                                                                            |
+| `kMatchAnySystemBucketInAnyDBResource` | `{ db: '', system_buckets: 'suffix' }`       | Matches the namespace pattern `*.system.buckets.suffix`.                                                                                                                                                            |
+| `kMatchExactSystemBucketResource`      | `{ db: 'dbname', system_buckets: 'suffix' }` | Matches the exact namespace `dbname.system.buckets.suffix`.                                                                                                                                                         |
 
 As `ResourcePattern`s are based on `NamespaceString`, they naturally include an optional `TenantId`,
 which scopes the pattern to a specific tenant in serverless. A user with a given `TenantId` can only
@@ -653,6 +690,10 @@ A "normal" resource is a `namespace` which does not match either of the followin
 | `*.system.*`      | `admin.system.version` `myDB.system.views` | Collections used by the database to support user collections. |
 
 See also: [NamespaceString::isNormalCollection()](../namespace_string.h)
+
+Note that this is purely a property of the namespace name. The set of namespaces matched by
+`kMatchAnyNormalResource` is strictly smaller: it also excludes the entire `config` and `local`
+databases. See [Normal resources](#normal-resources).
 
 #### ActionType
 
@@ -778,42 +819,20 @@ The user must supply roles when running the `createUser` command. Roles are stor
 
 #### LDAP Authorization
 
-LDAP authorization is an external method of getting roles. When a user authenticates using LDAP,
-there are roles stored in the User document specified by the LDAP system. The LDAP system relies on
-the
-[`AuthorizationBackendLDAP`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
-to make external requests to the LDAP server. The `AuthorizationBackendLDAP` overrides the
-`AuthorizationBackendLocal` for the current process, initially attempting to route all Authorization
-requests to LDAP and falling back on Local Authorization. LDAP queries are generated from
-[`UserRequest`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.cpp#L75-L113)
-objects, passing just the username into the query. If a user has specified the `userToDNMapping`
-server parameter, the `AuthorizationManager` calls the LDAPManager to transform the usernames into
-names that the LDAP server can understand. The LDAP subsystem relies on a complicated string
-escaping sequence, which is handled by the LDAPQuery class. After LDAP has returned the `User`
-document, it resolves role names into privileges by dispatching a call to
-[`Local::getUserObject`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.7.0/src/ldap/authz_manager_external_state_ldap.cpp#L110-L123)
-with a `UserRequest` struct containing a set of roles to be resolved.
+_(Enterprise only)_
 
-Connections to LDAP servers are made by the `LDAPManager` through the
-[`LDAPRunner`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_runner.h)
-by calling `bindAsUser()`. `BindAsUser()` attempts to set up a connection to the LDAP server using
-connection parameters specified through the command line when starting the process.The
-[`LDAPConnectionFactory`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/ldap_connection_factory.h)
-is the class that is actually tasked with establishing a connection and sending raw bytes over the
-wire to the LDAP server, all other classes decompose the information to send and use the factory to
-actually send the information. The `LDAPConnectionFactory` has its own thread pool and executor to
-drive throughput for authorization. LDAP has an
-[`LDAPUserCacheInvalidator`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_user_cache_invalidator_job.h)
-that periodically sweeps the `AuthorizationManager` and deletes user entries that have `$external`
-as their authentication database.
+LDAP authorization is an external method of getting roles used by the PLAIN and GSSAPI
+authentication mechanisms. Authorization backend selection is mechanism-aware: PLAIN and GSSAPI
+always use LDAP; MONGODB-OIDC uses claims-based authorization when `useAuthorizationClaim=true` (the
+default) or internal authorization when `useAuthorizationClaim=false`, and never consults LDAP in
+either mode; MONGODB-AWS always uses internal authorization regardless of whether LDAP is enabled;
+MONGODB-X509 uses LDAP by default when LDAP is enabled but can be switched to internal authorization
+via the `useInternalAuthzForX509` parameter.
 
-There are a few thread safety concerns when making connections to the LDAP server. MongoDB uses
-LibLDAP to make connections to the LDAP server. LibLDAP comes without any thread safety guarantees,
-so all the calls to libLDAP are wrapped with mutexes to ensure thread safety when connecting to LDAP
-servers on certain distros. The logic to see whether libLDAP is thread-safe lives
-[here](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/openldap_connection.cpp#L348-L378).
+For architecture details, deployment examples, and the interaction with other mechanisms, see
+[src/mongo/db/modules/enterprise/src/ldap/README.md](../modules/enterprise/src/ldap/README.md).
 
-#### <a name="x509azn"></a>X.509 Authorization
+#### <a name="x509-authorization"></a>X.509 Authorization
 
 In user acquisition in the
 [`AuthorizationManager`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager_impl.cpp#L454-L465),
@@ -830,6 +849,12 @@ to the AuthorizationBackend; in fact, they are resolved when the `UserRequest` i
 calling `addAndAuthorizeUser`. A tunable parameter in X509 Authorization is tlsCATrusts. TLSCATrusts
 is a setParameter that allows a user to specify a mapping of CAs that are trusted to use X509
 Authorization to a set of roles that are allowed to be specified by the CA.
+
+When LDAP is enabled, X.509 authorization defaults to the LDAP backend. The
+`useInternalAuthzForX509` parameter (settable at startup and runtime) routes X.509 to internal
+authorization instead, without affecting PLAIN or GSSAPI. The parameter is accepted in the Community
+edition but has no effect there since LDAP is not available and internal authorization is always
+used regardless of its value.
 
 ### Cursors and Operations
 
@@ -883,6 +908,13 @@ exceptions are `getMore` and `explain` since they inherit their checks from othe
 ## External References
 
 Refer to the following links for definitions of the Classes referenced in this document:
+
+For enterprise-only mechanism-aware and LDAP backend routing behavior, see
+[src/mongo/db/modules/enterprise/src/ldap/README.md](/src/mongo/db/modules/enterprise/src/ldap/README.md).
+
+For enterprise-only SASL mechanisms (MONGODB-AWS, MONGODB-OIDC, GSSAPI, and LDAP-backed PLAIN),
+including configuration examples and a comparison with community mechanisms, see
+[src/mongo/db/modules/enterprise/src/sasl/README.md](/src/mongo/db/modules/enterprise/src/sasl/README.md).
 
 | Class                            | File                                                                                                       | Description                                                                                                                              |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
