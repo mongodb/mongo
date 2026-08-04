@@ -731,15 +731,11 @@ server_parameters:
     initialSyncWaitForSyncSourceLastStableRecoveryTs:
         description: >-
             If true, during initial sync, we will wait for the sync source to advance its lastStableRecoveryTimestamp
-            to our beginApplyingTimestamp before starting collection cloning. This is to prevent a bug where we may miss
-            documents during collection clone if our sync source restarts. Please see SERVER-113184 for more details.
-            IMPORTANT: Turning this server parameter off will introduce risk for inconsistent data after initial sync.
-            Only turn this off if initial sync is unable to wait for sync source propagation, and run data consistency
-            validation after initial sync completes.
+            to our beginApplyingTimestamp before starting collection cloning.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
         cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTs
-        default: true
+        default: false
         redact: false
 
     initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs:
