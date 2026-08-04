@@ -731,7 +731,7 @@ private:
     // CancelableOperationContext must have a thread that is always available to it to mark its
     // opCtx as killed when the cancelToken has been cancelled.
     const std::shared_ptr<ThreadPool> _markKilledExecutor;
-    std::unique_ptr<HierarchicalCancelableOperationContextFactory> _cancelableOpCtxFactory;
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> _cancelableOpCtxFactory;
 
     /**
      * Must be locked while the `_canEnterCritical` promise is being fulfilled.

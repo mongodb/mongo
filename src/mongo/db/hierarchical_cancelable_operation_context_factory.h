@@ -22,7 +22,8 @@ namespace mongo {
  * parent token, the onCancel listener for the parent token will added permanently until the parent
  * token is destroyed.
  */
-class HierarchicalCancelableOperationContextFactory {
+class HierarchicalCancelableOperationContextFactory
+    : public std::enable_shared_from_this<HierarchicalCancelableOperationContextFactory> {
 public:
     HierarchicalCancelableOperationContextFactory(CancellationToken parentCancelToken,
                                                   ExecutorPtr executor);
@@ -37,14 +38,19 @@ public:
     HierarchicalCancelableOperationContextFactory& operator=(
         HierarchicalCancelableOperationContextFactory&&) = delete;
 
-    std::unique_ptr<HierarchicalCancelableOperationContextFactory> createChild();
-
     /**
-     * Creates a child factory as a shared_ptr. Use this when the child needs to be captured
-     * in lambdas that may be copied (e.g., for future chains), as shared_ptr allows shared
-     * ownership to keep the child alive until all captures are destroyed.
+     * Creates a child factory whose cancellation source is chained onto this factory's token.
+     *
+     * The child holds a reference to this factory automatically, so this factory cannot be
+     * destroyed while the child is still in use. That matters because a cancellation signal reaches
+     * the child only by propagating through this factory. Destroying this factory dismisses its
+     * source rather than canceling it, and dismissal does not run cancellation callbacks, so the
+     * link would be broken: the child would never observe a cancellation from above, leaving it
+     * permanently unable to report cancellation or to kill the operation contexts it hands out.
+     *
+     * This factory must be shared_ptr-owned, or shared_from_this() throws bad_weak_ptr.
      */
-    std::shared_ptr<HierarchicalCancelableOperationContextFactory> createSharedChild();
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> createChild();
 
     int getHierarchyDepth() const {
         return _hierarchyDepth;
@@ -59,10 +65,17 @@ public:
         std::function<void(OperationContext*)> opCtxModifier = [](OperationContext*) {}) const;
 
 private:
-    HierarchicalCancelableOperationContextFactory(CancellationToken parentCancelToken,
-                                                  ExecutorPtr executor,
-                                                  int hierarchyDepth);
+    HierarchicalCancelableOperationContextFactory(
+        std::shared_ptr<const HierarchicalCancelableOperationContextFactory> parentFactory,
+        CancellationToken parentCancelToken,
+        ExecutorPtr executor,
+        int hierarchyDepth);
 
+    /**
+     * Keep a reference to the parent factory to prevent it from being destroyed while this factory
+     * is still in use.
+     */
+    const std::shared_ptr<const HierarchicalCancelableOperationContextFactory> _parentFactory;
     const CancellationSource _cancelSource;
     const CancellationToken _cancelToken;
     const ExecutorPtr _executor;

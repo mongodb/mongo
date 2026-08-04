@@ -305,7 +305,7 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                        // Ensure the flushes to create participant state machines don't get
                        // interrupted upon abort.
                        _cancelableOpCtxFactory =
-                           std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                           std::make_shared<HierarchicalCancelableOperationContextFactory>(
                                _ctHolder->getStepdownToken(), _markKilledExecutor);
                    })
                    .then([this] {
@@ -321,7 +321,7 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                        // Swap back to using operation contexts canceled upon abort until ready to
                        // persist the decision or unrecoverable error.
                        _cancelableOpCtxFactory =
-                           std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                           std::make_shared<HierarchicalCancelableOperationContextFactory>(
                                _ctHolder->getAbortToken(), _markKilledExecutor);
 
                        return status;
@@ -463,7 +463,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
 
             // Allow abort to continue except when stepped down.
             _cancelableOpCtxFactory =
-                std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                std::make_shared<HierarchicalCancelableOperationContextFactory>(
                     _ctHolder->getStepdownToken(), _markKilledExecutor);
 
             // If we're already quiesced here it means we failed over and need to preserve the
@@ -603,7 +603,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
         .runOn(**executor, _ctHolder->getAbortToken())
         .onCompletion([this](auto passthroughFuture) {
             _cancelableOpCtxFactory =
-                std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                std::make_shared<HierarchicalCancelableOperationContextFactory>(
                     _ctHolder->getStepdownToken(), _markKilledExecutor);
             return passthroughFuture;
         })
@@ -809,7 +809,7 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     _abortIfCoordinatorInAbortingOrQuiescingOrRequested(abortRequest);
 
     _markKilledExecutor->startup();
-    _cancelableOpCtxFactory = std::make_unique<HierarchicalCancelableOperationContextFactory>(
+    _cancelableOpCtxFactory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
         _ctHolder->getAbortToken(), _markKilledExecutor);
 
     return _isReshardingOpRedundant(executor)
@@ -836,7 +836,7 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
             })
         .onCompletion([this, self = shared_from_this(), executor](Status status) {
             _cancelableOpCtxFactory =
-                std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                std::make_shared<HierarchicalCancelableOperationContextFactory>(
                     _ctHolder->getStepdownToken(), _markKilledExecutor);
             return _quiesce(executor, std::move(status));
         })
