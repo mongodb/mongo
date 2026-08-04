@@ -104,6 +104,7 @@
 #include "mongo/util/time_support.h"
 
 #include <array>
+#include <limits>
 #include <mutex>
 #include <string_view>
 #include <type_traits>
@@ -2451,7 +2452,9 @@ bool MigrationDestinationManager::migrationWouldDropPITHistory(OperationContext*
         const unsigned preserveSecs = static_cast<unsigned>(overriddenPitWindowToPreserveInSecs);
         const unsigned oldestSecs =
             (currTimeSeconds > preserveSecs) ? (currTimeSeconds - preserveSecs) : 0U;
-        oldestTimestamp = Timestamp(oldestSecs, 0);
+        // The preservation window is configured in seconds. Use the largest iteration so that
+        // timestamps in the cutoff second are considered older than the window as well.
+        oldestTimestamp = Timestamp(oldestSecs, std::numeric_limits<uint32_t>::max());
     }
 
     // A stored chunk drops PIT history when it is owned by another shard, is not fully covered by

@@ -392,6 +392,26 @@ TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkAgedOutByOverrid
     ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k50)));
 }
 
+// A zero-second preservation window also ages out ownership transitions in the current second,
+// regardless of their timestamp iteration.
+TEST_F(MigrationDestinationManagerTest,
+       PITReachableUnownedChunkSameSecondHigherIterationAgedOutByOverride) {
+    unittest::ServerParameterGuard overriddenPitWindowToPreserve(
+        "migrationRecipientPITHistoryToPreserveInSecs", 0);
+    const auto currentTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(currentTimestamp.getSecs(), 1), kOtherShard},
+                             {Timestamp(currentTimestamp.getSecs(), 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(1, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k50)));
+}
+
 // A reachable unowned entry extending below the span's min is likewise a conflict.
 TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkExtendsBelowSpanMin) {
     const auto collUuid = UUID::gen();

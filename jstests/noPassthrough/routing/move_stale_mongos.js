@@ -8,13 +8,16 @@ const st = new ShardingTest({
     shards: 3,
     mongos: 2,
     other: {
-        // Reduce the snapshot history window to 0 to allow chunks to be migrated back and forth between shards.
-        configOptions: {
+        rsOptions: {
             setParameter: {
-                minSnapshotHistoryWindowInSeconds: 0,
+                // Reduce migrationRecipientPITHistoryToPreserveInSecs to 0 to allow chunks to be
+                // migrated back and forth between shards.
+                // There is no risk in doing so because `test.foo` collection is not receiving snapshot reads.
+                migrationRecipientPITHistoryToPreserveInSecs: 0,
+                // Set orphanCleanupDelaySecs to 0 to speed up this test.
+                orphanCleanupDelaySecs: 0,
             },
         },
-        rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: 0}},
     },
 });
 let admin = st.s0.getDB("admin");
