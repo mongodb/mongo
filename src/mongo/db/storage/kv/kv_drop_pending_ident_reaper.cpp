@@ -396,6 +396,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
                       logv2::LogSeverity::Log(),
                       retries,
                       "Retrying immediate drop of drop-pending ident",
+                      "ident"_attr = ident,
                       "error"_attr = status);
     }
 }
