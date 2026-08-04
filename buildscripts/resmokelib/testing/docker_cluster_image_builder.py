@@ -504,6 +504,7 @@ class DockerComposeImageBuilder:
         if os.path.exists(qa_repo_destination):
             print(f"\n\tFound existing QA repo at: {qa_repo_destination}\n")
         else:
+            self._require_repo_pre_cloned_in_evergreen("QA", qa_repo_destination)
             print("Cloning QA repo to build context...")
             self._clone_repo("10gen", "QA", qa_repo_destination, get_expansion("github_token_qa"))
             print("Done cloning QA repo to build context.")
@@ -520,6 +521,7 @@ class DockerComposeImageBuilder:
         if os.path.exists(jstestfuzz_repo_destination):
             print(f"\n\tFound existing jstestfuzz repo at: {jstestfuzz_repo_destination}\n")
         else:
+            self._require_repo_pre_cloned_in_evergreen("jstestfuzz", jstestfuzz_repo_destination)
             print("Cloning jstestfuzz repo to build context...")
             self._clone_repo(
                 "10gen",
@@ -618,6 +620,22 @@ class DockerComposeImageBuilder:
                 file.write(disclaimer_message)
             print(
                 "Done writing stub `libvoidstar.so` to build context -- This is for development only."
+            )
+
+    def _require_repo_pre_cloned_in_evergreen(self, repo, destination):
+        """
+        Require that `repo` was already cloned into the build context when running in Evergreen.
+
+        The GitHub tokens in the expansions are generated at the start of the `antithesis image build
+        and push` function and expire one hour later, well before the image build reaches this point.
+        `evergreen/antithesis_clone_repos.sh` clones these repos up front instead, so reaching here
+        in Evergreen means that step did not run rather than that the clone is expected to work.
+        """
+        if self.in_evergreen:
+            raise RuntimeError(
+                f"No `{repo}` repo at: {destination} -- it should have been cloned by "
+                "`evergreen/antithesis_clone_repos.sh` before the image build started. Cloning it "
+                "here would use an expired GitHub token."
             )
 
     def _clone_repo(self, owner, repo, destination, token):
