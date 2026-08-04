@@ -127,11 +127,12 @@ BSONObj CollStatsStage::makeStatsForNs(const boost::intrusive_ptr<ExpressionCont
     // If filtering is required by the metrics policy, extract and append only the
     // metrics matching the allowlist to a separate builder and return the resulting object.
     auto& metricsPolicyManager = MetricsPolicyManager::get(expCtx->getOperationContext());
-    bool shouldFilter =
-        metricsPolicyManager.requiresCollStatsFiltering(expCtx->getOperationContext());
+    bool shouldFilter = metricsPolicyManager.requiresFiltering(
+        MetricsCategoryEnum::kCollStats, expCtx->getOperationContext(), /*forceFiltered=*/false);
 
     if (shouldFilter) {
-        const auto& matcher = metricsPolicyManager.getCollStatsAllowlistMatcher();
+        const auto& matcher =
+            metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kCollStats);
         BSONObjBuilder filteredBuilder;
         metrics_filtering_util::appendPaths(filteredBuilder, builder.obj(), matcher);
         return filteredBuilder.obj();

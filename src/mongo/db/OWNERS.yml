@@ -389,3 +389,6 @@ filters:
   - "metrics_policy_manager*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "metrics_category.idl":
+    approvers:
+      - 10gen/server-networking-and-observability

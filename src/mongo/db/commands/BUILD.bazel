@@ -428,6 +428,7 @@ idl_generator(
     src = "list_metrics_filtering_allowlist_command.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:metrics_category_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )

@@ -6,104 +6,53 @@
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string>
+
 namespace mongo {
 namespace {
 
-class MetricsPolicyManagerDefaultTest : public unittest::Test {};
+class MetricsPolicyManagerDefaultRegistrationTest : public unittest::Test {};
 
-TEST_F(MetricsPolicyManagerDefaultTest, IsAutoRegisteredOnServiceContextCreation) {
+TEST_F(MetricsPolicyManagerDefaultRegistrationTest, IsAutoRegisteredOnServiceContextCreation) {
     // The default metrics policy manager is auto-registered via ConstructorActionRegisterer,
     // so it should be available on any ServiceContext.
     auto svcCtx = ServiceContext::make();
     auto& manager = MetricsPolicyManager::get(svcCtx.get());
-    ASSERT_FALSE(manager.requiresServerStatusFiltering(/*opCtx=*/nullptr, /*forceFiltered=*/false));
+    ASSERT_FALSE(manager.requiresFiltering(
+        MetricsCategoryEnum::kServerStatus, /*opCtx=*/nullptr, /*forceFiltered=*/false));
 }
 
-//
-// Tests for serverStatus.
-//
+class MetricsPolicyManagerDefaultFilteringTest
+    : public unittest::Test,
+      public testing::WithParamInterface<MetricsCategoryEnum> {};
 
-TEST_F(MetricsPolicyManagerDefaultTest, DoesNotRequireServerStatusFiltering) {
+TEST_P(MetricsPolicyManagerDefaultFilteringTest, DoesNotRequireFiltering) {
     auto manager = std::make_unique<MetricsPolicyManagerDefault>();
     ASSERT_FALSE(
-        manager->requiresServerStatusFiltering(/*opCtx=*/nullptr, /*forceFiltered=*/false));
+        manager->requiresFiltering(GetParam(), /*opCtx=*/nullptr, /*forceFiltered=*/false));
 }
 
-TEST_F(MetricsPolicyManagerDefaultTest, GetServerStatusAllowlistPathsThrowsIllegalOperation) {
+TEST_P(MetricsPolicyManagerDefaultFilteringTest, GetAllowlistPathsThrowsIllegalOperation) {
     auto manager = std::make_unique<MetricsPolicyManagerDefault>();
     ASSERT_THROWS_CODE(
-        manager->getServerStatusAllowlistPaths(), DBException, ErrorCodes::IllegalOperation);
+        manager->getAllowlistPaths(GetParam()), DBException, ErrorCodes::IllegalOperation);
 }
 
-TEST_F(MetricsPolicyManagerDefaultTest, GetServerStatusAllowlistMatcherThrowsIllegalOperation) {
+TEST_P(MetricsPolicyManagerDefaultFilteringTest, GetAllowlistMatcherThrowsIllegalOperation) {
     auto manager = std::make_unique<MetricsPolicyManagerDefault>();
     ASSERT_THROWS_CODE(
-        manager->getServerStatusAllowlistMatcher(), DBException, ErrorCodes::IllegalOperation);
+        manager->getAllowlistMatcher(GetParam()), DBException, ErrorCodes::IllegalOperation);
 }
 
-//
-// Tests for replSetGetStatus.
-//
-
-TEST_F(MetricsPolicyManagerDefaultTest, DoesNotRequireReplSetGetStatusFiltering) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_FALSE(
-        manager->requiresReplSetGetStatusFiltering(/*opCtx=*/nullptr, /*forceFiltered=*/false));
-}
-
-TEST_F(MetricsPolicyManagerDefaultTest, GetReplSetGetStatusAllowlistPathsThrowsIllegalOperation) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_THROWS_CODE(
-        manager->getReplSetGetStatusAllowlistPaths(), DBException, ErrorCodes::IllegalOperation);
-}
-
-TEST_F(MetricsPolicyManagerDefaultTest, GetReplSetGetStatusAllowlistMatcherThrowsIllegalOperation) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_THROWS_CODE(
-        manager->getReplSetGetStatusAllowlistMatcher(), DBException, ErrorCodes::IllegalOperation);
-}
-
-//
-// Tests for collStats.
-//
-
-TEST_F(MetricsPolicyManagerDefaultTest, DoesNotRequireCollStatsFiltering) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_FALSE(manager->requiresCollStatsFiltering(/*opCtx=*/nullptr));
-}
-
-TEST_F(MetricsPolicyManagerDefaultTest, GetCollStatsAllowlistPathsThrowsIllegalOperation) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_THROWS_CODE(
-        manager->getCollStatsAllowlistPaths(), DBException, ErrorCodes::IllegalOperation);
-}
-
-TEST_F(MetricsPolicyManagerDefaultTest, GetCollStatsAllowlistMatcherThrowsIllegalOperation) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_THROWS_CODE(
-        manager->getCollStatsAllowlistMatcher(), DBException, ErrorCodes::IllegalOperation);
-}
-
-//
-// Tests for dbStats.
-//
-
-TEST_F(MetricsPolicyManagerDefaultTest, DoesNotRequireDbStatsFiltering) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_FALSE(manager->requiresDbStatsFiltering(/*opCtx=*/nullptr));
-}
-
-TEST_F(MetricsPolicyManagerDefaultTest, GetDbStatsAllowlistPathsThrowsIllegalOperation) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_THROWS_CODE(
-        manager->getDbStatsAllowlistPaths(), DBException, ErrorCodes::IllegalOperation);
-}
-
-TEST_F(MetricsPolicyManagerDefaultTest, GetDbStatsAllowlistMatcherThrowsIllegalOperation) {
-    auto manager = std::make_unique<MetricsPolicyManagerDefault>();
-    ASSERT_THROWS_CODE(
-        manager->getDbStatsAllowlistMatcher(), DBException, ErrorCodes::IllegalOperation);
-}
+INSTANTIATE_TEST_SUITE_P(AllCategories,
+                         MetricsPolicyManagerDefaultFilteringTest,
+                         testing::Values(MetricsCategoryEnum::kServerStatus,
+                                         MetricsCategoryEnum::kReplSetGetStatus,
+                                         MetricsCategoryEnum::kCollStats,
+                                         MetricsCategoryEnum::kDbStats),
+                         [](const testing::TestParamInfo<MetricsCategoryEnum>& info) {
+                             return std::string{idlSerialize(info.param)};
+                         });
 
 }  // namespace
 }  // namespace mongo

@@ -114,8 +114,8 @@ public:
                 checkIfAuthorizedForForceFiltered(opCtx);
             }
         }
-        bool requireFiltering =
-            metricsPolicyManager.requiresReplSetGetStatusFiltering(opCtx, forceFiltered);
+        bool requireFiltering = metricsPolicyManager.requiresFiltering(
+            MetricsCategoryEnum::kReplSetGetStatus, opCtx, forceFiltered);
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {
@@ -130,7 +130,8 @@ public:
         // If filtering is required, we appended the metrics fields to a temporary result builder.
         // Now extract and append only the ones matching the allowlist to the input result builder.
         if (requireFiltering) {
-            const auto& matcher = metricsPolicyManager.getReplSetGetStatusAllowlistMatcher();
+            const auto& matcher =
+                metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kReplSetGetStatus);
             metrics_filtering_util::appendPaths(
                 inputResultBuilder, tmpResultBuilder->obj(), matcher);
         }

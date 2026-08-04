@@ -1,0 +1,16 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+
+enums:
+    MetricsCategory:
+        mod_visibility: public
+        description: "The categories of metrics that can be filtered"
+        type: string
+        values:
+            kServerStatus: "serverStatus"
+            kReplSetGetStatus: "replSetGetStatus"
+            kCollStats: "collStats"
+            kDbStats: "dbStats"

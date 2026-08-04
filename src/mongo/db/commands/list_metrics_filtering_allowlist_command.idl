@@ -6,17 +6,8 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/metrics_category.idl"
     - "mongo/idl/generic_argument.idl"
-
-enums:
-    MetricsCategory:
-        description: "Enum for metrics filtering categories"
-        type: string
-        values:
-            serverStatus: "serverStatus"
-            replSetGetStatus: "replSetGetStatus"
-            collStats: "collStats"
-            dbStats: "dbStats"
 
 structs:
     ListMetricsFilteringAllowlistReply:

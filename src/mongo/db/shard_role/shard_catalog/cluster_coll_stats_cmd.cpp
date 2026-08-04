@@ -255,7 +255,8 @@ public:
         // result builder and filter them at the end. Otherwise, append directly to the input
         // result builder to avoid additional costs in the non-filtering case.
         auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
-        bool requireFiltering = metricsPolicyManager.requiresCollStatsFiltering(opCtx);
+        bool requireFiltering = metricsPolicyManager.requiresFiltering(
+            MetricsCategoryEnum::kCollStats, opCtx, /*forceFiltered=*/false);
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {
@@ -498,7 +499,8 @@ public:
         // If filtering is required, we appended the metrics in a temporary result builder.
         // Now extract and append only the ones matching the allowlist to the input result builder.
         if (success && requireFiltering) {
-            const auto& matcher = metricsPolicyManager.getCollStatsAllowlistMatcher();
+            const auto& matcher =
+                metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kCollStats);
             appendFilteredResults(inputResultBuilder, tmpResultBuilder->asTempObj(), matcher);
         }
 

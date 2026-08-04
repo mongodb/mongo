@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/metrics_category_gen.h"
 #include "mongo/db/metrics_filtering_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
@@ -38,76 +39,27 @@ public:
     static void set(ServiceContext* svcCtx, std::unique_ptr<MetricsPolicyManager>&& manager);
 
     /**
-     * Returns whether serverStatus metrics filtering is required for the given client.
-     * The value of forceFiltered is ignored if metrics filtering is not enabled or supported.
+     * Returns whether filtering of the given MetricsCategoryEnum is required for the given client.
+     * For categories that support forced filtering, the value of forceFiltered is ignored if
+     * metrics filtering is not enabled or supported. For categories that do not, forceFiltered is
+     * expected to always be false.
      */
-    virtual bool requiresServerStatusFiltering(OperationContext* opCtx,
-                                               bool forcedFiltered) const = 0;
+    virtual bool requiresFiltering(MetricsCategoryEnum category,
+                                   OperationContext* opCtx,
+                                   bool forcedFiltered) const = 0;
 
     /**
-     * Returns a reference to the allowlist paths for serverStatus filtering. Throws
+     * Returns a reference to the allowlist paths for the given MetricsCategoryEnum filtering.
+     * Throws IllegalOperation if metrics should never be filtered.
+     */
+    virtual const std::vector<std::string>& getAllowlistPaths(
+        MetricsCategoryEnum category) const = 0;
+
+    /**
+     * Returns a reference to the path matcher for the given MetricsCategoryEnum filtering. Throws
      * IllegalOperation if metrics should never be filtered.
      */
-    virtual const std::vector<std::string>& getServerStatusAllowlistPaths() const = 0;
-
-    /**
-     * Returns a reference to the path matcher for serverStatus filtering. Throws IllegalOperation
-     * if metrics should never be filtered.
-     */
-    virtual const PathMatcherNode& getServerStatusAllowlistMatcher() const = 0;
-
-    /**
-     * Returns whether replSetGetStatus metrics filtering is required for the given client.
-     * The value of forceFiltered is ignored if metrics filtering is not enabled or supported.
-     */
-    virtual bool requiresReplSetGetStatusFiltering(OperationContext* opCtx,
-                                                   bool forceFiltered) const = 0;
-
-    /**
-     * Returns a reference to the allowlist paths for replSetGetStatus filtering. Throws
-     * IllegalOperation if metrics should never be filtered.
-     */
-    virtual const std::vector<std::string>& getReplSetGetStatusAllowlistPaths() const = 0;
-
-    /**
-     * Returns a reference to the path matcher for replSetGetStatus filtering. Throws
-     * IllegalOperation if metrics should never be filtered.
-     */
-    virtual const PathMatcherNode& getReplSetGetStatusAllowlistMatcher() const = 0;
-
-    /**
-     * Returns whether collStats metrics filtering is required for the given client.
-     */
-    virtual bool requiresCollStatsFiltering(OperationContext* opCtx) const = 0;
-
-    /**
-     * Returns a reference to the allowlist paths for collStats filtering. Throws
-     * IllegalOperation if metrics should never be filtered.
-     */
-    virtual const std::vector<std::string>& getCollStatsAllowlistPaths() const = 0;
-
-    /**
-     * Returns a reference to the path matcher for collStats filtering. Throws IllegalOperation
-     * if metrics should never be filtered.
-     */
-    virtual const PathMatcherNode& getCollStatsAllowlistMatcher() const = 0;
-
-    /**
-     * Returns whether dbStats metrics filtering is required for the given client.
-     */
-    virtual bool requiresDbStatsFiltering(OperationContext* opCtx) const = 0;
-
-    /**
-     * Returns a reference to the allowlist paths for dbStats filtering. Throws
-     * IllegalOperation if metrics should never be filtered.
-     */
-    virtual const std::vector<std::string>& getDbStatsAllowlistPaths() const = 0;
-
-    /**
-     * Returns a reference to the path matcher for dbStats filtering. Throws IllegalOperation
-     * if metrics should never be filtered.
-     */
-    virtual const PathMatcherNode& getDbStatsAllowlistMatcher() const = 0;
+    virtual const PathMatcherNode& getAllowlistMatcher(MetricsCategoryEnum category) const = 0;
 
 protected:
     /**

@@ -361,7 +361,8 @@ public:
             // result builder and filter them at the end. Otherwise, append directly to the input
             // result builder to avoid additional costs in the non-filtering case.
             auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
-            bool requireFiltering = metricsPolicyManager.requiresCollStatsFiltering(opCtx);
+            bool requireFiltering = metricsPolicyManager.requiresFiltering(
+                MetricsCategoryEnum::kCollStats, opCtx, /*forceFiltered=*/false);
 
             auto serializationCtx =
                 SerializationContext::stateCommandReply(request().getSerializationContext());
@@ -385,7 +386,8 @@ public:
             // Now extract and append only the ones matching the allowlist to the input result
             // builder.
             if (requireFiltering) {
-                const auto& matcher = metricsPolicyManager.getCollStatsAllowlistMatcher();
+                const auto& matcher =
+                    metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kCollStats);
                 metrics_filtering_util::appendPaths(
                     inputResultBuilder, tmpResultBuilder->obj(), matcher);
             }
@@ -499,10 +501,12 @@ public:
 
             // If filtering is required by the metrics policy, filter the reply before returning.
             auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
-            if (metricsPolicyManager.requiresDbStatsFiltering(opCtx)) {
+            if (metricsPolicyManager.requiresFiltering(
+                    MetricsCategoryEnum::kDbStats, opCtx, /*forceFiltered=*/false)) {
                 BSONObj replyBSON = reply.toBSON();
                 BSONObjBuilder filteredBuilder;
-                const auto& matcher = metricsPolicyManager.getDbStatsAllowlistMatcher();
+                const auto& matcher =
+                    metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kDbStats);
                 metrics_filtering_util::appendPaths(filteredBuilder, replyBSON, matcher);
                 reply = Reply::parseOwned(filteredBuilder.obj());
             }

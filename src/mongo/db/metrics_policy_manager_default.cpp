@@ -15,52 +15,18 @@ ServiceContext::ConstructorActionRegisterer registerMetricsPolicyManager{
 
 }  // namespace
 
-bool MetricsPolicyManagerDefault::requiresServerStatusFiltering(OperationContext*, bool) const {
+bool MetricsPolicyManagerDefault::requiresFiltering(MetricsCategoryEnum,
+                                                    OperationContext*,
+                                                    bool) const {
     return false;
 }
 
-const std::vector<std::string>& MetricsPolicyManagerDefault::getServerStatusAllowlistPaths() const {
+const std::vector<std::string>& MetricsPolicyManagerDefault::getAllowlistPaths(
+    MetricsCategoryEnum) const {
     _throwNoAllowlistError();
 }
 
-const PathMatcherNode& MetricsPolicyManagerDefault::getServerStatusAllowlistMatcher() const {
-    _throwNoAllowlistError();
-}
-
-bool MetricsPolicyManagerDefault::requiresReplSetGetStatusFiltering(OperationContext*, bool) const {
-    return false;
-}
-
-const std::vector<std::string>& MetricsPolicyManagerDefault::getReplSetGetStatusAllowlistPaths()
-    const {
-    _throwNoAllowlistError();
-}
-
-const PathMatcherNode& MetricsPolicyManagerDefault::getReplSetGetStatusAllowlistMatcher() const {
-    _throwNoAllowlistError();
-}
-
-bool MetricsPolicyManagerDefault::requiresCollStatsFiltering(OperationContext* opCtx) const {
-    return false;
-}
-
-const std::vector<std::string>& MetricsPolicyManagerDefault::getCollStatsAllowlistPaths() const {
-    _throwNoAllowlistError();
-}
-
-const PathMatcherNode& MetricsPolicyManagerDefault::getCollStatsAllowlistMatcher() const {
-    _throwNoAllowlistError();
-}
-
-bool MetricsPolicyManagerDefault::requiresDbStatsFiltering(OperationContext* opCtx) const {
-    return false;
-}
-
-const std::vector<std::string>& MetricsPolicyManagerDefault::getDbStatsAllowlistPaths() const {
-    _throwNoAllowlistError();
-}
-
-const PathMatcherNode& MetricsPolicyManagerDefault::getDbStatsAllowlistMatcher() const {
+const PathMatcherNode& MetricsPolicyManagerDefault::getAllowlistMatcher(MetricsCategoryEnum) const {
     _throwNoAllowlistError();
 }
 

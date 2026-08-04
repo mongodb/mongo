@@ -138,8 +138,8 @@ public:
                 checkIfAuthorizedForForceFiltered(opCtx);
             }
         }
-        bool requireFiltering =
-            metricsPolicyManager.requiresServerStatusFiltering(opCtx, forceFiltered);
+        bool requireFiltering = metricsPolicyManager.requiresFiltering(
+            MetricsCategoryEnum::kServerStatus, opCtx, forceFiltered);
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {
@@ -257,7 +257,8 @@ public:
         // builder. Now extract and append only the ones matching the allowlist to the input result
         // builder.
         if (requireFiltering) {
-            const auto& matcher = metricsPolicyManager.getServerStatusAllowlistMatcher();
+            const auto& matcher =
+                metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kServerStatus);
             metrics_filtering_util::appendPaths(
                 inputResultBuilder, tmpResultBuilder->obj(), matcher);
         }

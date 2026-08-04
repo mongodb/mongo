@@ -54,22 +54,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
 
-            switch (request().getCategory()) {
-                case MetricsCategoryEnum::serverStatus: {
-                    return {metricsPolicyManager.getServerStatusAllowlistPaths()};
-                }
-                case MetricsCategoryEnum::replSetGetStatus: {
-                    return {metricsPolicyManager.getReplSetGetStatusAllowlistPaths()};
-                }
-                case MetricsCategoryEnum::collStats: {
-                    return {metricsPolicyManager.getCollStatsAllowlistPaths()};
-                }
-                case MetricsCategoryEnum::dbStats: {
-                    return {metricsPolicyManager.getDbStatsAllowlistPaths()};
-                }
-            }
-
-            uasserted(ErrorCodes::BadValue, "Unsupported metrics category");
+            return {metricsPolicyManager.getAllowlistPaths(request().getCategory())};
         }
     };
 };

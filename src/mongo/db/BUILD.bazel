@@ -3926,10 +3926,16 @@ mongo_cc_unit_test(
     ],
 )
 
+idl_generator(
+    name = "metrics_category_gen",
+    src = "metrics_category.idl",
+)
+
 mongo_cc_library(
     name = "metrics_policy_manager",
     srcs = [
         "metrics_policy_manager.cpp",
+        ":metrics_category_gen",
     ],
     hdrs = [
         "metrics_policy_manager.h",

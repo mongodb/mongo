@@ -17,29 +17,11 @@ class OperationContext;
  */
 class MetricsPolicyManagerDefault : public MetricsPolicyManager {
 public:
-    bool requiresServerStatusFiltering(OperationContext*, bool) const override;
+    bool requiresFiltering(MetricsCategoryEnum, OperationContext*, bool) const override;
 
-    const std::vector<std::string>& getServerStatusAllowlistPaths() const override;
+    const std::vector<std::string>& getAllowlistPaths(MetricsCategoryEnum) const override;
 
-    const PathMatcherNode& getServerStatusAllowlistMatcher() const override;
-
-    bool requiresReplSetGetStatusFiltering(OperationContext*, bool) const override;
-
-    const std::vector<std::string>& getReplSetGetStatusAllowlistPaths() const override;
-
-    const PathMatcherNode& getReplSetGetStatusAllowlistMatcher() const override;
-
-    bool requiresCollStatsFiltering(OperationContext* opCtx) const override;
-
-    const std::vector<std::string>& getCollStatsAllowlistPaths() const override;
-
-    const PathMatcherNode& getCollStatsAllowlistMatcher() const override;
-
-    bool requiresDbStatsFiltering(OperationContext* opCtx) const override;
-
-    const std::vector<std::string>& getDbStatsAllowlistPaths() const override;
-
-    const PathMatcherNode& getDbStatsAllowlistMatcher() const override;
+    const PathMatcherNode& getAllowlistMatcher(MetricsCategoryEnum) const override;
 };
 
 }  // namespace mongo
