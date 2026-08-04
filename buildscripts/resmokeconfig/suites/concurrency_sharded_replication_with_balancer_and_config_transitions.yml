@@ -59,6 +59,13 @@ selector:
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/concurrency/fsm_workloads/cleanup_orphaned_with_balancer.js
 
+    # Cycles the FCV, which is incompatible with continuous shard transitions: removing a shard
+    # requires draining it via moveCollection, and resharding refuses to run during an FCV
+    # transition (ReshardCollectionInterruptedDueToFCVChange). The transition thread treats that as
+    # fatal and dies, after which no test can complete its end-of-test hook handshake
+    # (SERVER-125400).
+    - jstests/concurrency/fsm_workloads/index_builds/create_index_fcv_downgrade.js
+
   exclude_with_any_tags:
     - requires_standalone
     - assumes_against_mongod_not_mongos

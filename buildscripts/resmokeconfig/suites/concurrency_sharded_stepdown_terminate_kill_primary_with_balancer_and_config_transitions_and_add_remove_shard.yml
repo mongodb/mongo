@@ -73,6 +73,13 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
+    # Cycles the FCV, which is incompatible with continuous shard transitions: removing a shard
+    # requires draining it via moveCollection, and resharding refuses to run during an FCV
+    # transition (ReshardCollectionInterruptedDueToFCVChange). The transition thread treats that as
+    # fatal and dies, after which no test can complete its end-of-test hook handshake
+    # (SERVER-125400).
+    - jstests/concurrency/fsm_workloads/index_builds/create_index_fcv_downgrade.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
