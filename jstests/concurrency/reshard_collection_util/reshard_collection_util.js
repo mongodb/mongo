@@ -31,6 +31,8 @@ export function executeReshardCollection($config, db, collName, connCache, sameK
         };
         if (sameKeyResharding) {
             reshardCollectionCmdObj.forceRedistribution = true;
+            // TODO(SERVER-131275): Remove reshardingUUID once the reshardCollectionCoordinator supports retryability.
+            reshardCollectionCmdObj.reshardingUUID = UUID();
         }
 
         print(`Started resharding collection ${ns}: ${tojson({newShardKey})}`);

@@ -46,6 +46,8 @@ export const $config = (function () {
         };
         if (forceRedistribution) {
             reshardCollectionCmd.forceRedistribution = forceRedistribution;
+            // TODO(SERVER-131275): Remove reshardingUUID once the reshardCollectionCoordinator supports retryability.
+            reshardCollectionCmd.reshardingUUID = UUID();
         }
         if (TestData.runningWithShardStepdowns) {
             assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd), [
