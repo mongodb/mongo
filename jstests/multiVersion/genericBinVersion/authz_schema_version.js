@@ -109,6 +109,9 @@ function testMixedVersionInitialSync(primaryBinVersion, newNodeBinVersion) {
     const currentVersion = adminDB[authSchemaColl].findOne({_id: "authSchema"}).currentVersion;
     assert.eq(currentVersion, schemaVersion28SCRAM);
 
+    // 'newNodeBinVersion' may be older than the set, and initial syncs from one of these nodes.
+    rst.forceCheckpointPastFCVTransition(primary);
+
     // Add a newNodeBinVersion node to the replica set and check that initial sync succeeds. The new
     // node will have no priority or
     let secondary = rst.add({

@@ -37,6 +37,9 @@ function runTest(downgradeVersion) {
             .runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
     );
 
+    // The downgrade node initial syncs from one of these nodes.
+    rst.forceCheckpointPastFCVTransition(primary);
+
     // Add a downgrade node to the set.
     let downgradeSecondary = rst.add({binVersion: downgradeVersion, rsConfig: {priority: 0}});
     rst.reInitiate();

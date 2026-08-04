@@ -453,6 +453,9 @@ function runReplicaSetTest(downgradeVersion) {
         );
     }
 
+    // The 'downgradeVersion' secondary below initial syncs from one of these nodes.
+    rst.forceCheckpointPastFCVTransition(primary);
+
     secondary = rst.add({binVersion: downgradeVersion});
     secondaryAdminDB = secondary.getDB("admin");
 
@@ -497,6 +500,9 @@ function runReplicaSetTest(downgradeVersion) {
         primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
     );
     rst.awaitReplication();
+
+    // The 'downgradeVersion' node below initial syncs from one of these nodes.
+    rst.forceCheckpointPastFCVTransition(primary);
 
     // Add a 'downgradeVersion' binary node to the set.
     secondary = rst.add({binVersion: downgradeVersion});

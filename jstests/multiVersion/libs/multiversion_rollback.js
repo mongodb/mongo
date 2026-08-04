@@ -350,6 +350,9 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
         initialPrimary.adminCommand({setFeatureCompatibilityVersion: lowerVersion, confirm: true}),
     );
 
+    // The third node runs an older binary and initial syncs from one of these nodes.
+    rst.forceCheckpointPastFCVTransition(initialPrimary);
+
     jsTestLog(`[${testName}] Bringing up third node with version ${lowerVersion}`);
     rst.add({binVersion: lowerVersion});
     rst.reInitiate();

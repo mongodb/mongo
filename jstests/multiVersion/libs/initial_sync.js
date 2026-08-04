@@ -43,6 +43,9 @@ export var multversionInitialSyncTest = function (
     }
     rst.awaitReplication();
 
+    // 'newNodeVersion' may be older than the set, and initial syncs from one of these nodes.
+    rst.forceCheckpointPastFCVTransition(primary);
+
     jsTestLog("Bringing up a new node with version '" + newNodeVersion + "' and adding to set.");
     rst.add({binVersion: newNodeVersion});
     rst.reInitiate();
