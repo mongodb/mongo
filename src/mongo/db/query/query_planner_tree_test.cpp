@@ -3010,6 +3010,49 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumer
     )");
 }
 
+// Lockstep OR enumeration composes with index intersection: each $or branch enumerates its
+// single-index plans as well as an intersection plan, and lockstep iteration walks all
+// combinations, including one where every branch uses an intersection.
+TEST_F(QueryPlannerTest, LockstepOrEnumerationWithIndexIntersection) {
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN |
+        QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+    addIndex(BSON("d" << 1));
+
+    runQuery(fromjson("{$or: [{a: 1, b: 1}, {c: 1, d: 1}]}"));
+
+    // Each branch has three choices (index on the first field, index on the second field, and an
+    // andSorted intersection of both), giving 3 * 3 = 9 combinations, all within the OR
+    // enumeration limit.
+    assertNumSolutions(9U);
+
+    // The lockstep-prioritized "both branches use their first index" plan.
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {b: 1}, node: {ixscan: {filter: null, pattern: {a: 1}}}}},"
+        "{fetch: {filter: {d: 1}, node: {ixscan: {filter: null, pattern: {c: 1}}}}}]}}");
+
+    // Both branches use an index intersection.
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {a: 1, b: 1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a: 1}}},"
+        "{ixscan: {filter: null, pattern: {b: 1}}}]}}}},"
+        "{fetch: {filter: {c: 1, d: 1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {c: 1}}},"
+        "{ixscan: {filter: null, pattern: {d: 1}}}]}}}}]}}");
+
+    // A mixed combination: one branch intersected, the other on a single index.
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {a: 1, b: 1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a: 1}}},"
+        "{ixscan: {filter: null, pattern: {b: 1}}}]}}}},"
+        "{fetch: {filter: {d: 1}, node: {ixscan: {filter: null, pattern: {c: 1}}}}}]}}");
+}
+
 TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
     addIndex(BSON("one" << 1));
     addIndex(BSON("two" << 1));

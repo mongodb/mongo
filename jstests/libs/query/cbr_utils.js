@@ -185,3 +185,19 @@ export function setPlanRankerConfigOnAllNonConfigNodes(conn, config) {
         setPlanRankerConfig(new Mongo(host).getDB("admin"), config);
     }
 }
+
+/**
+ * Returns the cost estimate of a plan root, handling both the flat and the 'statistics.costBased'
+ * explain shapes.
+ */
+export function getCost(plan) {
+    if (plan.hasOwnProperty("costEstimate")) {
+        return plan.costEstimate;
+    }
+    assert(
+        plan.hasOwnProperty("statistics") && plan.statistics.hasOwnProperty("costBased"),
+        "plan has no cost estimate",
+        {plan},
+    );
+    return plan.statistics.costBased.costEstimate;
+}

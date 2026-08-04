@@ -1114,7 +1114,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
         IndexToPredMap::const_iterator secondIt = firstIt;
         secondIt++;
         for (; secondIt != idxToFirst.end(); secondIt++) {
-            const IndexEntry& firstIndex = (*_indices)[secondIt->first];
+            const IndexEntry& firstIndex = (*_indices)[firstIt->first];
             const IndexEntry& secondIndex = (*_indices)[secondIt->first];
 
             // Limit n^2.

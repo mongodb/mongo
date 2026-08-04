@@ -880,8 +880,7 @@ TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder2) {
 TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
-    // True means multikey.
-    addIndex(BSON("a" << 1), true);
+    addIndex(BSON("a" << 1), /*multikey*/ true);
 
     // This one goes to 11.
     runQuery(fromjson("{a:1, a:2, a:3, a:4, a:5, a:6, a:7, a:8, a:9, a:10, a:11}"));
@@ -899,6 +898,64 @@ TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
         "{ixscan: {filter: null, pattern: {a:1}}},"        // 8
         "{ixscan: {filter: null, pattern: {a:1}}},"        // 9
         "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");  // 10
+}
+
+// A query with exactly kMaxSelfIntersections (10) predicates over a multikey index gets the full
+// self-intersection plan without truncation.
+TEST_F(QueryPlannerTest, IntersectSelfIntersectionsAtCapBoundary) {
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1), /*multikey*/ true);
+
+    runQuery(fromjson("{a:1, a:2, a:3, a:4, a:5, a:6, a:7, a:8, a:9, a:10}"));
+
+    assertSolutionExists(
+        "{fetch: {node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 1
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 2
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 3
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 4
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 5
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 6
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 7
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 8
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 9
+        "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");  // 10
+}
+
+// internalQueryEnumerationMaxIntersectPerAnd bounds how many intersection choices the enumerator
+// generates per AND node; single-index plans are unaffected.
+TEST_F(QueryPlannerTest, IntersectPerAndLimitCapsIntersectionChoices) {
+    QueryKnobGuardForTest maxIntersectPerAnd{
+        opCtx.get(), "internalQueryEnumerationMaxIntersectPerAnd", 1};
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    runQuery(fromjson("{a: 1, b: 1, c: 1}"));
+
+    // Three intersection pairs are possible ({a,b}, {a,c}, {b,c}), but the limit stops enumeration
+    // after it is exceeded, so we get the three single-index plans plus a truncated set of
+    // intersection plans.
+    assertSolutionExists(
+        "{fetch: {filter: {b:1,c:1}, node: {ixscan: {filter: null, pattern: {a:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1,c:1}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1,b:1}, node: {ixscan: {filter: null, pattern: {c:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1,b:1,c:1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a:1}}},"
+        "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    // With the default limit (3) this query produces all three intersection pairs (6 solutions
+    // total); the limit of 1 must have truncated that set.
+    ASSERT_LT(getNumSolutions(), 6U);
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitIndexedAndLimit)
+            << "solution did not report hitIndexedAndLimit: " << soln->toString();
+    }
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectSubnodes) {
