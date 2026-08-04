@@ -56,6 +56,8 @@ public:
         return kStageName.data();
     }
 
+    Value serialize(const SerializationOptions& opts) const override;
+
     static const Id& id;
 
     Id getId() const override {
