@@ -164,7 +164,10 @@ public:
                 Simple8b<uint64_t>::Iterator pos;
                 int64_t lastEncodedValue = 0;
                 int64_t lastEncodedValueForDeltaOfDelta = 0;
-                uint8_t scaleIndex;
+                // Only meaningful for doubles, set when loading a Simple-8b control byte. Left
+                // invalid until then so that an accidental read is caught rather than indexing
+                // out of bounds in Simple8bTypeUtil::decodeDouble().
+                uint8_t scaleIndex = bsoncolumn::kInvalidScaleIndex;
                 bool deltaOfDelta = false;
             };
 

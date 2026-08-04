@@ -89,7 +89,10 @@ private:
             boost::optional<int64_t> lastEncodedValue;
             Simple8b<uint64_t>::Iterator pos;
             int64_t lastEncodedValueForDeltaOfDelta = 0;
-            uint8_t scaleIndex;
+            // Only meaningful for doubles, set when loading a Simple-8b control byte. Left
+            // invalid until then so that an accidental read is caught rather than indexing out
+            // of bounds in Simple8bTypeUtil::decodeDouble().
+            uint8_t scaleIndex = bsoncolumn::kInvalidScaleIndex;
             bool deltaOfDelta = false;
         };
 
@@ -1137,6 +1140,8 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::appendToBuffer
             appendEncodedToBuffers<Buffer, Date_t>(buffers, Date_t::fromMillisSinceEpoch(value));
             break;
         case BSONType::numberDouble:
+            invariant(scaleIndex != bsoncolumn::kInvalidScaleIndex,
+                      "materializing a double before a control byte set the scale index");
             appendEncodedToBuffers<Buffer, double>(
                 buffers, Simple8bTypeUtil::decodeDouble(value, scaleIndex));
             break;

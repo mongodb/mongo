@@ -48,6 +48,8 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::writeToElement
                 esElem.value(), value, lastLiteral.__oid().getInstanceUnique());
         } break;
         case BSONType::numberDouble: {
+            invariant(scaleIndex != bsoncolumn::kInvalidScaleIndex,
+                      "materializing a double before a control byte set the scale index");
             BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 8);
             DataView(esElem.value())
                 .write<LittleEndian<double>>(Simple8bTypeUtil::decodeDouble(value, scaleIndex));
@@ -221,6 +223,11 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage
                   auto type = _lastLiteral.type();
                   if (type == BSONType::numberDouble) {
                       // Get the current double value, decoding with the old scale index if needed
+                      // An encoded value can only be present if a previous control byte
+                      // established the scale index it was encoded with.
+                      invariant(!d64.lastEncodedValue ||
+                                    d64.scaleIndex != bsoncolumn::kInvalidScaleIndex,
+                                "double encoded without a scale index");
                       double val = d64.lastEncodedValue
                           ? Simple8bTypeUtil::decodeDouble(*d64.lastEncodedValue, d64.scaleIndex)
                           : _lastLiteral.Double();

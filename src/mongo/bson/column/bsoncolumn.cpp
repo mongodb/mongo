@@ -610,6 +610,8 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
     int64_t valueToWrite = deltaOfDelta ? lastEncodedValueForDeltaOfDelta : lastEncodedValue;
     switch (type) {
         case BSONType::numberDouble:
+            invariant(scaleIndex != bsoncolumn::kInvalidScaleIndex,
+                      "materializing a double before a control byte set the scale index");
             DataView(elem.value())
                 .write<LittleEndian<double>>(
                     Simple8bTypeUtil::decodeDouble(valueToWrite, scaleIndex));
