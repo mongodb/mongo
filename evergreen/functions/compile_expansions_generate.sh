@@ -6,6 +6,19 @@ cd src
 set -o errexit
 set -o verbose
 activate_venv
+
+# SERVER-132775: Release variants (variants that publish artifacts to the
+# download buckets) must never use the scons cache, so that objects built
+# from patched source cannot leak into the shared cache and contaminate
+# promotable waterfall/release builds.
+scons_cache_disabled_for_release_variant=false
+if [ ! -z "${push_bucket}" ]; then
+  echo "Release variant: disabling the scons cache"
+  scons_cache_disabled_for_release_variant=true
+  scons_cache_scope=none
+  use_scons_cache=false
+fi
+
 # shared scons cache testing
 # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
 # 'scons_cache_scope' is set on a per variant basis
@@ -49,4 +62,17 @@ else
   # This script converts the generated version string into a sanitized version string for
   # use by scons and uploading artifacts as well as information about for the scons cache.
   SCONS_CACHE_MODE=${scons_cache_mode} USE_SCONS_CACHE=${use_scons_cache} IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+fi
+
+if [ "${scons_cache_disabled_for_release_variant}" = "true" ]; then
+  # Override the variant-level scons_cache_scope expansion for the rest of the
+  # task so later steps do not mount/unmount the shared cache or emit cache
+  # debugging for a cache that is intentionally not in use. When caching is
+  # disabled the shared-cache generator emits an empty document ("{}"), which
+  # must be replaced rather than appended to.
+  if grep -q "^{}$" compile_expansions.yml; then
+    echo "scons_cache_scope: none" > compile_expansions.yml
+  else
+    echo "scons_cache_scope: none" >> compile_expansions.yml
+  fi
 fi
