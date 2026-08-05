@@ -62,6 +62,14 @@ GetNextResult MatchStage::doGetNext() {
     return nextInput;
 }
 
+void MatchStage::detachFromOperationContext() {
+    _matchProcessor->releaseBuffer(_expressionEvalCtx.tracker);
+}
+
+void MatchStage::doDispose() {
+    _matchProcessor->releaseBuffer(_expressionEvalCtx.tracker);
+}
+
 Document MatchStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
     MutableDocument out(Stage::getExplainOutput(opts));
     if (_expressionEvalCtx.tracker) {

@@ -652,6 +652,11 @@ public:
         return _b.len();
     }
 
+    /** Returns the capacity of the underlying buffer. */
+    int capacity() const {
+        return _b.capacity();
+    }
+
     [[MONGO_MOD_NEEDS_REPLACEMENT]] B& bb() {
         return _b;
     }

@@ -59,18 +59,12 @@ public:
 
 class BSONMatchableDocument : public MatchableDocument {
 public:
-    BSONMatchableDocument(const BSONObj& obj);
-    ~BSONMatchableDocument() override;
+    BSONMatchableDocument(BSONObj obj) : _obj(std::move(obj)) {}
 
-    void reset(const BSONObj& obj) {
+    ~BSONMatchableDocument() override = default;
+
+    void reset(BSONObj obj) {
         tassert(13179700,
-                "Cannot reset BSONMatchableDocument while iterator is in use",
-                !_iteratorUsed);
-        _obj = obj;
-    }
-
-    void reset(BSONObj&& obj) {
-        tassert(13179701,
                 "Cannot reset BSONMatchableDocument while iterator is in use",
                 !_iteratorUsed);
         _obj = std::move(obj);
@@ -99,7 +93,7 @@ public:
 private:
     BSONObj _obj;
     mutable BSONElementIterator _iterator;
-    mutable bool _iteratorUsed;
+    mutable bool _iteratorUsed = false;
 };
 
 /**

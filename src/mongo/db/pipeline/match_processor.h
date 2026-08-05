@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/matchable.h"
@@ -12,6 +13,7 @@
 #include <memory>
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -50,10 +52,16 @@ public:
         return _predicate;
     }
 
+    void releaseBuffer(SimpleMemoryUsageTracker* tracker) const;
+
+    int64_t bufferCapacity() const;
+
 private:
     // Determines whether all paths have unique first fields. This is called once during object
     // construction to determine the value of '_dependenciesHaveUniqueFirstFields'.
     static bool dependenciesHaveUniqueFirstFields(const OrderedPathSet& paths);
+
+    void trackBufferMemory(const EvaluationContext& ctx) const;
 
     std::unique_ptr<MatchExpression> _expression;
 
@@ -70,8 +78,11 @@ private:
     // match expression does.
     BSONObj _predicate;
 
-    // Reused across process() calls to avoid per-document BSONMatchableDocument ctor and dtor.
-    mutable BSONMatchableDocument _matchableDoc{BSONObj{}};
+    // Reused across process() calls.
+    mutable boost::optional<BSONObjBuilder> _buffer;
+
+    // The '_buffer' capacity charged to memory tracking so far.
+    mutable int64_t _trackedBufferBytes = 0;
 };
 
 }  // namespace mongo
