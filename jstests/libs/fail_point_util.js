@@ -171,12 +171,16 @@ export function configureFailPointForAllShardsAndMongos({
 
     for (const host of hosts) {
         const hostConn = new Mongo(host, undefined);
-        assert.commandWorked(
-            hostConn.getDB("admin").runCommand({
-                "configureFailPoint": failPointName,
-                "mode": failPointMode,
-                data: data,
-            }),
-        );
+        try {
+            assert.commandWorked(
+                hostConn.getDB("admin").runCommand({
+                    "configureFailPoint": failPointName,
+                    "mode": failPointMode,
+                    data: data,
+                }),
+            );
+        } finally {
+            hostConn.close();
+        }
     }
 }

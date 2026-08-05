@@ -611,7 +611,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                       .getDatabaseProfileLevel(nss.dbName()));
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
+            &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert", nullptr, nss);
     };
 
     auto txnParticipant = TransactionParticipant::get(opCtx);

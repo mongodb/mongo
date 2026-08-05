@@ -41,6 +41,12 @@ public:
      * The field "shouldContinueOnInterrupt" may be set to 'true' to cause this method to continue
      * on interrupt without asserting, regardless of whether the field "shouldCheckForInterrupt" is
      * set.
+     *
+     * The failpoint's data may scope the failpoint to a subset of the operations reaching the
+     * callsite: a "comment" field matches only operations carrying an equal comment, and an "nss"
+     * field matches only operations on that namespace. "comment" takes precedence over "nss". A
+     * callsite which may be targeted by "nss" must pass 'nss'; supplying "nss" in the data without
+     * it uasserts, rather than silently matching every operation.
      */
     static void waitWhileFailPointEnabled(FailPoint* failPoint,
                                           OperationContext* opCtx,

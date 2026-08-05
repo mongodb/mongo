@@ -661,7 +661,9 @@ public:
                     CurOpFailpointHelpers::waitWhileFailPointEnabled(
                         &hangBeforeFetcherFindCommandOnOplog,
                         opCtx,
-                        "hangBeforeFetcherFindCommandOnOplog");
+                        "hangBeforeFetcherFindCommandOnOplog",
+                        nullptr,
+                        _ns);
                 }
                 // We do not want to wait to take tickets for internal (replication) oplog reads.
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may

@@ -246,6 +246,18 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "curop_failpoint_helpers_test",
+    srcs = [
+        "curop_failpoint_helpers_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":curop_failpoint_helpers",
+        ":service_context_test_fixture",
+    ],
+)
+
 idl_generator(
     name = "windows_options_gen",
     src = "windows_options.idl",
