@@ -268,14 +268,14 @@ protected:
         auto pinnedCursor =
             unittest::assertGet(cursorManager->checkOutCursorNoAuthCheck(cursorId, &*opCtx));
         // Make sure to return the tracker and the cursor when we're done.
-        std::unique_ptr<OperationMemoryUsageTracker> memoryUsageTracker;
+        std::shared_ptr<OperationMemoryUsageTracker> memoryUsageTracker;
         ScopeGuard guard{[&] {
-            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx.get(),
-                                                                std::move(memoryUsageTracker));
+            OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx.get(),
+                                                                  std::move(memoryUsageTracker));
             pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
         }};
         // The tracker should be on the opCtx now.
-        memoryUsageTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx.get());
+        memoryUsageTracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx.get());
         ASSERT_NE(nullptr, memoryUsageTracker);
         // Since we took the tracker off of the opCtx, the tracker's opCtx pointer will be null.
         ASSERT_EQ(nullptr, memoryUsageTracker->_opCtx);

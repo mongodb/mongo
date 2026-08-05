@@ -242,7 +242,9 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
         [&](CursorId cursorId) -> bool { return _cursorEntryMap.count(cursorId) == 0; },
         _pseudoRandom);
 
-    cursor->setMemoryUsageTracker(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+    // At most one ClusterClientCursor should be registered per aggregate. If that changes, this
+    // must switch to co-owning OperationMemoryUsageTracker::getOwningIfExists().
+    cursor->setMemoryUsageTracker(OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx));
 
     // Create a new CursorEntry and register it in the CursorEntryContainer's map.
     auto emplaceResult = _cursorEntryMap.emplace(cursorId,
@@ -316,8 +318,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash = cursorGuard->getQueryStatsKeyHash();
     CurOp::get(opCtx)->debug().setQueryShapeHash(opCtx, cursorGuard->getQueryShapeHash());
 
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
-                                                        cursorGuard->releaseMemoryUsageTracker());
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx,
+                                                          cursorGuard->releaseMemoryUsageTracker());
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
 
@@ -341,8 +343,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 
     auto cursorGuard = entry->releaseCursor(opCtx, commandName);
     cursorGuard->reattachToOperationContext(opCtx);
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
-                                                        cursorGuard->releaseMemoryUsageTracker());
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx,
+                                                          cursorGuard->releaseMemoryUsageTracker());
 
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
@@ -376,7 +378,8 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     }
 
     if (cursorState == CursorState::NotExhausted && !killPending) {
-        cursor->setMemoryUsageTracker(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+        cursor->setMemoryUsageTracker(
+            OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx));
     }
 
     entry->returnCursor(std::move(cursor));

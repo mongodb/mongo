@@ -34,6 +34,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <memory>
 
 namespace mongo {
 
@@ -64,6 +65,12 @@ class OperationMemoryUsageTracker : public SimpleMemoryUsageTracker {
     OperationMemoryUsageTracker() = delete;
 
 public:
+    /**
+     * Whether attachToOpCtxIfAvailable() should also point the tracker's CurOp reporting target at
+     * the destination opCtx. See that method for details.
+     */
+    enum class ReportToCurOp { kNo, kYes };
+
     /**
      * When constructing a stage containing a SimpleMemoryUsageTracker, use this method to ensure
      * that we aggregate operation-wide memory stats.
@@ -113,17 +120,36 @@ public:
     }
 
     /**
-     * Move the memory tracker out from the operation context, if there is one there. The caller
-     * will take ownership of the tracker.
+     * Detach the operation's memory tracker from the operation context. Returns a co-owning
+     * reference to it (or nullptr if there was none).
      */
-    static std::unique_ptr<OperationMemoryUsageTracker> moveFromOpCtxIfAvailable(
+    static std::shared_ptr<OperationMemoryUsageTracker> detachFromOpCtxIfAvailable(
         OperationContext* opCtx);
 
     /**
-     * Passes ownership of the memory tracker from the caller to the given operation context.
+     * Attach the given memory tracker to the operation context. A null tracker is a no-op that
+     * leaves any tracker already parked on the opCtx by a sibling cursor in place.
+     *
+     * With ReportToCurOp::kYes, also point the tracker's CurOp reporting target at 'opCtx' and
+     * flush current stats to that CurOp. With kNo, the tracker is published for binding only and
+     * its CurOp reporting target is cleared.
      */
-    static void moveToOpCtxIfAvailable(OperationContext* opCtx,
-                                       std::unique_ptr<OperationMemoryUsageTracker> tracker);
+    static void attachToOpCtxIfAvailable(OperationContext* opCtx,
+                                         std::shared_ptr<OperationMemoryUsageTracker> tracker,
+                                         ReportToCurOp reportToCurOp = ReportToCurOp::kYes);
+
+    /**
+     * Returns a co-owning reference to the operation's memory tracker without removing it from the
+     * operation context, or nullptr if there is none. Unlike getOperationMemoryUsageTracker(), does
+     * not create one.
+     */
+    [[nodiscard]] static std::shared_ptr<OperationMemoryUsageTracker> getOwningIfExists(
+        OperationContext* opCtx);
+
+    /**
+     * Returns the operation's tracker if one exists, otherwise nullptr. Never creates one.
+     */
+    static OperationMemoryUsageTracker* getIfExists(OperationContext* opCtx);
 
     explicit OperationMemoryUsageTracker(OperationContext* opCtx) : _opCtx(opCtx) {}
 
@@ -133,9 +159,11 @@ private:
 
     static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 
-    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(OperationContext* opCtx,
-                                                                       int64_t maxMemoryUsageBytes,
-                                                                       int64_t chunkSize = 0);
+    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(
+        OperationContext* opCtx,
+        int64_t maxMemoryUsageBytes,
+        int64_t chunkSize = 0,
+        bool excludeOperationMemoryTracking = false);
     static MemoryUsageTracker createMemoryUsageTrackerImpl(const ExpressionContext& expCtx,
                                                            bool allowDiskUse,
                                                            int64_t maxMemoryUsageBytes,

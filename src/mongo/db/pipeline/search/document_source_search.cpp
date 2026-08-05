@@ -138,6 +138,14 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
         search_index_view_validation::validate(*view);
     }
 
+    // Disable operation memory tracking for $search queries with metadata cursors. On v8.3, there
+    // are no memory tracking stages present on the shard during normal operation, but kept here to
+    // protect against future changes.
+    if (!expCtx->getInRouter() && spec.getMetadataMergeProtocolVersion().has_value() &&
+        spec.getRequiresSearchMetaCursor()) {
+        search_helpers::excludeOperationMemoryTrackingForSecondaryMetadataCursor(expCtx);
+    }
+
     return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec));
 }
 

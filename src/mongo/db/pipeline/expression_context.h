@@ -717,6 +717,14 @@ public:
         _params.isProfileFilter = isProfileFilter;
     }
 
+    bool getExcludeOperationMemoryTracking() const {
+        return _params.excludeOperationMemoryTracking;
+    }
+
+    void setExcludeOperationMemoryTracking(bool excludeOperationMemoryTracking) {
+        _params.excludeOperationMemoryTracking = excludeOperationMemoryTracking;
+    }
+
     bool getExprUnstableForApiV1() const {
         return _params.exprUnstableForApiV1;
     }
@@ -1169,6 +1177,10 @@ protected:
         // True if this ExpressionContext belongs to a profile filter. Like a collection validator,
         // a profile filter outlives the OperationContext it was parsed under.
         bool isProfileFilter = false;
+        // When true, stages built from this ExpressionContext do not chain their memory trackers to
+        // the operation-wide tracker. Set for $search queries that expose a secondary metadata
+        // cursor sharing the operation's tracker.
+        bool excludeOperationMemoryTracking = false;
         // These fields can be used in a context when API version validations were not enforced
         // during parse time (Example creating a view or validator), but needs to be enforce while
         // querying later.

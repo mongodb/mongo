@@ -127,7 +127,9 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _isChangeStreamQuery(CurOp::get(operationUsingCursor)->debug().isChangeStreamQuery),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
-      _opKey(operationUsingCursor->getOperationKey()) {
+      _opKey(operationUsingCursor->getOperationKey()),
+      // Take a co-owning reference to the operation's memory tracker.
+      _memoryUsageTracker(OperationMemoryUsageTracker::getOwningIfExists(operationUsingCursor)) {
     invariant(_exec);
     invariant(_operationUsingCursor);
 
@@ -237,8 +239,8 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     // transferred to another pin object via move construction or move assignment, but in this case
     // it is still considered pinned.
     cursorStats().openPinned.increment();
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
-                                                        std::move(_cursor->_memoryUsageTracker));
+    // Publish a copy of the tracker onto the operation context.
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, _cursor->_memoryUsageTracker);
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
@@ -297,8 +299,12 @@ void ClientCursorPin::release() {
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
 
-    _cursor->_memoryUsageTracker =
-        OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(_cursor->_operationUsingCursor);
+    // Reclaim the tracker from the operation context, but only overwrite the cursor's reference if
+    // one was there -- otherwise keep the reference captured at construction (don't clobber it).
+    if (auto tracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(
+            _cursor->_operationUsingCursor)) {
+        _cursor->_memoryUsageTracker = std::move(tracker);
+    }
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.

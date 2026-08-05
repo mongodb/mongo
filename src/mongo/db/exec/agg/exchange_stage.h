@@ -132,10 +132,21 @@ public:
      */
     void unblockLoading(size_t consumerId);
 
+    const OperationMemoryUsageTracker* getOperationMemoryTracker_forTest() const {
+        return _memoryTracker.get();
+    }
+
 private:
     /**
-     * Attaches the subpipeline to the given opCtx. If consumerId is zero, also attaches the
-     * OperationMemoryUsageTracker to the current opCtx, so memory metrics are reported to CurOp.
+     * Needed before executing/using the sub-pipeline (by the driving consumer).
+     *
+     * Attaches the subpipeline to the given opCtx, ensuring state like maxTimeMS is visible.
+     *
+     * Concerning memory tracking: this also attaches the Exchange's OperationMemoryUsageTracker to
+     * this opCtx. That way, the subpipeline's memory-tracked stages bind to the co-owned tracker
+     * and we aggregate memory use regardless of which consuming thread is driving the execution.
+     * The producer's memory is reported to CurOp only for consumer 0, so the metric is not
+     * duplicated across consumers.
      */
     void attachContext(OperationContext* opCtx, size_t consumerId);
 
@@ -146,10 +157,14 @@ private:
     size_t loadNextBatch();
 
     /**
-     * Detaches the subpipeline from its opCtx. If consumerId is zero, moves the
-     * OperationMemoryUsageTracker from the opCtx back to the Exchange object.
+     * Detaches the subpipeline from its opCtx.
+     *
+     * This also unpublishes the OperationMemoryUsageTracker from that opCtx. Note that this never
+     * clears the Exchange's own reference to the memory tracker: If it came from attachContext(),
+     * then the co-ownership ensures that unpublishing it does not free it. If it was created lazily
+     * during the subpipeline load, the Exchange adopts it.
      */
-    void detachContext(OperationContext* opCtx, size_t consumerId);
+    void detachContext(OperationContext* opCtx);
 
     size_t getTargetConsumer(const Document& input);
 
@@ -240,11 +255,13 @@ private:
     std::vector<std::unique_ptr<ExchangeBuffer>> _consumers;
 
     // The OperationMemoryTracker for the exchange pipeline. Stages in the subpipeline that track
-    // memory will report to this memory tracker. Except when consumer 0 is executing the
-    // subpipeline, the operation memory tracker is stored here and not attached to any particular
-    // OperationContext. We do this to avoid data races that would occur if we were to move the
-    // memory tracker between the OperationContext and ClientCursor while a pipeline is executing.
-    std::unique_ptr<OperationMemoryUsageTracker> _memoryTracker;
+    // memory will report to this memory tracker. A co-owning copy is also published on the driving
+    // consumer's opCtx while it executes the subpipeline. The Exchange stays an owner throughout,
+    // so the tracker cannot be destroyed out from under sub-stages -- which hold their tracker base
+    // as a raw pointer -- when a consumer's opCtx goes away. Co-owning rather than moving the
+    // tracker also avoids the data races that arose from handing it back and forth between the
+    // OperationContext and the ClientCursor while a pipeline is executing.
+    std::shared_ptr<OperationMemoryUsageTracker> _memoryTracker;
 };
 
 /**

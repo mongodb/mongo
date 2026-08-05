@@ -295,7 +295,7 @@ public:
      */
     virtual boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() = 0;
 
-    std::unique_ptr<OperationMemoryUsageTracker> releaseMemoryUsageTracker() {
+    std::shared_ptr<OperationMemoryUsageTracker> releaseMemoryUsageTracker() {
         return std::move(_memoryTracker);
     }
 
@@ -303,7 +303,7 @@ public:
         return _memoryTracker.get();
     }
 
-    void setMemoryUsageTracker(std::unique_ptr<OperationMemoryUsageTracker> memoryTracker) {
+    void setMemoryUsageTracker(std::shared_ptr<OperationMemoryUsageTracker> memoryTracker) {
         _memoryTracker = std::move(memoryTracker);
     }
 
@@ -319,7 +319,7 @@ private:
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 
-    std::unique_ptr<OperationMemoryUsageTracker> _memoryTracker;
+    std::shared_ptr<OperationMemoryUsageTracker> _memoryTracker;
 };
 
 }  // namespace mongo

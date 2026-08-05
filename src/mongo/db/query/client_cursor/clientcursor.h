@@ -517,7 +517,8 @@ private:
     // The execution time collected from the initial operation prior to any getMore requests.
     boost::optional<Microseconds> _firstResponseExecutionTime;
 
-    std::unique_ptr<OperationMemoryUsageTracker> _memoryUsageTracker;
+    // Co-owning reference to the operation's memory tracker.
+    std::shared_ptr<OperationMemoryUsageTracker> _memoryUsageTracker;
 };
 
 /**

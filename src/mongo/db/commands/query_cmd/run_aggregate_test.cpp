@@ -159,8 +159,8 @@ protected:
                     Status{static_cast<ErrorCodes::Error>(errorCode), result["errmsg"].String()};
                 // We expect there to be no tracker attached to the opCtx at this point, because we
                 // always move it back to the Exchange object before returning.
-                std::unique_ptr<OperationMemoryUsageTracker> tracker =
-                    OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+                std::shared_ptr<OperationMemoryUsageTracker> tracker =
+                    OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
                 ASSERT_EQ(nullptr, tracker.get());
                 break;
             }
@@ -185,7 +185,7 @@ protected:
                 ASSERT_EQ(docs.size(), 0);
                 // Unfortunately, the operation memory tracker stays attached to the Exchage object,
                 // so we don't have a chance to examine it in this test.
-                ASSERT_FALSE(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+                ASSERT_FALSE(OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx));
             }
 
             // Let some other threads do some work.
@@ -507,8 +507,8 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
             CursorManager* cursorManager = CursorManager::get(opCtx->getServiceContext());
             ClientCursorPin pin =
                 unittest::assertGet(cursorManager->pinCursor(opCtx, cursorId, "getMore"));
-            std::unique_ptr<OperationMemoryUsageTracker> tracker =
-                OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+            std::shared_ptr<OperationMemoryUsageTracker> tracker =
+                OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
             ASSERT(tracker);
             ASSERT_EQ(getTrackerOpCtx(tracker.get()), nullptr);
             // $trackingMock will always be increasing memory count with each document returned, so
@@ -518,7 +518,7 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
 
             prevMemoryInUse = tracker->inUseTrackedMemoryBytes();
 
-            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(tracker));
+            OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(tracker));
         }
 
         BSONObj getMoreCmdObj = fromjson(fmt::format(

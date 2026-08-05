@@ -37,8 +37,8 @@
 namespace mongo {
 namespace {
 
-const OperationContext::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> _getFromOpCtx =
-    OperationContext::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
+const OperationContext::Decoration<std::shared_ptr<OperationMemoryUsageTracker>> _getFromOpCtx =
+    OperationContext::declareDecoration<std::shared_ptr<OperationMemoryUsageTracker>>();
 
 }
 
@@ -50,8 +50,8 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
     OperationContext* opCtx) {
     OperationMemoryUsageTracker* opTracker = _getFromOpCtx(opCtx).get();
     if (!opTracker) {
-        auto uniqueTracker = std::make_unique<OperationMemoryUsageTracker>(opCtx);
-        opTracker = uniqueTracker.get();
+        auto sharedTracker = std::make_shared<OperationMemoryUsageTracker>(opCtx);
+        opTracker = sharedTracker.get();
         opTracker->setWriteToCurOp(
             [opTracker](int64_t inUseTrackedMemoryBytes, int64_t peakTrackedMemBytes) {
                 if (opTracker->_opCtx) {
@@ -61,7 +61,7 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
                     LOGV2_DEBUG(10430900, 3, "No OperationContext on OperationMemoryUsageTracker");
                 }
             });
-        _getFromOpCtx(opCtx) = std::move(uniqueTracker);
+        _getFromOpCtx(opCtx) = std::move(sharedTracker);
     }
 
     return opTracker;
@@ -69,7 +69,10 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
-    return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(), maxMemoryUsageBytes);
+    return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(),
+                                              maxMemoryUsageBytes,
+                                              0 /* chunkSize */,
+                                              expCtx.getExcludeOperationMemoryTracking());
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
@@ -90,7 +93,8 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryU
     return createSimpleMemoryUsageTrackerImpl(
         expCtx.getOperationContext(),
         maxMemoryUsageBytes,
-        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
+        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed(),
+        expCtx.getExcludeOperationMemoryTracking());
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
@@ -100,8 +104,12 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryU
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerImpl(
-    OperationContext* opCtx, int64_t maxMemoryUsageBytes, int64_t chunkSize) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+    OperationContext* opCtx,
+    int64_t maxMemoryUsageBytes,
+    int64_t chunkSize,
+    bool excludeOperationMemoryTracking) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        excludeOperationMemoryTracking) {
         return SimpleMemoryUsageTracker{maxMemoryUsageBytes, chunkSize};
     }
 
@@ -127,7 +135,8 @@ MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerImpl(
     bool allowDiskUse,
     int64_t maxMemoryUsageBytes,
     int64_t chunkSize) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        expCtx.getExcludeOperationMemoryTracking()) {
         return MemoryUsageTracker{allowDiskUse, maxMemoryUsageBytes};
     }
 
@@ -136,24 +145,44 @@ MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerImpl(
     return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes, chunkSize};
 }
 
-std::unique_ptr<OperationMemoryUsageTracker> OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(
-    OperationContext* opCtx) {
-    std::unique_ptr<OperationMemoryUsageTracker> tracker = std::move(_getFromOpCtx(opCtx));
+std::shared_ptr<OperationMemoryUsageTracker>
+OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(OperationContext* opCtx) {
+    invariant(opCtx);
+    std::shared_ptr<OperationMemoryUsageTracker> tracker = std::move(_getFromOpCtx(opCtx));
     if (tracker) {
         tracker->_opCtx = nullptr;
     }
     return tracker;
 }
 
-void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
-    OperationContext* opCtx, std::unique_ptr<OperationMemoryUsageTracker> tracker) {
+void OperationMemoryUsageTracker::attachToOpCtxIfAvailable(
+    OperationContext* opCtx,
+    std::shared_ptr<OperationMemoryUsageTracker> tracker,
+    ReportToCurOp reportToCurOp) {
     invariant(opCtx);
-    if (tracker) {
+    if (!tracker) {
+        // Nothing to publish. Leave any tracker already on the opCtx in place.
+        return;
+    }
+    if (reportToCurOp == ReportToCurOp::kYes) {
         tracker->_opCtx = opCtx;
         CurOp::get(opCtx)->setMemoryTrackingStats(tracker->inUseTrackedMemoryBytes(),
                                                   tracker->peakTrackedMemoryBytes());
+    } else {
+        // Reset tracker _opCtx to not report to curOp.
+        tracker->_opCtx = nullptr;
     }
     _getFromOpCtx(opCtx) = std::move(tracker);
+}
+
+std::shared_ptr<OperationMemoryUsageTracker> OperationMemoryUsageTracker::getOwningIfExists(
+    OperationContext* opCtx) {
+    invariant(opCtx);
+    return _getFromOpCtx(opCtx);
+}
+
+OperationMemoryUsageTracker* OperationMemoryUsageTracker::getIfExists(OperationContext* opCtx) {
+    return _getFromOpCtx(opCtx).get();
 }
 
 }  // namespace mongo
