@@ -23,14 +23,14 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
      * Once a tree is no longer empty, eviction should pay attention to it, and it's no longer
      * possible to bulk-load into it.
      */
-    if (!__wt_atomic_load_uint8_acquire(&btree->original))
+    if (!__wt_atomic_load_uint8_relaxed(&btree->original))
         return;
 
     /*
      * We use a compare-and-swap here to avoid races among the first inserts into a tree. Eviction
      * is disabled when an empty tree is opened, and it must only be enabled once.
      */
-    if (__wt_atomic_cas_uint8(&btree->original, 1, 0)) {
+    if (__wt_atomic_cas_uint8_relaxed(&btree->original, 1, 0)) {
         btree->evict_disabled_open = false;
         __wt_evict_file_exclusive_off(session);
     }

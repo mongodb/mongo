@@ -47,7 +47,7 @@ __sweep_file_dhandle_check_and_reset_tod(WT_SESSION_IMPL *session, WT_DATA_HANDL
          * Reset the time of death if the file dhandle exists for the associated table dhandle.
          */
         if (ret == 0) {
-            dhandle->timeofdeath = 0;
+            __wt_atomic_store_uint64_relaxed(&dhandle->timeofdeath, 0);
             WT_DHANDLE_CLEAR(session);
             return (WT_ERROR_LOG_ADD(ret));
         }
@@ -79,14 +79,15 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
          * of death.
          */
         if (__wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 1)
-            dhandle->timeofdeath = 0;
+            __wt_atomic_store_uint64_relaxed(&dhandle->timeofdeath, 0);
 
         /*
          * If the handle is open exclusive or currently in use, or the time of death is already set,
          * move on.
          */
         if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ||
-          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 0 || dhandle->timeofdeath != 0)
+          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 0 ||
+          __wt_atomic_load_uint64_relaxed(&dhandle->timeofdeath) != 0)
             continue;
 
         /* For table dhandles, skip expiration if associated file dhandles exist. */
@@ -122,7 +123,7 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
         __wt_verbose_level(session, WT_VERB_SWEEP, WT_VERBOSE_DEBUG_3,
           "Sweep server setting the time of death for dhandle %s", dhandle->name);
 
-        dhandle->timeofdeath = now;
+        __wt_atomic_store_uint64_relaxed(&dhandle->timeofdeath, now);
         WT_STAT_CONN_INCR(session, dh_sweep_tod);
     }
 }

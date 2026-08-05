@@ -331,7 +331,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
      * eviction, it must either clear the evict-disabled-open flag or restore the eviction
      * configuration when finished so that handle close behaves correctly.
      */
-    if (btree->original || F_ISSET(btree, WT_BTREE_NO_EVICT | WT_BTREE_SALVAGE | WT_BTREE_VERIFY)) {
+    if (__wt_atomic_load_uint8_relaxed(&btree->original) ||
+      F_ISSET(btree, WT_BTREE_NO_EVICT | WT_BTREE_SALVAGE | WT_BTREE_VERIFY)) {
         WT_ERR(__wt_evict_file_exclusive_on(session));
         btree->evict_disabled_open = true;
     }
@@ -1012,7 +1013,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool empty_ckpt)
      * cleared when a row is inserted into the tree.
      */
     if (empty_ckpt)
-        btree->original = 1;
+        __wt_atomic_store_uint8_relaxed(&btree->original, 1);
 
     /*
      * A note about empty trees: the initial tree is a single root page. It has a single reference

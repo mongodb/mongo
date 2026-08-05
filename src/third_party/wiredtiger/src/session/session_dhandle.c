@@ -842,12 +842,18 @@ __wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
          * evicted. These checks are not done with any locks in place, other than the data handle
          * reference, so we cannot peer past what is in the dhandle directly.
          */
-        if (dhandle != session->dhandle &&
-          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) == 0 &&
-          (WT_DHANDLE_INACTIVE(dhandle) || F_ISSET(dhandle, WT_DHANDLE_OUTDATED) ||
-            (dhandle->timeofdeath != 0 && now - dhandle->timeofdeath > conn->sweep.idle_time)) &&
-          (!WT_DHANDLE_BTREE(dhandle) ||
-            FLD_ISSET(dhandle->advisory_flags, WT_DHANDLE_ADVISORY_EVICTED))) {
+        const bool is_available_for_discard = dhandle != session->dhandle &&
+          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) == 0;
+
+        const uint64_t time_of_death = __wt_atomic_load_uint64_relaxed(&dhandle->timeofdeath);
+        const bool is_sweep_candidate = WT_DHANDLE_INACTIVE(dhandle) ||
+          F_ISSET(dhandle, WT_DHANDLE_OUTDATED) ||
+          (time_of_death != 0 && now - time_of_death > conn->sweep.idle_time);
+
+        const bool is_evictable = !WT_DHANDLE_BTREE(dhandle) ||
+          FLD_ISSET(dhandle->advisory_flags, WT_DHANDLE_ADVISORY_EVICTED);
+
+        if (is_available_for_discard && is_sweep_candidate && is_evictable) {
             WT_STAT_CONN_INCR(session, dh_session_handles);
             WT_ASSERT(session, !WT_IS_METADATA(dhandle));
             __session_discard_dhandle(session, dhandle_cache);

@@ -806,7 +806,7 @@ __clayered_open_ingest(WT_SESSION_IMPL *session, WTI_CURSOR_LAYERED *clayered, W
 /*
  * __clayered_update_ingest --
  *     Manage the ingest cursor lifecycle: open it when the operation uses the ingest constituent,
- *     close a leftover cursor after a role change.
+ *     close a leftover cursor after a step-up.
  */
 static int
 __clayered_update_ingest(WTI_CURSOR_LAYERED *clayered, uint32_t flags)
@@ -818,7 +818,7 @@ __clayered_update_ingest(WTI_CURSOR_LAYERED *clayered, uint32_t flags)
             WT_RET(__clayered_open_ingest(session, clayered, &clayered->ingest_cursor));
             WT_RET(__clayered_copy_bounds(clayered));
         }
-    } else if (LF_ISSET(CLAYERED_ENTER_ROLE_CHANGE) && clayered->ingest_cursor != NULL) {
+    } else if (LF_ISSET(CLAYERED_ENTER_STEP_UP) && clayered->ingest_cursor != NULL) {
         /*
          * A step-up leaves behind an ingest cursor the leader no longer uses: its ingest table is
          * empty for reads and unused for writes, and keeping the cursor open only adds

@@ -2732,7 +2732,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
      * Bulk-load is only permitted on newly created files, not any empty file -- see the checkpoint
      * code for a discussion.
      */
-    if (!btree->original)
+    if (!__wt_atomic_load_uint8_relaxed(&btree->original))
         WT_RET_MSG(session, EINVAL, "bulk-load is only possible for newly created trees");
 
     /*

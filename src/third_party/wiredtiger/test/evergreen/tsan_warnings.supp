@@ -28,9 +28,6 @@ race:__ref_track_state
 # __wt_configure_method intentionally allows for races between threads to avoid the overhead of taking a lock on each API call.
 race:__wt_configure_method
 
-# FIXME-WT-14930 Dhandle timeofdeath synchronization
-race:__sweep_mark
-
 # FIXME-WT-14948 Figure out concurrency control expectations around reconfigure
 race:conn_reconfig.c
 
