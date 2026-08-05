@@ -56,6 +56,7 @@ void CountCmdShape::appendCmdSpecificShapeComponents(
         } else {
             // Slow path: We need to re-parse from our representative shapes.
             auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID);
+            expCtx->setIsReparsingRepresentativeQueryShape(true);
             auto matchExpr = uassertStatusOK(
                 MatchExpressionParser::parse(components.representativeQuery,
                                              expCtx,

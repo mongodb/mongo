@@ -57,6 +57,7 @@ public:
     ExpressionContextBuilder& inUnionWith(bool);
     ExpressionContextBuilder& isParsingViewDefinition(bool);
     ExpressionContextBuilder& isParsingCollectionValidator(bool);
+    ExpressionContextBuilder& isReparsingRepresentativeQueryShape(bool);
     ExpressionContextBuilder& isIdHackQuery(bool);
     ExpressionContextBuilder& isFleQuery(bool);
     ExpressionContextBuilder& canBeRejected(bool);

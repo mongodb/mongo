@@ -42,6 +42,10 @@
       # Query settings application is skipped for queries targeting collections containing encryption information.
       - jstests/core/query/queryable_encryption/**/*.js
       - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+      # This test issues an aggregation containing the internal-only '$_internalIndexKey' expression
+      # over an internal-client connection. The override sets query settings over a separate,
+      # external connection, on which the representative query is rejected with error 5491300.
+      - jstests/core/query/index_key_expression.js
     exclude_with_any_tags:
       - assumes_standalone_mongod
       - does_not_support_repeated_reads

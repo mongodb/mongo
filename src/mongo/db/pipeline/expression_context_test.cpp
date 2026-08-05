@@ -12,6 +12,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -24,6 +25,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -681,6 +683,76 @@ TEST_F(ExpressionContextTest, ExcludeOperationMemoryTrackingIsPropagatedToCopies
     auto copy = makeCopyFromExpressionContext(
         expCtx, NamespaceString::createNamespaceString_forTest("test"sv, "other"sv));
     ASSERT_TRUE(copy->getExcludeOperationMemoryTracking());
+}
+
+TEST_F(ExpressionContextTest, isReparsingRepresentativeQueryShapeIsPropagatedToCopies) {
+    // Sub-pipeline contexts for $lookup, $unionWith and $graphLookup are all built from
+    // makeCopyFromExpressionContext, so without this the flag would be lost at the first
+    // sub-pipeline boundary of a re-parsed query shape.
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .isReparsingRepresentativeQueryShape(true)
+                      .build();
+
+    auto copy = makeCopyFromExpressionContext(
+        expCtx, NamespaceString::createNamespaceString_forTest("test"sv, "other"sv));
+    ASSERT_TRUE(copy->getIsReparsingRepresentativeQueryShape());
+}
+
+TEST_F(ExpressionContextTest, isReparsingRepresentativeQueryShapeDefaultsToFalse) {
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .build();
+    ASSERT_FALSE(expCtx->getIsReparsingRepresentativeQueryShape());
+}
+
+// An internal-only expression must still be rejected when an external client sends it, but must
+// parse when the server re-parses a stored query shape that contains it. Otherwise reading
+// $queryStats as an external client fails on any entry recorded for an internal client. See
+// SERVER-130571.
+class InternalOnlyExpressionParseTest : public ExpressionContextTest {
+protected:
+    static constexpr auto kInternalOnlyExpression =
+        "{$_internalIndexKey: {doc: '$foo', spec: {key: {a: 1}, name: 'bar'}}}";
+
+    // A client with a transport session and no internal tag is an external (user) client. Note that
+    // the default unittest client has no session at all, which counts as internal.
+    ServiceContext::UniqueClient makeExternalClient() {
+        return getServiceContext()->getService()->makeClient(
+            "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    }
+};
+
+TEST_F(InternalOnlyExpressionParseTest, RejectedForExternalClient) {
+    auto client = makeExternalClient();
+    auto opCtx = client->makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .build();
+
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(),
+                                                   fromjson(kInternalOnlyExpression),
+                                                   expCtx->variablesParseState),
+                       AssertionException,
+                       5491300);
+}
+
+TEST_F(InternalOnlyExpressionParseTest, AllowedForExternalClientWhenParsingQueryShape) {
+    auto client = makeExternalClient();
+    auto opCtx = client->makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .isReparsingRepresentativeQueryShape(true)
+                      .build();
+
+    ASSERT(Expression::parseExpression(
+        expCtx.get(), fromjson(kInternalOnlyExpression), expCtx->variablesParseState));
 }
 
 TEST_F(

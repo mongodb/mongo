@@ -96,6 +96,7 @@ selector:
     - jstests/core/index/wildcard/wildcard_index_filter.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/query/index_key_expression.js
     - jstests/core/index/geo/geo6.js
     - jstests/core/index/index_check6.js
     - jstests/core/index/index_diag.js

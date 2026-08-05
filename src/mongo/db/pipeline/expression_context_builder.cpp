@@ -171,6 +171,12 @@ ExpressionContextBuilder& ExpressionContextBuilder::isParsingCollectionValidator
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::isReparsingRepresentativeQueryShape(
+    bool isReparsingRepresentativeQueryShape) {
+    params.isReparsingRepresentativeQueryShape = isReparsingRepresentativeQueryShape;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::isIdHackQuery(bool isIdHackQuery) {
     params.isIdHackQuery = isIdHackQuery;
     return *this;
@@ -617,6 +623,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
         .serializationContext(other->getSerializationContext())
         .inLookup(other->getInLookup())
         .isParsingViewDefinition(other->getIsParsingViewDefinition())
+        .isReparsingRepresentativeQueryShape(other->getIsReparsingRepresentativeQueryShape())
         .exprUnstableForApiV1(other->getExprUnstableForApiV1())
         .exprDeprecatedForApiV1(other->getExprDeprecatedForApiV1())
         .jsHeapLimitMB(other->getJsHeapLimitMB())

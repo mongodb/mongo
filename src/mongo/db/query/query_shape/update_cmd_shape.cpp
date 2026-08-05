@@ -251,6 +251,7 @@ void UpdateCmdShape::appendCmdSpecificShapeComponents(
     }
 
     // Slow path: we need to re-parse from our representative shapes and re-shapify with 'opts'.
+    expCtx->setIsReparsingRepresentativeQueryShape(true);
 
     // Prepare UpdateOpEntry and UpdateRequest to reconstruct ParsedUpdate.
     write_ops::UpdateOpEntry op;
