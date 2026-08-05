@@ -174,10 +174,14 @@ function assertSerializedOrError({desc, failpointName, setupFn, ddlFn, ignorePla
     return aggRes;
 }
 
+// TODO SERVER-132284: Placement under concurrent moveCollection is racy ($out freezes
+// the temp shard at createTemporaryCollection()). We accept that for now and only
+// assert document correctness via ignorePlacement: true.
 assert.commandWorked(
     assertSerializedOrError({
         desc: "Concurrent $out and moveCollection on target",
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+        ignorePlacement: true, // TODO SERVER-132284
         setupFn() {
             setup();
             st.s.adminCommand({

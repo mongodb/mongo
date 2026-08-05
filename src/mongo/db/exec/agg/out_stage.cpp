@@ -23,7 +23,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceOutToStageFn(
     tassert(10561501, "expected 'DocumentSourceOut' type", ds);
 
     return make_intrusive<exec::agg::OutStage>(
-        ds->kStageName, ds->getExpCtx(), ds->getOutputNs(), ds->_timeseries, ds->getMergeShardId());
+        ds->kStageName, ds->getExpCtx(), ds->getOutputNs(), ds->_timeseries);
 }
 
 namespace exec {
@@ -225,8 +225,9 @@ void OutStage::createTemporaryCollection() {
             return ShardId(fpTarget.getData()["shardId"].String());
         } else {
             // If the output collection exists, we should create the temp collection on the shard
-            // that owns the output collection.
-            return _mergeShardId;
+            // that owns the output collection. Otherwise, it's created on the DB primary shard.
+            return pExpCtx->getMongoProcessInterface()->determineSpecificMergeShard(
+                pExpCtx->getOperationContext(), _outputNs);
         }
     }();
 

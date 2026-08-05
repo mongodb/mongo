@@ -34,12 +34,10 @@ public:
     OutStage(std::string_view stageName,
              const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
              NamespaceString outputNs,
-             const std::shared_ptr<TimeseriesOptions>& timeseries,
-             boost::optional<ShardId> mergeShardId)
+             const std::shared_ptr<TimeseriesOptions>& timeseries)
         : WriterStage<BSONObj>(stageName, pExpCtx, std::move(outputNs)),
           _writeConcern(pExpCtx->getOperationContext()->getWriteConcern()),
-          _timeseries(timeseries),
-          _mergeShardId(std::move(mergeShardId)) {}
+          _timeseries(timeseries) {}
 
 private:
     void doDispose() override;
@@ -162,8 +160,6 @@ private:
     // changed during execution, which can cause incomplete results. This can happen if the primary
     // steps down during execution.
     boost::optional<UUID> _tempNsUUID = boost::none;
-
-    boost::optional<ShardId> _mergeShardId;
 
     // True when the temporary and final out collection must be created
     // as legacy timeseries collections.
