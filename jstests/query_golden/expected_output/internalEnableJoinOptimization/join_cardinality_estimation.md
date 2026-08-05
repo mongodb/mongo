@@ -268,14 +268,14 @@ Close enough?: NO
 db.mostly_nulls.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":{"$ne":null}}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 1.001  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.mostly_nulls.aggregate([{"$lookup":{"from":"mostly_nulls","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":{"$ne":null}}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 501.00049999999993  
+Estimated cardinality: 500.5  
 Close enough?: NO
 
 # Joins with filter on the left side over the join field

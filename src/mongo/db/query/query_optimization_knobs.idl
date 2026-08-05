@@ -1248,7 +1248,10 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: "internalJoinPlanSamplingSize"
         cpp_vartype: Atomic<int>
-        default: 1000
+        # Derived from the Kolmogorov statistic: with critical value 1.63 (alpha = 0.01) and
+        # precision 0.05, a sample of (1.63 / 0.05)^2 ~= 1063 documents bounds the error of the
+        # sample's empirical CDF to within 5% with 99% confidence.
+        default: 1063
         validator:
             gt: 0
         redact: false
