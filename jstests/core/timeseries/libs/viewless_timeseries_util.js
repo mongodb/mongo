@@ -8,6 +8,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isFCVlt, isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 // Checks if the viewless timeseries feature flag is currently enabled.
 // Do not use this function in passthrough tests, because the feature flag may get enabled or
@@ -261,8 +262,8 @@ export function findTimeseriesConfigCollectionsDocument(coll) {
                     return null;
                 }
 
-                if (e.code === ErrorCodes.HostUnreachable) {
-                    // Retry if the host is not available.
+                if (RetryableWritesUtil.isRetryableCode(e.code) && retries > 0) {
+                    // Retry if the error is retryable.
                     sleep(500);
                     continue;
                 }
