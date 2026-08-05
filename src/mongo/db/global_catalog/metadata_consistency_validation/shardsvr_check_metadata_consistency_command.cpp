@@ -14,6 +14,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
@@ -170,7 +171,7 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
             }
 
-            if (TestingProctor::instance().isEnabled()) {
+            if (TestingProctor::instance().isEnabled() && getTestCommandsEnabled()) {
                 _secondaryMode =
                     request().getCommonFields().get_checkSecondariesMode().value_or_eval([&] {
                         const auto mode = opCtx->getClient()->getPrng().trueWithProbability(0.5)

@@ -7,6 +7,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
@@ -121,7 +122,7 @@ public:
                 AuthoritativeMetadataAccessLevelEnum::kNone) {
                 return;
             }
-            if (!TestingProctor::instance().isEnabled()) {
+            if (!TestingProctor::instance().isEnabled() || !getTestCommandsEnabled()) {
                 return;
             }
 
