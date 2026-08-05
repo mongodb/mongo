@@ -43,11 +43,7 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
     {"task": r"noPassthrough", "factor": 0.25},
     {
-        "task": r"replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough.*",
-        "factor": 0.20,
-    },
-    {
-        "task": r"replica_sets_reconfig_terminate_primary_jscore_passthrough_priority_ports",
+        "task": r"replica_sets_reconfig_.*jscore_.*passthrough.*",
         "factor": 0.20,
     },
     {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.125},
@@ -199,9 +195,7 @@ GLOBAL_TASK_FACTOR_OVERRIDES = {
     r"causally_consistent_hedged_reads_jscore_passthrough.*": 0.25,
     r"logical_session_cache.*_refresh_jscore_passthrough.*": 0.25,
     r"multi_shard_.*multi_stmt_txn_.*jscore_passthrough.*": 0.125,
-    r"replica_sets_reconfig_jscore_passthrough.*": 0.25,
-    r"replica_sets_reconfig_jscore_stepdown_passthrough.*": 0.25,
-    r"replica_sets_reconfig_kill_primary_jscore_passthrough.*": 0.25,
+    r"replica_sets_reconfig_.*jscore_.*passthrough.*": 0.25,
     r"replica_sets_transition_to_csrs_jscore_passthrough.*": 0.25,
     r"sharded_causally_consistent_jscore_passthrough.*": 0.75,
     r"sharded_collections_jscore_passthrough.*": 0.75,
