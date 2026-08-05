@@ -3,6 +3,8 @@
  * becomes available after upgrading FCV.
  *
  * Covers multiversion checklist item 2: verify that upgrading FCV turns the feature on.
+ *
+ * @tags: [future_git_tag_incompatible]
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
