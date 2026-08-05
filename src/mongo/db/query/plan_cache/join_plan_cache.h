@@ -111,6 +111,11 @@ struct CollectionTag {
     CollectionVersionTag versionTag;
 };
 
+// Hash of the set of indexes relevant to a single node of the join graph, including each index's
+// definition. Computed by 'join_ordering::makeNodeFingerprints' (index_fingerprint.h) from the
+// live catalog, both when an entry is stored and when a stored entry needs revalidating.
+using NodeFingerprint = std::size_t;
+
 // A full join plan cache entry: a reconstructable plan tree and its invalidation metadata.
 struct JoinPlanCacheEntry {
     JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,

@@ -167,6 +167,36 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "index_fingerprint",
+    srcs = [
+        "index_fingerprint.cpp",
+    ],
+    deps = [
+        ":catalog",
+        ":join_ordering",
+        "//src/mongo/db:common",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
+        "//src/mongo/db/query/compiler/dependency_analysis",
+        "//src/mongo/db/query/plan_cache:join_plan_cache",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_fingerprint_test",
+    srcs = [
+        "index_fingerprint_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":index_fingerprint",
+        ":unit_test_helpers",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+    ],
+)
+
+mongo_cc_library(
     name = "reorder_joins",
     srcs = [
         "reorder_joins.cpp",
