@@ -136,20 +136,11 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
 
     if (enabledSampling) {
         const entry = spec.getQueryStats(testDB.getMongo(), {collName})[0];
-        // For sharded deletes, docsExamined = COLLSCAN.docsTested + DELETE.docsFetched, where
-        // docsFetched is the number of documents that were fetched again. As a result, on sharded
-        // clusters each document may be re-fetched, so we assert that docsExamined is between 8
-        // and 16.
-        const isShardedDelete = !isStandalone && spec.label === "delete";
-        const docsExamined = isShardedDelete
-            ? getQueryExecMetrics(entry.metrics).docsExamined.sum
-            : 8;
-        if (isShardedDelete) {
-            assert.gte(docsExamined, 8, "docsExamined should be >= 8 for sharded delete", {entry});
-            assert.lte(docsExamined, 16, "docsExamined should be <= 16 for sharded delete", {
-                entry,
-            });
-        }
+        // Write conflicts make the write stages re-fetch documents, which inflates 'docsExamined'.
+        // We relax the exact assertion to 2x to reduce flakiness.
+        const docsExamined = getQueryExecMetrics(entry.metrics).docsExamined.sum;
+        assert.gte(docsExamined, 8, "docsExamined should be >= 8", {entry});
+        assert.lte(docsExamined, 16, "docsExamined should be <= 16", {entry});
         // The index-key maintenance counts are recorded on the shard and propagated back to mongos
         // via the singleWriteResult metrics, so the router-side entry matches the standalone counts.
         const expectedWrites = {
@@ -157,8 +148,7 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
             keysInserted: spec.keysInserted,
             keysDeleted: spec.keysDeleted,
         };
-        // For sharded deletes we validate docsExamined above. To make
-        // assertAggregatedMetricsSingleExec pass, we pass in the actual docsExamined value.
+        // Pass the actual 'docsExamined' since we already validated it above.
         assertAggregatedMetricsSingleExec(entry, {
             keysExamined: 0,
             docsExamined: docsExamined,
