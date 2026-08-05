@@ -1573,13 +1573,23 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     if ((localTimeseriesOptions && catalogTimeseriesOptions &&
          !timeseries::optionsAreEqual(*localTimeseriesOptions, *catalogTimeseriesOptions)) ||
         catalogTimeseriesOptions.has_value() != localTimeseriesOptions.has_value()) {
-        inconsistencies.emplace_back(makeOptionsMismatchInconsistencyBetweenShardAndConfig(
-            nss,
-            shardId,
-            BSON(CollectionType::kTimeseriesFieldsFieldName
-                 << (localTimeseriesOptions ? localTimeseriesOptions->toBSON() : BSONObj())),
-            BSON(CollectionType::kTimeseriesFieldsFieldName
-                 << (catalogTimeseriesOptions ? catalogTimeseriesOptions->toBSON() : BSONObj()))));
+        // TODO(SERVER-132808): remove this exception
+        if (rsMode == RSNodeMode::kDelayedSecondary &&
+            (!catalogColl.getAllowChunkOperations() || !catalogColl.getAllowMigrations())) {
+            LOGV2(13280600,
+                  "Skipping timeseries options check for collection in delayed secondary because a "
+                  "DDL coordinator has frozen chunk operations",
+                  "nss"_attr = nss);
+        } else {
+            inconsistencies.emplace_back(makeOptionsMismatchInconsistencyBetweenShardAndConfig(
+                nss,
+                shardId,
+                BSON(CollectionType::kTimeseriesFieldsFieldName
+                     << (localTimeseriesOptions ? localTimeseriesOptions->toBSON() : BSONObj())),
+                BSON(CollectionType::kTimeseriesFieldsFieldName
+                     << (catalogTimeseriesOptions ? catalogTimeseriesOptions->toBSON()
+                                                  : BSONObj()))));
+        }
     }
 
     // Verify default collation is consistent between the shard and the config server.
