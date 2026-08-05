@@ -178,7 +178,7 @@ IngressRequestRateLimiter::IngressRequestRateLimiter()
           static_cast<double>(gIngressRequestRateLimiterRatePerSec.load()),
           gIngressRequestRateLimiterBurstCapacitySecs.load(),
           gIngressRequestAdmissionMaxQueueDepth.load(),
-          "ingressRequestRateLimiter",
+          std::string(kRateLimiterName),
           RateLimiter::Options{.metricsRecorder = std::make_unique<RateLimiterOtelMetricsRecorder>(
                                    ingressRequestRateLimiterSpec())}} {
     if (const auto scopedFp = ingressRequestRateLimiterFractionalRateOverride.scoped();
@@ -195,10 +195,9 @@ IngressRequestRateLimiter& IngressRequestRateLimiter::get(ServiceContext* servic
 void IngressRequestRateLimiter::installOtelMetrics(ServiceContext* svcCtx) {
     _metricsSamplingJob =
         static_cast<RateLimiterOtelMetricsRecorder&>(_rateLimiter.stats())
-            .installOtelMetrics(svcCtx->getPeriodicRunner(),
-                                Seconds{1},
-                                "ingressRequestRateLimiter",
-                                [this] { return _rateLimiter.sampledAvailableTokens(); });
+            .installOtelMetrics(svcCtx->getPeriodicRunner(), Seconds{1}, kRateLimiterName, [this] {
+                return _rateLimiter.sampledAvailableTokens();
+            });
 }
 
 const Status& IngressRequestRateLimiter::rejectionStatus() {

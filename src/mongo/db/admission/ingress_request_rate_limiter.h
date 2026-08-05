@@ -9,6 +9,7 @@
 #include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -17,6 +18,8 @@ namespace admission {
 
 class [[MONGO_MOD_PUBLIC]] IngressRequestRateLimiter {
 public:
+    static constexpr std::string_view kRateLimiterName = "ingressRequestRateLimiter";
+
     IngressRequestRateLimiter();
     /**
      * Returns the reference to IngressRequestRateLimiter associated with the operation's service

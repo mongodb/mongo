@@ -8,6 +8,10 @@
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
 
 namespace mongo {
 namespace transport {
@@ -55,6 +59,22 @@ void Session::setInOperation(bool state) {
         _opCounters->total.fetchAndAddRelaxed(1);
     } else if (oldState) {
         _opCounters->completed.fetchAndAddRelaxed(1);
+    }
+}
+
+bool Session::waitForPeerDisconnectUntil(Date_t deadline) {
+    // A default implementation for sessions without optimize disconnect polling.
+    static constexpr Milliseconds kSampleInterval{500};
+
+    while (true) {
+        if (!isConnected()) {
+            return true;
+        }
+        const auto now = Date_t::now();
+        if (now >= deadline) {
+            return false;
+        }
+        sleepFor(std::min(kSampleInterval, deadline - now));
     }
 }
 

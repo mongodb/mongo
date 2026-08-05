@@ -15,6 +15,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
@@ -26,6 +27,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
+#include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
@@ -375,7 +377,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithEstablishedConnection) 
         auto baselineRejected = baseline.isEmpty() ? 0 : baseline["rejected"].numberLong();
 
         enableRateLimiter(/*maxQueueDepth=*/1);
-        auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+        auto hangFP = configureFailPoint(
+            "hangInRateLimiter",
+            BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
 
         auto futures = sendPings(6, Minutes{10});
 
@@ -404,7 +408,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithEstablishedConnection) {
             baseline.isEmpty() ? 0 : baseline["interruptedDueToClientDisconnect"].numberLong();
 
         enableRateLimiter(/*maxQueueDepth=*/10);
-        auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+        auto hangFP = configureFailPoint(
+            "hangInRateLimiter",
+            BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
 
         auto futures = sendPings(3, Minutes{10});
 
@@ -434,7 +440,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithNoEstablishedConnection
     // Keep initial token balance below one token so the first request cannot race through and
     // establish a connection before rejections propagate.
     enableRateLimiter(/*maxQueueDepth=*/1, /*burstCapacitySecs=*/0.1);
-    auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+    auto hangFP = configureFailPoint(
+        "hangInRateLimiter",
+        BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
     assertPoolHasNoEstablishedConnection(
         "Pool must have zero established connections before no-established rejection test");
 
@@ -462,7 +470,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithNoEstablishedConnection) 
 
     // Keep initial token balance below one token so requests have to queue in this test.
     enableRateLimiter(/*maxQueueDepth=*/10, /*burstCapacitySecs=*/0.1);
-    auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+    auto hangFP = configureFailPoint(
+        "hangInRateLimiter",
+        BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
     assertPoolHasNoEstablishedConnection(
         "Pool must have zero established connections before no-established timeout test");
 

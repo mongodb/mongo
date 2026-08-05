@@ -326,6 +326,58 @@ The following `serverStatus` metrics are emitted by the `IngressRequestRateLimit
   requests.
 - `totalAvailableTokens`: the current capacity of the underlying token bucket.
 
+# Egress Response Rate Limiting
+
+The `EgressResponseRateLimiter` paces the egress (response-send) path. It is a thin wrapper around
+[`admission::RateLimiter`](rate_limiter.h), stored as a `ServiceContext` decoration, mirroring the
+[`IngressRequestRateLimiter`](ingress_request_rate_limiter.h) pattern.
+
+When enabled, it engages for every `SystemOverloaded` rejection reply produced by the
+`IngressRequestRateLimiter` (the engagement gate lives in the `SessionWorkflow` egress hook). IRRL
+is the single authority on which ops get rejected. It already exempts unauthenticated,
+priority-port, and IP/app-list traffic, so anything that reaches the egress limiter has been deemed
+rejectable by IRRL and is throttled uniformly. A caller is never denied, when the queue is at
+capacity the call bypasses the queue and returns immediately (fail-open), so `throttle()` always
+returns and the returned `Status` is purely informational. This preserves the invariant that a
+rejection reply is never dropped; dropping it would corrupt the connection and hang the client.
+
+The wait is driven by a lightweight, per-session `Interruptible`
+(`DisconnectShutdownAwareInterruptible`, declared in `src/mongo/transport/session_workflow_p.h`)
+rather than a full `OperationContext`, so the rejection path does not pay for constructing an opCtx
+per response. The interruptible composes two cancellation conditions in a single sliced wait loop:
+
+- **Shutdown**: it polls a `CancellationToken` obtained from
+  `session()->getTransportLayer()->getSessionManager()->getShutdownToken()`, which is canceled from
+  the `SessionManager`'s `shutdown()` path. The token is a lock-free atomic poll, not a kernel wait,
+  so it is checked at each slice boundary. A parked egress waiter is released within one slice of
+  shutdown, so the egress path never blocks shutdown for longer than that slice.
+- **Client disconnect**: each slice is a blocking `Session::waitForPeerDisconnectUntil()`. Since the
+  rejection path has no `OperationContext`, it cannot rely on
+  `OperationContext::markKillOnClientDisconnect()` to be woken when the client gives up. Without
+  this wait a tarpitted reply would retain its worker thread and the session's transport resources
+  for the full nap time even after the client went away. On Asio sessions the slice is a single
+  kernel `poll(2)` for `POLLRDHUP|POLLHUP` on the session's socket, so the worker becomes runnable
+  as soon as the client's FIN/RST arrives rather than only noticing at the next slice boundary.
+  Sessions without an optimized override (gRPC, handoff) use `Session`'s default, which samples
+  `isConnected()` once per slice.
+
+On shutdown the wait returns `ErrorCodes::InterruptedAtShutdown`; on peer disconnect it returns
+`ErrorCodes::ClientDisconnect`, which the rate limiter surfaces as `InterruptedInQueue` and uses to
+return the borrowed token.
+
+Policy is driven externally via `setParameter` (e.g. mongotune):
+
+- `egressResponseRateLimiterEnabled` (bool, default: false): determines whether the limiter is
+  consulted at all. While it is false the egress hook returns before touching the limiter, so a
+  rejection reply is sent with no pacing and no admission is recorded. This is independent of
+  `ingressRequestRateLimiterEnabled`, so IRRL may reject requests without its replies being paced.
+- `egressResponseRateLimiterRatePerSec`: defaults to the maximum int32 value, so enabling the
+  limiter without also lowering this rate leaves it an effective no-op.
+- `egressResponseRateLimiterBurstCapacitySecs`: defaults to the maximum double value.
+- `egressResponseRateLimiterMaxQueueDepth`: defaults to the maximum int64 value until a lower value
+  is set. A value of 0 disables queueing, so responses that exceed rate+burst are sent immediately
+  without throttling.
+
 # Data-Node Ingress Admission Control
 
 ### Quick Overview

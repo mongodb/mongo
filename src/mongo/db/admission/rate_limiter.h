@@ -7,7 +7,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/rate_limiter_counter_metrics_recorder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/system_tick_source.h"
 
@@ -63,6 +65,12 @@ public:
          * Must be called exactly once, the deferred token is consumed on return.
          */
         Status get(OperationContext* opCtx) &&;
+
+        /**
+         * Overload that drives the wait through an arbitrary Interruptible and ClockSource rather
+         * than an OperationContext.
+         */
+        Status get(Interruptible* interruptible, ClockSource* clockSrc) &&;
 
         /**
          * Records that this request is not subject to admission control.

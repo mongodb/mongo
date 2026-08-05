@@ -1,3 +1,4 @@
+import {RateLimiterKind} from "jstests/libs/admission/rate_limiter.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -152,7 +153,11 @@ export function makeKeyfileExemptConn(host) {
 /**
  * Enables a near-zero-burst IRRL on conn. Sets burst capacity to kZeroBurstCapacitySecs so the
  * token bucket starts essentially empty and every non-exempt connection is immediately rejected.
- * Uses keyfile auth via authutil.asCluster since conn is a raw (unauthenticated) node connection.
+ *
+ * By default the setParameter is issued using `conn`'s existing authentication. Pass
+ * `{useKeyFileAuth: true}` to instead authenticate `conn` as `__system` via the keyfile for the
+ * duration of the call (a side effect that re-authenticates and logs out `conn`); this is required
+ * when `conn` is a raw, unauthenticated node connection (e.g. a ReplSetTest primary).
  *
  * Tests that configure the ingressRequestRateLimiterFractionalRateOverride failpoint at startup
  * (via kConfigLogsAndFailPointsForRateLimiterTests) do not need to set it again. Tests that start
@@ -163,9 +168,9 @@ export function makeKeyfileExemptConn(host) {
 export function enableZeroBurstRateLimiter(
     conn,
     exemptions,
-    {setRefreshRateFailpoint = false} = {},
+    {setRefreshRateFailpoint = false, useKeyFileAuth = false} = {},
 ) {
-    authutil.asCluster(conn, kKeyFile, () => {
+    const configure = () => {
         if (setRefreshRateFailpoint) {
             assert.commandWorked(
                 conn.adminCommand({
@@ -184,15 +189,24 @@ export function enableZeroBurstRateLimiter(
                 ingressRequestRateLimiterEnabled: 1,
             }),
         );
-    });
+    };
+    if (useKeyFileAuth) {
+        authutil.asCluster(conn, kKeyFile, configure);
+    } else {
+        configure();
+    }
 }
 
 /**
- * Disables IRRL on the node at host and restores sane rate/burst parameters. Opens a fresh
- * keyfile-authenticated exempt connection so it works for direct shard/config nodes.
+ * Disables IRRL on the given node and restores sane rate/burst parameters.
+ *
+ * Accepts either a host string or an already-authenticated connection (e.g. an exemptConn). When
+ * given a host, it opens a fresh keyfile-authenticated exempt connection (via makeKeyfileExemptConn)
+ * so it works for direct shard/config nodes; when given a connection, it issues the setParameter
+ * using that connection's existing authentication, avoiding the keyfile auth side effect.
  */
-export function disableRateLimiter(host) {
-    const conn = makeKeyfileExemptConn(host);
+export function disableRateLimiter(hostOrConn) {
+    const conn = typeof hostOrConn === "string" ? makeKeyfileExemptConn(hostOrConn) : hostOrConn;
     assert.commandWorked(
         conn.adminCommand({
             setParameter: 1,
@@ -253,7 +267,11 @@ export function withRateLimitingDisabled(exemptConn, fn) {
  */
 export function withForcedQueueing(exemptConn, fn) {
     assert.commandWorked(
-        exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "alwaysOn"}),
+        exemptConn.adminCommand({
+            configureFailPoint: "hangInRateLimiter",
+            mode: "alwaysOn",
+            data: {limiter: RateLimiterKind.IngressRequestRateLimiter},
+        }),
     );
     try {
         fn();
