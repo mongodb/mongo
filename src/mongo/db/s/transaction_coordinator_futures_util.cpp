@@ -200,6 +200,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                          shardId,
                          readPref,
                          operationContextFn,
+                         exec = _executor,
                          commandObj = commandObj.getOwned()](OperationContext* opCtx) mutable {
         operationContextFn(opCtx);
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -211,16 +212,29 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             hangWhileTargetingRemoteHost.pauseWhileSet(opCtx);
         }
 
+        // Target the host and send the command, keeping everything on the executor via
+        // '.thenRunOn(exec)'. 'exec' is captured so the executor outlives these continuations.
+        // 'scheduleWork' requires the task to return a plain Future, so we bridge the
+        // ExecutorFuture back with an explicit promise + getAsync (which runs on the executor)
+        // rather than unsafeToInlineFuture, so no continuation runs in an unexpected place.
+        auto pf = makePromiseFuture<ResponseStatus>();
         auto targeter = shard->getTargeter();
-        return targeter->findHost(readPref, CancellationToken::uncancelable(), {})
-            .thenRunOn(_executor)
-            .unsafeToInlineFuture()
-            .then([this, readPref, commandObj = std::move(commandObj), shard = std::move(shard)](
-                      HostAndPort host) mutable {
+        targeter->findHost(readPref, CancellationToken::uncancelable(), {})
+            .thenRunOn(exec)
+            .then([this,
+                   readPref,
+                   exec,
+                   commandObj = std::move(commandObj),
+                   shard = std::move(shard)](HostAndPort host) mutable {
                 hangBeforeSchedulingRemoteCommandForTest();
                 return _sendCommandToResolvedHost(
-                    std::move(host), std::move(shard), std::move(commandObj), readPref);
-            });
+                    std::move(host), std::move(shard), std::move(commandObj), readPref, exec);
+            })
+            .getAsync(
+                [promise = std::move(pf.promise)](StatusWith<ResponseStatus> swResponse) mutable {
+                    promise.setFrom(std::move(swResponse));
+                });
+        return std::move(pf.future);
     });
 }
 
@@ -228,54 +242,45 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::_sendCommandT
     HostAndPort host,
     std::shared_ptr<Shard> shard,
     BSONObj commandObj,
-    const ReadPreferenceSetting& readPref) {
+    const ReadPreferenceSetting& readPref,
+    const std::shared_ptr<executor::TaskExecutor>& executor) {
     executor::RemoteCommandRequest request(
         host, DatabaseName::kAdmin, commandObj, readPref.toContainingBSON(), nullptr);
 
     auto pf = makePromiseFuture<ResponseStatus>();
 
-    std::unique_lock<std::mutex> ul(_mutex);
-    uassertStatusOK(_shutdownStatus);
+    return _trackScheduledWork(std::move(pf.future), [&] {
+        return executor->scheduleRemoteCommand(
+            request,
+            [this,
+             executor,
+             hostTargeted = std::move(host),
+             shard = std::move(shard),
+             promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))](
+                const RemoteCommandCallbackArgs& args) mutable {
+                auto status = args.response.status;
+                shard->updateReplSetMonitor(hostTargeted, status);
 
-    auto scheduledCommandHandle = uassertStatusOK(_executor->scheduleRemoteCommand(
-        request,
-        [this,
-         hostTargeted = std::move(host),
-         shard = std::move(shard),
-         promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))](
-            const RemoteCommandCallbackArgs& args) mutable {
-            auto status = args.response.status;
-            shard->updateReplSetMonitor(hostTargeted, status);
+                // Only consider actual failures to send the command as errors.
+                if (status.isOK()) {
+                    auto commandStatus = getStatusFromCommandResult(args.response.data);
+                    shard->updateReplSetMonitor(hostTargeted, commandStatus);
 
-            // Only consider actual failures to send the command as errors.
-            if (status.isOK()) {
-                auto commandStatus = getStatusFromCommandResult(args.response.data);
-                shard->updateReplSetMonitor(hostTargeted, commandStatus);
+                    auto writeConcernStatus =
+                        getWriteConcernStatusFromCommandResult(args.response.data);
+                    shard->updateReplSetMonitor(hostTargeted, writeConcernStatus);
 
-                auto writeConcernStatus =
-                    getWriteConcernStatusFromCommandResult(args.response.data);
-                shard->updateReplSetMonitor(hostTargeted, writeConcernStatus);
-
-                promise->emplaceValue(args.response);
-            } else {
-                promise->setError([&] {
-                    if (status == ErrorCodes::CallbackCanceled) {
-                        std::unique_lock<std::mutex> ul(_mutex);
-                        return _shutdownStatus.isOK() ? status : _shutdownStatus;
-                    }
-                    return status;
-                }());
-            }
-        }));
-
-    auto it = _activeHandles.emplace(_activeHandles.begin(), std::move(scheduledCommandHandle));
-
-    ul.unlock();
-
-    return std::move(pf.future).tapAll([this, it = std::move(it)](StatusWith<ResponseStatus> s) {
-        std::lock_guard<std::mutex> lg(_mutex);
-        _activeHandles.erase(it);
-        _notifyAllTasksComplete(lg);
+                    promise->emplaceValue(args.response);
+                } else {
+                    promise->setError([&] {
+                        if (status == ErrorCodes::CallbackCanceled) {
+                            std::lock_guard lk(_mutex);
+                            return _shutdownStatus.isOK() ? status : _shutdownStatus;
+                        }
+                        return status;
+                    }());
+                }
+            });
     });
 }
 
