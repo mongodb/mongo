@@ -5,7 +5,6 @@
 #include "mongo/db/op_observer/fcv_op_observer.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
@@ -30,14 +29,10 @@
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 
-#include <string>
 #include <string_view>
 
 #include <boost/move/utility_core.hpp>
@@ -116,6 +111,10 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         if (role && role->has(ClusterRole::ShardServer)) {
             ShardCatalogRecovererTracker::get(opCtx)->interruptIncompatibleRecoveries(opCtx);
+            if (prevVersion) {
+                FilteringMetadataCache::get(opCtx)->fixPotentiallyStaleShardingStatesAfterUpgrade(
+                    opCtx, *prevVersion, newFcvSnapshot.getVersion());
+            }
         }
     } catch (const DBException&) {
         // Swallow the error when running within a recovery unit to avoid process termination.

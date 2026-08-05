@@ -1016,4 +1016,46 @@ FilteringMetadataCache::_onShardVersionMismatchNonAuthoritative(
     return MismatchAttemptResult::kDone;
 }
 
+void FilteringMetadataCache::fixPotentiallyStaleShardingStatesAfterUpgrade(
+    OperationContext* opCtx,
+    const multiversion::FeatureCompatibilityVersion& prevVersion,
+    const multiversion::FeatureCompatibilityVersion& newVersion) {
+    // There is a potential edge case right after an upgrade to the authoritative shards
+    // model where potentially confusing information could be installed right after the
+    // cloning step due to a legacy sharding metadata refresh. We handle this here now in
+    // order to clear out the legacy data and enter the authoritative model with full
+    // confidence that the CSS/DSS is kept in sync with the durable state.
+    if (feature_flags::gAuthoritativeShardsCRUD.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+            newVersion, prevVersion)) {
+
+        // A legacy refresh could install into the DSS metadata that says another shard is
+        // the dbPrimary. The authoritative model tries to maintain the invariant that the
+        // DSS only has data IF it is the dbPrimary. Note that this is safe to not do as
+        // it's been proven correct to maintain the legacy data around. However, this moves
+        // us closer to a world with a simpler model.
+        const auto shardId = ShardingState::get(opCtx)->shardId();
+        for (const auto& dbName : DatabaseShardingRuntime::getDatabaseNames(opCtx)) {
+            BypassDatabaseMetadataAccess bypass{opCtx,
+                                                BypassDatabaseMetadataAccess::Type::kReadAndWrite};
+            auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+            if (scopedDsr->getDbPrimaryShard(opCtx) != shardId) {
+                scopedDsr->clearDbMetadata(opCtx);
+            }
+        }
+
+        // A legacy refresh could install metadata saying the collection is either
+        // UNTRACKED/UNOWNED. TRACKED and OWNED collections are safe since the content must
+        // be the same before and after the legacy refresh. We only know of a single bug so
+        // far where an aggregation wouldn't converge and return a StaleConfig error due to
+        // this stale data (SERVER-132477). However, in order to avoid any more issues like
+        // this we force a clear of the metadata to force an authoritative recovery to
+        // happen.
+        for (const auto& nss : CollectionShardingRuntime::getCollectionNames(opCtx)) {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+            if (auto cm = scopedCsr->getCurrentMetadataIfKnown(); cm && !cm->hasRoutingTable()) {
+                scopedCsr->clearCollectionMetadata(opCtx);
+            }
+        }
+    }
+}
 }  // namespace mongo
