@@ -24,7 +24,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     createMetricsDirectory,
     getLatestMetrics,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 const kMetricName = "mongodb.serverStatus.metrics.changeStreams.cursor.lifespan";
 // Number of buckets = number of boundaries + 1 (for the implicit +inf bucket).

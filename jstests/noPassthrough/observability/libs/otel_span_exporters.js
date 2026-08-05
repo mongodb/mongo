@@ -1,7 +1,7 @@
 /**
  * Fixtures that let a tracing test run unchanged against either span exporter: the JSONL file
- * exporter or the OTLP HTTP exporter (TODO SERVER-132618). Each fixture knows how to configure a
- * node's startup parameters and how to read back the spans the cluster exported.
+ * exporter or the OTLP HTTP exporter. Each fixture knows how to configure a node's startup
+ * parameters and how to read back the spans the cluster exported.
  *
  * Typical use:
  *
@@ -19,6 +19,7 @@
  *         });
  *     }
  */
+import {OtelHttpServer} from "jstests/noPassthrough/observability/libs/otel_http_export_helpers.js";
 import {
     createTraceDirectory,
     readClusterSpans,
@@ -57,5 +58,38 @@ export class FileSpanExporter {
     stop() {}
 }
 
-// TODO(SERVER-132618): Add the HttpSpanExporter
-export const kSpanExporters = [FileSpanExporter];
+/**
+ * Exports spans over OTLP/HTTP to a mock collector shared by every node of the cluster.
+ */
+export class HttpSpanExporter {
+    static exporterName = "http exporter";
+
+    constructor(testName) {
+        this.server = new OtelHttpServer(testName);
+    }
+
+    start() {
+        this.server.start();
+    }
+
+    /**
+     * @returns {Object} Startup setParameters enabling the exporter.
+     */
+    startupParams() {
+        return {opentelemetryHttpEndpoint: this.server.getTracesEndpoint()};
+    }
+
+    /**
+     * The http server receives the spans of every node, so the connections are ignored.
+     * @returns {Array<Object>} Spans annotated with `resource`, deduplicated.
+     */
+    readSpans(conns) {
+        return this.server.readSpans();
+    }
+
+    stop() {
+        this.server.stop();
+    }
+}
+
+export const kSpanExporters = [FileSpanExporter, HttpSpanExporter];

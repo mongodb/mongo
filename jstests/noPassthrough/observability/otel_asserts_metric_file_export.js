@@ -11,7 +11,7 @@ import {
     getLatestMetrics,
     getLatestRawRecord,
     otelFileExportParams,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 const kMetricName = "mongodb.serverStatus.asserts";
 const kKinds = ["regular", "msg", "user", "tripwire"];

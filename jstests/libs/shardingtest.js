@@ -1274,6 +1274,26 @@ export class ShardingTest {
         try {
             const clusterVersionInfo = this.getClusterVersionInfo();
 
+            // Sets the OpenTelemetry trace directory on 'options' (in place) if tracing is enabled
+            // and the node being started supports it.
+            const maybeSetOtelTraceDirectory = (options, clusterVersionInfo) => {
+                if (!jsTestOptions().otelTraceDirectory || clusterVersionInfo.isMixedVersion) {
+                    return;
+                }
+                if (MongoRunner.compareBinVersions(
+                        MongoRunner.getBinVersionFor(options.binVersion ?? "latest"),
+                        MongoRunner.getBinVersionFor("8.3.0")) < 0) {
+                    return;
+                }
+                options.setParameter = options.setParameter ?? {};
+                // The trace directory and the HTTP endpoint cannot both be set, so don't create a
+                // trace directory for tests that should use the HTTP endpoint.
+                if (!options.setParameter.opentelemetryHttpEndpoint) {
+                    options.setParameter.opentelemetryTraceDirectory =
+                        jsTestOptions().otelTraceDirectory;
+                }
+            };
+
             let startTime = new Date();  // Measure the execution time of startup and initiate.
             if (!isConfigShardMode) {
                 //
@@ -1310,11 +1330,7 @@ export class ShardingTest {
                 startOptions = Object.merge(startOptions, otherParams.configOptions);
 
                 const clusterVersionInfo = this.getClusterVersionInfo();
-                if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
-                    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(startOptions.binVersion ?? "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
-                    startOptions.setParameter = startOptions.setParameter ?? {};
-                    startOptions.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
-                }
+                maybeSetOtelTraceDirectory(startOptions, clusterVersionInfo);
                 // Enable resharding document-count validation (off by default) in test clusters.
                 // TODO(SERVER-131910): Re-enable for mixed binary versions when last lts is 9.0.
                 if (!clusterVersionInfo.isMixedVersion) {
@@ -1398,10 +1414,7 @@ export class ShardingTest {
                     otherParams.migrationLockAcquisitionMaxWaitMS;
 
                 const clusterVersionInfo = this.getClusterVersionInfo();
-                if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
-                    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(rsDefaults.binVersion || "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
-                    rsDefaults.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
-                }
+                maybeSetOtelTraceDirectory(rsDefaults, clusterVersionInfo);
                 // Enable resharding document-count validation (off by default) in test clusters.
                 if (!clusterVersionInfo.isMixedVersion &&
                     rsDefaults.setParameter.reshardingDocumentVerification === undefined) {
@@ -1722,10 +1735,7 @@ export class ShardingTest {
                     options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown || 0;
 
                 const clusterVersionInfo = this.getClusterVersionInfo();
-                if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
-                    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(options.binVersion ?? "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
-                    options.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
-                }
+                maybeSetOtelTraceDirectory(options, clusterVersionInfo);
 
                 options.port = options.port || _allocatePortForMongos();
                 if (this._usePriorityPorts || options.hasOwnProperty("priorityPort")) {

@@ -20,7 +20,7 @@ import {
     getLatestMetrics,
     otelFileExportParams,
     waitForMetric,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 describe("OTel opcounters metric file export", function () {
     before(function () {

@@ -1,7 +1,7 @@
 import {
     findOtelFilesWithSuffix,
     readJsonlFile,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 /**
  * Generates the name for a tracing directory for the given test name and ensures the directory

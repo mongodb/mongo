@@ -1,4 +1,4 @@
-import {getLatestMetrics} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+import {getLatestMetrics} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 export function getIndexStatusMetrics(metricsDir, afterDate) {
     let metrics;

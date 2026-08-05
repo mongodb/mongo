@@ -18,7 +18,7 @@ import {
     awaitMetrics,
     createMetricsDirectory,
     getLatestMetrics,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 describe("OTel query performance counters in sharded cluster", function () {
     before(function () {

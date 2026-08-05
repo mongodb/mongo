@@ -1,9 +1,37 @@
 #! /usr/bin/env python3
-"""Mock OTLP HTTP endpoint that records request paths and headers."""
+"""Mock OTLP HTTP endpoint that records request paths, headers and exported spans."""
 
 import argparse
+import base64
+import gzip
 import http.server
 import json
+
+from google.protobuf import json_format
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2
+
+_ID_FIELDS = ("traceId", "spanId", "parentSpanId")
+
+
+def _to_hex_ids(value):
+    """Recursively rewrites the base64-encoded span/trace id fields of a decoded record to hex."""
+    if isinstance(value, list):
+        return [_to_hex_ids(element) for element in value]
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: base64.b64decode(val).hex()
+        if key in _ID_FIELDS and isinstance(val, str)
+        else _to_hex_ids(val)
+        for key, val in value.items()
+    }
+
+
+def decode_trace_request(body):
+    """Decodes an OTLP/protobuf ExportTraceServiceRequest into its OTLP/JSON representation."""
+    request = trace_service_pb2.ExportTraceServiceRequest()
+    request.ParseFromString(body)
+    return _to_hex_ids(json_format.MessageToDict(request))
 
 
 class OtelHttpHandler(http.server.BaseHTTPRequestHandler):
@@ -13,15 +41,21 @@ class OtelHttpHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         content_length = int(self.headers.get("Content-Length", 0))
-        if content_length:
-            self.rfile.read(content_length)
+        body = self.rfile.read(content_length) if content_length else b""
 
         record = {
             "path": self.path,
             "headers": {key: value for key, value in self.headers.items()},
         }
-        with open(self.server.output_file, "a", encoding="utf-8") as output:
-            output.write(json.dumps(record) + "\n")
+
+        # Only traces are decoded; metrics requests are recorded for their path and headers alone.
+        if body and self.path.endswith("/v1/traces"):
+            if self.headers.get("Content-Encoding") == "gzip":
+                body = gzip.decompress(body)
+            record.update(decode_trace_request(body))
+
+        with open(self.server.output_file, "ab", buffering=0) as output:
+            output.write((json.dumps(record) + "\n").encode("utf-8"))
 
         self.send_response(200)
         self.send_header("Content-Type", "application/x-protobuf")
@@ -33,8 +67,7 @@ class OtelHttpHandler(http.server.BaseHTTPRequestHandler):
 
 
 def run(port, output_file):
-    http.server.HTTPServer.protocol_version = "HTTP/1.1"
-    httpd = http.server.HTTPServer(("127.0.0.1", port), OtelHttpHandler)
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), OtelHttpHandler)
     httpd.output_file = output_file
     print(f"Mock OTLP HTTP Server Listening on port {port}", flush=True)
     httpd.serve_forever()

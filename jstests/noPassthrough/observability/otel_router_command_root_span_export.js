@@ -1,7 +1,6 @@
 /**
  * Tests that a router (mongos) command produces a root tracing span, as an entry point for sharded
- * operations, exported by both the OTel JSONL file exporter and the OTLP HTTP exporter
- * (TODO SERVER-132618).
+ * operations, exported by both the OTel JSONL file exporter and the OTLP HTTP exporter.
  *
  * @tags: [requires_otel_build, requires_sharding]
  */

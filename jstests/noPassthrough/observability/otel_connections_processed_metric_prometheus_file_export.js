@@ -17,7 +17,7 @@ import {
     extractPrometheusMetricIntValue,
     extractPrometheusMetricTime,
     findOtelFilesWithSuffix,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 /**
  * Gets the current total value of the network.connections_processed metric from the metrics file in the given directory

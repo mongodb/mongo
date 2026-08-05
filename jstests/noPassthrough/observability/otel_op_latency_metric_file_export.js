@@ -11,7 +11,7 @@ import {
     assertHistogramMetricIncreases,
     getLatestMetrics,
     otelFileExportParams,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 function assertOpLatencyIncreases(metricsDir, opType, fn) {
     assertHistogramMetricIncreases({

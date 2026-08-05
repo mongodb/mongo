@@ -1,9 +1,14 @@
 /**
  * Helpers for testing OpenTelemetry HTTP (OTLP) export. The mock server is signal-neutral: it can
- * receive metrics and/or traces. It records only the request path and headers (the body is
- * discarded), so it validates exporter routing and custom headers.
+ * receive metrics and/or traces. It records the request path and headers of every request, plus the
+ * decoded OTLP payload of trace requests, so it validates exporter routing, custom headers, and the
+ * spans that were exported.
  */
 import {getPython3Binary} from "jstests/libs/python.js";
+import {
+    dedupeSpans,
+    getSpansWithResource,
+} from "jstests/noPassthrough/observability/libs/otel_traces_file_export_helpers.js";
 
 /**
  * Custom headers shared by the HTTP export tests, in the form the mock server is expected to
@@ -63,7 +68,9 @@ function requestHasHeaders(requestHeaders, expectedHeaders) {
 }
 
 /**
- * Reads captured OTLP HTTP export requests written by otel_http_server.py.
+ * Reads captured OTLP HTTP export requests written by otel_http_server.py. Some spans may be
+ * partially written; such lines are skipped and will parse on a later read once the server has
+ * finished writing them.
  * @param {string} outputFile
  * @returns {Array<Object>}
  */
@@ -77,10 +84,18 @@ export function readCapturedRequests(outputFile) {
         return [];
     }
 
-    return content
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line));
+    const requests = [];
+    for (const line of content.trim().split("\n")) {
+        if (line.trim() === "") {
+            continue;
+        }
+        try {
+            requests.push(JSON.parse(line));
+        } catch (e) {
+            // Partially written record; it will be picked up on a later read.
+        }
+    }
+    return requests;
 }
 
 /**
@@ -136,6 +151,16 @@ export class OtelHttpServer {
 
     getTracesEndpoint() {
         return "http://127.0.0.1:" + this.port + "/v1/traces";
+    }
+
+    /**
+     * Returns every span exported to this server so far, annotated with the resource attributes of
+     * the node that emitted it (see getSpansWithResource()) and deduplicated. A partially written
+     * request record is skipped and will be picked up on a later call.
+     * @returns {Array<Object>}
+     */
+    readSpans() {
+        return dedupeSpans(readCapturedRequests(this.outputFile).flatMap(getSpansWithResource));
     }
 
     /**

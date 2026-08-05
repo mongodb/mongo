@@ -1,7 +1,7 @@
 /**
  * Tests that operations sent directly to a mongod (no mongos in front) produce tracing spans that
- * are exported by both the OTel JSONL file exporter and the OTLP HTTP exporter
- * (TODO SERVER-132618). Covers both a write and a read command.
+ * are exported by both the OTel JSONL file exporter and the OTLP HTTP exporter. Covers both a write
+ * and a read command.
  *
  * @tags: [requires_otel_build]
  */

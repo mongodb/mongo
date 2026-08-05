@@ -1,7 +1,7 @@
 /**
  * Tests that a scatter-gather query through mongos in a sharded cluster produces a span for each
  * mongos->mongod hop of the fanout, exported by both the OTel JSONL file exporter and the OTLP HTTP
- * exporter (TODO SERVER-132618).
+ * exporter.
  *
  * For a single trace we verify that each targeted shard's span for the command is the child of its
  * own mongos client (egress) span, and that all of those egress spans hang off one common mongos

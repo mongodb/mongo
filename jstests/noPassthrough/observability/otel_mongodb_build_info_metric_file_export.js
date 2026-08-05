@@ -16,7 +16,7 @@ import {
     getLatestMetrics,
     getLatestRawRecord,
     otelFileExportParams,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getBuildInfoAttrs(metricsDir) {

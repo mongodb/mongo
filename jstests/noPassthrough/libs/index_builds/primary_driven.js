@@ -29,7 +29,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 import {
     findOtelFilesWithSuffix,
     otelFileExportParams,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 /**
  * Which phase of the primary-driven index build to pause at before forcing a resume via step-up.
