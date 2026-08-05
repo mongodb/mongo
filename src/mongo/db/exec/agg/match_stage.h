@@ -30,8 +30,12 @@ public:
     Document getExplainOutput(const query_shape::SerializationOptions& opts =
                                   query_shape::SerializationOptions{}) const final;
 
+    void detachFromOperationContext() final;
+
 private:
     GetNextResult doGetNext() override;
+
+    void doDispose() final;
 
     std::shared_ptr<MatchProcessor> _matchProcessor;
 

@@ -1904,7 +1904,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher:extensions_callback_noop.cpp",
         "//src/mongo/db/matcher:in_list_data.cpp",
         "//src/mongo/db/matcher:match_expression_util.cpp",
-        "//src/mongo/db/matcher:matchable.cpp",
         "//src/mongo/db/matcher:matcher_type_set.cpp",
         "//src/mongo/db/matcher/schema:encrypt_schema_types.cpp",
         "//src/mongo/db/matcher/schema:expression_internal_schema_all_elem_match_from_index.cpp",

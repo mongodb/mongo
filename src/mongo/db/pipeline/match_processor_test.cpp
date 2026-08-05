@@ -8,6 +8,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matchable.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
@@ -33,6 +34,21 @@ MatchProcessor makeProcessor(boost::intrusive_ptr<ExpressionContext> expCtx,
     // project an empty document.
     DepsTracker deps;
     dependency_analysis::addDependencies(expr.get(), &deps);
+    return MatchProcessor(std::move(expr), std::move(deps), predicate.getOwned());
+}
+
+// Builds a processor whose dependencies demand the whole document, as $where and $text do.
+MatchProcessor makeWholeDocumentProcessor(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                          const BSONObj& predicate) {
+    auto expr = uassertStatusOK(
+        MatchExpressionParser::parse(predicate,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures));
+    expr = optimizeMatchExpression(std::move(expr));
+    DepsTracker deps;
+    dependency_analysis::addDependencies(expr.get(), &deps);
+    deps.needWholeDocument = true;
     return MatchProcessor(std::move(expr), std::move(deps), predicate.getOwned());
 }
 
@@ -239,6 +255,23 @@ TEST(MatchableDocumentTest, ResetManyTimesReflectsLatestBsonObj) {
     }
 }
 
+TEST(MatchableDocumentTest, SourceDocumentIsOptional) {
+    Document doc{BSON("a" << 1 << "b" << 2)};
+    BSONMatchableDocument withSource(BSON("a" << 1), &doc);
+    ASSERT_BSONOBJ_EQ(withSource.toBSON(), BSON("a" << 1));
+    ASSERT_TRUE(withSource.getSourceDocument().has_value());
+    ASSERT_BSONOBJ_EQ(withSource.getSourceDocument()->toBson(), BSON("a" << 1 << "b" << 2));
+
+    BSONMatchableDocument withoutSource(BSON("a" << 1));
+    ASSERT_FALSE(withoutSource.getSourceDocument().has_value());
+
+    // reset() rebinds the source along with the BSON.
+    withSource.reset(BSON("c" << 3));
+    ASSERT_FALSE(withSource.getSourceDocument().has_value());
+    withSource.reset(BSON("c" << 3), &doc);
+    ASSERT_TRUE(withSource.getSourceDocument().has_value());
+}
+
 // --- Reuse staleness tests ---
 // SERVER-131797: The reused BSONMatchableDocument must not go stale across repeated process()
 // calls with varying document shapes.
@@ -274,6 +307,208 @@ TEST_F(MatchProcessorTest, ProcessLongerThanShorterDocDoesNotGoStale) {
     ASSERT_FALSE(processor.process(trivialDoc(fromjson("{}"))));
     ASSERT_TRUE(processor.process(trivialDoc(
         fromjson("{a: {b: {c: {d: {e: 1}}}}, x: 1, longField: 'aaaaaaaaaaaaaaaaaaaa'}"))));
+}
+
+// --- Buffer reuse tests ---
+
+// 'modifiedDoc' forces the serialization path, so these alternate document sizes and match results
+// against one reused buffer.
+TEST_F(MatchProcessorTest, BufferReuseAcrossVaryingDocSizes) {
+    auto processor = makeProcessor(_expCtx, fromjson("{a: 5, b: {$gt: 10}}"));
+    const BSONObj big = BSON("pad" << std::string(4096, 'x') << "a" << 5 << "b" << 20);
+    for (int i = 0; i < 5; i++) {
+        ASSERT_TRUE(processor.process(modifiedDoc(fromjson("{a: 5, b: 20}"), "z"sv, i)));
+        ASSERT_TRUE(processor.process(modifiedDoc(big, "z"sv, i)));
+        ASSERT_FALSE(processor.process(modifiedDoc(fromjson("{a: 5, b: 5}"), "z"sv, i)));
+    }
+}
+
+TEST_F(MatchProcessorTest, BufferReuseWithDependenciesOnSeparateFields) {
+    auto processor = makeProcessor(_expCtx, fromjson("{$expr: {$eq: ['$a', '$b']}}"));
+    const BSONObj big = BSON("pad" << std::string(4096, 'x') << "a" << 7 << "b" << 7);
+    for (int i = 0; i < 5; i++) {
+        ASSERT_TRUE(processor.process(modifiedDoc(fromjson("{a: 7, b: 7}"), "extra"sv, i)));
+        ASSERT_TRUE(processor.process(modifiedDoc(big, "extra"sv, i)));
+        ASSERT_FALSE(processor.process(modifiedDoc(fromjson("{a: 7, b: 8}"), "extra"sv, i)));
+    }
+}
+
+// A whole-document dependency serializes the entire input into the buffer rather than projecting
+// the predicate's fields, so the reused buffer must also hold fields the predicate never reads.
+TEST_F(MatchProcessorTest, BufferReuseWithNeedWholeDocument) {
+    auto processor = makeWholeDocumentProcessor(_expCtx, fromjson("{a: 7}"));
+    const BSONObj big = BSON("pad" << std::string(4096, 'x') << "a" << 7);
+    for (int i = 0; i < 5; i++) {
+        ASSERT_TRUE(processor.process(modifiedDoc(fromjson("{a: 7, b: 1}"), "extra"sv, i)));
+        ASSERT_TRUE(processor.process(modifiedDoc(big, "extra"sv, i)));
+        ASSERT_FALSE(processor.process(modifiedDoc(fromjson("{a: 8, b: 1}"), "extra"sv, i)));
+    }
+}
+
+// Paths sharing a first field defeat the uniqueness optimization, selecting the slower
+// serialization that checks for a repeated first field.
+TEST_F(MatchProcessorTest, BufferReuseWithSharedFirstFieldDependencies) {
+    auto processor = makeProcessor(_expCtx, fromjson("{'a.b': 1, 'a.c': 2}"));
+    const BSONObj big = BSON("pad" << std::string(4096, 'x') << "a" << BSON("b" << 1 << "c" << 2));
+    for (int i = 0; i < 5; i++) {
+        ASSERT_TRUE(processor.process(modifiedDoc(fromjson("{a: {b: 1, c: 2}}"), "extra"sv, i)));
+        ASSERT_TRUE(processor.process(modifiedDoc(big, "extra"sv, i)));
+        ASSERT_FALSE(processor.process(modifiedDoc(fromjson("{a: {b: 1, c: 3}}"), "extra"sv, i)));
+    }
+}
+
+TEST(BSONObjBuilderTest, AsTempObjUsesLargeSizeTrait) {
+    const std::string bigStr(20 * 1024 * 1024, 'x');
+    BSONObjBuilder bob;
+    bob.append("pad", bigStr);
+    BSONObj temp = bob.asTempObj();
+    ASSERT_GT(temp.objsize(), BSONObjMaxInternalSize);
+    ASSERT_EQ(temp.firstElement().str(), bigStr);
+}
+
+// process() must handle a serialized doc past BSONObjMaxInternalSize without crashing.
+TEST_F(MatchProcessorTest, ProcessMatchesDocExceedingBSONObjMaxInternalSize) {
+    auto processor = makeWholeDocumentProcessor(_expCtx, fromjson("{target: 7}"));
+    const std::string bigStr(20 * 1024 * 1024, 'x');
+
+    auto matchingDoc = modifiedDoc(BSON("pad" << bigStr << "target" << 7), "extra"sv, 0);
+    ASSERT_TRUE(processor.process(matchingDoc));
+    ASSERT_GT(processor.bufferCapacity(), BSONObjMaxInternalSize);
+
+    auto nonMatchingDoc = modifiedDoc(BSON("pad" << bigStr << "target" << 8), "extra"sv, 0);
+    ASSERT_FALSE(processor.process(nonMatchingDoc));
+}
+
+// Same, but via the projection path instead of whole-document.
+TEST_F(MatchProcessorTest, ProjectionPathMatchesDocExceedingBSONObjMaxInternalSize) {
+    auto processor = makeProcessor(
+        _expCtx, fromjson("{pad1: {$exists: true}, pad2: {$exists: true}, target: 7}"));
+    const std::string bigStr(9 * 1024 * 1024, 'x');
+
+    auto matchingDoc =
+        modifiedDoc(BSON("pad1" << bigStr << "pad2" << bigStr << "target" << 7), "extra"sv, 0);
+    ASSERT_TRUE(processor.process(matchingDoc));
+    ASSERT_GT(processor.bufferCapacity(), BSONObjMaxInternalSize);
+
+    auto nonMatchingDoc =
+        modifiedDoc(BSON("pad1" << bigStr << "pad2" << bigStr << "target" << 8), "extra"sv, 0);
+    ASSERT_FALSE(processor.process(nonMatchingDoc));
+}
+
+// process() throws code on doc larger than BufferMaxSize (125MB).
+TEST_F(MatchProcessorTest, ProcessThrowsWhenDocExceedsBufferMaxSize) {
+    auto processor = makeWholeDocumentProcessor(_expCtx, fromjson("{target: 7}"));
+    const std::string bigStr(15 * 1024 * 1024, 'x');
+
+    MutableDocument mut;
+    mut.setField("target", Value(7));
+    for (int i = 0; i < 9; ++i) {
+        mut.setField(std::to_string(i), Value(bigStr));
+    }
+    Document hugeDoc = mut.freeze();
+    ASSERT_FALSE(hugeDoc.toBsonIfTriviallyConvertible().has_value());
+
+    ASSERT_THROWS_CODE(processor.process(hugeDoc), AssertionException, 13548);
+}
+
+// --- Buffer memory tracking tests ---
+
+TEST_F(MatchProcessorTest, TrackerChargesBufferGrowthHighWaterMark) {
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
+    EvaluationContext ctx;
+    ctx.tracker = &tracker;
+
+    auto processor = makeProcessor(_expCtx, fromjson("{pad: {$exists: true}, target: 1}"));
+
+    // Small doc: the tracker charges the buffer's whole initial allocation, not the bytes written.
+    processor.process(modifiedDoc(fromjson("{target: 1, pad: 'short'}"), "extra"sv, 0), ctx);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), processor.bufferCapacity());
+    auto afterSmall = tracker.inUseTrackedMemoryBytes();
+
+    // Same-size doc: no growth, tracker should not change.
+    processor.process(modifiedDoc(fromjson("{target: 1, pad: 'short'}"), "extra"sv, 0), ctx);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), afterSmall);
+
+    // Larger doc: buffer grows to fit the bigger projected field, tracker charges the delta.
+    const std::string big(4096, 'x');
+    processor.process(modifiedDoc(BSON("pad" << big << "target" << 1), "extra"sv, 0), ctx);
+    ASSERT_GT(tracker.inUseTrackedMemoryBytes(), afterSmall);
+
+    // Smaller doc after a large one: buffer retains capacity, no new charge.
+    auto afterBig = tracker.inUseTrackedMemoryBytes();
+    processor.process(modifiedDoc(fromjson("{target: 1, pad: 'short'}"), "extra"sv, 0), ctx);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), afterBig);
+}
+
+// The buffer holds its grown allocation after a small document overwrites a large one, so the
+// charge must stay at the capacity rather than falling back to the bytes written.
+TEST_F(MatchProcessorTest, TrackerChargesCapacityNotBytesWritten) {
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
+    EvaluationContext ctx;
+    ctx.tracker = &tracker;
+
+    auto processor = makeProcessor(_expCtx, fromjson("{pad: {$exists: true}, target: 1}"));
+
+    const std::string big(4096, 'x');
+    processor.process(modifiedDoc(BSON("pad" << big << "target" << 1), "extra"sv, 0), ctx);
+    const int64_t capacity = processor.bufferCapacity();
+    ASSERT_GT(capacity, 4096);
+
+    processor.process(modifiedDoc(fromjson("{target: 1, pad: 'short'}"), "extra"sv, 0), ctx);
+    ASSERT_EQ(processor.bufferCapacity(), capacity);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), capacity);
+}
+
+TEST_F(MatchProcessorTest, TrackerNotUpdatedWhenNull) {
+    auto processor = makeProcessor(_expCtx, fromjson("{target: 1}"));
+    // No tracker in EvaluationContext — must not crash.
+    ASSERT_TRUE(processor.process(modifiedDoc(fromjson("{target: 1}"), "extra"sv, 0)));
+    ASSERT_TRUE(processor.process(
+        modifiedDoc(BSON("pad" << std::string(4096, 'x') << "target" << 1), "extra"sv, 0)));
+}
+
+TEST_F(MatchProcessorTest, ReleaseBufferDeductsTrackerAndFreesMemory) {
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024 * 1024}};
+    EvaluationContext ctx;
+    ctx.tracker = &tracker;
+
+    auto processor = makeProcessor(_expCtx, fromjson("{pad: {$exists: true}, target: 1}"));
+
+    const std::string big(4096, 'x');
+    processor.process(modifiedDoc(BSON("pad" << big << "target" << 1), "extra"sv, 0), ctx);
+    ASSERT_GT(tracker.inUseTrackedMemoryBytes(), 0);
+
+    processor.releaseBuffer(&tracker);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+
+    // Buffer is recreated on next process() call.
+    processor.process(modifiedDoc(fromjson("{target: 1, pad: 'short'}"), "extra"sv, 0), ctx);
+    ASSERT_GT(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+// --- Buffer lifetime tests ---
+
+TEST_F(MatchProcessorTest, BufferAllocatedOnlyForSerializationAndFreedOnRelease) {
+    auto processor = makeProcessor(_expCtx, fromjson("{target: 1}"));
+    ASSERT_EQ(processor.bufferCapacity(), 0);
+
+    // The fast path never allocates the buffer.
+    ASSERT_TRUE(processor.process(trivialDoc(fromjson("{target: 1}"))));
+    ASSERT_EQ(processor.bufferCapacity(), 0);
+
+    ASSERT_TRUE(processor.process(modifiedDoc(fromjson("{target: 1}"), "extra"sv, 0)));
+    ASSERT_GT(processor.bufferCapacity(), 0);
+
+    // Taking the fast path must not drop the buffer; a workload alternating between the two paths
+    // would otherwise allocate per document.
+    ASSERT_TRUE(processor.process(trivialDoc(fromjson("{target: 1}"))));
+    ASSERT_GT(processor.bufferCapacity(), 0);
+
+    processor.releaseBuffer(nullptr);
+    ASSERT_EQ(processor.bufferCapacity(), 0);
+
+    ASSERT_TRUE(processor.process(modifiedDoc(fromjson("{target: 1}"), "extra"sv, 0)));
+    ASSERT_GT(processor.bufferCapacity(), 0);
 }
 
 }  // namespace

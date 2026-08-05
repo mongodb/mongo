@@ -202,6 +202,21 @@ TEST(BSONObjBuilderTest, ResetToEmptyResultsInEmptyObj) {
     ASSERT_BSONOBJ_EQ(BSONObj(), bob.obj());
 }
 
+TEST(BSONObjBuilderTest, CapacityGrowsWithContentAndSurvivesResetToEmpty) {
+    BSONObjBuilder bob;
+    ASSERT_GTE(bob.capacity(), bob.len());
+
+    bob.append("a", std::string(4096, 'x'));
+    ASSERT_GTE(bob.capacity(), bob.len());
+    ASSERT_GT(bob.capacity(), 4096);
+
+    const int grownCapacity = bob.capacity();
+    bob.resetToEmpty();
+    ASSERT_EQ(bob.capacity(), grownCapacity);
+    ASSERT_LT(bob.len(), grownCapacity);
+    ASSERT_BSONOBJ_EQ(BSONObj(), bob.obj());
+}
+
 TEST(BSONObjBuilderTest, ResetToEmptyForNestedBuilderOnlyResetsInnerObj) {
     BSONObjBuilder bob;
     bob.append("a", 3);

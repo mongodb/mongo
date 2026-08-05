@@ -68,25 +68,28 @@ public:
 
 class BSONMatchableDocument : public MatchableDocument {
 public:
-    BSONMatchableDocument(const BSONObj& obj);
-    ~BSONMatchableDocument() override;
+    BSONMatchableDocument(const BSONObj& obj, const Document* source = nullptr)
+        : _obj(obj), _source(source) {}
 
-    void reset(const BSONObj& obj) {
+    ~BSONMatchableDocument() override = default;
+
+    void reset(BSONObj obj, const Document* source = nullptr) {
         tassert(13179700,
                 "Cannot reset BSONMatchableDocument while iterator is in use",
                 !_iteratorUsed);
-        _obj = obj;
-    }
-
-    void reset(BSONObj&& obj) {
-        tassert(13179701,
-                "Cannot reset BSONMatchableDocument while iterator is in use",
-                !_iteratorUsed);
         _obj = std::move(obj);
+        _source = source;
     }
 
     BSONObj toBSON() const override {
         return _obj;
+    }
+
+    boost::optional<const Document&> getSourceDocument() const override {
+        if (!_source) {
+            return boost::none;
+        }
+        return *_source;
     }
 
     ElementIterator* allocateIterator(const ElementPath* path) const override {
@@ -107,32 +110,9 @@ public:
 
 private:
     BSONObj _obj;
+    const Document* _source;
     mutable BSONElementIterator _iterator;
-    mutable bool _iteratorUsed;
-};
-
-/**
- * Wraps up a `Document` as a `MatchableDocument`.
- */
-class DocumentMatchableDocument : public BSONMatchableDocument {
-public:
-    DocumentMatchableDocument(const Document& doc,
-                              const DepsTracker& dependencies,
-                              bool knownUniqueFields);
-
-    boost::optional<const Document&> getSourceDocument() const override {
-        return _doc;
-    }
-
-private:
-    // Named distinctly from the inherited 'BSONMatchableDocument::toBSON()' virtual: a member
-    // declared here would hide it, since name lookup does not form an overload set across class
-    // scopes.
-    static BSONObj documentToBSON(const Document& doc,
-                                  const DepsTracker& dependencies,
-                                  bool knownUniqueFields);
-
-    const Document& _doc;
+    mutable bool _iteratorUsed = false;
 };
 
 /**
