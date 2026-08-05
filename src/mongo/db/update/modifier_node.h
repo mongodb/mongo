@@ -75,7 +75,7 @@ protected:
         ModifyResult() {};
         ModifyResult(ModifyResult::Type type) : type(type) {}
 
-        Type type;
+        Type type = Type::kNoOp;
         std::variant<EmptyDescription, ArrayAppendUpdateDescription> description =
             EmptyDescription{};
     };
