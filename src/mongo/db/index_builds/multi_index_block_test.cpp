@@ -1842,6 +1842,9 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
 // _writeStateToContainer went through the container_write path (which fires the observer).
 class ResumeStateContainerInsertObserver : public OpObserverNoop {
 public:
+    // Keep the batched base-class overloads visible; they fan out to the single-op overrides below.
+    using OpObserverNoop::onContainerInsert;
+
     void onContainerInsert(OperationContext*,
                            std::string_view ident,
                            int64_t key,

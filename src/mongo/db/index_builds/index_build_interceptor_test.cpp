@@ -936,6 +936,10 @@ TEST_F(IndexBuilderInterceptorTest, GetTableAfterDropReturnsNull) {
  */
 class ContainerOpCountingObserver : public OpObserverNoop {
 public:
+    // Keep the batched base-class overloads visible; they fan out to the single-op overrides below.
+    using OpObserverNoop::onContainerDelete;
+    using OpObserverNoop::onContainerInsert;
+
     void onContainerInsert(OperationContext*,
                            std::string_view ident,
                            std::span<const char>,
