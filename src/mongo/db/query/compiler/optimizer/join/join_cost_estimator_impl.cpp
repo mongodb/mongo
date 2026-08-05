@@ -389,14 +389,23 @@ SortedSparseIO estimateSortedSparseIO(double numPagesAccessedColl,
 
     switch (mlCase) {
         case MackertLohmanCase::kCollectionFitsCache:
-            // For case 1 of M-L, do not charge sorted-sparse I/O. The accessed pages fit in cache,
-            // and the random I/O cost is already accounted for in the M-L formula.
+            // For the collection-fits-cache M-L case, do not charge sorted-sparse I/O. The accessed
+            // pages fit in cache, and the random I/O cost is already accounted for in the M-L
+            // formula.
             return {.numSeqIOs = 0.0, .numRandIOs = 0.0};
         case MackertLohmanCase::kReturnedDocsFitCache:
         case MackertLohmanCase::kPartialEviction: {
+            // The returned-documents-fit-cache and partial-eviction M-L cases only apply when the
+            // number of pages accessed exceeds the cache size, so the overflow factor below is
+            // guaranteed to be non-negative.
+            tassert(
+                13290900,
+                "The returned-documents-fit-cache and partial-eviction M-L cases imply that the "
+                "number of pages accessed exceeds the cache size",
+                numPagesAccessedColl > numPagesInStorageEngineCache);
+
             // The overflowFactor (0.0 to 1.0): what fraction of these pages overflow the buffer
             // pool?
-            // Case 2 and 3 of M-L, where the number of pages accessed exceeds the cache size.
             double overflowFactor = 1 - (numPagesInStorageEngineCache / numPagesAccessedColl);
 
             // Apply the sorted spatial locality dampening curve. The square root function models
