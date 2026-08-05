@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
@@ -199,8 +200,13 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
 }
 
 boost::optional<FieldPath> PathArrayness::getFirstInvalidatedPath(
-    const MonotonicallyIncreasingFieldPathSet& nonArrayPaths, const PathArrayness& current) {
-    if (MONGO_unlikely(pathArraynessYieldInvalidation.shouldFail())) {
+    const MonotonicallyIncreasingFieldPathSet& nonArrayPaths,
+    const PathArrayness& current,
+    const NamespaceString& ns) {
+    if (MONGO_unlikely(pathArraynessYieldInvalidation.shouldFail([&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+            return fpNss.isEmpty() || fpNss == ns;
+        }))) {
         return FieldPath("pathArraynessYieldInvalidationShouldFail");
     }
     for (const auto& path : nonArrayPaths) {
@@ -218,7 +224,7 @@ void PathArraynessChecker::uassertIfInvalidatedAndSyncEpoch(const PathArrayness&
         return;
     }
     prevEpoch = currentEpoch;
-    if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current)) {
+    if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current, ns)) {
         pathArraynessCounters.incrementInvalidation();
         uasserted(
             ErrorCodes::QueryPlanKilled,

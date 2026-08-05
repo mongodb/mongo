@@ -76,7 +76,9 @@ public:
      * boost::none if no paths are invalidated.
      */
     static boost::optional<FieldPath> getFirstInvalidatedPath(
-        const MonotonicallyIncreasingFieldPathSet& nonArrayPaths, const PathArrayness& current);
+        const MonotonicallyIncreasingFieldPathSet& nonArrayPaths,
+        const PathArrayness& current,
+        const NamespaceString& ns);
 
     /**
      * Returns a reference to an empty PathArrayness instance. This represents the conservative

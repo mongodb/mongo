@@ -11,6 +11,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const NUM_DOCS = 10;
@@ -45,9 +46,14 @@ function setupColl(name) {
 
 const kKilledMsg = "non-array path became multikey during yield";
 
-function runPhases({runQuery, isWriteCmd}) {
+function runPhases({coll, runQuery, isWriteCmd}) {
     const before = getInvalidationCount(db);
-    const fp = configureFailPoint(db, "pathArraynessYieldInvalidation", {}, {times: 1});
+    const fp = configureFailPoint(
+        db,
+        "pathArraynessYieldInvalidation",
+        {ns: coll.getFullName()},
+        {times: 1},
+    );
     try {
         // Verify query is killed with the path-arrayness invalidation message.
         if (isWriteCmd) {
@@ -86,7 +92,9 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     createIndexes(coll);
 
     // Force the arrayness check to kill the query if and only if it is reached on a yield.
-    const fp = configureFailPoint(testDb, "pathArraynessYieldInvalidation");
+    const fp = configureFailPoint(testDb, "pathArraynessYieldInvalidation", {
+        ns: coll.getFullName(),
+    });
     try {
         // Positive control: a normal read yields (YIELD_AUTO), reaches the check, and is killed.
         const beforeControl = getInvalidationCount(testDb);
@@ -127,6 +135,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     jsTest.log("Testing CollectionScan");
     const coll = setupColl("collscan");
     runPhases({
+        coll,
         runQuery: () => coll.find({}).hint({$natural: 1}).toArray(),
     });
 }
@@ -136,6 +145,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     const coll = setupColl("fetch");
     assert.commandWorked(coll.createIndex({a: 1}));
     runPhases({
+        coll,
         // Non-covered query: IXSCAN -> FETCH
         runQuery: () =>
             coll
@@ -154,6 +164,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
         assert.commandWorked(coll.insert({_id: i, a: i, b: i, val: "hello world"}));
     }
     runPhases({
+        coll,
         runQuery: () => coll.aggregate([{$sample: {size: 3}}]).toArray(),
     });
 }
@@ -163,6 +174,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     const coll = setupColl("index_scan");
     assert.commandWorked(coll.createIndex({a: 1}));
     runPhases({
+        coll,
         runQuery: () =>
             coll
                 .find({a: {$gte: 0}}, {a: 1, _id: 0})
@@ -176,6 +188,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     const coll = setupColl("text_or");
     assert.commandWorked(coll.createIndex({val: "text"}));
     runPhases({
+        coll,
         runQuery: () =>
             coll.find({$text: {$search: "hello"}}, {score: {$meta: "textScore"}}).toArray(),
     });
@@ -185,6 +198,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     jsTest.log("Testing DeleteStage");
     const coll = setupColl("delete_stage");
     runPhases({
+        coll,
         isWriteCmd: true,
         runQuery: () =>
             db.runCommand({
@@ -198,6 +212,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     jsTest.log("Testing UpdateStage");
     const coll = setupColl("update_stage");
     runPhases({
+        coll,
         isWriteCmd: true,
         runQuery: () =>
             db.runCommand({
@@ -224,6 +239,9 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
         );
     }
     runPhases({
+        // TimeseriesModifyStage acquires the underlying buckets collection, not the timeseries
+        // view, so the path-arrayness check (and thus the fail point) runs against its namespace.
+        coll: getTimeseriesCollForRawOps(db, tsColl),
         isWriteCmd: true,
         runQuery: () =>
             db.runCommand({
@@ -240,6 +258,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
     runPhases({
+        coll,
         runQuery: () => coll.find({a: {$gte: 0}, b: {$gte: 0}}).toArray(),
     });
 }
@@ -250,6 +269,7 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
     runPhases({
+        coll,
         runQuery: () => coll.find({$or: [{a: 1}, {b: 2}]}).toArray(),
     });
 }
