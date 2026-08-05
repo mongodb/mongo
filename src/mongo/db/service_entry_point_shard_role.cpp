@@ -133,6 +133,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
@@ -2516,10 +2517,18 @@ void HandleRequest::completeOperation(DbResponse& response) {
         try {
             collectQueryStatsMongodReadErrored(opCtx, errInfo.code());
         } catch (const DBException& ex) {
-            LOGV2_DEBUG(13192400,
-                        2,
-                        "Failed to collect query stats for an errored operation",
-                        "error"_attr = redact(ex));
+            // Failing to collect query stats for an errored operation is a bug. Surface a BF/AF,
+            // but swallow it and fire once per process to avoid any negative impact on the cluster.
+            static std::once_flag once;
+            std::call_once(once, [&] {
+                try {
+                    tasserted(13192400,
+                              str::stream()
+                                  << "Failed to collect query stats for an errored operation: "
+                                  << redact(ex));
+                } catch (const DBException&) {
+                }
+            });
         }
     }
 }

@@ -21,6 +21,15 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor);
 
 /**
+ * This is the completion-time hook that records query stats for router-level reads that error
+ * while the query stats key is still held by the operation's OpDebug. It no-ops when no key was
+ * collected for this request, or the key was moved into a cursor (in which case the cursor handles
+ * errors separately).
+ */
+[[MONGO_MOD_PUBLIC]] void collectQueryStatsMongosReadErrored(OperationContext* opCtx,
+                                                             ErrorCodes::Error errorCode);
+
+/**
  * Record metrics for a write operation. Writes are always batched into a single OperationContext on
  * the router, as it doesn't execute any writes on its own, but targets batches of writes for the
  * appropriate shards. We aggregate query stats metrics on the individual write up level, so it's

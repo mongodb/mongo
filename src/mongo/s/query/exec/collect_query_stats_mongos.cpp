@@ -3,6 +3,7 @@
 
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
 
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 
@@ -73,6 +74,38 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
                                      {} /* supplementalMetrics */,
                                      cursor->isChangeStreamCursor());
     }
+}
+
+void collectQueryStatsMongosReadErrored(OperationContext* opCtx, ErrorCodes::Error errorCode) {
+    if (!feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()) {
+        return;
+    }
+
+    // Writes register their key per statement at a separate opIndex, never the slot read here, so
+    // the lookup always misses for them. Batch writes additionally report per-statement failures in
+    // 'writeErrors' under a top-level ok:1, where this hook is not called.
+    auto& queryStatsInfo = CurOp::get(opCtx)->debug().getQueryStatsInfo();
+
+    // Only record when there is a live key still owned by this operation. The key's lifetime on
+    // OpDebug is therefore the window in which an error can be attributed to a shape. A null key
+    // means:
+    //  - The key was never created. registerRequest() opens the window, so an operation that fails
+    //    ahead of it (command parsing, query shape computation) has no shape to attribute to and is
+    //    invisible to $queryStats.
+    //  - The key was moved into a cursor, which closes the window. ClusterClientCursorImpl's
+    //    constructor std::moves it off OpDebug; mongos construction happens before the first batch
+    //    is fetched.
+    if (!queryStatsInfo.key) {
+        return;
+    }
+
+    // We deliberately do not capture metrics here, as writeQueryStats/updateStatistics discards the
+    // partial timing/exec metrics for errored snapshots.
+    query_stats::QueryStatsSnapshot snapshot{};
+    snapshot.errorCode = errorCode;
+
+    query_stats::writeQueryStats(
+        opCtx, queryStatsInfo.keyHash, std::move(queryStatsInfo.key), snapshot);
 }
 
 void collectQueryStatsMongosBatchWrites(OperationContext* opCtx) {

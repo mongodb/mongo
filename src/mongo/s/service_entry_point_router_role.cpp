@@ -28,16 +28,19 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/load_balancer_support.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
+#include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -152,6 +155,25 @@ void HandleRequest::onSuccess(const DbResponse& dbResponse) {
                    currentOp->elapsedTimeExcludingPauses(),
                    currentOp->debug().workingTimeMillis,
                    currentOp->getReadWriteType());
+
+    if (const auto& errInfo = currentOp->debug().errInfo; !errInfo.isOK()) {
+        try {
+            collectQueryStatsMongosReadErrored(opCtx, errInfo.code());
+        } catch (const DBException& ex) {
+            // Failing to collect query stats for an errored operation is a bug. Surface a BF/AF,
+            // but swallow it and fire once per process to avoid any negative impact on the cluster.
+            static std::once_flag once;
+            std::call_once(once, [&] {
+                try {
+                    tasserted(13192600,
+                              str::stream()
+                                  << "Failed to collect query stats for an errored operation: "
+                                  << redact(ex));
+                } catch (const DBException&) {
+                }
+            });
+        }
+    }
 }
 
 DbResponse HandleRequest::run() {

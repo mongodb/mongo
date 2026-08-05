@@ -455,6 +455,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:top",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_server_status",
         "//src/mongo/s/commands:cluster_commands_common",
+        "//src/mongo/s/query/exec:cluster_cursor",
         "//src/mongo/transport:session_manager",
     ],
 )
