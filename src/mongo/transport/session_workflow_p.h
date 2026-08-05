@@ -28,11 +28,13 @@ DbResponse makeDbResponseErrorForRateLimiting(const Message& message);
  * sliced wait loop:
  *   1. Shutdown: `shutdownToken` from `SessionManager::getShutdownToken()` is polled at each slice
  *      boundary.
- *   2. Client disconnect: each slice is a blocking `poll(2)` for POLLRDHUP/POLLHUP on the
- *      session's socket via `Session::waitForPeerDisconnectUntil()`, so the worker wakes within
- *      one scheduler tick of the client's FIN/RST.
+ *   2. Client disconnect: each slice is a blocking `Session::waitForPeerDisconnectUntil()`. On
+ *      Asio sessions that is a `poll(2)` for POLLRDHUP/POLLHUP on the session's socket, so the
+ *      worker becomes runnable as soon as the client's FIN/RST arrives. Sessions without an
+ *      optimized override (gRPC, handoff) use `Session`'s default, which samples `isConnected()`,
+ *      and so observe a disconnect only at the next slice boundary.
  *
- * Each poll is capped at `kMaxPollInterval` (500ms) so a parked waiter notices shutdown within
+ * Each slice is capped at `kMaxPollInterval` (500ms) so a parked waiter notices shutdown within
  * that bound.
  *
  * Returns `InterruptedAtShutdown` on shutdown, `ClientDisconnect` on peer disconnect.
@@ -62,14 +64,15 @@ public:
             }
 
             const auto sliceDeadline = std::min(deadline, now + kMaxPollInterval);
-            if (_session->waitForPeerDisconnectUntil(sliceDeadline)) {
+            const bool disconnected = _session->waitForPeerDisconnectUntil(sliceDeadline);
+            if (auto s = _checkShutdown(); !s.isOK()) {
+                return s;
+            }
+
+            if (disconnected) {
                 return Status(ErrorCodes::ClientDisconnect,
                               "client disconnected while waiting in egress response rate limiter "
                               "queue");
-            }
-
-            if (auto s = _checkShutdown(); !s.isOK()) {
-                return s;
             }
         }
     }
@@ -121,8 +124,7 @@ private:
     Session* const _session;
     ClockSource* const _clockSource;
 
-    // Upper bound on a single poll() slice, which bounds how long a parked waiter can stay
-    // in poll() before noticing SessionManager shutdown.
+    // Upper bound on how long a parked waiter can take to notice SessionManager shutdown.
     static constexpr Milliseconds kMaxPollInterval{500};
 };
 

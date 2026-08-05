@@ -365,13 +365,15 @@ per response. The interruptible composes two cancellation conditions in a single
   the `SessionManager`'s `shutdown()` path. The token is a lock-free atomic poll, not a kernel wait,
   so it is checked at each slice boundary. A parked egress waiter is released within one slice of
   shutdown, so the egress path never blocks shutdown for longer than that slice.
-- **Client disconnect**: each slice is a single blocking `poll(2)` for `POLLRDHUP|POLLHUP` on the
-  session's socket, via `Session::waitForPeerDisconnectUntil()`. Since the rejection path has no
-  `OperationContext`, it cannot rely on `OperationContext::markKillOnClientDisconnect()` to be woken
-  when the client gives up. Without this wait a tarpitted reply would park its worker thread and FD
-  for the full nap time even after the client closed the socket. Because the slice is a kernel
-  `poll()`, the worker is woken within one scheduler tick of the client's FIN/RST arriving rather
-  than only noticing at the next poll-slice boundary.
+- **Client disconnect**: each slice is a blocking `Session::waitForPeerDisconnectUntil()`. Since the
+  rejection path has no `OperationContext`, it cannot rely on
+  `OperationContext::markKillOnClientDisconnect()` to be woken when the client gives up. Without
+  this wait a tarpitted reply would retain its worker thread and the session's transport resources
+  for the full nap time even after the client went away. On Asio sessions the slice is a single
+  kernel `poll(2)` for `POLLRDHUP|POLLHUP` on the session's socket, so the worker becomes runnable
+  as soon as the client's FIN/RST arrives rather than only noticing at the next slice boundary.
+  Sessions without an optimized override (gRPC, handoff) use `Session`'s default, which samples
+  `isConnected()` once per slice.
 
 On shutdown the wait returns `ErrorCodes::InterruptedAtShutdown`; on peer disconnect it returns
 `ErrorCodes::ClientDisconnect`, which the rate limiter surfaces as `InterruptedInQueue` and uses to

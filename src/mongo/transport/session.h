@@ -178,13 +178,11 @@ public:
      * Returns `true` if the peer has disconnected (or the underlying socket is in an error state),
      * `false` if `deadline` expired without observing a disconnect.
      *
-     * This method performs a blocking `poll()` on the session's socket and therefore must not be
+     * Implementations may perform a blocking `poll()` on the session's socket, so this must not be
      * called concurrently with `sourceMessage()`/`sinkMessage()`/`waitForData()` on the same
      * session.
      */
-    virtual bool waitForPeerDisconnectUntil(Date_t deadline) {
-        return false;
-    }
+    virtual bool waitForPeerDisconnectUntil(Date_t deadline);
 
     /**
      * Returns true if this session was connected through an L4 load balancer.

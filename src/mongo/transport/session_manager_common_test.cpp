@@ -6,6 +6,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_manager_common_mock.h"
@@ -14,13 +15,16 @@
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 #include <cerrno>
+#include <memory>
 #include <mutex>
+#include <vector>
 
 #include <sys/resource.h>
 
@@ -265,6 +269,97 @@ TEST_F(SessionManagerCommonTest, DisconnectShutdownAwareInterruptibleWakesOnClie
         session->setConnected(false);
         woke.get();
     });
+}
+
+class UnpollableMockSession : public MockSession {
+public:
+    explicit UnpollableMockSession(TransportLayer* tl) : MockSession(tl) {}
+
+    void setConnected(bool v) {
+        _connected.store(v);
+    }
+
+    bool isConnected() override {
+        return _connected.load();
+    }
+
+private:
+    Atomic<bool> _connected{true};
+};
+
+// Session's default waitForPeerDisconnectUntil() has no socket to poll, but it must still block
+// until the deadline. Returning early would turn DisconnectShutdownAwareInterruptible's retry loop
+// into a spin for the full tarpit duration on every transport that does not override it.
+TEST_F(SessionManagerCommonTest, DefaultWaitForPeerDisconnectUntilBlocksUntilDeadline) {
+    TransportLayerMock tl;
+    auto session = std::make_shared<UnpollableMockSession>(&tl);
+
+    constexpr Milliseconds kWait{200};
+    const auto start = Date_t::now();
+    ASSERT_FALSE(session->waitForPeerDisconnectUntil(start + kWait));
+    ASSERT_GTE(Date_t::now() - start, kWait);
+}
+
+// The default implementation samples isConnected(), so it still reports a disconnect that occurs
+// while it is parked, well before the deadline.
+TEST_F(SessionManagerCommonTest, DefaultWaitForPeerDisconnectUntilObservesDisconnect) {
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        TransportLayerMock tl;
+        auto session = std::make_shared<UnpollableMockSession>(&tl);
+        const auto deadline = Date_t::now() + Seconds{30};
+
+        std::vector<unittest::JoinThread> threads;
+        threads.emplace_back(monitor.spawn([&]() {
+            sleepmillis(100);
+            session->setConnected(false);
+        }));
+
+        ASSERT_TRUE(session->waitForPeerDisconnectUntil(deadline));
+        ASSERT_LT(Date_t::now(), deadline);
+    });
+}
+
+// An already-disconnected session is reported without waiting for the deadline.
+TEST_F(SessionManagerCommonTest, DefaultWaitForPeerDisconnectUntilReturnsAtOnceIfDisconnected) {
+    TransportLayerMock tl;
+    auto session = std::make_shared<UnpollableMockSession>(&tl);
+    session->setConnected(false);
+
+    const auto start = Date_t::now();
+    ASSERT_TRUE(session->waitForPeerDisconnectUntil(start + Seconds{30}));
+    ASSERT_LT(Date_t::now() - start, Seconds{30});
+}
+
+// Trips the shutdown token from inside the disconnect wait, reproducing the interleaving that
+// SessionManager shutdown actually produces: it ends every session before draining, so the socket
+// teardown surfaces as a peer disconnect and both causes are live when the loop re-checks.
+class ShutdownRacingMockSession : public MockSession {
+public:
+    ShutdownRacingMockSession(TransportLayer* tl, CancellationSource* shutdownSource)
+        : MockSession(tl), _shutdownSource(shutdownSource) {}
+
+    bool waitForPeerDisconnectUntil(Date_t) override {
+        _shutdownSource->cancel();
+        return true;
+    }
+
+private:
+    CancellationSource* const _shutdownSource;
+};
+
+// When shutdown and disconnect are both live, shutdown must be the reported cause. Otherwise a
+// shutdown-induced release is indistinguishable from a client hangup, which would misattribute
+// every graceful-drain wakeup on the transports whose end() wakes the wait.
+TEST_F(SessionManagerCommonTest, ShutdownOutranksDisconnectWhenSessionTeardownWakesTheWait) {
+    TransportLayerMock tl;
+    CancellationSource shutdownSource;
+    auto session = std::make_shared<ShutdownRacingMockSession>(&tl, &shutdownSource);
+    DisconnectShutdownAwareInterruptible interruptible{
+        shutdownSource.token(), session.get(), getServiceContext()->getPreciseClockSource()};
+
+    ASSERT_THROWS_CODE(interruptible.sleepUntil(Date_t::now() + Seconds{30}),
+                       DBException,
+                       ErrorCodes::InterruptedAtShutdown);
 }
 
 }  // namespace
