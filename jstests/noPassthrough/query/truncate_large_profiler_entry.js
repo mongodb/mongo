@@ -1,6 +1,10 @@
 /**
  * Test which verifies that large profiler entries generated for SBE plans do not exceed the max
  * BSON depth. Instead, they get truncated right below the max depth.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to startup");

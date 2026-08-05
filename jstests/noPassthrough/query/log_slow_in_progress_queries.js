@@ -1,5 +1,9 @@
 /**
  * Confirms that long-running operations are logged once during their progress.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 
 import {findSlowInProgressQueryLogLine} from "jstests/libs/log.js";

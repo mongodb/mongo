@@ -865,6 +865,12 @@ export function runCommandAndValidateQueryStats({
         keyFieldsPrefixes.push(field.split(".")[0]);
     }
 
+    // On a replica set the shell adds a read preference to every command, so the key carries a
+    // field a standalone's would not. Callers list their key fields statically, so allow it here.
+    if (FixtureHelpers.isReplSet(testDB)) {
+        keyFieldsPrefixes.push("$readPreference");
+    }
+
     // Every field in the key is in keyFields or is the base of a path in keyFields.
     for (const field in entry.key) {
         assert(

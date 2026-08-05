@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   requires_profiling,
+ * ]
+ */
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const conn = MongoRunner.runMongod();

@@ -1,8 +1,12 @@
 /**
  * Tests that a standalone node started with --verbose, --profile, and --keyfile can
  * successfully run the replSetInitiate command.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
-let options = {verbose: 1, profile: 1, keyFile: "jstests/libs/key1", replSet: "rs0", port: 27017};
+let options = {verbose: 1, profile: 1, keyFile: "jstests/libs/key1", replSet: "rs0"};
 
 const conn = MongoRunner.runMongod(options);
 
@@ -10,7 +14,7 @@ assert.commandWorked(
     conn.getDB("admin").runCommand({
         replSetInitiate: {
             "_id": "rs0",
-            "members": [{"_id": 0, "host": "127.0.0.1:27017"}],
+            "members": [{"_id": 0, "host": conn.host}],
             writeConcernMajorityJournalDefault: false,
         },
     }),

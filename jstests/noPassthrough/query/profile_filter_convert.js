@@ -1,6 +1,10 @@
 /**
  * A profile filter whose $expr contains a $convert (which must perform a feature flag check)
  * must not crash the server during profiling.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start");

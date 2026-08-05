@@ -1,5 +1,9 @@
 /**
  * Tests for serverStatus metrics.queryExecutor stats.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");

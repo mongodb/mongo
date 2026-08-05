@@ -1,5 +1,9 @@
 /**
  * Tests that the query planning time is captured in the profiler.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 

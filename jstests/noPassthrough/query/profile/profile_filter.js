@@ -1,7 +1,7 @@
 /*
  * Test the usage and behavior of the 'filter' profiler option.
  *
- * @tags: [requires_sharding, requires_replication]
+ * @tags: [requires_sharding, requires_replication, requires_profiling]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
