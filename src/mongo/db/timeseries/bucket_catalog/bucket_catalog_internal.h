@@ -148,6 +148,8 @@ void rollover(BucketCatalog& catalog,
 /**
  * Perform archived-based reopening and returns the fetched bucket document.
  * Increments statistics accordingly.
+ * This function does not throw if querying the bucket fails, and will return an empty BSONObj in
+ * that case.
  */
 BSONObj reopenFetchedBucket(OperationContext* opCtx,
                             const Collection* bucketsColl,
@@ -158,6 +160,8 @@ BSONObj reopenFetchedBucket(OperationContext* opCtx,
  * Perform query-based reopening and returns the fetched bucket document if the supporting index
  * exists.
  * Increments statistics accordingly.
+ * This function does not throw if querying the bucket fails, and will return an empty BSONObj in
+ * that case.
  */
 BSONObj reopenQueriedBucket(OperationContext* opCtx,
                             const Collection* bucketsColl,
