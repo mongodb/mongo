@@ -458,8 +458,6 @@ generateMetadataForUnsplittableCollectionCreation(OperationContext* opCtx,
  * (the database primary always tracks the collection). When omitted it defaults to the shard
  * running this code, which is correct only when that shard is the database primary. Callers that
  * run elsewhere - such as the migration donor - must pass the real database primary shard.
- *
- * TODO (SERVER-129204): Review shard catalog commit modularity.
  */
 [[MONGO_MOD_NEEDS_REPLACEMENT]] void commitCreateCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
