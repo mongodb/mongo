@@ -5528,6 +5528,12 @@ class TestMainWorkflow(unittest.TestCase):
             self.assertIn("HEAD", symbolic_ref_command)
             self.assertIn("refs/heads/copybara_sync_source_v8_2", symbolic_ref_command)
 
+    def test_get_copybara_source_mirror_url_uses_container_path_semantics(self):
+        self.assertEqual(
+            sync_repo_with_copybara.get_copybara_source_mirror_url(),
+            "file:///tmp/copybara-output/source-mirror.git",
+        )
+
     def test_advertise_source_mirror_commits_makes_ancestor_shas_resolvable(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
