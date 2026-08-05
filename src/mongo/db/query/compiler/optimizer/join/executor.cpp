@@ -509,6 +509,13 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
     auto singleTableAccess = std::move(swAccessPlans.getValue());
 
+    // A trivially false predicate yields an EOF access plan, which carries no 'SolutionCacheData'
+    // and therefore cannot be serialized into the join plan cache.
+    const bool cacheWinningPlan = useJoinPlanCache &&
+        std::all_of(singleTableAccess.cbrCqQsns.cbegin(),
+                    singleTableAccess.cbrCqQsns.cend(),
+                    [](const auto& cqQsn) { return cqQsn.second->cacheData != nullptr; });
+
     // Pre-process indexes per collection to facilitate INLJ enumeration.
     auto indexesPerColl = extractINLJEligibleIndexes(singleTableAccess.cbrCqQsns, mca);
     PerCollUniqueFieldInfo uniqueFieldInfo;
@@ -557,7 +564,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                              costEstimator,
                                              hintedStrat ? std::move(*hintedStrat)
                                                          : getEnumerationStrategy(qkc),
-                                             useJoinPlanCache /* populateCachedJoinPlan */,
+                                             cacheWinningPlan /* populateCachedJoinPlan */,
                                              *metrics.planEnumerationMetrics);
         }
 
@@ -582,7 +589,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     auto reordered = std::move(swReordered.getValue());
 
     // Store the winning plan in the join plan cache for future queries with the same shape.
-    if (useJoinPlanCache && reordered.cachedJoinPlan) {
+    if (cacheWinningPlan && reordered.cachedJoinPlan) {
         auto entry = std::make_unique<JoinPlanCacheEntry>(
             std::move(reordered.cachedJoinPlan), reordered.baseNode, makeCollectionTags(mca));
         JoinPlanCache::get(opCtx->getServiceContext()).put(std::move(*cacheKey), std::move(entry));
