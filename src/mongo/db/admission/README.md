@@ -346,14 +346,14 @@ The `EgressResponseRateLimiter` paces the egress (response-send) path. It is a t
 [`admission::RateLimiter`](rate_limiter.h), stored as a `ServiceContext` decoration, mirroring the
 [`IngressRequestRateLimiter`](ingress_request_rate_limiter.h) pattern.
 
-It engages for every `SystemOverloaded` rejection reply produced by the `IngressRequestRateLimiter`
-(the engagement gate lives in the `SessionWorkflow` egress hook). IRRL is the single authority on
-which ops get rejected. It already exempts unauthenticated, priority-port, and IP/app-list traffic,
-so anything that reaches the egress limiter has been deemed rejectable by IRRL and is throttled
-uniformly. A caller is never denied, when the queue is at capacity the call bypasses the queue and
-returns immediately (fail-open), so `throttle()` always returns and the returned `Status` is purely
-informational. This preserves the invariant that a rejection reply is never dropped; dropping it
-would corrupt the connection and hang the client.
+When enabled, it engages for every `SystemOverloaded` rejection reply produced by the
+`IngressRequestRateLimiter` (the engagement gate lives in the `SessionWorkflow` egress hook). IRRL
+is the single authority on which ops get rejected. It already exempts unauthenticated,
+priority-port, and IP/app-list traffic, so anything that reaches the egress limiter has been deemed
+rejectable by IRRL and is throttled uniformly. A caller is never denied, when the queue is at
+capacity the call bypasses the queue and returns immediately (fail-open), so `throttle()` always
+returns and the returned `Status` is purely informational. This preserves the invariant that a
+rejection reply is never dropped; dropping it would corrupt the connection and hang the client.
 
 The wait is driven by a lightweight, per-session `Interruptible`
 (`DisconnectShutdownAwareInterruptible`, declared in `src/mongo/transport/session_workflow_p.h`)
@@ -378,11 +378,17 @@ On shutdown the wait returns `ErrorCodes::InterruptedAtShutdown`; on peer discon
 return the borrowed token.
 
 Policy is driven externally via `setParameter` (e.g. mongotune):
-`egressResponseRateLimiterRatePerSec`, `egressResponseRateLimiterBurstCapacitySecs`, and
-`egressResponseRateLimiterMaxQueueDepth`. The limiter is always engaged for IRRL rejection replies,
-it has no on/off toggle and defaults to the maximum int32 rate until a lower rate is set. The max
-queue depth defaults to the maximum int64 value until a lower value is set. A value of 0 disables
-queueing, so responses that exceed rate+burst are sent immediately without throttling.
+
+- `egressResponseRateLimiterEnabled` (bool, default: false): determines whether the limiter is
+  consulted at all. While it is false the egress hook returns before touching the limiter, so a
+  rejection reply is sent with no pacing and no admission is recorded. This is independent of
+  `ingressRequestRateLimiterEnabled`, so IRRL may reject requests without its replies being paced.
+- `egressResponseRateLimiterRatePerSec`: defaults to the maximum int32 value, so enabling the
+  limiter without also lowering this rate leaves it an effective no-op.
+- `egressResponseRateLimiterBurstCapacitySecs`: defaults to the maximum double value.
+- `egressResponseRateLimiterMaxQueueDepth`: defaults to the maximum int64 value until a lower value
+  is set. A value of 0 disables queueing, so responses that exceed rate+burst are sent immediately
+  without throttling.
 
 # Data-Node Ingress Admission Control
 

@@ -12,11 +12,22 @@ imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
+    egressResponseRateLimiterEnabled:
+        description: >-
+            Controls whether the egress response rate limiter mechanism is enabled. This is
+            independent of ingressRequestRateLimiterEnabled, so the ingress request limiter may be
+            enabled without also pacing the rejection replies it produces.
+        set_at: [startup, runtime]
+        cpp_varname: gEgressResponseRateLimiterEnabled
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+
     egressResponseRateLimiterRatePerSec:
         description: >-
-            The number of egress responses permitted per second. The egress response rate limiter
-            is always engaged for user/application rejection replies; this rate defaults to the
-            maximum int32 value, making the limiter an effective no-op until a lower rate is set.
+            The number of egress responses permitted per second. This rate defaults to the maximum
+            int32 value, so enabling the limiter without also lowering this rate leaves it an
+            effective no-op.
         set_at: [startup, runtime]
         cpp_varname: gEgressResponseRateLimiterRatePerSec
         cpp_vartype: Atomic<int32_t>

@@ -13,6 +13,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -955,6 +956,7 @@ public:
         // Snapshot the counters now so each test can assert on the delta it
         // produced rather than on absolute, leak-prone values.
         _baselineStats = getRateLimiterStats();
+        _baselineEgressAttemptedAdmissions = getEgressAttemptedAdmissions();
     }
 
     auto enableRateOverrideBehaviorWithSpecifiedBurstSize(double burstSize) -> void {
@@ -1002,6 +1004,40 @@ public:
         return uassertStatusOK(compressorManager.compressMessage(message, &cid));
     }
 
+    auto getEgressAttemptedAdmissions() -> int64_t {
+        return EgressResponseRateLimiter::get(getServiceContext()).stats().attemptedAdmissions();
+    }
+
+    auto getEgressAttemptedAdmissionsDelta() -> int64_t {
+        return getEgressAttemptedAdmissions() - _baselineEgressAttemptedAdmissions;
+    }
+
+    /**
+     * Drives one fire-and-forget request to consume the burst, then a second request that the
+     * ingress limiter rejects, sinking the rejection reply through the egress path. Returns the
+     * body of the sunk reply.
+     */
+    auto sinkOneRejectionReply() -> BSONObj {
+        startSession();
+
+        expect<Event::sessionSourceMessage>(setMoreToCome(makeOpMsg()));
+        runSepHandleRequest(
+            [](OperationContext*, const Message&) { return makeResponse(Message{}); });
+
+        expect<Event::sessionSourceMessage>(makeOpMsg());
+        BSONObj body;
+        expect<Event::sessionSinkMessage>([&](const Message& m) {
+            body = OpMsg::parse(m).body.getOwned();
+            return Status::OK();
+        });
+
+        expect<Event::sessionSourceMessage>(kClosedSessionError);
+        expect<Event::sepEndSession>();
+        joinSessions();
+
+        return body;
+    }
+
 private:
     double _convertBurstSizeToBurstCapacitySecs(double refreshRate, double burstSize) {
         // Rounding needed to ensure that the conversion back to burstSize won't be incorrect
@@ -1019,6 +1055,7 @@ private:
     boost::optional<unittest::ServerParameterGuard> _requestLimiterBurstCapacitySecs;
     boost::optional<unittest::ServerParameterGuard> _requestAdmissionRatePerSec;
     IngressRequestRateLimiterStats _baselineStats{};
+    int64_t _baselineEgressAttemptedAdmissions{0};
 };
 
 TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
@@ -1161,6 +1198,33 @@ TEST_F(IngressRequestRateLimiterTest, ImmediateRejectionHasExpectedErrorLabels) 
     ASSERT_EQ(stats.successfulAdmissions, 1);
     ASSERT_EQ(stats.rejectedAdmissions, 1);
     ASSERT_EQ(stats.addedToQueue, 0);
+}
+
+// The egress response rate limiter paces IRRL rejection replies, but only when
+// egressResponseRateLimiterEnabled is set. It defaults to off, so a rejection reply must reach the
+// wire without the limiter ever being consulted.
+TEST_F(IngressRequestRateLimiterTest, RejectionSkipsEgressResponseRateLimiterWhenDisabled) {
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+
+    const auto body = sinkOneRejectionReply();
+
+    ASSERT_EQ(getStatusFromCommandResult(body).code(), ErrorCodes::IngressRequestRateLimitExceeded);
+    ASSERT_EQ(getRateLimiterStatsDelta().rejectedAdmissions, 1);
+    ASSERT_EQ(getEgressAttemptedAdmissionsDelta(), 0);
+}
+
+// The two limiters are independently switchable: the ingress limiter stays enabled by the fixture
+// while the egress limiter is turned on here, and the rejection reply now passes through it. The
+// egress rate is left at its default maximum, so the reply is admitted without any pacing delay.
+TEST_F(IngressRequestRateLimiterTest, RejectionEngagesEgressResponseRateLimiterWhenEnabled) {
+    unittest::ServerParameterGuard egressLimiterEnabled{"egressResponseRateLimiterEnabled", true};
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+
+    const auto body = sinkOneRejectionReply();
+
+    ASSERT_EQ(getStatusFromCommandResult(body).code(), ErrorCodes::IngressRequestRateLimitExceeded);
+    ASSERT_EQ(getRateLimiterStatsDelta().rejectedAdmissions, 1);
+    ASSERT_EQ(getEgressAttemptedAdmissionsDelta(), 1);
 }
 
 TEST_F(IngressRequestRateLimiterTest, QueueDepthExceededRejectionHasExpectedErrorLabels) {

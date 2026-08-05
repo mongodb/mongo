@@ -7,7 +7,9 @@
  * `serverStatus.network.egressResponseRateLimiter` counters:
  *
  *   - The limiter engages (successfulAdmissions increments) for an IRRL rejection reply sent to a
- *     user connection.
+ *     user connection, once `egressResponseRateLimiterEnabled` is set.
+ *   - The limiter does NOT engage while `egressResponseRateLimiterEnabled` is off (its default),
+ *     even when IRRL is rejecting and a tight egress rate is configured.
  *   - The limiter does NOT engage for a normal (non-rejected) response.
  *   - The limiter does NOT engage for a rejection reply sent to an IRRL-exempt connection (the
  *     exempt connection is never rejected, so it never produces a rejection reply).
@@ -85,17 +87,19 @@ function withEgressStats(conn, fn) {
 }
 
 /**
- * Configures the egress response rate limiter on conn with the given rate/burst. The limiter is
- * always engaged for user/application rejection replies; with the default max rate it is a no-op,
- * so setting a finite rate/burst is what actually introduces pacing.
+ * Configures the egress response rate limiter on conn. The limiter is off by default and only
+ * engages for user/application rejection replies once `egressResponseRateLimiterEnabled` is set;
+ * even then, the default max rate makes it a no-op, so a finite rate/burst is what actually
+ * introduces pacing.
  */
-function enableEgressLimiter(
+function configureEgressLimiter(
     exemptConn,
-    {ratePerSec = maxInt32, burstCapacitySecs = Number.MAX_VALUE} = {},
+    {enabled = true, ratePerSec = maxInt32, burstCapacitySecs = Number.MAX_VALUE} = {},
 ) {
     assert.commandWorked(
         exemptConn.adminCommand({
             setParameter: 1,
+            egressResponseRateLimiterEnabled: enabled,
             egressResponseRateLimiterRatePerSec: ratePerSec,
             egressResponseRateLimiterBurstCapacitySecs: burstCapacitySecs,
         }),
@@ -103,15 +107,9 @@ function enableEgressLimiter(
 }
 
 function disableEgressLimiter(exemptConn) {
-    // Reset the egress limiter to its no-op defaults (max rate, unbounded burst) so subsequent
-    // tests start from a non-pacing state. The limiter has no on/off toggle.
-    assert.commandWorked(
-        exemptConn.adminCommand({
-            setParameter: 1,
-            egressResponseRateLimiterRatePerSec: maxInt32,
-            egressResponseRateLimiterBurstCapacitySecs: Number.MAX_VALUE,
-        }),
-    );
+    // Reset the egress limiter to its startup defaults (off, max rate, unbounded burst) so
+    // subsequent tests start from a non-pacing state.
+    configureEgressLimiter(exemptConn, {enabled: false});
 }
 
 /**
@@ -166,7 +164,7 @@ describe("egress response rate limiter", function () {
 
         it("engages for an IRRL rejection reply on a user connection", function () {
             enableZeroBurstRateLimiter(exemptConn, [kRateLimiterExemptAppName]);
-            enableEgressLimiter(exemptConn); // huge rate: no pacing delay, just observe engagement.
+            configureEgressLimiter(exemptConn); // huge rate: no pacing delay, just observe engagement.
 
             const {delta, before, after} = withEgressStats(exemptConn, () => {
                 assert.commandFailedWithCode(
@@ -183,8 +181,33 @@ describe("egress response rate limiter", function () {
             );
         });
 
+        it("does not engage for an IRRL rejection reply while disabled", function () {
+            enableZeroBurstRateLimiter(exemptConn, [kRateLimiterExemptAppName]);
+            // A rate tight enough to pace visibly if the limiter were consulted at all, paired with
+            // the limiter switched off. The rejection reply must bypass it entirely.
+            configureEgressLimiter(exemptConn, {
+                enabled: false,
+                ratePerSec: kEgressRatePerSec,
+                burstCapacitySecs: kEgressBurstCapacitySecs,
+            });
+
+            const {delta, before, after} = withEgressStats(exemptConn, () => {
+                assert.commandFailedWithCode(
+                    userConn.adminCommand({ping: 1, comment: "egress-rej-disabled-standalone"}),
+                    ErrorCodes.IngressRequestRateLimitExceeded,
+                );
+            });
+
+            assert.eq(
+                delta.attemptedAdmissions,
+                0,
+                "egress limiter must not be consulted at all while disabled",
+                {before, after},
+            );
+        });
+
         it("does not engage for a normal (non-rejected) response", function () {
-            enableEgressLimiter(exemptConn);
+            configureEgressLimiter(exemptConn);
             // IRRL stays disabled, so the user request succeeds and produces a normal response.
             const {delta, before, after} = withEgressStats(exemptConn, () => {
                 assert.commandWorked(
@@ -205,7 +228,7 @@ describe("egress response rate limiter", function () {
             // elapsed time with generous slack so slow/loaded CI machines do not flake: N rejection
             // replies at rate R with burst 1 must take at least (N-1)/R seconds, minus slack.
             enableZeroBurstRateLimiter(exemptConn, [kRateLimiterExemptAppName]);
-            enableEgressLimiter(exemptConn, {
+            configureEgressLimiter(exemptConn, {
                 ratePerSec: kEgressRatePerSec,
                 burstCapacitySecs: kEgressBurstCapacitySecs,
             });
@@ -291,7 +314,7 @@ describe("egress response rate limiter", function () {
             // Enable IRRL on the mongos only (shards stay off), so user requests are rejected at the
             // router and the mongos egress hook paces the rejection reply.
             enableZeroBurstRateLimiter(exemptConn, [kRateLimiterExemptAppName]);
-            enableEgressLimiter(exemptConn); // huge rate: no pacing delay, just observe engagement.
+            configureEgressLimiter(exemptConn); // huge rate: no pacing delay, just observe engagement.
 
             const {delta, before, after} = withEgressStats(exemptConn, () => {
                 assert.commandFailedWithCode(
@@ -309,7 +332,7 @@ describe("egress response rate limiter", function () {
         });
 
         it("does not engage for a normal (non-rejected) response through the mongos", function () {
-            enableEgressLimiter(exemptConn);
+            configureEgressLimiter(exemptConn);
             const {delta, before, after} = withEgressStats(exemptConn, () => {
                 assert.commandWorked(
                     userConn.adminCommand({ping: 1, comment: "egress-normal-mongos"}),
