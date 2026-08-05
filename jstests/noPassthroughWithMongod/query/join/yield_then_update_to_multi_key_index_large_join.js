@@ -12,16 +12,7 @@
  */
 
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
-
-// TODO (SERVER-130377): Investigate why this test fails on in-memory variant.
-if (jsTest.options().storageEngine === "inMemory") {
-    jsTest.log.info("Skipping test on inMemory storage engine");
-    quit();
-}
-
-const conn = MongoRunner.runMongod();
-const db = conn.getDB(jsTestName());
-assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 
 function* charRange(startChar, endChar) {
     for (let code = startChar.charCodeAt(0); code <= endChar.charCodeAt(0); code++) {
@@ -130,6 +121,19 @@ function runPipeline({pipeline, localColl}) {
 
 const localColl = db.baseColl;
 
-const pipeline = buildOutCollectionsIndexesAndPipeline(db, localColl);
-runPipeline({pipeline, localColl});
-MongoRunner.stopMongod(conn);
+runWithKnobs(
+    db,
+    () => {
+        const pipeline = buildOutCollectionsIndexesAndPipeline(db, localColl);
+        runPipeline({pipeline, localColl});
+    },
+    {
+        internalEnableJoinOptimization: true,
+        // Yield on every check so the query is reliably yielding when the array values are
+        // inserted below.
+        internalQueryExecYieldIterations: 1,
+        // 'runPipeline()' overwrites this knob on each iteration; listing it here ensures the
+        // original value is restored once the test is complete.
+        internalRandomJoinOrderSeed: 0,
+    },
+);
