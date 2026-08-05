@@ -125,6 +125,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterDocumentInsertsReserveOpTimes);
 MONGO_FAIL_POINT_DEFINE(hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesReopenArchivedBucketBeforeFetch);
 
 // The withLock fail points are for testing interruptability of these operations, so they will not
 // themselves check for interrupt.
@@ -2970,10 +2971,25 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
                         BSONObj suitableBucket;
 
                         if (auto* bucketId = stdx::get_if<OID>(&reopeningContext->candidate)) {
+                            hangTimeseriesReopenArchivedBucketBeforeFetch.execute(
+                                [&](const BSONObj& data) {
+                                    if (auto elem = data["sleepMillis"]; elem.ok()) {
+                                        opCtx->sleepFor(Milliseconds(elem.safeNumberLong()));
+                                    } else {
+                                        hangTimeseriesReopenArchivedBucketBeforeFetch.pauseWhileSet(
+                                            opCtx);
+                                    }
+                                });
                             DBDirectClient client{opCtx};
                             hangTimeseriesInsertBeforeReopeningQuery.pauseWhileSet();
-                            suitableBucket =
-                                client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
+                            suitableBucket = [&]() -> BSONObj {
+                                try {
+                                    return client.findOne(bucketsColl->ns(),
+                                                          BSON("_id" << *bucketId));
+                                } catch (const DBException&) {
+                                    return BSONObj{};
+                                }
+                            }();
                             reopeningContext->fetchedBucket = true;
                         } else if (auto* pipeline = stdx::get_if<std::vector<BSONObj>>(
                                        &reopeningContext->candidate)) {
