@@ -11,7 +11,7 @@
  */
 
 import {before, describe, it} from "jstests/libs/mochalite.js";
-import {runWithKnobs} from "jstests/libs/property_test_helpers/common_properties.js";
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 
 describe("$_internalAssertDataAssumptions", function () {
     const coll = db[jsTestName()];
