@@ -22,6 +22,6 @@ function runCommandIgnoreDropOperations(
     return res;
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstesats/libs/override_methods/noop_drop.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/noop_drop.js");
 
 OverrideHelpers.overrideRunCommand(runCommandIgnoreDropOperations);
