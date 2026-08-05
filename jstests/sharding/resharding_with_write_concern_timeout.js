@@ -169,6 +169,15 @@ function runTests() {
         shards: 3,
         rs: {nodes: 3},
     });
+
+    // The failWaitForWriteConcernIfTimeoutSet failpoint below also applies to the routing table
+    // refreshes triggered by this test's own writes, which the unified write executor retries a
+    // bounded number of times before giving up with NoProgressMade. Raise that bound so the test
+    // does not fail on the fault injection it installs for moveCollection.
+    assert.commandWorked(
+        st.s.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 20}),
+    );
+
     testWriteConcernBasic(st);
     testWriteConcernFailover(st);
 
