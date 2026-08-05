@@ -95,3 +95,7 @@ structs:
                     associated with the cursor."
                 type: long
                 optional: true
+            redacted:
+                description: If true, the originatingCommand has been redacted because it contained sensitive QE information.
+                type: bool
+                optional: true

@@ -11,6 +11,21 @@
 
 namespace mongo::generic_cursor {
 
+BSONObj maybeRedactOriginatingCommand(const BSONObj& cmd, bool shouldOmit) {
+    if (!shouldOmit || cmd.isEmpty()) {
+        return cmd;
+    }
+
+    BSONObjBuilder bob;
+    bob.append(cmd.firstElement());
+    for (std::string_view name : {"$db", "collection", "comment"}) {
+        if (auto elem = cmd[name]; elem.ok()) {
+            bob.append(elem);
+        }
+    }
+    return bob.obj();
+}
+
 CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random) {
     for (int i = 0; i < 10000; i++) {
         CursorId id = random.nextInt64();

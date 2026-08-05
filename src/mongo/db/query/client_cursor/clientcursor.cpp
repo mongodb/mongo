@@ -10,6 +10,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
+#include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -129,7 +130,9 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _readConcernArgs(std::move(params.readConcernArgs)),
       _readPreferenceSetting(std::move(params.readPreferenceSetting)),
       _rawData(isRawDataOperation(operationUsingCursor)),
-      _originatingCommand(params.originatingCommandObj),
+      _originatingCommand(generic_cursor::maybeRedactOriginatingCommand(
+          params.originatingCommandObj,
+          CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation())),
       _originatingPrivileges(std::move(params.originatingPrivileges)),
       _tailableMode(params.tailableMode),
       _isNoTimeout(params.isNoTimeout),
@@ -217,6 +220,9 @@ GenericCursor ClientCursor::toGenericCursor() const {
     gc.setTailable(isTailable());
     gc.setAwaitData(isAwaitData());
     gc.setNoCursorTimeout(isNoTimeout());
+    if (_shouldOmitDiagnosticInformation && !_originatingCommand.isEmpty()) {
+        gc.setRedacted(true);
+    }
     gc.setOriginatingCommand(getOriginatingCommandObj());
     gc.setLsid(getSessionId());
     gc.setTxnNumber(_txnNumber);

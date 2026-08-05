@@ -479,6 +479,92 @@ TEST_F(CursorManagerTest, CursorStoresAPIParameters) {
     ASSERT_TRUE(*storedAPIParams.getAPIDeprecationErrors());
 }
 
+/**
+ * Fixture for testing the redaction of a cursor's originating command.
+ */
+class CursorManagerOriginatingCommandTest : public CursorManagerTest {
+protected:
+    ClientCursorPin makeCursorWithOriginatingCommand(BSONObj originatingCommand,
+                                                     bool shouldOmitDiagnosticInformation) {
+        {
+            std::lock_guard<Client> clientLock(*_opCtx->getClient());
+            CurOp::get(_opCtx.get())
+                ->setShouldOmitDiagnosticInformation(clientLock, shouldOmitDiagnosticInformation);
+        }
+        return _cursorManager.registerCursor(
+            _opCtx.get(),
+            {makeFakePlanExecutor(),
+             kTestNss,
+             {},
+             APIParameters(),
+             {},
+             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+             std::move(originatingCommand),
+             PrivilegeVector()});
+    }
+};
+
+TEST_F(CursorManagerOriginatingCommandTest, NotRedactedWhenDiagnosticsAllowed) {
+    auto originatingCommand =
+        BSON("find" << "collection" << "filter" << BSON("ssn" << "secret") << "$db" << "test");
+    auto cursorPin = makeCursorWithOriginatingCommand(originatingCommand, false);
+
+    ASSERT_BSONOBJ_EQ(originatingCommand, cursorPin->getOriginatingCommandObj());
+    ASSERT_FALSE(cursorPin->toGenericCursor().getRedacted().has_value());
+}
+
+TEST_F(CursorManagerOriginatingCommandTest, RedactedWhenDiagnosticsOmitted) {
+    auto cursorPin = makeCursorWithOriginatingCommand(
+        BSON("find" << "collection" << "filter" << BSON("ssn" << "secret") << "$db" << "test"
+                    << "collection" << "collection" << "comment" << "myComment"),
+        true);
+
+    // Only the command name and the allowlisted fields survive redaction.
+    ASSERT_BSONOBJ_EQ(BSON("find" << "collection" << "$db" << "test" << "collection" << "collection"
+                                  << "comment" << "myComment"),
+                      cursorPin->getOriginatingCommandObj());
+}
+
+TEST_F(CursorManagerOriginatingCommandTest, RedactedCommandOmitsAbsentAllowlistedFields) {
+    auto cursorPin = makeCursorWithOriginatingCommand(BSON("aggregate" << "collection"), true);
+
+    const auto& redacted = cursorPin->getOriginatingCommandObj();
+    ASSERT_BSONOBJ_EQ(BSON("aggregate" << "collection"), redacted);
+    ASSERT_FALSE(redacted["$db"].ok());
+    ASSERT_FALSE(redacted["collection"].ok());
+    ASSERT_FALSE(redacted["comment"].ok());
+}
+
+TEST_F(CursorManagerOriginatingCommandTest, RedactionHandlesEmptyCommand) {
+    auto cursorPin = makeCursorWithOriginatingCommand(BSONObj(), true);
+
+    ASSERT_BSONOBJ_EQ(BSONObj(), cursorPin->getOriginatingCommandObj());
+    // Nothing was stripped, so the cursor is not reported as redacted.
+    ASSERT_FALSE(cursorPin->toGenericCursor().getRedacted().has_value());
+}
+
+TEST_F(CursorManagerOriginatingCommandTest, ToGenericCursorReportsRedactedCommand) {
+    auto cursorPin = makeCursorWithOriginatingCommand(
+        BSON("find" << "collection" << "filter" << BSON("ssn" << "secret") << "$db" << "test"),
+        true);
+
+    auto gc = cursorPin->toGenericCursor();
+    ASSERT_BSONOBJ_EQ(BSON("find" << "collection" << "$db" << "test"), *gc.getOriginatingCommand());
+    // The 'redacted' flag sits alongside the originating command, not within it.
+    ASSERT_TRUE(gc.getRedacted().value_or(false));
+}
+
+TEST_F(CursorManagerOriginatingCommandTest, RedactedCommandIsStableAcrossCalls) {
+    auto cursorPin = makeCursorWithOriginatingCommand(
+        BSON("find" << "collection" << "filter" << BSON("ssn" << "secret")), true);
+
+    // Redaction happens once at construction, so repeated calls return the same buffer rather than
+    // rebuilding (and, historically, dangling).
+    ASSERT_EQ(cursorPin->getOriginatingCommandObj().objdata(),
+              cursorPin->getOriginatingCommandObj().objdata());
+}
+
 class CursorManagerTestCustomOpCtx : public CursorManagerTestBase {
 protected:
     auto makeOperationContext() {

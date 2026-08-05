@@ -78,7 +78,11 @@ GenericCursor cursorToGenericCursor(ClusterClientCursor* cursor,
     gc.setNDocsReturned(cursor->getNumReturnedSoFar());
     gc.setTailable(cursor->isTailable());
     gc.setAwaitData(cursor->isTailableAndAwaitData());
-    gc.setOriginatingCommand(cursor->getOriginatingCommand());
+    auto originatingCommand = cursor->getOriginatingCommand();
+    if (cursor->shouldOmitDiagnosticInformation() && !originatingCommand.isEmpty()) {
+        gc.setRedacted(true);
+    }
+    gc.setOriginatingCommand(std::move(originatingCommand));
     gc.setLastAccessDate(cursor->getLastUseDate());
     gc.setCreatedDate(cursor->getCreatedDate());
     gc.setNBatchesReturned(cursor->getNBatches());

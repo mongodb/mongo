@@ -23,6 +23,13 @@ namespace mongo::generic_cursor {
 CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random);
 
 /**
+ * If 'shouldOmit' is set, strips all but the command name and a small allowlist of non-sensitive
+ * fields from the originating command 'cmd'. Otherwise returns 'cmd' unchanged. Callers are
+ * responsible for setting GenericCursor's 'redacted' field.
+ */
+BSONObj maybeRedactOriginatingCommand(const BSONObj& cmd, bool shouldOmit);
+
+/**
  * Cursors in a session can kill other session's cursors. Cursors in a transaction can't.
  */
 void validateKillInTransaction(OperationContext* opCtx,

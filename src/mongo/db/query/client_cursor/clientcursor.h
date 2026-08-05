@@ -203,7 +203,8 @@ public:
     }
 
     /**
-     * Returns the original command object which created this cursor.
+     * Returns the original command object which created this cursor, with sensitive information
+     * redacted, if necessary.
      */
     const BSONObj& getOriginatingCommandObj() const {
         return _originatingCommand;

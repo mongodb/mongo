@@ -18,6 +18,7 @@ mongo_cc_library(
     ],
     deps = [
         ":cursor_server_params",
+        ":generic_cursor",
         "//src/mongo/db:commands",
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/memory_tracking",
