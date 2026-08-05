@@ -111,6 +111,7 @@ mongo_cc_library(
     deps = [
         ":find_and_modify_image_lookup_util",
         "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/db:local_executor",
         "//src/mongo/db:mongod_options",
         "//src/mongo/db:profile_collection",

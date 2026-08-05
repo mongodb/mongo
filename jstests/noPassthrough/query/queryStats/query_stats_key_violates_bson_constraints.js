@@ -1,6 +1,6 @@
 /**
- * Integration coverage for $queryStats when a command's query shape approaches or exceeds the 16MB
- * BSON limits.
+ * Integration coverage for $queryStats when a command's query shape approaches or exceeds the BSON
+ * size or nesting depth limits.
  *
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
@@ -10,10 +10,21 @@ import {
     getQueryStatsWithTransform,
 } from "jstests/libs/query/query_stats_utils.js";
 
-describe("$queryStats and query shapes near the 16MB BSON limit", function () {
+describe("$queryStats and query shapes near the BSON limits", function () {
     // Each clause '{x: {$lt: i, $gte: i}}' shapifies into two predicates on 'x'. ~226000 clauses
     // produce a shapified query above BSONObjMaxInternalSize (16MB + 16KB).
     const kOversizedClauses = 226000;
+
+    // Pinned via setParameter below so the depth arithmetic does not drift with the server default.
+    const kMaxBSONDepth = 200;
+
+    // A dotted projection path shapifies into one nested object per component. The stored key adds
+    // 4 levels above it ('queryShape.pipeline.<n>.$project') and the reply adds 4 more
+    // ('cursor.firstBatch.<n>.key'). This length keeps the key valid on its own (199 <=
+    // kMaxBSONDepth) while making it unreturnable (203 > kMaxBSONDepth).
+    const kTooDeepPath = kMaxBSONDepth - 5;
+
+    const kShallowPath = 5;
 
     function buildLargeAndFilter(numClauses) {
         const clauses = [];
@@ -21,6 +32,24 @@ describe("$queryStats and query shapes near the 16MB BSON limit", function () {
             clauses.push({x: {$lt: i, $gte: i}});
         }
         return {$and: clauses};
+    }
+
+    function buildDottedPath(depth) {
+        let path = "a0";
+        for (let i = 1; i < depth; i++) {
+            path += ".a" + i;
+        }
+        return path;
+    }
+
+    function aggregateWithProjectDepth(depth) {
+        assert.commandWorked(
+            testDB.runCommand({
+                aggregate: collName,
+                pipeline: [{$project: {[buildDottedPath(depth)]: 1}}],
+                cursor: {},
+            }),
+        );
     }
 
     let conn, testDB, collName;
@@ -31,6 +60,7 @@ describe("$queryStats and query shapes near the 16MB BSON limit", function () {
             setParameter: {
                 internalQueryStatsSampleRate: 1,
                 internalQueryStatsWriteCmdSampleRate: 1,
+                maxBSONDepth: kMaxBSONDepth,
             },
         });
         testDB = conn.getDB("test");
@@ -97,5 +127,37 @@ describe("$queryStats and query shapes near the 16MB BSON limit", function () {
             testDB.serverStatus().metrics.queryStats.numHmacApplicationErrors,
             errorsBefore + 1,
         );
+    });
+
+    it("collects an aggregate whose projection depth is under the limit", function () {
+        aggregateWithProjectDepth(kShallowPath);
+        const entries = getQueryStats(conn, {collName});
+        assert.eq(entries.length, 1, entries);
+    });
+
+    it("does not fail $queryStats but omits an entry too deeply nested for the reply", function () {
+        const errorsBefore = testDB.serverStatus().metrics.queryStats.numHmacApplicationErrors;
+
+        aggregateWithProjectDepth(kTooDeepPath);
+
+        // Reading query stats must succeed rather than returning a reply no client can parse.
+        const entries = getQueryStats(conn, {collName});
+        assert.eq(entries, [], entries);
+
+        // Proves entry was skipped as numHmacApplicationErrors is incremented on the query stats
+        // read path.
+        assert.eq(
+            testDB.serverStatus().metrics.queryStats.numHmacApplicationErrors,
+            errorsBefore + 1,
+        );
+    });
+
+    it("returns the remaining entries alongside one that is too deeply nested", function () {
+        aggregateWithProjectDepth(kTooDeepPath);
+        assert.commandWorked(testDB.runCommand({find: collName, filter: {x: 1}}));
+
+        const entries = getQueryStats(conn, {collName});
+        assert.eq(entries.length, 1, entries);
+        assert.eq(entries[0].key.queryShape.command, "find", entries);
     });
 });
