@@ -3,9 +3,6 @@
  *
  * @tags: [
  *   requires_scripting,
- *   # TODO SERVER-128404: Re-enable on TSAN once the Wasmtime rayon thread pool no longer
- *   # bypasses TSAN's pthread_create interception.
- *   tsan_incompatible,
  * ]
  */
 import {describe, it} from "jstests/libs/mochalite.js";

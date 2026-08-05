@@ -221,10 +221,6 @@ TEST(WasmtimeScope, EmitBufferExceedsStoreLimitFails) {
 // When the WASM store limiter is triggered (SpiderMonkey MOZ_CRASHes inside
 // WASM linear memory), scope->invoke() must surface ExceededMemoryLimit rather
 // than the opaque generic trap error code.
-//
-// Disabled under TSan: the MOZ_CRASH signal handler performs allocations that
-// TSan intercepts before Wasmtime can convert the SIGABRT into a trap.
-#if !__has_feature(thread_sanitizer)
 TEST(WasmtimeScope, MemoryLimit_StoreLimiterTrapClassifiedAsExceededMemoryLimit) {
     auto savedHeap = gJSHeapLimitMB.load();
     auto savedStore = gWasmtimeStoreMemoryLimitMB.load();
@@ -252,4 +248,3 @@ TEST(WasmtimeScope, MemoryLimit_StoreLimiterTrapClassifiedAsExceededMemoryLimit)
     ASSERT_THROWS_CODE(
         scope->invoke(fn, nullptr, nullptr, 0), DBException, ErrorCodes::ExceededMemoryLimit);
 }
-#endif  // !__has_feature(thread_sanitizer)

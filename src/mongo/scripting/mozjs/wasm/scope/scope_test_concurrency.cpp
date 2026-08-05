@@ -603,10 +603,7 @@ TEST_F(WasmtimeScopeInterruptTranslationTest, MaxTimeAlwaysTimeOutForcesDeadline
 // increment_epoch() on the shared engine and interrupts every other
 // concurrently-running scope.  The callback re-arms non-killed bridges so
 // they continue executing.  This test verifies that property at the scope
-// layer (the bridge-level equivalent is EpochIsolation_BridgeBCompletesWhile
-// BridgeAIsKilled in bridge_test.cpp, which is disabled under TSan due to an
-// unrelated wasmtime signal-handler issue; this test does not exercise the
-// store limiter so it is TSan-safe).
+// layer.
 // ---------------------------------------------------------------------------
 
 // Killing scope A must not prevent scope B from executing on the calling thread.

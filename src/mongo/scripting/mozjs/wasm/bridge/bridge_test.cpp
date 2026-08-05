@@ -2537,12 +2537,6 @@ TEST_F(WasmMozJSBridgeTest, MapReduceOomRecoveryAfterDrain) {
 // Triggers the store limiter OOM path — the WASM module hits the linear memory
 // ceiling, SpiderMonkey aborts inside WASM, and wasmtime catches the resulting trap.
 // The bridge's _callFunc/_callFuncNoArgs method latches hasTrapped() before re-throwing.
-//
-// Disabled under TSan: when the store limiter denies memory.grow, SpiderMonkey
-// MOZ_CRASHes during GC. Wasmtime catches the SIGABRT via a signal handler that
-// performs allocations (signal-unsafe). TSan intercepts the signal, flags the
-// malloc, and aborts the process before wasmtime can convert it into a trap.
-#if !__has_feature(thread_sanitizer)
 TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapSetsFlag) {
     _bridge->shutdown();
     _bridge.reset();
@@ -2581,8 +2575,6 @@ TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapSetsFlag) {
 // Verifies that a store-limiter trap is classified as ExceededMemoryLimit (146) rather
 // than the generic kWasmtimeTrapErrorCode. When memory.grow is denied by the store
 // limiter, SpiderMonkey MOZ_CRASHes via `unreachable`, which _throwAfterTrap() detects.
-//
-// Also disabled under TSan for the same SIGABRT-signal-handler-malloc reason as above.
 TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapClassifiedAsExceededMemoryLimit) {
     _bridge->shutdown();
     _bridge.reset();
@@ -2614,8 +2606,6 @@ TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapClassifiedAsExceededMemoryLimit) {
     ASSERT_TRUE(_bridge->hasTrapped());
     _bridge.reset();
 }
-
-#endif  // !__has_feature(thread_sanitizer)
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
 // Core regression for this change: a trap that is NOT caused by a denied memory.grow (e.g. a
@@ -3291,11 +3281,6 @@ TEST_F(WasmMozJSBridgeTest, EpochIsolation_KillingBridgeADoesNotPreventBridgeBFr
 // Concurrent isolation: bridge B executes a finite loop WHILE bridge A is being killed.
 // Bridge B's per-bridge callback re-arms mid-execution when the kill epoch fires, and
 // bridge B completes its loop normally.
-//
-// Disabled under TSan: the same Wasmtime signal-handler-malloc issue that affects
-// StoreLimiterTrapSetsFlag may surface here if the epoch callback is called inside a
-// signal (unlikely but possible in pathological Wasmtime builds).
-#if !__has_feature(thread_sanitizer)
 TEST_F(WasmMozJSBridgeTest, EpochIsolation_BridgeBCompletesWhileBridgeAIsKilled) {
     MozJSWasmBridge::Options opts{};
     opts.linearMemoryLimitMB = gWasmtimeStoreMemoryLimitMB.load();
@@ -3364,7 +3349,6 @@ TEST_F(WasmMozJSBridgeTest, EpochIsolation_BridgeBCompletesWhileBridgeAIsKilled)
     if (bridgeB->isInitialized())
         bridgeB->shutdown();
 }
-#endif  // !__has_feature(thread_sanitizer)
 
 /**
  * Tests exposed javascript functions.
@@ -3415,11 +3399,8 @@ TEST_F(WasmMozJSBridgeTest, AssertTest) {
 // value (jsHeapLimitMB + max(64, jsHeapLimitMB/10)) so the test is fast: OOM
 // occurs during the first large allocation, not after a long warmup.
 //
-// TODO SERVER-128404: Wasmtime's OOM trap signal handler allocates memory, causing
-// TSan to abort.  Skip these tests under TSan until that is resolved.
 // ---------------------------------------------------------------------------
 
-#if !__has_feature(thread_sanitizer)
 TEST_F(WasmMozJSBridgeTest, OomTrapThrowsExceededMemoryLimit) {
     // Use jsHeapLimitMB=50 → minOverhead=max(64,5)=64 → minStore=114 MB.
     // A 117 MB store is tight: it satisfies the constraint but OOMs when the
@@ -3459,7 +3440,6 @@ TEST_F(WasmMozJSBridgeTest, OomTrapThrowsExceededMemoryLimit) {
         AssertionException,
         ErrorCodes::ExceededMemoryLimit);
 }
-#endif  // !__has_feature(thread_sanitizer)
 
 }  // namespace
 }  // namespace wasm
