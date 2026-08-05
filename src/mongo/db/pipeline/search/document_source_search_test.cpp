@@ -363,5 +363,64 @@ TEST_F(SearchTest, CreateFromBsonAcceptsSerializedInternalSpec) {
         DocumentSourceSearch::createFromBson(serializedSpec.firstElement(), expCtx));
 }
 
+TEST_F(SearchTest, SerializeAnonymizesMongotQueryForQueryStats) {
+    const auto mongotQuery = fromjson("{index: 'default', text: {query: 'cakes', path: 'title'}}");
+    const auto stageObj = BSON("$search" << mongotQuery);
+
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    intrusive_ptr<DocumentSource> searchDS =
+        DocumentSourceSearch::createFromBson(stageObj.firstElement(), expCtx);
+
+    const auto anonymized = Document({{"$search", Value(std::string{"?object"})}});
+
+    // Query stats must collapse the whole query to a single anonymized object, regardless of
+    // topology.
+    expCtx->setInRouter(false);
+    ASSERT_DOCUMENT_EQ(
+        searchDS->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions)
+            .getDocument(),
+        anonymized);
+
+    expCtx->setInRouter(true);
+    ASSERT_DOCUMENT_EQ(
+        searchDS->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions)
+            .getDocument(),
+        anonymized);
+}
+
+TEST_F(SearchTest, SerializeForExplainEmitsFullSpecOnlyOnRouter) {
+    const auto mongotQuery = fromjson("{index: 'default', text: {query: 'cakes', path: 'title'}}");
+    const auto stageObj = BSON("$search" << mongotQuery);
+
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    intrusive_ptr<DocumentSource> searchDS =
+        DocumentSourceSearch::createFromBson(stageObj.firstElement(), expCtx);
+
+    query_shape::SerializationOptions opts;
+    opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+
+    // On a shard, explain only needs the mongotQuery, so the $search value is just the user query.
+    expCtx->setInRouter(false);
+    auto onShard = searchDS->serialize(opts);
+    ASSERT_DOCUMENT_EQ(onShard.getDocument(), Document({{"$search", Document(mongotQuery)}}));
+
+    // On a router, explain emits the full spec so the internal routing fields reach the shards.
+    expCtx->setInRouter(true);
+    auto onRouter = searchDS->serialize(opts);
+    ASSERT_DOCUMENT_EQ(onRouter.getDocument(),
+                       searchDS->serialize(query_shape::SerializationOptions{}).getDocument());
+    ASSERT_DOCUMENT_NE(onRouter.getDocument(), onShard.getDocument());
+    ASSERT_DOCUMENT_EQ(onRouter.getDocument()
+                           .getField("$search")
+                           .getDocument()
+                           .getField("mongotQuery")
+                           .getDocument(),
+                       Document(mongotQuery));
+}
+
 }  // namespace
 }  // namespace mongo
