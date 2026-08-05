@@ -1562,7 +1562,12 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
         }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
-        case STAGE_PROJECTION_SIMPLE: {
+        case STAGE_PROJECTION_SIMPLE:
+        // A shard filter is estimated as a pass-through on the basis that chunk migrations are rare
+        // and so effectively no documents are filtered out. The limit is therefore propagated
+        // through it unchanged, consistent with that estimate.
+        // TODO SERVER-132848: Move these passthrough stages to be with the FETCH node.
+        case STAGE_SHARDING_FILTER: {
             // passthrough
             applyLimitToSelf();
             propagateToChildren(limit);
