@@ -888,22 +888,36 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     Lock::GlobalLock catalogLock(opCtx, MODE_IS);
     const auto catalog = CollectionCatalog::get(opCtx);
 
-    auto enqueueDb = [&](const DatabaseName& dbName) {
+    // Collect every namespace to validate along with its data size, so that the largest
+    // collections can be dispatched first. Scheduling longest-processing-time-first keeps a
+    // large collection from being picked up late and running as a long tail.
+    std::vector<std::pair<long long, NamespaceString>> collectionsBySize;
+    auto collectDb = [&](const DatabaseName& dbName) {
         for (const auto& coll : catalog->range(dbName)) {
-            queue.push(NamespaceString{coll->ns()});
+            collectionsBySize.emplace_back(coll->dataSize(opCtx), NamespaceString{coll->ns()});
         }
     };
 
     if (!gValidateDbName.empty()) {
         const boost::optional<TenantId>& tenantId = boost::none;
-        enqueueDb(DatabaseNameUtil::deserialize(
+        collectDb(DatabaseNameUtil::deserialize(
             tenantId,
             gValidateDbName.data(),
             SerializationContext(SerializationContext::Source::Catalog)));
     } else {
         for (const auto& dbName : catalog->getAllDbNames()) {
-            enqueueDb(dbName);
+            collectDb(dbName);
         }
+    }
+
+    // Sort descending by data size, breaking ties by namespace to keep dispatch order
+    // deterministic.
+    std::sort(collectionsBySize.begin(), collectionsBySize.end(), std::greater<>());
+
+    // The queue is FIFO and bounded, so pushing in sorted order is enough to control the order
+    // work is picked up in; `maxQueueDepth` only throttles how far ahead this producer may run.
+    for (auto&& [_, nss] : collectionsBySize) {
+        queue.push(std::move(nss));
     }
     queue.closeProducerEnd();
 
