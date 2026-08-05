@@ -526,7 +526,7 @@ public:
     bool isOwned() const {
         // An empty BSON can be a special case, it can be treated 'owned'. We save on memory
         // allocation when constructing an empty Document.
-        return _bson.isEmptyPrototype() || _bson.isOwned();
+        return _bson.isOwned() || _bson.isEmptyPrototype();
     }
 
     void makeOwned() {

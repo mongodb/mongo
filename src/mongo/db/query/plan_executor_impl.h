@@ -344,6 +344,9 @@ private:
     // Whether the executor must return owned BSON.
     bool _mustReturnOwnedBson;
 
+    // Whether the query requested recordId metadata. Fixed once planning completes.
+    const bool _mustSetRecordIdMetadata;
+
     // If the current operation was "softly" interrupted. Will be set if a configured response
     // deadline is reached. Cleared upon every 'reattachToOperationContext()' call.
     bool _interrupted = false;
