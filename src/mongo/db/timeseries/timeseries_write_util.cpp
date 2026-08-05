@@ -110,6 +110,7 @@ namespace mongo::timeseries {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(timeseriesDataIntegrityCheckFailureUpdate);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesReopenArchivedBucketBeforeFetch);
 
 // Return a verifierFunction that is used to perform a data integrity check on inserts into
 // a compressed column.
@@ -620,8 +621,21 @@ BSONObj getSuitableBucketForReopening(OperationContext* opCtx,
         OverloadedVisitor{
             [](const std::monostate&) { return BSONObj{}; },
             [&](const OID& bucketId) {
+                hangTimeseriesReopenArchivedBucketBeforeFetch.execute([&](const BSONObj& data) {
+                    if (auto elem = data["sleepMillis"]; elem.ok()) {
+                        opCtx->sleepFor(Milliseconds(elem.safeNumberLong()));
+                    } else {
+                        hangTimeseriesReopenArchivedBucketBeforeFetch.pauseWhileSet(opCtx);
+                    }
+                });
+
                 reopeningContext.fetchedBucket = true;
-                return DBDirectClient{opCtx}.findOne(bucketsColl->ns(), BSON("_id" << bucketId));
+                try {
+                    return DBDirectClient{opCtx}.findOne(bucketsColl->ns(),
+                                                         BSON("_id" << bucketId));
+                } catch (const DBException&) {
+                    return BSONObj{};
+                }
             },
             [&](const std::vector<BSONObj>& pipeline) {
                 // Ensure we have a index on meta and time for the time-series collection before
