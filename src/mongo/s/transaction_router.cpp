@@ -1533,6 +1533,12 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
     _updateLastClientInfo(opCtx->getClient());
 }
 
+void TransactionRouter::Router::setIsServerInitiatedTransaction(OperationContext* opCtx) {
+    invariant(isInitialized());
+    std::lock_guard<Client> lk(*opCtx->getClient());
+    o(lk).isServerInitiatedTransaction = true;
+}
+
 void TransactionRouter::Router::stash(OperationContext* opCtx, StashReason reason) {
     if (!isInitialized()) {
         return;
@@ -2006,6 +2012,13 @@ void TransactionRouter::Router::_resetRouterState(
         o(lk).txnNumberAndRetryCounter.setTxnRetryCounter(
             *txnNumberAndRetryCounter.getTxnRetryCounter());
         o(lk).commitType = CommitType::kNotInitiated;
+        // A client with no network session is server-internal (e.g. the transaction API runs on a
+        // sessionless client), so classify this as a server-initiated transaction. A genuine
+        // end-user connection has a network session. This is only authoritative on the top-level
+        // router: a sub-router runs on the internal connection from its parent router, so it always
+        // computes 'external' regardless of the original client and its value must not be relied
+        // on.
+        o(lk).isServerInitiatedTransaction = !opCtx->getClient()->session();
         p().isRecoveringCommit = false;
         o(lk).participants.clear();
         o(lk).coordinatorId.reset();
@@ -2232,8 +2245,11 @@ void TransactionRouter::Router::_onStartCommit(WithLock wl, OperationContext* op
     }
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
-    o(wl).metricsTracker->startCommit(
-        tickSource, tickSource->getTicks(), o().commitType, o().participants.size());
+    o(wl).metricsTracker->startCommit(tickSource,
+                                      tickSource->getTicks(),
+                                      o().commitType,
+                                      o().participants.size(),
+                                      o().isServerInitiatedTransaction);
 }
 
 void TransactionRouter::Router::_onNonRetryableCommitError(OperationContext* opCtx,
@@ -2276,8 +2292,12 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
         // active transactions.
         o(lk).metricsTracker->trySetActive(tickSource, curTicks);
 
-        o(lk).metricsTracker->endTransaction(
-            tickSource, curTicks, terminationCause, o().commitType, o().abortCause);
+        o(lk).metricsTracker->endTransaction(tickSource,
+                                             curTicks,
+                                             terminationCause,
+                                             o().commitType,
+                                             o().abortCause,
+                                             o().isServerInitiatedTransaction);
     }
 
     const auto& timingStats = o().metricsTracker->getTimingStats();
@@ -2426,14 +2446,15 @@ void TransactionRouter::MetricsTracker::trySetInactive(TickSource* tickSource,
 void TransactionRouter::MetricsTracker::startCommit(TickSource* tickSource,
                                                     TickSource::Tick curTicks,
                                                     TransactionRouter::CommitType commitType,
-                                                    std::size_t numParticipantsAtCommit) {
+                                                    std::size_t numParticipantsAtCommit,
+                                                    bool isServerInitiated) {
     dassert(isActive());
 
     timingStats.commitStartTime = tickSource->getTicks();
     timingStats.commitStartWallClockTime = _service->getPreciseClockSource()->now();
 
     auto routerTxnMetrics = RouterTransactionsMetrics::get(_service);
-    routerTxnMetrics->incrementCommitInitiated(commitType);
+    routerTxnMetrics->incrementCommitInitiated(commitType, isServerInitiated);
     if (commitType != CommitType::kRecoverWithToken) {
         // We only know the participant list if we're not recovering a decision.
         routerTxnMetrics->addToTotalParticipantsAtCommit(numParticipantsAtCommit);
@@ -2445,7 +2466,8 @@ void TransactionRouter::MetricsTracker::endTransaction(
     TickSource::Tick curTicks,
     TransactionRouter::TerminationCause terminationCause,
     TransactionRouter::CommitType commitType,
-    std::string_view abortCause) {
+    std::string_view abortCause,
+    bool isServerInitiated) {
     dassert(isActive());
 
     timingStats.timeActiveMicros +=
@@ -2466,7 +2488,7 @@ void TransactionRouter::MetricsTracker::endTransaction(
         dassert(commitType != CommitType::kNotInitiated);
         routerTxnMetrics->incrementTotalCommitted();
         routerTxnMetrics->incrementCommitSuccessful(
-            commitType, timingStats.getCommitDuration(tickSource, curTicks));
+            commitType, timingStats.getCommitDuration(tickSource, curTicks), isServerInitiated);
     }
 }
 

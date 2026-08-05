@@ -39,6 +39,10 @@ structs:
                 type: CommitTypeStats
             twoPhaseCommit:
                 type: CommitTypeStats
+            twoPhaseCommitInternal:
+                type: CommitTypeStats
+            twoPhaseCommitExternal:
+                type: CommitTypeStats
             recoverWithToken:
                 type: CommitTypeStats
 

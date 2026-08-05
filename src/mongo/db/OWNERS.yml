@@ -156,6 +156,9 @@ filters:
   - "*txn*":
     approvers:
       - 10gen/server-transactions
+  - "initialize_operation_session_info*":
+    approvers:
+      - 10gen/server-transactions
   - "dbdirectclient*":
     approvers:
       - 10gen/server-programmability

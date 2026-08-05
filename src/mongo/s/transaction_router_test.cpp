@@ -35,6 +35,8 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/router_transactions_metrics.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/transaction_router.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -5848,23 +5850,59 @@ protected:
     }
 
     void runTwoPhaseCommit() {
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
-        txnRouter().processParticipantResponse(
-            operationContext(),
+        runTwoPhaseCommit(operationContext());
+    }
+
+    void runTwoPhaseCommit(OperationContext* opCtx) {
+        auto txnRouter = TransactionRouter::get(opCtx);
+        txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, kDummyFindCmd);
+        txnRouter.processParticipantResponse(
+            opCtx,
             shard1,
             TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyFalseResponse));
-        txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
-        txnRouter().processParticipantResponse(
-            operationContext(),
+        txnRouter.attachTxnFieldsIfNeeded(opCtx, shard2, kDummyFindCmd);
+        txnRouter.processParticipantResponse(
+            opCtx,
             shard2,
             TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyFalseResponse));
 
         logs.start();
-        auto future = launchAsync(
-            [&] { txnRouter().commitTransaction(operationContext(), kDummyRecoveryToken); });
+        auto future = launchAsync([&] { txnRouter.commitTransaction(opCtx, kDummyRecoveryToken); });
         expectCoordinateCommitTransaction();
         future.default_timed_get();
         logs.stop();
+    }
+
+    // Runs a full two-phase commit from a manually set up client via AlternativeClientRegion and
+    // exercises the internal/external classification computed in _resetRouterState.
+    // If withSession is true, this function will provide the client client with a mock network
+    // session.
+    void runTwoPhaseCommitOnClient(bool withSession, bool markServerInitiatedExplicitly) {
+        auto clientOwned = withSession
+            ? getServiceContext()->getService()->makeClient(
+                  "externalClient", std::make_shared<transport::MockSession>(nullptr))
+            : getServiceContext()->getService()->makeClient("SEP-internal-txn-client");
+        AlternativeClientRegion acr(clientOwned);
+        auto opCtxHolder = cc().makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+
+        // Fresh lsid so we don't collide with the fixture's checked-out default session.
+        opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+        opCtx->setTxnNumber(kTxnNumber);
+        opCtx->setInMultiDocumentTransaction();
+        repl::ReadConcernArgs::get(opCtx) = repl::ReadConcernArgs();
+
+        RouterOperationContextSession routerOpCtxSession(opCtx);
+        auto txnRouter = TransactionRouter::get(opCtx);
+
+        txnRouter.beginOrContinueTxn(
+            opCtx, kTxnNumber, TransactionRouter::TransactionActions::kStart);
+        if (markServerInitiatedExplicitly) {
+            txnRouter.setIsServerInitiatedTransaction(opCtx);
+        }
+        txnRouter.setDefaultAtClusterTime(opCtx);
+
+        runTwoPhaseCommit(opCtx);
     }
 
     void runRecoverWithTokenCommit(boost::optional<ShardId> recoveryShard) {
@@ -7823,6 +7861,66 @@ TEST_F(TransactionRouterMetricsTest, IsTrackingOverIfTxnImplicitlyAborted) {
     ASSERT_FALSE(txnRouter().isTrackingOver());
     implicitAbortInProgress();
     ASSERT(txnRouter().isTrackingOver());
+}
+
+TEST_F(TransactionRouterMetricsTest, TwoPhaseCommitExternalStatsForUserTxn) {
+    runTwoPhaseCommitOnClient(true /* withSession */, false /* markServerInitiatedExplicitly */);
+
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().successful.load());
+    ASSERT_EQUALS(1L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(1L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().successful.load());
+}
+
+TEST_F(TransactionRouterMetricsTest, TwoPhaseCommitInternalStatsForSessionlessClient) {
+    // A sessionless client (e.g. the internal transaction API's "SEP-internal-txn-client") is
+    // classified internal by the base !session() predicate when no explicit override is provided.
+    // This is the mechanism internal txn_api transactions rely on for classification.
+    runTwoPhaseCommitOnClient(false /* withSession */, false /* markServerInitiatedExplicitly */);
+
+    ASSERT_EQUALS(1L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(1L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().successful.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().successful.load());
+}
+
+TEST_F(TransactionRouterMetricsTest, TwoPhaseCommitInternalStatsForServerInitiatedTxn) {
+    // Runs on a client with a session and relies on the explicit override (the legacy WCOS path) to
+    // classify internal, so this exercises setIsServerInitiatedTransaction().
+    runTwoPhaseCommitOnClient(true /* withSession */, true /* markServerInitiatedExplicitly */);
+
+    ASSERT_EQUALS(1L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(1L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().successful.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().successful.load());
+}
+
+TEST_F(TransactionRouterMetricsTest, InternalExternalStatsUntouchedByNonTwoPhaseCommit) {
+    // The internal/external split only applies to two-phase commits. A single-write-shard commit
+    // must not touch either the internal or external 2PC counter.
+    beginTxnWithDefaultTxnNumber();
+    runSingleWriteShardCommit();
+
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().initiated.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().successful.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()->getTwoPhaseCommitExternalStats_forTest().successful.load());
 }
 
 bool doesExistInCatalog(const LogicalSessionId& lsid, SessionCatalog* sessionCatalog) {

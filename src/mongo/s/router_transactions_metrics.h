@@ -77,9 +77,13 @@ public:
 
     [[MONGO_MOD_PRIVATE]] const CommitStats& getCommitTypeStats_forTest(
         TransactionRouter::CommitType commitType) const;
-    void incrementCommitInitiated(TransactionRouter::CommitType commitType);
+    [[MONGO_MOD_PRIVATE]] const CommitStats& getTwoPhaseCommitInternalStats_forTest() const;
+    [[MONGO_MOD_PRIVATE]] const CommitStats& getTwoPhaseCommitExternalStats_forTest() const;
+
+    void incrementCommitInitiated(TransactionRouter::CommitType commitType, bool isServerInitiated);
     void incrementCommitSuccessful(TransactionRouter::CommitType commitType,
-                                   Microseconds durationMicros);
+                                   Microseconds durationMicros,
+                                   bool isServerInitiated);
 
     void incrementAbortCauseMap(std::string abortCause);
 
@@ -129,6 +133,8 @@ private:
     CommitStats _singleWriteShardCommitStats;
     CommitStats _readOnlyCommitStats;
     CommitStats _twoPhaseCommitStats;
+    CommitStats _twoPhaseCommitInternalStats;
+    CommitStats _twoPhaseCommitExternalStats;
     CommitStats _recoverWithTokenCommitStats;
 
     // Mutual exclusion for _abortCauseMap

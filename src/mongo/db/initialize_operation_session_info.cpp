@@ -44,7 +44,7 @@ bool isAuthorizedForInternalClusterAction(OperationContext* opCtx,
 
 /**
  * A client is internal if the connection is a self connection, a connection from a mongos or
- * different mongod or a direct client connection.
+ * different mongod or a DBDirectClient connection.
  */
 bool isInternalClient(OperationContext* opCtx) {
     return !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient() ||

@@ -344,6 +344,9 @@ void startTransactionForShardKeyUpdate(OperationContext* opCtx) {
     invariant(txnNumber);
 
     txnRouter.beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
+    // This transaction runs on the user's opCtx, and will be counted as an external
+    // user-initiated transaction in 2PC router metrics unless set explicitly.
+    txnRouter.setIsServerInitiatedTransaction(opCtx);
     txnRouter.setDefaultAtClusterTime(opCtx);
 }
 

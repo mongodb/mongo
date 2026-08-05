@@ -271,13 +271,14 @@ public:
         void trySetInactive(TickSource* tickSource, TickSource::Tick curTicks);
 
         /**
-         * Marks the transaction as having begun commit, updating relevent stats. Assumes the
+         * Marks the transaction as having begun commit, updating relevant stats. Assumes the
          * transaction is currently active.
          */
         void startCommit(TickSource* tickSource,
                          TickSource::Tick curTicks,
                          TransactionRouter::CommitType commitType,
-                         std::size_t numParticipantsAtCommit);
+                         std::size_t numParticipantsAtCommit,
+                         bool isServerInitiated);
 
         /**
          * Marks the transaction as over, updating stats based on the termination cause, which is
@@ -287,7 +288,8 @@ public:
                             TickSource::Tick curTicks,
                             TransactionRouter::TerminationCause terminationCause,
                             TransactionRouter::CommitType commitType,
-                            std::string_view abortCause);
+                            std::string_view abortCause,
+                            bool isServerInitiated);
 
     private:
         // Pointer to the service context used to get the tick source and router wide transaction
@@ -377,6 +379,14 @@ public:
         void beginOrContinueTxn(OperationContext* opCtx,
                                 TxnNumber txnNumber,
                                 TransactionActions action);
+
+        /**
+         * Explicit override to indicate that a transaction is server-initiated even though
+         * it runs on an external user's opCtx, e.g. for the legacy WouldChangeOwningShard
+         * flow, where a retryable write is promoted to a transaction. Must follow
+         * beginOrContinueTxn, after _resetRouterState resets isServerInitiatedTransaction.
+         */
+        void setIsServerInitiatedTransaction(OperationContext* opCtx);
 
         /**
          * Updates transaction diagnostics and, if necessary, the number of active yielders when the
@@ -727,7 +737,7 @@ public:
         void _onNonRetryableCommitError(OperationContext* opCtx, Status commitStatus);
 
         /**
-         * Updates relevent metrics when a transaction is continued.
+         * Updates relevant metrics when a transaction is continued.
          */
         void _onContinue(OperationContext* opCtx);
 
@@ -903,6 +913,10 @@ private:
         // Indicates whether the router was created by a shard that is an active transaction
         // participant.
         bool subRouter{false};
+
+        // Indicates if the current transaction was started by the server itself (internal
+        // transaction) rather than explicitly by a user. Set when the transaction starts.
+        bool isServerInitiatedTransaction{false};
     } _o;
 
     /**

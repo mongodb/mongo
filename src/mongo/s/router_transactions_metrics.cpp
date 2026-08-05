@@ -136,7 +136,18 @@ const RouterTransactionsMetrics::CommitStats& RouterTransactionsMetrics::getComm
     MONGO_UNREACHABLE;
 }
 
-void RouterTransactionsMetrics::incrementCommitInitiated(TransactionRouter::CommitType commitType) {
+const RouterTransactionsMetrics::CommitStats&
+RouterTransactionsMetrics::getTwoPhaseCommitInternalStats_forTest() const {
+    return _twoPhaseCommitInternalStats;
+}
+
+const RouterTransactionsMetrics::CommitStats&
+RouterTransactionsMetrics::getTwoPhaseCommitExternalStats_forTest() const {
+    return _twoPhaseCommitExternalStats;
+}
+
+void RouterTransactionsMetrics::incrementCommitInitiated(TransactionRouter::CommitType commitType,
+                                                         bool isServerInitiated) {
     switch (commitType) {
         case TransactionRouter::CommitType::kNotInitiated:
             MONGO_UNREACHABLE;
@@ -154,6 +165,11 @@ void RouterTransactionsMetrics::incrementCommitInitiated(TransactionRouter::Comm
             break;
         case TransactionRouter::CommitType::kTwoPhaseCommit:
             _twoPhaseCommitStats.initiated.fetchAndAdd(1);
+            if (isServerInitiated) {
+                _twoPhaseCommitInternalStats.initiated.fetchAndAdd(1);
+            } else {
+                _twoPhaseCommitExternalStats.initiated.fetchAndAdd(1);
+            }
             break;
         case TransactionRouter::CommitType::kRecoverWithToken:
             _recoverWithTokenCommitStats.initiated.fetchAndAdd(1);
@@ -162,7 +178,8 @@ void RouterTransactionsMetrics::incrementCommitInitiated(TransactionRouter::Comm
 }
 
 void RouterTransactionsMetrics::incrementCommitSuccessful(TransactionRouter::CommitType commitType,
-                                                          Microseconds durationMicros) {
+                                                          Microseconds durationMicros,
+                                                          bool isServerInitiated) {
     switch (commitType) {
         case TransactionRouter::CommitType::kNotInitiated:
             MONGO_UNREACHABLE;
@@ -190,6 +207,15 @@ void RouterTransactionsMetrics::incrementCommitSuccessful(TransactionRouter::Com
             _twoPhaseCommitStats.successful.fetchAndAdd(1);
             _twoPhaseCommitStats.successfulDurationMicros.fetchAndAdd(
                 durationCount<Microseconds>(durationMicros));
+            if (isServerInitiated) {
+                _twoPhaseCommitInternalStats.successful.fetchAndAdd(1);
+                _twoPhaseCommitInternalStats.successfulDurationMicros.fetchAndAdd(
+                    durationCount<Microseconds>(durationMicros));
+            } else {
+                _twoPhaseCommitExternalStats.successful.fetchAndAdd(1);
+                _twoPhaseCommitExternalStats.successfulDurationMicros.fetchAndAdd(
+                    durationCount<Microseconds>(durationMicros));
+            }
             break;
         case TransactionRouter::CommitType::kRecoverWithToken:
             _recoverWithTokenCommitStats.successful.fetchAndAdd(1);
@@ -237,6 +263,8 @@ void RouterTransactionsMetrics::updateStats(RouterTransactionsStats* stats) {
     commitTypes.setSingleWriteShard(_constructCommitTypeStats(_singleWriteShardCommitStats));
     commitTypes.setReadOnly(_constructCommitTypeStats(_readOnlyCommitStats));
     commitTypes.setTwoPhaseCommit(_constructCommitTypeStats(_twoPhaseCommitStats));
+    commitTypes.setTwoPhaseCommitInternal(_constructCommitTypeStats(_twoPhaseCommitInternalStats));
+    commitTypes.setTwoPhaseCommitExternal(_constructCommitTypeStats(_twoPhaseCommitExternalStats));
     commitTypes.setRecoverWithToken(_constructCommitTypeStats(_recoverWithTokenCommitStats));
     stats->setCommitTypes(commitTypes);
 
