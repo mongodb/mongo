@@ -422,7 +422,8 @@ boost::optional<MigrateInfo> chooseRandomMigration(
                 1,
                 "balancerShouldReturnRandomMigrations",
                 "fromShardId"_attr = donorShard.get(),
-                "toShardId"_attr = recipientShard.get());
+                "toShardId"_attr = recipientShard.get(),
+                logAttrs(distribution.nss()));
 
     const auto& randomChunk = [&] {
         const auto numChunksOnDonorShard = distribution.numberOfChunksInShard(donorShard.get());
@@ -492,7 +493,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                                             "chunk"_attr = redact(
                                                 makeChunkType(
                                                     distribution.getChunkManager().getUUID(), chunk)
-                                                    .toString()));
+                                                    .toString()),
+                                            logAttrs(distribution.nss()));
                             }
                             return true;  // continue
                         }
@@ -535,7 +537,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 LOGV2_WARNING(21890,
                               "Unable to find any chunk to move from draining shard",
                               "shardId"_attr = stat.shardId,
-                              "numJumboChunks"_attr = numJumboChunks);
+                              "numJumboChunks"_attr = numJumboChunks,
+                              logAttrs(distribution.nss()));
             }
 
             if (availableShards->size() < 2) {
@@ -594,7 +597,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                                 "chunk"_attr = redact(
                                     makeChunkType(distribution.getChunkManager().getUUID(), chunk)
                                         .toString()),
-                                "zone"_attr = redact(zoneName));
+                                "zone"_attr = redact(zoneName),
+                                logAttrs(distribution.nss()));
                             return true;  // continue
                         }
 
@@ -610,7 +614,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                                         redact(makeChunkType(
                                                    distribution.getChunkManager().getUUID(), chunk)
                                                    .toString()),
-                                    "zone"_attr = redact(zoneName));
+                                    "zone"_attr = redact(zoneName),
+                                    logAttrs(distribution.nss()));
                             }
                             return true;  // continue
                         }
@@ -736,7 +741,10 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
         _getLeastLoadedReceiverShard(shardStats, collDataSizeInfo, zone, *availableShards);
     if (!to.isValid()) {
         if (migrations->empty()) {
-            LOGV2(6581600, "No available shards to take chunks for zone", "zone"_attr = zone);
+            LOGV2_WARNING(6581600,
+                          "No available shards to take chunks for zone",
+                          "zone"_attr = zone,
+                          logAttrs(distribution.nss()));
         }
         return false;
     }

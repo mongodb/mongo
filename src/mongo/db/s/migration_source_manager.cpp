@@ -544,7 +544,8 @@ void MigrationSourceManager::enterCriticalSection() {
                         2,
                         {logv2::LogComponent::kShardMigrationPerf},
                         "Starting critical section",
-                        "migrationId"_attr = _coordinator->getMigrationId());
+                        "migrationId"_attr = _coordinator->getMigrationId(),
+                        logAttrs(nss()));
 
     _critSec.emplace(_opCtx, nss(), _critSecReason);
 
@@ -567,7 +568,8 @@ void MigrationSourceManager::enterCriticalSection() {
 
     LOGV2(22017,
           "Migration successfully entered critical section",
-          "migrationId"_attr = _coordinator->getMigrationId());
+          "migrationId"_attr = _coordinator->getMigrationId(),
+          logAttrs(nss()));
 
     scopedGuard.dismiss();
 }
@@ -675,7 +677,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             2,
                             {logv2::LogComponent::kShardMigrationPerf},
                             "Starting post-migration commit refresh on the shard",
-                            "migrationId"_attr = _coordinator->getMigrationId());
+                            "migrationId"_attr = _coordinator->getMigrationId(),
+                            logAttrs(nss()));
 
         forceShardFilteringMetadataRefresh(_opCtx, nss());
 
@@ -683,13 +686,15 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             2,
                             {logv2::LogComponent::kShardMigrationPerf},
                             "Finished post-migration commit refresh on the shard",
-                            "migrationId"_attr = _coordinator->getMigrationId());
+                            "migrationId"_attr = _coordinator->getMigrationId(),
+                            logAttrs(nss()));
     } catch (const DBException& ex) {
         LOGV2_DEBUG_OPTIONS(4817410,
                             2,
                             {logv2::LogComponent::kShardMigrationPerf},
                             "Finished post-migration commit refresh on the shard with error",
                             "migrationId"_attr = _coordinator->getMigrationId(),
+                            logAttrs(nss()),
                             "error"_attr = redact(ex));
         {
             // TODO (SERVER-71444): Fix to be interruptible or document exception.
@@ -719,7 +724,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     LOGV2(22018,
           "Migration succeeded and updated collection placement version",
           "updatedCollectionPlacementVersion"_attr = refreshedMetadata.getCollPlacementVersion(),
-          "migrationId"_attr = _coordinator->getMigrationId());
+          "migrationId"_attr = _coordinator->getMigrationId(),
+          logAttrs(nss()));
 
     // If the migration has succeeded, clear the BucketCatalog so that the buckets that got migrated
     // out are no longer updatable.
@@ -739,6 +745,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     LOGV2(6107801,
           "Exiting commit critical section",
           "migrationId"_attr = _coordinator->getMigrationId(),
+          logAttrs(nss()),
           "durationMillis"_attr = t.millis());
 
     // Exit the critical section and ensure that all the necessary state is fully persisted before
@@ -762,9 +769,9 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     if (_args.getWaitForDelete()) {
         LOGV2(22019,
               "Waiting for migration cleanup after chunk commit",
+              "migrationId"_attr = _coordinator->getMigrationId(),
               logAttrs(nss()),
-              "range"_attr = redact(range.toString()),
-              "migrationId"_attr = _coordinator->getMigrationId());
+              "range"_attr = redact(range.toString()));
 
         Status deleteStatus = _cleanupCompleteFuture
             ? _cleanupCompleteFuture->getNoThrow(_opCtx)
@@ -868,11 +875,13 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                             2,
                             {logv2::LogComponent::kShardMigrationPerf},
                             "Finished critical section",
-                            "migrationId"_attr = _coordinator->getMigrationId());
+                            "migrationId"_attr = _coordinator->getMigrationId(),
+                            logAttrs(nss()));
 
         LOGV2(6107802,
               "Finished critical section",
               "migrationId"_attr = _coordinator->getMigrationId(),
+              logAttrs(nss()),
               "durationMillis"_attr = _cloneAndCommitTimer.millis());
     }
 
@@ -924,7 +933,8 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                       "Failed to complete the migration",
                       "chunkMigrationRequestParameters"_attr = redact(_args.toBSON({})),
                       "error"_attr = redact(ex),
-                      "migrationId"_attr = _coordinator->getMigrationId());
+                      "migrationId"_attr = _coordinator->getMigrationId(),
+                      logAttrs(nss()));
         // Something went really wrong when completing the migration just unset the metadata and let
         // the next op to recover.
         // TODO (SERVER-71444): Fix to be interruptible or document exception.

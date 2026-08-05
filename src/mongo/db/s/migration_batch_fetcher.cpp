@@ -206,6 +206,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
                         0,
                         "Chunk migration initial clone complete",
                         "migrationId"_attr = _migrationId,
+                        logAttrs(_nss),
                         "duration"_attr = totalTimer.elapsed());
             break;
         }
@@ -216,6 +217,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
                     0,
                     "Chunk migration initial clone fetch end",
                     "migrationId"_attr = _migrationId,
+                    logAttrs(_nss),
                     "batchSize"_attr = batchSize,
                     "fetch"_attr = duration_cast<Milliseconds>(fetchTime));
 
@@ -262,6 +264,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
                         1,
                         "Chunk migration initial clone apply batch",
                         "migrationId"_attr = migrationId,
+                        logAttrs(_nss),
                         "batchSize"_attr = batchSize,
                         "total"_attr = duration_cast<Milliseconds>(totalTime),
                         "totalThroughputMBps"_attr = batchThroughputMBps,
@@ -277,6 +280,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
     LOGV2_ERROR(6718413,
                 "Chunk migration failure fetching data",
                 "migrationId"_attr = _migrationId,
+                logAttrs(_nss),
                 "failure"_attr = e.toStatus());
 }
 
@@ -284,7 +288,8 @@ template <typename Inserter>
 MigrationBatchFetcher<Inserter>::~MigrationBatchFetcher() {
     LOGV2(6718401,
           "Shutting down and joining inserter threads for migration {migrationId}",
-          "migrationId"_attr = _migrationId);
+          "migrationId"_attr = _migrationId,
+          logAttrs(_nss));
 
     // Call waitForIdle first since join can spawn another thread while ignoring the maxPoolSize
     // to finish the pending task. This is safe as long as ThreadPool::shutdown can't be
@@ -295,7 +300,8 @@ MigrationBatchFetcher<Inserter>::~MigrationBatchFetcher() {
 
     LOGV2(6718415,
           "Inserter threads for migration {migrationId} joined",
-          "migrationId"_attr = _migrationId);
+          "migrationId"_attr = _migrationId,
+          logAttrs(_nss));
 }
 
 template class MigrationBatchFetcher<MigrationBatchInserter>;

@@ -142,7 +142,8 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     LOGV2_DEBUG(23890,
                 2,
                 "Persisting range deletion task on donor",
-                "migrationId"_attr = _migrationInfo.getId());
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
     RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
                                         _migrationInfo.getNss(),
                                         _migrationInfo.getCollectionUuid(),
@@ -163,7 +164,8 @@ void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
                 2,
                 "MigrationCoordinator setting migration decision",
                 "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
-                "migrationId"_attr = _migrationInfo.getId());
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
     _migrationInfo.setDecision(decision);
 }
 
@@ -178,14 +180,16 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
             "started stepping down or shutting down after having initiated commit against the "
             "config server but before having found out if the commit succeeded. The new primary of "
             "this replica set will complete the migration coordination.",
-            "migrationId"_attr = _migrationInfo.getId());
+            "migrationId"_attr = _migrationInfo.getId(),
+            logAttrs(_migrationInfo.getNss()));
         return boost::none;
     }
 
     LOGV2(23893,
           "MigrationCoordinator delivering decision to self and to recipient",
           "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
-          "migrationId"_attr = _migrationInfo.getId());
+          "migrationId"_attr = _migrationInfo.getId(),
+          logAttrs(_migrationInfo.getNss()));
 
     if (!_releaseRecipientCriticalSectionFuture) {
         launchReleaseRecipientCriticalSection(opCtx);
@@ -218,8 +222,11 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
     OperationContext* opCtx) {
     hangBeforeMakingCommitDecisionDurable.pauseWhileSet();
 
-    LOGV2_DEBUG(
-        23894, 2, "Making commit decision durable", "migrationId"_attr = _migrationInfo.getId());
+    LOGV2_DEBUG(23894,
+                2,
+                "Making commit decision durable",
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
     migrationutil::persistCommitDecision(opCtx, _migrationInfo);
 
     _waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(opCtx);
@@ -242,7 +249,8 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
     LOGV2_DEBUG(6376300,
                 2,
                 "Retrieving number of orphan documents from recipient",
-                "migrationId"_attr = _migrationInfo.getId());
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
 
     const auto numOrphans = rangedeletionutil::retrieveNumOrphansFromShard(
         opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
@@ -255,7 +263,8 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
     LOGV2_DEBUG(23896,
                 2,
                 "Deleting range deletion task on recipient",
-                "migrationId"_attr = _migrationInfo.getId());
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
     rangedeletionutil::deleteRangeDeletionTaskOnRecipient(opCtx,
                                                           _migrationInfo.getRecipientShardId(),
                                                           _migrationInfo.getCollectionUuid(),
@@ -311,8 +320,11 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
 void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
     hangBeforeMakingAbortDecisionDurable.pauseWhileSet();
 
-    LOGV2_DEBUG(
-        23899, 2, "Making abort decision durable", "migrationId"_attr = _migrationInfo.getId());
+    LOGV2_DEBUG(23899,
+                2,
+                "Making abort decision durable",
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
     migrationutil::persistAbortDecision(opCtx, _migrationInfo);
 
     hangBeforeSendingAbortDecision.pauseWhileSet();
@@ -324,7 +336,8 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
     LOGV2_DEBUG(23901,
                 2,
                 "Deleting range deletion task on donor",
-                "migrationId"_attr = _migrationInfo.getId());
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
     rangedeletionutil::deleteRangeDeletionTaskLocally(
         opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
 
@@ -346,8 +359,8 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                     1,
                     "Failed to advance transaction number on recipient shard for abort and/or "
                     "marking range deletion task on recipient as ready for processing",
-                    logAttrs(_migrationInfo.getNss()),
                     "migrationId"_attr = _migrationInfo.getId(),
+                    logAttrs(_migrationInfo.getNss()),
                     "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
                     "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
                     "error"_attr = exShardNotFound);
@@ -356,7 +369,8 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
     LOGV2_DEBUG(23902,
                 2,
                 "Marking range deletion task on recipient as ready for processing",
-                "migrationId"_attr = _migrationInfo.getId());
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
     rangedeletionutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
                                                                _migrationInfo.getRecipientShardId(),
                                                                _migrationInfo.getCollectionUuid(),
@@ -368,7 +382,8 @@ void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
     LOGV2_DEBUG(23903,
                 2,
                 "Deleting migration coordinator document",
-                "migrationId"_attr = _migrationInfo.getId());
+                "migrationId"_attr = _migrationInfo.getId(),
+                logAttrs(_migrationInfo.getNss()));
 
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
@@ -395,6 +410,7 @@ void MigrationCoordinator::_waitForReleaseRecipientCriticalSectionFutureIgnoreSh
         LOGV2(5899100,
               "Failed to releaseCriticalSectionOnRecipient",
               "shardId"_attr = _migrationInfo.getRecipientShardId(),
+              logAttrs(_migrationInfo.getNss()),
               "error"_attr = exShardNotFound);
     }
 }
