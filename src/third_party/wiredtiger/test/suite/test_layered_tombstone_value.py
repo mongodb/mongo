@@ -58,8 +58,10 @@ class test_layered_tombstone_value(wttest.WiredTigerTestCase):
     mixed = b'\x14\x14ab'   # \x14\x14ab\x14              -> suffix (trailing appended byte)
 
     def conn_config(self):
-        return self.extensionsConfig() + \
-            ',create,statistics=(all),disaggregated=(role="leader")'
+        # The escaped stable format only arises on legacy data (a new database is unescaped);
+        # force it with the break-glass override to exercise the counters.
+        return self.extensionsConfig() + ',create,statistics=(all),' + \
+            'disaggregated=(legacy_tombstone_encoding_break_glass=true,role="leader")'
 
     def setUp(self):
         super().setUp()

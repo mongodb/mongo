@@ -159,8 +159,16 @@ struct __wt_layered_table_manager {
  * - COMPATIBLE_VERSION: The minimum reader version required to read what this code writes.
  */
 #define WT_DISAGG_CHECKPOINT_META_VERSION_DEFAULT 1
-#define WT_DISAGG_CHECKPOINT_META_VERSION 1
+#define WT_DISAGG_CHECKPOINT_META_VERSION 2
 #define WT_DISAGG_CHECKPOINT_META_COMPATIBLE_VERSION 1
+/*
+ * A checkpoint whose stable tables omit tombstone encoding cannot be read by a node that still
+ * strips the escape byte; such readers are version 2 or newer. Checkpoints that keep the encoding
+ * stay compatible with every reader. The compatible version doubles as the format indicator: a
+ * reader below this version would strip escape bytes that are not there, so a checkpoint at or
+ * above it carries raw stable values and an older one carries escaped values.
+ */
+#define WT_DISAGG_CHECKPOINT_META_VERSION_STABLE_UNENCODED 2
 
 /*
  * Turtle/checkpoint metadata version constants:
@@ -335,6 +343,32 @@ struct __wt_disaggregated_storage {
     bool base_write_gen_missing;
 
     /*
+     * !!!
+     * Stable tombstone encoding mode transitions, per connection. The mode itself lives in the
+     * WT_DISAGG_STABLE_TOMBSTONE_ENCODING flag; the decision tree below has no other transitions,
+     * and reconfigure never changes the mode: the break-glass option is not part of the
+     * reconfigure schema. The states are in-memory; the durable truth is each checkpoint's
+     * compatible version ("compat" below: < 2 escaped, >= 2 unescaped, absent fields default 1).
+     *
+     * wiredtiger_open:
+     * - break_glass=true -> Forced legacy (escaped);
+     *   break_glass=false -> Forced new (unescaped):
+     *   - fixed for the connection's life; any pickup keeps the mode, a disagreeing pickup warns.
+     * - option unset -> Unadopted (encoding off), then the first of:
+     *   - pickup with compat < 2, OR with absent version fields -> Adopted legacy (escaped);
+     *   - pickup with compat >= 2, OR a leader starting on empty storage (a new database)
+     *     -> Adopted new (unescaped);
+     *   and on every later pickup:
+     *   - the same compat side -> re-adopt, a no-op;
+     *   - the other compat side -> PANIC: the storage was rewritten in the other format, and a
+     *     restart re-detects from the data.
+     *
+     * This flag records the adoption: true once automatic mode has adopted from a pickup or a new
+     * database. Unused while the mode is forced (WT_DISAGG_STABLE_TOMBSTONE_ENCODING_FORCED).
+     */
+    bool stable_tombstone_encoding_adopted;
+
+    /*
      * Total size of all stable tables in the database, along with other components such as the KEK
      * table. Saved via the checkpoint completion record and loaded via connection reconfigure.
      */
@@ -355,7 +389,9 @@ struct __wt_disaggregated_storage {
      */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_DISAGG_NO_LOCAL_DURABILITY 0x1u
-#define WT_DISAGG_STRICT_CHECKPOINT_METADATA 0x2u
+#define WT_DISAGG_STABLE_TOMBSTONE_ENCODING 0x2u
+#define WT_DISAGG_STABLE_TOMBSTONE_ENCODING_FORCED 0x4u
+#define WT_DISAGG_STRICT_CHECKPOINT_METADATA 0x8u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };

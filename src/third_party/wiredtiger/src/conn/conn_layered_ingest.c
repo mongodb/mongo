@@ -328,6 +328,7 @@ __layered_fix_prepared_transaction_callback(
         op->u.op_upd->txnid = WT_TXN_ABORTED;
         /* Point the operation to the stable btree. */
         op->btree = cookie->stable_btree;
+        WT_ASSERT(session, WT_URI_IS_STABLE(op->btree->dhandle->name));
 
         /*
          * Transfer the session_inuse reference from the ingest btree to the stable btree. The
@@ -616,8 +617,14 @@ __layered_copy_ingest_table(
                  */
                 if (__wt_clayered_deleted(value))
                     WT_ERR(__wt_upd_alloc_tombstone(session, &upd, NULL));
-                else
+                else {
+                    /*
+                     * The ingest value is tombstone-escaped; store it in the stable table's form so
+                     * an unescaped stable table does not inherit the encoding on disk.
+                     */
+                    __wt_clayered_ingest_to_stable_value(session, value);
                     WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, NULL));
+                }
                 /*
                  * If the prepared update is aborted, move the aborted update to the stable table
                  * because we may write a prepared update to the disk in a future reconciliation.

@@ -37,6 +37,11 @@ from wtscenario import make_scenarios
 class test_key_provider_disagg04(KeyProviderBase):
     test_name = __qualname__
 
+    def setUp(self):
+        super().setUp()
+        # INFO verbosity also surfaces the tombstone encoding adoption line at every open.
+        self.ignoreStdoutPattern(r'stable tombstone encoding (on|off) \(')
+
     def conn_config(self):
         # Raise disaggregated-storage verbosity to INFO so the crypt-key load message is emitted;
         # restarts assert on it to confirm the persisted timestamp round-trips.

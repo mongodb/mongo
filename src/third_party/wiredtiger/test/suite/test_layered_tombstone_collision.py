@@ -54,11 +54,19 @@ class test_layered_tombstone_collision(wttest.WiredTigerTestCase):
         ('follower_direct', dict(mode='follower_direct')),
         ('follower_checkpoint', dict(mode='follower_checkpoint')),
     ]
+    # The collision value must round-trip whether the stable table escapes tombstone-namespace values
+    # or stores them verbatim, so run the whole matrix in both modes, forced with the break-glass
+    # override so every node runs the scenario's mode regardless of what it would detect.
+    encodings = [
+        ('escaped',   dict(encoding='true')),
+        ('unescaped', dict(encoding='false')),
+    ]
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages, values, modes)
+    scenarios = make_scenarios(disagg_storages, values, modes, encodings)
 
     def conn_config(self):
-        return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
+        return self.extensionsConfig() + self.conn_base_config + \
+            f'disaggregated=(legacy_tombstone_encoding_break_glass={self.encoding},role="leader")'
 
     def setUp(self):
         super().setUp()
@@ -66,7 +74,8 @@ class test_layered_tombstone_collision(wttest.WiredTigerTestCase):
         self.ignoreStdoutPattern('stable table value in the tombstone namespace')
         self.session.create(self.uri, 'key_format=S,value_format=u')
         self.follow_conn = self.wiredtiger_open('follower',
-            self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="follower")')
+            self.extensionsConfig() + self.conn_base_config +
+            f'disaggregated=(legacy_tombstone_encoding_break_glass={self.encoding},role="follower")')
         self.follow = self.follow_conn.open_session('')
         self.follow.create(self.uri, 'key_format=S,value_format=u')
 
@@ -203,3 +212,30 @@ class test_layered_tombstone_collision(wttest.WiredTigerTestCase):
         self.remove('k')
         self.write('k', self.value)
         self.check('k', self.value)
+
+    def test_insert_duplicate_value(self):
+        # A duplicate-key insert returns the existing value on the same cursor without a second
+        # search; it must be decoded, not the escaped bytes stored under the key.
+        self.write('k', self.value)
+        c = self.wsession.open_cursor(self.uri, None, 'overwrite=false')
+        self.wsession.begin_transaction()
+        c.set_key('k')
+        c.set_value(b'\x14\x14\xff')
+        self.assertRaisesHavingMessage(
+            wiredtiger.WiredTigerError, lambda: c.insert(), '/WT_DUPLICATE_KEY/')
+        self.assertEqual(c.get_value(), self.value)
+        self.wsession.rollback_transaction()
+        c.close()
+
+    def test_update_returns_value(self):
+        # An update leaves the value on the cursor; reading it back without a search must return the
+        # decoded value, not the escaped bytes just written.
+        self.write('k', b'plain')
+        c = self.wsession.open_cursor(self.uri)
+        self.wsession.begin_transaction()
+        c.set_key('k')
+        c.set_value(self.value)
+        self.assertEqual(c.update(), 0)
+        self.assertEqual(c.get_value(), self.value)
+        self.commit()
+        c.close()

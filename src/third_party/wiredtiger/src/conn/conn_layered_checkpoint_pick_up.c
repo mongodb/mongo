@@ -1216,14 +1216,19 @@ __wti_disagg_pick_up_checkpoint_meta(
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
+    WT_DISAGGREGATED_STORAGE *disagg;
     WT_DISAGG_CHECKPOINT_META ckpt_meta;
     WT_SESSION_IMPL *internal_session;
     uint64_t metadata_checksum;
     char *meta_str;
+    bool encoding, prev_adopted, prev_encoding;
 
     WT_CLEAR(ckpt_meta);
+    disagg = &S2C(session)->disaggregated_storage;
     meta_str = NULL;
     internal_session = NULL;
+    prev_encoding = F_ISSET(disagg, WT_DISAGG_STABLE_TOMBSTONE_ENCODING);
+    prev_adopted = disagg->stable_tombstone_encoding_adopted;
 
     /* Extract the item into a string. */
     WT_ERR(__wt_strndup(session, meta_data, meta_data_size, &meta_str));
@@ -1255,6 +1260,21 @@ __wti_disagg_pick_up_checkpoint_meta(
     /* Parse and validate version and compatible_version fields. */
     WT_ERR(__disagg_check_meta_version(session, meta_str, &ckpt_meta));
 
+    /*
+     * Derive the stable tombstone encoding mode from the checkpoint's compatible version and adopt
+     * it: in automatic mode the data on disk decides how stable values are decoded. A checkpoint
+     * predating the unescaped format (including one predating the version fields entirely) carries
+     * escaped stable values. A break-glass-forced mode wins over the derivation: the adopt call
+     * keeps the forced mode and warns when the checkpoint disagrees.
+     *
+     * FIXME-WT-18206: once no supported checkpoint carries escaped stable values, drop the
+     * derivation and the escaped mode.
+     */
+    encoding = ckpt_meta.compatible_version < WT_DISAGG_CHECKPOINT_META_VERSION_STABLE_UNENCODED;
+    WT_ERR(__wti_disagg_adopt_stable_tombstone_encoding(session, encoding,
+      encoding ? "a checkpoint compatible version predating the unescaped format" :
+                 "the checkpoint compatible version"));
+
     WT_ERR(__wt_open_internal_session(
       S2C(session), "checkpoint-pick-up", false, 0, 0, &internal_session));
     /* Now actually pick up the checkpoint. */
@@ -1262,7 +1282,24 @@ __wti_disagg_pick_up_checkpoint_meta(
       internal_session, ret = __disagg_pick_up_checkpoint(internal_session, &ckpt_meta));
     WT_ERR(ret);
 
+    /* Record the picked-up checkpoint's version fields; a failed pickup leaves them unchanged. */
+    WT_STAT_CONN_SET(session, disagg_checkpoint_storage_version, ckpt_meta.version);
+    WT_STAT_CONN_SET(
+      session, disagg_checkpoint_storage_compatible_version, ckpt_meta.compatible_version);
+
 err:
+    /* A failed pickup must not leave the failed checkpoint's encoding mode adopted. */
+    if (ret != 0) {
+        if (prev_encoding)
+            F_SET(disagg, WT_DISAGG_STABLE_TOMBSTONE_ENCODING);
+        else
+            F_CLR(disagg, WT_DISAGG_STABLE_TOMBSTONE_ENCODING);
+        disagg->stable_tombstone_encoding_adopted = prev_adopted;
+        WT_STAT_CONN_SET(session, disagg_stable_tombstone_encoding,
+          prev_adopted || F_ISSET(disagg, WT_DISAGG_STABLE_TOMBSTONE_ENCODING_FORCED) ?
+            (prev_encoding ? 1 : 2) :
+            0);
+    }
     if (internal_session != NULL)
         WT_TRET(__wt_session_close_internal(internal_session));
     __wt_free(session, meta_str);

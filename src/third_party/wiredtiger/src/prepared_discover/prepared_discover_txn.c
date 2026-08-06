@@ -46,8 +46,16 @@ static int
 __prepare_discover_alloc_upd(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UNPACK_KV *unpack,
   WT_UPDATE **updp, size_t *sizep)
 {
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+    WT_ITEM ingest_value;
     WT_UPDATE *upd;
 
+    /*
+     * Write the out-parameters before any error path can return: the release build otherwise flags
+     * the caller's use of the update pointer as possibly uninitialized.
+     */
+    *updp = NULL;
     *sizep = 0;
     upd = NULL;
     if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&(unpack->tw))) {
@@ -67,7 +75,12 @@ __prepare_discover_alloc_upd(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_U
         upd->prepare_state = WT_PREPARE_INPROGRESS;
     } else {
         WT_ASSERT(session, WT_TIME_WINDOW_HAS_START_PREPARE(&(unpack->tw)));
-        WT_RET(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, sizep));
+        /*
+         * Restoring a stable cell into the ingest table must re-establish the ingest escape when
+         * the stable image is unescaped, the mirror of the drain conversion.
+         */
+        WT_ERR(__wt_clayered_stable_to_ingest_value(session, value, &ingest_value, &tmp));
+        WT_ERR(__wt_upd_alloc(session, &ingest_value, WT_UPDATE_STANDARD, &upd, sizep));
         upd->txnid = unpack->tw.start_txn;
         upd->prepared_id = unpack->tw.start_prepared_id;
         upd->prepare_ts = unpack->tw.start_prepare_ts;
@@ -76,7 +89,9 @@ __prepare_discover_alloc_upd(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_U
         upd->prepare_state = WT_PREPARE_INPROGRESS;
     }
     *updp = upd;
-    return (0);
+err:
+    __wt_scr_free(session, &tmp);
+    return (ret);
 }
 
 /*

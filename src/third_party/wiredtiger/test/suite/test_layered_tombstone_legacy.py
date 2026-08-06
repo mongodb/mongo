@@ -30,7 +30,8 @@
 #   Before we reintroduced the escaping logic for the ingest tombstone value, a value equal to the
 #   tombstone (0x14 0x14) could be persisted verbatim in the stable table. Write that raw value
 #   straight into the stable constituent to mimic such on-disk data, and confirm the follower reads
-#   it as a value, not a deletion.
+#   it as a value, not a deletion. Both nodes run in the legacy escaped mode, forced with the
+#   break-glass override since a new database is otherwise unescaped.
 #
 #   Note that none of the known customers ever pass the exact 0x14 0x14 value to WT, so this is more
 #   of a theoretical scenario.
@@ -50,7 +51,8 @@ class test_layered_tombstone_legacy(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages)
 
     def conn_config(self):
-        return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
+        return self.extensionsConfig() + self.conn_base_config + \
+            'disaggregated=(legacy_tombstone_encoding_break_glass=true,role="leader")'
 
     def test_legacy_verbatim_tombstone_value(self):
         # A raw tombstone value on the stable table logs a warning; that is expected here.
@@ -58,7 +60,8 @@ class test_layered_tombstone_legacy(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=u')
 
         follow_conn = self.wiredtiger_open('follower',
-            self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="follower")')
+            self.extensionsConfig() + self.conn_base_config +
+            'disaggregated=(legacy_tombstone_encoding_break_glass=true,role="follower")')
         follow = follow_conn.open_session('')
         follow.create(self.uri, 'key_format=S,value_format=u')
 
