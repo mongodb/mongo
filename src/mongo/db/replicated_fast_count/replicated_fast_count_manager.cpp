@@ -478,7 +478,6 @@ void ReplicatedFastCountManager::flushSync_ForTest(OperationContext* opCtx) {
 }
 
 void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
-    invariant(!_checkpointer, "flushSync_ForTest() requires startup() to have been called");
     _isUnderTest = true;
 }
 
