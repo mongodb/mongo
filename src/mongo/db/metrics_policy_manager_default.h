@@ -17,7 +17,7 @@ class OperationContext;
  */
 class MetricsPolicyManagerDefault : public MetricsPolicyManager {
 public:
-    bool requiresFiltering(MetricsCategoryEnum, OperationContext*, bool) const override;
+    bool requiresFiltering(OperationContext*, MetricsCategoryEnum, bool) const override;
 
     const std::vector<std::string>& getAllowlistPaths(MetricsCategoryEnum) const override;
 

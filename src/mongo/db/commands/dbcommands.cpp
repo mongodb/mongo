@@ -362,7 +362,7 @@ public:
             // result builder to avoid additional costs in the non-filtering case.
             auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
             bool requireFiltering = metricsPolicyManager.requiresFiltering(
-                MetricsCategoryEnum::kCollStats, opCtx, /*forceFiltered=*/false);
+                opCtx, MetricsCategoryEnum::kCollStats, /*forceFiltered=*/false);
 
             auto serializationCtx =
                 SerializationContext::stateCommandReply(request().getSerializationContext());
@@ -502,7 +502,7 @@ public:
             // If filtering is required by the metrics policy, filter the reply before returning.
             auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
             if (metricsPolicyManager.requiresFiltering(
-                    MetricsCategoryEnum::kDbStats, opCtx, /*forceFiltered=*/false)) {
+                    opCtx, MetricsCategoryEnum::kDbStats, /*forceFiltered=*/false)) {
                 BSONObj replyBSON = reply.toBSON();
                 BSONObjBuilder filteredBuilder;
                 const auto& matcher =

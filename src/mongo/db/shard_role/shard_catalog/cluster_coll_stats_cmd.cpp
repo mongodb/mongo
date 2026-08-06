@@ -256,7 +256,7 @@ public:
         // result builder to avoid additional costs in the non-filtering case.
         auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
         bool requireFiltering = metricsPolicyManager.requiresFiltering(
-            MetricsCategoryEnum::kCollStats, opCtx, /*forceFiltered=*/false);
+            opCtx, MetricsCategoryEnum::kCollStats, /*forceFiltered=*/false);
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {

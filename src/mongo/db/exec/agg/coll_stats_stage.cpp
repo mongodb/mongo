@@ -128,7 +128,7 @@ BSONObj CollStatsStage::makeStatsForNs(const boost::intrusive_ptr<ExpressionCont
     // metrics matching the allowlist to a separate builder and return the resulting object.
     auto& metricsPolicyManager = MetricsPolicyManager::get(expCtx->getOperationContext());
     bool shouldFilter = metricsPolicyManager.requiresFiltering(
-        MetricsCategoryEnum::kCollStats, expCtx->getOperationContext(), /*forceFiltered=*/false);
+        expCtx->getOperationContext(), MetricsCategoryEnum::kCollStats, /*forceFiltered=*/false);
 
     if (shouldFilter) {
         const auto& matcher =

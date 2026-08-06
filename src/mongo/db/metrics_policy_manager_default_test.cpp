@@ -19,7 +19,7 @@ TEST_F(MetricsPolicyManagerDefaultRegistrationTest, IsAutoRegisteredOnServiceCon
     auto svcCtx = ServiceContext::make();
     auto& manager = MetricsPolicyManager::get(svcCtx.get());
     ASSERT_FALSE(manager.requiresFiltering(
-        MetricsCategoryEnum::kServerStatus, /*opCtx=*/nullptr, /*forceFiltered=*/false));
+        /*opCtx=*/nullptr, MetricsCategoryEnum::kServerStatus, /*forceFiltered=*/false));
 }
 
 class MetricsPolicyManagerDefaultFilteringTest
@@ -29,7 +29,7 @@ class MetricsPolicyManagerDefaultFilteringTest
 TEST_P(MetricsPolicyManagerDefaultFilteringTest, DoesNotRequireFiltering) {
     auto manager = std::make_unique<MetricsPolicyManagerDefault>();
     ASSERT_FALSE(
-        manager->requiresFiltering(GetParam(), /*opCtx=*/nullptr, /*forceFiltered=*/false));
+        manager->requiresFiltering(/*opCtx=*/nullptr, GetParam(), /*forceFiltered=*/false));
 }
 
 TEST_P(MetricsPolicyManagerDefaultFilteringTest, GetAllowlistPathsThrowsIllegalOperation) {

@@ -115,7 +115,7 @@ public:
             }
         }
         bool requireFiltering = metricsPolicyManager.requiresFiltering(
-            MetricsCategoryEnum::kReplSetGetStatus, opCtx, forceFiltered);
+            opCtx, MetricsCategoryEnum::kReplSetGetStatus, forceFiltered);
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {

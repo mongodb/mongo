@@ -44,8 +44,8 @@ public:
      * metrics filtering is not enabled or supported. For categories that do not, forceFiltered is
      * expected to always be false.
      */
-    virtual bool requiresFiltering(MetricsCategoryEnum category,
-                                   OperationContext* opCtx,
+    virtual bool requiresFiltering(OperationContext* opCtx,
+                                   MetricsCategoryEnum category,
                                    bool forcedFiltered) const = 0;
 
     /**

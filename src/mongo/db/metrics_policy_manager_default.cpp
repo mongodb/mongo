@@ -15,8 +15,8 @@ ServiceContext::ConstructorActionRegisterer registerMetricsPolicyManager{
 
 }  // namespace
 
-bool MetricsPolicyManagerDefault::requiresFiltering(MetricsCategoryEnum,
-                                                    OperationContext*,
+bool MetricsPolicyManagerDefault::requiresFiltering(OperationContext*,
+                                                    MetricsCategoryEnum,
                                                     bool) const {
     return false;
 }
