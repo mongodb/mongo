@@ -354,7 +354,7 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
             )
 
             mock_get_api.return_value.tasks_by_project_and_commit.assert_called_once_with(
-                "mongodb-mongo-master-v8.3-staging", "abc123"
+                "mongodb-mongo-master-v8.3-staging", "abc123", params={"limit": 1}
             )
             mock_retrieve.assert_called_once_with(
                 test_name="BM_Name1/arg1/arg with space",
@@ -686,7 +686,7 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
             )
 
         mock_get_api.return_value.tasks_by_project_and_commit.assert_called_once_with(
-            "mongodb-mongo-master", "abc123"
+            "mongodb-mongo-master", "abc123", params={"limit": 1}
         )
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.Github")

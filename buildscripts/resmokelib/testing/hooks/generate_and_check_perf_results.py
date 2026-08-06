@@ -347,7 +347,12 @@ class GenerateAndCheckPerfResults(interface.Hook):
         parent_version_id = None
         try:
             evg_api = evergreen_conn.get_evergreen_api()
-            base_commit_tasks = evg_api.tasks_by_project_and_commit(project, base_commit_hash)
+            # Every task at the commit carries the same version ID, so cap the page size at 1. Without
+            # a limit, the client paginates every task at the commit (~12k on a mainline commit) just
+            # to read one field, which is slow enough to hit the task's idle timeout.
+            base_commit_tasks = evg_api.tasks_by_project_and_commit(
+                project, base_commit_hash, params={"limit": 1}
+            )
             if base_commit_tasks:
                 parent_version_id = base_commit_tasks[0].version_id
         except Exception as exc:
