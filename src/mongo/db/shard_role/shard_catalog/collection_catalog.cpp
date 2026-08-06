@@ -2218,17 +2218,18 @@ const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContex
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
                                                                     const UUID& uuid) const {
-    return _lookupNSSByUUID(opCtx, uuid, false);
+    return _lookupNSSByUUID(opCtx, uuid, CommitPendingMode::kIgnore);
 }
 
-bool CollectionCatalog::isNamespaceOrUUIDCommitPending_forTest(
-    const NamespaceStringOrUUID& nssOrUUID) const {
-    return _findPendingCommitEntry(nssOrUUID) != nullptr;
-}
+boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(
+    OperationContext* opCtx, const UUID& uuid, CommitPendingMode commitPendingMode) const {
+    if (commitPendingMode == CommitPendingMode::kThrow) {
+        const auto pendingEntry = _pendingCommitUUIDs.find(uuid);
+        uassert(ErrorCodes::CommitPendingNamespaceOrUUID,
+                str::stream() << "UUID " << uuid.toString() << " is commit pending",
+                !pendingEntry);
+    }
 
-boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(OperationContext* opCtx,
-                                                                     const UUID& uuid,
-                                                                     bool withCommitPending) const {
     // Return any previously instantiated collection for this snapshot
     if (auto instantiatedColl = _findInstantiatedCollectionByUUID(opCtx, uuid)) {
         if (const auto collPtr = instantiatedColl->get()) {
@@ -2237,7 +2238,7 @@ boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(OperationCo
         return boost::none;
     }
 
-    if (withCommitPending) {
+    if (commitPendingMode == CommitPendingMode::kInclude) {
         if (const auto entry = _pendingCommitUUIDs.find(uuid); entry && entry->collection &&
             !_hasPendingTimeseriesUpgradeDowngradeCommit({entry->collection->ns().dbName(), uuid},
                                                          entry->collection)) {
@@ -2398,7 +2399,7 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     }
 
     return _resolveNamespaceStringFromDBNameAndUUID(
-        opCtx, nsOrUUID.dbName(), nsOrUUID.uuid(), false);
+        opCtx, nsOrUUID.dbName(), nsOrUUID.uuid(), CommitPendingMode::kIgnore);
 }
 
 NamespaceString CollectionCatalog::resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
@@ -2412,20 +2413,20 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUIDWithCommitPending
     }
 
     return _resolveNamespaceStringFromDBNameAndUUID(
-        opCtx, nsOrUUID.dbName(), nsOrUUID.uuid(), true);
+        opCtx, nsOrUUID.dbName(), nsOrUUID.uuid(), CommitPendingMode::kInclude);
 }
 
-NamespaceString CollectionCatalog::resolveNamespaceStringFromDBNameAndUUID(
+NamespaceString CollectionCatalog::resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(
     OperationContext* opCtx, const DatabaseName& dbName, const UUID& uuid) const {
-    return _resolveNamespaceStringFromDBNameAndUUID(opCtx, dbName, uuid, false);
+    return _resolveNamespaceStringFromDBNameAndUUID(opCtx, dbName, uuid, CommitPendingMode::kThrow);
 }
 
 NamespaceString CollectionCatalog::_resolveNamespaceStringFromDBNameAndUUID(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const UUID& uuid,
-    bool withCommitPending) const {
-    auto resolvedNss = _lookupNSSByUUID(opCtx, uuid, withCommitPending);
+    CommitPendingMode commitPendingMode) const {
+    auto resolvedNss = _lookupNSSByUUID(opCtx, uuid, commitPendingMode);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Unable to resolve " << uuid.toString(),
             resolvedNss && resolvedNss->isValid());
@@ -2951,4 +2952,10 @@ HistoricalCatalogIdTracker& CollectionCatalog::catalogIdTracker() {
 void CollectionCatalog::resetCatalogIdTracker(Timestamp oldest) {
     _catalogIdTracker = HistoricalCatalogIdTracker(oldest);
 }
+
+bool CollectionCatalog::isNamespaceOrUUIDCommitPending_forTest(
+    const NamespaceStringOrUUID& nssOrUUID) const {
+    return _findPendingCommitEntry(nssOrUUID) != nullptr;
+}
+
 }  // namespace mongo

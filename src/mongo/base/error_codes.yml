@@ -1345,5 +1345,7 @@ error_codes:
 
   - {code: 523, name: InvalidBSONFromJavaScript, categories: [ValidationError]}
 
+  - {code: 524, name: CommitPendingNamespaceOrUUID, categories: [InternalOnly]}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

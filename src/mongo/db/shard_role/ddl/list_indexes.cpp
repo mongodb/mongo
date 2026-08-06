@@ -256,7 +256,7 @@ public:
                 if (nssOrUuid.isNamespaceString()) {
                     return nssOrUuid.nss();
                 }
-                return shard_role_nocheck::resolveNssWithoutAcquisition(
+                return shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(
                     opCtx, nssOrUuid.dbName(), nssOrUuid.uuid());
             }();
 

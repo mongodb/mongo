@@ -140,7 +140,7 @@ public:
             : InvocationBaseGen(opCtx, command, opMsgRequest),
               _ns(request().getNamespaceOrUUID().isNamespaceString()
                       ? request().getNamespaceOrUUID().nss()
-                      : shard_role_nocheck::resolveNssWithoutAcquisition(
+                      : shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(
                             opCtx,
                             request().getNamespaceOrUUID().dbName(),
                             request().getNamespaceOrUUID().uuid())) {

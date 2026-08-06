@@ -2881,6 +2881,10 @@ TEST_F(CollectionCatalogTimestampTest, UUIDLookupWhileCommitPendingCreate) {
             auto catalog = CollectionCatalog::get(opCtx);
             ASSERT_THROWS(catalog->resolveNamespaceStringOrUUID(opCtx, {nss.dbName(), uuid}),
                           ExceptionFor<ErrorCodes::NamespaceNotFound>);
+            ASSERT_THROWS_CODE(catalog->resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(
+                                   opCtx, nss.dbName(), uuid),
+                               DBException,
+                               ErrorCodes::CommitPendingNamespaceOrUUID);
             ASSERT_EQ(catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
                           opCtx, {nss.dbName(), uuid}),
                       nss);

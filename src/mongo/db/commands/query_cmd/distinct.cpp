@@ -329,7 +329,7 @@ public:
             : MinimalInvocationBase(opCtx, cmd, opMsgRequest),
               _ns(request().getNamespaceOrUUID().isNamespaceString()
                       ? request().getNamespaceOrUUID().nss()
-                      : shard_role_nocheck::resolveNssWithoutAcquisition(
+                      : shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(
                             opCtx,
                             request().getNamespaceOrUUID().dbName(),
                             request().getNamespaceOrUUID().uuid())) {
@@ -384,7 +384,7 @@ public:
                 return;
             }
 
-            const auto resolvedNss = shard_role_nocheck::resolveNssWithoutAcquisition(
+            const auto resolvedNss = shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(
                 opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
             uassertStatusOK(auth::checkAuthForFind(authSession, resolvedNss, hasTerm));
         }

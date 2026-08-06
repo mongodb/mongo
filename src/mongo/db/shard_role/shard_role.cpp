@@ -8,6 +8,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/backoff_with_jitter.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/intent_registry.h"
@@ -2632,11 +2633,24 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
     }
 }
 
-NamespaceString shard_role_nocheck::resolveNssWithoutAcquisition(OperationContext* opCtx,
-                                                                 const DatabaseName& dbName,
-                                                                 const UUID& uuid) {
-    return CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
-        opCtx, dbName, uuid);
+NamespaceString shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(OperationContext* opCtx,
+                                                                         const DatabaseName& dbName,
+                                                                         const UUID& uuid) {
+    boost::optional<BackoffWithJitter> backoff;
+
+    while (true) {
+        try {
+            return CollectionCatalog::latest(opCtx)
+                ->resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(opCtx, dbName, uuid);
+        } catch (const ExceptionFor<ErrorCodes::CommitPendingNamespaceOrUUID>&) {
+            if (!backoff) {
+                backoff.emplace(Milliseconds{1}, Milliseconds{10});
+            }
+            // Unless there's at least 1 attempt, the backoff is 0. Increment first.
+            backoff->incrementAttemptCount();
+            opCtx->sleepFor(backoff->getBackoffDelay());
+        }
+    }
 }
 
 boost::optional<NamespaceString> shard_role_nocheck::lookupNssWithoutAcquisition(
