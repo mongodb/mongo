@@ -23,7 +23,9 @@
  * ]
  */
 
+import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 const timeFieldName = "t_field";
 const metaFieldName = "m_field";
@@ -70,18 +72,27 @@ export const $config = (function () {
         }
     };
 
+    // FCV transitions race with concurrent CRUD/index operations in this workload. Treat known
+    // transient errors as a no-op for this iteration.
+    let runSetFCVToleratingErrors = function (db, targetFCV) {
+        try {
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+            );
+        } catch (e) {
+            if (handleRandomSetFCVErrors(e, targetFCV)) return;
+            throw e;
+        }
+    };
+
     let states = {
         upgrade: function (db, collName) {
             jsTestLog(`Upgrade`);
-            assert.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-            );
+            runSetFCVToleratingErrors(db, latestFCV);
         },
         downgrade: function (db, collName) {
             jsTestLog(`Downgrade`);
-            assert.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-            );
+            runSetFCVToleratingErrors(db, lastLTSFCV);
         },
         insertOne: function (db, collName) {
             const coll = db[getCollNames()[0]];
@@ -175,9 +186,7 @@ export const $config = (function () {
     };
 
     let teardown = function (db, collName) {
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
     };
 
     return {

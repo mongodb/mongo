@@ -25,6 +25,7 @@
  */
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 export const $config = (function () {
     const prefix = jsTestName();
@@ -274,21 +275,7 @@ export const $config = (function () {
 
     const teardown = function (db, collName, cluster) {
         // TODO(SERVER-114573): Remove once v9.0 is last LTS and viewless timeseries upgrade/downgrade doesn't happen.
-        // A downgrade may have been interrupted due to an index build (SERVER-119738), we must complete it before upgrading to latest.
-        assert.commandWorkedOrFailedWithCode(
-            db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-            // "10778001: Cannot downgrade featureCompatibilityVersion if a previous FCV upgrade stopped in the middle ..."
-            // This error indicates that setFCV was interrupted during an upgrade rather than downgrade.
-            // The next setFCV command will complete that upgrade and set the FCV to 'latest' for tests that run afterwards.
-            10778001,
-        );
-
-        assert.commandWorked(
-            db.adminCommand({
-                setFeatureCompatibilityVersion: latestFCV,
-                confirm: true,
-            }),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
     };
 
     return {
