@@ -19,7 +19,21 @@ static constexpr std::string_view kLowString = "low"sv;
 static constexpr std::string_view kExemptString = "exempt"sv;
 
 MONGO_FAIL_POINT_DEFINE(sleepInWaitingForAdmissionGuard);
+
+struct AggregateQueueingStats {
+    Atomic<int64_t> totalTimeQueuedMicros{0};
+};
+
+const auto aggregateQueueingStats = OperationContext::declareDecoration<AggregateQueueingStats>();
+
+void recordAggregateQueueTime(OperationContext* opCtx, Microseconds waitTime) {
+    aggregateQueueingStats(opCtx).totalTimeQueuedMicros.fetchAndAddRelaxed(waitTime.count());
+}
 }  // namespace
+
+Microseconds AdmissionContext::getTotalTimeQueuedForAdmission(const OperationContext* opCtx) {
+    return Microseconds{aggregateQueueingStats(opCtx).totalTimeQueuedMicros.loadRelaxed()};
+}
 
 AdmissionContext::AdmissionContext(const AdmissionContext& other)
     : _admissions(other._admissions.load()),
@@ -28,6 +42,9 @@ AdmissionContext::AdmissionContext(const AdmissionContext& other)
       _startQueueingTime(other._startQueueingTime.load()) {}
 
 AdmissionContext& AdmissionContext::operator=(const AdmissionContext& other) {
+    if (this == &other) {
+        return *this;
+    }
     _admissions.store(other._admissions.load());
     _priority.store(other._priority.load());
     _totalTimeQueuedMicros.store(other._totalTimeQueuedMicros.load());
@@ -137,8 +154,11 @@ WaitingForAdmissionGuard::WaitingForAdmissionGuard(AdmissionContext* admCtx, Tic
 WaitingForAdmissionGuard::~WaitingForAdmissionGuard() {
     auto startQueueingTime = _admCtx->_startQueueingTime.loadRelaxed();
     invariant(startQueueingTime != AdmissionContext::kNotQueueing);
-    _admCtx->_totalTimeQueuedMicros.fetchAndAdd(durationCount<Microseconds>(
-        _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startQueueingTime)));
+    auto waitTime = _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startQueueingTime);
+    _admCtx->_totalTimeQueuedMicros.fetchAndAdd(durationCount<Microseconds>(waitTime));
+    if (auto* opCtx = _admCtx->getOperationContext()) {
+        recordAggregateQueueTime(opCtx, waitTime);
+    }
     _admCtx->_startQueueingTime.store(AdmissionContext::kNotQueueing);
     _admCtx->_startQueueingTime.notifyAll();
 }

@@ -13,7 +13,9 @@ const auto contextDecoration =
 }  // namespace
 
 WriteThrottlerAdmissionContext& WriteThrottlerAdmissionContext::get(OperationContext* opCtx) {
-    return contextDecoration(opCtx);
+    auto& context = contextDecoration(opCtx);
+    context._setOperationContext(opCtx);
+    return context;
 }
 
 }  // namespace mongo

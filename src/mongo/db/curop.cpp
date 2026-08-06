@@ -732,12 +732,7 @@ Milliseconds CurOp::_sumBlockedTimeTotal() {
                                              ->getPrepareConflictTracker()
                                              .getThisOpPrepareConflictDuration();
     auto cumulativeLockWaitTime = Microseconds(locker->stats().getCumulativeWaitTimeMicros());
-    // Sum admission wait time across every admission queue in the TicketHolderQueueStats
-    // registry, so that queueing at any gate is counted as blocked time.
-    Microseconds timeQueuedForAdmission{0};
-    for (auto&& [queueType, lookup] : TicketHolderQueueStats::getQueueMetricsRegistry()) {
-        timeQueuedForAdmission += lookup(opCtx())->totalTimeQueuedMicros();
-    }
+    auto timeQueuedForAdmission = AdmissionContext::getTotalTimeQueuedForAdmission(opCtx());
     auto timeQueuedForFlowControl = Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
 
     if (_resourceStatsBase) {
@@ -1311,11 +1306,7 @@ CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats() {
     // Snapshot the admission wait time over the same set of queues that _sumBlockedTimeTotal sums,
     // so that a sub-operation's base does not leave the enclosing operation's queueing time
     // attributed to it.
-    Microseconds timeQueuedForAdmission{0};
-    for (auto&& [queueType, lookup] : TicketHolderQueueStats::getQueueMetricsRegistry()) {
-        timeQueuedForAdmission += lookup(opCtx())->totalTimeQueuedMicros();
-    }
-    stats.timeQueuedForAdmission = timeQueuedForAdmission;
+    stats.timeQueuedForAdmission = AdmissionContext::getTotalTimeQueuedForAdmission(opCtx());
 
     return stats;
 }

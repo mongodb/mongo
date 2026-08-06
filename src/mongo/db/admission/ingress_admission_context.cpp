@@ -12,7 +12,9 @@ const auto contextDecoration = OperationContext::declareDecoration<IngressAdmiss
 }  // namespace
 
 IngressAdmissionContext& IngressAdmissionContext::get(OperationContext* opCtx) {
-    return contextDecoration(opCtx);
+    auto& context = contextDecoration(opCtx);
+    context._setOperationContext(opCtx);
+    return context;
 }
 
 }  // namespace mongo
