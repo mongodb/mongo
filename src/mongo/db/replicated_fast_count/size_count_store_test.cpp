@@ -3,18 +3,57 @@
 
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/unittest/death_test.h"
+
+#include <limits>
 
 namespace mongo::replicated_fast_count {
 namespace {
 
 enum class Mode { kCollection, kContainer };
+
+int64_t makeTestHash() {
+    return 0x0102030405060708;
+}
+
+// Builds the `meta` subdocument of the on-disk shape, optionally carrying an `h` value.
+BSONObj makeMeta(boost::optional<int64_t> hash) {
+    BSONObjBuilder meta;
+    meta.append(kCountKey, int64_t{7});
+    meta.append(kSizeKey, int64_t{42});
+    if (hash) {
+        meta.append(kHashKey, *hash);
+    }
+    return meta.obj();
+}
+
+// Builds a persisted metadata document of the on-disk shape, optionally carrying an `h` value.
+BSONObj makeMetadataDoc(boost::optional<int64_t> hash) {
+    return BSON(kValidAsOfKey << Timestamp(10, 1) << kMetadataKey << makeMeta(hash));
+}
+
+// Builds a persisted metadata document whose `h` field carries `hashElem`'s value and type.
+BSONObj makeMetadataDocWithRawHash(const BSONElement& hashElem) {
+    BSONObjBuilder meta;
+    meta.append(kCountKey, int64_t{7});
+    meta.append(kSizeKey, int64_t{42});
+    meta.appendAs(hashElem, kHashKey);
+    return BSON(kValidAsOfKey << Timestamp(10, 1) << kMetadataKey << meta.obj());
+}
+
+SizeCountStore::Entry parseDoc(const BSONObj& doc) {
+    return SizeCountStore::parseContainerValue(
+        {doc.objdata(), static_cast<std::size_t>(doc.objsize())});
+}
 
 // Runs each test case in both collection-backed and container-backed modes.
 class SizeCountStoreTest : public CatalogTestFixture, public ::testing::WithParamInterface<Mode> {
@@ -59,6 +98,35 @@ protected:
             return std::make_unique<CollectionSizeCountStore>();
         }
         return std::make_unique<ContainerSizeCountStore>(std::move(_recordStore));
+    }
+
+    // Persists `doc` for `uuid` bypassing the store's write path, which cannot emit `h`. Used to
+    // stage documents in the shape a future writer (or another node) would produce.
+    // TODO(SERVER-132687): Remove once writers emit the hash; tests staging a document without
+    // `h` will still need it.
+    void rawInsert(SizeCountStore& store, const UUID& uuid, const BSONObj& doc) {
+        auto opCtx = operationContext();
+        WriteUnitOfWork wuow(opCtx);
+        if (GetParam() == Mode::kCollection) {
+            const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
+            BSONObjBuilder builder;
+            builder.appendElements(BSON("_id" << uuid));
+            builder.appendElements(doc);
+            ASSERT_OK(collection_internal::insertDocument(opCtx,
+                                                          acquisition.getCollectionPtr(),
+                                                          InsertStatement(builder.obj()),
+                                                          /*opDebug=*/nullptr));
+        } else {
+            auto containerVariant =
+                static_cast<ContainerSizeCountStore&>(store).rs_ForTest()->getContainer();
+            auto& container =
+                std::get<std::reference_wrapper<StringKeyedContainer>>(containerVariant).get();
+            ASSERT_OK(container.insert(*shard_role_details::getRecoveryUnit(opCtx),
+                                       test_helpers::uuidSpan(uuid),
+                                       test_helpers::bsonSpan(doc),
+                                       container::ExistingKeyPolicy::reject));
+        }
+        wuow.commit();
     }
 
     std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
@@ -300,6 +368,78 @@ TEST_P(SizeCountStoreTest, RemoveMassertsWithoutGlobalWriteLock) {
     ASSERT_THROWS_CODE(storePtr->remove(opCtx, uuid), DBException, 12915204);
 }
 
+// A record carrying `h` must be readable through the public read() API on both backends: live
+// on-disk data may contain the field before this node's writers ever emit it.
+TEST_P(SizeCountStoreTest, ReadPopulatesHash) {
+    auto storePtr = makeStore();
+    auto& store = *storePtr;
+    auto opCtx = operationContext();
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
+    const UUID uuid = UUID::gen();
+    const int64_t hash = makeTestHash();
+
+    rawInsert(store, uuid, makeMetadataDoc(hash));
+
+    const auto result = store.read(opCtx, uuid);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->hash.has_value());
+    EXPECT_EQ(hash, *result->hash);
+    EXPECT_EQ(42, result->size);
+    EXPECT_EQ(7, result->count);
+}
+
+TEST_P(SizeCountStoreTest, ReadLeavesHashUnsetWhenAbsent) {
+    auto storePtr = makeStore();
+    auto& store = *storePtr;
+    auto opCtx = operationContext();
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
+    const UUID uuid = UUID::gen();
+
+    rawInsert(store, uuid, makeMetadataDoc(boost::none));
+
+    const auto result = store.read(opCtx, uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->hash.has_value());
+}
+
+// The write path does not emit `h` yet, so a hash set on an Entry must not survive a round trip.
+// This pins the parse-only scope of this change: readers must ship everywhere before any node
+// writes the field.
+// TODO(SERVER-132687): Invert this once writers emit `h` behind the FCV gate.
+TEST_P(SizeCountStoreTest, WriteDoesNotPersistHash) {
+    auto storePtr = makeStore();
+    auto& store = *storePtr;
+    Lock::GlobalLock writeLock(operationContext(), MODE_IX);
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{
+        .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = makeTestHash()};
+
+    test_helpers::insertSizeCountEntry(operationContext(), store, uuid, entry);
+
+    const auto result = store.read(operationContext(), uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->hash.has_value());
+}
+
+// An `h`-bearing record must still accumulate correctly on the checkpoint path, which reads the
+// same documents but only sums size and count.
+TEST_P(SizeCountStoreTest, ReadAndIncrementSizeCountsIgnoresHash) {
+    auto storePtr = makeStore();
+    auto& store = *storePtr;
+    auto opCtx = operationContext();
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
+    const UUID uuid = UUID::gen();
+
+    rawInsert(store, uuid, makeMetadataDoc(makeTestHash()));
+
+    SizeCountDeltas deltas;
+    deltas[uuid] = SizeCountDelta{.sizeCount = {.size = 8, .count = 1}};
+    store.readAndIncrementSizeCounts(opCtx, deltas);
+
+    EXPECT_EQ(50, deltas[uuid].sizeCount.size);
+    EXPECT_EQ(8, deltas[uuid].sizeCount.count);
+}
+
 INSTANTIATE_TEST_SUITE_P(,
                          SizeCountStoreTest,
                          ::testing::Values(Mode::kCollection, Mode::kContainer),
@@ -316,6 +456,79 @@ TEST_F(SizeCountStoreCollectionModeTest, ReadReturnsNoneWhenCollectionDoesNotExi
     const CollectionSizeCountStore store;
     Lock::GlobalLock readLock(operationContext(), MODE_IS);
     EXPECT_FALSE(store.read(operationContext(), UUID::gen()).has_value());
+}
+
+TEST(ParseContainerValueTest, HashNoneWhenAbsent) {
+    EXPECT_FALSE(parseDoc(makeMetadataDoc(boost::none)).hash.has_value());
+}
+
+TEST(ParseContainerValueTest, PopulatesHashWhenPresent) {
+    const int64_t hash = makeTestHash();
+    const auto entry = parseDoc(makeMetadataDoc(hash));
+    ASSERT_TRUE(entry.hash.has_value());
+    EXPECT_EQ(hash, *entry.hash);
+    EXPECT_EQ(42, entry.size);
+    EXPECT_EQ(7, entry.count);
+}
+
+// A persisted zero is a real hash value and must be distinguishable from a missing field. This is
+// the property that motivates `hash` being optional rather than defaulting to 0.
+TEST(ParseContainerValueTest, RoundTripsZeroHash) {
+    const auto entry = parseDoc(makeMetadataDoc(int64_t{0}));
+    ASSERT_TRUE(entry.hash.has_value());
+    EXPECT_EQ(0, *entry.hash);
+}
+
+// The hash is a 64-bit value reinterpreted as int64_t, so roughly half of all real hashes are
+// negative and the extremes must survive a round trip.
+TEST(ParseContainerValueTest, RoundTripsNegativeAndBoundaryHashes) {
+    for (const int64_t hash : {int64_t{-1},
+                               int64_t{-0x0102030405060708},
+                               std::numeric_limits<int64_t>::min(),
+                               std::numeric_limits<int64_t>::max()}) {
+        const auto entry = parseDoc(makeMetadataDoc(hash));
+        ASSERT_TRUE(entry.hash.has_value()) << "hash: " << hash;
+        EXPECT_EQ(hash, *entry.hash) << "hash: " << hash;
+    }
+}
+
+DEATH_TEST_REGEX(ParseContainerValueDeathTest, TassertsOnWrongType, "13197400") {
+    const BSONObj hash = BSON(kHashKey << "not-a-long");
+    parseDoc(makeMetadataDocWithRawHash(hash.firstElement()));
+}
+
+// A 32-bit NumberInt is the realistic mis-encoding to guard against: `h` must be a NumberLong.
+DEATH_TEST_REGEX(ParseContainerValueDeathTest, TassertsOnInt32, "13197400") {
+    const BSONObj hash = BSON(kHashKey << int32_t{5});
+    parseDoc(makeMetadataDocWithRawHash(hash.firstElement()));
+}
+
+// A double is what a manual mongosh update to `h` would leave behind.
+DEATH_TEST_REGEX(ParseContainerValueDeathTest, TassertsOnDouble, "13197400") {
+    const BSONObj hash = BSON(kHashKey << 5.0);
+    parseDoc(makeMetadataDocWithRawHash(hash.firstElement()));
+}
+
+// An explicit null is present as far as eoo() is concerned, so it is rejected rather than treated
+// as a missing field.
+DEATH_TEST_REGEX(ParseContainerValueDeathTest, TassertsOnNull, "13197400") {
+    const BSONObj hash = BSON(kHashKey << BSONNULL);
+    parseDoc(makeMetadataDocWithRawHash(hash.firstElement()));
+}
+
+// Entry equality is defaulted, so it now discriminates on the hash. Existing comparisons rely on
+// this staying true once writers begin emitting `h`.
+TEST(EntryEqualityTest, DiscriminatesOnHash) {
+    const SizeCountStore::Entry base{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+    SizeCountStore::Entry withHash = base;
+    withHash.hash = makeTestHash();
+
+    EXPECT_NE(base, withHash);
+    EXPECT_EQ(withHash, withHash);
+
+    SizeCountStore::Entry otherHash = withHash;
+    otherHash.hash = makeTestHash() + 1;
+    EXPECT_NE(withHash, otherHash);
 }
 
 }  // namespace

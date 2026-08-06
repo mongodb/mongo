@@ -11,6 +11,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
 #include <ostream>
 #include <span>
 #include <string_view>
@@ -25,6 +26,7 @@ using namespace std::literals::string_view_literals;
 inline constexpr std::string_view kMetadataKey = "meta"sv;
 inline constexpr std::string_view kSizeKey = "sz"sv;
 inline constexpr std::string_view kCountKey = "ct"sv;
+inline constexpr std::string_view kHashKey = "h"sv;
 inline constexpr std::string_view kValidAsOfKey = "valid-as-of"sv;
 
 /**
@@ -59,12 +61,15 @@ class SizeCountStore {
 public:
     /**
      * In-memory representation of the persisted `size` and `count` for a collection. The
-     * `timestamp` indicates when the `size` and `count` values were last flushed.
+     * `timestamp` indicates when the `size` and `count` values were last flushed. `hash`
+     * is boost::none for records written before the field existed or by nodes that do not yet emit
+     * it.
      */
     struct Entry {
         Timestamp timestamp{0, 0};
         int64_t size{0};
         int64_t count{0};
+        boost::optional<int64_t> hash;
         bool operator==(const Entry&) const = default;
     };
 
@@ -177,7 +182,13 @@ private:
 };
 
 inline std::ostream& operator<<(std::ostream& os, const SizeCountStore::Entry& e) {
-    return os << "{ timestamp: " << e.timestamp.toString() << ", size: " << e.size
-              << ", count: " << e.count << " }";
+    os << "{ timestamp: " << e.timestamp.toString() << ", size: " << e.size
+       << ", count: " << e.count << ", hash: ";
+    if (e.hash) {
+        os << *e.hash;
+    } else {
+        os << "none";
+    }
+    return os << " }";
 }
 }  // namespace mongo::replicated_fast_count

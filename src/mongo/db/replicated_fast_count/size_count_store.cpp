@@ -37,6 +37,28 @@ void assertInWriteUnitOfWorkAndLocked(OperationContext* opCtx, std::string_view 
                 "Must hold the GlobalLock in a write mode when calling SizeCountStore::{}()", op),
             shard_role_details::getLocker(opCtx)->isWriteLocked());
 }
+
+// Extracts the 64-bit collection hash from a persisted `meta` subdocument. Returns boost::none if
+// the subdocument does not carry the field.
+boost::optional<int64_t> parseHash(const BSONObj& meta) {
+    const BSONElement hashElem = meta.getField(kHashKey);
+    if (hashElem.eoo()) {
+        return boost::none;
+    }
+    tassert(13197400,
+            "hash must be stored as a 64-bit integer",
+            hashElem.type() == BSONType::numberLong);
+    return hashElem.Long();
+}
+
+// Decodes a persisted metadata document into an Entry, extracting the `meta` subdocument once.
+SizeCountStore::Entry parseEntry(const BSONObj& data) {
+    const BSONObj meta = data.getField(kMetadataKey).Obj();
+    return SizeCountStore::Entry{.timestamp = data.getField(kValidAsOfKey).timestamp(),
+                                 .size = meta.getField(kSizeKey).Long(),
+                                 .count = meta.getField(kCountKey).Long(),
+                                 .hash = parseHash(meta)};
+}
 }  // namespace
 
 boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
@@ -73,10 +95,7 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
 }
 
 SizeCountStore::Entry SizeCountStore::parseContainerValue(std::span<const char> value) {
-    BSONObj data(value.data());
-    return Entry{.timestamp = data.getField(kValidAsOfKey).timestamp(),
-                 .size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
-                 .count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long()};
+    return parseEntry(BSONObj(value.data()));
 }
 
 boost::optional<SizeCountStore::Entry> CollectionSizeCountStore::read(OperationContext* opCtx,
@@ -102,11 +121,7 @@ boost::optional<SizeCountStore::Entry> CollectionSizeCountStore::read(OperationC
         return boost::none;
     }
 
-    const BSONObj& data = document.value();
-    return SizeCountStore::Entry{
-        .timestamp = data.getField(kValidAsOfKey).timestamp(),
-        .size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
-        .count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long()};
+    return parseEntry(document.value());
 }
 
 void CollectionSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
@@ -207,9 +222,9 @@ void CollectionSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCt
                                  .getValue();
         Snapshotted<BSONObj> doc;
         if (coll->findDoc(opCtx, rid, &doc)) {
-            const BSONObj& data = doc.value();
-            delta.sizeCount.count += data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
-            delta.sizeCount.size += data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
+            const Entry entry = parseEntry(doc.value());
+            delta.sizeCount.count += entry.count;
+            delta.sizeCount.size += entry.size;
         }
     }
 }
