@@ -92,8 +92,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
                                                   std::shared_ptr<Collection> coll,
                                                   Entry::Action action) {
     const auto& nss = coll->ns();
-    auto uuid = coll->uuid();
-    _entries.push_back({action, coll, nss, uuid});
+    _entries.push_back({action, std::move(coll), nss});
 }
 
 void UncommittedCatalogUpdates::writableCollection(std::shared_ptr<Collection> collection) {
@@ -108,7 +107,7 @@ void UncommittedCatalogUpdates::renameCollection(const Collection* collection,
     });
     invariant(it != _entries.rend());
     it->nss = collection->ns();
-    _entries.push_back({Entry::Action::kRenamedCollection, nullptr, from, boost::none, it->nss});
+    _entries.push_back({Entry::Action::kRenamedCollection, nullptr, from, it->nss});
 }
 
 void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
@@ -126,7 +125,6 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
     // Transform the found entry into a dropped entry.
     invariant(it->collection.get() == collection);
     it->action = Entry::Action::kDroppedCollection;
-    it->externalUUID = it->collection->uuid();
     it->droppedCollection = it->collection;
     it->collection = nullptr;
 }
@@ -136,7 +134,6 @@ void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbNa
     _entries.push_back({Entry::Action::kReplacedViewsForDatabase,
                         nullptr,
                         NamespaceString{dbName},
-                        boost::none,
                         {},
                         std::move(vfdb)});
 }

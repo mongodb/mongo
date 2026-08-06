@@ -36,6 +36,7 @@
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -1065,6 +1066,44 @@ public:
         _setupDDLOperation(opCtx, timestamp);
         wuow.emplace(opCtx);
         _dropCollection(opCtx, nss, timestamp);
+    }
+
+    void writableCollectionAndLeaveUncommitted(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               Timestamp timestamp,
+                                               boost::optional<WriteUnitOfWork>& wuow) {
+        _setupDDLOperation(opCtx, timestamp);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        wuow.emplace(opCtx);
+        CollectionWriter collection(opCtx, &acq);
+        ASSERT(collection.getWritableCollection(opCtx));
+    }
+
+    void renameCollectionAndLeaveUncommitted(OperationContext* opCtx,
+                                             const NamespaceString& from,
+                                             const NamespaceString& to,
+                                             Timestamp timestamp,
+                                             boost::optional<WriteUnitOfWork>& wuow) {
+        _setupDDLOperation(opCtx, timestamp);
+        wuow.emplace(opCtx);
+        _renameCollection(opCtx, from, to, timestamp);
+    }
+
+    void recreateCollectionWithUUIDInCurrentWUOW(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 UUID uuid) {
+        _createCollection(opCtx, nss, uuid, false);
+    }
+
+    void rollbackAfterCatalogPrecommit(boost::optional<WriteUnitOfWork>& wuow) {
+        shard_role_details::getRecoveryUnit(opCtx.get())
+            ->registerPreCommitHook([](OperationContext*, boost::optional<Timestamp>) {
+                throwWriteConflictException("Force rollback after catalog precommit");
+            });
+        ASSERT_THROWS(wuow->commit(), WriteConflictException);
     }
 
     void renameCollection(OperationContext* opCtx,
@@ -2924,6 +2963,116 @@ TEST_F(CollectionCatalogTimestampTest, UUIDLookupWhileCommitPendingDrop) {
                           opCtx, {nss.dbName(), uuid}),
                       nss);
         });
+}
+
+TEST_F(CollectionCatalogTimestampTest, NamespaceAndUUIDPendingEntriesRemovedAfterDropRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID uuid = createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        dropCollectionAndLeaveUncommitted(opCtx.get(), nss, Timestamp(20, 20), wuow);
+
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss.dbName(), uuid)));
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), uuid), original);
+}
+
+TEST_F(CollectionCatalogTimestampTest, CreatedCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID uuid = UUID::gen();
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        createCollectionWithUUIDAndLeaveUncommitted(
+            opCtx.get(), nss, Timestamp(10, 10), uuid, wuow);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss.dbName(), uuid)));
+    ASSERT_FALSE(catalog->lookupCollectionByNamespace(opCtx.get(), nss));
+    ASSERT_FALSE(catalog->lookupCollectionByUUID(opCtx.get(), uuid));
+}
+
+TEST_F(CollectionCatalogTimestampTest, WritableCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID uuid = createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        writableCollectionAndLeaveUncommitted(opCtx.get(), nss, Timestamp(20, 20), wuow);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss.dbName(), uuid)));
+    ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx.get(), nss), original);
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), uuid), original);
+}
+
+TEST_F(CollectionCatalogTimestampTest, RenamedCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString renamedNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const UUID uuid = createCollection(opCtx.get(), originalNss, Timestamp(10, 10));
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        renameCollectionAndLeaveUncommitted(
+            opCtx.get(), originalNss, renamedNss, Timestamp(20, 20), wuow);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(originalNss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(renamedNss)));
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(
+        NamespaceStringOrUUID(originalNss.dbName(), uuid)));
+    ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx.get(), originalNss), original);
+    ASSERT_FALSE(catalog->lookupCollectionByNamespace(opCtx.get(), renamedNss));
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), uuid), original);
+}
+
+TEST_F(CollectionCatalogTimestampTest, RecreatedCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID oldUuid = createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    const UUID newUuid = UUID::gen();
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), oldUuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        dropCollectionAndLeaveUncommitted(opCtx.get(), nss, Timestamp(20, 20), wuow);
+        recreateCollectionWithUUIDInCurrentWUOW(opCtx.get(), nss, newUuid);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(
+        NamespaceStringOrUUID(nss.dbName(), oldUuid)));
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(
+        NamespaceStringOrUUID(nss.dbName(), newUuid)));
+    ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx.get(), nss), original);
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), oldUuid), original);
+    ASSERT_FALSE(catalog->lookupCollectionByUUID(opCtx.get(), newUuid));
 }
 
 TEST_F(CollectionCatalogTimestampTest,

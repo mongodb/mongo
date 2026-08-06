@@ -537,15 +537,9 @@ public:
                 catalog._pendingCommitNamespaces =
                     catalog._pendingCommitNamespaces.set(entry.nss, pendingEntry);
 
-                if (entry.collection) {
-                    // If we have a collection instance for this entry also mark the uuid as pending
+                if (const auto uuid = entry.uuid()) {
                     catalog._pendingCommitUUIDs =
-                        catalog._pendingCommitUUIDs.set(entry.collection->uuid(), pendingEntry);
-                } else if (entry.externalUUID) {
-                    // Drops do not have a collection instance but set their UUID in the entry. Mark
-                    // it as pending with no collection instance.
-                    catalog._pendingCommitUUIDs =
-                        catalog._pendingCommitUUIDs.set(*entry.externalUUID, pendingEntry);
+                        catalog._pendingCommitUUIDs.set(*uuid, pendingEntry);
                 }
             }
 
@@ -699,10 +693,8 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection: {
-                    writeJobs.push_back([opCtx,
-                                         collection = entry.collection,
-                                         uuid = *entry.externalUUID,
-                                         commitTime](CollectionCatalog& catalog) {
+                    writeJobs.push_back([opCtx, collection = entry.collection, commitTime](
+                                            CollectionCatalog& catalog) {
                         // Override existing Collection on this namespace
                         catalog._registerCollection(opCtx,
                                                     std::move(collection),
@@ -782,12 +774,9 @@ public:
                 catalog._pendingCommitNamespaces =
                     catalog._pendingCommitNamespaces.erase(entry.nss);
 
-                // Entry without collection, nothing more to do
-                if (!entry.collection)
-                    continue;
-
-                catalog._pendingCommitUUIDs =
-                    catalog._pendingCommitUUIDs.erase(entry.collection->uuid());
+                if (const auto uuid = entry.uuid()) {
+                    catalog._pendingCommitUUIDs = catalog._pendingCommitUUIDs.erase(*uuid);
+                }
             }
         });
     }
@@ -2230,6 +2219,11 @@ const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContex
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
                                                                     const UUID& uuid) const {
     return _lookupNSSByUUID(opCtx, uuid, false);
+}
+
+bool CollectionCatalog::isNamespaceOrUUIDCommitPending_forTest(
+    const NamespaceStringOrUUID& nssOrUUID) const {
+    return _findPendingCommitEntry(nssOrUUID) != nullptr;
 }
 
 boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(OperationContext* opCtx,

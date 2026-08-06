@@ -52,10 +52,11 @@ public:
         };
 
         boost::optional<UUID> uuid() const {
-            if (action == Action::kCreatedCollection || action == Action::kWritableCollection ||
-                action == Action::kRenamedCollection)
+            if (collection)
                 return collection->uuid();
-            return externalUUID;
+            if (droppedCollection)
+                return droppedCollection->uuid();
+            return boost::none;
         }
 
         // Type of action this entry has stored. Members below may or may not be set depending on
@@ -70,10 +71,6 @@ public:
         // Store namespace separately to handle rename and drop without making writable first.
         // Set for all actions.
         NamespaceString nss;
-
-        // External uuid when not accessible via collection.
-        // Set for actions kDroppedCollection, kRecreatedCollection. boost::none otherwise.
-        boost::optional<UUID> externalUUID;
 
         // New namespace this collection has been renamed to.
         // Set for action kRenamedCollection. Default constructed otherwise.

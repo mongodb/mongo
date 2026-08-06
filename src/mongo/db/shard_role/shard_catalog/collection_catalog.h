@@ -352,6 +352,7 @@ public:
      */
     boost::optional<NamespaceString> lookupNSSByUUID(OperationContext* opCtx,
                                                      const UUID& uuid) const;
+    bool isNamespaceOrUUIDCommitPending_forTest(const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
      * Returns the UUID if `nss` exists in CollectionCatalog.
