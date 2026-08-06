@@ -26,12 +26,20 @@ bool hasNumericPathComponent(const FieldPath& fp) {
 }
 
 /**
- * Ensures join predicate paths can't include arrays and doesn't have a numeric component.
+ * Ensures join predicate paths can't include arrays and doesn't have a numeric component. Returns
+ * boost::none if the path is valid, otherwise the reason it was rejected.
  */
-bool isPathValid(const pipeline::dependency_graph::DependencyGraph& graph,
-                 const DocumentSource* at,
-                 const FieldPath& path) {
-    return !hasNumericPathComponent(path) && !graph.canPathBeArray(at, path.fullPath());
+boost::optional<JoinFallbackReason> checkPathValidity(
+    const pipeline::dependency_graph::DependencyGraph& graph,
+    const DocumentSource* at,
+    const FieldPath& path) {
+    if (hasNumericPathComponent(path)) {
+        return JoinFallbackReason::kPredicateFieldNumericComponent;
+    }
+    if (graph.canPathBeArray(at, path.fullPath())) {
+        return JoinFallbackReason::kPredicateFieldCouldBeArray;
+    }
+    return boost::none;
 }
 }  // namespace
 
@@ -153,7 +161,8 @@ boost::optional<ResolvedPath> PathResolver::_resolve(
 
 boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
                                               const DocumentSource* at,
-                                              boost::optional<NodeId> nodeId) {
+                                              boost::optional<NodeId> nodeId,
+                                              boost::optional<JoinFallbackReason>& fallbackReason) {
     const pipeline::dependency_graph::DependencyGraph* graph = nullptr;
     const bool mainPipelineResolution = !nodeId || nodeId == _baseNodeId;
     if (mainPipelineResolution) {
@@ -165,13 +174,15 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
 
     // Make sure this path is actually valid before proceeding. We validate the path where it is
     // referenced for arrayness.
-    if (!isPathValid(*graph, at, fieldPath)) {
+    if (auto invalidReason = checkPathValidity(*graph, at, fieldPath)) {
+        fallbackReason = invalidReason;
         return boost::none;
     }
 
     boost::optional<ResolvedPath> resolved =
         _resolve(*graph, fieldPath, at, nodeId.get_value_or(_baseNodeId));
     if (!resolved) {
+        fallbackReason = JoinFallbackReason::kUnresolvableJoinPath;
         return boost::none;
     }
 
@@ -196,11 +207,16 @@ boost::optional<PathId> PathResolver::resolve(const FieldPath& fieldPath,
             resolved->fieldPathAfterRenames = *alias;
         } else if (subOrigin.kind != pipeline::dependency_graph::FieldOriginKind::kBaseDocument) {
             // Path was modified- bail.
+            fallbackReason = JoinFallbackReason::kUnresolvableJoinPath;
             return boost::none;
         }
     }
 
-    return addPathOrGetExisting(*resolved);
+    auto pathId = addPathOrGetExisting(*resolved);
+    if (!pathId) {
+        fallbackReason = JoinFallbackReason::kUnresolvableJoinPath;
+    }
+    return pathId;
 }
 
 std::vector<ResolvedPath> PathResolver::releaseResolvedPaths(size_t maxNodeIdExclusive) {

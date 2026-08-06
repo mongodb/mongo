@@ -139,9 +139,7 @@ bool isCollectionOrViewEligibleForJoinOpt(const CollectionOrViewAcquisition& col
     return coll.isCollection() && isCollectionEligibleForJoinOpt(coll.getCollection());
 }
 
-bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
-                                    const Pipeline& pipeline,
-                                    const boost::optional<BSONObj>& queryHint) {
+bool isJoinOrderingEnabled(const ExpressionContext& ctx) {
     // The join optimizer unconditionally uses CBR, if the feature flag is disabled
     // this also disables join ordering.
     // TODO: SERVER-129697 Remove this check when the feature flag is removed.
@@ -149,27 +147,38 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
         return false;
     }
 
-    const auto& queryKnob = pipeline.getContext()->getQueryKnobConfiguration();
-
+    const auto& queryKnob = ctx.getQueryKnobConfiguration();
     if (!queryKnob.isJoinOrderingEnabled()) {
         return false;
     }
-
     if (queryKnob.isForceClassicEngineEnabled()) {
+        return false;
+    }
+    return true;
+}
+
+bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
+                                    const Pipeline& pipeline,
+                                    const boost::optional<BSONObj>& queryHint) {
+    if (!AggJoinModel::pipelineEligibleForJoinReordering(pipeline)) {
+        // Return false- don't want to record any kind of metric for this.
         return false;
     }
 
     if (queryHint.has_value() && !queryHint->isEmpty()) {
+        // TODO SERVER-132003: Record reason as JoinFallbackReason::kUserHintPresent.
         return false;
     }
 
     if (!mca.hasMainCollection()) {
         // We can't determine if the base collection is sharded.
+        // TODO SERVER-132003: Record reason as JoinFallbackReason::kNoMainCollection.
         return false;
     }
 
     // Ensure that the base collection is eligible. If not, this aggregation can't participate in
     // join optimization.
+    // TODO SERVER-132003: Record reason.
     if (!isCollectionEligibleForJoinOpt(mca.getMainCollectionAcquisition())) {
         return false;
     }
@@ -178,6 +187,7 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
     // TODO SERVER-125401: instead of falling back, shorten the prefix.
     for (const auto& [_, collAcq] : mca.getSecondaryCollectionAcquisitions()) {
         if (!isCollectionOrViewEligibleForJoinOpt(collAcq)) {
+            // TODO SERVER-132003: Record reason.
             return false;
         }
     }
@@ -191,10 +201,12 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
         }
     });
     if (foundCrossDbLookup) {
+        // TODO SERVER-132003: Record reason as JoinFallbackReason::kCrossDbLookup.
         return false;
     }
 
-    return AggJoinModel::pipelineEligibleForJoinReordering(pipeline);
+    // Yay! Eligible.
+    return true;
 }
 
 bool indexIsValidForINLJ(const std::shared_ptr<const IndexCatalogEntry>& ice) {
@@ -412,6 +424,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     const boost::optional<BSONObj>& queryHint,
     OperationContext* opCtx,
     const boost::intrusive_ptr<ExpressionContext> expCtx) {
+    // Don't proceed if join optimization is not enabled.
+    if (!isJoinOrderingEnabled(*expCtx)) {
+        return Status(ErrorCodes::QueryFeatureNotAllowed,
+                      "Pipeline or collection ineligible for join-reordering");
+    }
+
     // Quick eligibility check.
     if (!isAggEligibleForJoinReordering(mca, pipeline, queryHint)) {
         return Status(ErrorCodes::QueryFeatureNotAllowed,
@@ -452,6 +470,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                return !mca.knowsNamespace(lookup->getFromNs());
                                            });
     if (missingAcquisitions) {
+        metrics.fallbackReason = JoinFallbackReason::kMissingForeignAcquisition;
         return Status(
             ErrorCodes::QueryFeatureNotAllowed,
             "Pipeline ineligible for join-reordering due to missing foreign namespace acquisition");
@@ -505,6 +524,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     auto swAccessPlans =
         singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators, peMetrics);
     if (!swAccessPlans.isOK()) {
+        metrics.fallbackReason = JoinFallbackReason::kCBRFailedToGetSingleTableAccess;
         return swAccessPlans.getStatus();
     }
     auto singleTableAccess = std::move(swAccessPlans.getValue());

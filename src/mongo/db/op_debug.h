@@ -12,6 +12,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -408,6 +409,11 @@ public:
     struct JoinOptimizationMetrics {
         // Was this query eligible for join optimization.
         bool joinOptimizable = false;
+        // Why join optimization stopped doing more than it did, if it stopped early. Read together
+        // with 'joinOptimizable': when false, this is why we bailed out entirely; when true, this
+        // is why the join-graph prefix stopped growing and the query was only optimized over that
+        // prefix.
+        boost::optional<join_ordering::JoinFallbackReason> fallbackReason;
         // Number of unique namespaces that were pushed into the join model.
         int numNamespaces = 0;
         // Number of $lookup stages that remained in the non-join-reorderable query suffix.

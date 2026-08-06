@@ -682,4 +682,72 @@ TEST_F(ExtractExprPredicatesTest, MatchNonExprEquality) {
     ASSERT_FALSE(result.expressionIsFullyAbsorbed);
     ASSERT_EQ(2, result.predicates.size());
 }
+
+/**
+ * The following tests pin down the 'reason' reported for each way a top-level $match can fail to be
+ * fully absorbed into the join graph. These reasons surface in query stats as the join-optimization
+ * fallback reason, so each JoinFallbackReason::kMatch* value gets a test that reaches it.
+ */
+void assertReason(const ExprPredicatesResult& result, JoinFallbackReason expected) {
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_TRUE(result.reason.has_value());
+    ASSERT_EQ(toStringData(*result.reason), toStringData(expected));
+}
+
+/**
+ * A $match predicate that isn't a $expr (or an $and of them) can't encode a join predicate.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchNonExprPredicate) {
+    auto result = extract("{'first.a': 2}");
+    assertReason(result, JoinFallbackReason::kMatchNonExprPredicate);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * A $expr containing an expression other than $and/$eq (here $or) is unsupported.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchUnsupportedExpression) {
+    auto result = extract("{$expr: {$or: [{$eq: ['$first.a', '$second.b']}]}}");
+    assertReason(result, JoinFallbackReason::kMatchUnsupportedExpression);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * Only equality comparisons can become join predicates.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchNonEqualityPredicate) {
+    auto result = extract("{$expr: {$gt: ['$first.a', '$second.b']}}");
+    assertReason(result, JoinFallbackReason::kMatchNonEqualityPredicate);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * Both sides of the equality must be field paths, not constants.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchNonFieldPathOperand) {
+    auto result = extract("{$expr: {$eq: ['$first.a', 5]}}");
+    assertReason(result, JoinFallbackReason::kMatchNonFieldPathOperand);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * A system-variable operand can't name a field of a collection, so it can't be a join predicate.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchVariableOperand) {
+    for (std::string_view json :
+         {"{$expr: {$eq: ['$first.a', '$$NOW']}}"sv, "{$expr: {$eq: ['$first.a', '$$NOW.x']}}"sv}) {
+        auto result = extract(json);
+        assertReason(result, JoinFallbackReason::kMatchVariableOperand);
+        ASSERT_EQ(0, result.predicates.size()) << json;
+    }
+}
+
+/**
+ * An equality between two fields of the same collection is a self-edge, not a join predicate.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchPredicateOnSameNode) {
+    auto result = extract("{$expr: {$eq: ['$first.a', '$first.b']}}");
+    assertReason(result, JoinFallbackReason::kMatchPredicateOnSameNode);
+    ASSERT_EQ(0, result.predicates.size());
+}
 }  // namespace mongo::join_ordering

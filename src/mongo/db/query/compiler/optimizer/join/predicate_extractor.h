@@ -103,6 +103,10 @@ struct ExprPredicatesResult {
 
     // Extracted join predicates.
     std::vector<JoinPredicate> predicates;
+
+    // Reason why we may have failed to extract. Only set if a predicate field was rejected because
+    // it isn't a legal join predicate path.
+    boost::optional<JoinFallbackReason> reason;
 };
 
 /**
@@ -113,7 +117,8 @@ struct ExprPredicatesResult {
  * The 'expr' can be fully absorbed into join graph if it contains only proper join equality
  * predicates and $and's.
  * The function returns 'ExprPredicatesResult' which contains a list of join predicates and a
- * boolean value identifying whether the 'expr' was fully absorbed.
+ * boolean value identifying whether the 'expr' was fully absorbed, or a metrics 'reason' why this
+ * failed.
  */
 ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver,
                                            const DocumentSourceMatch* match);

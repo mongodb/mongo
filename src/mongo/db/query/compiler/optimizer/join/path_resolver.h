@@ -6,6 +6,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 #include "mongo/util/modules.h"
 
@@ -52,10 +53,14 @@ public:
      * It returns boost::none if a path cannot be resolved- for example, if the path was introduced
      * by a stage other than one of our $lookups (e.g. a computed field in a $project). We only
      * support fields that can be directly traced back to their base collection.
+     *
+     * 'fallbackReason' is set when the path was rejected because it isn't a legal join predicate
+     * field in the first place or it couldn't be resolved.
      */
     boost::optional<PathId> resolve(const FieldPath& fieldPath,
                                     const DocumentSource* at,
-                                    boost::optional<NodeId> nodeId = boost::none);
+                                    boost::optional<NodeId> nodeId,
+                                    boost::optional<JoinFallbackReason>& fallbackReason);
 
     /**
      * This function is allows us to know that future paths passed into resolve() may reference the

@@ -10,6 +10,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <map>
 #include <memory>
 
 namespace mongo::query_stats {
@@ -35,6 +36,9 @@ public:
           joinModelingTimeMicros(metrics.joinModelingTimeMicros),
           sbeLoweringTimeMicros(metrics.sbeLoweringTimeMicros) {
         joinOptimizable.aggregate(metrics.joinOptimizable);
+        if (metrics.fallbackReason) {
+            fallbackReasonCounts[*metrics.fallbackReason] = 1;
+        }
         if (const auto& pe = metrics.planEnumerationMetrics) {
             planEnumerationMetrics = PlanEnumerationMetrics{
                 1,
@@ -71,6 +75,12 @@ public:
     uint64_t updateCount = 0;
 
     AggregatedBool joinOptimizable;
+
+    // How many executions of this shape stopped join optimization early for each reason. Stored
+    // sparsely, like 'PlanShapeCounts', so that only reasons actually hit take up space and appear
+    // in the output. Read alongside 'joinOptimizable', which says whether such an execution
+    // fell back entirely or was optimized over a shortened prefix.
+    std::map<join_ordering::JoinFallbackReason, int64_t> fallbackReasonCounts;
 
     AggregatedMetric<int64_t> numNamespaces;
     AggregatedMetric<int64_t> numLookupsInSuffix;

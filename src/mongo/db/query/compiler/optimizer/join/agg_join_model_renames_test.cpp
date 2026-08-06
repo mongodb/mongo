@@ -28,6 +28,7 @@ TEST_F(RenamesTest, RenamePrefixLocalForeign) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -72,6 +73,7 @@ TEST_F(RenamesTest, RenamePrefixMultiLocalForeignProjectDups) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -118,6 +120,7 @@ TEST_F(RenamesTest, RenamePrefixMatchExpr) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -163,6 +166,7 @@ TEST_F(RenamesTest, RenameSubpipelineLocalForeign) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -209,6 +213,7 @@ TEST_F(RenamesTest, RenameSubpipelineMatchExpr) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -255,6 +260,7 @@ TEST_F(RenamesTest, RenameSubpipelineMatchExprProjectDups) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -302,6 +308,9 @@ TEST_F(RenamesTest, RenameSubpipelineMatchExprSwapped) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
     ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kUnsupportedStage));
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
@@ -331,6 +340,9 @@ TEST_F(RenamesTest, TrailingMatchAfterRename) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_NOT_OK(swJoinModel);
     ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kGraphDisconnected));
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -359,6 +371,7 @@ TEST_F(RenamesTest, RenamePrefixTrailingMatch) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -405,6 +418,7 @@ TEST_F(RenamesTest, RenameSubpipelineTrailingMatch) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -451,6 +465,7 @@ TEST_F(RenamesTest, RenameSubpipelineTrailingMatchProjectDups) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
@@ -507,6 +522,11 @@ TEST_F(RenamesTest, RenameAllTypesCycle) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    // The query is fully optimized, but the trailing $project ends the prefix, so a reason is
+    // still recorded.
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kUnsupportedStage));
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
@@ -579,6 +599,11 @@ TEST_F(RenamesTest, RenameMultipleCycle) {
         AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
     ASSERT_OK(swJoinModel);
     ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    // The query is fully optimized, but the trailing $project ends the prefix, so a reason is
+    // still recorded.
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kUnsupportedStage));
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
     ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
     ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);

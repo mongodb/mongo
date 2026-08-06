@@ -204,17 +204,20 @@ struct PredicateExtractor {
 class ExtractExprPredicatesHelper {
 public:
     explicit ExtractExprPredicatesHelper(PathResolver& pathResolver, const DocumentSource* src)
-        : _src(src), _pathResolver(pathResolver), _expressionIsFullyAbsorbed(true) {}
+        : _src(src),
+          _pathResolver(pathResolver),
+          _fallbackReason(boost::none),
+          _expressionIsFullyAbsorbed(true) {}
 
     ExprPredicatesResult extract(const MatchExpression* expr) {
         _expressionIsFullyAbsorbed = true;
         _predicates.clear();
+        _fallbackReason = boost::none;
         extractMatch(expr);
 
-        return {
-            .expressionIsFullyAbsorbed = _expressionIsFullyAbsorbed,
-            .predicates = std::move(_predicates),
-        };
+        return {.expressionIsFullyAbsorbed = _expressionIsFullyAbsorbed,
+                .predicates = std::move(_predicates),
+                .reason = std::move(_fallbackReason)};
     }
 
 private:
@@ -253,8 +256,9 @@ private:
                 extractMatchExpr(static_cast<const ExprMatchExpression*>(expr));
                 break;
             default:
+                // Not a $expr- this $match can't encode a join predicate.
                 _expressionIsFullyAbsorbed = false;
-                // ignore
+                _fallbackReason = JoinFallbackReason::kMatchNonExprPredicate;
                 break;
         }
     }
@@ -268,7 +272,12 @@ private:
     void extractMatchExpr(const ExprMatchExpression* expr) {
         ExpressionVisitor visitor{*this};
         expr->getExpression()->acceptVisitor(&visitor);
-        _expressionIsFullyAbsorbed &= (visitor.numVisitedNodes() == 1);
+        if (visitor.numVisitedNodes() != 1) {
+            // The visitor only visits expressions we can extract join predicates from ($and & $eq),
+            // so an unvisited node is an expression we don't support.
+            _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchUnsupportedExpression;
+        }
     }
 
     void extractExpressionAnd(const ExpressionAnd* expr) {
@@ -276,7 +285,11 @@ private:
         for (const auto& child : expr->getChildren()) {
             child->acceptVisitor(&visitor);
         }
-        _expressionIsFullyAbsorbed &= (visitor.numVisitedNodes() == expr->getChildren().size());
+        if (visitor.numVisitedNodes() != expr->getChildren().size()) {
+            // As above- some child of this $and is an expression we don't support.
+            _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchUnsupportedExpression;
+        }
     }
 
     // Returns the field path to pass to PathResolver::resolve(), or boost::none if 'expr' is not a
@@ -296,6 +309,7 @@ private:
         if (expr->getOp() != ExpressionCompare::EQ || children.size() != 2) {
             // 1. Extract equality predicates only.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchNonEqualityPredicate;
             return;
         }
 
@@ -305,6 +319,7 @@ private:
         if (left == nullptr || right == nullptr) {
             // 2. Both sides of the equality predicate must be field paths.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchNonFieldPathOperand;
             return;
         }
 
@@ -316,11 +331,12 @@ private:
             // single-component path ('$$NOW', '$$ROOT', '$$CURRENT') cannot name a field of a
             // collection and so cannot be a join predicate.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchVariableOperand;
             return;
         }
 
-        auto leftPathId = _pathResolver.resolve(*leftPath, _src);
-        auto rightPathId = _pathResolver.resolve(*rightPath, _src);
+        auto leftPathId = _pathResolver.resolve(*leftPath, _src, boost::none, _fallbackReason);
+        auto rightPathId = _pathResolver.resolve(*rightPath, _src, boost::none, _fallbackReason);
         if (!leftPathId.has_value() || !rightPathId.has_value()) {
             // 4. Both field paths must be attributable to a single node in the graph.
             _expressionIsFullyAbsorbed = false;
@@ -330,6 +346,7 @@ private:
         if (_pathResolver[*leftPathId].nodeId == _pathResolver[*rightPathId].nodeId) {
             // 5. To be a proper join predicate the field paths must be from different collections.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchPredicateOnSameNode;
             return;
         }
 
@@ -339,6 +356,7 @@ private:
 
     const DocumentSource* _src;
     PathResolver& _pathResolver;
+    boost::optional<JoinFallbackReason> _fallbackReason;
     std::vector<JoinPredicate> _predicates;
     bool _expressionIsFullyAbsorbed;
 };

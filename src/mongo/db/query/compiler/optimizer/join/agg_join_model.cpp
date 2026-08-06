@@ -61,20 +61,27 @@ DocumentSource* getFirstSubpipelineStage(const DocumentSourceLookUp& lookup) {
 }
 
 StatusWith<std::unique_ptr<CanonicalQuery>> createCQForJoinPipeline(
-    boost::intrusive_ptr<ExpressionContext> expCtx, Pipeline& pipeline) {
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    Pipeline& pipeline,
+    boost::optional<JoinFallbackReason>& reason) {
+    // Ensure that we disable classic plan cache use for CQ generation, but reset this if it turns
+    // out we need to bail.
     ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
     expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
-    auto swCQ = createCanonicalQuery(expCtx, expCtx->getNamespaceString(), pipeline);
-    // Mark the CQ as SBE-compatible to work around the check in 'shouldCacheQuery()' that prevents
-    // caching of non-sbe collscan plans.
-    swCQ.getValue()->setSbeCompatible(true);
-    expCtx->setPlanCache(oldPlanCache);
+    ON_BLOCK_EXIT([&]() { expCtx->setPlanCache(oldPlanCache); });
 
+    auto swCQ = createCanonicalQuery(expCtx, expCtx->getNamespaceString(), pipeline);
     if (!swCQ.isOK()) {
+        reason = JoinFallbackReason::kFailedToCreateCQ;
         return swCQ;
     }
 
+    // Mark the CQ as SBE-compatible to work around the check in 'shouldCacheQuery()' that prevents
+    // caching of non-sbe collscan plans.
+    swCQ.getValue()->setSbeCompatible(true);
+
     if (SubPlanningUtils::canUseSubplanning(*swCQ.getValue())) {
+        reason = JoinFallbackReason::kRootedOrSubplanning;
         return Status(ErrorCodes::QueryFeatureNotAllowed,
                       "Encountered rooted $or, can't use subplanning together with join opt");
     }
@@ -95,12 +102,14 @@ struct Predicates {
 boost::optional<JoinPredicate> resolve(const ExtractedJoinPredicate& predicate,
                                        const DocumentSourceLookUp* lookup,
                                        PathResolver& pathResolver,
-                                       NodeId foreignNodeId) {
+                                       NodeId foreignNodeId,
+                                       boost::optional<JoinFallbackReason>& fallbackReason) {
     // We're not sure which collection this field came from- don't specify a node scope.
     // "local" is a misnomer- it really means "as seen in top-level pipeline".
-    auto localPathId = pathResolver.resolve(predicate.localField(), lookup);
+    auto localPathId =
+        pathResolver.resolve(predicate.localField(), lookup, boost::none, fallbackReason);
     if (!localPathId) {
-        return boost ::none;
+        return boost::none;
     }
 
     // Ensure that for local/foreign field join, we specify that this is at the start of the foreign
@@ -109,7 +118,8 @@ boost::optional<JoinPredicate> resolve(const ExtractedJoinPredicate& predicate,
     auto foreignPathId = pathResolver.resolve(
         predicate.foreignField(),
         predicate.isExpr() ? predicate.source() : getFirstSubpipelineStage(*lookup),
-        foreignNodeId);
+        foreignNodeId,
+        fallbackReason);
     if (!foreignPathId) {
         return boost ::none;
     }
@@ -124,11 +134,12 @@ boost::optional<JoinPredicate> resolve(const ExtractedJoinPredicate& predicate,
  * expressions within its subpipeline. This function finds and resolves all such predicates. If for
  * some reason this $lookup includes ineligible nested sub-pipeline stages, or if the predicate
  * fields are invalid, this function returns a bad status to signal that we can't push this $lookup
- * into the agg join model prefix.
+ * into the agg join model prefix, and sets 'reason' for fallback metrics tracking.
  */
 StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& lookup,
                                                    PathResolver& pathResolver,
-                                                   NodeId foreignNodeId) {
+                                                   NodeId foreignNodeId,
+                                                   boost::optional<JoinFallbackReason>& reason) {
     std::vector<JoinPredicate> joinPredicates;
     std::unique_ptr<MatchExpression> singleTablePredicates;
 
@@ -137,7 +148,8 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
                                     *lookup.getLocalField(), *lookup.getForeignField(), &lookup),
                                 &lookup,
                                 pathResolver,
-                                foreignNodeId);
+                                foreignNodeId,
+                                reason);
         if (!resolved) {
             return Status(ErrorCodes::BadValue, "Could not resolve local or foreign $lookup paths");
         }
@@ -151,6 +163,7 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
         // Attempt to split.
         auto splitRes = splitJoinAndSingleCollectionPredicates(match, lookup.getLetVariables());
         if (!splitRes.has_value()) {
+            reason = JoinFallbackReason::kNonEquijoinCorrelatedPredicate;
             return Status(ErrorCodes::QueryFeatureNotAllowed,
                           "Encountered subpipeline with $match containing non-equijoin correlated "
                           "predicates");
@@ -158,7 +171,7 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
 
         joinPredicates.reserve(joinPredicates.size() + splitRes->joinPredicates.size());
         for (const auto& predicate : splitRes->joinPredicates) {
-            auto resolved = resolve(predicate, &lookup, pathResolver, foreignNodeId);
+            auto resolved = resolve(predicate, &lookup, pathResolver, foreignNodeId, reason);
             if (!resolved) {
                 return Status(ErrorCodes::BadValue,
                               "Could not resolve local or foreign $lookup paths");
@@ -178,9 +191,9 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
                                                    lookup.getSubpipelineExpCtx(),
                                                    ExtensionsCallbackNoop(),
                                                    Pipeline::kAllowedMatcherFeatures);
-        if (!swExpr.isOK()) {
-            return swExpr.getStatus();
-        }
+        tassert(13199201,
+                str::stream() << "Failed to parse absorbed filter: " << swExpr.getStatus(),
+                swExpr.isOK());
         if (singleTablePredicates) {
             // We construct the AND by first adding the sub-pipeline $match (singleTablePredicates),
             // followed by the absorbed filter's $match. Note that downstream CanonicalQuery
@@ -202,13 +215,15 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
         pipelineForCQ->addInitialSource(
             make_intrusive<DocumentSourceMatch>(std::move(singleTablePredicates), cqExpCtx));
     }
-    auto swCq = createCQForJoinPipeline(cqExpCtx, *pipelineForCQ);
+
+    auto swCq = createCQForJoinPipeline(cqExpCtx, *pipelineForCQ, reason);
     if (!swCq.isOK()) {
         return swCq.getStatus();
     }
 
     if (!pipelineForCQ->empty()) {
         // We bail out if the entire sub-pipeline can't be pushed into a CQ.
+        reason = JoinFallbackReason::kUnsupportedStage;
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Encountered complex sub-pipeline");
     }
 
@@ -238,6 +253,7 @@ std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
 bool isUnwindEligible(const DocumentSourceUnwind& unwind) {
     // If 'preserveNullAndEmptyArrays' is set to true, this is an outer join, which is currently
     // ineligible for join-opt. Similarly, we don't support $unwinds that set the array index.
+    // TODO SERVER-132003: Record reason.
     return !unwind.preserveNullAndEmptyArrays() && !unwind.indexPath();
 }
 
@@ -253,10 +269,12 @@ bool isSubPipelineOrPrefixEligible(auto start, auto end) {
 bool isLookupEligible(const DocumentSourceLookUp& lookup) {
     if (lookup.getExpCtx()->getSubPipelineDepth() != 0) {
         // We've descended into a subpipeline, fallback.
+        // TODO SERVER-132003: Record reason as JoinFallbackReason::kInsideSubPipeline.
         return false;
     }
 
     if (!lookup.hasUnwindSrc() || !isUnwindEligible(*lookup.getUnwindSource())) {
+        // TODO SERVER-132003: Record reason.
         return false;
     }
 
@@ -275,6 +293,7 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
 
     // Otherwise the sub-pipeline must contain a single $match stage. The absorbed filter (if any)
     // is combined with that $match in extractPredicatesFromLookup().
+    // TODO SERVER-132003: Record reason as JoinFallbackReason::kIneligibleSubPipelineStage.
     return isSubPipelineOrPrefixEligible(
         lookup.getResolvedIntrospectionPipeline().getSources().begin(),
         lookup.getResolvedIntrospectionPipeline().getSources().end());
@@ -291,6 +310,7 @@ bool addJoinPredicates(const std::vector<JoinPredicate>& joinPreds,
                 "Join predicate fields must be from different nodes",
                 leftNodeId != rightNodeId);
         if (!graph.addEdge(leftNodeId, rightNodeId, {predicate})) {
+            metrics.fallbackReason = JoinFallbackReason::kTooManyEdgesOrPredicates;
             return false;
         }
 
@@ -307,15 +327,6 @@ bool addJoinPredicates(const std::vector<JoinPredicate>& joinPreds,
 }  // namespace
 
 bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
-    // We don't support non-simple collations.
-    if (!CollatorInterface::isSimpleCollator(pipeline.getContext()->getCollator())) {
-        return false;
-    }
-
-    if (pipeline.getSources().empty()) {
-        return false;
-    }
-
     auto startIt = pipeline.getSources().begin();
 
     // Permit a leading join hint- we'll check it later.
@@ -323,17 +334,40 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
         startIt++;
     }
 
+    bool foundLookup = false;
     auto it = startIt;
     while (it != pipeline.getSources().end()) {
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(it->get()); lookup) {
             // Found first $lookup- if prefix not valid, or if $lookup itself is not eligible,
             // bail!
-            return isLookupEligible(*lookup) && isSubPipelineOrPrefixEligible(startIt, it);
+            if (isLookupEligible(*lookup) && isSubPipelineOrPrefixEligible(startIt, it)) {
+                foundLookup = true;
+            } else {
+                // First $lookup is ineligible.
+                // TODO SERVER-132003: Record reason.
+                return false;
+            }
+            // One eligible $lookup is enough to proceed.
+            break;
         }
         it++;
     }
 
-    return false;
+    if (!foundLookup) {
+        // TODO SERVER-132003: Record reason as JoinFallbackReason::kNoLookup.
+        return false;
+    }
+
+    // Note: we do additional checks after the query shape check, since that's the most important
+    // reason we might bail.
+
+    // We don't support non-simple collations.
+    if (!CollatorInterface::isSimpleCollator(pipeline.getContext()->getCollator())) {
+        // TODO SERVER-132003: Record reason as JoinFallbackReason::kPipelineCollation.
+        return false;
+    }
+
+    return true;
 }
 
 StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
@@ -382,7 +416,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     pipeline::dependency_graph::DependencyGraph mainCollDeps(suffix->getSources(),
                                                              canMainCollPathBeArray);
 
-    auto swCQ = createCQForJoinPipeline(expCtx, *suffix);
+    auto swCQ = createCQForJoinPipeline(expCtx, *suffix, metrics.fallbackReason);
     if (!swCQ.isOK()) {
         // Bail out & return the failure status- we failed to generate a CanonicalQuery from a
         // pipeline prefix.
@@ -392,9 +426,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     // Initialize the JoinGraph & base NodeId.
     MutableJoinGraph graph{buildParams.joinGraphBuildParams};
     auto baseNodeId = graph.addNode(nss, std::move(swCQ.getValue()), boost::none);
-    if (!baseNodeId) {
-        return Status(ErrorCodes::BadValue, "Failed to create a node for base collection");
-    }
+    tassert(13199200, "Unable to create base node", baseNodeId);
 
     auto prefix = createEmptyPipeline(suffix->getContext());
     if (hint) {
@@ -407,14 +439,23 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     // Go through the pipeline trying to find the maximal chain of join optimization eligible
     // $lookup+$unwinds pairs and turning them into CanonicalQueries. At the end only ineligible for
     // join optimization stages are left in the suffix.
-    // If we already reach the maximum number of nodes and/or edges we bail out from building the
-    // graph and put the remaining stages into the suffix.
-    while (!suffix->getSources().empty() &&
-           graph.numNodes() < buildParams.joinGraphBuildParams.maxNodesInJoin &&
-           graph.numEdges() < buildParams.joinGraphBuildParams.maxEdgesInJoin) {
+    while (!suffix->getSources().empty()) {
+        // If we already reach the maximum number of nodes and/or edges we bail out from building
+        // the graph and put the remaining stages into the suffix.
+        if (graph.numNodes() >= buildParams.joinGraphBuildParams.maxNodesInJoin) {
+            // Note that we add one node per loop.
+            metrics.fallbackReason = JoinFallbackReason::kTooManyNodes;
+            break;
+        }
+        if (graph.numEdges() >= buildParams.joinGraphBuildParams.maxEdgesInJoin) {
+            metrics.fallbackReason = JoinFallbackReason::kTooManyEdgesOrPredicates;
+            break;
+        }
+
         auto* stage = suffix->getSources().front().get();
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(stage); lookup) {
             if (!isLookupEligible(*lookup)) {
+                // TODO SERVER-132003: Record reason.
                 break;
             }
 
@@ -422,6 +463,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
             // ready to modify the join graph.
             NodeId foreignNodeIdReserved = graph.numNodes();
             if (!pathResolver.trackEmbedPath(*lookup, foreignNodeIdReserved)) {
+                metrics.fallbackReason = JoinFallbackReason::kInvalidEmbedPath;
                 break;
             }
 
@@ -430,8 +472,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
             // is no subpipeline, this returns no join predicates and a CanonicalQuery with empty
             // predicate. If this returns a bad status, then this extraction failed due to an
             // ineligible stage/expression.
-            auto swPreds =
-                extractPredicatesFromLookup(*lookup, pathResolver, foreignNodeIdReserved);
+            auto swPreds = extractPredicatesFromLookup(
+                *lookup, pathResolver, foreignNodeIdReserved, metrics.fallbackReason);
             if (!swPreds.isOK()) {
                 break;
             }
@@ -445,15 +487,15 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
                 lookup->getFromNs(), std::move(preds.canonicalQuery), lookup->getAsField());
             tassert(12835900,
                     "Expected reserved node id to match eventual id",
-                    foreignNodeIdReserved == foreignNodeId);
-            if (!foreignNodeId) {
-                return Status(ErrorCodes::BadValue, "Graph is too big: too many nodes");
-            }
+                    foreignNodeId && foreignNodeIdReserved == *foreignNodeId);
 
             // Add join predicates to join graph. Bail if we fail to add any of them.
             if (!addJoinPredicates(
                     preds.joinPredicates, pathResolver.resolvedPaths(), graph, metrics)) {
-                return Status(ErrorCodes::BadValue, "Graph is too big: too many edges");
+                // 'addEdge' applies both the edge and predicate limits, and reports a single
+                // failure for either.
+                return Status(ErrorCodes::BadValue,
+                              "Graph is too big: too many edges or predicates");
             }
 
             auto next = suffix->popFront();
@@ -481,7 +523,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
 
             if (!canMatchBeEliminated) {
                 // End prefix here- this $match includes something we can't push into the join
-                // model.
+                // model. 'extractExprPredicates()' reports which part.
+                metrics.fallbackReason = result.reason;
                 break;
             }
 
@@ -491,6 +534,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
 
         } else {
             // Unrecognized stage, give up on building a prefix.
+            metrics.fallbackReason = JoinFallbackReason::kUnsupportedStage;
             break;
         }
     }
@@ -510,6 +554,9 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
 
     if (graph.numNodes() < 2) {
         // We need at least 1 eligible $lookup and a fully SBE-pushed-down prefix.
+        if (!metrics.fallbackReason) {
+            metrics.fallbackReason = JoinFallbackReason::kTooFewNodes;
+        }
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
@@ -519,15 +566,14 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
                                            buildParams.maxNumberNodesConsideredForImplicitEdges,
                                            clonedExpCtx,
                                            metrics);
-    if (!swVec.isOK()) {
-        return swVec.getStatus();
-    }
+    tassert(13199202, "Failed to add implicit edges and infer predicates", swVec.isOK());
 
     // Update remaining inferred statistics.
     metrics.numInferredEdges = graph.numEdges() - metrics.numSyntacticEdges;
 
     JoinGraph result = JoinGraph(std::move(graph));
     if (!result.isConnected()) {
+        metrics.fallbackReason = JoinFallbackReason::kGraphDisconnected;
         return Status(ErrorCodes::InternalErrorNotSupported,
                       "Join graph must be connected as cross-products are not yet supported");
     }

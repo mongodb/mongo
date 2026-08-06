@@ -128,7 +128,7 @@ function assertTimerPopulated(joinMetrics, name, updateCount) {
 // Asserts every join optimization counter, given the number of times the (identical) query has been
 // aggregated into the query stats entry. Each per-query value is identical across runs, so the
 // aggregated 'sum' is 'value * updateCount' while 'min' and 'max' equal the per-query value.
-function assertJoinMetrics(joinMetrics, updateCount, enumerationCount) {
+function assertJoinMetrics(joinMetrics, updateCount, enumerationCount, fallbackReasons = {}) {
     assert.eq(joinMetrics.updateCount, updateCount, tojson(joinMetrics));
     // Every run of this pipeline is join-optimizable.
     assert.docEq(
@@ -171,6 +171,20 @@ function assertJoinMetrics(joinMetrics, updateCount, enumerationCount) {
             assert.eq(counter.max, perEnumeration, `counter '${name}' max`, {joinMetrics});
             assert.eq(counter.min, perEnumeration, `counter '${name}' min`, {joinMetrics});
         }
+    }
+
+    // Validate fallback reasons.
+    const expectedNum = Object.entries(fallbackReasons).length;
+    if (expectedNum > 0) {
+        assert(joinMetrics.fallbackReasons, tojson(joinMetrics));
+        assert.eq(Object.entries(joinMetrics.fallbackReasons).length, expectedNum, {joinMetrics});
+        for (const [reason, count] of Object.entries(fallbackReasons)) {
+            assert.eq(joinMetrics.fallbackReasons[reason], count, `fallback reason '${reason}'`, {
+                joinMetrics,
+            });
+        }
+    } else {
+        assert(!joinMetrics.fallbackReasons, tojson(joinMetrics));
     }
 }
 
@@ -271,7 +285,8 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 
     const joinMetrics = matching[0].metrics.supplementalMetrics.JoinOptimization;
     assert(joinMetrics);
-    assertJoinMetrics(joinMetrics, 1, 1);
+    // Check that we get the expected fallback reason ($group cant be pushed to join model).
+    assertJoinMetrics(joinMetrics, 1, 1, {unsupportedStage: NumberLong(1)});
 }
 
 {
