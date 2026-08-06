@@ -7,6 +7,9 @@ from typing import Union
 from git import Repo
 from utils.evergreen_git import get_default_origin_branch
 
+from bazel.toolchains.cc.mongo_linux.gdb_python_version_check import (
+    check_gdb_wrapper_python_version,
+)
 from buildscripts.bazel_custom_formatter import (
     validate_bazel_groups,
     validate_clang_tidy_configs,
@@ -237,6 +240,15 @@ def main() -> int:
     prettier_path: pathlib.Path = args.prettier.resolve()
 
     os.chdir(default_dir)
+
+    gdb_python_version_errors = check_gdb_wrapper_python_version(
+        pathlib.Path("bazel/toolchains/cc/mongo_linux/mongo_gdb.bzl")
+    )
+    if gdb_python_version_errors:
+        print("GDB wrapper Python version check failed:")
+        for error in gdb_python_version_errors:
+            print(f"- {error}")
+        return 1
 
     origin_branch = args.origin_branch
     if origin_branch == "auto":

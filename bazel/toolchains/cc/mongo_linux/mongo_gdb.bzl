@@ -14,7 +14,7 @@ def _gdb_download(ctx):
 
     if ctx.attr.version == "v5":
         if toolchain_key in TOOLCHAIN_MAP_V5:
-            python3_version = "3.10"
+            python3_version = "3.13"
             toolchain_info = TOOLCHAIN_MAP_V5[toolchain_key]
             urls = toolchain_info["url"]
             sha = toolchain_info["sha"]
@@ -35,7 +35,7 @@ def _gdb_download(ctx):
     ctx.report_progress("generating gdb " + ctx.attr.version + " build file")
 
     external = str(ctx.path(".."))
-    pythonhome = external + "/gdb_" + ctx.attr.version + "/stow/python3-" + ctx.attr.version
+    pythonhome = external + "/gdb_" + ctx.attr.version + "/stow/python313-" + ctx.attr.version
 
     gdb_prefix = external + "/gdb_" + ctx.attr.version + "/" + ctx.attr.version
 
@@ -68,7 +68,7 @@ def _gdb_download(ctx):
         # Ensure the bundled Python does not write .pyc files into the toolchain/runfiles tree.
         write_python_pyc_cache_prefix_customization(
             ctx,
-            "stow/python3-{version}/lib/python{pyver}/site-packages/sitecustomize.py".format(
+            "stow/python313-{version}/lib/python{pyver}/site-packages/sitecustomize.py".format(
                 version = ctx.attr.version,
                 pyver = python3_version,
             ),
@@ -89,7 +89,7 @@ def _gdb_download(ctx):
                 ctx.report_progress("Failed to install python module; some pretty printer functions may not work while debugging.\nSTDOUT:\n{}\nSTDERR:\n{}".format(result.stdout, result.stderr))
 
         python_env = """{
-        "PYTHONPATH": "%s/lib/python3.10",
+        "PYTHONPATH": "%s/lib/python%s",
         "PYTHONHOME": "%s",
         "LD_LIBRARY_PATH": "%s",
         "MONGO_GDB_PP_DIR": "%s",
@@ -100,6 +100,7 @@ def _gdb_download(ctx):
         "GDB": "%s/bin/gdb",
     }""" % (
             pythonhome,
+            python3_version,
             pythonhome,
             python_lib_path,
             stdlib_pp_dir,
@@ -113,7 +114,7 @@ def _gdb_download(ctx):
         # The wrapper scripts must also export these so gdb can load its python runtime (and pretty printers)
         # when invoked via bazel run/test.
         wrapper_python_setup = """
-PYTHONHOME="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/stow/python3-%s"
+PYTHONHOME="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/stow/python313-%s"
 export PYTHONHOME
 export PYTHONPATH="${PYTHONHOME}/lib/python%s:${PYTHONPATH:-}"
 export LD_LIBRARY_PATH="${PYTHONHOME}/lib:${PYTHONHOME}/lib64:${LD_LIBRARY_PATH:-}"
@@ -189,7 +190,7 @@ export GDB
         """
 filegroup(
     name = "python_runtime",
-    srcs = glob(["stow/python3-%s/**"]),
+    srcs = glob(["stow/python313-%s/**"]),
     visibility = ["//visibility:private"],
 )
 

@@ -1,4 +1,22 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "gdb_python_version_check",
+    srcs = [
+        "gdb_python_version_check.py",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "gdb_python_version_check_test",
+    srcs = [
+        "gdb_python_version_check_test.py",
+    ],
+    deps = [
+        ":gdb_python_version_check",
+    ],
+)
 
 py_binary(
     name = "mongo_toolchain_version_generator",
