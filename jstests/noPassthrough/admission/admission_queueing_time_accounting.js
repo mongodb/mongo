@@ -24,10 +24,12 @@
  *   - attributed to the queue of the gate that imposed them, in the per-gate "queues" breakdown of
  *     both the slow query log and the profiler,
  *   - counted towards the duration reported by both the slow query log and the profiler,
- *   - reported as blocked rather than working time, and
+ *   - reported as blocked rather than working time,
  *   - carried into the cumulative queueing time each gate reports in serverStatus, so the
  *     process-wide totals are denominated in the same measured waits the per-operation surfaces
- *     report.
+ *     report, and
+ *   - split across serverStatus's opLatencies and opWorkingTime, the process-wide counters FTDC
+ *     scrapes and the Atlas UI charts.
  *
  * The gates are opened and closed process-wide and the failpoint applies to every operation, so
  * this test runs its own mongod rather than sharing one.
@@ -117,6 +119,20 @@ function getCumulativeQueuedMicros() {
             execution.read.normalPriority.totalTimeQueuedMicros +
             execution.write.normalPriority.totalTimeQueuedMicros,
         [AdmissionQueue.WriteThrottle]: status.queues.writeThrottler.totalTimeQueuedMicros,
+    };
+}
+
+/**
+ * Returns the cumulative write-operation totals from the two serverStatus sections that end up in
+ * FTDC and the Atlas UI: `opLatencies` accumulates total elapsed time and `opWorkingTime`
+ * accumulates the same operations' time excluding blocked intervals. Latencies are microseconds.
+ */
+function getCumulativeWriteLatencies() {
+    const status = assert.commandWorked(adminDB.runCommand({serverStatus: 1}));
+    return {
+        totalTimeMicros: status.opLatencies.writes.latency,
+        workingTimeMicros: status.opWorkingTime.writes.latency,
+        ops: status.opLatencies.writes.ops,
     };
 }
 
@@ -270,6 +286,8 @@ describe("admission queueing time accounting", function () {
         let profileEntry;
         let cumulativeQueuedMicrosBefore;
         let cumulativeQueuedMicrosAfter;
+        let writeLatenciesBefore;
+        let writeLatenciesAfter;
 
         before(function () {
             sleepFailPoint = configureFailPoint(exemptConn, "sleepInWaitingForAdmissionGuard", {
@@ -277,6 +295,7 @@ describe("admission queueing time accounting", function () {
             });
 
             cumulativeQueuedMicrosBefore = getCumulativeQueuedMicros();
+            writeLatenciesBefore = getCumulativeWriteLatencies();
 
             const insertThread = new Thread(
                 runMeasuredInsert,
@@ -320,6 +339,7 @@ describe("admission queueing time accounting", function () {
 
             logAttrs = getSlowQueryLogAttrs();
             profileEntry = getProfileEntry();
+            writeLatenciesAfter = getCumulativeWriteLatencies();
         });
 
         it("attributes a wait to every gate the operation passed through", function () {
@@ -403,6 +423,41 @@ describe("admission queueing time accounting", function () {
                 queuedMillis,
                 "queueing time should be excluded from working time",
                 {logAttrs},
+            );
+        });
+
+        it("separates the waits across serverStatus opLatencies and opWorkingTime", function () {
+            // These are the counters FTDC scrapes and the Atlas UI charts, so the split has to hold
+            // here and not only in the per-operation surfaces above.
+            const queuedMicros = sumQueuedMillis(logAttrs.queues) * 1000;
+            const context = {logAttrs, writeLatenciesBefore, writeLatenciesAfter};
+
+            assert.gte(
+                writeLatenciesAfter.ops - writeLatenciesBefore.ops,
+                1,
+                "serverStatus should have counted the insert as a write",
+                context,
+            );
+
+            // The counters are process-wide and the insert's preamble writes too, so every delta
+            // here covers more than the measured insert alone. That only ever adds time, which
+            // keeps the insert's own waits a valid lower bound.
+            const totalTimeMicros =
+                writeLatenciesAfter.totalTimeMicros - writeLatenciesBefore.totalTimeMicros;
+            assert.gte(
+                totalTimeMicros,
+                queuedMicros,
+                "opLatencies should count the waits towards total write latency",
+                context,
+            );
+
+            const workingTimeMicros =
+                writeLatenciesAfter.workingTimeMicros - writeLatenciesBefore.workingTimeMicros;
+            assert.gte(
+                totalTimeMicros - workingTimeMicros,
+                queuedMicros,
+                "opWorkingTime should exclude the waits opLatencies counts",
+                context,
             );
         });
     });

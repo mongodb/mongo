@@ -27,6 +27,8 @@ public:
      */
     static WriteThrottlerAdmissionContext& get(OperationContext* opCtx);
 
+    OperationContext* getOperationContext() override;
+
     /**
      * Records that a single key write actually happened against the storage engine (one document
      * record or one index key). Called from WiredTiger cursor helpers only after a successful

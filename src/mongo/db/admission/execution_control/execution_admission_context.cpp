@@ -25,9 +25,11 @@ bool ExecutionAdmissionContext::shouldDeprioritize(std::int32_t admissions) {
 }
 
 ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCtx) {
-    auto& context = contextDecoration(opCtx);
-    context._setOperationContext(opCtx);
-    return context;
+    return contextDecoration(opCtx);
+}
+
+OperationContext* ExecutionAdmissionContext::getOperationContext() {
+    return contextDecoration.owner(this);
 }
 
 ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionContext& other)

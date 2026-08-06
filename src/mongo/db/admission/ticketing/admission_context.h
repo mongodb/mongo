@@ -73,7 +73,7 @@ public:
 
     /** Returns the operation context associated with this admission context, if any. */
     virtual OperationContext* getOperationContext() {
-        return _opCtx;
+        return nullptr;
     }
 
     /**
@@ -151,11 +151,6 @@ protected:
 
     AdmissionContext() = default;
 
-    void _setOperationContext(OperationContext* opCtx) {
-        invariant(!_opCtx || _opCtx == opCtx);
-        _opCtx = opCtx;
-    }
-
     constexpr static TickSource::Tick kNotQueueing = -1;
 
     [[MONGO_MOD_PRIVATE]] Atomic<std::int32_t> _exemptedAdmissions{0};
@@ -166,7 +161,6 @@ protected:
     [[MONGO_MOD_PRIVATE]] WaitableAtomic<TickSource::Tick> _startQueueingTime{kNotQueueing};
     [[MONGO_MOD_PRIVATE]] Atomic<bool> _holdingTicket;
     [[MONGO_MOD_PRIVATE]] Atomic<bool> _loadShed;
-    [[MONGO_MOD_PRIVATE]] OperationContext* _opCtx{nullptr};
 };
 
 /**

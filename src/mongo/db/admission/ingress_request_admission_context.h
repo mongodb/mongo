@@ -21,6 +21,8 @@ public:
      * Retrieve the IngressRequestAdmissionContext decoration the provided OperationContext.
      */
     static IngressRequestAdmissionContext& get(OperationContext* opCtx);
+
+    OperationContext* getOperationContext() override;
 };
 
 }  // namespace mongo
