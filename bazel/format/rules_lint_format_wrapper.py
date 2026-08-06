@@ -70,6 +70,18 @@ def _get_files_changed_since_fork_point(origin_branch: str) -> list[str]:
     return list(file_set)
 
 
+def _split_file_args(file_args: list[str]) -> list[str]:
+    """Flatten --file values, each of which may be a comma or newline separated list."""
+    files = []
+    for file_arg in file_args:
+        for line in file_arg.splitlines():
+            for entry in line.split(","):
+                entry = entry.strip()
+                if entry and entry not in files:
+                    files.append(entry)
+    return files
+
+
 def run_rules_lint(
     rules_lint_format_path: pathlib.Path,
     rules_lint_format_check_path: pathlib.Path,
@@ -215,8 +227,10 @@ def main() -> int:
     )
     parser.add_argument(
         "--file",
-        help="The file to format",
-        type=pathlib.Path,
+        help="A file to format. May be repeated, and each value may be a comma or newline "
+        "separated list of files.",
+        action="append",
+        default=[],
     )
 
     args = parser.parse_args()
@@ -229,8 +243,9 @@ def main() -> int:
         origin_branch = get_default_origin_branch(Repo())
 
     files_to_format = "all"
-    if args.file:
-        files_to_format = [str(args.file)]
+    explicit_files = _split_file_args(args.file)
+    if explicit_files:
+        files_to_format = explicit_files
     elif not args.all:
         max_distance = 100
         distance = _git_distance([f"{origin_branch}..HEAD"])
@@ -272,8 +287,11 @@ def main() -> int:
         validate_idl_naming(generate_report=True, fix=not args.check)
         validate_private_headers(generate_report=True, fix=not args.check)
 
-    if files_to_format != "all":
+    if files_to_format == "all":
+        print("Formatting all files in the repository")
+    else:
         files_to_format = [str(file) for file in files_to_format if os.path.isfile(file)]
+        print(f"Formatting {len(files_to_format)} file(s)")
 
     def files_to_format_contain_backports(files: Union[list[str], str]) -> bool:
         if files == "all":
