@@ -1734,5 +1734,96 @@ TEST_F(AuthoritativeRefreshFixture,
     ASSERT_EQ(stats.getIntField("countDiskRecoveriesPerformed"), 1);
 }
 
+TEST_F(AuthoritativeRefreshFixture, UnownedIsClearedOutAfterUpgrade) {
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+    }
+
+    const auto trackedZeroChunksVersion =
+        ChunkVersion({OID::gen(), Timestamp(50, 1)}, {0 /* major */, 0 /* minor */});
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, trackedZeroChunksVersion);
+    ASSERT_OK(status);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_TRUE(csr->isUnowned())
+            << "Expected CSS state kUnowned after recovery of a collection with no on-disk entry "
+               "on a non-DB-primary shard";
+    }
+
+    FilteringMetadataCache::get(opCtx)->fixPotentiallyStaleShardingStatesAfterUpgrade(
+        opCtx,
+        multiversion::FeatureCompatibilityVersion::kVersion_8_0,
+        multiversion::FeatureCompatibilityVersion::kVersion_9_0);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown().has_value());
+    }
+}
+
+TEST_F(AuthoritativeRefreshFixture, UntrackedIsClearedOutAfterUpgrade) {
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+    }
+    auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
+    ASSERT_OK(status);
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        ASSERT_TRUE(csr->getCurrentMetadataIfKnown());
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+    }
+
+    FilteringMetadataCache::get(opCtx)->fixPotentiallyStaleShardingStatesAfterUpgrade(
+        opCtx,
+        multiversion::FeatureCompatibilityVersion::kVersion_8_0,
+        multiversion::FeatureCompatibilityVersion::kVersion_9_0);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown().has_value());
+    }
+}
+
+TEST_F(AuthoritativeRefreshFixture, NonDbPrimaryMetadataIsClearedOutAfterUpgrade) {
+    auto* opCtx = operationContext();
+
+    {
+        unittest::ServerParameterGuard crudFeatureFlag{"featureFlagAuthoritativeShardsCRUD", false};
+
+        const auto kOtherShardId = ShardId{kMyShardName.toString() + "_suffix"};
+        BypassDatabaseMetadataAccess bypass(
+            opCtx,
+            BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTestNss.dbName());
+        scopedDsr->setDbInfo_DEPRECATED(
+            opCtx, DatabaseType{kTestNss.dbName(), kOtherShardId, {UUID::gen(), Timestamp{1, 1}}});
+    }
+
+    FilteringMetadataCache::get(opCtx)->fixPotentiallyStaleShardingStatesAfterUpgrade(
+        opCtx,
+        multiversion::FeatureCompatibilityVersion::kVersion_8_0,
+        multiversion::FeatureCompatibilityVersion::kVersion_9_0);
+
+    {
+        auto dsr = DatabaseShardingRuntime::acquireShared(opCtx, kTestNss.dbName());
+        auto primaryShard = dsr->getDbPrimaryShard(opCtx);
+        ASSERT_FALSE(primaryShard);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

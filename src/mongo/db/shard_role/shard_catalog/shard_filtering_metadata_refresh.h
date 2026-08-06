@@ -11,11 +11,11 @@
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
-#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/version/releases.h"
 
 #include <memory>
 
@@ -135,6 +135,20 @@ public:
     Status onDbVersionMismatch(OperationContext* opCtx,
                                const DatabaseName& dbName,
                                const DatabaseVersion& clientDbVersion) noexcept;
+
+
+    /**
+     * Clear out potentially dangerous metadata if performing an FCV upgrade that enables the
+     * authoritative shards model.
+     *
+     * This affects both database and collection sharding metadata. In particular:
+     * - Database metadata for which this shard isn't the primary shard will get cleared out
+     * - Collection metadata will be cleared out if it's for an untracked/unowned collection.
+     */
+    void fixPotentiallyStaleShardingStatesAfterUpgrade(
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion& prevVersion,
+        const multiversion::FeatureCompatibilityVersion& newVersion);
 
     /**
      * Unconditionally causes the database metadata to be refreshed from the config server.
