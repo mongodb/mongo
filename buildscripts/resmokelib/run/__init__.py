@@ -671,13 +671,16 @@ class TestRunner(Subcommand):
             local_resmoke_invocation_with_params,
         )
 
+        if task is None:
+            self._resmoke_logger.warning(
+                "Skipping local-resmoke-invocation.txt because no evergreen task definition could"
+                " be found for %s.",
+                suite_name,
+            )
+            return
+
         try:
             lines = []
-
-            if task is None:
-                raise RuntimeError(
-                    f"Error: Could not find evergreen task definition for {suite_name}"
-                )
 
             is_multiversion = "multiversion" in task.tags
             generate_func = task.find_func_command("generate resmoke tasks")

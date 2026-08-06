@@ -47,10 +47,18 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 resmoke_suite_test(
     name = "resmoke_end2end_tests",
     config = "//buildscripts/resmokeconfig:suites/resmoke_end2end_tests.yml",
-    shard_count = 2,
+    data = [
+        "//buildscripts/modules/atlas:all_suite_configs",
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/tests/resmoke_end2end:all_test_data",
+        "//buildscripts/tests/resmoke_end2end:js_debugger_test_deps",
+        "//etc:evergreen_config",
+        "//jstests/noPassthrough/shell/js:mochalite.js",
+        "//jstests/resmoke_selftest:all_subpackage_javascript_files",
+    ],
     tags = [
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # Makes many assumptions about paths that are incompatible with sandboxing.
+        "incompatible_with_bazel_remote_test",  # Requires binaries from the system, such as `evergreen`.
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -59,6 +67,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )

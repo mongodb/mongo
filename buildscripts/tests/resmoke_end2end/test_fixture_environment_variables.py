@@ -4,6 +4,12 @@ import subprocess
 import sys
 import unittest
 
+from buildscripts.tests.resmoke_end2end.nested_resmoke import stage_mongo_version_file
+
+
+def setUpModule():
+    stage_mongo_version_file()
+
 
 def execute_resmoke(resmoke_args: list[str], subcommand: str = "run"):
     """Execute resmoke with the given arguments."""

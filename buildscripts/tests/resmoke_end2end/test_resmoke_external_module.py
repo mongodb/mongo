@@ -10,6 +10,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from buildscripts.resmokelib import config
+from buildscripts.tests.resmoke_end2end.nested_resmoke import stage_mongo_version_file
+
+
+def setUpModule():
+    stage_mongo_version_file()
 
 
 class TestExternalModule(unittest.TestCase):

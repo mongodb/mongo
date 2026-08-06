@@ -23,6 +23,11 @@ from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import (
 )
 from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import get_generated_task_name
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
+from buildscripts.tests.resmoke_end2end.nested_resmoke import stage_mongo_version_file
+
+
+def setUpModule():
+    stage_mongo_version_file()
 
 
 class _ResmokeSelftest(unittest.TestCase):
@@ -904,10 +909,12 @@ class TestEvergreenYML(unittest.TestCase):
         jstestfuzz_count = 0
         for task in self.evg_conf.tasks:
             generate_func = task.find_func_command("generate resmoke tasks")
-            if (
-                generate_func is None
-                or get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) is not True
-            ):
+            if generate_func is None:
+                continue
+
+            # `evergreen evaluate` renders command vars as strings, so the flag arrives as
+            # "true" rather than a boolean when the evergreen binary is available.
+            if get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) not in (True, "true"):
                 continue
 
             jstestfuzz_count += 1

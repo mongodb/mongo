@@ -14,7 +14,10 @@ function start() {
         getPython3Binary() +
         " buildscripts/resmoke.py run " +
         "--storageEngineCacheSizeGB=1 --dbpathPrefix=/data/db/selftest_inner " +
-        "--archiveMode=test_archival --taskId=123 " +
+        // --taskId makes resmoke believe it is running in Evergreen, where it reads the
+        // symbolizer secrets out of expansions.yml. That file only exists in an Evergreen
+        // task's working directory, so skip symbolization like the outer invocation does.
+        "--archiveMode=test_archival --taskId=123 --skipSymbolization " +
         "--originSuite=resmoke_end2end_tests " +
         "--internalParam=is_inner_level " +
         "--basePort=20020 " +

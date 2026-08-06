@@ -12,6 +12,19 @@ exports_files([
     "coverity_config_schema.json",
 ])
 
+# The master and nightly Evergreen project configs and everything they include, for tests that evaluate it.
+filegroup(
+    name = "evergreen_config",
+    srcs = [
+        "evergreen.yml",
+        "evergreen_nightly.yml",
+        "//:monguard/.evergreen/config_mongodb_master.yml",
+        "//:monguard/.evergreen/config_tasks.yml",
+        "//src/mongo/db/modules/atlas:atlas_dev.yml",
+        "//src/mongo/db/modules/atlas:atlas_sls_pin_bump.yml",
+    ] + glob(["evergreen_yml_components/**"]),
+)
+
 # This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't
 # exist in cc_binary. Instead, we add the denylists to srcs as header files to make them visible to
 # the compiler executable.
