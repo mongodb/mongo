@@ -1,9 +1,3 @@
-/**
- * @tags: [
- *   # TODO SERVER-132344: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
- * ]
- */
 // this tests all points using $near
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 
