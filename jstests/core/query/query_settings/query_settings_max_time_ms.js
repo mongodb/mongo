@@ -42,6 +42,15 @@
  *   # timing out the suite.
  *   assumes_balancer_off,
  *   needs_query_settings_user_role,
+ *   # The enforcement cases pin 'readConcern: local' (see the comment above 'makeAggCmd') so that a
+ *   # shard-side readConcern wait cannot race the fail-point-based timing. Suites that override the
+ *   # read concern defeat that: the added wait is governed by the pre-override client 'maxTimeMS',
+ *   # which kills the operation before the query settings value can take effect.
+ *   does_not_support_causal_consistency,
+ *   # Several cases intentionally fail a command, which aborts the wrapping transaction in
+ *   # multi-statement-transaction passthroughs and rolls back the test's data. Such suites also
+ *   # force 'readConcern: snapshot', which defeats the pinned 'readConcern: local' above.
+ *   does_not_support_transactions,
  * ]
  */
 import {describe, it} from "jstests/libs/mochalite.js";
@@ -99,11 +108,15 @@ describe("maxTimeMS query setting enforcement", function () {
     // leading $match), guaranteeing a real 'DocumentSourceCursor' — and thus a reachable
     // 'hangBeforeDocumentSourceCursorLoadBatch' fail point — even when transparently redirected
     // through a view or timeseries collection.
+    // 'readConcern: local' rules out a shard-side readConcern-wait (e.g. for a lagging secondary
+    // under a snapshot/majority read) racing with these tests' fail-point-based timing, since these
+    // tests only care about which maxTimeMS value governs, not causal-consistency semantics.
     function makeAggCmd(filter) {
         return {
             aggregate: coll.getName(),
             pipeline: [{$match: filter}, {$_internalInhibitOptimization: {}}],
             cursor: {},
+            readConcern: {level: "local"},
         };
     }
     const aggCmd = {...makeAggCmd({a: 1}), $db: db.getName()};
@@ -111,8 +124,16 @@ describe("maxTimeMS query setting enforcement", function () {
     // The "Slow query" log line (read back by getLastDurationMillis() below) is only emitted for
     // operations slower than the default 'slowms' threshold (100ms), so both values here are kept
     // comfortably above it to avoid depending on server profiling settings.
-    const kTightMaxTimeMS = 200;
-    const kLooseMaxTimeMS = 2000;
+    //
+    // The tight value additionally has to exceed however long the router spends *before* query
+    // settings are resolved. The router sets the operation deadline from the client-supplied
+    // 'maxTimeMS' at ingress, and the query settings override is only applied later, during
+    // planning; if routing-table refresh, session/transaction setup or admission queueing overrun
+    // the tight budget first, the operation is killed with MaxTimeMSExpired and the later loosening
+    // cannot revive it. A tight value of a few hundred ms is not enough headroom for that on slow
+    // variants (tsan, Windows debug), so keep it at second scale.
+    const kTightMaxTimeMS = 1000;
+    const kLooseMaxTimeMS = 5000;
 
     // Upper bound for asserting that the *tight* value governed: generous enough to absorb
     // scheduling/log-flush slop, but well below kLooseMaxTimeMS, so a duration under this bound
@@ -220,7 +241,10 @@ describe("maxTimeMS query setting enforcement", function () {
                 // Had the tight user value won, this would have run for ~kTightMaxTimeMS, not
                 // ~kLooseMaxTimeMS. We assert on the largest duration because e.g. an executing
                 // shard only receives the time remaining from the router, not the full deadline.
-                assert.gte(Math.max(...durations), kLooseMaxTimeMS);
+                // Asserting against kTightUpperBoundMS rather than kLooseMaxTimeMS keeps this off
+                // the exact boundary: the reported duration straddles the nominal deadline by a few
+                // milliseconds either way, so ">= kLooseMaxTimeMS" is a coin flip.
+                assert.gt(Math.max(...durations), kTightUpperBoundMS);
             } finally {
                 fp.off();
             }
@@ -265,8 +289,10 @@ describe("maxTimeMS query setting enforcement", function () {
                     comment,
                 });
                 // Had the tight client-side value won, this would have run for
-                // ~kTightMaxTimeMS, not ~kLooseMaxTimeMS.
-                assert.gte(Math.max(...durations), kLooseMaxTimeMS);
+                // ~kTightMaxTimeMS, not ~kLooseMaxTimeMS. Asserting against kTightUpperBoundMS
+                // rather than kLooseMaxTimeMS keeps this off the exact boundary; see the
+                // equivalent case above.
+                assert.gt(Math.max(...durations), kTightUpperBoundMS);
             } finally {
                 fp.off();
             }
