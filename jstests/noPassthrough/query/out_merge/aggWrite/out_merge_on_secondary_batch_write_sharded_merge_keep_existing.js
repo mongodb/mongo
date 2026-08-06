@@ -6,8 +6,6 @@
  * @tags: [
  *   uses_$out,
  *   assumes_read_preference_unchanged,
- *   # TODO SERVER-132345: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 

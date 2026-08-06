@@ -4,8 +4,6 @@
  * if the 2 operations were not interleaved.
  *
  * @tags: [
- *   # TODO SERVER-132345: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 

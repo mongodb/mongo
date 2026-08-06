@@ -76,6 +76,8 @@ overrides:
   atlas-amazon2023:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
+    - task: ^no_passthrough_disagg_override_replsets
+      exec_timeout: 80 # 80min (preserved from previous task-level exec_timeout_secs)
 
   enterprise-amazon2023-arm64:
     - task: aggregation_blockprocessing_fuzzer
@@ -384,3 +386,11 @@ overrides:
   enterprise-rhel8-debug-tsan-all-non-rollback-feature-flags:
     - task: concurrency_simultaneous
       exec_timeout: 180 # 3 hours
+
+  enterprise-amazon2023-linux-x86-debug-tsan-all-feature-flags:
+    - task: ^no_passthrough_disagg_override_replsets
+      exec_timeout: 120 # 2 hours
+
+  atlas-ubuntu2204-arm64:
+    - task: ^no_passthrough_disagg_override_replsets
+      exec_timeout: 80 # 80min (preserved from previous task-level exec_timeout_secs)

@@ -105,6 +105,11 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": r"sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.*", "factor": 0.125},
         {"task": "sharding_jscore_passthrough_priority_ports", "factor": 0.25},
     ],
+    r"enterprise-amazon2023-linux-x86-debug-tsan.*": [
+        # Reduce concurrency for the disagg override suite under TSAN to avoid CPU starvation
+        # of the SLS log server containers, which causes cascading failures.
+        {"task": r"no_passthrough_disagg_override.*", "factor": 0.125},
+    ],
     "rhel8-debug-aubsan-classic-engine": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-all-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-non-rollback-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,

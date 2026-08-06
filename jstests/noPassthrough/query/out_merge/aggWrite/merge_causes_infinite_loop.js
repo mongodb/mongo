@@ -7,8 +7,6 @@
  * to the collection being read from.
  *
  * @tags: [
- *   # TODO SERVER-132345: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 const conn = MongoRunner.runMongod();
