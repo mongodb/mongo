@@ -1290,11 +1290,25 @@ void CommonMongodProcessInterface::_handleTimeseriesCreateError(const DBExceptio
 
 boost::optional<TimeseriesOptions> CommonMongodProcessInterface::_getTimeseriesOptions(
     OperationContext* opCtx, const NamespaceString& ns) {
-    auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
-    if (!view || !view->timeseries()) {
+    // TODO(SERVER-123282): Use `CommonMongodProcessInterface::getCollectionOptions` here once it
+    // uses listCollections so it returns the proper timeseries options for legacy timeseries views.
+    // We can then remove the `ShardServerProcessInterface::_getTimeseriesOptions` overload.
+    BSONObj options;
+    try {
+        options = getCollectionInfoFromPrimary(opCtx, ns).getOptions().value_or(BSONObj{});
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        options = BSONObj{};
+    }
+
+    if (options.isEmpty()) {
         return boost::none;
     }
-    return mongo::timeseries::getTimeseriesOptions(opCtx, ns, true /*convertToBucketsNamespace*/);
+    const BSONElement timeseries = options["timeseries"];
+    if (!timeseries || !timeseries.isABSONObj()) {
+        return boost::none;
+    }
+    return TimeseriesOptions::parseOwned(timeseries.Obj().getOwned(),
+                                         IDLParserContext("TimeseriesOptions"));
 }
 
 void CommonMongodProcessInterface::writeRecordsToSpillTable(
