@@ -115,6 +115,19 @@ setup_mongo_toolchain_aliases()
 
 setup_gdb_toolchain_aliases()
 
+sh_binary(
+    name = "install-local-toolchain",
+    srcs = ["//bazel/install_rules:install_mongodbtoolchain.sh"],
+    data = [
+        ":gdb_toolchain_files",
+        ":toolchain_files",
+        "@py_host//:files",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
+)
+
 render_template(
     name = "clang_tidy_config",
     srcs = [

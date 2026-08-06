@@ -2,6 +2,13 @@ package(default_visibility = ["//visibility:public"])
 
 # Expose script for external usage through bazel.
 exports_files([
+    "install_mongodbtoolchain.sh",
     "install_rules.py",
     "pretty_printer_test_creator.py",
 ])
+
+sh_test(
+    name = "install_mongodbtoolchain_test",
+    srcs = ["install_mongodbtoolchain_test.sh"],
+    data = ["install_mongodbtoolchain.sh"],
+)

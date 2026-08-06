@@ -202,6 +202,16 @@ filegroup(
     visibility = ["//visibility:private"],
 )
 
+filegroup(
+    name = "all_files",
+    srcs = glob([
+        "%s/**",
+        "stow/gdb-%s/**",
+        "stow/python3-%s/**",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
 sh_binary(
     name = "gdb",
     srcs = ["working_dir_gdb.sh"],
@@ -241,6 +251,9 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 """ % (
+            ctx.attr.version,
+            ctx.attr.version,
+            ctx.attr.version,
             ctx.attr.version,
             ctx.attr.version,
             ctx.attr.version,
@@ -370,6 +383,10 @@ def setup_gdb_toolchain_aliases(name = "setup_toolchains"):
     native.alias(
         name = "gdb-add-index",
         actual = "@gdb_v5//:gdb-add-index",
+    )
+    native.alias(
+        name = "gdb_toolchain_files",
+        actual = "@gdb_v5//:all_files",
     )
 
     native.alias(
