@@ -45,6 +45,17 @@ mongo_cc_library(
 )
 
 mongo_cc_benchmark(
+    name = "filter_bm",
+    srcs = [
+        "filter_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/unittest:benchmark_util",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "distinct_scan_bm",
     srcs = [
         "distinct_scan_bm.cpp",
