@@ -55,24 +55,12 @@ Status errorCodeToStatus(const std::error_code& ec, std::string_view context) {
         return makeStatus(ErrorCodes::ConnectionClosedByPeer,
                           fmt::format("Connection closed by peer: {}", ec.message()));
 #endif
-#ifdef _WIN32
     } else if (ec == asio::error::connection_reset || ec == asio::error::connection_aborted) {
-        // On Windows, a purposeful peer termination during connection establishment can surface as
-        // an abortive close -- connection_reset (WSAECONNRESET, "connection reset by peer") or
-        // connection_aborted (WSAECONNABORTED, "an established connection was aborted by the
-        // software in your host machine") -- whereas Linux reports the same termination as a
-        // graceful close (eof) or a plain reset. Normalize the Windows abortive codes to
-        // ConnectionClosedByPeer so an establishment-phase peer close is classified consistently
-        // across platforms. The appended ec.message() keeps the variants distinguishable in
-        // diagnostics.
+        // Normalize abortive peer closes to ConnectionClosedByPeer so establishment-phase peer
+        // closes are classified consistently across platforms. ec.message() keeps variants
+        // distinguishable in diagnostics.
         return makeStatus(ErrorCodes::ConnectionClosedByPeer,
                           fmt::format("Connection closed by peer: {}", ec.message()));
-#else
-    } else if (ec == asio::error::connection_reset) {
-        // Preserve the historical classification on non-Windows platforms: a reset is treated as a
-        // network-level failure rather than a graceful peer close.
-        return makeStatus(ErrorCodes::HostUnreachable, "Connection reset by peer");
-#endif
     } else if (ec == asio::error::network_reset) {
         return makeStatus(ErrorCodes::HostUnreachable, "Connection reset by network");
     } else if (ec == asio::error::in_progress) {

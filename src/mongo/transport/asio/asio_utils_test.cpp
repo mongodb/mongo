@@ -160,21 +160,15 @@ TEST(ASIOUtils, PeekPastAvailableBytesTCPNonBlocking) {
     peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
 }
 // A graceful peer close maps to ErrorCodes::ConnectionClosedByPeer on all platforms: a non-TLS FIN
-// (eof) and a TLS close without close_notify (stream_truncated). The reason carries ec.message(),
-// so the transport modes stay distinguishable in diagnostics under the single code. On Windows, a
-// purposeful termination can also surface as an abortive close (connection_reset /
-// connection_aborted), which is normalized to the same code; on other platforms a reset keeps its
-// historical HostUnreachable classification.
+// (eof), a TLS close without close_notify (stream_truncated), or an abortive close
+// (connection_reset / connection_aborted). The reason carries ec.message(), so the transport modes
+// stay distinguishable in diagnostics under the single code.
 TEST(ASIOUtils, PeerClosedMapsToConnectionClosedByPeer) {
     ASSERT_EQ(errorCodeToStatus(asio::error::eof).code(), ErrorCodes::ConnectionClosedByPeer);
-#ifdef _WIN32
     ASSERT_EQ(errorCodeToStatus(asio::error::connection_reset).code(),
               ErrorCodes::ConnectionClosedByPeer);
     ASSERT_EQ(errorCodeToStatus(asio::error::connection_aborted).code(),
               ErrorCodes::ConnectionClosedByPeer);
-#else
-    ASSERT_EQ(errorCodeToStatus(asio::error::connection_reset).code(), ErrorCodes::HostUnreachable);
-#endif
 #ifdef MONGO_CONFIG_SSL
     ASSERT_EQ(errorCodeToStatus(asio::ssl::error::stream_truncated).code(),
               ErrorCodes::ConnectionClosedByPeer);
