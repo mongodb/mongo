@@ -1009,25 +1009,11 @@ TEST_F(QueryPlannerTest, NonPrefixRegexMultikey) {
     addIndex(BSON("a" << 1), true);
     runQuery(fromjson("{a: /foo/}"));
 
-    // Multikey no longer blocks pushing the covered filter onto the index scan.
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {filter: {a: /foo/}, dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: "
-        "{pattern: {a: 1}, filter: {a: /foo/}}}}}");
-}
-
-TEST_F(QueryPlannerTest, NonPrefixRegexOrMultikey) {
-    // true means multikey
-    addIndex(BSON("a" << 1), true);
-    runQuery(fromjson("{$or: [{a: /0/}, {a: /1/}]}"));
-
-    // Multikey no longer blocks pushing the covered OR filter onto the index scan.
-    assertNumSolutions(2U);
-    assertSolutionExists("{cscan: {filter: {a: {$in: [/0/, /1/]}}, dir: 1}}");
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: "
-        "{pattern: {a: 1}, filter: {a: {$in: [/0/, /1/]}}}}}}");
+        "{fetch: {filter: {a: /foo/}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null}}}}");
 }
 
 TEST_F(QueryPlannerTest, ThreeRegexSameFieldMultikey) {
@@ -1035,37 +1021,20 @@ TEST_F(QueryPlannerTest, ThreeRegexSameFieldMultikey) {
     addIndex(BSON("a" << 1), true);
     runQuery(fromjson("{$and: [{a: /0/}, {a: /1/}, {a: /2/}]}"));
 
-    // Only the regex used for the bounds is pushed onto the ixscan as a filter; the other two
-    // stay on the enclosing fetch.
     assertNumSolutions(4U);
     assertSolutionExists("{cscan: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {$and:[{a:/1/},{a:/2/}]}, node: {ixscan: "
-        "{pattern: {a: 1}, filter: {a: /0/}, "
+        "{fetch: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
         "bounds: {a: [['', {}, true, false], [/0/, /0/, true, true]]}}}}}");
     assertSolutionExists(
-        "{fetch: {filter: {$and:[{a:/0/},{a:/2/}]}, node: {ixscan: "
-        "{pattern: {a: 1}, filter: {a: /1/}, "
+        "{fetch: {filter: {$and:[{a:/1/},{a:/0/},{a:/2/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
         "bounds: {a: [['', {}, true, false], [/1/, /1/, true, true]]}}}}}");
     assertSolutionExists(
-        "{fetch: {filter: {$and:[{a:/0/},{a:/1/}]}, node: {ixscan: "
-        "{pattern: {a: 1}, filter: {a: /2/}, "
+        "{fetch: {filter: {$and:[{a:/2/},{a:/0/},{a:/1/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
         "bounds: {a: [['', {}, true, false], [/2/, /2/, true, true]]}}}}}");
-}
-
-TEST_F(QueryPlannerTest, CompoundIndexRegexOnMultikeyTrailingField) {
-    // Only 'b' (the second, trailing field) is multikey.
-    addIndex(fromjson("{a: 1, b: 1}"), MultikeyPaths{{}, {0}});
-    runQuery(fromjson("{a: 5, b: /y/}"));
-
-    // 'b' being multikey doesn't block the filter pushdown, nor does it affect 'a's EXACT bounds.
-    assertNumSolutions(2U);
-    assertSolutionExists("{cscan: {filter: {a: 5, b: /y/}, dir: 1}}");
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: "
-        "{pattern: {a: 1, b: 1}, filter: {b: /y/}, "
-        "bounds: {a: [[5, 5, true, true]], b: [['', {}, true, false], [/y/, /y/, true, "
-        "true]]}}}}}");
 }
 
 //

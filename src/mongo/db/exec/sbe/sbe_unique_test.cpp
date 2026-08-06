@@ -16,13 +16,11 @@
 
 namespace mongo::sbe {
 /**
- * This file contains tests for sbe::UniqueStage and sbe::UniqueRoaringStage (including its
- * optional fused-filter mode).
+ * This file contains tests for sbe::UniqueStage and sbe::UniqueRoaringStage.
  */
 
 using UniqueStageTest = PlanStageTestFixture;
 using UniqueRoaringStageTest = PlanStageTestFixture;
-using UniqueRoaringStageWithFilterTest = PlanStageTestFixture;
 
 TEST_F(UniqueStageTest, DeduplicatesAndPreservesOrderSimple) {
     value::TagValueOwned inputOwned =
@@ -292,148 +290,5 @@ TEST_F(UniqueRoaringStageTest, UniqueRoaringStageTracksMemory) {
         ASSERT_GT(newTrackedMem, prevTrackedMem);
         prevTrackedMem = newTrackedMem;
     }
-}
-
-namespace {
-// Two-slot virtual scan (recordId, keyValue) wrapped in a UniqueRoaringStage (with a filter) that
-// dedups on recordId and filters on "keyValue == 'b'".
-std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeDedupFilterEqBStage(
-    PlanStageTestFixture& fixture, const BSONArray& rows) {
-    auto [scanSlots, scanStage] = fixture.generateVirtualScanMulti(2, rows);
-    auto filterExpr = sbe::makeE<EPrimBinary>(
-        EPrimBinary::eq, makeVariable(scanSlots[1]), makeStringConstant("b"));
-    auto stage = makeS<UniqueRoaringStage>(
-        std::move(scanStage), scanSlots[0], std::move(filterExpr), kEmptyPlanNodeId);
-    return {scanSlots, std::move(stage)};
-}
-}  // namespace
-
-TEST_F(UniqueRoaringStageWithFilterTest, MatchOnLaterKeyStillReturnsRecordExactlyOnce) {
-    // Record 1's first key ("a") fails the filter; only its second key ("b") passes. A naive
-    // dedup-before-filter ordering would drop the matching "b" key.
-    auto rows = BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(2 << "x"));
-
-    auto [scanSlots, stage] = makeDedupFilterEqBStage(*this, rows);
-    auto ctx = makeCompileCtx();
-    auto accessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(scanSlots[0]));
-
-    value::TagValueOwned resultsOwned =
-        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), accessors));
-
-    value::TagValueOwned expectedOwned =
-        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1))));
-
-    ASSERT_TRUE(valueEquals(
-        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
-}
-
-TEST_F(UniqueRoaringStageWithFilterTest, DuplicateMatchingKeysReturnRecordOnce) {
-    // Two identical matching keys should still return the document only once.
-    auto rows = BSON_ARRAY(BSON_ARRAY(1 << "b") << BSON_ARRAY(1 << "b"));
-
-    auto [scanSlots, stage] = makeDedupFilterEqBStage(*this, rows);
-    auto ctx = makeCompileCtx();
-    auto accessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(scanSlots[0]));
-
-    value::TagValueOwned resultsOwned =
-        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), accessors));
-
-    value::TagValueOwned expectedOwned =
-        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1))));
-
-    ASSERT_TRUE(valueEquals(
-        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
-}
-
-TEST_F(UniqueRoaringStageWithFilterTest, RecordExcludedWhenNoKeyMatchesFilter) {
-    // Neither key matches the filter, so the document should not be returned.
-    auto rows = BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "c"));
-
-    auto [scanSlots, stage] = makeDedupFilterEqBStage(*this, rows);
-    auto ctx = makeCompileCtx();
-    auto accessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(scanSlots[0]));
-
-    value::TagValueOwned resultsOwned =
-        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), accessors));
-
-    value::TagValueOwned emptyOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
-
-    ASSERT_TRUE(valueEquals(
-        resultsOwned.tag(), resultsOwned.value(), emptyOwned.tag(), emptyOwned.value()));
-
-    // Neither key ever passes the filter, so dupsDropped should stay 0.
-    auto stats = stage->getStats(/* includeDebugInfo */ true);
-    ASSERT_FALSE(stats->debugInfo.isEmpty());
-    ASSERT_EQ(stats->debugInfo.getField("dupsTested").numberLong(), 2);
-    ASSERT_EQ(stats->debugInfo.getField("filterTested").numberLong(), 2);
-    ASSERT_EQ(stats->debugInfo.getField("dupsDropped").numberLong(), 0);
-}
-
-TEST_F(UniqueRoaringStageWithFilterTest, FilterIsNotReRunOnKeysOfAlreadyMatchedRecord) {
-    // Only the first key ("b") should hit the filter; later keys for the same record should be
-    // skipped via the cheap dedup-set lookup instead.
-    auto rows = BSON_ARRAY(BSON_ARRAY(1 << "b") << BSON_ARRAY(1 << "z") << BSON_ARRAY(1 << "y"));
-
-    auto [scanSlots, stage] = makeDedupFilterEqBStage(*this, rows);
-    auto ctx = makeCompileCtx();
-    auto accessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(scanSlots[0]));
-
-    exhaustStage(stage.get(), accessors[0]);
-
-    auto stats = stage->getStats(/* includeDebugInfo */ true);
-    ASSERT_FALSE(stats->debugInfo.isEmpty());
-    ASSERT_EQ(stats->debugInfo.getField("dupsTested").numberLong(), 3);
-    ASSERT_EQ(stats->debugInfo.getField("filterTested").numberLong(), 1);
-    // The other two keys are skipped via the "already seen" path instead of re-running the filter.
-    ASSERT_EQ(stats->debugInfo.getField("dupsDropped").numberLong(), 2);
-}
-
-TEST_F(UniqueRoaringStageWithFilterTest, ResetsStateAfterClose) {
-    auto rows = BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(2 << "x"));
-
-    auto [scanSlots, stage] = makeDedupFilterEqBStage(*this, rows);
-    auto ctx = makeCompileCtx();
-    auto accessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(scanSlots[0]));
-
-    value::TagValueOwned resultsOwned =
-        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), accessors));
-    value::TagValueOwned expectedOwned =
-        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1))));
-    ASSERT_TRUE(valueEquals(
-        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
-
-    stage->close();
-    stage->open(false);
-
-    value::TagValueOwned resetResultsOwned =
-        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), accessors));
-    ASSERT_TRUE(valueEquals(resetResultsOwned.tag(),
-                            resetResultsOwned.value(),
-                            expectedOwned.tag(),
-                            expectedOwned.value()));
-}
-
-TEST_F(UniqueRoaringStageWithFilterTest, ResetsStateAfterReopen) {
-    auto rows = BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(2 << "x"));
-
-    auto [scanSlots, stage] = makeDedupFilterEqBStage(*this, rows);
-    auto ctx = makeCompileCtx();
-    auto accessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(scanSlots[0]));
-
-    value::TagValueOwned resultsOwned =
-        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), accessors));
-    value::TagValueOwned expectedOwned =
-        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1))));
-    ASSERT_TRUE(valueEquals(
-        resultsOwned.tag(), resultsOwned.value(), expectedOwned.tag(), expectedOwned.value()));
-
-    stage->open(/* reOpen */ true);
-
-    value::TagValueOwned resetResultsOwned =
-        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), accessors));
-    ASSERT_TRUE(valueEquals(resetResultsOwned.tag(),
-                            resetResultsOwned.value(),
-                            expectedOwned.tag(),
-                            expectedOwned.value()));
 }
 }  // namespace mongo::sbe

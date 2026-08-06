@@ -466,18 +466,6 @@ TEST_F(QueryPlannerWildcardTest, NonPrefixRegex) {
         "a: [['',{},true,false], [/foo/,/foo/,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerWildcardTest, NonPrefixRegexMultikey) {
-    addWildcardIndex(BSON("$**" << 1), {"a"});
-    runQuery(fromjson("{a: /foo/}"));
-
-    // Multikey no longer blocks pushing the covered filter onto the index scan.
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: {filter: {a: /foo/}, pattern: {'$_path': 1, a: 1},"
-        "bounds: {'$_path': [['a','a',true,true]],"
-        "a: [['',{},true,false], [/foo/,/foo/,true,true]]}}}}}");
-}
-
 TEST_F(QueryPlannerWildcardTest, GreaterThan) {
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$gt: 5}}"));

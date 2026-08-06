@@ -5,7 +5,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/row.h"
@@ -38,35 +37,7 @@ uint64_t estimateRowSizeBytes(const value::MaterializedRow& row) {
     return valueAndTags + size_estimator::estimate(row);
 }
 
-int64_t extractRoaringKey(value::SlotAccessor* accessor) {
-    auto [tag, val] = accessor->getViewOfValue();
-
-    switch (tag) {
-        case value::TypeTags::NumberInt32: {
-            return value::bitcastTo<int32_t>(val);
-        }
-        case value::TypeTags::NumberInt64: {
-            return value::bitcastTo<int64_t>(val);
-        }
-        case value::TypeTags::RecordId: {
-            auto recordId = value::getRecordIdView(val);
-            tassert(9762501,
-                    "unique_roaring stage encountered a record id that is not formatted as long",
-                    recordId->isLong());
-            return recordId->getLong();
-        }
-        default: {
-            auto tag_ = tag;
-            tasserted(9762500,
-                      str::stream()
-                          << "unique_roaring stage encountered unexpected SBE value type: "
-                          << tag_);
-        }
-    }
-}
-
 }  // namespace
-
 UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector keys,
                          PlanNodeId planNodeId,
@@ -207,18 +178,8 @@ UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
                                        value::SlotId key,
                                        PlanNodeId planNodeId,
                                        bool participateInTrialRunTracking)
-    : UniqueRoaringStage(
-          std::move(input), key, nullptr, planNodeId, participateInTrialRunTracking) {}
-
-UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
-                                       value::SlotId key,
-                                       std::unique_ptr<EExpression> filter,
-                                       PlanNodeId planNodeId,
-                                       bool participateInTrialRunTracking)
-    : PlanStage(filter ? "unique_roaring_filter"sv : "unique_roaring"sv,
-                nullptr /* yieldPolicy */,
-                planNodeId,
-                participateInTrialRunTracking),
+    : PlanStage(
+          "unique_roaring"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _keySlot(key),
       _seen(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
             static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
@@ -229,28 +190,18 @@ UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
               uniqueRoaringCounters.incrementPerDeduplication(deduplicatedBytes,
                                                               deduplicatedRecords);
           },
-          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())),
-      _filter(std::move(filter)) {
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {
     _children.emplace_back(std::move(input));
 }
 
 std::unique_ptr<PlanStage> UniqueRoaringStage::clone() const {
-    return std::make_unique<UniqueRoaringStage>(_children[0]->clone(),
-                                                _keySlot,
-                                                _filter ? _filter->clone() : nullptr,
-                                                _commonStats.nodeId,
-                                                participateInTrialRunTracking());
+    return std::make_unique<UniqueRoaringStage>(
+        _children[0]->clone(), _keySlot, _commonStats.nodeId, participateInTrialRunTracking());
 }
 
 void UniqueRoaringStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _inKeyAccessor = _children[0]->getAccessor(ctx, _keySlot);
-
-    if (_filter) {
-        ctx.root = this;
-        _filterCode = _filter->compile(ctx);
-    }
-
     _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
         _opCtx, loadMemoryLimit(StageMemoryLimit::SBEUniqueStageMaxMemoryBytes));
 }
@@ -265,8 +216,8 @@ void UniqueRoaringStage::open(bool reOpen) {
 
     if (reOpen) {
         _seen.clear();
-        _prevSeenSizeBytes = 0;
         _memoryTracker->set(0);
+        _prevSeenSizeBytes = 0;
     }
     _children[0]->open(reOpen);
 }
@@ -275,35 +226,39 @@ PlanState UniqueRoaringStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
     while (_children[0]->getNext() == PlanState::ADVANCED) {
-        auto roaringVal = extractRoaringKey(_inKeyAccessor);
-        ++_specificStats.dupsTested;
+        auto [tag, val] = _inKeyAccessor->getViewOfValue();
 
-        if (_filter) {
-            if (_seen.contains(roaringVal)) {
-                // Already returned; skip without running the filter.
-                ++_specificStats.dupsDropped;
-                continue;
+        int64_t roaringVal;
+        switch (tag) {
+            case value::TypeTags::NumberInt32: {
+                roaringVal = value::bitcastTo<int32_t>(val);
+                break;
             }
-
-            ++_filterTested;
-            if (!_bytecode.runPredicate(_filterCode.get())) {
-                // Don't mark as seen: a later key for the same document may still match.
-                continue;
+            case value::TypeTags::NumberInt64: {
+                roaringVal = value::bitcastTo<int64_t>(val);
+                break;
             }
-
-            invariant(_seen.addChecked(roaringVal));
-            size_t newSeenSizeBytes = _seen.getApproximateSize();
-            _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
-            _dedupReporter.add(newSeenSizeBytes - _prevSeenSizeBytes);
-            _prevSeenSizeBytes = newSeenSizeBytes;
-            uassert(10249001,
-                    "Exceeded memory limit in record id deduplicator for unique_roaring_filter "
-                    "stage",
-                    _memoryTracker->withinMemoryLimit(_opCtx));
-            return trackPlanState(PlanState::ADVANCED);
+            case value::TypeTags::RecordId: {
+                auto recordId = value::getRecordIdView(val);
+                tassert(
+                    9762501,
+                    "unique_roaring stage encountered a record id that is not formatted as long",
+                    recordId->isLong());
+                roaringVal = recordId->getLong();
+                break;
+            }
+            default: {
+                auto tag_ = tag;
+                tasserted(9762500,
+                          str::stream()
+                              << "unique_roaring stage encountered unexpected SBE value type: "
+                              << tag_);
+            }
         }
 
-        if (_seen.addChecked(roaringVal)) {
+        ++_specificStats.dupsTested;
+        auto inserted = _seen.addChecked(roaringVal);
+        if (inserted) {
             size_t newSeenSizeBytes = _seen.getApproximateSize();
             _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
             _dedupReporter.add(newSeenSizeBytes - _prevSeenSizeBytes);
@@ -341,13 +296,7 @@ std::unique_ptr<PlanStageStats> UniqueRoaringStage::getStats(bool includeDebugIn
         BSONObjBuilder bob;
         bob.appendNumber("dupsTested", static_cast<long long>(_specificStats.dupsTested));
         bob.appendNumber("dupsDropped", static_cast<long long>(_specificStats.dupsDropped));
-        if (_filter) {
-            bob.appendNumber("filterTested", static_cast<long long>(_filterTested));
-        }
         bob.append("keySlot", _keySlot);
-        if (_filter) {
-            bob.append("filter", DebugPrinter{}.print(_filter->debugPrint()));
-        }
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
             bob.appendNumber("peakTrackedMemBytes",
                              static_cast<long long>(_specificStats.peakTrackedMemBytes));
@@ -366,30 +315,13 @@ const SpecificStats* UniqueRoaringStage::getSpecificStats() const {
 void UniqueRoaringStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
                                       DebugPrintInfo& debugPrintInfo) const {
     DebugPrinter::addIdentifier(ret, _keySlot);
-
-    if (_filter) {
-        ret.emplace_back(DebugPrinter::Block("`,"));
-
-        ret.emplace_back(DebugPrinter::Block("{`"));
-        DebugPrinter::addBlocks(ret, _filter->debugPrint());
-        ret.emplace_back(DebugPrinter::Block("`}"));
-    }
-
     DebugPrinter::addNewLine(ret);
-
-    if (_filter && debugPrintInfo.printBytecode) {
-        PlanStage::debugPrintBytecode(ret, _filterCode, "FILTER" /*title*/);
-    }
-
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
 }
 
 size_t UniqueRoaringStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
-    if (_filter) {
-        size += _filter->estimateSize();
-    }
     size += size_estimator::estimate(_specificStats);
     return size;
 }

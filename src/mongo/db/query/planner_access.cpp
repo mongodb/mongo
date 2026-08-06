@@ -1154,7 +1154,8 @@ bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
                 fmt::format("Expected scanState->loosestBounds to be INEXACT_COVERED, but found {}",
                             static_cast<int>(scanState->loosestBounds)),
                 scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED);
-        return false;
+        const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
+        return index.multikey;
     }
 }
 
@@ -2069,7 +2070,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
 
             if (tightness == IndexBoundsBuilder::EXACT) {
                 return soln;
-            } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED) {
+            } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED &&
+                       !indices[tag->index].multikey) {
                 MONGO_verify(nullptr == soln->filter.get());
                 soln->filter = std::move(ownedRoot);
                 return soln;
@@ -2609,6 +2611,7 @@ void QueryPlannerAccess::handleFilterOr(ScanBuildingState* scanState) {
 
 void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
     MatchExpression* root = scanState->root;
+    const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
 
     if (scanState->inArrayOperator) {
         // We're inside an array operator. The entire array operator expression
@@ -2620,11 +2623,19 @@ void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
         // control returns to handleIndexedAnd we know that we don't need it to create a FETCH
         // stage.
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
-    } else if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED) {
-        // The bounds are not exact, but the information needed to evaluate the predicate is in
-        // the index key. Remove the MatchExpression from its parent and attach it to the filter
-        // of the index scan we're building. This is safe for multikey indexes too: the executor
-        // only dedups a record after the filter has matched one of its keys.
+    } else if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED &&
+               (INDEX_TEXT == index.type || !index.multikey)) {
+        // The bounds are not exact, but the information needed to
+        // evaluate the predicate is in the index key. Remove the
+        // MatchExpression from its parent and attach it to the filter
+        // of the index scan we're building.
+        //
+        // We can only use this optimization if the index is NOT multikey.
+        // Suppose that we had the multikey index {x: 1} and a document
+        // {x: ["a", "b"]}. Now if we query for {x: /b/} the filter might
+        // ever only be applied to the index key "a". We'd incorrectly
+        // conclude that the document does not match the query :( so we
+        // gotta stick to non-multikey indices.
         auto child = std::move((*root->getChildVector())[scanState->curChild]);
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
 
