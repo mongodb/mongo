@@ -498,7 +498,6 @@ std::vector<int> mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
 
         std::vector<ExecutorFuture<void>> statementsChain;
 
-        StmtId stmtId{};
         for (auto& chunk : newChunks) {
             // Prepare deletion of existing chunks in the range
             BSONObjBuilder queryBuilder;
@@ -520,16 +519,8 @@ std::vector<int> mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
             write_ops::InsertCommandRequest insertOp(NamespaceString::kConfigsvrChunksNamespace,
                                                      {chunk.toConfigBSON()});
 
-            // When the inner transaction inherits a retryable-write context, every write op must
-            // carry an explicit stmtIds field. The delete is multi=true, which is incompatible
-            // with retryable-write statement tracking, so we mark it as untracked
-            // (kUninitializedStmtId). The insert is single-doc and can have a real stmt id.
-            // Per-statement idempotency is not needed here: atomicity is guaranteed by the
-            // surrounding transaction and retry semantics live at the parent's session level.
-            const StmtId insertStmtId = stmtId++;
-
             statementsChain.push_back(
-                txnClient.runCRUDOp(deleteOp, {kUninitializedStmtId})
+                txnClient.runCRUDOp(deleteOp, {})
                     .thenRunOn(txnExec)
                     .then([&numMergedChunksPerRange](auto removeChunksResponse) {
                         uassertStatusOK(removeChunksResponse.toStatus());
@@ -537,8 +528,8 @@ std::vector<int> mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
                             static_cast<int>(removeChunksResponse.getN()));
                     })
                     .thenRunOn(txnExec)
-                    .then([&txnClient, insertOp = std::move(insertOp), insertStmtId]() {
-                        return txnClient.runCRUDOp(insertOp, {insertStmtId});
+                    .then([&txnClient, insertOp = std::move(insertOp)]() {
+                        return txnClient.runCRUDOp(insertOp, {});
                     })
                     .thenRunOn(txnExec)
                     .then([](auto insertChunkResponse) {
@@ -553,14 +544,7 @@ std::vector<int> mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
-    // Provide a yielder so the inner transaction can be safely run when the caller has a session
-    // checked out on its opCtx (e.g. when invoked as a retryable write); the yielder is a no-op
-    // otherwise.
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx,
-        executor,
-        TransactionParticipantResourceYielder::make("mergeAllChunksOnShard"),
-        inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
     txn.run(opCtx, updateChunksFn);
 
     if (MONGO_unlikely(mergeAllChunksFailAfterCommit.shouldFail())) {

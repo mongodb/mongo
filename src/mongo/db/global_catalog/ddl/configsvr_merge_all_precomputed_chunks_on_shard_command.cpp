@@ -15,6 +15,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
@@ -86,9 +87,28 @@ public:
                 newChunks.emplace_back(std::move(chunkBson));
             }
 
-            auto const [placementVersions, changedChunks] = uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->commitMergeAllPrecomputedChunksOnShard(
-                    opCtx, ns(), request().getShard(), std::move(newChunks)));
+            ShardingCatalogManager::ShardAndCollectionPlacementVersions placementVersions;
+            std::vector<mongo::ChunkType> changedChunks;
+
+            {
+                auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+                    "CommitMergeAllPrecomputedChunksOnShard");
+                AlternativeClientRegion acr(newClient);
+                auto executor =
+                    Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+                auto newOpCtxPtr = CancelableOperationContext(
+                    cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
+                auto* const newOpCtx = newOpCtxPtr.get();
+
+                AuthorizationSession::get(newOpCtx->getClient())->grantInternalAuthorization();
+                newOpCtx->setWriteConcern(opCtx->getWriteConcern());
+                repl::ReadConcernArgs::get(newOpCtx) =
+                    repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+                std::tie(placementVersions, changedChunks) = uassertStatusOK(
+                    ShardingCatalogManager::get(newOpCtx)->commitMergeAllPrecomputedChunksOnShard(
+                        newOpCtx, ns(), request().getShard(), std::move(newChunks)));
+            }
 
             std::vector<BSONObj> changedChunkDocs;
             changedChunkDocs.reserve(changedChunks.size());
@@ -96,8 +116,16 @@ public:
                 changedChunkDocs.push_back(chunk.toConfigBSON());
             }
 
-            return ConfigsvrMergeAllPrecomputedChunksOnShardResponse{
-                placementVersions.collectionPlacementVersion, std::move(changedChunkDocs)};
+            // No write happened on this txnNumber in the parent opCtx, so make a dummy write to
+            // protect against older requests with old txnNumbers being replayed.
+            DBDirectClient client(opCtx);
+            client.update(NamespaceString::kServerConfigurationNamespace,
+                          BSON("_id" << "commitMergeAllPrecomputedChunksOnShardStats"),
+                          BSON("$inc" << BSON("count" << 1)),
+                          true /* upsert */,
+                          false /* multi */);
+
+            return {placementVersions.collectionPlacementVersion, std::move(changedChunkDocs)};
         }
 
     private:
