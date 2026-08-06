@@ -1,0 +1,30 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+global:
+    cpp_namespace: "mongo"
+    mod_visibility: private
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    InternalConstructNdvSketchAccumulatorParams:
+        description: "Schema for the $_internalConstructNdvSketch accumulator"
+        fields:
+            val:
+                type: string
+            fields:
+                type: array<string>
+
+    NdvSketch:
+        description: >-
+            A single HyperLogLog sketch document as emitted by the accumulator and persisted
+            in system.stats.ndv.
+        strict: true
+        fields:
+            ndv:
+                type: long
+            registers:
+                type: bindata_generic
+            precision:
+                type: int

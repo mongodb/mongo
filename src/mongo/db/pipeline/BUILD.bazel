@@ -379,6 +379,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "pipeline",
     srcs = [
+        "accumulator_internal_construct_ndv_sketch.cpp",
         "accumulator_internal_construct_stats.cpp",
         "catalog_resource_handle.cpp",
         "document_source.cpp",
@@ -612,6 +613,9 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/query/compiler/ce/ndv:hyperloglog",
+        "//src/mongo/db/query/compiler/ce/ndv:ndv_hashing",
+        "//src/mongo/db/query/compiler/ce/ndv:ndv_sketch_gen_lib",
         "//src/mongo/db/query/compiler/dependency_analysis:dependencies",
         "//src/mongo/db/query/compiler/dependency_analysis:pipeline_dependency_graph",
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
@@ -1234,6 +1238,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "db_pipeline_expression_test",
     srcs = [
+        "accumulator_internal_construct_ndv_sketch_test.cpp",
         "accumulator_test.cpp",
         "expression_and_test.cpp",
         "expression_clone_test.cpp",
@@ -1295,6 +1300,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/ce/ndv:hyperloglog",
+        "//src/mongo/db/query/compiler/ce/ndv:ndv_sketch_gen_lib",
         "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/scripting:scripting_server",
         "//src/mongo/transport:transport_layer_mock",

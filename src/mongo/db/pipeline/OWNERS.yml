@@ -49,6 +49,9 @@ filters:
     approvers:
       - 10gen/query-integration-features
       - 10gen/query-execution-classic
+  - "accumulator_internal_construct_ndv_sketch*":
+    approvers:
+      - 10gen/query-optimization
   - "accumulator_internal_construct_stats.cpp":
     approvers:
       - 10gen/query-optimization
