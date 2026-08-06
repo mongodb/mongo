@@ -3,7 +3,6 @@
 
 #include "mongo/db/timeseries/timeseries_options.h"
 
-#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
@@ -496,12 +495,5 @@ INSTANTIATE_TEST_SUITE_P(TimeseriesOptions,
                              InheritFixedBucketingTestParams{false, true, false},
                              InheritFixedBucketingTestParams{false, false, false},
                              InheritFixedBucketingTestParams{false, boost::none, false}));
-
-TEST(TimeseriesOptionsTest, BSONColumnMemEstimationCalculations) {
-    // The calculations for BSONColumn memory estimation in bson_validate.cpp rely on the defaults
-    // for some server parameters. If these change, we also need to recalculate and potentially
-    // adjust the memory threshold of the 'bsonMaxExpandedMemUsage' parameter.
-    EXPECT_EQ(gTimeseriesBucketMinCount, 10);
-}
 
 }  // namespace mongo

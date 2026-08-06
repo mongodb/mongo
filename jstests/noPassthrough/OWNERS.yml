@@ -27,9 +27,6 @@ filters:
   - "validate_js_generated_bson.js":
     approvers:
       - 10gen/server-programmability
-  - "bucket_exceed_uncompressed_mem_limit.js":
-    approvers:
-      - 10gen/server-bsoncolumn
   - "timeseries_upgrade_downgrade_apply_ops.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

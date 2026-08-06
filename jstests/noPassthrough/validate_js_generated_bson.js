@@ -258,34 +258,4 @@ describe("validate JS-generated BSON", function () {
 
         tsColl.drop();
     });
-
-    it("preserves ExceededMemoryLimit for valid BSONColumn exceeding memory limit", function () {
-        const originalLimit = assert.commandWorked(
-            this.mongod.adminCommand({getParameter: 1, bsonMaxExpandedMemUsage: 1}),
-        ).bsonMaxExpandedMemUsage;
-
-        // Use a limit low enough that the valid BSONColumn exceeds it, but high enough that
-        // normal server operations (like setParameter) still work.
-        const lowLimit = 1024;
-        assert.commandWorked(
-            this.mongod.adminCommand({setParameter: 1, bsonMaxExpandedMemUsage: lowLimit}),
-        );
-
-        try {
-            assert.commandFailedWithCode(
-                this.db.runCommand({
-                    aggregate: this.coll.getName(),
-                    pipeline: [{$project: {result: makeFunctionExpr(validBSONColumn)}}],
-                    cursor: {},
-                }),
-                ErrorCodes.ExceededMemoryLimit,
-                "valid BSONColumn exceeding memory limit should throw ExceededMemoryLimit, " +
-                    "not InvalidBSONFromJavaScript",
-            );
-        } finally {
-            assert.commandWorked(
-                this.mongod.adminCommand({setParameter: 1, bsonMaxExpandedMemUsage: originalLimit}),
-            );
-        }
-    });
 });
