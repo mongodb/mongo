@@ -130,6 +130,9 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     # Add test selection flag based on patch parameter
     if [ -n "${enable_evergreen_api_test_selection}" ]; then
         extra_args="$extra_args --enableEvergreenApiTestSelection=${enable_evergreen_api_test_selection}"
+    # If no parameter present, check the project setting
+    elif [ "${is_test_selection_enabled}" == true ]; then
+        extra_args="$extra_args --enableEvergreenApiTestSelection=${is_test_selection_enabled}"
     fi
 
     # Split comma separated list of strategies

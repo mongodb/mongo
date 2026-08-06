@@ -109,6 +109,9 @@ build_ci_flags() {
 
     if [ -n "${enable_evergreen_api_test_selection}" ]; then
         ci_flags+=" --test_arg=--enableEvergreenApiTestSelection=${enable_evergreen_api_test_selection}"
+    # If no parameter present, check the project setting
+    elif [ "${is_test_selection_enabled}" == true ]; then
+        ci_flags+=" --test_arg=--enableEvergreenApiTestSelection=${is_test_selection_enabled}"
     fi
 
     # Split comma separated list of strategies

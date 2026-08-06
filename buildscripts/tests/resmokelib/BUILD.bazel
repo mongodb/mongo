@@ -29,10 +29,6 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:resmoke",
-        dependency(
-            "mock",
-            group = "testing",
-        ),
     ],
 )
 
