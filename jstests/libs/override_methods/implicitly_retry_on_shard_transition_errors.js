@@ -179,6 +179,50 @@ function shouldRetry(cmdObj, res) {
     return false;
 }
 
+function logRetry(cmdName, attempt, res) {
+    jsTest.log.info(
+        "Retrying on error from " + cmdName + " with transitioning shard. Attempt: " + attempt,
+        {res},
+    );
+}
+
+function hasOnlyDuplicateKeyErrors(errorOrRes) {
+    if (errorOrRes.hasOwnProperty("writeErrors")) {
+        return (
+            errorOrRes.writeErrors.length > 0 &&
+            errorOrRes.writeErrors.every((err) => err.code === ErrorCodes.DuplicateKey)
+        );
+    }
+
+    return errorOrRes.code === ErrorCodes.DuplicateKey;
+}
+
+/**
+ * After retrying a failed insert, treat duplicate key errors as success since the
+ * documents may have been inserted by a previous attempt that failed partway through.
+ *
+ * @returns {object|null} A normalized success response, or null if not applicable.
+ */
+function tryNormalizeInsertDuplicateKeyErrors(cmdName, attempt, errorOrRes) {
+    if (cmdName !== "insert" || attempt <= 1 || !hasOnlyDuplicateKeyErrors(errorOrRes)) {
+        return null;
+    }
+
+    // Thrown errors may only carry a top-level error code.
+    const res =
+        errorOrRes.hasOwnProperty("writeErrors") || errorOrRes.hasOwnProperty("ok")
+            ? errorOrRes
+            : {ok: 0, n: 1};
+
+    if (res.hasOwnProperty("writeErrors")) {
+        res.n = (res.n || 0) + res.writeErrors.length;
+        delete res.writeErrors;
+    }
+
+    res.ok = 1;
+    return res;
+}
+
 function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs) {
     let res;
     let attempt = 0;
@@ -187,35 +231,34 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
         () => {
             attempt++;
 
-            res = func.apply(conn, makeFuncArgs(cmdObj));
+            try {
+                res = func.apply(conn, makeFuncArgs(cmdObj));
 
-            if (shouldRetry(cmdObj, res)) {
-                jsTest.log.info(
-                    "Retrying on error from " +
-                        cmdName +
-                        " with transitioning shard. Attempt: " +
-                        attempt,
-                    {res},
-                );
-                return kRetry;
-            }
-
-            // Some workloads use bulk inserts to load data and can fail with duplicate key errors
-            // on retry if the first attempt failed part way through because of a movePrimary.
-            if (cmdName === "insert" && attempt > 1 && res.hasOwnProperty("writeErrors")) {
-                const hasOnlyDuplicateKeyErrors = res.writeErrors.every((err) => {
-                    return err.code === ErrorCodes.DuplicateKey;
-                });
-                if (hasOnlyDuplicateKeyErrors) {
-                    res.n += res.writeErrors.length;
-                    delete res.writeErrors;
+                if (shouldRetry(cmdObj, res)) {
+                    logRetry(cmdName, attempt, res);
+                    return kRetry;
                 }
-                jsTest.log(
-                    "No longer retrying " + cmdName + " due to non-retryable error: " + tojson(res),
-                );
-            }
 
-            return kNoRetry;
+                const normalizedRes = tryNormalizeInsertDuplicateKeyErrors(cmdName, attempt, res);
+                if (normalizedRes) {
+                    res = normalizedRes;
+                }
+
+                return kNoRetry;
+            } catch (e) {
+                if (shouldRetry(cmdObj, e)) {
+                    logRetry(cmdName, attempt, e);
+                    return kRetry;
+                }
+
+                const normalizedRes = tryNormalizeInsertDuplicateKeyErrors(cmdName, attempt, e);
+                if (normalizedRes) {
+                    res = normalizedRes;
+                    return kNoRetry;
+                }
+
+                throw e;
+            }
         },
         () => "Timed out while retrying command '" + tojson(cmdObj) + "', response: " + tojson(res),
         kTimeout,
