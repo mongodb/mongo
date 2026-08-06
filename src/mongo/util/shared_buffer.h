@@ -5,12 +5,13 @@
 
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/platform/atomic.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <algorithm>
+#include <atomic>  // NOLINT
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -151,11 +152,15 @@ private:
 
         // these are called automatically by boost::intrusive_ptr
         friend void intrusive_ptr_add_ref(Holder* h) {
-            h->_refCount.fetchAndAdd(1);
+            // See this for a description of why relaxed is OK here. It is also used in libc++.
+            // http://www.boost.org/doc/libs/1_66_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters.discussion
+            h->_refCount.fetch_add(1, std::memory_order_relaxed);
         }
 
         friend void intrusive_ptr_release(Holder* h) {
-            if (h->_refCount.subtractAndFetch(1) == 0) {
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ
+            if (h->_refCount.fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 ByteAllocator byteAllocator{h->_allocator};
                 HolderAllocator holderAllocator{h->_allocator};
                 auto capacity = h->_capacity;
@@ -163,6 +168,7 @@ private:
                 HolderAllocatorTraits::destroy(holderAllocator, h);
                 byteAllocator.deallocate(reinterpret_cast<std::byte*>(h), kHolderSize + capacity);
             }
+            MONGO_COMPILER_DIAGNOSTIC_POP
         }
 
         char* data() {
@@ -174,11 +180,11 @@ private:
         }
 
         bool isShared() const {
-            return _refCount.load() > 1;
+            return _refCount.load(std::memory_order_acquire) > 1;
         }
 
         MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator _allocator;
-        Atomic<unsigned> _refCount;
+        std::atomic<unsigned> _refCount{0};  // NOLINT
         uint32_t _capacity;
     };
 
