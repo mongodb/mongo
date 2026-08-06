@@ -698,9 +698,15 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         }
 
         try {
+            // Only the retryable-writes path above categorizes the delete as
+            // WriteType::WithoutShardKeyWithId. In the transaction branch the write is
+            // WriteType::Ordinary, so it is never broadcast and cannot be over-counted.
+            const usedRetryableSession = !!session;
+
             // Used for validation after running the write operation.
             const containsMatchedDocs = collection.findOne(query) != null;
             const numMatchedDocsBefore = collection.countDocuments(query);
+            const uweEnabled = this.uweEnabled;
 
             jsTestLog(
                 "deleteOneWithId state running with query: " +
@@ -718,7 +724,19 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             const numMatchedDocsAfter = collection.countDocuments(query);
 
             if (containsMatchedDocs) {
-                assert.eq(res.deletedCount, 1, res);
+                // The unified write executor broadcasts a retryable delete by _id to every shard in
+                // scope and sums the per-shard replies without the dedup that BatchWriteExec
+                // performs. Once a concurrent migration has copied the session history to the
+                // recipient, the retried statement is counted on both shards and reported as
+                // 'deletedCount: 2'. Only the reported count is inflated -- the document is still
+                // removed exactly once, which the assertion below continues to enforce strictly.
+                // TODO SERVER-54019 Avoid over-counting 'n' and 'nModified' values when retrying
+                // updates by _id or deletes by _id after chunk migration.
+                assert.contains(
+                    res.deletedCount,
+                    uweEnabled && usedRetryableSession ? [1, 2] : [1],
+                    res,
+                );
                 assert.eq(numMatchedDocsAfter, numMatchedDocsBefore - 1);
             } else {
                 assert.eq(res.deletedCount, 0, res);
