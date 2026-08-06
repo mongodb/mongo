@@ -31,7 +31,15 @@ public:
         // BSONElementIterator does some interesting things with arrays that I don't think
         // SimpleArrayElementIterator does.
         if (_wsm->hasObj()) {
-            return new BSONElementIterator(path, _obj);
+            // Avoid a heap allocation per predicate by reusing the embedded iterator. Nested
+            // matching (e.g. $elemMatch) can request a second iterator while the first is still
+            // live, in which case we fall back to allocating.
+            if (_iteratorUsed) {
+                return new BSONElementIterator(path, _obj);
+            }
+            _iteratorUsed = true;
+            _iterator.reset(path, _obj);
+            return &_iterator;
         }
 
         // NOTE: This (kind of) duplicates code in WorkingSetMember::getFieldDotted.
@@ -69,12 +77,19 @@ public:
     }
 
     void releaseIterator(ElementIterator* iterator) const final {
-        delete iterator;
+        if (iterator == &_iterator) {
+            _iteratorUsed = false;
+        } else {
+            delete iterator;
+        }
     }
 
 private:
     WorkingSetMember* _wsm;
     BSONObj _obj;
+
+    mutable BSONElementIterator _iterator;
+    mutable bool _iteratorUsed = false;
 };
 
 class IndexKeyMatchableDocument : public MatchableDocument {
