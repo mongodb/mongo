@@ -34,6 +34,7 @@
 #include <stack>
 
 #include "mongo/base/init.h"
+#include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/matcher/doc_validation_util.h"
@@ -1828,8 +1829,11 @@ private:
                 "Must have at least one mismatched array element when generating an error for an "
                 "'InternalSchemaAllElemMatchFromIndexMatchExpression' expression",
                 failingElement);
-            _context->getCurrentObjBuilder().appendNumber(
-                "itemIndex"_sd, std::stoll(failingElement.fieldNameStringData().toString()));
+
+            int itemIndex;
+            uassertStatusOK(
+                NumberParser().base(10)(failingElement.fieldNameStringData(), &itemIndex));
+            _context->getCurrentObjBuilder().appendNumber("itemIndex"_sd, itemIndex);
             _context->setChildInput(toObjectWithPlaceholder(failingElement),
                                     _context->getCurrentInversion());
         } else {
