@@ -209,6 +209,65 @@ insertDocs(50);
 }
 
 // =============================================================================
+// internalSamplingSizeOverride knob
+// =============================================================================
+
+// The override knob takes precedence over the default size derived from samplingConfidenceInterval and
+// samplingMarginOfError when the command does not specify a sampleSize.
+cleanup();
+insertDocs(500);
+{
+    const overrideSize = 25;
+    assert.neq(
+        overrideSize,
+        defaultSampleSize,
+        "override size must differ from the derived default for this test to be meaningful",
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalSamplingSizeOverride: overrideSize}),
+    );
+    try {
+        runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "random",
+            requestedSampleSize: overrideSize,
+            actualSampleSize: overrideSize,
+            expectedSchemaVersion: expectedSchemaVersion,
+            expectedFields: sourceDocFields,
+        });
+    } finally {
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 0}));
+    }
+}
+
+// An explicit sampleSize on the command takes precedence over the override knob.
+cleanup();
+insertDocs(500);
+{
+    const explicitSampleSize = 40;
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 25}));
+    try {
+        runAnalyze({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: explicitSampleSize,
+            samplingMethod: "random",
+        });
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "random",
+            requestedSampleSize: explicitSampleSize,
+            actualSampleSize: explicitSampleSize,
+            expectedSchemaVersion: expectedSchemaVersion,
+            expectedFields: sourceDocFields,
+        });
+    } finally {
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 0}));
+    }
+}
+
+// =============================================================================
 // numChunks parameter
 // =============================================================================
 

@@ -17,6 +17,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
@@ -56,10 +57,6 @@ public:
      */
     void setPersistentSampleMethodForTesting(SamplingCEMethodEnum method) {
         _persistentSampleMethod = method;
-    }
-
-    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError) {
-        return SamplingEstimatorImpl::calculateSampleSize(ci, marginOfError);
     }
 
     static bool matches(const OrderedIntervalList& oil, BSONElement val) {
@@ -207,6 +204,14 @@ struct PlanRankingExecutionStatistics {
     std::map<int, std::map<SampleSizeDef, std::vector<double>>> cbrPlanningTimes;
     std::vector<double> selectivities;
 };
+
+/**
+ * Sets the confidence interval, margin of error, and sample size override knobs to the given values
+ * and returns the sample size that the sampling estimator derives from them.
+ */
+size_t sampleSizeForKnobs(SamplingConfidenceIntervalEnum ci,
+                          double marginOfError,
+                          int sampleSizeOverride = 0);
 
 size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef);
 

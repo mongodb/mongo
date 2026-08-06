@@ -11,6 +11,7 @@
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/idl/idl_parser.h"
 
 #include <string>
 
@@ -135,20 +136,29 @@ std::vector<BSONObj> SamplingEstimatorTest::createDocumentsFromSBEValue(
     return docs;
 }
 
+size_t sampleSizeForKnobs(SamplingConfidenceIntervalEnum ci,
+                          double marginOfError,
+                          int sampleSizeOverride) {
+    unittest::ServerParameterGuard confidenceIntervalGuard{"samplingConfidenceInterval",
+                                                           std::string{idl::serialize(ci)}};
+    unittest::ServerParameterGuard marginOfErrorGuard{"samplingMarginOfError", marginOfError};
+    unittest::ServerParameterGuard sampleSizeOverrideGuard{"internalSamplingSizeOverride",
+                                                           sampleSizeOverride};
+    return SamplingEstimatorImpl::calculateSampleSize(
+        QueryKnobConfiguration{query_settings::QuerySettings{}});
+}
+
 size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef) {
     // Translate the sample size definition to corresponding sample size.
     switch (sampleSizeDef) {
         case SampleSizeDef::ErrorSetting1: {
-            return SamplingEstimatorForTesting::calculateSampleSize(
-                SamplingConfidenceIntervalEnum::k95, 1.0);
+            return sampleSizeForKnobs(SamplingConfidenceIntervalEnum::k95, 1.0);
         }
         case SampleSizeDef::ErrorSetting2: {
-            return SamplingEstimatorForTesting::calculateSampleSize(
-                SamplingConfidenceIntervalEnum::k95, 2.0);
+            return sampleSizeForKnobs(SamplingConfidenceIntervalEnum::k95, 2.0);
         }
         case SampleSizeDef::ErrorSetting5: {
-            return SamplingEstimatorForTesting::calculateSampleSize(
-                SamplingConfidenceIntervalEnum::k95, 5.0);
+            return sampleSizeForKnobs(SamplingConfidenceIntervalEnum::k95, 5.0);
         }
     }
     MONGO_UNREACHABLE;

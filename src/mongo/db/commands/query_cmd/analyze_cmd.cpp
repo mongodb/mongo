@@ -213,8 +213,7 @@ void runSampleMode(OperationContext* opCtx,
         if (sampleSizeOpt) {
             sampleSize = *sampleSizeOpt;
         } else {
-            sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(
-                qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError());
+            sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(qkc);
         }
 
         if (requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {

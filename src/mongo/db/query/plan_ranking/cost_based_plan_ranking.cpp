@@ -29,8 +29,7 @@ using namespace cost_based_ranker;
 CostEstimate estimateCBRCost(const CanonicalQuery& query,
                              const std::vector<std::unique_ptr<QuerySolution>>& solutions) {
     const auto& qkc = query.getExpCtx()->getQueryKnobConfiguration();
-    auto sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(
-        qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError(), qkc.getSamplingSizeOverride());
+    auto sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(qkc);
 
     const auto randomSampleInc = makeCostCoefficient(nsec(1400));
     const auto matchExprInc = makeCostCoefficient(nsec(160));

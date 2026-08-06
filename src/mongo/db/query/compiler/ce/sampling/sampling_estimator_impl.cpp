@@ -321,12 +321,14 @@ std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(
 }
 
 
-size_t SamplingEstimatorImpl::calculateSampleSize(SamplingConfidenceIntervalEnum ci,
-                                                  double marginOfError,
-                                                  int32_t sampleSizeOverride) {
+size_t SamplingEstimatorImpl::calculateSampleSize(const QueryKnobConfiguration& qkc) {
+    const int sampleSizeOverride = qkc.getSamplingSizeOverride();
     if (sampleSizeOverride > 0) {
         return static_cast<size_t>(sampleSizeOverride);
     }
+
+    SamplingConfidenceIntervalEnum ci = qkc.getConfidenceInterval();
+    double marginOfError = qkc.getSamplingMarginOfError();
     uassert(9406301, "Margin of error should be larger than 0.", marginOfError > 0);
     double z = getZScore(ci);
     double ciWidth = 2 * marginOfError / 100.0;
@@ -1048,31 +1050,6 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
     const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    SamplingCEMethodEnum samplingStyle,
-    CardinalityEstimate collectionCard,
-    SamplingConfidenceIntervalEnum ci,
-    double marginOfError,
-    boost::optional<int> numChunks,
-    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-    SamplingSourceEnum samplingSource,
-    SamplingCEMethodEnum persistentSampleMethod)
-    : SamplingEstimatorImpl(opCtx,
-                            collections,
-                            nss,
-                            yieldPolicy,
-                            calculateSampleSize(ci, marginOfError),
-                            samplingStyle,
-                            numChunks,
-                            collectionCard,
-                            std::move(customerQueryExpCtx),
-                            samplingSource,
-                            persistentSampleMethod) {}
-
-SamplingEstimatorImpl::SamplingEstimatorImpl(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    const NamespaceString& nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t sampleSize,
     SamplingCEMethodEnum samplingStyle,
     boost::optional<int> numChunks,
@@ -1314,8 +1291,7 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
     const MultipleCollectionAccessor& collections,
     SamplingSourceEnum samplingSource) {
     const auto& qkc = cq.getExpCtx()->getQueryKnobConfiguration();
-    const size_t sampleSize = calculateSampleSize(
-        qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError(), qkc.getSamplingSizeOverride());
+    const size_t sampleSize = calculateSampleSize(qkc);
     return std::unique_ptr<ce::SamplingEstimatorImpl>(
         new ce::SamplingEstimatorImpl(cq.getOpCtx(),
                                       collections,

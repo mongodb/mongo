@@ -78,6 +78,9 @@ export function setPersistentSamplesConfig(
 // Get the default sample size based on query knobs so the test stays correct if knob values change
 export function defaultSampleSize(db) {
     const knobValues = getSampleSizeRelatedKnobs(db);
+    if (knobValues.kInternalSamplingSizeOverride > 0) {
+        return knobValues.kInternalSamplingSizeOverride;
+    }
     return calculateSampleSize(
         knobValues.kSamplingConfidenceInterval,
         knobValues.kSamplingMarginOfError,
@@ -466,12 +469,14 @@ function getSampleSizeRelatedKnobs(db) {
     const {
         samplingConfidenceInterval: kCI,
         samplingMarginOfError: kMoE,
+        internalSamplingSizeOverride: kSizeOverride,
         internalQueryNumChunksForChunkBasedSampling: kNumChunks,
     } = assert.commandWorked(
         db.adminCommand({
             getParameter: 1,
             samplingConfidenceInterval: 1,
             samplingMarginOfError: 1,
+            internalSamplingSizeOverride: 1,
             internalQueryNumChunksForChunkBasedSampling: 1,
         }),
     );
@@ -479,6 +484,7 @@ function getSampleSizeRelatedKnobs(db) {
     return {
         kSamplingConfidenceInterval: kCI,
         kSamplingMarginOfError: kMoE,
+        kInternalSamplingSizeOverride: kSizeOverride,
         kInternalQueryNumChunksForChunkBasedSampling: kNumChunks,
     };
 }

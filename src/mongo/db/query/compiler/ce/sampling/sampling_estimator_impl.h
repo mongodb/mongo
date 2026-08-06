@@ -11,6 +11,7 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/modules.h"
@@ -39,32 +40,9 @@ public:
         const MultipleCollectionAccessor& collections,
         SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
-    /**
-     * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
-     * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' is the on-the-fly
-     * method used when no persisted sample is loaded. 'samplingSource' controls whether to try
-     * reading a persistent sample from `<db>.system.stats.samples` before falling back to
-     * on-the-fly SBE sampling; 'analyze' passes kOnTheFlySample to bypass the persisted read.
-     * 'persistentSampleMethod' independently picks which sampling technique to look for in the
-     * persisted samples collection. Prefer the factory method above outside tests.
-     */
-    SamplingEstimatorImpl(
-        OperationContext* opCtx,
-        const MultipleCollectionAccessor& collections,
-        const NamespaceString& nss,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        SamplingCEMethodEnum samplingStyle,
-        CardinalityEstimate collectionCard,
-        SamplingConfidenceIntervalEnum ci,
-        double marginOfError,
-        boost::optional<int> numChunks,
-        boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
-        SamplingCEMethodEnum persistentSampleMethod = PersistentSampleCEMethod::kDataDefault);
-
     /*
-     * Lets the caller specify an exact sample size, e.g. for a smaller preliminary-analysis
-     * sample. Prefer the factory method above outside tests.
+     * Lets the caller specify an exact sample size. Prefer the factory method above for most use
+     * cases outside tests.
      */
     SamplingEstimatorImpl(
         OperationContext* opCtx,
@@ -270,14 +248,13 @@ public:
     }
 
     /*
-     * The sample size is calculated based on the confidence level and margin of error(MoE)
-     * required.  n = Z^2 / W^2
-     * where Z is the z-score for the confidence interval and
-     * W is the width of the confidence interval, W = 2 * MoE.
+     * Returns the sample size as set by the relevant knobs. Unless overridden, calculated from
+     * confidence interval and margin of error:
+     * n = Z^2 / W^2
+     * where Z is the z-score for the confidence interval
+     * and W is the width of the confidence interval, W = 2 * MoE.
      */
-    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci,
-                                      double marginOfError,
-                                      int32_t sampleSizeOverride = 0);
+    static size_t calculateSampleSize(const QueryKnobConfiguration& qkc);
 
     /**
      * TODO SERVER-129240: Remove this helper once types are unified

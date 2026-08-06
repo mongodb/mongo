@@ -19,7 +19,9 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
+#include "mongo/db/query/query_settings/query_settings_context_test_util.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
@@ -564,7 +566,7 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
     ASSERT_EQUALS(newSample.size(), 3);
 }
 
-TEST_F(SamplingEstimatorTest, SampleSize) {
+TEST_F(SamplingEstimatorTest, CalculateSampleSize) {
     std::map<std::pair<SamplingConfidenceIntervalEnum, double>, size_t> sampleSizes = {
         {std::make_pair(SamplingConfidenceIntervalEnum::k90, 2), 1691},
         {std::make_pair(SamplingConfidenceIntervalEnum::k95, 2), 2401},
@@ -574,10 +576,65 @@ TEST_F(SamplingEstimatorTest, SampleSize) {
         {std::make_pair(SamplingConfidenceIntervalEnum::k99, 5), 664},
     };
     for (auto& el : sampleSizes) {
-        auto size =
-            SamplingEstimatorForTesting::calculateSampleSize(el.first.first, el.first.second);
-        ASSERT_EQUALS(size, el.second);
+        ASSERT_EQUALS(sampleSizeForKnobs(el.first.first, el.first.second), el.second);
     }
+}
+
+TEST_F(SamplingEstimatorTest, CalculateSampleSizeOverrideKnobTakesPrecedence) {
+    // The override wins over the confidence interval and margin of error knobs.
+    ASSERT_EQUALS(sampleSizeForKnobs(SamplingConfidenceIntervalEnum::k95, 5.0, 42), 42);
+    ASSERT_EQUALS(sampleSizeForKnobs(SamplingConfidenceIntervalEnum::k90, 1.0, 42), 42);
+
+    // Without the override, the size is derived from those two knobs again.
+    ASSERT_EQUALS(sampleSizeForKnobs(SamplingConfidenceIntervalEnum::k95, 5.0), 384);
+}
+
+TEST_F(SamplingEstimatorTest, CalculateSampleSizeRespectsQuerySettingsKnobOverrides) {
+    const size_t card = 500;
+    insertDocuments(kTestNss, createDocuments(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    unittest::ServerParameterGuard featureFlagGuard{"featureFlagPqsQueryKnobs", true};
+
+    // Persistent query settings takes effect even though the global knob value is unchanged.
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        operationContext(), fromjson(R"({queryKnobs: {samplingMarginOfError: 2.0}})")};
+
+    auto cq =
+        createCanonicalQueryFromMatchExpression(*this, std::make_unique<AndMatchExpression>());
+    auto estimator = SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+        *cq,
+        SamplingEstimatorTest::makeCardinalityEstimate(card),
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        colls);
+    // The size reflects k95 with the 2% margin of error from the query settings.
+    ASSERT_EQUALS(estimator->getSampleSize(),
+                  sampleSizeForKnobs(SamplingConfidenceIntervalEnum::k95, 2.0));
+}
+
+TEST_F(SamplingEstimatorTest, CalculateSampleSizeRespectsQuerySettingsSampleSizeOverride) {
+    const size_t card = 500;
+    insertDocuments(kTestNss, createDocuments(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    unittest::ServerParameterGuard featureFlagGuard{"featureFlagPqsQueryKnobs", true};
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        operationContext(), fromjson(R"({queryKnobs: {samplingSizeOverride: 77}})")};
+
+    auto cq =
+        createCanonicalQueryFromMatchExpression(*this, std::make_unique<AndMatchExpression>());
+    auto estimator = SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+        *cq,
+        SamplingEstimatorTest::makeCardinalityEstimate(card),
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        colls);
+    ASSERT_EQUALS(estimator->getSampleSize(), 77);
 }
 
 TEST_F(SamplingEstimatorTest, SampleSizeRespectsSampleSizeParamState) {
@@ -588,10 +645,11 @@ TEST_F(SamplingEstimatorTest, SampleSizeRespectsSampleSizeParamState) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    // When 'internalSamplingSizeOverride' is not set, the sample size is derived from confidence
-    // interval and margin of error (k95, 5.0 -> 384).
-    const size_t defaultSampleSize =
-        SamplingEstimatorForTesting::calculateSampleSize(SamplingConfidenceIntervalEnum::k95, 5.0);
+    // When 'internalSamplingSizeOverride' is not set and no query settings are applied, the sample
+    // size is derived from default confidence interval and margin of error values
+    // (k95, 5.0 -> 384).
+    const size_t defaultSampleSize = SamplingEstimatorImpl::calculateSampleSize(
+        QueryKnobConfiguration{query_settings::QuerySettings{}});
 
     auto cq =
         createCanonicalQueryFromMatchExpression(*this, std::make_unique<AndMatchExpression>());
