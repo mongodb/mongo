@@ -221,3 +221,6 @@ filters:
   - "invalid_shard_identity_doc.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "retryable_find_and_modify_remove_by_id_chunk_migration.js":
+    approvers:
+      - 10gen/query-execution-router
