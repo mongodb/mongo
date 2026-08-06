@@ -78,12 +78,17 @@ size_t CachedJoinPlan::estimateObjectSizeInBytes() const {
 
 JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                                        join_ordering::NodeId baseNode,
-                                       std::vector<CollectionTag> collections)
+                                       std::vector<CollectionTag> collections,
+                                       std::vector<NodeFingerprint> nodeFingerprints)
     : joinTree(std::move(joinTree)),
       baseNode(baseNode),
       collections(std::move(collections)),
-      estimatedEntrySizeBytes(sizeof(JoinPlanCacheEntry) +
-                              (this->joinTree ? this->joinTree->estimateObjectSizeInBytes() : 0)) {}
+      nodeFingerprints(std::move(nodeFingerprints)),
+      estimatedEntrySizeBytes(
+          sizeof(JoinPlanCacheEntry) +
+          (this->joinTree ? this->joinTree->estimateObjectSizeInBytes() : 0) +
+          container_size_helper::estimateObjectSizeInBytes(this->collections) +
+          container_size_helper::estimateObjectSizeInBytes(this->nodeFingerprints)) {}
 
 std::shared_ptr<const JoinPlanCacheEntry> JoinPlanCache::lookup(const JoinPlanCacheKey& key) const {
     // Hold the partition lock while copying out the shared_ptr because PartitionedCache::lookup()
@@ -135,28 +140,43 @@ std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& 
     return tags;
 }
 
-bool areCollectionTagsCurrent(const std::vector<CollectionTag>& tags,
-                              const MultipleCollectionAccessor& mca) {
+CollectionTagStatus classifyCollectionTags(const std::vector<CollectionTag>& tags,
+                                           const MultipleCollectionAccessor& mca) {
+    auto status = CollectionTagStatus::kCurrent;
+
     // TODO (SERVER-130873): Simplify lookup once we have constant time access via UUID.
     for (const auto& tag : tags) {
-        bool found = false;
-        bool isCurrent = false;
+        boost::optional<CollectionVersionTag> liveTag;
         mca.forEach([&](const CollectionPtr& collection) {
-            if (found || !collection || collection->uuid() != tag.uuid) {
+            if (liveTag || !collection || collection->uuid() != tag.uuid) {
                 return;
             }
-            found = true;
-            isCurrent = (JoinPlanCache::currentVersionTags(collection.get()) == tag.versionTag);
+            liveTag = JoinPlanCache::currentVersionTags(collection.get());
         });
-        if (!isCurrent) {
+
+        if (!liveTag) {
+            // The collection with the given UUID no longer exists, i.e. it was dropped.
+            // This is the most restrictive status, so no other collection can change the outcome.
             LOGV2_DEBUG(12926600,
                         5,
-                        "Detected stale join plan cache entry due to stale CollectionVersionTag",
+                        "Join plan cache entry references a collection which no longer exists",
                         "uuid"_attr = tag.uuid);
-            return false;
+            return CollectionTagStatus::kStale;
         }
+        if (liveTag->collectionVersion != tag.versionTag.collectionVersion) {
+            // A DDL ran, but it may have been on an index this plan could never use, which
+            // the relevant-index fingerprints can settle.
+            LOGV2_DEBUG(13036800,
+                        5,
+                        "Collection version bumped since the join plan was cached",
+                        "uuid"_attr = tag.uuid,
+                        "cachedVersion"_attr = tag.versionTag.collectionVersion,
+                        "currentVersion"_attr = liveTag->collectionVersion);
+            status = CollectionTagStatus::kNeedsIndexRevalidation;
+        }
+        // TODO (SERVER-129270): Return kStale when the persisted sample has been refreshed.
     }
-    return true;
+    return status;
 }
 
 }  // namespace mongo

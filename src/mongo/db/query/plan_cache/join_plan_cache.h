@@ -120,7 +120,8 @@ using NodeFingerprint = std::size_t;
 struct JoinPlanCacheEntry {
     JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                        join_ordering::NodeId baseNode,
-                       std::vector<CollectionTag> collections);
+                       std::vector<CollectionTag> collections,
+                       std::vector<NodeFingerprint> nodeFingerprints);
 
     // Reconstructable plan.
     std::unique_ptr<const CachedJoinPlan> joinTree;
@@ -132,7 +133,11 @@ struct JoinPlanCacheEntry {
     // invalidation on plan cache lookup.
     std::vector<CollectionTag> collections;
 
-    // TODO: (SERVER-130368) Add relevant index invalidation.
+    // One fingerprint per join graph node, indexed by NodeId in ascending order - exactly the
+    // layout 'join_ordering::makeNodeFingerprints' returns. Captured when this entry was cached
+    // and compared against freshly computed fingerprints when 'collections' no longer validates,
+    // so that an index DDL irrelevant to this plan does not force a replan.
+    std::vector<NodeFingerprint> nodeFingerprints;
 
     // Estimated memory footprint of this entry.
     // Precomputed once at construction as the join tree is immutable.
@@ -145,12 +150,26 @@ struct JoinPlanCacheEntry {
 std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& mca);
 
 /*
- * Returns true iff every tag in 'tags' still matches the corresponding live collection in 'mca'.
- * A referenced collection that's no longer resolvable in 'mca' (dropped/renamed) counts as a
- * mismatch, not an error.
+ * The action to take with a cached entry, given its collection tags.
  */
-bool areCollectionTagsCurrent(const std::vector<CollectionTag>& tags,
-                              const MultipleCollectionAccessor& mca);
+enum class CollectionTagStatus {
+    // Reuse the entry.
+    kCurrent,
+
+    // A DDL ran, but it may have been on an index the plan could never use. Compare the
+    // relevant-index fingerprints to decide.
+    kNeedsIndexRevalidation,
+
+    // Discard the entry; no fingerprint can rescue it.
+    kStale,
+};
+
+/*
+ * Classifies 'tags' against the live collections in 'mca'. When several collections disagree, the
+ * most restrictive status wins, in the order kStale > kNeedsIndexRevalidation > kCurrent.
+ */
+CollectionTagStatus classifyCollectionTags(const std::vector<CollectionTag>& tags,
+                                           const MultipleCollectionAccessor& mca);
 
 // Functor for estimating the memory footprint of a join plan cache entry.
 struct JoinPlanCacheBudgetEstimator {

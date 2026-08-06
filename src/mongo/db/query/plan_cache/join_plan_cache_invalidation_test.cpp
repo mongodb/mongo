@@ -68,7 +68,8 @@ TEST_F(JoinPlanCacheInvalidationTest, MakeCollectionTagsCapturesCurrentTags) {
     ASSERT_EQ(liveTag.collectionVersion, tags[0].versionTag.collectionVersion);
     ASSERT_EQ(0, tags[0].versionTag.sampleVersion);
 
-    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr, join_ordering::NodeId{0}, tags);
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, tags, std::vector<NodeFingerprint>{});
     ASSERT_EQ(1, entry->collections.size());
     ASSERT_EQ(coll.uuid(), entry->collections[0].uuid);
     ASSERT_EQ(liveTag.collectionVersion, entry->collections[0].versionTag.collectionVersion);
@@ -81,10 +82,10 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsAreCurrentWhenNothingChanged) {
     MultipleCollectionAccessor mca(coll);
 
     auto tags = makeCollectionTags(mca);
-    ASSERT_TRUE(areCollectionTagsCurrent(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kCurrent, classifyCollectionTags(tags, mca));
 }
 
-TEST_F(JoinPlanCacheInvalidationTest, TagsAreNotCurrentAfterSimulatedCatalogChange) {
+TEST_F(JoinPlanCacheInvalidationTest, TagsNeedRevalidationAfterSimulatedCatalogChange) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     auto coll = createAndAcquireCollection(nss);
     MultipleCollectionAccessor mca(coll);
@@ -96,10 +97,12 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsAreNotCurrentAfterSimulatedCatalogChan
     ASSERT_EQ(baseVersion + 1,
               JoinPlanCache::currentVersionTags(coll.getCollectionPtr().get()).collectionVersion);
 
-    ASSERT_FALSE(areCollectionTagsCurrent(tags, mca));
+    // The DDL may have been irrelevant to any cached plan, so this is the recoverable status
+    // rather than an outright rejection.
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
 }
 
-TEST_F(JoinPlanCacheInvalidationTest, TagsAreNotCurrentWhenCachedTagIsAheadOfCurrent) {
+TEST_F(JoinPlanCacheInvalidationTest, TagsNeedRevalidationWhenCachedTagIsAheadOfCurrent) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     auto coll = createAndAcquireCollection(nss);
     MultipleCollectionAccessor mca(coll);
@@ -111,10 +114,10 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsAreNotCurrentWhenCachedTagIsAheadOfCur
     std::vector<CollectionTag> tags{CollectionTag{
         coll.uuid(), CollectionVersionTag{.collectionVersion = 5, .sampleVersion = 0}}};
 
-    ASSERT_FALSE(areCollectionTagsCurrent(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
 }
 
-TEST_F(JoinPlanCacheInvalidationTest, TagsAreNotCurrentWhenCollectionIsGone) {
+TEST_F(JoinPlanCacheInvalidationTest, TagsAreStaleWhenCollectionIsGone) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     auto coll = createAndAcquireCollection(nss);
     MultipleCollectionAccessor mca(coll);
@@ -122,9 +125,10 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsAreNotCurrentWhenCollectionIsGone) {
     auto tags = makeCollectionTags(mca);
 
     // 'mca' below has no collection matching the tag's uuid (simulating the referenced collection
-    // having been dropped/renamed since the plan was cached). This must not crash.
+    // having been dropped/renamed since the plan was cached). This must not crash, and there is no
+    // catalog left to fingerprint against, so it must not ask for revalidation either.
     MultipleCollectionAccessor emptyMca;
-    ASSERT_FALSE(areCollectionTagsCurrent(tags, emptyMca));
+    ASSERT_EQ(CollectionTagStatus::kStale, classifyCollectionTags(tags, emptyMca));
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, MultiCollectionTagsTrackMainAndSecondary) {
@@ -141,11 +145,33 @@ TEST_F(JoinPlanCacheInvalidationTest, MultiCollectionTagsTrackMainAndSecondary) 
 
     auto tags = makeCollectionTags(mca);
     ASSERT_EQ(2, tags.size());
-    ASSERT_TRUE(areCollectionTagsCurrent(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kCurrent, classifyCollectionTags(tags, mca));
 
     // Bumping only the secondary collection's tag should be enough to invalidate.
     bumpCatalogVersion(secondaryColl);
-    ASSERT_FALSE(areCollectionTagsCurrent(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
+}
+
+TEST_F(JoinPlanCacheInvalidationTest, ClassifyTagsReportsMostRestrictiveStatusAcrossCollections) {
+    auto mainNss = NamespaceString::createNamespaceString_forTest("TestDB", "MainColl");
+    auto secondaryNss = NamespaceString::createNamespaceString_forTest("TestDB", "SecondaryColl");
+    auto mainColl = createAndAcquireCollection(mainNss);
+    auto secondaryColl = createAndAcquireCollection(secondaryNss);
+
+    MultipleCollectionAccessor mca(
+        CollectionOrViewAcquisition(CollectionAcquisition(mainColl)),
+        makeAcquisitionMap(CollectionOrViewAcquisitions{
+            CollectionOrViewAcquisition(CollectionAcquisition(secondaryColl))}),
+        false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    auto tags = makeCollectionTags(mca);
+    ASSERT_EQ(2, tags.size());
+
+    // One collection revalidatable, the other gone: the entry must be rejected outright rather
+    // than given the fingerprint second chance.
+    ++tags[0].versionTag.collectionVersion;
+    tags[1].uuid = UUID::gen();
+    ASSERT_EQ(CollectionTagStatus::kStale, classifyCollectionTags(tags, mca));
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, BumpCollectionVersionForDDLIncrementsVersion) {
@@ -176,7 +202,7 @@ TEST_F(JoinPlanCacheInvalidationTest, BumpCollectionVersionForDDLIsMonotonicAcro
               JoinPlanCache::currentVersionTags(coll.getCollectionPtr().get()).collectionVersion);
 }
 
-TEST_F(JoinPlanCacheInvalidationTest, RealIndexCreationBumpsVersionAndInvalidatesCachedTags) {
+TEST_F(JoinPlanCacheInvalidationTest, RealIndexCreationBumpsVersionAndRequiresRevalidation) {
     auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
 
@@ -202,10 +228,10 @@ TEST_F(JoinPlanCacheInvalidationTest, RealIndexCreationBumpsVersionAndInvalidate
     auto coll = acquireForRead(nss);
     MultipleCollectionAccessor mca(coll);
     // The DDL bumped the live version past the captured baseline, so the previously-captured
-    // tags are now stale.
+    // tags no longer validate on their own.
     ASSERT_LT(baseVersion,
               JoinPlanCache::currentVersionTags(coll.getCollectionPtr().get()).collectionVersion);
-    ASSERT_FALSE(areCollectionTagsCurrent(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
 }
 
 }  // namespace

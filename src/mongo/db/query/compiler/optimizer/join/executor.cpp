@@ -16,6 +16,7 @@
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 #include "mongo/db/query/compiler/optimizer/join/hint.h"
+#include "mongo/db/query/compiler/optimizer/join/index_fingerprint.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
@@ -356,19 +357,68 @@ void recordSuffixLoweringMetrics(const Pipeline* suffix,
     metrics.numResidualClassicSources = suffix ? suffix->getSources().size() : 0;
 }
 
+/**
+ * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
+ * if it is stale and the query must be replanned.
+ *
+ * A bumped collection version alone is not enough to reject the entry: the DDL responsible may
+ * have touched an index that is irrelevant to the cached plan. In that case we use relevant-index
+ * fingerprints, which only cover indexes usable for the fields each join graph node actually
+ * references.
+ */
+bool validateCacheEntry(const JoinPlanCacheEntry& hit,
+                        const MultipleCollectionAccessor& mca,
+                        const AggJoinModel& model,
+                        const AvailableIndexes& perCollIdxs) {
+    switch (classifyCollectionTags(hit.collections, mca)) {
+        case CollectionTagStatus::kCurrent:
+            // Nothing has changed since the entry was cached, so no fingerprinting is needed.
+            return true;
+        case CollectionTagStatus::kStale:
+            // A stale tag can mean a dropped collection or a sample refresh.
+            return false;
+        case CollectionTagStatus::kNeedsIndexRevalidation:
+            break;
+    }
+
+    tassert(13036801,
+            "Cached join plan must have one index fingerprint per join graph node",
+            hit.nodeFingerprints.size() == model.getGraph().numNodes());
+
+    auto currentFingerprints =
+        makeNodeFingerprints(model.getGraph(), model.getResolvedPaths(), perCollIdxs);
+    if (hit.nodeFingerprints != currentFingerprints) {
+        LOGV2_DEBUG(
+            13036802, 5, "Join plan cache entry invalidated by a change to a relevant index");
+        return false;
+    }
+
+    // TODO (SERVER-131010): Refresh the entry's collection version tags here, so that subsequent
+    // lookups take the fast path above instead of re-fingerprinting on every query.
+    LOGV2_DEBUG(13036803,
+                5,
+                "Join plan cache entry revalidated: the catalog change did not affect any relevant "
+                "index");
+    return true;
+}
+
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     OperationContext* opCtx,
     const JoinPlanCacheKey& cacheKey,
     const MultipleCollectionAccessor& mca,
     const AggJoinModel& model,
+    const AvailableIndexes& perCollIdxs,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     OpDebug::JoinOptimizationMetrics& metrics) {
     auto& cache = JoinPlanCache::get(opCtx->getServiceContext());
     auto hit = cache.lookup(cacheKey);
+    if (!hit) {
+        return nullptr;
+    }
+
     // TODO (SERVER-129268): Evict stale entries.
-    if (hit && areCollectionTagsCurrent(hit->collections, mca)) {
+    if (validateCacheEntry(*hit, mca, model, perCollIdxs)) {
         LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
-        auto perCollIdxs = extractINLJEligibleIndexesFromGraph(model.getGraph(), mca);
         auto qsn = fromCachedJoinPlan(opCtx, model.getGraph(), mca, perCollIdxs, *hit->joinTree);
         auto winnerSoln = std::make_unique<QuerySolution>();
         winnerSoln->setRoot(std::move(qsn));
@@ -498,10 +548,15 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     const bool useJoinPlanCache = !hintedStrat &&
         qkc.getJoinReorderMode() != JoinReorderModeEnum::kRandom && qkc.getEnableJoinPlanCache() &&
         !expCtx->getExplain().has_value();
+
+    // 'cacheKey' and 'cacheEligibleIdxs' are set iff 'useJoinPlanCache' is true.
     boost::optional<JoinPlanCacheKey> cacheKey;
+    boost::optional<AvailableIndexes> cacheEligibleIdxs;
     if (useJoinPlanCache) {
         cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
-        auto exec = checkPlanCacheForPlan(opCtx, *cacheKey, mca, model, yieldPolicy, metrics);
+        cacheEligibleIdxs = extractINLJEligibleIndexesFromGraph(model.getGraph(), mca);
+        auto exec = checkPlanCacheForPlan(
+            opCtx, *cacheKey, mca, model, *cacheEligibleIdxs, yieldPolicy, metrics);
         if (exec) {
             joinPlanCacheHits.increment(1);
             return JoinReorderedExecutorResult{.executor = std::move(exec),
@@ -610,8 +665,18 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Store the winning plan in the join plan cache for future queries with the same shape.
     if (cacheWinningPlan && reordered.cachedJoinPlan) {
+        tassert(13036804,
+                "Join plan cache key must be set when the join plan cache is in use",
+                cacheKey.has_value());
+        tassert(13036805,
+                "Join plan cache eligible indexes must be set when the join plan cache is in use",
+                cacheEligibleIdxs.has_value());
+
         auto entry = std::make_unique<JoinPlanCacheEntry>(
-            std::move(reordered.cachedJoinPlan), reordered.baseNode, makeCollectionTags(mca));
+            std::move(reordered.cachedJoinPlan),
+            reordered.baseNode,
+            makeCollectionTags(mca),
+            makeNodeFingerprints(model.getGraph(), model.getResolvedPaths(), *cacheEligibleIdxs));
         JoinPlanCache::get(opCtx->getServiceContext()).put(std::move(*cacheKey), std::move(entry));
     }
 
