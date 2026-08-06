@@ -105,6 +105,17 @@ TEST_F(GoldenGenExpressionTest, TestSimpleExpr) {
         runTest(&arr2ObjExpr, rootSlot, Value(root), "ExpressionArrayToObject"sv);
     }
     {
+        // Wrap in $objectToArray (rather than using a constant array) so the argument isn't
+        // constant-folded away before it reaches the SBE stage builder.
+        auto varExpr = ExpressionFieldPath::createVarFromString(
+            _expCtx.get(), "ROOT", _expCtx->variablesParseState);
+        boost::intrusive_ptr<ExpressionObjectToArray> obj2arrExpr{
+            new ExpressionObjectToArray(_expCtx.get())};
+        obj2arrExpr->addOperand(varExpr);
+        ExpressionSize sizeExpr(_expCtx.get(), {obj2arrExpr});
+        runTest(&sizeExpr, rootSlot, Value(4), "ExpressionSize"sv);
+    }
+    {
         auto varExpr = ExpressionFieldPath::createVarFromString(
             _expCtx.get(), "ROOT", _expCtx->variablesParseState);
         ExpressionBsonSize bsonSizeExpr(_expCtx.get());

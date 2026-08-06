@@ -4,6 +4,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -43,7 +44,7 @@ std::unique_ptr<Pipeline> makePipeline(boost::intrusive_ptr<mongo::ExpressionCon
     return pipeline_factory::makePipeline(stages, expCtx, pipeline_factory::kOptionsMinimal);
 }
 
-std::vector<BSONObj> makeAndOptimizePipeline(
+std::unique_ptr<Pipeline> makeAndOptimizePipelineKeepingStages(
     boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
     std::vector<BSONObj> stages,
     int bucketMaxSpanSeconds,
@@ -53,7 +54,19 @@ std::vector<BSONObj> makeAndOptimizePipeline(
     auto pipeline =
         makePipeline(expCtx, stages, bucketMaxSpanSeconds, fixedBuckets, fields, exclude);
     pipeline_optimization::optimizePipeline(*pipeline);
-    return pipeline->serializeToBson();
+    return pipeline;
+}
+
+std::vector<BSONObj> makeAndOptimizePipeline(
+    boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+    std::vector<BSONObj> stages,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets,
+    BSONArray fields = BSONArray(),
+    bool exclude = true) {
+    return makeAndOptimizePipelineKeepingStages(
+               expCtx, stages, bucketMaxSpanSeconds, fixedBuckets, fields, exclude)
+        ->serializeToBson();
 }
 
 // This makes a pipeline and optimizes twice, once as the router, and once as a shard. This is meant
@@ -88,6 +101,13 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountAggStage) {
         "'$control.version', {$const : 2} ]}, '$control.count', {$size : [ {$objectToArray : "
         "['$data.t']} ] } ] } }, $willBeMerged: false } }");
     ASSERT_BSONOBJ_EQ(groupOptimized, serialized[0]);
+
+    // The $size in the rewrite is SBE-supported, so the group shouldn't be forced to classic.
+    auto pipeline = makeAndOptimizePipelineKeepingStages(
+        getExpCtx(), {countSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    auto* group = dynamic_cast<DocumentSourceGroup*>(pipeline->getSources().front().get());
+    ASSERT(group);
+    ASSERT_EQ(SbeCompatibility::noRequirements, group->sbeCompatibility());
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountInGroup) {
@@ -102,6 +122,13 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountInGroup) {
         "'$control.version', {$const : 2} ]}, '$control.count', {$size : [ {$objectToArray : "
         "['$data.t']} ] } ] } }, $willBeMerged: false } }");
     ASSERT_BSONOBJ_EQ(groupOptimized, serialized[0]);
+
+    // The $size in the rewrite is SBE-supported, so the group shouldn't be forced to classic.
+    auto pipeline = makeAndOptimizePipelineKeepingStages(
+        getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    auto* group = dynamic_cast<DocumentSourceGroup*>(pipeline->getSources().front().get());
+    ASSERT(group);
+    ASSERT_EQ(SbeCompatibility::noRequirements, group->sbeCompatibility());
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountNegative) {

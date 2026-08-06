@@ -2632,7 +2632,33 @@ public:
     }
 
     void visit(const ExpressionSize* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arg = popExpr();
+        auto frameId = _context->state.frameId();
+        SbVar var{frameId, 0};
+
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, var));
+        auto makeNotArrayFail = [&] {
+            return _b.makeFail(ErrorCodes::Error{8069800},
+                               "The argument to $size must be an array");
+        };
+
+        // getArraySize() always returns an int64, but classic $size returns an int32 when the
+        // count fits (Value::createIntOrLong), so narrow the result to match.
+        auto sizeFrameId = _context->state.frameId();
+        SbVar sizeVar{sizeFrameId, 0};
+        auto narrowedSize = _b.makeLet(
+            sizeFrameId,
+            SbExpr::makeSeq(_b.makeFunction(sbe::EFn::kGetArraySize, var)),
+            _b.makeFillEmpty(_b.makeNumericConvert(sizeVar, sbe::value::TypeTags::NumberInt32),
+                             sizeVar));
+
+        auto sizeExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(var), makeNotArrayFail()},
+                SbExprPair{std::move(argumentIsNotArray), makeNotArrayFail()}),
+            std::move(narrowedSize));
+
+        pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(sizeExpr)));
     }
     void visit(const ExpressionReverseArray* expr) final {
         auto arg = popExpr();

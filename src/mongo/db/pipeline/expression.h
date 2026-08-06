@@ -3859,14 +3859,10 @@ public:
 class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
 public:
     explicit ExpressionSize(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSize, 1>(expCtx) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : ExpressionFixedArity<ExpressionSize, 1>(expCtx) {}
 
     ExpressionSize(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionSize, 1>(expCtx, std::move(children)) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : ExpressionFixedArity<ExpressionSize, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root,
                    Variables* variables,
