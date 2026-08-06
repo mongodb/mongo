@@ -25,16 +25,14 @@ class SbeValueTest : public SbeStageBuilderTestFixture {};
 TEST_F(SbeValueTest, CompareTwoObjectsWithSubobjectsOfDifferentTypesWithDifferentFieldNames) {
     auto lhsObj = BSON("a" << kMinBSONKey);
     auto rhsObj = BSON("a" << BSON("c" << 1));
-    auto [lhsTag, lhsVal] = value::copyValue(value::TypeTags::bsonObject,
-                                             value::bitcastFrom<const char*>(lhsObj.objdata()));
-    value::ValueGuard lhsGuard{lhsTag, lhsVal};
+    value::TagValueOwned lhs = value::TagValueOwned::fromRaw(value::copyValue(
+        value::TypeTags::bsonObject, value::bitcastFrom<const char*>(lhsObj.objdata())));
 
-    auto [rhsTag, rhsVal] = value::copyValue(value::TypeTags::bsonObject,
-                                             value::bitcastFrom<const char*>(rhsObj.objdata()));
-    value::ValueGuard rhsGuard{rhsTag, rhsVal};
+    value::TagValueOwned rhs = value::TagValueOwned::fromRaw(value::copyValue(
+        value::TypeTags::bsonObject, value::bitcastFrom<const char*>(rhsObj.objdata())));
 
     // LHS should compare less than RHS.
-    auto [cmpTag, cmpVal] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+    auto [cmpTag, cmpVal] = value::compareValue(lhs.tag(), lhs.value(), rhs.tag(), rhs.value());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
 }
@@ -46,17 +44,15 @@ TEST_F(SbeValueTest, CompareTwoArraySets) {
     auto arraySetComparisonTestGenFn = [](std::function<ValueFnType> lhsValueGenFn,
                                           std::function<ValueFnType> rhsValueGenFn,
                                           std::function<AssertFnType> assertFn) {
-        auto [lhsTag, lhsVal] = value::makeNewArraySet();
-        value::ValueGuard lhsGuard{lhsTag, lhsVal};
-        auto lhsView = value::getArraySetView(lhsVal);
+        value::TagValueOwned lhs = value::TagValueOwned::fromRaw(value::makeNewArraySet());
+        auto lhsView = value::getArraySetView(lhs.value());
         lhsValueGenFn(lhsView);
 
-        auto [rhsTag, rhsVal] = value::makeNewArraySet();
-        value::ValueGuard rhsGuard{rhsTag, rhsVal};
-        auto rhsView = value::getArraySetView(rhsVal);
+        value::TagValueOwned rhs = value::TagValueOwned::fromRaw(value::makeNewArraySet());
+        auto rhsView = value::getArraySetView(rhs.value());
         rhsValueGenFn(rhsView);
 
-        assertFn(lhsTag, lhsVal, rhsTag, rhsVal);
+        assertFn(lhs.tag(), lhs.value(), rhs.tag(), rhs.value());
     };
 
     auto arraySetEqualityComparisonTestGenFn = [&](std::function<ValueFnType> lhsValueGenFn,
@@ -160,10 +156,10 @@ void insertIntoMapType(value::ValueMapType<size_t>* map,
                        value::TypeTags keyTag,
                        value::Value keyVal,
                        size_t value) {
-    value::ValueGuard guard{keyTag, keyVal};
+    value::TagValueOwned key = value::TagValueOwned::fromRaw(keyTag, keyVal);
     auto [_, inserted] = map->insert({keyTag, keyVal}, value);
     if (inserted) {
-        guard.reset();
+        key.reset();
     }
 }
 
@@ -306,10 +302,9 @@ TEST_F(SbeValueTest, ArrayMoveIsDestructive) {
 }
 
 TEST_F(SbeValueTest, ArrayForEachMoveIsDestructive) {
-    auto [tag, val] = value::makeNewArray();
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned arrOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
 
-    value::Array& arr1 = *value::getArrayView(val);
+    value::Array& arr1 = *value::getArrayView(arrOwned.value());
 
     auto pushStr = [](value::Array* arr, std::string_view str) {
         auto [t, v] = value::makeBigString(str);
@@ -330,9 +325,10 @@ TEST_F(SbeValueTest, ArrayForEachMoveIsDestructive) {
 
     value::Array arr2;
     // Move elements from arr1 into arr2.
-    value::arrayForEach<true>(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
-        arr2.push_back_raw(elTag, elVal);
-    });
+    value::arrayForEach<true>(
+        arrOwned.tag(), arrOwned.value(), [&](value::TypeTags elTag, value::Value elVal) {
+            arr2.push_back_raw(elTag, elVal);
+        });
 
     ASSERT_EQ(arr1.size(), 0);
     {
@@ -346,10 +342,9 @@ TEST_F(SbeValueTest, ArrayForEachMoveIsDestructive) {
 }
 
 TEST_F(SbeValueTest, ArraySetForEachMoveIsDestructive) {
-    auto [tag, val] = value::makeNewArraySet();
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned arrSetOwned = value::TagValueOwned::fromRaw(value::makeNewArraySet());
 
-    value::ArraySet& arr1 = *value::getArraySetView(val);
+    value::ArraySet& arr1 = *value::getArraySetView(arrSetOwned.value());
 
     auto pushStr = [](value::ArraySet* arr, std::string_view str) {
         auto [t, v] = value::makeBigString(str);
@@ -363,9 +358,10 @@ TEST_F(SbeValueTest, ArraySetForEachMoveIsDestructive) {
 
     value::ArraySet arr2;
     // Move elements from arr1 into arr2.
-    value::arrayForEach<true>(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
-        arr2.push_back_raw(elTag, elVal);
-    });
+    value::arrayForEach<true>(
+        arrSetOwned.tag(), arrSetOwned.value(), [&](value::TypeTags elTag, value::Value elVal) {
+            arr2.push_back_raw(elTag, elVal);
+        });
 
     ASSERT_EQ(arr1.size(), 0);
     ASSERT_EQ(arr2.size(), 2);
@@ -451,23 +447,24 @@ TEST_F(SbeValueTest, SortSpecCompareCollation) {
     auto sortSpecBson = BSON("x" << 1);
     SortSpec sortSpec(sortSpecBson);
 
-    auto [tag1, val1] = value::makeBigString("12345678");
-    value::ValueGuard guard1{tag1, val1};
-    auto [tag2, val2] = value::makeBigString("87654321");
-    value::ValueGuard guard2{tag2, val2};
+    value::TagValueOwned str1 = value::TagValueOwned::fromRaw(value::makeBigString("12345678"));
+    value::TagValueOwned str2 = value::TagValueOwned::fromRaw(value::makeBigString("87654321"));
 
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
 
-    auto [cmpTag, cmpVal] = sortSpec.compare(tag1, val1, tag2, val2, collator.get());
+    auto [cmpTag, cmpVal] =
+        sortSpec.compare(str1.tag(), str1.value(), str2.tag(), str2.value(), collator.get());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag2, val2, tag1, val1, collator.get());
+    std::tie(cmpTag, cmpVal) =
+        sortSpec.compare(str2.tag(), str2.value(), str1.tag(), str1.value(), collator.get());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, tag1, val1, collator.get());
+    std::tie(cmpTag, cmpVal) =
+        sortSpec.compare(str1.tag(), str1.value(), str1.tag(), str1.value(), collator.get());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
 }
@@ -476,33 +473,35 @@ TEST_F(SbeValueTest, SortSpecCompareMultiValueMix) {
     auto sortSpecBson = BSON("x" << 1 << "y" << -1);
     SortSpec sortSpec(sortSpecBson);
 
-    auto [tag11, val11] =
-        createArray(value::makeBigString("11111111"), value::makeBigString("11111111"));
-    value::ValueGuard guard11{tag11, val11};
-    auto [tag12, val12] =
-        createArray(value::makeBigString("11111111"), value::makeBigString("22222222"));
-    value::ValueGuard guard12{tag12, val12};
-    auto [tag21, val21] =
-        createArray(value::makeBigString("22222222"), value::makeBigString("11111111"));
-    value::ValueGuard guard21{tag21, val21};
+    value::TagValueOwned arr11 = value::TagValueOwned::fromRaw(
+        createArray(value::makeBigString("11111111"), value::makeBigString("11111111")));
+    value::TagValueOwned arr12 = value::TagValueOwned::fromRaw(
+        createArray(value::makeBigString("11111111"), value::makeBigString("22222222")));
+    value::TagValueOwned arr21 = value::TagValueOwned::fromRaw(
+        createArray(value::makeBigString("22222222"), value::makeBigString("11111111")));
 
-    auto [cmpTag, cmpVal] = sortSpec.compare(tag11, val11, tag21, val21);
+    auto [cmpTag, cmpVal] =
+        sortSpec.compare(arr11.tag(), arr11.value(), arr21.tag(), arr21.value());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag11, val11, tag12, val12);
+    std::tie(cmpTag, cmpVal) =
+        sortSpec.compare(arr11.tag(), arr11.value(), arr12.tag(), arr12.value());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag21, val21, tag11, val11);
+    std::tie(cmpTag, cmpVal) =
+        sortSpec.compare(arr21.tag(), arr21.value(), arr11.tag(), arr11.value());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag12, val12, tag11, val11);
+    std::tie(cmpTag, cmpVal) =
+        sortSpec.compare(arr12.tag(), arr12.value(), arr11.tag(), arr11.value());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag11, val11, tag11, val11);
+    std::tie(cmpTag, cmpVal) =
+        sortSpec.compare(arr11.tag(), arr11.value(), arr11.tag(), arr11.value());
     ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
     ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
 }
@@ -511,27 +510,28 @@ TEST_F(SbeValueTest, SortSpecCompareInvalid) {
     auto sortSpecBson = BSON("x" << 1 << "y" << -1);
     SortSpec sortSpec(sortSpecBson);
 
-    auto [tag1, val1] =
-        createArray(value::makeBigString("11111111"), value::makeBigString("11111111"));
-    value::ValueGuard guard1{tag1, val1};
-    auto [tag2, val2] = createArray(value::makeBigString("11111111"),
-                                    value::makeBigString("11111111"),
-                                    value::makeBigString("11111111"));
-    value::ValueGuard guard2{tag2, val2};
+    value::TagValueOwned arr1 = value::TagValueOwned::fromRaw(
+        createArray(value::makeBigString("11111111"), value::makeBigString("11111111")));
+    value::TagValueOwned arr2 =
+        value::TagValueOwned::fromRaw(createArray(value::makeBigString("11111111"),
+                                                  value::makeBigString("11111111"),
+                                                  value::makeBigString("11111111")));
 
-    auto [cmpTag, cmpVal] = sortSpec.compare(value::TypeTags::NumberInt32, 0, tag1, val1);
+    auto [cmpTag, cmpVal] =
+        sortSpec.compare(value::TypeTags::NumberInt32, 0, arr1.tag(), arr1.value());
     ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
     ASSERT_EQ(cmpVal, 0);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, value::TypeTags::NumberInt32, 0);
+    std::tie(cmpTag, cmpVal) =
+        sortSpec.compare(arr1.tag(), arr1.value(), value::TypeTags::NumberInt32, 0);
     ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
     ASSERT_EQ(cmpVal, 0);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, tag2, val2);
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(arr1.tag(), arr1.value(), arr2.tag(), arr2.value());
     ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
     ASSERT_EQ(cmpVal, 0);
 
-    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag2, val2, tag1, val1);
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(arr2.tag(), arr2.value(), arr1.tag(), arr1.value());
     ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
     ASSERT_EQ(cmpVal, 0);
 }
@@ -593,9 +593,8 @@ TEST(SbeNumericCastTest, TagValueViewOverload) {
     TagValueView vd{TypeTags::NumberDouble, bitcastFrom<double>(2.5)};
     ASSERT_EQ(numericCast<double>(vd), 2.5);
 
-    auto [decTag, decVal] = makeCopyDecimal(Decimal128("3.14"));
-    ValueGuard guard{decTag, decVal};
-    TagValueView vDec{decTag, decVal};
+    TagValueOwned dec = TagValueOwned::fromRaw(makeCopyDecimal(Decimal128("3.14")));
+    TagValueView vDec{dec.tag(), dec.value()};
     ASSERT_EQ(numericCast<Decimal128>(vDec), Decimal128("3.14"));
 }
 }  // namespace mongo::sbe

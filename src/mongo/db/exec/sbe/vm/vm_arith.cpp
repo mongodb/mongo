@@ -1130,9 +1130,10 @@ value::TagValueMaybeOwned ByteCode::genericPow(value::TagValueView base,
 
 value::TagValueOwned ByteCode::genericNot(value::TypeTags tag, value::Value value) {
     if (tag == value::TypeTags::Boolean) {
-        return {tag, value::bitcastFrom<bool>(!value::bitcastTo<bool>(value))};
+        return value::TagValueOwned::fromRaw(
+            tag, value::bitcastFrom<bool>(!value::bitcastTo<bool>(value)));
     } else {
-        return {value::TypeTags::Nothing, 0};
+        return value::TagValueOwned::fromRaw(value::TypeTags::Nothing, 0);
     }
 }
 

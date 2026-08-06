@@ -63,7 +63,8 @@ TEST(CodeFragmentTest, AggCollMinMalformedCollation) {
     sbe::vm::CodeFragment fragment;
     fragment.appendMoveVal(&accAccessor);
     fragment.appendConstVal(sbe::value::TypeTags::Nothing, sbe::value::Value{0});
-    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"sv)};
+    sbe::value::TagValueOwned field =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString("fieldName"sv));
     fragment.appendConstVal(field.tag(), field.value());
     fragment.appendCollMin();
 
@@ -83,7 +84,8 @@ TEST(CodeFragmentTest, AggCollMaxMalformedCollation) {
     sbe::vm::CodeFragment fragment;
     fragment.appendMoveVal(&accAccessor);
     fragment.appendConstVal(sbe::value::TypeTags::Nothing, sbe::value::Value{0});
-    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"sv)};
+    sbe::value::TagValueOwned field =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString("fieldName"sv));
     fragment.appendConstVal(field.tag(), field.value());
     fragment.appendCollMax();
 

@@ -225,7 +225,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
         return d == std::numeric_limits<int64_t>::max() ? d : d - 1;
     };
 
-    value::TagValueOwned newArr{value::makeNewArray()};
+    value::TagValueOwned newArr = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arrOutput = value::getArrayView(newArr.value());
     // The array position we will be sending to the lambda holds the depth in the highest 32 bit,
     // and the actual index in the current array in the lowest 32 bit.
@@ -431,7 +431,7 @@ void ByteCode::genericResetDoubleDoubleSumState(value::Array* state) {
 }
 
 std::pair<value::TypeTags, value::Value> ByteCode::genericInitializeDoubleDoubleSumState() {
-    value::TagValueOwned result{value::makeNewArray()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arr = value::getArrayView(result.value());
     arr->reserve(AggSumValueElems::kMaxSizeOfArray);
 
@@ -655,7 +655,8 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
             newSetMembers.tag(),
             newSetMembers.value(),
             [&](value::TypeTags tagNewElem, value::Value valNewElem) {
-                value::TagValueOwned newElem{tagNewElem, valNewElem};
+                value::TagValueOwned newElem =
+                    value::TagValueOwned::fromRaw(tagNewElem, valNewElem);
 
                 if (accSet->values().contains({tagNewElem, valNewElem})) {
                     // Skip this element, because it's already in the set, and continue with the
