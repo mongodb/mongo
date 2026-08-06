@@ -94,7 +94,7 @@ structs:
                 type: safeInt64
                 optional: true
                 stability: internal
-                validator: {gte: 0}
+                validator: {gte: 0, lte: 2147483647} # [0, 2^31 - 1]
         mod_visibility: public
 
     QueryShapeConfiguration:

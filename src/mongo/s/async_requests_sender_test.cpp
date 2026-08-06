@@ -10,9 +10,14 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
+#include "mongo/db/commands/query_cmd/explain_gen.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
@@ -699,6 +704,104 @@ TEST_F(AsyncRequestsSenderTest, SameTelemetryContextAcrossRetriesForSameShard) {
     EXPECT_TRUE(static_cast<bool>(firstAttemptCtx));
     EXPECT_TRUE(static_cast<bool>(secondAttemptCtx));
     EXPECT_EQ(firstAttemptCtx, secondAttemptCtx);
+}
+
+// Fixture for the SERVER-130922 tripwire, which asserts that a router forwarding a query settings
+// 'maxTimeMS' also reflects it in the command's own 'maxTimeMS'.
+class AsyncRequestsSenderQuerySettingsMaxTimeMSTest : public AsyncRequestsSenderTest {
+public:
+    void setUp() override {
+        AsyncRequestsSenderTest::setUp();
+
+        // The tripwire compares the forwarded 'maxTimeMS' against the router's own remaining
+        // budget, so the router needs a deadline of its own.
+        operationContext()->setDeadlineAfterNowBy(kRouterMaxTime, ErrorCodes::MaxTimeMSExpired);
+    }
+
+protected:
+    static constexpr Milliseconds kRouterMaxTime{5000};
+    static constexpr long long kQuerySettingsMaxTimeMS = 60'000;
+
+    static BSONObj makeCmdObj(std::string_view cmdName, long long cmdMaxTimeMS) {
+        return BSON(cmdName << "bar" << query_request_helper::cmdOptionMaxTimeMS << cmdMaxTimeMS
+                            << FindCommandRequest::kQuerySettingsFieldName
+                            << BSON(query_settings::QuerySettings::kMaxTimeMSFieldName
+                                    << kQuerySettingsMaxTimeMS));
+    }
+
+    // Asserts that 'cmdObj' passes the tripwire and reaches the shard.
+    void assertForwarded(BSONObj cmdObj) {
+        std::vector<AsyncRequestsSender::Request> requests;
+        requests.emplace_back(kTestShardIds[0], std::move(cmdObj));
+        auto ars = AsyncRequestsSender(operationContext(),
+                                       executor(),
+                                       kTestNss.dbName(),
+                                       requests,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       Shard::RetryPolicy::kNoRetry,
+                                       nullptr /* no yielder */,
+                                       {} /* designatedHostsMap */);
+
+        auto future = launchAsync([&]() { ASSERT_OK(ars.next().swResponse.getStatus()); });
+
+        onCommand([&](const auto&) {
+            return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+
+        future.default_timed_get();
+    }
+
+    // Asserts that 'cmdObj' trips the tripwire, so it never reaches the network.
+    void assertTripwireFires(BSONObj cmdObj) {
+        std::vector<AsyncRequestsSender::Request> requests;
+        requests.emplace_back(kTestShardIds[0], std::move(cmdObj));
+        auto ars = AsyncRequestsSender(operationContext(),
+                                       executor(),
+                                       kTestNss.dbName(),
+                                       requests,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       Shard::RetryPolicy::kNoRetry,
+                                       nullptr /* no yielder */,
+                                       {} /* designatedHostsMap */);
+
+        // The tassert fires while the request is still being prepared, so the error is visible
+        // without pumping the network.
+        ASSERT_EQ(ars.next().swResponse.getStatus().code(), 13092200);
+
+        // The tripwire assertion was expected, so don't let it fail the test binary at exit.
+        assertionCount.tripwire.subtractAndFetch(1);
+    }
+};
+
+TEST_F(AsyncRequestsSenderQuerySettingsMaxTimeMSTest, StaleClientMaxTimeMSTripsAssertion) {
+    // A 'maxTimeMS' materially below the router's remaining budget is the stale client value the
+    // shard would otherwise prefer over the forwarded query settings one.
+    assertTripwireFires(makeCmdObj("find"sv, 100));
+}
+
+TEST_F(AsyncRequestsSenderQuerySettingsMaxTimeMSTest, ForwardingTheResolvedTotalIsAccepted) {
+    // The find/distinct convention: forward the resolved query settings value verbatim.
+    assertForwarded(makeCmdObj("find"sv, kQuerySettingsMaxTimeMS));
+}
+
+TEST_F(AsyncRequestsSenderQuerySettingsMaxTimeMSTest, ForwardingTheRemainingBudgetIsAccepted) {
+    // The aggregate targeted-dispatch convention: forward this router's remaining budget, read the
+    // same way 'sharded_agg_helpers.cpp' reads it. Because remaining time only decreases, the value
+    // captured here is always >= the one the tripwire re-reads, so this passes without needing any
+    // tolerance beyond fast-clock granularity.
+    auto remaining = durationCount<Milliseconds>(operationContext()->getRemainingMaxTimeMillis());
+    assertForwarded(makeCmdObj("aggregate"sv, remaining));
+}
+
+TEST_F(AsyncRequestsSenderQuerySettingsMaxTimeMSTest, GetMoreIsExempt) {
+    // On a getMore, 'maxTimeMS' is an await-time rather than a deadline.
+    assertForwarded(makeCmdObj(GetMoreCommandRequest::kCommandName, 100));
+}
+
+TEST_F(AsyncRequestsSenderQuerySettingsMaxTimeMSTest, ExplainIsExempt) {
+    // An explain deliberately does not enforce the query settings 'maxTimeMS'.
+    assertForwarded(makeCmdObj(ExplainCommandRequest::kCommandName, 100));
 }
 
 }  // namespace

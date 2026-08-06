@@ -164,11 +164,10 @@ BSONObj makeFindCommandForShards(OperationContext* opCtx,
         findCommand.setLet(vars.toBSON(vps, *letParams));
     }
 
-    // ExpressionContext may contain previously looked up query settings. Propagate it to the
-    // shards.
-    if (!query_settings::isDefault(query.getExpCtx()->getQuerySettings())) {
-        findCommand.setQuerySettings(query.getExpCtx()->getQuerySettings());
-    }
+    // ExpressionContext may contain previously looked up query settings. Propagate them, and the
+    // 'maxTimeMS' resolved from them, to the shards.
+    query_settings::applyToShardRequest(
+        findCommand, query.getExpCtx()->getQuerySettings(), static_cast<bool>(query.getExplain()));
 
     // Pass the queryShapeHash to the shards. We must validate that all participating shards can
     // understand 'originalQueryShapeHash' and therefore check the feature flag. We use the last LTS

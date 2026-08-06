@@ -371,6 +371,39 @@ bool allowQuerySettingsFromClient(Client* client);
 bool isDefault(const QuerySettings& querySettings);
 
 /**
+ * Returns the resolved 'maxTimeMS' from 'querySettings' to forward as a shard sub-request's generic
+ * 'maxTimeMS', so the shard's deadline selection sees it before query settings are re-applied
+ * inside the command's own execution. Returns boost::none if there's nothing to forward, or if
+ * 'isExplain' is true: like 'QuerySettingsService::applyMaxTimeMSFromSettings', an explain must not
+ * be bounded by the query settings 'maxTimeMS' - it is still reported in the 'querySettings'
+ * section of explain output, but must not affect explain execution itself.
+ */
+inline boost::optional<std::int64_t> resolveMaxTimeMSForShardForwarding(
+    const QuerySettings& querySettings, bool isExplain) {
+    if (isExplain) {
+        return boost::none;
+    }
+    return querySettings.getMaxTimeMS();
+}
+
+/**
+ * Attaches 'querySettings' to a shard-bound 'request', together with the 'maxTimeMS' resolved from
+ * them. Both must be kept in step: forwarding the settings without the resolved 'maxTimeMS' leaves
+ * the shard computing its deadline from the stale, client-supplied value. A no-op for default
+ * settings.
+ */
+template <typename Request>
+void applyToShardRequest(Request& request, const QuerySettings& querySettings, bool isExplain) {
+    if (isDefault(querySettings)) {
+        return;
+    }
+    request.setQuerySettings(querySettings);
+    if (auto qsMaxTimeMS = resolveMaxTimeMSForShardForwarding(querySettings, isExplain)) {
+        request.setMaxTimeMS(*qsMaxTimeMS);
+    }
+}
+
+/**
  * Merges the query settings 'lhs' with query settings 'rhs', by replacing all attributes in 'lhs'
  * with the existing attributes in 'rhs'.
  */

@@ -6,7 +6,12 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/retry_strategy.h"
+#include "mongo/db/commands/query_cmd/explain_gen.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -21,6 +26,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -37,6 +43,63 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforePollResponse);
 MONGO_FAIL_POINT_DEFINE(hangAfterYield);
+
+/**
+ * Test-only tripwire guarding the forwarding of a query-settings 'maxTimeMS' to a shard: if a
+ * command carries 'querySettings.maxTimeMS', its own 'maxTimeMS' must reflect it, or the shard's
+ * ingress deadline logic prefers the stale, tighter client value (SERVER-130922).
+ *
+ * Note this is *tautological* for the paths that use 'query_settings::applyToShardRequest()', which
+ * sets 'querySettings' and 'maxTimeMS' from the same value in the same breath. Its purpose is to
+ * catch a *future* dispatch path that attaches 'querySettings' by hand without resolving
+ * 'maxTimeMS' via 'query_settings::resolveMaxTimeMSForShardForwarding()' so that it fails in CI
+ * rather than silently in production.
+ *
+ * Two forwarding conventions are legitimate and both must keep passing: the resolved total
+ * (find/distinct), and this router's remaining budget (the aggregate targeted-dispatch path in
+ * 'sharded_agg_helpers.cpp'). The latter is computed upstream of this check, and remaining time
+ * only decreases, so it is always >= the budget re-read here. A stale client value is materially
+ * below both. Unifying the two conventions would allow tightening this to exact equality.
+ *
+ * Two deliberate blind spots:
+ *   - It cannot detect settings resolving to the *wrong* value; it only detects a resolved value
+ *     that was not forwarded. A faithfully-forwarded wrong value satisfies the equality branch.
+ *   - It is fail-open: absent or non-numeric 'maxTimeMS' returns early, and an operation that is
+ *     out of budget has a remaining budget of zero, which any value satisfies.
+ */
+void assertQuerySettingsMaxTimeMSWasForwarded(const BSONObj& cmdObj, OperationContext* opCtx) {
+    if (!TestingProctor::instance().isEnabled()) {
+        return;
+    }
+
+    // 'maxTimeMS' on a getMore is an await-time, not a deadline, and explain deliberately does not
+    // enforce the query settings 'maxTimeMS' at all.
+    auto cmdName = cmdObj.firstElementFieldNameStringData();
+    if (cmdName == GetMoreCommandRequest::kCommandName ||
+        cmdName == ExplainCommandRequest::kCommandName) {
+        return;
+    }
+
+    auto querySettings = cmdObj.getObjectField(FindCommandRequest::kQuerySettingsFieldName);
+    auto qsMaxTimeMSElem =
+        querySettings.getField(query_settings::QuerySettings::kMaxTimeMSFieldName);
+    auto cmdMaxTimeMSElem = cmdObj.getField(query_request_helper::cmdOptionMaxTimeMS);
+    if (!qsMaxTimeMSElem.isNumber() || !cmdMaxTimeMSElem.isNumber()) {
+        return;
+    }
+
+    auto qsMaxTimeMS = qsMaxTimeMSElem.safeNumberLong();
+    auto cmdMaxTimeMS = cmdMaxTimeMSElem.safeNumberLong();
+    auto remaining = durationCount<Milliseconds>(opCtx->getRemainingMaxTimeMillis());
+    tassert(13092200,
+            str::stream() << "command forwards a query settings 'maxTimeMS' of " << qsMaxTimeMS
+                          << " but its own 'maxTimeMS' is " << cmdMaxTimeMS
+                          << ", which is below this router's remaining budget of " << remaining
+                          << "; the dispatch path for '" << cmdName
+                          << "' likely attached 'querySettings' without resolving 'maxTimeMS' via "
+                             "query_settings::resolveMaxTimeMSForShardForwarding()",
+            cmdMaxTimeMS == qsMaxTimeMS || cmdMaxTimeMS >= remaining);
+}
 
 }  // namespace
 
@@ -357,6 +420,8 @@ auto AsyncRequestsSender::Impl::RemoteData::scheduleRequest(std::shared_ptr<Impl
 auto AsyncRequestsSender::Impl::RemoteData::scheduleRemoteCommand(const HostAndPort& hostAndPort,
                                                                   std::shared_ptr<Impl> impl)
     -> SemiFuture<RemoteCommandCallbackArgs> {
+    assertQuerySettingsMaxTimeMSWasForwarded(_cmdObj, impl->_opCtx);
+
     executor::RemoteCommandRequest request(
         hostAndPort,
         impl->_db,

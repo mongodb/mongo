@@ -914,20 +914,16 @@ Status runAggregateImpl(OperationContext* opCtx,
         explain_common::generateQueryKnobs(expCtx, &result);
     }
 
-    // Here we modify the original 'request' object by copying the query settings from 'expCtx' into
-    // it.
-    //
-    // In case when the original 'request' fails with the 'CommandOnShardedViewNotSupportedOnMongod'
-    // exception, we retrieve the view definition and run the resolved/expanded request. The
-    // resolved/expanded request must use the query settings matching the original request.
-    //
-    // By attaching the query settings to the original request object we can re-use the query
-    // settings even though the original 'expCtx' object has been already destroyed.
+    // Attach the query settings, and the 'maxTimeMS' resolved from them, to both request objects:
+    //   - 'request' is this attempt's local copy (see its construction above) and is what builds
+    //     the commands dispatched to the shards;
+    //   - 'req' is the caller-owned parameter, which outlives this attempt. If the pipeline fails
+    //     with 'CommandOnShardedViewNotSupportedOnMongod' we retrieve the view definition and run
+    //     the resolved/expanded request, which must use the same query settings - and by then this
+    //     'expCtx' (and 'request') are gone, so 'req' is what carries them into the retry.
     const auto& querySettings = expCtx->getQuerySettings();
-    if (!query_settings::isDefault(querySettings)) {
-        request.setQuerySettings(querySettings);
-        req.setQuerySettings(querySettings);
-    }
+    query_settings::applyToShardRequest(request, querySettings, isExplain);
+    query_settings::applyToShardRequest(req, querySettings, isExplain);
 
     // Need to explicitly assign expCtx because lambdas can't capture structured bindings.
     auto status = [&](auto& expCtx) {
