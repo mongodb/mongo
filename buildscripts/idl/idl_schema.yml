@@ -367,6 +367,7 @@ properties:
           - description
           - cpp_type
           - bson_serialization_type
+          - is_view
   enums:
     description: YAML map that allows integer and string enumeration.
     type: object

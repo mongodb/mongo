@@ -267,6 +267,7 @@ def _parse_type(ctxt, spec, name, node):
             "description": _RuleDesc("scalar", _RuleDesc.REQUIRED),
             "cpp_type": _RuleDesc("scalar", _RuleDesc.REQUIRED),
             "bson_serialization_type": _RuleDesc("scalar_or_sequence", _RuleDesc.REQUIRED),
+            # TODO(SERVER-133051): Make is_view required.
             "is_view": _RuleDesc("bool_scalar"),
             "bindata_subtype": _RuleDesc("scalar"),
             "serializer": _RuleDesc("scalar"),

@@ -341,6 +341,7 @@ class Type(common.SourceLocation):
         self.bson_serialization_type = None  # type: List[str]
         # A view type means the type could act as a view upon unowned data. The member is used to
         # determine whether BSONObj anchors are needed for memory safety.
+        # TODO(SERVER-133051): Make is_view required.
         self.is_view = True  # type: bool
         self.bindata_subtype = None  # type: str
         self.serializer = None  # type: str

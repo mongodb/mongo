@@ -15,6 +15,7 @@ types:
         bson_serialization_type: any
         description: "Either a string or null."
         cpp_type: boost::optional<std::string>
+        is_view: true
         serializer: "::mongo::stringOrNullSerializeToBSON"
         deserializer: "::mongo::stringOrNullParseFromBSON"
 

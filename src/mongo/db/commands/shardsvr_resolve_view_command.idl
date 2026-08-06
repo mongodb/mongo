@@ -17,6 +17,7 @@ types:
             The custom serialize and deserialize methods instruct IDL how to covert to/from C++ and BSON.  "
         bson_serialization_type: any
         cpp_type: "mongo::ResolvedNamespace"
+        is_view: true
         serializer: "mongo::ResolvedNamespace::serializeToBSON"
         deserializer: "mongo::ResolvedNamespace::parseFromBSON"
 
