@@ -591,6 +591,43 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const shard1GlobalChunks = getGlobalCatalogChunks(globalMeta.uuid, st.shard1.shardName);
             assert.gt(shard1GlobalChunks.length, 0);
         });
+
+        it("cleans up untracked collection metadata from the donor shard", () => {
+            const db = setupDb("moveprimary_no_tracked");
+            const dbName = db.getName();
+            const coll = db.coll;
+
+            assert.commandWorked(coll.insert([{x: -1}, {x: 1}]));
+
+            st.awaitReplicationOnShards();
+
+            // Make sure that the primary and a secondary have populated the in-memory state.
+            assert.eq(2, coll.find({}).toArray().length);
+            assert.eq(2, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+
+            st.awaitReplicationOnShards();
+
+            // Make sure that the primary and a secondary in the new dbPrimary have populated the in-memory state.
+            assert.eq(2, coll.find({}).toArray().length);
+            assert.eq(2, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            // Shard 0 should not have any in-memory state for the untracked collection.
+            st.rs0.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                assert.eq("UNKNOWN", res.global, res);
+            });
+
+            // Shard 1 should either not have any in-memory state for the untracked collection or knows that it is untracked.
+            st.rs1.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                if (res.global !== "UNKNOWN") {
+                    const cmpResult = timestampCmp(res.global, Timestamp(0, 0));
+                    assert.eq(0, cmpResult, res);
+                }
+            });
+        });
     });
 
     describe("moveRange", function () {
@@ -928,6 +965,35 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 assertShardCatalogAbsentOnNode(node, ns2, uuid2);
                 assertInMemoryMetadataNotSharded(node, ns1);
                 assertInMemoryMetadataNotSharded(node, ns2);
+            });
+        });
+
+        it("cleans up untracked collection metadata from the shards", () => {
+            const db = setupDb("dropdb_untracked");
+            const coll = db.coll;
+
+            assert.commandWorked(coll.insert([{x: -1}, {x: 1}]));
+
+            st.awaitReplicationOnShards();
+
+            assert.eq(2, coll.find({}).toArray().length);
+            assert.eq(2, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            assert.commandWorked(db.dropDatabase());
+
+            st.awaitReplicationOnShards();
+
+            assert.eq(0, coll.find({}).toArray().length);
+            assert.eq(0, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            // Shards should have no garbage data in memory after the drop.
+            st.rs0.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                assert.eq("UNKNOWN", res.global, res);
+            });
+            st.rs1.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                assert.eq("UNKNOWN", res.global, res);
             });
         });
     });
