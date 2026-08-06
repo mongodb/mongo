@@ -326,6 +326,17 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
                   "ident"_attr = identInfo->identName,
                   "dropTimestamp"_attr = identInfo->dropTime,
                   "error"_attr = status);
+        } else if (status == ErrorCodes::WriteConflict) {
+            // commit_transaction validates that WT_ROLLBACK specifically has a
+            // WT_STEP_DOWN sub-error before throwing WriteConflict, so any WriteConflict reaching
+            // here from _tryToDrop()'s wuow.commit() should be due to WT_STEP_DOWN.
+            // There could also be a WriteConflict from other sources in _tryToDrop's wuow block
+            // like _engine->dropIdent.
+            LOGV2(13285200,
+                  "WriteConflict while dropping ident, will retry later",
+                  "ident"_attr = identInfo->identName,
+                  "dropTimestamp"_attr = identInfo->dropTime,
+                  "error"_attr = status);
         } else if (status.isA<ErrorCategory::Interruption>()) {
             LOGV2(11873702,
                   "Interruption while dropping ident",
