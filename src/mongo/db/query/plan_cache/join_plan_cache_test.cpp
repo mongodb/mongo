@@ -224,7 +224,7 @@ TEST(JoinPlanCacheSizeTest, CollectionTagsIncreaseSize) {
 
 TEST(JoinPlanCacheSizeTest, BudgetEstimatorSumsEntryAndKey) {
     JoinPlanCacheBudgetEstimator estimator;
-    std::shared_ptr<const JoinPlanCacheEntry> entry =
+    std::shared_ptr<JoinPlanCacheEntry> entry =
         std::make_unique<JoinPlanCacheEntry>(makeComplexTree(),
                                              join_ordering::NodeId{0},
                                              std::vector<CollectionTag>{},

@@ -3,11 +3,15 @@
 
 #include "mongo/db/query/plan_cache/join_plan_cache.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 
+#include <algorithm>
+#include <mutex>
 #include <variant>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -80,17 +84,49 @@ JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                                        join_ordering::NodeId baseNode,
                                        std::vector<CollectionTag> collections,
                                        std::vector<NodeFingerprint> nodeFingerprints)
-    : joinTree(std::move(joinTree)),
+    : estimatedEntrySizeBytes(sizeof(JoinPlanCacheEntry) +
+                              (joinTree ? joinTree->estimateObjectSizeInBytes() : 0) +
+                              container_size_helper::estimateObjectSizeInBytes(collections) +
+                              container_size_helper::estimateObjectSizeInBytes(nodeFingerprints)),
+      joinTree(std::move(joinTree)),
       baseNode(baseNode),
-      collections(std::move(collections)),
       nodeFingerprints(std::move(nodeFingerprints)),
-      estimatedEntrySizeBytes(
-          sizeof(JoinPlanCacheEntry) +
-          (this->joinTree ? this->joinTree->estimateObjectSizeInBytes() : 0) +
-          container_size_helper::estimateObjectSizeInBytes(this->collections) +
-          container_size_helper::estimateObjectSizeInBytes(this->nodeFingerprints)) {}
+      _collections(std::move(collections)) {}
 
-std::shared_ptr<const JoinPlanCacheEntry> JoinPlanCache::lookup(const JoinPlanCacheKey& key) const {
+std::vector<CollectionTag> JoinPlanCacheEntry::getCollectionTags() {
+    std::lock_guard lk(_collectionsMutex);
+    return _collections;
+}
+
+void JoinPlanCacheEntry::refreshCollectionTags(const std::vector<CollectionTag>& tags) {
+    std::lock_guard lk(_collectionsMutex);
+
+    tassert(13101000,
+            "Refreshed join plan cache collection tags must cover the same number of collections",
+            tags.size() == _collections.size());
+
+    // TODO (SERVER-130873): Simplify lookup once we have constant time access via UUID.
+    for (const auto& tag : tags) {
+        auto cached = std::find_if(_collections.begin(),
+                                   _collections.end(),
+                                   [&](const CollectionTag& c) { return c.uuid == tag.uuid; });
+        // Equal sizes plus a match for every incoming UUID means the two describe the same
+        // collections, since a collection appears at most once in either.
+        tassert(13101001,
+                "Refreshed join plan cache collection tag matches no cached collection",
+                cached != _collections.end());
+
+        // Never move a collection version backwards. Two operations can revalidate this entry
+        // concurrently, each against its own catalog snapshot, and a DDL running between them
+        // leaves the older snapshot carrying a lower version.
+        if (tag.versionTag.collectionVersion < cached->versionTag.collectionVersion) {
+            continue;
+        }
+        cached->versionTag = tag.versionTag;
+    }
+}
+
+std::shared_ptr<JoinPlanCacheEntry> JoinPlanCache::lookup(const JoinPlanCacheKey& key) const {
     // Hold the partition lock while copying out the shared_ptr because PartitionedCache::lookup()
     // releases its lock before returning.
     auto [swEntry, partitionLock] = _cache.getWithPartitionLock(key);
@@ -102,7 +138,7 @@ std::shared_ptr<const JoinPlanCacheEntry> JoinPlanCache::lookup(const JoinPlanCa
 
 size_t JoinPlanCache::put(JoinPlanCacheKey key, std::unique_ptr<JoinPlanCacheEntry> entry) {
     tassert(12926501, "entry to join plan cache must not be null", entry);
-    return _cache.put(std::move(key), std::shared_ptr<const JoinPlanCacheEntry>(std::move(entry)));
+    return _cache.put(std::move(key), std::shared_ptr<JoinPlanCacheEntry>(std::move(entry)));
 }
 
 void JoinPlanCache::remove(const JoinPlanCacheKey& key) {
@@ -138,6 +174,15 @@ std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& 
             CollectionTag{collection->uuid(), JoinPlanCache::currentVersionTags(collection.get())});
     });
     return tags;
+}
+
+BSONObj collectionVersionsForLog(const std::vector<CollectionTag>& tags) {
+    BSONObjBuilder builder;
+    for (const auto& tag : tags) {
+        builder.append(tag.uuid.toString(),
+                       static_cast<long long>(tag.versionTag.collectionVersion));
+    }
+    return builder.obj();
 }
 
 CollectionTagStatus classifyCollectionTags(const std::vector<CollectionTag>& tags,

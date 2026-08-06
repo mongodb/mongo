@@ -366,11 +366,12 @@ void recordSuffixLoweringMetrics(const Pipeline* suffix,
  * fingerprints, which only cover indexes usable for the fields each join graph node actually
  * references.
  */
-bool validateCacheEntry(const JoinPlanCacheEntry& hit,
+bool validateCacheEntry(JoinPlanCacheEntry& hit,
                         const MultipleCollectionAccessor& mca,
                         const AggJoinModel& model,
                         const AvailableIndexes& perCollIdxs) {
-    switch (classifyCollectionTags(hit.collections, mca)) {
+    auto cachedTags = hit.getCollectionTags();
+    switch (classifyCollectionTags(cachedTags, mca)) {
         case CollectionTagStatus::kCurrent:
             // Nothing has changed since the entry was cached, so no fingerprinting is needed.
             return true;
@@ -393,12 +394,18 @@ bool validateCacheEntry(const JoinPlanCacheEntry& hit,
         return false;
     }
 
-    // TODO (SERVER-131010): Refresh the entry's collection version tags here, so that subsequent
-    // lookups take the fast path above instead of re-fingerprinting on every query.
+    // The catalog change left every relevant index untouched, so this entry is valid against the
+    // current collection state. Adopt that state's version tags so subsequent lookups take the
+    // fast path above instead of re-fingerprinting on every query.
+    auto currentTags = makeCollectionTags(mca);
+    hit.refreshCollectionTags(currentTags);
+
     LOGV2_DEBUG(13036803,
                 5,
                 "Join plan cache entry revalidated: the catalog change did not affect any relevant "
-                "index");
+                "index",
+                "cachedVersions"_attr = collectionVersionsForLog(cachedTags),
+                "currentVersions"_attr = collectionVersionsForLog(currentTags));
     return true;
 }
 

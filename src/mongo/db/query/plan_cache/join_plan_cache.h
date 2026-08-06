@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/optimizer/join/join_method.h"
@@ -22,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <variant>
 #include <vector>
@@ -123,31 +125,60 @@ struct JoinPlanCacheEntry {
                        std::vector<CollectionTag> collections,
                        std::vector<NodeFingerprint> nodeFingerprints);
 
+    // Estimated memory footprint of this entry. Declared first so it can be computed from the
+    // constructor's arguments before they are moved into the members below.
+    const size_t estimatedEntrySizeBytes;
+
     // Reconstructable plan.
     std::unique_ptr<const CachedJoinPlan> joinTree;
     const join_ordering::NodeId baseNode;
 
-    // One CollectionTag per collection referenced by 'joinTree', captured when this entry was
-    // cached. Each tag's 'uuid' is matched against the live collections acquired by the query
-    // to find the corresponding entry. The version tags of the entry are compared to detect
-    // invalidation on plan cache lookup.
-    std::vector<CollectionTag> collections;
-
     // One fingerprint per join graph node, indexed by NodeId in ascending order - exactly the
     // layout 'join_ordering::makeNodeFingerprints' returns. Captured when this entry was cached
-    // and compared against freshly computed fingerprints when 'collections' no longer validates,
-    // so that an index DDL irrelevant to this plan does not force a replan.
+    // and compared against freshly computed fingerprints when the collection tags no longer
+    // validate, so that an index DDL irrelevant to this plan does not force a replan.
     std::vector<NodeFingerprint> nodeFingerprints;
 
-    // Estimated memory footprint of this entry.
-    // Precomputed once at construction as the join tree is immutable.
-    const size_t estimatedEntrySizeBytes;
+    /*
+     * Returns a copy of this entry's collection tags. A copy rather than a reference because the
+     * tags can be refreshed concurrently by 'refreshCollectionTags'.
+     */
+    std::vector<CollectionTag> getCollectionTags();
+
+    /*
+     * Adopts the version counters in 'tags' for the collections this entry already references.
+     * Called when a lookup found the collection versions bumped but the relevant-index fingerprints
+     * unchanged: taking on the newer versions lets subsequent lookups take the fast path instead of
+     * re-fingerprinting on every query.
+     *
+     * 'tags' must have been snapshotted from the very same catalog state the fingerprints were
+     * just validated against, so that this entry never claims to be current for a collection state
+     * it was not checked against. It must also describe the same set of collections, which the join
+     * graph shape the entry is keyed on guarantees; the order is free to differ, as tags are paired
+     * up by UUID.
+     */
+    void refreshCollectionTags(const std::vector<CollectionTag>& tags);
+
+private:
+    // Guards '_collections', held only for the copy out of, or the counter updates to, that vector.
+    std::mutex _collectionsMutex;
+
+    // One CollectionTag per collection referenced by 'joinTree', compared against the live
+    // collections to detect invalidation on plan cache lookup.
+    std::vector<CollectionTag> _collections;
 };
 
 /*
  * Snapshots the current CollectionVersionTag for every collection in 'mca'.
  */
 std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& mca);
+
+/*
+ * Renders 'tags' for logging as a BSONObj that maps from collection UUID to collection version.
+ * Keyed by UUID rather than emitted as a list because two sets of tags being compared are not in a
+ * guaranteed order.
+ */
+BSONObj collectionVersionsForLog(const std::vector<CollectionTag>& tags);
 
 /*
  * The action to take with a cached entry, given its collection tags.
@@ -174,7 +205,7 @@ CollectionTagStatus classifyCollectionTags(const std::vector<CollectionTag>& tag
 // Functor for estimating the memory footprint of a join plan cache entry.
 struct JoinPlanCacheBudgetEstimator {
     size_t operator()(const JoinPlanCacheKey& key,
-                      const std::shared_ptr<const JoinPlanCacheEntry>& entry) const {
+                      const std::shared_ptr<JoinPlanCacheEntry>& entry) const {
         return entry->estimatedEntrySizeBytes + key.size();
     }
 };
@@ -188,11 +219,10 @@ struct JoinPlanCacheKeyPartitioner {
 };
 
 // The backing store: a budget-based, LRU-evicting PartitionedCache. The mapped type is a
-// shared_ptr so lookups can hand out a stable reference-counted copy of the immutable entry, and
-// the cache copies the pointer rather than the entry. KeyHasher/Eq default to those for
-// std::string.
+// shared_ptr so lookups can hand out a stable reference-counted handle on the entry, and the cache
+// copies the pointer rather than the entry. KeyHasher/Eq default to those for std::string.
 using JoinPlanCacheStore = PartitionedCache<JoinPlanCacheKey,
-                                            std::shared_ptr<const JoinPlanCacheEntry>,
+                                            std::shared_ptr<JoinPlanCacheEntry>,
                                             JoinPlanCacheBudgetEstimator,
                                             JoinPlanCacheKeyPartitioner,
                                             NoopInsertionEvictionListener>;
@@ -227,9 +257,11 @@ public:
         Collection::declareDecoration<CollectionVersionTag>();
 
     /*
-     * Returns a shared pointer to the cache entry, or nullptr if not present.
+     * Returns a shared pointer to the cache entry, or nullptr if not present. The entry is mutable:
+     * a lookup which revalidates it against the current catalog updates its collection tags in
+     * place. Entries are internally synchronized, as several operations can share one.
      */
-    std::shared_ptr<const JoinPlanCacheEntry> lookup(const JoinPlanCacheKey& key) const;
+    std::shared_ptr<JoinPlanCacheEntry> lookup(const JoinPlanCacheKey& key) const;
 
     /*
      * Inserts or replaces the entry for 'key'. Assumes entry is non-null. Returns the number of
