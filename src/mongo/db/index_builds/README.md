@@ -290,6 +290,52 @@ spill to local unreplicated temporary files, primary-driven builds spill into a
 [replicated storage engine table](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_build_interceptor.h#L221)
 so that sorted keys are propagated to secondaries through the oplog.
 
+### Resumability
+
+Primary-driven index builds support resuming on step-up after a failover or primary restart, at any
+point of the build and for any build configuration. They use a
+[similar on-disk format](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/resumable_index_builds.idl)
+as the [startup-recovery mechanism from two-phase index builds](#resumable-index-builds): a
+build-wide record of which phase (scan, load, drain) the build was in, plus, for each index, a
+record of the sorter's persisted ranges and the idents for its side-writes, duplicate key, and
+skipped records tables. What differs is the exact format of that information. The first entry in the
+table (key 1) holds the build-wide phase information; one entry per index (keys 2 to N+1) holds that
+index's persisted state.
+
+The metadata about the state of the build is updated periodically:
+
+- During the collection scan, the state is
+  [rewritten every time the sorter spills](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/multi_index_block.cpp#L1692)
+  a chunk of sorted keys to the table, via a
+  [callback triggered at spill time](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/multi_index_block.cpp#L561-L567).
+  Only entries that are still reachable in the sorter's persisted ranges are kept; if a resume
+  happens after ranges have been merged but before the merged-from sorter entries are deleted, any
+  sorter entries that fall outside the persisted ranges are simply discarded, since the ranges are
+  always written before the corresponding merged-from entries are removed.
+- During the load phase, the k-way merge that loads sorted keys into the index table periodically
+  persists each range's current iterator position. The interval, in number of keys loaded, is
+  controlled by the
+  [`primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys`](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/multi_index_block.idl#L94-L104)
+  server parameter.
+- Upon entering the drain phase, the
+  [state for all indexes is written once](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/multi_index_block.cpp#L1715-L1740).
+  No further updates are needed for this phase since draining the side-writes table requires no
+  additional metadata to track incremental progress.
+
+On step-up, the coordinator
+[iterates the in-memory registry](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/index_builds_coordinator.cpp#L2190-L2254)
+of primary-driven index builds that were active on the previous primary. For each build, it
+[reads the state of the build](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/primary_driven/util.cpp#L305-L346)
+and attempts to resume it. If the table has no records yet (the build was interrupted before the
+first spill or drain), an initial-phase resume state is synthesized instead of reading one back. If
+resuming fails for any reason, the build is aborted instead.
+
+Since every write during a primary-driven index build, including side writes, is explicitly
+replicated through the oplog, a document write to a collection with `n` indexes being built produces
+`n+1` operations (the collection write plus one side write per index) that must be applied as an
+atomic unit; otherwise a secondary could apply a subset of them and end up with an index state
+inconsistent with its collection data.
+
 ## Single-Phase Index Builds
 
 Index builds on empty collections replicate a `createIndexes` oplog entry. This oplog entry was used
