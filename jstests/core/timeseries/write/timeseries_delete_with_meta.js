@@ -7,6 +7,8 @@
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
+ *   # This test uses multi-deletes (limit: 0), which cannot be retried during FCV time-series transformations.
+ *   requires_multi_updates,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  * ]
