@@ -5,8 +5,19 @@
 const conn = MongoRunner.runMongod();
 const coll = conn.getDB("test").compound_wildcard_index_key;
 
+// '$_internalIndexKey' is restricted to internal clients.
+const internalConn = new Mongo(conn.host);
+assert.commandWorked(internalConn.getDB("admin").runCommand({
+    hello: 1,
+    internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+}));
+const internalColl = internalConn.getDB("test").compound_wildcard_index_key;
+
 function getKeys(spec) {
-    return coll.aggregate([{$replaceRoot: {newRoot: {_id: {$_internalIndexKey: {doc: "$$ROOT", spec}}}}}]).toArray()[0]
+    return internalColl
+        .aggregate([{$replaceRoot: {newRoot: {_id: {$_internalIndexKey: {doc: "$$ROOT", spec}}}}}],
+                   {readConcern: {}, writeConcern: {w: "majority"}})
+        .toArray()[0]
         ._id;
 }
 
