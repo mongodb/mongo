@@ -376,6 +376,11 @@ feature_flags:
         cpp_varname: gFeatureFlagCollStatsMetricsFiltering
         default: false
         fcv_gated: false
+    featureFlagMetricsFiltering:
+        description: "Enable metrics filtering."
+        cpp_varname: gFeatureFlagMetricsFiltering
+        default: false
+        fcv_gated: false
     featureFlagEnableSchemaEpochs:
         description: "Enable using WiredTiger schema epochs on supported platforms."
         cpp_varname: gFeatureFlagEnableSchemaEpochs
