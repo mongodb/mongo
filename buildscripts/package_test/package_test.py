@@ -710,7 +710,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
 
     commands.append(
         f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} "
-        f"{' '.join(docker_packages_urls)}"
+        f"--edition {test.edition} {' '.join(docker_packages_urls)}"
     )
     logging.debug(
         "Attempting to run the following docker commands:\n\t%s",

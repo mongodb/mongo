@@ -1,5 +1,6 @@
 import pathlib
 import unittest
+from unittest import mock
 
 from buildscripts.package_test import package_test_internal as under_test
 
@@ -28,6 +29,61 @@ class PackageTestInternalHelpersTest(unittest.TestCase):
     def test_unknown_package_set_raises(self):
         with self.assertRaises(RuntimeError):
             under_test.get_package_kind(["mongodb-database-tools", "mongodb-mongosh"])
+
+    def test_detects_org_package_edition(self):
+        self.assertEqual(
+            "org",
+            under_test.get_package_edition(
+                ["mongodb-org", "mongodb-org-server", "mongodb-database-tools"]
+            ),
+        )
+
+    def test_detects_enterprise_package_edition(self):
+        self.assertEqual(
+            "enterprise",
+            under_test.get_package_edition(
+                ["mongodb-enterprise", "mongodb-enterprise-server", "mongodb-database-tools"]
+            ),
+        )
+
+    def test_binary_edition_accepts_unstable_expected_edition(self):
+        with mock.patch.object(
+            under_test,
+            "run_and_log",
+            return_value=mock.Mock(stdout=b'Build Info: {"modules": ["enterprise"]}'),
+        ):
+            under_test.test_binary_edition(
+                {"package_names": ["mongodb-enterprise-unstable"]}, "enterprise-unstable"
+            )
+
+    def test_parses_org_binary_edition(self):
+        version_output = 'db version v8.0.0\nBuild Info: {"modules": []}\n'
+
+        self.assertEqual("org", under_test.get_binary_edition(version_output))
+
+    def test_parses_enterprise_binary_edition(self):
+        version_output = 'db version v8.0.0\nBuild Info: {"modules": ["enterprise"]}\n'
+
+        self.assertEqual("enterprise", under_test.get_binary_edition(version_output))
+
+    def test_binary_edition_requires_build_info(self):
+        with self.assertRaisesRegex(RuntimeError, "build info"):
+            under_test.get_binary_edition("db version v8.0.0\n")
+
+    def test_binary_edition_rejects_unknown_modules(self):
+        with self.assertRaisesRegex(RuntimeError, "determine edition"):
+            under_test.get_binary_edition('Build Info: {"modules": ["atlas"]}')
+
+    def test_binary_edition_rejects_mismatched_package(self):
+        with mock.patch.object(
+            under_test,
+            "run_and_log",
+            return_value=mock.Mock(stdout=b'Build Info: {"modules": []}'),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "does not match"):
+                under_test.test_binary_edition(
+                    {"package_names": ["mongodb-enterprise"]}, "enterprise"
+                )
 
     def test_server_required_files_include_mongod_service(self):
         test_args = {

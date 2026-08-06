@@ -84,6 +84,70 @@ def get_package_kind(package_names: List[str]) -> str:
     raise RuntimeError("Unsupported package set: {}".format(", ".join(package_names)))
 
 
+def get_package_edition(package_names: List[str]) -> str:
+    for package_name in package_names:
+        if is_server_package(package_name):
+            return package_name.split("-")[1]
+
+    raise RuntimeError("Could not determine server package edition")
+
+
+def get_base_edition(edition: str) -> str:
+    unstable_suffix = "-unstable"
+    if edition.endswith(unstable_suffix):
+        return edition[: -len(unstable_suffix)]
+    return edition
+
+
+def get_binary_edition(version_output: str) -> str:
+    build_info_marker = "Build Info:"
+    marker_index = version_output.find(build_info_marker)
+    if marker_index == -1:
+        raise RuntimeError("Could not find build info in mongod --version output")
+
+    build_info_text = version_output[marker_index + len(build_info_marker) :].lstrip()
+    try:
+        build_info = json.JSONDecoder().raw_decode(build_info_text)[0]
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Could not parse build info in mongod --version output") from exc
+
+    if not isinstance(build_info, dict):
+        raise RuntimeError("Could not determine edition from mongod --version output")
+
+    modules = build_info.get("modules")
+    if not isinstance(modules, list):
+        raise RuntimeError("Could not determine edition from mongod --version output")
+    if not modules:
+        return "org"
+    if "enterprise" in modules:
+        return "enterprise"
+
+    raise RuntimeError("Could not determine edition from mongod --version output")
+
+
+def test_binary_edition(test_args: TestArgs, expected_edition: str) -> None:
+    logging.info("Checking that the binary edition matches the package edition.")
+
+    expected_edition = get_base_edition(expected_edition)
+    package_edition = get_package_edition(test_args["package_names"])
+    if package_edition != expected_edition:
+        raise RuntimeError(
+            "Installed package edition `{}` does not match expected edition `{}`".format(
+                package_edition, expected_edition
+            )
+        )
+
+    version_output = run_and_log("/usr/bin/mongod --version").stdout.decode("utf-8")
+    binary_edition = get_binary_edition(version_output)
+
+    if expected_edition != binary_edition:
+        raise RuntimeError(
+            "Binary edition `{}` does not match package edition `{}`".format(
+                binary_edition, expected_edition
+            )
+        )
+
+
 def get_required_files(test_args: TestArgs) -> List[pathlib.Path]:
     if test_args["package_kind"] == "server":
         return [
@@ -590,12 +654,17 @@ def test_uninstall_is_complete(test_args: TestArgs):
 def main() -> int:
     global test_args
 
-    if len(sys.argv) < 3:
-        print("Usage: {} <log-path> <package-url> [package-url ...]".format(sys.argv[0]))
+    if len(sys.argv) < 5 or sys.argv[2] != "--edition":
+        print(
+            "Usage: {} <log-path> --edition <edition> <package-url> [package-url ...]".format(
+                sys.argv[0]
+            )
+        )
         return 1
 
     configure_logging(sys.argv[1])
-    package_urls = sys.argv[2:]
+    expected_edition = sys.argv[3]
+    package_urls = sys.argv[4:]
 
     if len(package_urls) == 0:
         logging.error("No packages to test... Failing test")
@@ -626,6 +695,7 @@ def main() -> int:
     logging.info("Detected package kind: %s", test_args["package_kind"])
 
     if test_args["package_kind"] == "server":
+        test_binary_edition(test_args, expected_edition)
         setup(test_args)
         install_fake_systemd(test_args)
         test_start()
