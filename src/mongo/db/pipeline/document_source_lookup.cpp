@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -493,9 +494,12 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 }
 
 void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
-    boost::intrusive_ptr<DocumentSourceLookUp>& lookupStage, size_t newIdx) {
-    if (!lookupStage->_fieldMatchPipelineIdx || newIdx == *lookupStage->_fieldMatchPipelineIdx)
-        return;
+    boost::intrusive_ptr<DocumentSourceLookUp>& lookupStage, size_t insertIdx) {
+    // Callers only relocate for a localField/foreignField join, which always establishes the
+    // placeholder during construction, so an unset index here means the caller skipped that check.
+    tassert(13287901,
+            "expected a field match placeholder to relocate",
+            lookupStage->_fieldMatchPipelineIdx.has_value());
     auto& resolvedPipeline = lookupStage->_sharedState->resolvedPipeline;
     auto oldIdx = *lookupStage->_fieldMatchPipelineIdx;
     const auto oldSize = resolvedPipeline.size();
@@ -504,21 +508,18 @@ void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
                           << oldIdx << " in resolvedPipeline of size " << oldSize,
             oldIdx < oldSize && resolvedPipeline[oldIdx].hasField("$match") &&
                 resolvedPipeline[oldIdx]["$match"].Obj().isEmpty());
-    // 'newIdx' is an index into the placeholder-containing pipeline and may equal 'oldSize' when
-    // the mongot prefix is the entire subpipeline and the $match must be appended at the end.
-    tassert(12761201,
-            str::stream() << "internalFieldMatchPipelineIdx " << newIdx
-                          << " out of range of resolvedPipeline of size " << oldSize,
-            newIdx <= oldSize);
     resolvedPipeline.erase(resolvedPipeline.begin() + oldIdx);
-    // Erasing the old placeholder shifts every later element left by one, so a target index past
-    // the old position must be decremented to land in the right place (this also maps an
-    // append-at-end 'newIdx' == oldSize to the new last position).
-    if (newIdx > oldIdx) {
-        --newIdx;
-    }
-    resolvedPipeline.insert(resolvedPipeline.begin() + newIdx, BSON("$match" << BSONObj()));
-    lookupStage->_fieldMatchPipelineIdx = newIdx;
+    // 'insertIdx' is a post-erase index, i.e. an index into the placeholder-free subpipeline, so it
+    // is used as-is. Callers whose index was computed against the placeholder-containing pipeline
+    // must shift it down themselves. Inserting at 'insertIdx' leaves the placeholder at final index
+    // 'insertIdx'; 'insertIdx' == size() appends it as the last stage.
+    tassert(12761201,
+            str::stream() << "internalFieldMatchPipelineIdx " << insertIdx
+                          << " out of range of placeholder-free resolvedPipeline of size "
+                          << resolvedPipeline.size(),
+            insertIdx <= resolvedPipeline.size());
+    resolvedPipeline.insert(resolvedPipeline.begin() + insertIdx, BSON("$match" << BSONObj()));
+    lookupStage->_fieldMatchPipelineIdx = insertIdx;
 }
 
 namespace {
@@ -629,23 +630,56 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
                                              !params.noUserPipeline,
                                              params.subpipelineViewPolicy);
 
-    // TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
-    // parsing/desugaring/resolution.
-    if (params.internalFromIsAView && lookupStage->hasLocalFieldForeignFieldJoin() &&
-        params.internalFieldMatchPipelineIdx) {
-        // The router computed internalFieldMatchPipelineIdx against the undesugared pipeline (index
-        // 1, right after the leading search/hybrid stage). On the shard the pipeline arrives
-        // desugared, so we recompute the field match placeholder's position.
-        const auto& resolvedPipeline = lookupStage->_sharedState->resolvedPipeline;
-        size_t newIdx = isHybridSearchLookup
-            ? computeHybridSearchFieldMatchIdx(resolvedPipeline)
-            : computeDesugaredMongotFieldMatchIdx(resolvedPipeline);
-        relocateFieldMatchPlaceholder(lookupStage, newIdx);
-    } else if (const auto& idx = params.internalFieldMatchPipelineIdx) {
-        relocateFieldMatchPlaceholder(lookupStage, static_cast<size_t>(*idx));
-    }
-
+    // 'internalFieldMatchPipelineIdx' is only ever serialized alongside 'internalFromIsAView' (see
+    // serializeToArray).
     if (params.internalFromIsAView) {
+        if (const auto& idx = params.internalFieldMatchPipelineIdx;
+            idx && lookupStage->hasLocalFieldForeignFieldJoin()) {
+            const auto& resolvedPipelineForIdx = lookupStage->_sharedState->resolvedPipeline;
+            tassert(13287900,
+                    "expected a field match placeholder index for a localField/foreignField join",
+                    lookupStage->_fieldMatchPipelineIdx.has_value());
+
+            // TODO SERVER-121094 Remove the mongot/hybrid recompute when legacy mongot branches are
+            // removed from pipeline parsing/desugaring/resolution.
+            const bool hasMongotPrefix =
+                std::any_of(resolvedPipelineForIdx.begin(),
+                            resolvedPipelineForIdx.end(),
+                            [](const BSONObj& stage) { return isSourceStage(stage); });
+
+            size_t insertIdx;
+            if (isHybridSearchLookup || hasMongotPrefix) {
+                // Mongot and hybrid subpipelines arrive desugared, so the router's index (computed
+                // against the undesugared pipeline, right after the leading search/hybrid stage) no
+                // longer describes the right position. Re-derive it from the stages we received.
+                insertIdx = isHybridSearchLookup
+                    ? computeHybridSearchFieldMatchIdx(resolvedPipelineForIdx)
+                    : computeDesugaredMongotFieldMatchIdx(resolvedPipelineForIdx);
+                // The helpers return an index into 'resolvedPipeline' with the empty $match
+                // placeholder still at '_fieldMatchPipelineIdx'. relocateFieldMatchPlaceholder
+                // wants the insertion index *after* that placeholder has been erased, and erasing
+                // it shifts every later stage down by one. So a target sitting after the
+                // placeholder must be decremented; one sitting before it is already correct.
+                //
+                // With the placeholder at index 0 and a two-stage mongot prefix:
+                //     before:      [ {$match:{}}, mongotRemote, idLookup ]   helper returns 3
+                //     post-erase:  [ mongotRemote, idLookup ]                insert at 3 - 1 = 2
+                //     after:       [ mongotRemote, idLookup, {$match:{}} ]
+                //
+                // This also covers the case where the mongot prefix is the entire subpipeline and
+                // the helper returns 'resolvedPipeline.size()' (one past the end): size() - 1 is
+                // exactly the append position of the shortened pipeline, so the placeholder becomes
+                // the last stage.
+                if (insertIdx > *lookupStage->_fieldMatchPipelineIdx) {
+                    --insertIdx;
+                }
+            } else {
+                // A plain view involves no desugaring, so the router's index is already the final
+                // position and must be honored verbatim.
+                insertIdx = static_cast<size_t>(*idx);
+            }
+            relocateFieldMatchPlaceholder(lookupStage, insertIdx);
+        }
         lookupStage->_fromNsIsAView = true;
     }
 
@@ -657,6 +691,19 @@ DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto* typedParams = dynamic_cast<LookUpStageParams*>(stageParams.get());
     tassert(11786210, "Expected LookUpStageParams for lookup stage", typedParams != nullptr);
+
+    if (auto originalSpec = typedParams->getOriginalBson();
+        originalSpec.type() == BSONType::object) {
+        const auto& spec = originalSpec.embeddedObject();
+        for (const auto& fieldName :
+             {DocumentSourceLookupSpec::kInternalFieldMatchPipelineIdxFieldName,
+              DocumentSourceLookupSpec::kInternalFromIsAViewFieldName}) {
+            if (spec.hasField(fieldName)) {
+                assertAllowedInternalIfRequired(
+                    expCtx->getOperationContext(), fieldName, AllowedWithClientType::kInternal);
+            }
+        }
+    }
 
     // TODO SERVER-121094 Remove when feature flag is removed.
     auto ifrCtx = expCtx->getIfrContext();
@@ -1090,6 +1137,14 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         getExpCtx()->getInRouter() || opts.isSerializingForRemoteDispatch;
     const auto& serializeFromNs = (_fromNsIsAView && serializeForRemote) ? _resolvedNs : _fromNs;
 
+    // Whether this serialization is the router-to-shard (or shard-to-shard) hand-off of a $lookup
+    // whose foreign namespace was a view. Every field describing that resolved view -- the view
+    // marker, the join $match's position, and the view's own stages -- must be emitted together or
+    // not at all.
+    const bool serializeResolvedViewForRemote = _fromNsIsAView && serializeForRemote &&
+        !opts.isSerializingForQueryStats() && !opts.isSerializingForExplain() &&
+        !opts.serializeForFLE2;
+
     // Do not include the tenantId in serialized 'from' namespace.
     auto fromValue = getExpCtx()->getNamespaceString().isEqualDb(serializeFromNs)
         ? Value(opts.serializeIdentifier(serializeFromNs.coll()))
@@ -1107,9 +1162,12 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
             Value(opts.serializeFieldPath(_foreignField.value()));
         // We need to serialize the `fieldMatchPipelineIdx` when fully resolving views so that the
         // remote receiver knows where the $match stage is.
-        if (_fromNsIsAView && serializeForRemote && _userPipeline &&
-            _fieldMatchPipelineIdx.has_value() && !opts.isSerializingForQueryStats() &&
-            !opts.isSerializingForExplain() && !opts.serializeForFLE2) {
+        //
+        // Note this must NOT be gated on '_userPipeline': for a localField/foreignField $lookup
+        // against a view with no user pipeline, the view's stages are the entire serialized
+        // subpipeline, and without this index the shard would rebuild the join $match *before*
+        // them, joining on fields the view has not computed yet.
+        if (serializeResolvedViewForRemote && _fieldMatchPipelineIdx.has_value()) {
             output[getSourceName()]["$_internalFieldMatchPipelineIdx"] =
                 Value(static_cast<long long>(*_fieldMatchPipelineIdx));
         }
@@ -1117,8 +1175,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
 
     // Save whether or not this `fromNs` was a view or not so that the remote receiver can make
     // optimization choices (specifically for identity-view $lookups and SBE-lowering to EQ_LOOKUP).
-    if (_fromNsIsAView && serializeForRemote && !opts.isSerializingForQueryStats() &&
-        !opts.isSerializingForExplain() && !opts.serializeForFLE2) {
+    if (serializeResolvedViewForRemote) {
         output[getSourceName()]["$_internalFromIsAView"] = Value(true);
     }
 
@@ -1188,10 +1245,9 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         serializedPipeline.emplace_back(BSON("$match" << serializedFilter));
     }
     // Even if the user did not provide a pipeline, we still need to serialize the view's pipeline.
-    if (_fromNsIsAView && serializeForRemote && !_userPipeline &&
-        _fieldMatchPipelineIdx.has_value() && *_fieldMatchPipelineIdx > 0 &&
-        !opts.isSerializingForQueryStats() && !opts.isSerializingForExplain() &&
-        !opts.serializeForFLE2) {
+    // Note that a `_fieldMatchPipelineIdx` of 0 means there are no view stages and the insert below
+    // is already a no-op.
+    if (serializeResolvedViewForRemote && !_userPipeline && _fieldMatchPipelineIdx.has_value()) {
         std::vector<BSONObj> rewrittenViewStages =
             _sharedState->resolvedIntrospectionPipeline->serializeToBson(opts);
         serializedPipeline.insert(
@@ -1518,8 +1574,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
             DocumentSourceUnwind::createFromBson(unwindSpec.firstElement(), pExpCtx));
     }
 
-    if (const auto& idx = lookupSpec.getInternalFieldMatchPipelineIdx())
+    if (const auto& idx = lookupSpec.getInternalFieldMatchPipelineIdx();
+        idx && lookupStage->hasLocalFieldForeignFieldJoin()) {
         relocateFieldMatchPlaceholder(lookupStage, static_cast<size_t>(*idx));
+    }
 
     if (lookupSpec.getInternalFromIsAView().value_or(false)) {
         lookupStage->_fromNsIsAView = true;

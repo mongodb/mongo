@@ -1950,5 +1950,63 @@ TEST_F(DocumentSourceLookUpTest, LetVariablesCloneRebindsExpressionContext) {
         ASSERT_EQ(var.expression->getExpressionContext(), newExpCtx);
     }
 }
+
+// Mimics the router-to-shard rewrite for a localField/foreignField $lookup against a view: the
+// view's stages arrive in 'pipeline' and the join $match's target position arrives in
+// $_internalFieldMatchPipelineIdx. The placeholder must end up AFTER the view stages, otherwise the
+// join matches against fields the view has not computed yet.
+TEST_F(DocumentSourceLookUpTest, FieldMatchPlaceholderRelocatesAfterViewStagesOnShard) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "foreign"
+                                      << "as" << "c" << "localField" << "a" << "foreignField" << "b"
+                                      << "$_internalFromIsAView" << true
+                                      << "$_internalFieldMatchPipelineIdx" << 1LL << "pipeline"
+                                      << BSON_ARRAY(BSON("$addFields" << BSON("b" << 0)))))
+            .firstElement(),
+        expCtx);
+    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookupStage);
+
+    const auto& resolved = lookupStage->getResolvedPipelineForTest();
+    ASSERT_EQ(2u, resolved.size());
+    // The view stage must come first and the join $match placeholder second.
+    ASSERT(resolved[0].hasField("$addFields")) << resolved[0];
+    ASSERT(resolved[1].hasField("$match") && resolved[1]["$match"].Obj().isEmpty()) << resolved[1];
+}
+
+// As above, but with a stage trailing the placeholder's target position, so that a correct
+// relocation is distinguishable from simply appending the placeholder at the end of the
+// subpipeline.
+TEST_F(DocumentSourceLookUpTest, FieldMatchPlaceholderRelocatesBetweenSubpipelineStagesOnShard) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    // A trailing $project after the mongot prefix, so a correct placement is distinguishable from
+    // simply appending the placeholder at the end.
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "foreign"
+                                      << "as" << "c" << "localField" << "a" << "foreignField" << "b"
+                                      << "$_internalFromIsAView" << true
+                                      << "$_internalFieldMatchPipelineIdx" << 1LL << "pipeline"
+                                      << BSON_ARRAY(BSON("$search" << BSON("term" << "asdf"))
+                                                    << BSON("$project" << BSON("b" << 1)))))
+            .firstElement(),
+        expCtx);
+    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookupStage);
+
+    const auto& resolved = lookupStage->getResolvedPipelineForTest();
+    ASSERT_EQ(3u, resolved.size());
+    ASSERT(resolved[0].hasField("$search")) << resolved[0];
+    ASSERT(resolved[1].hasField("$match") && resolved[1]["$match"].Obj().isEmpty()) << resolved[1];
+    ASSERT(resolved[2].hasField("$project")) << resolved[2];
+}
 }  // namespace
 }  // namespace mongo
