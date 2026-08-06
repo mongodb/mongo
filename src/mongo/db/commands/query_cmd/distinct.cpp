@@ -755,16 +755,22 @@ public:
             auto ownedQueryStatsKey = std::move(curOp->debug().getQueryStatsInfo().key);
             curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
 
+            // This aggregation was derived locally from the distinct, so any IFR flag kickback it
+            // raises has to be absorbed here rather than propagated to the router.
+            //
             // If running explain distinct as agg, then aggregate is executed without privilege
             // checks and without response formatting.
             if (verbosity) {
-                uassertStatusOK(runAggregate(opCtx,
-                                             distinctAggRequest,
-                                             {distinctAggRequest},
-                                             distinctAggRequest.toBSON(),
-                                             PrivilegeVector(),
-                                             verbosity,
-                                             replyBuilder));
+                retryOnLocalIFRFlagKickback(
+                    opCtx, distinctAggRequest, "explain distinct as aggregation", [&] {
+                        uassertStatusOK(runAggregate(opCtx,
+                                                     distinctAggRequest,
+                                                     {distinctAggRequest},
+                                                     distinctAggRequest.toBSON(),
+                                                     PrivilegeVector(),
+                                                     verbosity,
+                                                     replyBuilder));
+                    });
                 return;
             }
 
@@ -774,13 +780,15 @@ public:
                                                 distinctAggRequest.getNamespace(),
                                                 distinctAggRequest,
                                                 false /* isMongos */));
-            uassertStatusOK(runAggregate(opCtx,
-                                         distinctAggRequest,
-                                         {distinctAggRequest},
-                                         distinctAggRequest.toBSON(),
-                                         privileges,
-                                         verbosity,
-                                         replyBuilder));
+            retryOnLocalIFRFlagKickback(opCtx, distinctAggRequest, "distinct as aggregation", [&] {
+                uassertStatusOK(runAggregate(opCtx,
+                                             distinctAggRequest,
+                                             {distinctAggRequest},
+                                             distinctAggRequest.toBSON(),
+                                             privileges,
+                                             verbosity,
+                                             replyBuilder));
+            });
 
             // Copy the result from the aggregate command.
             auto resultBuilder = replyBuilder->getBodyBuilder();

@@ -144,9 +144,10 @@ public:
                         << "Failed to resolve view '" << involvedNs.toStringForErrorMsg());
                 }
 
-                // The mongos all-view resolution path doesn't correctly handle timeseries views.
-                // Since mongos view resolution and viewless timeseries are released in 9.0, we do
-                // not need to support this for timeseries views.
+                // The mongos all-view resolution path doesn't correctly handle timeseries views. We
+                // still need to handle timeseries views in 9.0 because of FCV downgrades. We
+                // perform a kickback here to retry the aggregation without hybrid search enabled to
+                // ensure we handle the view correctly.
                 const auto& ifrContext = getIfrContext();
                 const bool extensionsInsideHybridSearchEnabled = ifrContext &&
                     ifrContext->getSavedFlagValue(

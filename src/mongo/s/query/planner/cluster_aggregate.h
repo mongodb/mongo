@@ -98,6 +98,9 @@ public:
      * collection routing management, therefore it has to be managed by the caller. If the view is
      * resolved, 'request' will refer to the resolved request and 'originalRequest' will refer to
      * the unresolved request'. Avoid calling this function unless it's strictly necessary.
+     *
+     * Like runAggregate(), this absorbs an 'IFRFlagRetry' kickback by disabling the offending
+     * feature flag and re-running 'request' against the same routing context.
      */
     static Status runAggregateWithRoutingCtx(
         OperationContext* opCtx,

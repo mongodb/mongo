@@ -584,16 +584,19 @@ public:
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto viewAggRequest =
                 query_request_conversion::asAggregateCommandRequest(req, true /* hasExplain */);
-            // An empty PrivilegeVector is acceptable because these privileges are only checked
-            // on getMore and explain will not open a cursor.
-            auto runStatus = runAggregate(opCtx,
-                                          viewAggRequest,
-                                          {viewAggRequest},
-                                          req.toBSON(),
-                                          PrivilegeVector(),
-                                          verbosity,
-                                          replyBuilder);
-            uassertStatusOK(runStatus);
+            // This aggregation was derived locally from the explain, so any IFR flag kickback it
+            // raises has to be absorbed here rather than propagated to the router.
+            retryOnLocalIFRFlagKickback(opCtx, viewAggRequest, "explain count as aggregation", [&] {
+                // An empty PrivilegeVector is acceptable because these privileges are only checked
+                // on getMore and explain will not open a cursor.
+                uassertStatusOK(runAggregate(opCtx,
+                                             viewAggRequest,
+                                             {viewAggRequest},
+                                             req.toBSON(),
+                                             PrivilegeVector(),
+                                             verbosity,
+                                             replyBuilder));
+            });
         }
 
         CountCommandReply runCountAsAgg(OperationContext* opCtx, const RequestType& req) {
@@ -601,11 +604,16 @@ public:
             auto aggRequest = query_request_conversion::asAggregateCommandRequest(req);
             auto opMsgAggRequest =
                 OpMsgRequestBuilder::create(vts, aggRequest.getDbName(), aggRequest.toBSON());
-            BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, opMsgAggRequest);
 
-            long long countResult = ViewResponseFormatter(aggResult).getCountValue(
-                _ns.dbName().tenantId(),
-                SerializationContext::stateCommandReply(req.getSerializationContext()));
+            // This aggregation was derived locally from the count, so any IFR flag kickback it
+            // raises has to be absorbed here rather than propagated to the router.
+            long long countResult =
+                retryOnLocalIFRFlagKickback(opCtx, aggRequest, "count as aggregation", [&] {
+                    BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, opMsgAggRequest);
+                    return ViewResponseFormatter(aggResult).getCountValue(
+                        _ns.dbName().tenantId(),
+                        SerializationContext::stateCommandReply(req.getSerializationContext()));
+                });
 
             return count_cmd_helper::buildCountReply(countResult);
         }

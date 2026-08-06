@@ -1051,19 +1051,24 @@ public:
                                                     false));
             // This will do view definition resolution for views and timeseries things for
             // timeseries queries.
-            const auto status = runAggregate(opCtx,
-                                             aggRequest,
-                                             {aggRequest},
-                                             unparsedRequest().body,
-                                             privileges,
-                                             verbosity,
-                                             replyBuilder);
-            if (status.code() == ErrorCodes::InvalidPipelineOperator) {
-                uasserted(ErrorCodes::InvalidPipelineOperator,
-                          str::stream{} << "Unsupported operator in converted pipeline: "
-                                        << status.reason());
-            }
-            uassertStatusOK(status);
+            //
+            // This aggregation was derived locally from the find, so any IFR flag kickback it
+            // raises has to be absorbed here rather than propagated to the router.
+            retryOnLocalIFRFlagKickback(opCtx, aggRequest, "find as aggregation", [&] {
+                const auto status = runAggregate(opCtx,
+                                                 aggRequest,
+                                                 {aggRequest},
+                                                 unparsedRequest().body,
+                                                 privileges,
+                                                 verbosity,
+                                                 replyBuilder);
+                if (status.code() == ErrorCodes::InvalidPipelineOperator) {
+                    uasserted(ErrorCodes::InvalidPipelineOperator,
+                              str::stream{} << "Unsupported operator in converted pipeline: "
+                                            << status.reason());
+                }
+                uassertStatusOK(status);
+            });
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

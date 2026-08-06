@@ -13,16 +13,19 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/query/util/retry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -31,6 +34,8 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -40,6 +45,33 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * A test-only IFR flag, registered on first use, that a mocked shard can ask the router to disable.
+ */
+IncrementalRolloutFeatureFlag& testIFRFlag() {
+    static IncrementalRolloutFeatureFlag flag{
+        "featureFlagClusterAggregateTestIfrRetry", RolloutPhase::inDevelopment, true};
+    // The global flag registry does not support re-registration, so register exactly once even
+    // though each test's setUp() runs again.
+    static std::once_flag registered;
+    std::call_once(registered, [] { flag.registerFlag(); });
+    return flag;
+}
+
+/**
+ * Builds the reply a shard sends when it wants the router to disable an IFR flag and re-plan the
+ * request: an IFRFlagRetry error whose extra info names the flag.
+ */
+BSONObj makeIFRFlagRetryResponse(std::string_view disabledFlagName) {
+    BSONObjBuilder bob;
+    bob.append("ok", 0.0);
+    bob.append("code", static_cast<int>(ErrorCodes::IFRFlagRetry));
+    bob.append("codeName", ErrorCodes::errorString(ErrorCodes::IFRFlagRetry));
+    bob.append("errmsg", "forced IFR flag kickback for testing");
+    bob.append("disabledFlagName", disabledFlagName);
+    return bob.obj();
+}
 
 class ClusterAggregateTest : public ClusterCommandTestFixture {
 protected:
@@ -199,6 +231,75 @@ TEST_F(ClusterAggregateTest, AllowPartialResultsIsNotForwardedToShardAggregateCo
             ASSERT_FALSE(request.cmdObj.hasField("allowPartialResults"));
         },
         true /* isTargeted */);
+}
+
+// When a shard asks for an IFR flag to be disabled, the router disables it and re-dispatches the
+// user's original request rather than failing the command.
+TEST_F(ClusterAggregateTest, RetriesOriginalRequestOnIFRFlagKickback) {
+    const auto flagName = testIFRFlag().getName();
+
+    auto future = launchAsync([&] { return runCommand(kAggregateCmdTargeted); });
+
+    // The shard asks for the flag to be disabled instead of answering the aggregate.
+    // 'request.cmdObj' is only valid for the duration of the callback, so take an owned copy of the
+    // pipeline to compare the retry against.
+    BSONObj firstAttemptPipeline;
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+        firstAttemptPipeline = request.cmdObj["pipeline"].wrap().getOwned();
+        return makeIFRFlagRetryResponse(flagName);
+    });
+
+    // The router has to disable the flag and re-run this same aggregate.
+    const std::vector<BSONObj> batch = {BSON("_id" << 0)};
+    bool sawRetry = false;
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+
+        // Assert the flag is disabled in the retry.
+        auto ifrCtx = IncrementalFeatureRolloutContext::tryGet(request.opCtx);
+        ASSERT(ifrCtx) << "expected an IFR context on the dispatching opCtx";
+        ASSERT_FALSE(ifrCtx->getSavedFlagValue(testIFRFlag()));
+
+        ASSERT_BSONOBJ_EQ(firstAttemptPipeline, request.cmdObj["pipeline"].wrap());
+        sawRetry = true;
+
+        BSONObjBuilder bob(CursorResponse(kNss, CursorId(0), batch)
+                               .toBSON(CursorResponse::ResponseType::InitialResponse));
+        appendTxnResponseMetadata(bob);
+        return bob.obj();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT(sawRetry);
+
+    // The retry's results must reach the client.
+    const auto replyBody = OpMsgRequest::parse(response.response).body;
+    ASSERT_OK(getStatusFromCommandResult(replyBody));
+    const auto firstBatch = replyBody["cursor"].Obj()["firstBatch"].Array();
+    ASSERT_EQ(1u, firstBatch.size()) << replyBody;
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 0), firstBatch[0].Obj());
+}
+
+TEST_F(ClusterAggregateTest, ExhaustsRetriesOnRepeatedIFRFlagKickbacks) {
+    const auto flagName = testIFRFlag().getName();
+
+    auto future = launchAsync([&] { return runCommand(kAggregateCmdTargeted); });
+
+    // 'retryOn()' runs the command once and then retries it 'kDefaultMaxRetries' times, so the
+    // kickback has to be answered one more time than 'kDefaultMaxRetries'.
+    for (size_t attempt = 0; attempt < kDefaultMaxRetries + 1; ++attempt) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+            return makeIFRFlagRetryResponse(flagName);
+        });
+    }
+
+    auto response = future.default_timed_get();
+    const auto replyBody = OpMsgRequest::parse(response.response).body;
+    const auto status = getStatusFromCommandResult(replyBody);
+    ASSERT_EQ(ErrorCodes::IFRFlagRetry, status.code()) << replyBody;
+    ASSERT_STRING_CONTAINS(status.reason(), "Exhausted max retries");
 }
 
 }  // namespace

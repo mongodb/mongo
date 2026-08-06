@@ -1186,6 +1186,14 @@ struct RetryState {
     bool alreadyDesugared = false;
     // The result of view resolution - contains a map containing all views resolved by the shard.
     ResolvedNamespaceMap preResolvedNamespaces;
+
+    void reset(const ClusterAggregate::Namespaces& initialNamespaces, bool initAlreadyDesugared) {
+        resolvedView = boost::none;
+        preResolvedNamespaces.clear();
+        originalRequest = boost::none;
+        currentNamespaces = initialNamespaces;
+        alreadyDesugared = initAlreadyDesugared;
+    }
 };
 
 PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
@@ -1349,11 +1357,30 @@ void handleViewKickback(
 
 void handleIFRFlagRetry(const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
                         RetryState& state,
+                        OperationContext* opCtx,
+                        const ClusterAggregate::Namespaces& namespaces,
+                        bool alreadyDesugared,
                         BSONObjBuilder* result) {
-    disableIfrFlagAndResetResult(IncrementalRolloutFeatureFlag::findByName(
-                                     ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
-                                 state,
-                                 result);
+    auto retryInfo = ex.extraInfo<IFRFlagRetryInfo>();
+    tassert(13248905, "IFR retry is missing its IFRFlagRetryInfo", retryInfo);
+    std::string_view disabledFlagName = retryInfo->getDisabledFlagName();
+    auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+    tassert(13248902,
+            str::stream() << "IFR retry referenced an unknown feature flag: " << disabledFlagName,
+            flag);
+
+    disableIfrFlagAndResetResult(flag, state, result);
+
+    // Restart from scratch: discard every piece of view resolution state accumulated by previous
+    // attempts so that the next attempt re-runs the user's original request, with the offending
+    // flag(s) disabled, as if it were the first attempt.
+    state.reset(namespaces, alreadyDesugared);
+
+    // We are abandoning this attempt and re-planning the pipeline from scratch, so every
+    // participant the attempt enrolled has to be aborted and dropped.
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter.onViewResolutionError(opCtx, namespaces.requestedNss);
+    }
 }
 }  // namespace
 
@@ -1604,7 +1631,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         };
 
     auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex, RetryState& state) {
-        handleIFRFlagRetry(ex, state, result);
+        handleIFRFlagRetry(ex, state, opCtx, namespaces, alreadyDesugared, result);
     };
 
     try {
@@ -1636,19 +1663,64 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
     bool alreadyDesugared) {
+    // Source the per-operation IFRContext from the opCtx.
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
 
-    return runAggregateImpl(opCtx,
-                            routingCtx,
-                            namespaces,
-                            request,
-                            liteParsedPipeline,
-                            privileges,
-                            resolvedView,
-                            originalRequest,
-                            verbosity,
-                            result,
-                            IncrementalFeatureRolloutContext::get(opCtx),
-                            alreadyDesugared);
+    // The caller derived this aggregation from another command (a count, distinct or find over a
+    // viewless timeseries collection) and translated the namespaces of 'routingCtx' in order to do
+    // so, so the aggregation has to execute against that same routing table.
+    RetryState retryState;
+    retryState.currentNamespaces = namespaces;
+    retryState.alreadyDesugared = alreadyDesugared;
+
+    auto body = [&](RetryState& state) -> Status {
+        // Disable the IFR flags accumulated by previous attempts, as 'runAggregate()' does.
+        for (auto* ifrFlag : state.ifrFlagsToDisableOnRetries) {
+            ifrContext->disableFlag(*ifrFlag);
+        }
+
+        const LiteParsedPipeline liteParsedToUse =
+            maybeRebuildLiteParsedPipelineForRetry(
+                state, request, boost::none /* userLPP */, opCtx, ifrContext)
+                .value_or(liteParsedPipeline);
+
+        // 'request' is deliberately reused across attempts rather than copied per attempt.
+        // 'runAggregateImpl()' runs against its own copy, and the only state it writes back here is
+        // query settings it resolved - which is idempotent, and which subsequent attempts
+        // should reuse rather than re-resolve. Unlike 'ClusterAggregate::runAggregate()' there is
+        // no per-attempt request to build, because this entry point never resolves a view.
+        auto status = runAggregateImpl(opCtx,
+                                       routingCtx,
+                                       state.currentNamespaces,
+                                       request,
+                                       liteParsedToUse,
+                                       privileges,
+                                       resolvedView,
+                                       originalRequest,
+                                       verbosity,
+                                       result,
+                                       ifrContext,
+                                       state.alreadyDesugared,
+                                       state.preResolvedNamespaces);
+
+        // Throw so that a kickback reported as a Status is retried too.
+        uassertStatusOK(status);
+        return status;
+    };
+
+    auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex, RetryState& state) {
+        handleIFRFlagRetry(ex, state, opCtx, namespaces, alreadyDesugared, result);
+    };
+
+    try {
+        return retryOnWithState("ClusterAggregate::runAggregateWithRoutingCtx",
+                                std::move(retryState),
+                                kDefaultMaxRetries,
+                                body,
+                                makeErrorHandler<ErrorCodes::IFRFlagRetry>(onIFRError));
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 Status ClusterAggregate::retryOnViewOrIFRKickbackError(
@@ -1670,7 +1742,12 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     // If this is an IFR retry, pre-disable the flag.
     if (std::holds_alternative<IFRFlagRetryInfo>(errInfo)) {
         const auto& ifrInfo = std::get<IFRFlagRetryInfo>(errInfo);
-        auto* flag = IncrementalRolloutFeatureFlag::findByName(ifrInfo.getDisabledFlagName());
+        std::string_view disabledFlagName = ifrInfo.getDisabledFlagName();
+        auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+        tassert(13248901,
+                str::stream() << "IFR retry referenced an unknown feature flag: "
+                              << disabledFlagName,
+                flag);
         ifrContext->disableFlag(*flag);
 
         // For IFR retries, just call runAggregate with the original request.

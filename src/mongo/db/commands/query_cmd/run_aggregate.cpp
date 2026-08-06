@@ -1671,11 +1671,31 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
 void disableIfrFlag(
     IncrementalRolloutFeatureFlag* flag,
     stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
-    tassert(13130502, "IFR retry referenced an unknown feature flag", flag);
     ifrFlagsToDisableOnRetries.insert(flag);
 }
 
 }  // namespace
+
+bool shouldPropagateIfrKickbackToRouter(OperationContext* opCtx,
+                                        const AggregateCommandRequest& request) {
+    // If this pipeline is merging cursors, we need to propagate the error and retry from the very
+    // beginning (back on the router originating the request) in order to reestablish the cursors.
+    if (aggregation_request_helper::hasMergeCursors(request)) {
+        return true;
+    }
+
+    // Likewise, if a router (either mongos or a shard acting like a router) produced this request,
+    // the router should re-derive it under the new flag value. For queries on views, if the view is
+    // unsharded the aggregation will be retried locally by the command (count/distinct/find). If
+    // the aggregation is on a sharded collection, the router will retry the operation using mongos
+    // retry loop.
+    //
+    // It is safe to throw this error back up to the router since the router has the retry logic,
+    // and if flags did not exist on the router they would be pinned to false on this shard.
+    return (OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx) ||
+            aggregation_request_helper::getFromRouter(request)) &&
+        IncrementalFeatureRolloutContext::get(opCtx)->isInstalledFromWire();
+}
 
 // TODO SERVER-93536 take these variables in by rvalue to take internal ownership of them.
 Status runAggregate(
@@ -1758,15 +1778,24 @@ Status runAggregate(
     auto onIFRError =
         [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
             stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
-            // If this pipeline is merging cursors, we need to propagate the error and retry from
-            // the very beginning (back on the router originating the request) in order to
-            // reestablish the cursors.
-            if (aggregation_request_helper::hasMergeCursors(request)) {
+            // This request cannot be re-derived here, so hand the kickback to whoever produced it.
+            if (shouldPropagateIfrKickbackToRouter(opCtx, request)) {
                 throw ex;
             }
-            disableIfrFlag(IncrementalRolloutFeatureFlag::findByName(
-                               ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
-                           ifrFlagsToDisableOnRetries);
+
+            auto retryInfo = ex.extraInfo<IFRFlagRetryInfo>();
+            tassert(13130503, "IFR retry is missing its IFRFlagRetryInfo", retryInfo);
+
+            // 'findByName()' returns nullptr for a flag this binary does not know about, and a null
+            // flag would be dereferenced when the retry body disables the accumulated flags.
+            std::string_view disabledFlagName = retryInfo->getDisabledFlagName();
+            auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+            tassert(13130502,
+                    str::stream() << "IFR retry referenced an unknown feature flag: "
+                                  << disabledFlagName,
+                    flag);
+
+            disableIfrFlag(flag, ifrFlagsToDisableOnRetries);
         };
 
     // Retry on CollectionBecameView if the namespace concurrently transitioned from collection to
