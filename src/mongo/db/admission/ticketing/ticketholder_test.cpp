@@ -1171,8 +1171,8 @@ TEST_F(TicketHolderTestTick, WaitForTicketDeadlineBetweenTimeoutWindows) {
     // ticket wait finishes in an interval which has no overlap with the first or second
     // timeout window.
     runTicketWaitTimeoutTest(Milliseconds{650},   // maxTimeMS
-                             Milliseconds{100},   // lowerBoundSlack
-                             Milliseconds{100});  // upperBoundSlack
+                             Milliseconds{49},    // lowerBoundSlack
+                             Milliseconds{149});  // upperBoundSlack
 }
 
 TEST_F(TicketHolderTestTick, WaitForTicketWithShortDeadline) {
@@ -1181,6 +1181,6 @@ TEST_F(TicketHolderTestTick, WaitForTicketWithShortDeadline) {
     // finishing well before the 500ms semaphore polling interval.
     runTicketWaitTimeoutTest(Milliseconds{50},    // maxTimeMS - much less than 500ms base interval
                              Milliseconds{50},    // lowerBoundSlack
-                             Milliseconds{350});  // upperBoundSlack; total < 500ms poll interval
+                             Milliseconds{349});  // upperBoundSlack; total < 500ms poll interval
 }
 }  // namespace
