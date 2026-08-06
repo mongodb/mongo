@@ -2712,6 +2712,55 @@ TEST(JSONSchemaValidation, ArrayAdditionalItemsFalseAlwaysTrue) {
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
+TEST(JSONSchemaValidation, ArrayBadValueInArray) {
+    BSONObj query =
+        fromjson("  {'$jsonSchema': {'properties': {'a': {'items': {'type': 'number'}}}}}");
+    // Manually create a compact array with an invalid value inside.
+    BSONObj document1 = BSON("a" << BSONArray(BSON("0" << 900 << "10987" << 1024 << "2147483647"
+                                                       << "400")));
+    BSONObj expectedError1 = fromjson(
+        "{ operatorName: '$jsonSchema',"
+        "  schemaRulesNotSatisfied: ["
+        "    { operatorName: 'properties',"
+        "      propertiesNotSatisfied: ["
+        "        { propertyName: 'a',"
+        "          details: ["
+        "            { operatorName: 'items',"
+        "              reason: 'At least one item did not match the sub-schema',"
+        "              itemIndex: 2147483647,"
+        "              details: ["
+        "                { operatorName: 'type',"
+        "                  specifiedAs: {"
+        "                    type: 'number'"
+        "                  },"
+        "                  reason: 'type did not match',"
+        "                  consideredValue: '400',"
+        "                  consideredType: 'string'"
+        "                }"
+        "              ]"
+        "            }"
+        "          ]"
+        "        }"
+        "      ]"
+        "    }"
+        "  ]"
+        "}");
+    doc_validation_error::verifyGeneratedError(query, document1, expectedError1);
+
+    // Manually create an invalid array representation.
+    BSONObj document2 = BSON("a" << BSONArray(BSON("this_should_be_an_index"
+                                                   << "bad")));
+    BSONObj expectedError2 =
+        fromjson("{ code: 9, codeName: 'FailedToParse', errmsg: 'Did not consume whole string.' }");
+    doc_validation_error::verifyGeneratedError(query, document2, expectedError2);
+
+    // Manually create a compact array with a huge number of entries.
+    BSONObj document3 = BSON("a" << BSONArray(BSON("9223372036854775808"
+                                                   << "bad")));
+    BSONObj expectedError3 = fromjson("{ code: 15, codeName: 'Overflow', errmsg: 'Overflow' }");
+    doc_validation_error::verifyGeneratedError(query, document3, expectedError3);
+}
+
 // Object keywords
 
 // minProperties

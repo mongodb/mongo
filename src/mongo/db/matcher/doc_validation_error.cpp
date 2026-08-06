@@ -42,6 +42,7 @@
 #include <s2cellid.h>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -1854,8 +1855,11 @@ private:
                 "Must have at least one mismatched array element when generating an error for an "
                 "'InternalSchemaAllElemMatchFromIndexMatchExpression' expression",
                 failingElement);
-            _context->getCurrentObjBuilder().appendNumber(
-                "itemIndex"_sd, std::stoll(failingElement.fieldNameStringData().toString()));
+
+            int itemIndex;
+            uassertStatusOK(
+                NumberParser().base(10)(failingElement.fieldNameStringData(), &itemIndex));
+            _context->getCurrentObjBuilder().appendNumber("itemIndex"_sd, itemIndex);
             _context->setChildInput(toObjectWithPlaceholder(failingElement),
                                     _context->getCurrentInversion());
         } else {
