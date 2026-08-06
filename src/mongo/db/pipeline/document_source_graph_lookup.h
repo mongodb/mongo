@@ -53,7 +53,8 @@ struct GraphLookUpParams {
     boost::optional<FieldPath> depthField;
     boost::optional<long long> maxDepth;
     boost::optional<OwnedLiteParsedPipeline>
-        fromLpp;  // set in constructor; nullopt for regular collections
+        fromLpp;  // Always set after construction: the resolved view definition(s) for 'from', or
+                  // an empty pipeline for a regular collection.
 };
 
 class DocumentSourceGraphLookUp final : public DocumentSource {

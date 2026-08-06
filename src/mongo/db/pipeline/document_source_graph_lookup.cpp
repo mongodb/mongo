@@ -497,12 +497,22 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
 
         if (argName == DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName) {
             // This internal field is consumed at lite-parse time (LiteParsedGraphLookUp::parse).
-            // Reject it from external clients and ignore it on the legacy createFromBson path.
+            // Reject it from external clients, and it should never be set internally.
             assertAllowedInternalIfRequired(
                 expCtx->getOperationContext(),
                 DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName,
                 AllowedWithClientType::kInternal);
-            continue;
+
+            // A router that resolved a view for 'from' sends the resolved definition in this field,
+            // but only when it parsed the request with 'featureFlagExtensionsInsideHybridSearch'
+            // enabled; We enter this parsing function when
+            // 'featureFlagExtensionsInsideHybridSearch' is disabled. That combination should be
+            // impossible: a shard that disables the flag mid-operation propagates the IFRFlagRetry
+            // back to the router, and the router then retries the request with the flag off, which
+            // does not serialize '$_internalFromPipeline' at all.
+            tasserted(13248900,
+                      "Cannot parse '$_internalFromPipeline' when "
+                      "'featureFlagExtensionsInsideHybridSearch' is disabled");
         }
 
         if (argName == "from" || argName == "as" || argName == "connectFromField" ||
