@@ -26,18 +26,6 @@
 
 namespace mongo {
 namespace repl {
-namespace {
-void checkIfAuthorizedForForceFiltered(OperationContext* opCtx) {
-    auto authSession = AuthorizationSession::get(opCtx->getClient());
-    auto clusterResource = ResourcePattern::forClusterResource(authSession->getUserTenantId());
-    uassert(
-        ErrorCodes::Unauthorized,
-        "Not authorized to set forceFiltered on replSetGetStatus",
-        authSession->isAuthorizedForActionsOnResource(clusterResource,
-                                                      ActionType::getCompleteReplSetStatus) ||
-            authSession->isAuthorizedForActionsOnResource(clusterResource, ActionType::internal));
-}
-}  // namespace
 
 class CmdReplSetGetStatus : public ReplSetCommand {
 public:
@@ -107,15 +95,8 @@ public:
         // result builder and filter them at the end. Otherwise, append directly to the input result
         // builder to avoid additional costs in the non-filtering case.
         auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
-        bool forceFiltered = false;
-        if (gFeatureFlagReplSetGetStatusMetricsFiltering.isEnabled()) {
-            forceFiltered = cmdObj["forceFiltered"].trueValue();
-            if (forceFiltered) {
-                checkIfAuthorizedForForceFiltered(opCtx);
-            }
-        }
         bool requireFiltering = metricsPolicyManager.requiresFiltering(
-            opCtx, MetricsCategoryEnum::kReplSetGetStatus, forceFiltered);
+            opCtx, MetricsCategoryEnum::kReplSetGetStatus, cmdObj["forceFiltered"].trueValue());
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {

@@ -56,17 +56,6 @@ namespace {
 using namespace std::literals::string_view_literals;
 constexpr auto kTimingSection = "timing"sv;
 
-void checkIfAuthorizedForForceFiltered(OperationContext* opCtx) {
-    auto authSession = AuthorizationSession::get(opCtx->getClient());
-    auto clusterResource = ResourcePattern::forClusterResource(authSession->getUserTenantId());
-    uassert(
-        ErrorCodes::Unauthorized,
-        "Not authorized to set forceFiltered on serverStatus",
-        authSession->isAuthorizedForActionsOnResource(clusterResource,
-                                                      ActionType::getCompleteServerStatus) ||
-            authSession->isAuthorizedForActionsOnResource(clusterResource, ActionType::internal));
-}
-
 class CmdServerStatus : public BasicCommand {
 public:
     CmdServerStatus() : BasicCommand("serverStatus"), _started(Date_t::now()) {}
@@ -131,15 +120,8 @@ public:
         // temporary result builder and filter them at the end. Otherwise, append directly to the
         // input result builder to avoid additional costs in the non-filtering case.
         auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
-        bool forceFiltered = false;
-        if (gFeatureFlagServerStatusMetricsFiltering.isEnabled()) {
-            forceFiltered = cmdObj["forceFiltered"].trueValue();
-            if (forceFiltered) {
-                checkIfAuthorizedForForceFiltered(opCtx);
-            }
-        }
         bool requireFiltering = metricsPolicyManager.requiresFiltering(
-            opCtx, MetricsCategoryEnum::kServerStatus, forceFiltered);
+            opCtx, MetricsCategoryEnum::kServerStatus, cmdObj["forceFiltered"].trueValue());
 
         boost::optional<BSONObjBuilder> tmpResultBuilder;
         if (requireFiltering) {
