@@ -24,7 +24,6 @@ export const runTestStandaloneParamsSetAtStartup = (setParams, testCase) => {
     let mongod = MongoRunner.runMongod({
         setParameter: {
             ...setParams,
-            featureFlagRateLimitIngressConnectionEstablishment: true,
         },
         config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
     });
@@ -43,7 +42,6 @@ export const runTestStandaloneParamsSetAtStartup = (setParams, testCase) => {
 
 export const runTestStandaloneParamsSetAtRuntime = (setParams, testCase) => {
     let mongod = MongoRunner.runMongod({
-        setParameter: {featureFlagRateLimitIngressConnectionEstablishment: true},
         config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
     });
     mongod.adminCommand({
@@ -72,7 +70,6 @@ export const runTestReplSet = (setParams, testCase) => {
         nodeOptions: {
             setParameter: {
                 ...setParams,
-                featureFlagRateLimitIngressConnectionEstablishment: true,
             },
             config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
         },
@@ -103,7 +100,6 @@ export const runTestShardedCluster = (setParams, testCase) => {
             mongosOptions: {
                 setParameter: {
                     ...setParams,
-                    featureFlagRateLimitIngressConnectionEstablishment: true,
                 },
                 config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
             },

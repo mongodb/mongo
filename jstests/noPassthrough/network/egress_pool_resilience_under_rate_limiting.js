@@ -47,8 +47,7 @@ function runTest(tlsOptions, label) {
 
     // tlsOptions contains command-line options (tlsMode, tlsCertificateKeyFile, etc.), not server
     // parameters, so spread them at the top level of each node options object rather than inside
-    // setParameter.  featureFlagRateLimitIngressConnectionEstablishment is a startup-only server
-    // parameter, so it goes inside setParameter on the shard (rsOptions).
+    // setParameter.
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,
@@ -68,14 +67,11 @@ function runTest(tlsOptions, label) {
                 },
             },
             rsOptions: {
+                // The limiter is left disabled at startup so cluster bring-up and the initial
+                // connection are not throttled; we enable and tighten it entirely at runtime below.
+                // The limiter is fully runtime-configurable -- the enabled flag is read on each new
+                // session.
                 ...tlsOptions,
-                setParameter: {
-                    // Only the feature flag is startup-only (it's a feature flag). The limiter is
-                    // left disabled at startup so cluster bring-up and the initial connection are not
-                    // throttled; we enable and tighten it entirely at runtime below. The limiter is
-                    // fully runtime-configurable -- the enabled flag is read on each new session.
-                    featureFlagRateLimitIngressConnectionEstablishment: true,
-                },
             },
             configOptions: {...tlsOptions},
         },

@@ -38,7 +38,6 @@ let rs = new ReplSetTest({
             ingressConnectionEstablishmentBurstCapacitySecs: 1,
             ingressConnectionEstablishmentMaxQueueDepth: 0,
             ingressConnectionEstablishmentRateLimiterBypass: {ranges: [exemptIP]},
-            featureFlagRateLimitIngressConnectionEstablishment: true,
         },
     },
 });

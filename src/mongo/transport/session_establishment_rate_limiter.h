@@ -29,10 +29,10 @@ namespace mongo::transport {
  * - ingressConnectionEstablishmentMaxQueueDepth
  * - ingressConnectionEstablishmentRateLimiterBypass
  *
- * SessionEstablishmentRateLimiter is used in SessionWorkflow if the following feature flag
- * server parameter is true:
+ * SessionEstablishmentRateLimiter is used in SessionWorkflow if the following server parameter is
+ * true:
  *
- * - featureFlagRateLimitIngressConnectionEstablishment
+ * - ingressConnectionEstablishmentRateLimiterEnabled
  */
 class [[MONGO_MOD_PUBLIC]] SessionEstablishmentRateLimiter {
 public:

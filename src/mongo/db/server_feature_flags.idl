@@ -207,11 +207,6 @@ feature_flags:
         cpp_varname: gFeatureFlagRecordDelinquentMetrics
         default: true
         fcv_gated: false
-    featureFlagRateLimitIngressConnectionEstablishment:
-        description: "Queues connection establishment after exceeding the maximum rate"
-        cpp_varname: gFeatureFlagRateLimitIngressConnectionEstablishment
-        default: true
-        fcv_gated: false
     featureFlagIngressRateLimiting:
         description: "Limit the rate of operation going through ingress admission"
         cpp_varname: gFeatureFlagIngressRateLimiting

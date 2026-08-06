@@ -1060,8 +1060,7 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         try {
             if (MONGO_unlikely(_inFirstIteration)) {
                 session()->prelude();
-                if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabled() &&
-                    gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
+                if (gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
                     // This enforces the connection establishment rate limit by possibly sleeping
                     // the current thread ("queued") or throwing an exception ("rejected").
                     uassertStatusOK(session()
