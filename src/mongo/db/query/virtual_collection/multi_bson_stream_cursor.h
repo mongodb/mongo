@@ -55,6 +55,12 @@ public:
         return {};
     }
 
+    // The size the assembly buffer starts at before any expansion, and the size of the block reads
+    // it performs at that size. See the '_bufSize' comment below for how the starting size is
+    // chosen. Exposed so that tests and benchmarks can size documents relative to these.
+    static constexpr int kInitialBufSize = 8 * 1024;
+    static constexpr int kInitialBlockReadSize = kInitialBufSize / 2;
+
 private:
     void expandBuffer(int32_t bsonSize);
     boost::optional<Record> nextFromCurrentStream();
@@ -77,8 +83,8 @@ private:
     // to avoid memory fragmentation, as most BSON objects will not be so tiny, however, many may be
     // quite small. The starting size is chosen as 8K because at the time of writing the most common
     // Linux filesystem block size is 4K, and our block read size is half the buffer size.
-    int _bufSize = 8 * 1024;                              // current buffer size
-    int _blockReadSize = _bufSize / 2;                    // size of a block read
+    int _bufSize = kInitialBufSize;                       // current buffer size
+    int _blockReadSize = kInitialBlockReadSize;           // size of a block read
     std::unique_ptr<char[]> _buffer{new char[_bufSize]};  // the buffer itself
     int _bufBegin = 0;  // index of first unconsumed byte in '_buffer'
     int _bufEnd = 0;    // index one past the last valid byte in '_buffer'

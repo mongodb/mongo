@@ -12,6 +12,7 @@
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -606,7 +607,7 @@ TEST_F(ExternalRecordStoreTest, RejectsNegativeEmbeddedArraySize) {
     ASSERT_THROWS_CODE(msbc.next(), DBException, 12849400);
 }
 
-// Similar to the test above, we reject BSON whose top-level size is negative.
+// A negative top-level size is caught by the explicit size check, before validateBSON() sees it.
 TEST_F(ExternalRecordStoreTest, RejectsNegativeTopLevelSize) {
     // clang-format off
     static constexpr char kNegativeSizeBson[] = {
@@ -635,7 +636,109 @@ TEST_F(ExternalRecordStoreTest, RejectsNegativeTopLevelSize) {
     vopts.dataSources.emplace_back(meta);
     MultiBsonStreamCursor msbc(vopts);
 
-    ASSERT_THROWS_CODE(msbc.next(), DBException, 12849400);
+    ASSERT_THROWS_CODE(msbc.next(), DBException, 13251201);
+}
+
+// Builds a well-formed BSON document of exactly 'totalSize' bytes holding one string field "a".
+// Laid out by hand because BSONObjBuilder cannot produce sizes above BSONObjMaxUserSize:
+//   int32 totalSize | 0x02 (string) | "a\0" | int32 strLen | strLen bytes | 0x00 (doc terminator)
+std::string makeRawStringBson(int32_t totalSize) {
+    constexpr int32_t kOverhead = 12;
+    invariant(totalSize > kOverhead);
+    const int32_t strLen = totalSize - kOverhead;  // includes the string's own NUL terminator
+
+    std::string doc;
+    doc.reserve(totalSize);
+    doc.append(reinterpret_cast<const char*>(&totalSize), sizeof(totalSize));
+    doc.push_back('\x02');
+    doc.append("a\0", 2);
+    doc.append(reinterpret_cast<const char*>(&strLen), sizeof(strLen));
+    doc.append(strLen - 1, 'x');
+    doc.push_back('\0');  // string terminator
+    doc.push_back('\0');  // document terminator
+    invariant(static_cast<int32_t>(doc.size()) == totalSize);
+
+    return doc;
+}
+
+// An oversized document must be rejected even when it fits in the cursor's buffer. Reaching that
+// case takes a specific sequence, since expandBuffer()'s check only fires when the buffer grows:
+//   1. A document at the limit grows the buffer to its maximum, making the block read size
+//      BSONObjMaxUserSize.
+//   2. A small document is consumed off the front of the next block read, leaving the oversized
+//      document near offset 0 with most of it already buffered.
+//   3. Its remainder fits in the buffer's free tail, so it is read without expanding again.
+// The overshoot must stay small enough for step 3 to hold; a larger one would force an expansion
+// and be caught by expandBuffer() instead.
+TEST_F(ExternalRecordStoreTest, RejectsDocumentLargerThanMaxUserSize) {
+    static constexpr int32_t kOvershoot = 4 * 1024 * 1024;
+    static_assert(kOvershoot > 0 && kOvershoot < BSONObjMaxUserSize);
+
+    const std::string maxSizeDoc = makeRawStringBson(BSONObjMaxUserSize);
+    const auto smallDoc = BSON("small" << 1);
+    const std::string oversizedDoc = makeRawStringBson(BSONObjMaxUserSize + kOvershoot);
+
+    // The cursor rejects the document partway through it and closes the read end, leaving the
+    // blocked producer with a broken pipe.
+    static constexpr int kExpectedWriteErrorCode =
+#ifdef _WIN32
+        7239301;
+#else
+        7239300;
+#endif
+    AtomicWord<int> producerWriteErrorCode{0};
+
+    PipeWaiter pw;
+    const auto pipePath = createPipeFilename("RejectsDocumentLargerThanMaxUserSizePipe");
+    stdx::thread producer([&] {
+        NamedPipeOutput pipeWriter(pipePath);
+        pw.notify();
+        pipeWriter.open();
+        try {
+            pipeWriter.write(maxSizeDoc.data(), maxSizeDoc.size());
+            pipeWriter.write(smallDoc.objdata(), smallDoc.objsize());
+            pipeWriter.write(oversizedDoc.data(), oversizedDoc.size());
+        } catch (const DBException& ex) {
+            // Recorded rather than asserted here: an assertion escaping this thread would terminate
+            // the test process. Verified on the main thread after the join below.
+            producerWriteErrorCode.store(ex.code());
+        }
+        pipeWriter.close();
+    });
+    ON_BLOCK_EXIT([&] {
+        if (producer.joinable()) {
+            producer.join();
+        }
+    });
+    pw.wait();
+
+    VirtualCollectionOptions vopts;
+    ExternalDataSourceMetadata meta(
+        fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePath),
+        StorageTypeEnum::pipe,
+        FileTypeEnum::bson);
+    vopts.dataSources.emplace_back(meta);
+
+    {
+        MultiBsonStreamCursor msbc(vopts);
+
+        // The first document is exactly at the limit, so it is accepted.
+        auto record = msbc.next();
+        ASSERT(record) << "Expected to read the BSONObjMaxUserSize document";
+        ASSERT_EQ(record->data.size(), BSONObjMaxUserSize);
+
+        record = msbc.next();
+        ASSERT(record) << "Expected to read the small document";
+        ASSERT_EQ(record->data.size(), smallDoc.objsize());
+
+        // The oversized document fits in the buffer but violates the max user size invariant. It is
+        // rejected by the size check.
+        ASSERT_THROWS_CODE(msbc.next(), DBException, 13251201);
+    }  // Closes the read end of the pipe, unblocking the producer with a broken pipe.
+
+    producer.join();
+    ASSERT_EQ(producerWriteErrorCode.load(), kExpectedWriteErrorCode)
+        << "Expected the producer to fail writing the remainder of the oversized document";
 }
 
 }  // namespace
