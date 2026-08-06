@@ -504,6 +504,40 @@ TEST_F(GoldenSbeStageBuilderTest, TestOr) {
                                 << "b")));
 }
 
+TEST_F(GoldenSbeStageBuilderTest, TestMultikeyIxscanFilter) {
+    auto indexKeyPattern = BSON("a" << 1);
+    createCollection({fromjson("{_id: 0, a: ['x', 'y']}"), fromjson("{_id: 1, a: ['z']}")},
+                     indexKeyPattern);
+
+    // A multikey IndexEntry causes the generated IndexScanNode's 'shouldDedup' to be set.
+    IndexEntry indexEntry = makeIndexEntry(indexKeyPattern);
+    indexEntry.multikey = true;
+
+    auto indexScanNode = std::make_unique<IndexScanNode>(_nss, indexEntry);
+    OrderedIntervalList oil("a");
+    oil.intervals.emplace_back(BSON("" << "x" << "" << "z"), true, true);
+    indexScanNode->bounds.fields.emplace_back(std::move(oil));
+    indexScanNode->sortSet = ProvidedSortSet{indexKeyPattern};
+
+    // Doc 0's "x" key fails this filter, but its "y" key passes; the fused stage must not drop it.
+    // 'query' must outlive the parsed MatchExpression, which holds BSONElements pointing into it.
+    BSONObj query = fromjson("{a: 'y'}");
+    indexScanNode->filter = uassertStatusOK(MatchExpressionParser::parse(query, _expCtx));
+
+    // Covered sort/projection (mirroring TestSortCovered) so no fetch is needed for output.
+    auto coveredSortNode = std::make_unique<SortNodeDefault>(std::move(indexScanNode),
+                                                             BSON("a" << 1) /* pattern */,
+                                                             -1 /* limit */,
+                                                             LimitSkipParameterization::Disabled,
+                                                             kSortMaxMemoryUsageBytes);
+    auto projection = BSON("a" << 1 << "_id" << 0);
+    auto projectNode = makeProjNode<ProjectionNodeCovered>(
+        _expCtx, std::move(coveredSortNode), projection, indexKeyPattern);
+
+    auto expected = BSON_ARRAY(BSON("a" << "y"));
+    runTest(std::move(projectNode), expected);
+}
+
 TEST_F(GoldenSbeStageBuilderTest, TestUnwind) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << BSON_ARRAY(1 << 2 << 3)))};
     boost::optional<FieldPath> fp = boost::none;

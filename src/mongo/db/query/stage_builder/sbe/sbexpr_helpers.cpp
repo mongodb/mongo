@@ -666,6 +666,14 @@ SbStage SbBuilder::makeUniqueRoaring(SbStage stage, SbSlot key) {
     return sbe::makeS<sbe::UniqueRoaringStage>(std::move(stage), key.getId(), _nodeId);
 }
 
+SbStage SbBuilder::makeUniqueRoaringFilter(const VariableTypes& varTypes,
+                                           SbStage stage,
+                                           SbSlot key,
+                                           SbExpr condition) {
+    return sbe::makeS<sbe::UniqueRoaringStage>(
+        std::move(stage), key.getId(), lower(condition, &varTypes), _nodeId);
+}
+
 SbStage SbBuilder::makeSort(const VariableTypes& varTypes,
                             SbStage stage,
                             const SbSlotVector& orderBy,

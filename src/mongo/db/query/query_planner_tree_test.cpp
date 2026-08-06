@@ -551,11 +551,12 @@ TEST_F(QueryPlannerTest, OrInexactCoveredMultikey) {
     addIndex(BSON("names" << 1), true);
     runQuery(fromjson("{$or: [{names: 'dave'}, {names: /joe/}]}"));
 
+    // Multikey no longer blocks pushing the OR's filter onto the index scan.
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {names: {$in: ['dave', /joe/]}}, "
-        "node: {ixscan: {filter: null, pattern: {names: 1}}}}}");
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: {names: {$in: ['dave', /joe/]}}, pattern: {names: 1}}}}}");
 }
 
 // SERVER-13960: $elemMatch object with $or.

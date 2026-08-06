@@ -614,10 +614,9 @@ TEST_F(QueryPlannerTest, CompoundMultikey2DNear) {
              true);
     runQuery(fromjson("{a: {$near: [0, 0]}, b: {$gte: 0}}"));
 
+    // 'b' being multikey no longer forces a fetch; the filter is pushed onto geoNear2d instead.
     assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: { filter : {b:{$gte: 0}}, node: "
-        "{geoNear2d: {a: '2d', b: 1} } } }");
+    assertSolutionExists("{geoNear2d: {a: '2d', b: 1} }");
 }
 
 // SERVER-9257

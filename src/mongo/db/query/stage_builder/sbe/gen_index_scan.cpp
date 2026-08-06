@@ -525,6 +525,50 @@ IntervalsRequired canGenerateSingleIntervalIndexScan(
     return currentState == State::EqOrConstPoint ? IntervalsRequired::EqualityInterval
                                                  : IntervalsRequired::SingleRangeInterval;
 }
+
+// Generates the residual filter (if any) for 'ixn' and applies it together with dedup, matching
+// the ordering required for a covered filter over a (possibly) multikey index scan: a filter on a
+// non-clustered, deduped scan is fused with dedup via 'makeUniqueRoaringFilter' so the filter only
+// re-runs on keys of records not yet returned; other combinations fall back to separate dedup and
+// filter stages.
+SbStage applyIndexScanFilterAndDedup(StageBuilderState& state,
+                                     const CollectionPtr& collection,
+                                     const IndexScanNode* ixn,
+                                     SbBuilder& b,
+                                     SbStage stage,
+                                     PlanStageSlots& outputs) {
+    SbExpr filterExpr;
+    if (ixn->filter) {
+        const bool isOverIxscan = true;
+        filterExpr = generateFilter(state, ixn->filter.get(), {}, outputs, isOverIxscan);
+    }
+
+    if (ixn->shouldDedup && !filterExpr.isNull()) {
+        if (collection->isClustered()) {
+            // Clustered RecordIds may not fit the roaring representation, so filter before dedup
+            // instead (correct, but reruns the filter on every key).
+            stage = b.makeFilter(std::move(stage), std::move(filterExpr));
+            stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+        } else {
+            stage = b.makeUniqueRoaringFilter(
+                std::move(stage), outputs.get(PlanStageSlots::kRecordId), std::move(filterExpr));
+        }
+    } else {
+        if (ixn->shouldDedup) {
+            if (collection->isClustered()) {
+                stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+            } else {
+                stage =
+                    b.makeUniqueRoaring(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+            }
+        }
+        if (!filterExpr.isNull()) {
+            stage = b.makeFilter(std::move(stage), std::move(filterExpr));
+        }
+    }
+
+    return stage;
+}
 }  // namespace
 
 bool ietsArePointInterval(const std::vector<interval_evaluation_tree::IET>& iets) {
@@ -896,21 +940,7 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& stat
             reqs);
     }
 
-    if (ixn->shouldDedup) {
-        if (collection->isClustered()) {
-            stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
-        } else {
-            stage = b.makeUniqueRoaring(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
-        }
-    }
-
-    if (ixn->filter) {
-        const bool isOverIxscan = true;
-        auto filterExpr = generateFilter(state, ixn->filter.get(), {}, outputs, isOverIxscan);
-        if (!filterExpr.isNull()) {
-            stage = b.makeFilter(std::move(stage), std::move(filterExpr));
-        }
-    }
+    stage = applyIndexScanFilterAndDedup(state, collection, ixn, b, std::move(stage), outputs);
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -1090,21 +1120,7 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
             isGenericScanSlot.getId(), genericBoundsSlot->getId(), optimizedBoundsSlot->getId()}};
     }
 
-    if (ixn->shouldDedup) {
-        if (collection->isClustered()) {
-            stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
-        } else {
-            stage = b.makeUniqueRoaring(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
-        }
-    }
-
-    if (ixn->filter) {
-        const bool isOverIxscan = true;
-        auto filterExpr = generateFilter(state, ixn->filter.get(), {}, outputs, isOverIxscan);
-        if (!filterExpr.isNull()) {
-            stage = b.makeFilter(std::move(stage), std::move(filterExpr));
-        }
-    }
+    stage = applyIndexScanFilterAndDedup(state, collection, ixn, b, std::move(stage), outputs);
 
     state.data->indexBoundsEvaluationInfos.emplace_back(
         IndexBoundsEvaluationInfo{ixn->index,

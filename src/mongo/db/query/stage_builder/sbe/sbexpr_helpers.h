@@ -474,6 +474,16 @@ public:
 
     SbStage makeUniqueRoaring(SbStage stage, SbSlot key);
 
+    inline SbStage makeUniqueRoaringFilter(SbStage stage, SbSlot key, SbExpr condition) {
+        return makeUniqueRoaringFilter(
+            VariableTypes{}, std::move(stage), key, std::move(condition));
+    }
+
+    SbStage makeUniqueRoaringFilter(const VariableTypes& varTypes,
+                                    SbStage stage,
+                                    SbSlot key,
+                                    SbExpr condition);
+
     SbStage makeSort(SbStage stage,
                      const SbSlotVector& orderBy,
                      std::vector<sbe::value::SortDirection> dirs,

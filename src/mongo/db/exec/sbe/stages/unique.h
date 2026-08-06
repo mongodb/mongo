@@ -4,11 +4,14 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/util/hash_roaring_set.h"
 #include "mongo/util/modules.h"
@@ -82,14 +85,25 @@ private:
  * This stage is the same as UniqueStage functionally but uses roaring bitmap internally. It can
  * only be used to deduplicate a single integral key.
  *
+ * Optionally fuses in a residual filter: a key is only recorded as "seen" once it passes the
+ * filter, so later keys for an already-matched document skip the filter entirely, while a
+ * not-yet-matched document still gets a chance on its next key.
+ *
  * Debug string representation:
  *
  *   unique_roaring [<key>] childStage
+ *   unique_roaring_filter [<key>] { <filter> } childStage
  */
 class UniqueRoaringStage final : public PlanStage {
 public:
     UniqueRoaringStage(std::unique_ptr<PlanStage> input,
                        value::SlotId key,
+                       PlanNodeId planNodeId,
+                       bool participateInTrialRunTracking = true);
+
+    UniqueRoaringStage(std::unique_ptr<PlanStage> input,
+                       value::SlotId key,
+                       std::unique_ptr<EExpression> filter,
                        PlanNodeId planNodeId,
                        bool participateInTrialRunTracking = true);
 
@@ -118,9 +132,16 @@ private:
     value::SlotAccessor* _inKeyAccessor = nullptr;
     HashRoaringSet _seen;
     size_t _prevSeenSizeBytes = 0;
+    DeduplicatorReporter _dedupReporter;
+
+    const std::unique_ptr<EExpression> _filter;
+    std::unique_ptr<vm::CodeFragment> _filterCode;
+    vm::ByteCode _bytecode;
+
+    // Number of rows the filter was actually evaluated on, when a filter is present. Reported via
+    // debugInfo only.
+    size_t _filterTested = 0;
 
     UniqueStats _specificStats;
-
-    DeduplicatorReporter _dedupReporter;
 };
 }  // namespace mongo::sbe
