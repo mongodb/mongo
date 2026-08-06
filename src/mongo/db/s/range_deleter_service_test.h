@@ -111,7 +111,8 @@ std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngo
 [[MONGO_MOD_NEEDS_REPLACEMENT]] SharedSemiFuture<void> registerAndCreatePersistentTask(
     OperationContext* opCtx,
     const RangeDeletionTask& rdt,
-    SemiFuture<void>&& waitForActiveQueriesToComplete);
+    SemiFuture<void>&& waitForActiveQueriesToComplete,
+    bool ready = true);
 
 int insertDocsWithinRange(
     OperationContext* opCtx, const NamespaceString& nss, int min, int max, int maxCount);

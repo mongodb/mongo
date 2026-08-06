@@ -399,7 +399,7 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
 
                     if ((overlappingTask->getRegistrationTime() < registrationTime) ||
                         (overlappingTask->getRegistrationTime() == registrationTime &&
-                         taskId < overlappingTask->getTaskId())) {
+                         overlappingTask->getTaskId() < taskId)) {
                         LOGV2_DEBUG(11943500,
                                     2,
                                     "Waiting for overlapping range deletion task to complete",

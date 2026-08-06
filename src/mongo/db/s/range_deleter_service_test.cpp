@@ -1263,7 +1263,7 @@ TEST_F(RangeDeleterServiceTest, OverlappingTasksWithSameTimestampOneWaitsForOthe
                                         BSON(kShardKey << 0),
                                         BSON(kShardKey << 10),
                                         CleanWhenEnum::kNow,
-                                        /*pending=*/false);
+                                        /*pending=*/true);
     rdt0.setTimestamp(sameTimestamp);
     auto task0 = std::make_shared<RangeDeletionWithOngoingQueries>(rdt0);
 
@@ -1271,15 +1271,17 @@ TEST_F(RangeDeleterServiceTest, OverlappingTasksWithSameTimestampOneWaitsForOthe
                                         BSON(kShardKey << 5),
                                         BSON(kShardKey << 15),
                                         CleanWhenEnum::kNow,
-                                        /*pending=*/false);
+                                        /*pending=*/true);
     rdt1.setTimestamp(sameTimestamp);
     auto task1 = std::make_shared<RangeDeletionWithOngoingQueries>(rdt1);
 
-    // Register both tasks
-    auto completionFuture0 =
-        registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
-    auto completionFuture1 =
-        registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+    // Register both tasks as pending before starting either of them. Registering and starting task0
+    // in one step would let it run its overlap check before task1 has been registered, so
+    // it would find nothing to wait for and the overlap ordering under test would go unexercised.
+    auto completionFuture0 = registerAndCreatePersistentTask(
+        opCtx, task0->getTask(), task0->getOngoingQueriesFuture(), /*ready=*/false);
+    auto completionFuture1 = registerAndCreatePersistentTask(
+        opCtx, task1->getTask(), task1->getOngoingQueriesFuture(), /*ready=*/false);
 
     ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
@@ -1291,9 +1293,17 @@ TEST_F(RangeDeleterServiceTest, OverlappingTasksWithSameTimestampOneWaitsForOthe
     auto& firstFuture = task0GoesFirst ? completionFuture0 : completionFuture1;
     auto& secondFuture = task0GoesFirst ? completionFuture1 : completionFuture0;
 
+    // Start both tasks now that they are both registered.
+    removePendingField(opCtx, rdt0.getId());
+    removePendingField(opCtx, rdt1.getId());
+
     // Drain the SECOND task's ongoing queries first.
     // It should still be blocked waiting for the first task to complete.
+    //
+    // Draining only hands the task off to the service's executor, so sleep to give a task that is
+    // not actually blocked the time to complete.
     secondTask->drainOngoingQueries();
+    sleepmillis(100);
     ASSERT_FALSE(secondFuture.isReady());
 
     // Now drain the first task's ongoing queries - it should complete.
