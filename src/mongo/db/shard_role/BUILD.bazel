@@ -69,6 +69,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:db_raii.cpp",
     ],
     deps = [
+        "//src/mongo/client:backoff_with_jitter",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role_api",

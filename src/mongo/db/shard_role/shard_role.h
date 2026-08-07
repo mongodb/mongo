@@ -722,15 +722,27 @@ CollectionAcquisition acquireLocalCollectionNoConsistentCatalog(
     LockMode lockMode);
 
 /*
- * Resolve the collection namespace without acquiring a collection. These helpers do not lock the
- * namespace or provide shard version checks. They only make sense to run quick prechecks before
- * executing code that will eventually acquire the collections.
+ * Resolve the collection namespace without acquiring a collection. Does not lock the namespace or
+ * provide shard version checks. Ensures the resolution is done on the latest catalog, and in case
+ * the UUID is pending commit, waits until it is committed and published. Only use to run quick
+ * prechecks before executing code that will eventually acquire the collections, or for
+ * authorization checks.
+ *
+ * Throws NamespaceNotFound if the UUID is not found.
  */
 [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]]
-NamespaceString resolveNssWithoutAcquisition(OperationContext* opCtx,
-                                             const DatabaseName& dbName,
-                                             const UUID& uuid);
+NamespaceString resolveNssWithoutAcquisitionAtLatest(OperationContext* opCtx,
+                                                     const DatabaseName& dbName,
+                                                     const UUID& uuid);
 
+/*
+ * Lookup the collection namespace without acquiring a collection. Does not lock the namespace or
+ * provide shard version checks. If there is a stashed catalog, it will be used. If the UUID is
+ * pending commit, the pre-commit state will be used. Only use to run quick prechecks before
+ * executing code that will eventually acquire the collections, or for authorization checks.
+ *
+ * Returns boost::none if the UUID is not found.
+ */
 [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]]
 boost::optional<NamespaceString> lookupNssWithoutAcquisition(OperationContext* opCtx,
                                                              const UUID& uuid);

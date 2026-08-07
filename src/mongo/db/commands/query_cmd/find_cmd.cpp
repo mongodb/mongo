@@ -391,7 +391,7 @@ public:
                         nsOrUUID.nss().isValid());
                 uassertStatusOK(auth::checkAuthForFind(authSession, nsOrUUID.nss(), hasTerm));
             } else {
-                const auto resolvedNss = shard_role_nocheck::resolveNssWithoutAcquisition(
+                const auto resolvedNss = shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(
                     opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
                 uassertStatusOK(auth::checkAuthForFind(authSession, resolvedNss, hasTerm));
             }

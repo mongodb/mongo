@@ -424,10 +424,11 @@ public:
 
     /**
      * Resolves and validates the namespace from the given DatabaseName and UUID.
+     *
+     * Throws CommitPendingNamespaceOrUUID if the UUID is pending commit.
      */
-    NamespaceString resolveNamespaceStringFromDBNameAndUUID(OperationContext* opCtx,
-                                                            const DatabaseName& dbName,
-                                                            const UUID& uuid) const;
+    NamespaceString resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(
+        OperationContext* opCtx, const DatabaseName& dbName, const UUID& uuid) const;
 
     /**
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the
@@ -630,6 +631,7 @@ public:
     class BatchedCollectionWrite;
 
 private:
+    enum class CommitPendingMode { kIgnore, kInclude, kThrow };
     friend class CollectionCatalog::iterator;
 
     // We only allow the CollectionWriter class to interface with the catalog. This is to prevent
@@ -754,23 +756,36 @@ private:
     /**
      * Resolves and validates the namespace from the given DatabaseName and UUID.
      *
-     * This will also lookup in the commit pending entries if passed true for withCommitPending.
+     * When CommitPendingMode::kInclude is passed, this will return the commit pending entry if
+     * there is one.
+     *
+     * When CommitPendingMode::kThrow is passed, this will throw CommitPendingNamespaceOrUUID if the
+     * UUID is pending commit.
+     *
+     * When CommitPendingMode::kIgnore is passed, this will ignore any commit pending entries.
      */
-    NamespaceString _resolveNamespaceStringFromDBNameAndUUID(OperationContext* opCtx,
-                                                             const DatabaseName& dbName,
-                                                             const UUID& uuid,
-                                                             bool withCommitPending) const;
+    NamespaceString _resolveNamespaceStringFromDBNameAndUUID(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        const UUID& uuid,
+        CommitPendingMode commitPendingMode) const;
 
     /**
      * This function gets the NamespaceString from the collection catalog entry that
-     * corresponds to UUID uuid. If no collection exists with the uuid, return
-     * boost::none. See onCloseCatalog/onOpenCatalog for more info.
+     * corresponds to UUID uuid. If no collection exists with the uuid, return boost::none. See
+     * onCloseCatalog/onOpenCatalog for more info.
      *
-     * This will also lookup in the commit pending entries if passed true for withCommitPending.
+     * When CommitPendingMode::kInclude is passed, this will return the commit pending entry if
+     * there is one.
+     *
+     * When CommitPendingMode::kThrow is passed, this will throw CommitPendingNamespaceOrUUID if the
+     * UUID is pending commit.
+     *
+     * When CommitPendingMode::kIgnore is passed, this will ignore any commit pending entries.
      */
     boost::optional<NamespaceString> _lookupNSSByUUID(OperationContext* opCtx,
                                                       const UUID& uuid,
-                                                      bool withCommitPending) const;
+                                                      CommitPendingMode commitPendingMode) const;
 
     /**
      * Checks if an instance of the given namespace or UUID has already been instantiated for the
