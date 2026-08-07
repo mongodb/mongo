@@ -280,11 +280,14 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInComm
 
     MutableDocument changeStreamStage(
         pipeline[0][DocumentSourceChangeStream::kStageName].getDocument());
-    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value(resumeToken);
 
-    // If the command was initially specified with a startAtOperationTime, we need to remove it to
-    // use the new resume token.
+    // Provide 'resumeToken' as 'startAfter', and clear 'resumeAfter' and 'startAtOperationTime'
+    // so no stale field from the original command survives. Exactly one resume-point field is
+    // ever set on the re-issued command.
+    changeStreamStage[DocumentSourceChangeStreamSpec::kStartAfterFieldName] = Value(resumeToken);
     changeStreamStage[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName] = Value();
+    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value();
+
     pipeline[0] =
         Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
     MutableDocument newCmd(std::move(originalCmd));

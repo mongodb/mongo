@@ -122,8 +122,9 @@ private:
 
     /**
      * Given the '_originalAggregateCommand' and a resume token, returns a new BSON object with the
-     * same command except with the addition of a resumeAfter option containing the resume token.
-     * If there was a previous resumeAfter option, it will be removed.
+     * same command except with the addition of a startAfter option containing the resume token.
+     * Any previous resumeAfter, startAfter, or startAtOperationTime option is cleared first, so
+     * the returned command never has more than one resume-point field set.
      */
     BSONObj replaceResumeTokenInCommand(Document resumeToken);
 
