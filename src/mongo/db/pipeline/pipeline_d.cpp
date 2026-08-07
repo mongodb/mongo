@@ -2091,17 +2091,7 @@ BSONObj PipelineD::getPostBatchResumeToken(const exec::agg::Pipeline* pipeline) 
 }
 
 bool PipelineD::isSearchPresentAndEligibleForSbe(const Pipeline* pipeline) {
-    auto expCtx = pipeline->getContext();
-
-    auto firstStageIsSearch = search_helpers::isSearchPipeline(pipeline) ||
-        search_helpers::isSearchMetaPipeline(pipeline);
-
-    auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabled();
-    auto forceClassicEngine =
-        expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp() ==
-        QueryFrameworkControlEnum::kForceClassicEngine;
-
-    return firstStageIsSearch && searchInSbeEnabled && !forceClassicEngine;
+    return false;
 }
 
 StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(

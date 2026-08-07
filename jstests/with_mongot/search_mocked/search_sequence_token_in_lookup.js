@@ -120,7 +120,7 @@ mongotmockClassic.start();
 const mongotConnClassic = mongotmockClassic.getConnection();
 
 const connClassic = MongoRunner.runMongod({
-    setParameter: {mongotHost: mongotConnClassic.host, featureFlagSearchInSbe: false},
+    setParameter: {mongotHost: mongotConnClassic.host},
 });
 const dbClassic = connClassic.getDB("test");
 const collClassic = dbClassic[jsTestName()];

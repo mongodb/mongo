@@ -143,8 +143,7 @@ public:
      */
     static BSONObj getPostBatchResumeToken(const exec::agg::Pipeline* pipeline);
 
-    // Returns true if it is a $search pipeline, 'featureFlagSearchInSbe' is enabled and
-    // forceClassicEngine is false.
+    // Returns true if the $search pipeline is eligible for SBE execution, which it never is.
     static bool isSearchPresentAndEligibleForSbe(const Pipeline* pipeline);
 
 private:

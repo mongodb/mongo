@@ -241,10 +241,6 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
                 "Pushing down $search into SBE but forceClassicEngine is on"sv,
                 !query.getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled());
 
-        tassert(7816301,
-                "Pushing down $search into SBE but featureFlagSearchInSbe is disabled."sv,
-                feature_flags::gFeatureFlagSearchInSbe.isEnabled());
-
         // Build a SearchNode in order to retrieve the search info.
         auto searchNode =
             search_helpers::getSearchNode(query.nss(), query.cqPipeline().front().get());

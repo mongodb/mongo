@@ -14,7 +14,6 @@
 # if featureFlagAllMongodsAreSharded is re-enabled.
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
-- featureFlagSearchInSbe
 - featureFlagGaplessFTDC
 # TODO SERVER-67034: re-enable 'featureFlagSbeFull'.
 - featureFlagSbeFull

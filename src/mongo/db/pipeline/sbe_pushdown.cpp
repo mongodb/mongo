@@ -551,8 +551,7 @@ size_t getNumSbeCompatibleStagesForPushdown(
  *   - No additional criteria.
  *
  * $search and $searchMeta via 'DocumentSourceSearch':
- *   - The 'featureFlagSearchInSbe' flag is enabled.
- *   - The 'featureFlagSbeFull' flag is enabled.
+ *   - Never pushed down.
  *
  * 'DocumentSourceUnpackBucket':
  *   - The 'featureFlagSbeFull' flag is enabled.
@@ -636,10 +635,7 @@ bool findSbeCompatibleStagesForPushdown(
 
         .limitSkip = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
-        // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
-        // enabled.
-        .search = meetsRequirements(SbeCompatibility::requiresSbeFull) &&
-            feature_flags::gFeatureFlagSearchInSbe.isEnabled(),
+        .search = false,
 
         .window = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
