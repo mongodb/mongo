@@ -3,23 +3,19 @@
 
 #include "mongo/db/repl/internode_validation_hash_utils.h"
 
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/crypto/hash_block.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/server_feature_flags_gen.h"
+
+// The //src/third_party/xxhash target is header-only and defines XXH_INLINE_ALL for its consumers,
+// so XXH3 is inlined into the hashing functions below.
+#include <xxhash.h>
 
 namespace mongo {
 namespace repl {
 
 int64_t computeDocValidationHash(const BSONObj& doc) {
-    // Reuse a single EVP_MD_CTX per thread across all documents this thread hashes, rather than
-    // allocating one per operation.
-    thread_local HashContext ctx;
-    auto sha =
-        SHA256Block::computeHashWithCtx(&ctx, {ConstDataRange(doc.objdata(), doc.objsize())});
-    return ConstDataView(reinterpret_cast<const char*>(sha.data())).read<LittleEndian<int64_t>>();
+    // XXH3 is a non-cryptographic hash, so this value is only used to guard against replication
+    // bugs and storage corruption.
+    return static_cast<int64_t>(XXH3_64bits(doc.objdata(), doc.objsize()));
 }
 
 int64_t computeUpdateValidationHash(const BSONObj& preImage, const BSONObj& postImage) {
