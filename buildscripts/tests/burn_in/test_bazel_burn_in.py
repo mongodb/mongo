@@ -259,5 +259,54 @@ class TestGetTargetsWithTag(unittest.TestCase):
         self.assertIn("incompatible_with_bazel_remote_test", query_str)
 
 
+class TestGetTargetsMatchingTagFilter(unittest.TestCase):
+    """Tests for get_targets_matching_tag_filter function."""
+
+    TAGS_TO_TARGETS = {
+        "ci-development-critical": ["//s:dev"],
+        "ci-release-critical": ["//s:rel", "//s:mitigated"],
+        "suggested_excluding_required__for_devprod_mitigation_only": ["//s:mitigated"],
+        "requires_all_feature_flags": [],
+        "requires_compile_variant": [],
+        "incompatible_development_variant": ["//s:dev"],
+    }
+
+    def setUp(self):
+        patcher = patch(ns("get_targets_with_tag"), side_effect=self.TAGS_TO_TARGETS.__getitem__)
+        self.mock_get_targets_with_tag = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_union_of_positive_tags(self):
+        self.assertEqual(
+            under_test.get_targets_matching_tag_filter(
+                "ci-development-critical,ci-release-critical"
+            ),
+            {"//s:dev", "//s:rel", "//s:mitigated"},
+        )
+
+    def test_negated_tags_are_excluded(self):
+        self.assertEqual(
+            under_test.get_targets_matching_tag_filter(
+                "ci-development-critical,ci-release-critical,"
+                "-suggested_excluding_required__for_devprod_mitigation_only,"
+                "-requires_all_feature_flags,-requires_compile_variant,"
+                "-incompatible_development_variant"
+            ),
+            {"//s:rel"},
+        )
+
+    def test_negations_query_the_tag_without_the_dash(self):
+        under_test.get_targets_matching_tag_filter("ci-release-critical,-requires_compile_variant")
+
+        queried = [call.args[0] for call in self.mock_get_targets_with_tag.call_args_list]
+        self.assertEqual(queried, ["ci-release-critical", "requires_compile_variant"])
+
+    def test_blank_entries_are_ignored(self):
+        self.assertEqual(
+            under_test.get_targets_matching_tag_filter(" ci-release-critical , "),
+            {"//s:rel", "//s:mitigated"},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

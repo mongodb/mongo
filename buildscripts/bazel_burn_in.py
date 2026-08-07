@@ -321,6 +321,25 @@ def get_targets_with_tag(tag: str) -> list[str]:
         raise
 
 
+def get_targets_matching_tag_filter(tag_filter: str) -> set[str]:
+    """Resolve a comma-separated resmoke tag filter to the set of matching targets.
+
+    Entries prefixed with '-' are negations: targets carrying that tag are excluded from
+    the union of the targets matched by the positive entries.
+    """
+    included = set()
+    excluded = set()
+    for entry in tag_filter.split(","):
+        tag = entry.strip()
+        if not tag:
+            continue
+        if tag.startswith("-"):
+            excluded.update(get_targets_with_tag(tag.removeprefix("-")))
+        else:
+            included.update(get_targets_with_tag(tag))
+    return included - excluded
+
+
 def make_task(targets_to_run, variant_name):
     task = Task(
         name=f"resmoke_tests_burn_in_{variant_name}",
@@ -419,10 +438,9 @@ def generate_tasks(
             continue
         task = variant.get_task("resmoke_tests")
         if task:
-            tags = variant.expansion("resmoke_tests_tag_filter").split(",")
-            targets_with_tag = []
-            for tag in tags:
-                targets_with_tag += get_targets_with_tag(tag)
+            targets_with_tag = get_targets_matching_tag_filter(
+                variant.expansion("resmoke_tests_tag_filter")
+            )
 
             burn_in_targets_to_run = [
                 target.burn_in_target
