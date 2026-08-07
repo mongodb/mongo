@@ -5,6 +5,8 @@
 #include "mongo/db/session/session_catalog_test.h"
 
 #include "mongo/db/session/kill_sessions.h"
+#include "mongo/db/session/session_catalog_gen.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -12,6 +14,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/observable_mutex_registry.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -20,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 #include <absl/container/node_hash_set.h>
 #include <boost/move/utility_core.hpp>
@@ -113,6 +118,86 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnNumbe
     ASSERT_EQ(parentLsid, parentSession->getSessionId());
 }
 
+TEST_F(SessionCatalogTest, PartitionCountDefaultsToTwiceTheCoreCountCappedAt64) {
+    const auto saved = gSessionCatalogPartitions;
+    ON_BLOCK_EXIT([&] { gSessionCatalogPartitions = saved; });
+
+    const auto expectedAutoSize = std::min<size_t>(64, 2 * ProcessInfo::getNumAvailableCores());
+
+    // 0 means auto-size from the cores available to this process (capped at 64), and the
+    // computed size is published back so getParameter reports the partitions actually in use.
+    gSessionCatalogPartitions = 0;
+    ASSERT_EQ(expectedAutoSize, SessionCatalog().numPartitions_forTest());
+    ASSERT_EQ(static_cast<int>(expectedAutoSize), gSessionCatalogPartitions);
+
+    // Any explicit value is used as given, including one above the auto-sizing cap and 1, which
+    // collapses the catalog onto a single mutex the way it behaved before it was partitioned.
+    gSessionCatalogPartitions = 7;
+    ASSERT_EQ(7U, SessionCatalog().numPartitions_forTest());
+
+    gSessionCatalogPartitions = 256;
+    ASSERT_EQ(256U, SessionCatalog().numPartitions_forTest());
+
+    gSessionCatalogPartitions = 1;
+    ASSERT_EQ(1U, SessionCatalog().numPartitions_forTest());
+}
+
+TEST_F(SessionCatalogTest, CheckoutAndScanWorkWithASinglePartition) {
+    const auto saved = gSessionCatalogPartitions;
+    ON_BLOCK_EXIT([&] { gSessionCatalogPartitions = saved; });
+    gSessionCatalogPartitions = 1;
+
+    SessionCatalog catalog;
+    ASSERT_EQ(1U, catalog.numPartitions_forTest());
+
+    // A whole session family plus an unrelated session all land in the one partition, and
+    // checkout, lookup, scanning, and size accounting still behave.
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
+    auto otherLsid = makeLogicalSessionIdForTest();
+
+    for (const auto& lsid : {parentLsid, childLsid, otherLsid}) {
+        catalog.scanSession(
+            lsid, [](const ObservableSession&) {}, SessionCatalog::ScanSessionCreateSession::kYes);
+    }
+    ASSERT_EQ(2U, catalog.size());
+
+    size_t scanned = 0;
+    auto opCtx = makeOperationContext();
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx.get())});
+    catalog.scanSessions(matcherAllSessions, [&](const ObservableSession&) { ++scanned; });
+    ASSERT_EQ(3U, scanned);
+
+    catalog.reset_forTest();
+    ASSERT_EQ(0U, catalog.size());
+}
+
+TEST_F(SessionCatalogTest, SizeCountsSessionFamiliesNotChildSessions) {
+    ASSERT_EQ(0U, catalog()->size());
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    catalog()->scanSession(
+        parentLsid,
+        [](const ObservableSession&) {},
+        SessionCatalog::ScanSessionCreateSession::kYes);
+    ASSERT_EQ(1U, catalog()->size());
+
+    // Creating a child session of an already tracked parent session must not change the size.
+    auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
+    catalog()->scanSession(
+        childLsid, [](const ObservableSession&) {}, SessionCatalog::ScanSessionCreateSession::kYes);
+    ASSERT_EQ(1U, catalog()->size());
+
+    auto otherLsid = makeLogicalSessionIdForTest();
+    catalog()->scanSession(
+        otherLsid, [](const ObservableSession&) {}, SessionCatalog::ScanSessionCreateSession::kYes);
+    ASSERT_EQ(2U, catalog()->size());
+
+    catalog()->reset_forTest();
+    ASSERT_EQ(0U, catalog()->size());
+}
+
 TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnUUID) {
     auto parentLsid = makeLogicalSessionIdForTest();
     auto childLsid = makeLogicalSessionIdWithTxnUUIDForTest(parentLsid);
@@ -204,6 +289,44 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckoutMultipleChildSessionsCo
             makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
             makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+}
+
+TEST_F(SessionCatalogTest, ConcurrentCheckoutsOfSessionFamilyAreMutuallyExclusive) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    const std::vector<LogicalSessionId> familyLsids{
+        parentLsid,
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
+        makeLogicalSessionIdWithTxnUUIDForTest(parentLsid)};
+
+    // Checking out any member of a session family checks out the whole family, so across all
+    // threads at most one checkout may be live at any instant.
+    Atomic<int> concurrentOwners{0};
+    Atomic<int> violations{0};
+
+    static constexpr int kNumThreads = 8;
+    static constexpr int kIterationsPerThread = 100;
+
+    std::vector<std::future<void>> futures;
+    for (int threadId = 0; threadId < kNumThreads; ++threadId) {
+        futures.push_back(std::async(std::launch::async, [&, threadId] {
+            ThreadClient tc(getServiceContext()->getService());
+            for (int i = 0; i < kIterationsPerThread; ++i) {
+                auto opCtx = cc().makeOperationContext();
+                opCtx->setLogicalSessionId(familyLsids[(threadId + i) % familyLsids.size()]);
+                OperationContextSession ocs(opCtx.get());
+
+                if (concurrentOwners.fetchAndAdd(1) != 0) {
+                    violations.fetchAndAdd(1);
+                }
+                concurrentOwners.fetchAndSubtract(1);
+            }
+        }));
+    }
+    for (auto& future : futures) {
+        future.get();
+    }
+
+    ASSERT_EQ(0, violations.load());
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, OperationContextCheckedOutSession) {
@@ -384,6 +507,18 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenSessionIsIdle)
 }
 
 using SessionCatalogTestWithDefaultOpCtxDeathTest = SessionCatalogTestWithDefaultOpCtx;
+DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtxDeathTest,
+             OperationContextCannotCheckOutSecondSession,
+             "invariant") {
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    OperationContextSession firstCheckOut(_opCtx);
+
+    // An operation context that already has a checked-out session may only re-enter checkout via
+    // DBDirectClient reentrancy, so trying to check out a second session must invariant.
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    OperationContextSession secondCheckOut(_opCtx);
+}
+
 DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtxDeathTest,
              ScanSessionDoesNotSupportReaping,
              "Cannot reap a session via 'scanSession'") {
@@ -1781,14 +1916,23 @@ TEST_F(SessionCatalogTest, FindExpiredParentSessionsSkipsChildSessions) {
 // TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
 #if !__has_feature(thread_sanitizer)
 TEST_F(SessionCatalogTest, MutexRegisteredWithObservableMutexRegistry) {
-    catalog()->size();
-
-    const BSONObj report = ObservableMutexRegistry::get().report(false);
     const std::string_view name = "sessionCatalogMutex";
-    ASSERT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
-    const BSONObj exclusive =
-        report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);
-    ASSERT_GT(exclusive.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName), 0);
+    const auto acquisitions = [&] {
+        const BSONObj report = ObservableMutexRegistry::get().report(false);
+        ASSERT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
+        return report.getObjectField(name)
+            .getObjectField(ObservableMutexRegistry::kExclusiveFieldName)
+            .getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName);
+    };
+
+    // size() reads an atomic counter and deliberately takes no partition mutex, so it must not be
+    // what drives this. Check out a session instead, which locks the owning partition.
+    const auto before = acquisitions();
+    catalog()->size();
+    ASSERT_EQ(before, acquisitions()) << "size() must not acquire a partition mutex";
+
+    assertCanCheckoutSession(makeLogicalSessionIdForTest());
+    ASSERT_GT(acquisitions(), before);
 }
 #endif
 

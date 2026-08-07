@@ -1,0 +1,22 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+# Server parameters for the session catalog.
+
+global:
+    cpp_namespace: "mongo"
+    mod_visibility: private
+
+server_parameters:
+    sessionCatalogPartitions:
+        description: >-
+            Number of partitions the session catalog is split into. Any value is used as given.
+            0, the default, sizes it at twice the number of cores available to the process, capped
+            at 64.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gSessionCatalogPartitions
+        default: 0
+        validator:
+            gte: 0
+        redact: false
