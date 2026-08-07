@@ -24,7 +24,6 @@ resmoke_suite_test(
     shard_count = 4,
     tags = [
         "aggregation",
-        "blocked_in_join_opt_variant",
         "ci-release-critical",
         "common",
     ],
