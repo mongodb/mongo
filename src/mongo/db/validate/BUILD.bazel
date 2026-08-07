@@ -79,6 +79,7 @@ mongo_cc_library(
     name = "collection_validation",
     srcs = [
         "collection_validation.cpp",
+        "concurrent_progress_meter.cpp",
         "key_string_index_consistency.cpp",
         "validate_adaptor.cpp",
         "validate_timeseries.cpp",
@@ -115,6 +116,7 @@ mongo_cc_unit_test(
     srcs = [
         "bson_utf8_test.cpp",
         "collection_validation_test.cpp",
+        "concurrent_progress_meter_test.cpp",
         "key_string_index_consistency_test.cpp",
         "size_limited_bsonobj_heap_test.cpp",
         "validate_results_test.cpp",
