@@ -16,6 +16,8 @@ import {describe, it, before, after} from "jstests/libs/mochalite.js";
 import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
 import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {
+    assertPersistedSampleMetadataAbsent,
+    assertPersistedSampleMetadataPresent,
     dropSamplesColl,
     getExpectedSamplingMethod,
 } from "jstests/libs/query/persistent_samples_utils.js";
@@ -130,6 +132,7 @@ describe("ceSamplingMetadata in join explain", function () {
                 "expected sampleTechnique to be a known technique",
                 {ordersMeta, validTechniques},
             );
+            assertPersistedSampleMetadataAbsent(ordersMeta);
 
             const productsMeta = ceSamplingMetadata[productsNs];
             assert(productsMeta, "expected ceSamplingMetadata entry for products namespace", {
@@ -158,6 +161,7 @@ describe("ceSamplingMetadata in join explain", function () {
                 "expected sampleTechnique to be a known technique",
                 {productsMeta, validTechniques},
             );
+            assertPersistedSampleMetadataAbsent(productsMeta);
         });
     });
 
@@ -262,6 +266,7 @@ describe("ceSamplingMetadata in join explain", function () {
                     `expected sampling technique ${expectedSamplingMethodUsed} for orders`,
                     {ordersMeta},
                 );
+                assertPersistedSampleMetadataPresent(ordersMeta);
 
                 const productsMeta = ceSamplingMetadata[products.getFullName()];
                 assert(productsMeta, "expected ceSamplingMetadata entry for products namespace", {
@@ -292,6 +297,7 @@ describe("ceSamplingMetadata in join explain", function () {
                     `expected sampling technique ${expectedSamplingMethodUsed} for products`,
                     {productsMeta},
                 );
+                assertPersistedSampleMetadataPresent(productsMeta);
             });
         } finally {
             dropSamplesColl(db);

@@ -418,6 +418,9 @@ private:
     size_t _requestedSampleSize = 0;
     // The actual sampling strategy used. Set by generateSample() before dispatch.
     boost::optional<SamplingTechniqueEnum> _usedSamplingTechnique;
+
+    // Only set when tryLoadPersistentSample() successfully loads a persisted sample.
+    boost::optional<size_t> _numPages;
 };
 
 }  // namespace mongo::ce

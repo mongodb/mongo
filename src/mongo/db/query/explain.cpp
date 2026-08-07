@@ -143,6 +143,13 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
             nsMetaBob.appendNumber("sampleDocCount", static_cast<long long>(meta.docCount));
             nsMetaBob.appendNumber("sampleMemorySizeBytes",
                                    static_cast<long long>(meta.memorySizeBytes));
+            tassert(13096900,
+                    "sampleNumPages must only be set when the sample was persisted",
+                    !meta.numPages || meta.isPersisted);
+            if (meta.numPages) {
+                nsMetaBob.appendNumber("sampleNumPages",
+                                       static_cast<long long>(meta.numPages.value()));
+            }
             tassert(12433203,
                     "SamplingMetadata::createdAt must be set before explain is generated",
                     meta.createdAt.has_value());

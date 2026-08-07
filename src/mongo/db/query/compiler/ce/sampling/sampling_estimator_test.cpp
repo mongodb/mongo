@@ -2336,6 +2336,51 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
     }
 }
 
+TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    const UUID uuid = UUID::gen();
+    // 3 docs across 2 pages, so a `pagesRead` taken from the doc count would report 3, not 2.
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)};
+    const BSONObj pageZero = buildPersistentSampleDoc(uuid,
+                                                      SamplingTechniqueEnum::kRandom,
+                                                      persistedDocs.size(),
+                                                      {persistedDocs[0], persistedDocs[1]},
+                                                      boost::none,
+                                                      kPersistentSampleSchemaVersion,
+                                                      BSONObj(),
+                                                      /*pageNo=*/0);
+    const BSONObj pageOne = buildPersistentSampleDoc(uuid,
+                                                     SamplingTechniqueEnum::kRandom,
+                                                     persistedDocs.size(),
+                                                     {persistedDocs[2]},
+                                                     boost::none,
+                                                     kPersistentSampleSchemaVersion,
+                                                     BSONObj(),
+                                                     /*pageNo=*/1);
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {pageZero, pageOne},
+        /*clustered=*/true);
+
+    PersistentSampleLoader loader;
+    auto result = loader.tryLoad(operationContext(),
+                                 kTestNss.dbName(),
+                                 uuid,
+                                 SamplingTechniqueEnum::kRandom,
+                                 persistedDocs.size(),
+                                 /*numChunks=*/boost::none);
+    ASSERT_OK(result.getStatus());
+    const auto& loaded = result.getValue();
+
+    ASSERT_EQUALS(loaded.pagesRead, 2u);
+    ASSERT_EQUALS(loaded.sample.getDocs().size(), 3u);
+    ASSERT_BSONOBJ_EQ(loaded.sample.getDocs()[0], persistedDocs[0]);
+    ASSERT_BSONOBJ_EQ(loaded.sample.getDocs()[1], persistedDocs[1]);
+    ASSERT_BSONOBJ_EQ(loaded.sample.getDocs()[2], persistedDocs[2]);
+}
+
 TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
     // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
@@ -2555,6 +2600,9 @@ TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSampl
     const auto meta = estimator.getSamplingMetadata();
     ASSERT_TRUE(meta.isPersisted);
     ASSERT_TRUE(meta.technique == SamplingTechniqueEnum::kRandom);
+    // Page count is only known for a sample that was loaded from the persisted samples collection.
+    ASSERT_TRUE(meta.numPages.has_value());
+    ASSERT_EQUALS(meta.numPages.value(), 1u);
 }
 
 TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlyUsingSamplingStyle) {
@@ -2609,6 +2657,8 @@ TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlyUsingSamplingStyle
     const auto meta = estimator.getSamplingMetadata();
     ASSERT_FALSE(meta.isPersisted);
     ASSERT_TRUE(meta.technique == SamplingTechniqueEnum::kChunk);
+    // An on-the-fly sample was never paged to disk, so the page count does not apply.
+    ASSERT_FALSE(meta.numPages.has_value());
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlagDisabled) {

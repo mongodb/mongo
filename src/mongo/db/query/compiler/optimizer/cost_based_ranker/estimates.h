@@ -756,6 +756,7 @@ struct SamplingMetadata {
     ce::SamplingTechniqueEnum technique;
     boost::optional<int> numChunks;
     boost::optional<Date_t> createdAt;
+    boost::optional<size_t> numPages;
 };
 
 /**

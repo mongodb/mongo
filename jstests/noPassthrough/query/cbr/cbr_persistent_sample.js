@@ -122,6 +122,7 @@ try {
             "random technique should not have numChunks",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
     }
 
     {
@@ -149,6 +150,7 @@ try {
             "random technique should not have numChunks",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataAbsent(meta);
     }
 
     {
@@ -207,6 +209,7 @@ try {
             "expected requestedDocCount to match",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
     }
 
     {
@@ -230,6 +233,7 @@ try {
             "expected requestedDocCount to match",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataAbsent(meta);
     }
 
     // TODO SERVER-127501
@@ -284,6 +288,7 @@ try {
             "expected requestedDocCount to match default sample size",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
     }
 
     {
@@ -333,6 +338,7 @@ try {
             "expected requestedDocCount to match default sample size",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataAbsent(meta);
     }
 
     {
@@ -376,6 +382,7 @@ try {
             "seqScan technique should not have numChunks",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
 
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
@@ -408,6 +415,7 @@ try {
             "seqScan technique should not have numChunks",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataAbsent(meta);
 
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
@@ -455,6 +463,7 @@ try {
             "strides technique should not have numChunks",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
 
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: false}),
@@ -487,6 +496,7 @@ try {
             "strides technique should not have numChunks",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataAbsent(meta);
 
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: false}),
@@ -543,6 +553,10 @@ try {
             "expected docCount to match the sample size persisted with analyze",
             {meta},
         );
+        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
+        assert.eq(meta.sampleNumPages, 2, "expected the estimator to read both persisted pages", {
+            meta,
+        });
 
         coll.drop();
         PersistentSamplesUtils.dropSamplesColl(db);

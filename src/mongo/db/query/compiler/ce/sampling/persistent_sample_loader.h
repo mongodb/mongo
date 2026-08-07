@@ -77,6 +77,15 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> pages);
 
 /**
+ * A loaded persistent sample, together with facts about the load that produced it.
+ */
+struct LoadedPersistentSample {
+    PersistentSampleDoc sample;
+    // Number of page documents scanned to reassemble `sample`.
+    size_t pagesRead = 0;
+};
+
+/**
  * This class coordinates the loading of persisted samples.
  */
 class PersistentSampleLoader {
@@ -88,12 +97,12 @@ public:
      * - `NoSuchKey` if no document matches
      * - `UnsupportedFormat` if the document is found but malformed.
      */
-    StatusWith<PersistentSampleDoc> tryLoad(OperationContext* opCtx,
-                                            const DatabaseName& dbName,
-                                            const UUID& collectionUuid,
-                                            SamplingTechniqueEnum method,
-                                            size_t sampleSize,
-                                            boost::optional<int> numChunks) const;
+    StatusWith<LoadedPersistentSample> tryLoad(OperationContext* opCtx,
+                                               const DatabaseName& dbName,
+                                               const UUID& collectionUuid,
+                                               SamplingTechniqueEnum method,
+                                               size_t sampleSize,
+                                               boost::optional<int> numChunks) const;
 };
 
 }  // namespace mongo::ce

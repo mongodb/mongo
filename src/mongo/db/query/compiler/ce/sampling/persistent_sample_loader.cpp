@@ -340,7 +340,7 @@ auto& persistentSampleAgeAtReadHistogram =
          .bind(HistogramServerStatusMetric::pow(26, 1000, 2));
 }  // namespace
 
-StatusWith<PersistentSampleDoc> PersistentSampleLoader::tryLoad(
+StatusWith<LoadedPersistentSample> PersistentSampleLoader::tryLoad(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const UUID& collectionUuid,
@@ -400,18 +400,21 @@ StatusWith<PersistentSampleDoc> PersistentSampleLoader::tryLoad(
         return ex.toStatus();
     }
 
-    // PagesRead recorded only on success.
     const size_t pagesRead = pages.size();
     auto reassembled = reassemblePersistentSample(std::move(pages));
-    if (reassembled.isOK()) {
-        persistentSamplePagesReadHistogram.increment(pagesRead);
-        const Date_t now = Date_t::now();
-        const Date_t createdAt = reassembled.getValue().getCreatedAt();
-        // A sample stamped in the future normalized to 0 rather than a negative value.
-        const Milliseconds age = now > createdAt ? now - createdAt : Milliseconds(0);
-        persistentSampleAgeAtReadHistogram.increment(durationCount<Milliseconds>(age));
+    if (!reassembled.isOK()) {
+        return reassembled.getStatus();
     }
-    return reassembled;
+
+    // Metrics are recorded on success.
+    persistentSamplePagesReadHistogram.increment(pagesRead);
+    const Date_t now = Date_t::now();
+    const Date_t createdAt = reassembled.getValue().getCreatedAt();
+    // A sample stamped in the future normalized to 0 rather than a negative value.
+    const Milliseconds age = now > createdAt ? now - createdAt : Milliseconds(0);
+    persistentSampleAgeAtReadHistogram.increment(durationCount<Milliseconds>(age));
+
+    return LoadedPersistentSample{std::move(reassembled.getValue()), pagesRead};
 }
 
 }  // namespace mongo::ce

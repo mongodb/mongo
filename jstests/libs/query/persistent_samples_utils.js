@@ -128,6 +128,25 @@ export function assertSamplesCollClustered(db) {
     );
 }
 
+/**
+ * Asserts that `meta` reflects a persisted-sample hit with at least one page.
+ */
+export function assertPersistedSampleMetadataPresent(meta) {
+    assert(meta.hasOwnProperty("sampleNumPages"), "expected sampleNumPages on hit", {meta});
+    assert.gte(meta.sampleNumPages, 1, "expected at least one page", {meta});
+}
+
+/**
+ * Asserts that `meta` reflects an on-the-fly sample with no page-count field present.
+ */
+export function assertPersistedSampleMetadataAbsent(meta) {
+    assert(
+        !meta.hasOwnProperty("sampleNumPages"),
+        "on-the-fly sample should not have sampleNumPages",
+        {meta},
+    );
+}
+
 // Create a BSON object of exactly the given size
 export function makeDocOfSize(targetBytes, id = 0) {
     let doc = {_id: id, pad: ""};

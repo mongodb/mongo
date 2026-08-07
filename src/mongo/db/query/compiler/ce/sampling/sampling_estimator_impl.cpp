@@ -1111,23 +1111,25 @@ Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingTechniqueEnum meth
     auto startTicks = tickSource->getTicks();
 
     PersistentSampleLoader loader;
-    auto parsed =
+    auto loadResult =
         loader.tryLoad(_opCtx, _nss.dbName(), collection->uuid(), method, _sampleSize, numChunks);
 
     auto loadMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
     persistentSampleLoadMicros.increment(loadMicros);
     persistentSampleLoadMicrosHistogram.increment(durationCount<Microseconds>(loadMicros));
 
-    if (!parsed.isOK()) {
+    if (!loadResult.isOK()) {
         persistentSampleMisses.incrementRelaxed();
-        return parsed.getStatus();
+        return loadResult.getStatus();
     }
 
-    _sample = parsed.getValue().getDocs();
+    const auto& parsed = loadResult.getValue().sample;
+    _sample = parsed.getDocs();
     _sampleSize = _sample.size();
     _uniqueDocCount = boost::none;
     _wasSamplePersisted = true;
-    _sampleCreatedAt = parsed.getValue().getCreatedAt();
+    _sampleCreatedAt = parsed.getCreatedAt();
+    _numPages = loadResult.getValue().pagesRead;
 
     persistentSampleHits.incrementRelaxed();
     persistentSampleDocsLoaded.incrementRelaxed(_sampleSize);
@@ -1155,6 +1157,7 @@ SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
         meta.numChunks = _numChunks;
     }
     meta.createdAt = _sampleCreatedAt;
+    meta.numPages = _numPages;
     return meta;
 }
 

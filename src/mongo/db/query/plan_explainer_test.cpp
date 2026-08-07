@@ -7,6 +7,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_common.h"
@@ -1064,6 +1065,83 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataSerializedInExplain) {
     ASSERT(nsMeta.hasField("sampleDocCount")) << nsMeta;
     ASSERT(nsMeta.hasField("sampleRequestedDocCount")) << nsMeta;
     ASSERT(nsMeta.hasField("sampleMemorySizeBytes")) << nsMeta;
+    ASSERT(!nsMeta.hasField("sampleNumPages")) << nsMeta;
+}
+
+TEST_F(PlanExplainerTest, CBRSamplingMetadataReportsPagesForPersistedSample) {
+    // Verifies that the page count shows up in 'ceSamplingMetadata' when read back
+    // from persisted samples collection.
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag("featureFlagPersistentStats", true);
+    unittest::ServerParameterGuard planRankerController("internalQueryPlanRanker", "costBased");
+    unittest::ServerParameterGuard samplingController("internalQueryCBRCEMode", "samplingCE");
+    // Requested sample size is part of a persisted sample's key, so pin it to avoid full coll scan.
+    constexpr int kPersistedSampleSize = 10;
+    unittest::ServerParameterGuard sampleSizeOverride("internalSamplingSizeOverride",
+                                                      kPersistedSampleSize);
+
+    const UUID collUuid = [&] {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                operationContext(), kNss, AcquisitionPrerequisites::OperationType::kRead),
+            MODE_IS);
+        return coll.getCollectionPtr()->uuid();
+    }();
+
+    std::vector<BSONObj> sample;
+    for (int i = 0; i < kPersistedSampleSize; ++i) {
+        sample.push_back(BSON("_id" << i << "a" << i << "b" << i));
+    }
+
+    const std::vector<BSONObj> pages =
+        ce::makePersistentSamplePageDocs(collUuid,
+                                         ce::SamplingTechniqueEnum::kRandom,
+                                         kPersistedSampleSize,
+                                         boost::none /* numChunks */,
+                                         sample,
+                                         Date_t::now());
+    ASSERT_EQ(pages.size(), 1u);
+
+    ce::createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceString::createNamespaceString_forTest(kNss.dbName(), ce::kSamplesCollectionName),
+        pages,
+        /*clustered=*/true);
+
+    const auto verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    expCtx->setExplain(verbosity);
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+
+    auto coll = acquireCollection(operationContext(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      operationContext(), kNss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+    MultipleCollectionAccessor colls{coll};
+
+    BSONObjBuilder bob;
+    Explain::explainStages(exec.get(),
+                           colls,
+                           verbosity,
+                           Status::OK(),
+                           boost::none,
+                           BSONObj(),
+                           SerializationContext::stateCommandReply(),
+                           BSONObj(),
+                           &bob);
+    const BSONObj explained = bob.obj();
+
+    auto queryPlanner = explained["queryPlanner"];
+    ASSERT(queryPlanner.isABSONObj()) << "Missing queryPlanner in: " << explained;
+    auto ceSamplingMeta = queryPlanner["ceSamplingMetadata"];
+    ASSERT(ceSamplingMeta.isABSONObj())
+        << "Missing ceSamplingMetadata in queryPlanner: " << queryPlanner;
+    ASSERT_EQ(ceSamplingMeta.Obj().nFields(), 1) << ceSamplingMeta;
+    const BSONObj nsMeta = ceSamplingMeta.Obj().firstElement().Obj();
+
+    // Reading the persisted sample makes the page count available.
+    ASSERT_EQ(nsMeta["sampleSource"].String(), "persisted") << nsMeta;
+    ASSERT_EQ(nsMeta["sampleNumPages"].numberLong(), 1) << nsMeta;
 }
 
 TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsNothingWhenFeatureFlagOff) {
