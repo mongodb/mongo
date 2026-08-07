@@ -30,6 +30,7 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/util/assert_util.h"
@@ -568,12 +569,12 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     // Tells whether this scan will be performed as a clustered collection scan in SBE.
     bool doClusteredCollectionScanSbe() const {
-        return (isClustered && !isOplog && (minRecord || maxRecord || resumeScanPoint));
+        return (isClustered && !isOplog && (!rangeList.isUnbounded() || resumeScanPoint));
     }
 
     // Tells whether this scan will be performed as a clustered collection scan in classic.
     bool doClusteredCollectionScanClassic() const {
-        return (isClustered && !isOplog && (minRecord || maxRecord));
+        return (isClustered && !isOplog && !rangeList.isUnbounded());
     }
 
     void markNotEligibleForPlanCache() {
@@ -585,13 +586,9 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // Name of the namespace.
     NamespaceString nss;
 
-    // If present, this parameter sets the start point of a forward scan or the end point of a
-    // reverse scan.
-    boost::optional<RecordIdBound> minRecord;
-
-    // If present, this parameter sets the start point of a reverse scan or the end point of a
-    // forward scan.
-    boost::optional<RecordIdBound> maxRecord;
+    // The set of RecordId ranges to scan. Default-constructed as unbounded (all records).
+    // For clustered non-oplog scans this encodes the planner-derived bounds.
+    RecordIdRangeList rangeList;
 
     // If present, this parameter denotes the clustering info on the collection
     boost::optional<ClusteredIndexSpec> clusteredIndex;
@@ -609,7 +606,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // - If 'tolerateKeyNotFound' is true, and if the RecordId does not exist, it will seek to the
     // next valid one.
     // This field must only be set on forward collection scans and cannot be used in conjunction
-    // with 'minRecord' or 'maxRecord'.
+    // with 'rangeList' bounds.
     boost::optional<ResumeScanPoint> resumeScanPoint;
 
     // Should we make a tailable cursor?
@@ -631,10 +628,6 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     // Tells whether the collection is an oplog.
     bool isOplog = false;
-
-    // By default, includes the minRecord and maxRecord when present.
-    CollectionScanParams::ScanBoundInclusion boundInclusion =
-        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords;
 
     // Whether or not to wait for oplog visibility on oplog collection scans.
     bool shouldWaitForOplogVisibility = false;

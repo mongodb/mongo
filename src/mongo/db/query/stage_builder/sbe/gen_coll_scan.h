@@ -14,8 +14,6 @@
 
 namespace mongo::stage_builder {
 
-class PlanStageSlots;
-
 /**
  * Generates an SBE plan stage sub-tree implementing a collection scan. 'fields' can be used to
  * specify top-level fields that should be retrieved during the scan. For each name in 'fields',

@@ -203,7 +203,7 @@ struct PlanStageStaticData {
     std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
 
     // Stores data to restore collection scan bounds for a cached auto-parameterized SBE plan for
-    // every clustered collection scan used by the plan.
+    // non-multi-range clustered collection scans used by the plan.
     std::vector<ParameterizedClusteredScanSlots> clusteredCollBoundsInfos;
 
     /**

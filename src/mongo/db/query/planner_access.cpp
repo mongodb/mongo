@@ -43,7 +43,9 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/record_id_range.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/optime.h"
@@ -585,15 +587,19 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // collection. Not compatible with resumeScanPoint, so we do not optimize in that case.
         if (!csn->resumeScanPoint) {
             auto [minTs, maxTs] = extractTsRange(root);
+            boost::optional<RecordIdBound> minBound, maxBound;
             if (minTs) {
-                assignRecordIdFromTimestamp(*minTs, &csn->minRecord);
+                assignRecordIdFromTimestamp(*minTs, &minBound);
                 if (assertMinTsHasNotFallenOffOplog) {
                     csn->assertTsHasNotFallenOff = *minTs;
                 }
             }
             if (maxTs) {
-                assignRecordIdFromTimestamp(*maxTs, &csn->maxRecord);
+                assignRecordIdFromTimestamp(*maxTs, &maxBound);
             }
+            RecordIdRange oplogRange;
+            oplogRange.intersectRange(minBound, maxBound);
+            csn->rangeList = RecordIdRangeList(oplogRange);
         }
 
         // If the query is just a lower bound on "ts" on a forward scan, every document in the
@@ -629,14 +635,14 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     if (csn->isClustered && !csn->resumeScanPoint) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
-        // via minRecord and maxRecord if applicable. During this process, we will check if the
-        // query is guaranteed to exclude values of the cluster key which are affected by collation.
+        // via rangeList if applicable. During this process, we will check if the query is
+        // guaranteed to exclude values of the cluster key which are affected by collation.
         // If so, then even if the query and collection collations differ, the collation difference
         // won't affect the query results. In that case, we can say hasCompatibleCollation is true.
 
         RecordIdRange recordRange;
-        // min/max records may have been set if oplog.
-        recordRange.intersectRange(csn->minRecord, csn->maxRecord);
+        // Seed from any existing rangeList bounds (e.g. oplog timestamp bounds set above).
+        recordRange.intersectRange(csn->rangeList.outerBounds());
         bool compatibleCollation = handleRIDRangeScan(
             csn->filter.get(),
             queryCollator,
@@ -648,21 +654,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
         handleRIDRangeMinMax(query, csn->direction, queryCollator, collCollator, recordRange);
 
-        csn->minRecord = recordRange.getMin();
-        csn->maxRecord = recordRange.getMax();
-
-        switch (csn->direction) {
-            case CollectionScanParams::Direction::FORWARD:
-                csn->boundInclusion = CollectionScanParams::makeInclusion(
-                    recordRange.isMinInclusive(), recordRange.isMaxInclusive());
-                break;
-            case CollectionScanParams::Direction::BACKWARD:
-                csn->boundInclusion = CollectionScanParams::makeInclusion(
-                    recordRange.isMaxInclusive(), recordRange.isMinInclusive());
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
+        csn->rangeList = RecordIdRangeList(recordRange);
     }
 
     if (canSimplifyFilter) {

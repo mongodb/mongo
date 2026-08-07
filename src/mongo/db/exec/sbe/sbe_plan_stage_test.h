@@ -13,6 +13,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/util/modules.h"
@@ -68,6 +69,10 @@ inline std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId,
 template <typename T>
 using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
     T scanSlots, std::unique_ptr<PlanStage> scanStage)>;
+
+template <typename T>
+using MakeStageWithEnvFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
+    T scanSlots, std::unique_ptr<PlanStage> scanStage, stage_builder::Environment& env)>;
 
 using AssertStageStatsFn = std::function<void(const SpecificStats*)>;
 
@@ -283,6 +288,13 @@ public:
                                                      value::TypeTags inputTag,
                                                      value::Value inputVal,
                                                      const MakeStageFn<value::SlotId>& makeStage);
+
+    // Like the `MakeStageFn` overload above, but passes the RuntimeEnvironment to makeStage so the
+    // stage can register slots in it (e.g. when using stage_builder::StageBuilderState).
+    std::pair<value::TypeTags, value::Value> runTest(
+        value::TypeTags inputTag,
+        value::Value inputVal,
+        const MakeStageWithEnvFn<value::SlotId>& makeStage);
 
     void runFast(value::TypeTags inputTag, value::Value inputVal, auto makeStage) {
         auto cctx = makeCompileCtx();

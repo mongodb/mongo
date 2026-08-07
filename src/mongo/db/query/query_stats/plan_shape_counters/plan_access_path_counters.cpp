@@ -60,11 +60,18 @@ AccessPathCounter classifyBoundsInterval(const BSONElement& start, const BSONEle
 }
 
 // Classify the bounds of a clustered collscan.
-void classifyCollscanBounds(AccessPathCounts& counts,
-                            const boost::optional<RecordIdBound>& minRecord,
-                            const boost::optional<RecordIdBound>& maxRecord) {
-    bool isPoint = minRecord && maxRecord && *minRecord == *maxRecord;
-    counts.set(classifyBoundsInterval(!minRecord, !maxRecord, isPoint));
+void classifyCollscanBounds(AccessPathCounts& counts, const RecordIdRangeList& bounds) {
+    bool isPoint = [&]() {
+        if (bounds.getRanges().size() != 1) {
+            return false;
+        }
+        auto bound = bounds.getRanges()[0];
+        return bound.getMin() && bound.getMax() && *bound.getMin() == *bound.getMax();
+    }();
+    bool unboundedBelow = !bounds.isEmpty() && !bounds.getRanges()[0].getMin();
+    bool unboundedAbove = !bounds.isEmpty() && !bounds.getRanges().rbegin()->getMax();
+
+    counts.set(classifyBoundsInterval(unboundedBelow, unboundedAbove, isPoint));
 }
 
 // Classify the bounds of an ixscan.
@@ -124,7 +131,7 @@ void AccessPathAnalyzer::preVisit(query_solution_analyzer::RuleEngine&,
             _counts.set(isClustered ? AccessPathCounter::kClusteredCollscan
                                     : AccessPathCounter::kCollscan);
             if (isClustered) {
-                classifyCollscanBounds(_counts, csn.minRecord, csn.maxRecord);
+                classifyCollscanBounds(_counts, csn.rangeList);
             }
             break;
         }

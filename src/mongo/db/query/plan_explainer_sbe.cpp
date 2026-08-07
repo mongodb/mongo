@@ -274,11 +274,18 @@ void statsToBSON(const QuerySolutionNode* node,
                 "nss",
                 NamespaceStringUtil::serialize(csn->nss, SerializationContext::stateDefault()));
             bob->append("direction", csn->direction > 0 ? "forward" : "backward");
-            if (csn->minRecord) {
-                csn->minRecord->appendToBSONAs(bob, "minRecord");
+
+            const auto outerBounds = csn->rangeList.outerBounds();
+            if (outerBounds.getMin()) {
+                outerBounds.getMin()->appendToBSONAs(bob, "minRecord");
             }
-            if (csn->maxRecord) {
-                csn->maxRecord->appendToBSONAs(bob, "maxRecord");
+            if (outerBounds.getMax()) {
+                outerBounds.getMax()->appendToBSONAs(bob, "maxRecord");
+            }
+
+            // No need to emit an additional list of ranges if there is a single range.
+            if (csn->rangeList.getRanges().size() != 1) {
+                bob->append("recordIdRanges", csn->rangeList.toBSONArray());
             }
             break;
         }

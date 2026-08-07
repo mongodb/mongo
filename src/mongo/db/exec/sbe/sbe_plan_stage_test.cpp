@@ -202,6 +202,20 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
     return getAllResults(stage.get(), resultAccessor);
 }
 
+std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
+    value::TypeTags inputTag,
+    value::Value inputVal,
+    const MakeStageWithEnvFn<value::SlotId>& makeStage) {
+    stage_builder::Environment env{std::make_unique<RuntimeEnvironment>()};
+
+    return runTest(&env.ctx,
+                   inputTag,
+                   inputVal,
+                   [&](value::SlotId scanSlots, std::unique_ptr<PlanStage> scanStage) {
+                       return makeStage(scanSlots, std::move(scanStage), env);
+                   });
+}
+
 void PlanStageTestFixture::runTest(value::TypeTags inputTag,
                                    value::Value inputVal,
                                    value::TypeTags expectedTag,

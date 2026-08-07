@@ -76,7 +76,9 @@ public:
     std::unique_ptr<CollectionScanNode> makeClusteredCollScan() {
         auto scan = makeCollScan();
         scan->isClustered = true;
-        scan->minRecord = RecordIdBound(RecordId(1));
+        RecordIdRange range;
+        range.maybeNarrowMin(RecordIdBound(RecordId(1)), true /* inclusive */);
+        scan->rangeList = RecordIdRangeList(range);
         return scan;
     }
 

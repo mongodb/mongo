@@ -20,6 +20,7 @@
 #include "mongo/db/exec/classic/limit.h"
 #include "mongo/db/exec/classic/merge_sort.h"
 #include "mongo/db/exec/classic/mock_stage.h"
+#include "mongo/db/exec/classic/multi_range_clustered_scan.h"
 #include "mongo/db/exec/classic/or.h"
 #include "mongo/db/exec/classic/projection.h"
 #include "mongo/db/exec/classic/return_key.h"
@@ -60,6 +61,35 @@
 
 
 namespace mongo::stage_builder {
+
+namespace {
+void assertCompatibleMultiRangeCollScan(const CollectionScanNode* csn) {
+    // None of the resume/tailable/oplog features
+    // apply to multi-range scans — they are mutually exclusive with the
+    // multi-range optimization on the planner side.
+    tassert(12591300, "Multi-range collection scan cannot be tailable", !csn->tailable);
+    tassert(12591301,
+            "Multi-range collection scan cannot track latest oplog timestamp",
+            !csn->shouldTrackLatestOplogTimestamp);
+    tassert(12591302,
+            "Multi-range collection scan does not support assertTsHasNotFallenOff",
+            !csn->assertTsHasNotFallenOff);
+    tassert(12591303,
+            "Multi-range collection scan does not wait for oplog visibility",
+            !csn->shouldWaitForOplogVisibility);
+    tassert(12591304,
+            "Multi-range collection scan does not produce resume tokens",
+            !csn->requestResumeToken);
+    tassert(12591305,
+            "Multi-range collection scan cannot be resumed from a scan point",
+            !csn->resumeScanPoint);
+    tassert(12591306,
+            "stopApplyingFilterAfterFirstMatch unsupported for multi-range "
+            "collection scan",
+            !csn->stopApplyingFilterAfterFirstMatch);
+}
+}  // namespace
+
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
 //
@@ -76,21 +106,44 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         switch (root->getType()) {
             case STAGE_COLLSCAN: {
                 const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
-                // TODO(SERVER-127890): Build a MultiRangeClusteredScan once QSN supports
-                // RecordIdRangeList.
+                const auto direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
+                                                             : CollectionScanParams::BACKWARD;
+
+                if (csn->rangeList.getRanges().size() != 1) {
+                    // Multi-range clustered scan.
+                    assertCompatibleMultiRangeCollScan(csn);
+
+                    MultiRangeClusteredScanParams params;
+                    params.rangeList = csn->rangeList;
+                    params.direction = direction;
+                    return std::make_unique<MultiRangeClusteredScan>(
+                        expCtx, _collection, params, _ws, csn->filter.get());
+                }
+
+                // A single range: collapse to the contiguous CollectionScan, with bounds derived
+                // from the rangeList's outer bounds. (For an unbounded rangeList, outerBounds()
+                // returns a range with no min/max — i.e. a full collection scan.)
+                const auto outer = csn->rangeList.outerBounds();
+                const bool startInclusive = (direction == CollectionScanParams::FORWARD)
+                    ? outer.isMinInclusive()
+                    : outer.isMaxInclusive();
+                const bool endInclusive = (direction == CollectionScanParams::FORWARD)
+                    ? outer.isMaxInclusive()
+                    : outer.isMinInclusive();
+
                 CollectionScanParams params;
                 params.tailable = csn->tailable;
                 params.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
                 params.assertTsHasNotFallenOff = csn->assertTsHasNotFallenOff;
-                params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
-                                                         : CollectionScanParams::BACKWARD;
+                params.direction = direction;
                 params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
-                params.minRecord = csn->minRecord;
-                params.maxRecord = csn->maxRecord;
+                params.minRecord = outer.getMin();
+                params.maxRecord = outer.getMax();
                 params.requestResumeToken = csn->requestResumeToken;
                 params.resumeScanPoint = csn->resumeScanPoint;
                 params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
-                params.boundInclusion = csn->boundInclusion;
+                params.boundInclusion =
+                    CollectionScanParams::makeInclusion(startInclusive, endInclusive);
                 return std::make_unique<CollectionScan>(
                     expCtx, _collection, params, _ws, csn->filter.get());
             }

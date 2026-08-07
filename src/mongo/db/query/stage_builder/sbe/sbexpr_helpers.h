@@ -96,6 +96,11 @@ inline SbIndexInfoType operator~(SbIndexInfoType t) {
     return static_cast<SbIndexInfoType>(~static_cast<uint32_t>(t));
 }
 
+/**
+ * Bounds for a single-range or unbounded scan that the stage builder turns into a ScanStage (or
+ * a GenericScanStage when both slots are absent). For non-contiguous multi-range scans, pass in
+ * the RecordIdRangeList object directly instead.
+ */
 struct SbScanBounds {
     boost::optional<SbSlot> minRecordIdSlot;
     boost::optional<SbSlot> maxRecordIdSlot;
@@ -311,15 +316,25 @@ public:
         _nodeId = nodeId;
     }
 
-    std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeScan(
-        UUID collectionUuid,
-        DatabaseName dbName,
-        bool forward = true,
-        std::vector<std::string> scanFieldNames = {},
-        const SbScanBounds& scanBounds = {},
-        const SbIndexInfoSlots& indexInfoSlots = {},
-        sbe::ScanOpenCallback scanOpenCallback = {},
-        boost::optional<SbSlot> oplogTsSlot = boost::none);
+    using MakeScanResult = std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector>;
+
+    MakeScanResult makeScan(UUID collectionUuid,
+                            DatabaseName dbName,
+                            bool forward = true,
+                            std::vector<std::string> scanFieldNames = {},
+                            const SbScanBounds& scanBounds = {},
+                            const SbIndexInfoSlots& indexInfoSlots = {},
+                            sbe::ScanOpenCallback scanOpenCallback = {},
+                            boost::optional<SbSlot> oplogTsSlot = boost::none);
+
+    // Multi-range overload: produces a MultiRangeClusteredScanStage.
+    MakeScanResult makeScan(UUID collectionUuid,
+                            DatabaseName dbName,
+                            bool forward,
+                            std::vector<std::string> scanFieldNames,
+                            RecordIdRangeList scanBounds,
+                            const SbIndexInfoSlots& indexInfoSlots = {},
+                            sbe::ScanOpenCallback scanOpenCallback = {});
 
     std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> makeSimpleIndexScan(
         UUID collectionUuid,

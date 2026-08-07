@@ -197,7 +197,7 @@ bool isSolutionBoundedCollscan(const QuerySolution* querySoln) {
                               << numCollscanNodes,
                 count == 1);
         auto collscan = static_cast<const CollectionScanNode*>(node);
-        return collscan->minRecord || collscan->maxRecord;
+        return !collscan->rangeList.isUnbounded();
     }
     return false;
 }

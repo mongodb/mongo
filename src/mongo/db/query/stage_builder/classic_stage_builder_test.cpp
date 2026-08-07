@@ -15,7 +15,12 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range.h"
+#include "mongo/db/query/record_id_range_list.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -365,6 +370,63 @@ TEST_F(ClassicStageBuilderTest, TextMatchDroppedAndReplacedIndexThrowsQueryPlanK
     ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(textMatch)), collection.get()),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
+}
+
+namespace {
+RecordIdRange makeIntRange(int min, bool minInclusive, int max, bool maxInclusive) {
+    RecordIdRange r;
+    r.maybeNarrowMin(RecordIdBound(RecordId(min)), minInclusive);
+    r.maybeNarrowMax(RecordIdBound(RecordId(max)), maxInclusive);
+    return r;
+}
+
+// CollectionMock with isClustered() == true, as required by MultiRangeClusteredScan's
+// constructor check.
+class ClusteredCollectionMock : public CollectionMock {
+public:
+    ClusteredCollectionMock(const UUID& uuid, const NamespaceString& nss)
+        : CollectionMock(uuid, nss) {}
+    bool isClustered() const override {
+        return true;
+    }
+};
+}  // namespace
+
+// A bounded CollectionScanNode on a clustered collection with exactly one range (including an
+// unbounded CollectionScanNode) collapses to a contiguous CollectionScan.
+TEST_F(ClassicStageBuilderTest, CollScanSingleRangeDispatchesToCollectionScan) {
+    auto clusteredColl = std::make_unique<ClusteredCollectionMock>(UUID::gen(), kNss);
+    auto csn = std::make_unique<CollectionScanNode>(kNss);
+    auto stage = buildPlanStage(makeQuerySolution(std::move(csn)), clusteredColl.get());
+    ASSERT_EQ(stage->stageType(), STAGE_COLLSCAN);
+
+    csn = std::make_unique<CollectionScanNode>(kNss);
+    csn->rangeList = RecordIdRangeList{makeIntRange(1, true, 10, true)};
+    stage = buildPlanStage(makeQuerySolution(std::move(csn)), clusteredColl.get());
+    ASSERT_EQ(stage->stageType(), STAGE_COLLSCAN);
+}
+
+// A CollectionScanNode on a clustered collection with two disjoint ranges dispatches to
+// MultiRangeClusteredScan.
+TEST_F(ClassicStageBuilderTest, CollScanMultiRangeDispatchesToMultiRangeClusteredScan) {
+    auto clusteredColl = std::make_unique<ClusteredCollectionMock>(UUID::gen(), kNss);
+    auto csn = std::make_unique<CollectionScanNode>(kNss);
+    csn->rangeList = RecordIdRangeList::makeUnion(
+        {makeIntRange(1, true, 5, true), makeIntRange(10, true, 20, true)});
+
+    auto stage = buildPlanStage(makeQuerySolution(std::move(csn)), clusteredColl.get());
+    ASSERT_EQ(stage->stageType(), STAGE_COLLSCAN_MULTI_RANGE);
+}
+
+// An empty rangeList (∅, zero ranges) on a clustered collection also dispatches to
+// MultiRangeClusteredScan.
+TEST_F(ClassicStageBuilderTest, CollScanEmptyRangeListDispatchesToMultiRangeClusteredScan) {
+    auto clusteredColl = std::make_unique<ClusteredCollectionMock>(UUID::gen(), kNss);
+    auto csn = std::make_unique<CollectionScanNode>(kNss);
+    csn->rangeList = RecordIdRangeList::makeUnion({});  // explicit empty list
+
+    auto stage = buildPlanStage(makeQuerySolution(std::move(csn)), clusteredColl.get());
+    ASSERT_EQ(stage->stageType(), STAGE_COLLSCAN_MULTI_RANGE);
 }
 
 }  // namespace mongo

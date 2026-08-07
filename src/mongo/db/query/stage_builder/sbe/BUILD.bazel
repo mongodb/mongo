@@ -188,3 +188,17 @@ mongo_cc_library(
         "//src/mongo/util:string_listset",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "gen_coll_scan_test",
+    srcs = [
+        "gen_coll_scan_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":stage_builder",
+        "//src/mongo/db/exec/sbe:clustered_scan_stage_test_fixtures",
+        "//src/mongo/db/exec/sbe:sbe_plan_stage_test",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)

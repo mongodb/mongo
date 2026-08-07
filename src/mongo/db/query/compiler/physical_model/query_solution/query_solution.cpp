@@ -431,8 +431,7 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     cloneBaseData(copy.get());
 
     copy->nss = this->nss;
-    copy->minRecord = this->minRecord;
-    copy->maxRecord = this->maxRecord;
+    copy->rangeList = this->rangeList;
     copy->clusteredIndex = this->clusteredIndex;
     copy->hasCompatibleCollation = this->hasCompatibleCollation;
     copy->requestResumeToken = this->requestResumeToken;
@@ -443,7 +442,6 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     copy->direction = this->direction;
     copy->isClustered = this->isClustered;
     copy->isOplog = this->isOplog;
-    copy->boundInclusion = this->boundInclusion;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
     copy->stopApplyingFilterAfterFirstMatch = this->stopApplyingFilterAfterFirstMatch;
     return copy;

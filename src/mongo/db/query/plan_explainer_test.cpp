@@ -20,6 +20,10 @@
 #include "mongo/db/query/query_settings/query_knob_overrides.h"
 #include "mongo/db/query/query_settings/query_settings_context_test_util.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range.h"
+#include "mongo/db/query/record_id_range_list.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -779,6 +783,21 @@ auto makeCollScanNode(const std::string& collName) {
     return node;
 }
 
+namespace {
+RecordIdRange makeIntRange(int min, bool minInclusive, int max, bool maxInclusive) {
+    RecordIdRange r;
+    r.maybeNarrowMin(RecordIdBound(RecordId(min)), minInclusive);
+    r.maybeNarrowMax(RecordIdBound(RecordId(max)), maxInclusive);
+    return r;
+}
+
+BSONObj callStatsToBSON(const QuerySolutionNode* node) {
+    BSONObjBuilder bob;
+    statsToBSON(node, &bob, &bob);
+    return bob.obj();
+}
+}  // namespace
+
 TEST_F(PlanExplainerTest, HashJoinEmbeddingTest) {
     auto outerScanNode = makeCollScanNode("testdb.explain");
     auto innerScanNode = makeCollScanNode("testdb.foreign_explain");
@@ -1099,6 +1118,36 @@ TEST_F(PlanExplainerTest, GenerateQueryKnobsOmitsKnobsWhenOutputNearlyFull) {
     auto result = out.obj();
     ASSERT_FALSE(result.hasField("queryKnobs"));
     ASSERT_TRUE(result.hasField("warning"));
+}
+
+// A CollectionScanNode with two ranges must emit recordIdRanges with both entries.
+TEST_F(PlanExplainerTest, CollScanMultiRangeIncludesRecordIdRanges) {
+    auto csn = makeCollScanNode("testdb.col");
+    csn->rangeList = RecordIdRangeList::makeUnion(
+        {makeIntRange(1, true, 5, true), makeIntRange(10, false, 20, true)});
+
+    auto result = callStatsToBSON(csn.get());
+    ASSERT(result.hasField("recordIdRanges")) << result;
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"([{"min":1, "minInclusive": true, "max":5, "maxInclusive": true}, {"min":10, "minInclusive": false, "max": 20, "maxInclusive": true}])",
+        BSONArray(result["recordIdRanges"].Obj()))
+        << result;
+    // Outer bounds are also emitted for backward compatibility.
+    ASSERT_EQ(result["minRecord"].Long(), 1) << result;
+    ASSERT_EQ(result["maxRecord"].Long(), 20) << result;
+}
+
+// An empty rangeList (∅, no ranges) also emits recordIdRanges (as an empty array).
+// In this case, both minRecord and maxRecord are set to null.
+TEST_F(PlanExplainerTest, CollScanEmptyRangeListIncludesRecordIdRanges) {
+    auto csn = makeCollScanNode("testdb.col");
+    csn->rangeList = RecordIdRangeList::makeUnion({});  // explicit empty list
+
+    auto result = callStatsToBSON(csn.get());
+    ASSERT(result.hasField("recordIdRanges")) << result;
+    ASSERT_EQ(result["recordIdRanges"].Array().size(), 0u) << result;
+    ASSERT(result["minRecord"].isNull()) << result;
+    ASSERT(result["maxRecord"].isNull()) << result;
 }
 
 }  // namespace
