@@ -53,21 +53,16 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
-    name = "change_streams_test",
+    name = "change_streams_shard_targeter_test",
     srcs = [
         "all_databases_change_stream_shard_targeter_impl_test.cpp",
-        "all_databases_change_stream_state_event_handler_test.cpp",
         "change_stream_reader_builder_impl_test.cpp",
-        "collection_change_stream_db_absent_state_event_handler_test.cpp",
-        "collection_change_stream_db_present_state_event_handler_test.cpp",
         "collection_change_stream_shard_targeter_impl_test.cpp",
         "control_events_test.cpp",
         "data_to_shards_allocation_query_service_impl_test.cpp",
-        "database_change_stream_db_absent_state_event_handler_test.cpp",
-        "database_change_stream_db_present_state_event_handler_test.cpp",
         "database_change_stream_shard_targeter_impl_test.cpp",
     ],
-    tags = ["mongo_unittest_fifth_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":change_streams",
         ":change_streams_control_events",
@@ -79,5 +74,23 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:change_stream_test_helpers",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/repl:change_stream_oplog_notification",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "change_streams_state_event_handler_test",
+    srcs = [
+        "all_databases_change_stream_state_event_handler_test.cpp",
+        "collection_change_stream_db_absent_state_event_handler_test.cpp",
+        "collection_change_stream_db_present_state_event_handler_test.cpp",
+        "database_change_stream_db_absent_state_event_handler_test.cpp",
+        "database_change_stream_db_present_state_event_handler_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":change_streams",
+        ":change_streams_control_events",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/exec/document_value",
     ],
 )
