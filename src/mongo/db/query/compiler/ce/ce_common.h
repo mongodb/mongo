@@ -86,11 +86,12 @@ struct FieldPathAndEqSemantics {
  *   the NDV is 1.
  * - When values are objects, field order matters: given documents [{a: {b: 1, c: 1}}, {a: {c: 1, b:
  *   1}}], the NDV of "a" is 2.
- * - The field order of fields in 'fieldNames' in the documents in 'docs' is not significant: given
+ * - The field order of fields in 'fields' in the documents in 'docs' is not significant: given
  *   documents [{a: 1, b: 2}, {b: 2, a: 1}], the NDV of ["a","b"] is 1.
  *
- * Does not support counting NDV over array-valued fields; tasserts if any of 'fieldNames' are
- * array-valued in 'docs'.
+ * Does not support counting NDV over array-valued fields; uasserts with QueryPlanKilled if any of
+ * 'fields' are array-valued in 'docs', as this implies the underlying index's multikeyness
+ * changed since planning.
  */
 size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
                 const std::vector<BSONObj>& docs,

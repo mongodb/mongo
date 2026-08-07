@@ -229,29 +229,35 @@ TEST(CountNDV, DifferentNumericTypesAreNotDistinguished) {
                fromjson("{a: NumberDecimal('1.00000')}")});
 }
 
-DEATH_TEST(CountNDVDeathTest, ThrowsOnEmptyArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest, ThrowsOnEmptyArray, "non-array path became multikey during yield") {
     countNDV({{.path = "a"}}, {fromjson("{a: []}")});
 }
 
-DEATH_TEST(CountNDVDeathTest, ThrowsOnNonEmptyArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest,
+           ThrowsOnNonEmptyArray,
+           "non-array path became multikey during yield") {
     countNDV({{.path = "a"}}, {fromjson("{a: [1, 2, 3]}")});
 }
 
-DEATH_TEST(CountNDVDeathTest, ThrowsOnNestedEmptyArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest,
+           ThrowsOnNestedEmptyArray,
+           "non-array path became multikey during yield") {
     countNDV({{.path = "a.b"}}, {fromjson("{a: {b: []}}")});
 }
 
-DEATH_TEST(CountNDVDeathTest, ThrowsOnNestedArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest, ThrowsOnNestedArray, "non-array path became multikey during yield") {
     countNDV({{.path = "a.b"}}, {fromjson("{a: {b: [1, 2, 3]}}")});
 }
 
 DEATH_TEST(CountNDVDeathTest,
            ThrowsOnEmptyArrayInTraversal,
-           "unexpected array in NDV computation") {
+           "non-array path became multikey during yield") {
     countNDV({{.path = "a.b"}}, {fromjson("{a: []}")});
 }
 
-DEATH_TEST(CountNDVDeathTest, ThrowsOnArrayInTraversal, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest,
+           ThrowsOnArrayInTraversal,
+           "non-array path became multikey during yield") {
     countNDV({{.path = "a.b"}}, {fromjson("{a: [{b: 1}]}")});
 }
 
