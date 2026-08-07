@@ -175,7 +175,7 @@ patch_aliases:
     variant: "^(.*query-quick-patch-only|linux-x86-dynamic-compile)$"
     task: ".*"
   - alias: query-joo
-    variant: "^(.*join-optimization-query-patch-only|amazon-linux2023-arm64-static-compile)"
+    variant: "^(.*join-optimization-query-patch-only|amazon-linux2023-arm64-static-compile|run-all-affected-jstests)"
     task: ".*"
   - alias: security
     variant: "^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$"
