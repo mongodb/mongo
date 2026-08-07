@@ -24,6 +24,13 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
+namespace {
+// Fields in a failpoint's data which scope the failpoint to a subset of the operations reaching a
+// 'waitWhileFailPointEnabled' callsite.
+constexpr auto kCommentFieldName = "comment"sv;
+constexpr auto kNssFieldName = "nss"sv;
+}  // namespace
+
 std::string CurOpFailpointHelpers::updateCurOpFailPointMsg(OperationContext* opCtx,
                                                            const std::string& newMsg) {
     std::lock_guard<Client> lk(*opCtx->getClient());
@@ -72,11 +79,27 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
             updateCurOpFailPointMsg(opCtx, origCurOpFailpointMsg);
         },
         [&](const BSONObj& data) {
-            if (data.hasField("comment") && opCtx->getComment()) {
-                return opCtx->getComment()->String() == data.getStringField("comment");
+            // Hang only the queries matching the comment field if one is specified.
+            if (auto targeted = data[kCommentFieldName]; !targeted.eoo()) {
+                auto comment = opCtx->getComment();
+                return comment && comment->woCompare(targeted) == 0;
             }
-            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"sv);
-            return nss.isEmpty() || fpNss.isEmpty() || fpNss == nss;
+            // Hang only the queries matching the nss field if a non-empty one is specified. An
+            // empty 'nss' means "do not scope by namespace", which some tests rely on when they
+            // build the failpoint data unconditionally.
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, kNssFieldName);
+            if (!fpNss.isEmpty()) {
+                // The callsite must pass the namespace of the operation being evaluated, otherwise
+                // the scoping would be silently ignored and the failpoint would match every
+                // operation reaching this callsite.
+                uassert(13238000,
+                        str::stream() << "failpoint data specifies a non-empty '" << kNssFieldName
+                                      << "' but the callsite of waitWhileFailPointEnabled does not "
+                                         "pass a namespace",
+                        !nss.isEmpty());
+                return fpNss == nss;
+            }
+            return true;
         });
 }
 }  // namespace mongo
