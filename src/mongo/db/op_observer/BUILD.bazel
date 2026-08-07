@@ -230,7 +230,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/commands:create_command",
         "//src/mongo/db/repl:image_collection_entry",
-        "//src/mongo/db/repl:internode_validation_hash_utils",
         "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:oplog_interface_local",

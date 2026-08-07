@@ -3593,7 +3593,7 @@
       "properties": [
         {
           "name": "emits_persisted_data",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "import_script_path",

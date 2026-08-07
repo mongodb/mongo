@@ -14,6 +14,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
@@ -35,7 +36,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
-#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
@@ -522,6 +522,19 @@ protected:
         wuow.commit();
         auto entry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
         return getSizeMetadataFromOplogEntry(entry);
+    }
+
+    int64_t calculateDocHash(const BSONObj& doc) {
+        const SHA256Block sha =
+            SHA256Block::computeHash({ConstDataRange(doc.objdata(), doc.objsize())});
+        return ConstDataView(reinterpret_cast<const char*>(sha.data()))
+            .read<LittleEndian<int64_t>>();
+    }
+
+    // Matches the hash computed for updates: the pre-image and post-image are hashed
+    // independently and XOR-ed together.
+    int64_t calculateUpdateDocHash(const BSONObj& preImage, const BSONObj& postImage) {
+        return calculateDocHash(preImage) ^ calculateDocHash(postImage);
     }
 
     const NamespaceString nss =
@@ -1883,7 +1896,7 @@ TEST_F(OpObserverTest, CheckHashExistsOnInsertWithFlagAndRecordId) {
     const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, nss, doc, {RecordId(1)});
     ASSERT(sizeMetadata);
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateDocHash(doc));
     EXPECT_FALSE(sizeMetadata->getSz().has_value());
 }
 
@@ -1912,7 +1925,7 @@ TEST_F(OpObserverTest, CheckHashExistsOnUpdateWithFlagAndRecordId) {
         opCtx, nss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId(1), /*replicatedSizeDelta=*/{});
     ASSERT(sizeMetadata);
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), repl::computeUpdateValidationHash(kPreImageDoc, kUpdatedDoc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateUpdateDocHash(kPreImageDoc, kUpdatedDoc));
     EXPECT_FALSE(sizeMetadata->getSz().has_value());
 }
 
@@ -1944,7 +1957,7 @@ TEST_F(OpObserverTest, CheckHashExistsOnDeleteWithFlagAndRecordId) {
         deleteAndGetSizeMetadata(opCtx, nss, doc, RecordId(1), /*replicatedSizeDelta=*/{});
     ASSERT(sizeMetadata);
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateDocHash(doc));
     EXPECT_FALSE(sizeMetadata->getSz().has_value());
 }
 
@@ -2011,7 +2024,7 @@ TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnInsert) {
     ASSERT(sizeMetadata->getSz());
     EXPECT_EQ(*sizeMetadata->getSz(), doc.objsize());
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateDocHash(doc));
 }
 
 TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnUpdate) {
@@ -2025,7 +2038,7 @@ TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnUpdate) {
     ASSERT(sizeMetadata->getSz());
     EXPECT_EQ(*sizeMetadata->getSz(), 10);
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), repl::computeUpdateValidationHash(kPreImageDoc, kUpdatedDoc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateUpdateDocHash(kPreImageDoc, kUpdatedDoc));
 }
 
 TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnDelete) {
@@ -2040,7 +2053,7 @@ TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnDelete) {
     ASSERT(sizeMetadata->getSz());
     EXPECT_EQ(*sizeMetadata->getSz(), 10);
     ASSERT(sizeMetadata->getH());
-    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+    EXPECT_EQ(*sizeMetadata->getH(), calculateDocHash(doc));
 }
 
 /**
@@ -2429,7 +2442,7 @@ TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionInsertWithFlagAndR
     unittest::ServerParameterGuard continuousInternodeScope{
         "featureFlagContinuousInternodeValidationPerDocument", true};
     const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-    const int64_t expectedHash = repl::computeDocValidationHash(doc);
+    const int64_t expectedHash = calculateDocHash(doc);
     const auto sizeMetadata = txnInsertAndGetSizeMetadata(nss1, doc, {RecordId(1)});
     ASSERT(sizeMetadata);
     ASSERT(sizeMetadata->getH());
@@ -2452,7 +2465,7 @@ TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionInsertWithou
 TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionUpdateWithFlagAndRecordId) {
     unittest::ServerParameterGuard continuousInternodeScope{
         "featureFlagContinuousInternodeValidationPerDocument", true};
-    const int64_t expectedHash = repl::computeUpdateValidationHash(kPreImageDoc, kUpdatedDoc);
+    const int64_t expectedHash = calculateUpdateDocHash(kPreImageDoc, kUpdatedDoc);
     const auto sizeMetadata =
         txnUpdateAndGetSizeMetadata(nss1, kPreImageDoc, kUpdatedDoc, RecordId(1));
     ASSERT(sizeMetadata);
@@ -2477,7 +2490,7 @@ TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionDeleteWithFlagAndR
     unittest::ServerParameterGuard continuousInternodeScope{
         "featureFlagContinuousInternodeValidationPerDocument", true};
     const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-    const int64_t expectedHash = repl::computeDocValidationHash(doc);
+    const int64_t expectedHash = calculateDocHash(doc);
     const auto sizeMetadata = txnDeleteAndGetSizeMetadata(nss1, doc, RecordId(1));
     ASSERT(sizeMetadata);
     ASSERT(sizeMetadata->getH());
@@ -5860,8 +5873,8 @@ TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedInsertWithFlagAndRecordI
     OperationContext* opCtx = opCtxRaii.get();
     const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
     const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
-    const int64_t expectedHash1 = repl::computeDocValidationHash(doc1);
-    const int64_t expectedHash2 = repl::computeDocValidationHash(doc2);
+    const int64_t expectedHash1 = calculateDocHash(doc1);
+    const int64_t expectedHash2 = calculateDocHash(doc2);
 
     const auto sizeMetadata =
         batchedInsertAndGetSizeMetadata(opCtx, _nss, doc1, doc2, {RecordId(1), RecordId(2)});
@@ -5909,8 +5922,8 @@ TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedUpdateWithFlagAndRecordI
     const BSONObj updatedDoc1 = BSON("_id" << 0 << "data" << "y");
     const BSONObj preImageDoc2 = BSON("_id" << 1 << "data" << 1);
     const BSONObj updatedDoc2 = BSON("_id" << 1 << "data" << 2);
-    const int64_t expectedHash1 = repl::computeUpdateValidationHash(preImageDoc1, updatedDoc1);
-    const int64_t expectedHash2 = repl::computeUpdateValidationHash(preImageDoc2, updatedDoc2);
+    const int64_t expectedHash1 = calculateUpdateDocHash(preImageDoc1, updatedDoc1);
+    const int64_t expectedHash2 = calculateUpdateDocHash(preImageDoc2, updatedDoc2);
     const auto sizeMetadata = batchedUpdateAndGetSizeMetadata(opCtx,
                                                               _nss,
                                                               preImageDoc1,
@@ -5962,8 +5975,8 @@ TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedDeleteWithFlagAndRecordI
     OperationContext* opCtx = opCtxRaii.get();
     const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
     const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
-    const int64_t expectedHash1 = repl::computeDocValidationHash(doc1);
-    const int64_t expectedHash2 = repl::computeDocValidationHash(doc2);
+    const int64_t expectedHash1 = calculateDocHash(doc1);
+    const int64_t expectedHash2 = calculateDocHash(doc2);
 
     const auto sizeMetadata =
         batchedDeleteAndGetSizeMetadata(opCtx, _nss, doc1, doc2, RecordId(1), RecordId(2));
