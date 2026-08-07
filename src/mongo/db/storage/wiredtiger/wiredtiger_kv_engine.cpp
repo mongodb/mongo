@@ -1087,8 +1087,11 @@ void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHolds
     // If there's no journal (ephemeral), we must checkpoint all of the data.
     Fsync fsyncType = !isEphemeral() ? Fsync::kCheckpointStableTimestamp : Fsync::kCheckpointAll;
 
-    UseJournalListener useListener = callerHoldsReadLock ? UseJournalListener::kUpdateUnderReadLock
-                                                         : UseJournalListener::kUpdate;
+    // We will skip updating the journal listener if the caller holds read locks.
+    // The JournalListener may do writes, and taking write locks would conflict with the read
+    // locks.
+    UseJournalListener useListener =
+        callerHoldsReadLock ? UseJournalListener::kSkip : UseJournalListener::kUpdate;
 
     waitUntilDurable(opCtx, fsyncType, useListener);
 }
@@ -3064,15 +3067,12 @@ WiredTigerKVEngine::_getJournalListenerWithToken(OperationContext* opCtx,
         return _journalListener;
     }();
     std::unique_ptr<JournalListener::Token> token;
-    if (journalListener) {
+    if (journalListener && useListener == UseJournalListener::kUpdate) {
         // Update a persisted value with the latest write timestamp that is safe across
         // startup recovery in the repl layer. Then report that timestamp as durable to the
         // repl layer below after we have flushed in-memory data to disk.
         // Note: only does a write if primary, otherwise just fetches the timestamp.
-        token = journalListener->getToken(opCtx,
-                                          useListener == UseJournalListener::kUpdateUnderReadLock
-                                              ? JournalListener::TokenMode::kReadLockHeld
-                                              : JournalListener::TokenMode::kDefault);
+        token = journalListener->getToken(opCtx);
     }
     return std::make_pair(journalListener, std::move(token));
 }

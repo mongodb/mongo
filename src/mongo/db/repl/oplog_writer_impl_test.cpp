@@ -40,8 +40,7 @@ public:
         bool isPrimary;
     };
 
-    std::unique_ptr<JournalListener::Token> getToken(OperationContext* opCtx,
-                                                     TokenMode /*mode*/) override {
+    std::unique_ptr<JournalListener::Token> getToken(OperationContext* opCtx) override {
         return std::make_unique<Token>(
             repl::ReplicationCoordinator::get(opCtx)->getMyLastWrittenOpTimeAndWallTime(true),
             false /* isPrimary */);
