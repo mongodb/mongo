@@ -5850,11 +5850,30 @@ class TestMainWorkflow(unittest.TestCase):
                             "git",
                             "-C",
                             sync_repo_with_copybara.shell_quote(destination_repo_dir),
+                            "-c",
+                            sync_repo_with_copybara.shell_quote("tag.gpgSign=false"),
+                            "tag",
+                            "--annotate",
+                            sync_repo_with_copybara.shell_quote("r8.2.7"),
+                            "--message",
+                            sync_repo_with_copybara.shell_quote("r8.2.7"),
+                            sync_repo_with_copybara.shell_quote("publicsha123"),
+                        ]
+                    )
+                ),
+                call(
+                    " ".join(
+                        [
+                            "git",
+                            "-C",
+                            sync_repo_with_copybara.shell_quote(destination_repo_dir),
                             "push",
                             sync_repo_with_copybara.shell_quote(
                                 "https://example.com/destination.git"
                             ),
-                            sync_repo_with_copybara.shell_quote("publicsha123:refs/tags/r8.2.7"),
+                            sync_repo_with_copybara.shell_quote(
+                                "refs/tags/r8.2.7:refs/tags/r8.2.7"
+                            ),
                         ]
                     )
                 ),
