@@ -54,6 +54,11 @@ namespace executor {
 class TaskExecutor;
 }  // namespace executor
 
+struct [[MONGO_MOD_PARENT_PRIVATE]] ExpiredHistoryFilter {
+    ShardId shardId;            // this shard's identity: ShardId
+    Timestamp oldestTimestamp;  // WT oldest timestamp
+};
+
 /**
  * Builds the aggregation that joins a "collections" namespace with its "chunks" namespace in order
  * to retrieve the routing table of 'nss'.
@@ -61,13 +66,17 @@ class TaskExecutor;
  * When 'sinceVersion' shares the collection's epoch the aggregation only returns the chunks that
  * changed since that version (incremental refresh). Otherwise it returns all of the collection's
  * chunks (full refresh); pass ChunkVersion::UNTRACKED() to always force a full refresh.
+ *
+ * 'expiredFilter' carries data for filtering WT unreachable chunks from the aggregation
+ * result. Pass boost::none to disable filtering.
  */
 [[MONGO_MOD_PARENT_PRIVATE]] AggregateCommandRequest makeCollectionAndChunksAggregation(
     OperationContext* opCtx,
     const NamespaceString& collectionsNss,
     const NamespaceString& chunksNss,
     const NamespaceString& nss,
-    const ChunkVersion& sinceVersion);
+    const ChunkVersion& sinceVersion,
+    const boost::optional<ExpiredHistoryFilter>& expiredFilter = boost::none);
 
 /**
  * Implements the catalog client for reading from replica set config servers.

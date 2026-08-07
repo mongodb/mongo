@@ -4,12 +4,14 @@
 #include "mongo/db/shard_role/shard_catalog/collection_metadata_synchronizer.h"
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -22,8 +24,11 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
-// Every test in this file places chunks on a single shard.
 const ShardId kShard{"0"};
+const ShardId kOtherShard{"1"};
+const Timestamp kOldest{100, 0};
+const Timestamp kBelow{50, 0};
+const Timestamp kAbove{150, 0};
 
 // Builds a shard-key bound at the given value, e.g. {_id: 150}.
 BSONObj shardKey(int value) {
@@ -46,6 +51,8 @@ std::pair<CollectionType, std::vector<ChunkType>> makeShardedMetadataForDisk(
         auto range = ChunkRange(min, max);
         auto& chunkInserted = chunks.emplace_back(uuid, std::move(range), chunkVersion, shardId);
         chunkInserted.setName(OID::gen());
+        chunkInserted.setOnCurrentShardSince(Timestamp::max());
+        chunkInserted.setHistory({ChunkHistory(Timestamp::max(), shardId)});
         chunkVersion.incMajor();
     }
 
@@ -75,6 +82,18 @@ ChunkType makeChunk(const UUID& uuid,
     return chunk;
 }
 
+ChunkType makeChunkWithHistory(const UUID& uuid,
+                               BSONObj min,
+                               BSONObj max,
+                               ChunkVersion version,
+                               Timestamp onCurrentShardSince,
+                               const ShardId& shard = kShard) {
+    ChunkType chunk = makeChunk(uuid, min, max, version, shard);
+    chunk.setOnCurrentShardSince(onCurrentShardSince);
+    chunk.setHistory({ChunkHistory(onCurrentShardSince, shard)});
+    return chunk;
+}
+
 // Splits 'chunk' at 'splitPoint' into [min, splitPoint) and [splitPoint, max), stamping the two
 // halves with 'lowVersion' and 'highVersion'. Models the chunks a split would write.
 std::vector<ChunkType> splitChunk(const ChunkType& chunk,
@@ -101,6 +120,15 @@ void assertChunkAt(const CollectionMetadata& metadata,
     ASSERT_EQ(chunk.getLastmod(), expectedVersion);
 }
 
+void assertChunkPresent(const CollectionMetadata& metadata, const ChunkType& chunk) {
+    assertChunkAt(metadata,
+                  chunk.getMin(),
+                  chunk.getMin(),
+                  chunk.getMax(),
+                  chunk.getShard(),
+                  chunk.getVersion());
+}
+
 class MetadataSynchronizerFixture : public ShardServerTestFixture {
 protected:
     void seedShardCatalogOnDisk(OperationContext* opCtx,
@@ -117,12 +145,82 @@ protected:
         }
     }
 
+    CollectionMetadata recoverMetadata(OperationContext* opCtx) {
+        CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+        synchronizer.start(opCtx, getExecutor());
+        auto metadata = synchronizer.drainAndApply(opCtx);
+        ASSERT_TRUE(metadata);
+        return std::move(*metadata);
+    }
+
+    struct MixedHistoryChunks {
+        std::vector<ChunkType> retained;
+        std::vector<ChunkType> expired;
+    };
+
+    MixedHistoryChunks seedMixedHistoryCollection(OperationContext* opCtx) {
+        const UUID uuid = UUID::gen();
+        const OID epoch = OID::gen();
+        const Timestamp collTimestamp(Date_t::now());
+        CollectionType collType{
+            kTestNss, epoch, collTimestamp, Date_t::now(), uuid, kShardKeyPattern};
+
+        auto version = ChunkVersion({epoch, collTimestamp}, {1, 0});
+        auto nextVersion = [&version] {
+            auto v = version;
+            version.incMajor();
+            return v;
+        };
+
+        MixedHistoryChunks chunks;
+        std::vector<ChunkType> allChunks;
+        auto keep = [&](ChunkType c) {
+            chunks.retained.push_back(c);
+            allChunks.push_back(std::move(c));
+        };
+
+        auto drop = [&](ChunkType c) {
+            chunks.expired.push_back(c);
+            allChunks.push_back(std::move(c));
+        };
+
+        // A: owned + below oldest
+        keep(makeChunkWithHistory(
+            uuid, BSON(kShardKey << MINKEY), shardKey(0), nextVersion(), kBelow, kMyShardName));
+        // B: unowned + reachable
+        keep(makeChunkWithHistory(
+            uuid, shardKey(0), shardKey(100), nextVersion(), kAbove, kOtherShard));
+        // C: unowned + boundary (onCurrentShardSince == oldest)
+        drop(makeChunkWithHistory(
+            uuid, shardKey(100), shardKey(200), nextVersion(), kOldest, kOtherShard));
+        // D: unowned + strictly below oldest
+        drop(makeChunkWithHistory(
+            uuid, shardKey(200), shardKey(300), nextVersion(), kBelow, kOtherShard));
+        // E: owned + legacy-artifact (empty history)
+        keep(makeChunk(uuid, shardKey(300), shardKey(400), nextVersion(), kMyShardName));
+        // F: unowned + legacy-artifact (empty history)
+        drop(makeChunk(uuid, shardKey(400), shardKey(500), nextVersion(), kOtherShard));
+        // G: owned + above oldest
+        keep(makeChunkWithHistory(
+            uuid, shardKey(500), BSON(kShardKey << MAXKEY), nextVersion(), kAbove, kMyShardName));
+
+        seedShardCatalogOnDisk(opCtx, collType, allChunks);
+        return chunks;
+    }
+
     // Returns the timestamp the next recovery round will read at, i.e. the timestamp an oplog
     // entry must meet or exceed to be enqueued rather than dropped.
     Timestamp lastWrittenTimestamp() {
         return repl::ReplicationCoordinator::get(operationContext())
             ->getMyLastWrittenOpTime()
             .getTimestamp();
+    }
+
+    // Forces the storage engine's oldest timestamp.
+    void setOldestTimestamp(Timestamp ts) {
+        auto* storageEngine = getServiceContext()->getStorageEngine();
+        storageEngine->setOldestTimestamp(ts, true);
+        ASSERT_EQ(storageEngine->getOldestTimestamp(), ts);
     }
 
     void setUp() override {
@@ -169,6 +267,43 @@ TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerCanRecoverFromDisk) {
     const auto shardVersionExpected = chunks.back().getVersion();
 
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), shardVersionExpected);
+}
+
+TEST_F(MetadataSynchronizerFixture, RecoverySkipsExpiredHistoricalChunksWhenFlagEnabled) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryCleanup",
+                                               true};
+    OperationContext* opCtx = operationContext();
+    const auto chunks = seedMixedHistoryCollection(opCtx);
+    setOldestTimestamp(kOldest);
+
+    const auto metadata = recoverMetadata(opCtx);
+
+    for (const auto& chunk : chunks.retained) {
+        assertChunkPresent(metadata, chunk);
+    }
+    for (const auto& chunk : chunks.expired) {
+        ASSERT_THROWS(
+            metadata.getChunkManager()->findIntersectingChunkWithSimpleCollation(chunk.getMin()),
+            DBException);
+    }
+
+    ASSERT_EQ(metadata.getChunkManager()->numChunks(), chunks.retained.size());
+}
+
+TEST_F(MetadataSynchronizerFixture, RecoveryKeepsExpiredHistoricalChunksWhenFlagDisabled) {
+    OperationContext* opCtx = operationContext();
+    const auto chunks = seedMixedHistoryCollection(opCtx);
+
+    const auto metadata = recoverMetadata(opCtx);
+
+    for (const auto& chunk : chunks.retained) {
+        assertChunkPresent(metadata, chunk);
+    }
+    for (const auto& chunk : chunks.expired) {
+        assertChunkPresent(metadata, chunk);
+    }
+    ASSERT_EQ(metadata.getChunkManager()->numChunks(),
+              chunks.retained.size() + chunks.expired.size());
 }
 
 TEST_F(MetadataSynchronizerFixture, QueryableBackupModeRecoversFromLocalCatalogWithoutExecutor) {
@@ -359,7 +494,6 @@ TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerDrainsMultipleDeltas) {
         *collMetadata, shardKey(170), shardKey(150), shardKey(200), kShard, secondHighVersion);
 }
 
-// An invalidate queued after a delta forces a new recovery round and drops the delta.
 // An invalidate queued after a delta forces the caller to discard this synchronizer; a new
 // instance re-reads disk and is unaffected by the discarded delta.
 TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerRestartsWhenDeltaFollowedByInvalidate) {
@@ -582,7 +716,9 @@ TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerBubblesUpDiskReadingFail
 
     DBDirectClient client(opCtx);
     client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
-                  BSON("uuid" << collType.getUuid() << "lastmod" << "Invalid value"));
+                  BSON(ChunkType::shard.name()
+                       << kMyShardName.toString() << "uuid" << collType.getUuid() << "lastmod"
+                       << "Invalid value"));
 
     {
         CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
@@ -592,7 +728,7 @@ TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerBubblesUpDiskReadingFail
         synchronizer.start(operationContext(), getExecutor());
         auto status = synchronizer.getMetadataFuture().getNoThrow(operationContext());
         ASSERT_NOT_OK(status);
-        ASSERT_EQ(status.getStatus().code(), ErrorCodes::NoSuchKey);
+        ASSERT_EQ(status.getStatus().code(), ErrorCodes::BadValue);
     }
 }
 

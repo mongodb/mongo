@@ -8,6 +8,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_impl.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -15,7 +16,10 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -40,12 +44,20 @@ CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
         repl::ReadConcernArgs::get(opCtx) = repl::ReadConcernArgs{};
     }
 
+    boost::optional<ExpiredHistoryFilter> expiredFilter;
+    if (feature_flags::gShardCatalogExpiredHistoryCleanup.isEnabled()) {
+        const auto oldestTimestamp =
+            opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp();
+        expiredFilter = ExpiredHistoryFilter{ShardingState::get(opCtx)->shardId(), oldestTimestamp};
+    }
+
     auto aggRequest =
         makeCollectionAndChunksAggregation(opCtx,
                                            NamespaceString::kConfigShardCatalogCollectionsNamespace,
                                            NamespaceString::kConfigShardCatalogChunksNamespace,
                                            nss,
-                                           ChunkVersion::UNTRACKED());
+                                           ChunkVersion::UNTRACKED(),
+                                           expiredFilter);
 
     std::vector<BSONObj> aggResult;
     {

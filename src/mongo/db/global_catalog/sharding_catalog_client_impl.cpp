@@ -183,11 +183,13 @@ StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
 
 }  // namespace
 
-AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
-                                                           const NamespaceString& collectionsNss,
-                                                           const NamespaceString& chunksNss,
-                                                           const NamespaceString& nss,
-                                                           const ChunkVersion& sinceVersion) {
+AggregateCommandRequest makeCollectionAndChunksAggregation(
+    OperationContext* opCtx,
+    const NamespaceString& collectionsNss,
+    const NamespaceString& chunksNss,
+    const NamespaceString& nss,
+    const ChunkVersion& sinceVersion,
+    const boost::optional<ExpiredHistoryFilter>& expiredFilter) {
     ResolvedNamespaceMap resolvedNamespaces;
     resolvedNamespaces[collectionsNss] = {collectionsNss, std::vector<BSONObj>()};
     resolvedNamespaces[chunksNss] = {chunksNss, std::vector<BSONObj>()};
@@ -251,6 +253,13 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     //                                 },
     //                             }
     //                         },
+    //                         // Only when expiredHistoryFilter is set
+    //                         {
+    //                           $match: { $or : [
+    //                             { shard: <shardId> },
+    //                             { onCurrentShardSince: { $gt: <oldest WT timestamp> } }
+    //                           ] }
+    //                         },
     //                         { $match: { lastmod: { $gte: <sinceVersion> } } },
     //                         {
     //                             $sort: {
@@ -290,6 +299,13 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     //                                 },
     //                             }
     //                         },
+    //                         // Only when expiredHistoryFilter is set
+    //                         {
+    //                           $match: { $or : [
+    //                             { shard: <shardId> },
+    //                             { onCurrentShardSince: { $gt: <oldest WT timestamp> } }
+    //                           ] }
+    //                         },
     //                         {
     //                             $sort: {
     //                                 lastmod: 1
@@ -317,6 +333,16 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
         const auto uuidExpr =
             Arr{Value{"$" + ChunkType::collectionUUID.name()}, Value{"$$local_uuid"sv}};
 
+        const auto expiredFilterExpr = expiredFilter
+            ? Value{Doc{
+                  {"$match",
+                   Doc{{"$or",
+                        Value{Arr{Value{Doc{{ChunkType::shard.name(),
+                                             expiredFilter->shardId.toString()}}},
+                                  Value{Doc{{ChunkType::onCurrentShardSince.name(),
+                                             Doc{{"$gt", expiredFilter->oldestTimestamp}}}}}}}}}}}}
+            : Value{/*noop*/};
+
         constexpr auto chunksLookupOutputFieldName = "chunks"sv;
 
         const auto lookupPipeline = [&]() {
@@ -326,6 +352,7 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
                 {"let", letExpr},
                 {"pipeline",
                  Arr{Value{Doc{{"$match", Doc{{"$expr", Doc{{"$eq", uuidExpr}}}}}}},
+                     expiredFilterExpr,
                      incremental
                          ? Value{Doc{{"$match",
                                       Doc{{ChunkType::lastmod.name(),
