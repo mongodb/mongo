@@ -357,7 +357,7 @@ TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkExtendsPastSpanM
 TEST_F(MigrationDestinationManagerTest,
        PITReachableUnownedChunkExtendsPastSpanMax_TestEnvironment) {
     unittest::ServerParameterGuard overriddenPitWindowToPreserve(
-        "migrationRecipientPITHistoryToPreserveInSecs", 1);
+        "migrationRecipientPITHistoryToPreserveInSecs", 2);
     const auto collUuid = UUID::gen();
     const auto currentOwnershipTimestamp =
         VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
@@ -392,10 +392,9 @@ TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkAgedOutByOverrid
     ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k50)));
 }
 
-// A zero-second preservation window also ages out ownership transitions in the current second,
-// regardless of their timestamp iteration.
-TEST_F(MigrationDestinationManagerTest,
-       PITReachableUnownedChunkSameSecondHigherIterationAgedOutByOverride) {
+TEST_F(
+    MigrationDestinationManagerTest,
+    PITReachableUnownedChunkShouldNotConflictIfMigrationRecipientPITHistoryToPreserveInSecsIsZero) {
     unittest::ServerParameterGuard overriddenPitWindowToPreserve(
         "migrationRecipientPITHistoryToPreserveInSecs", 0);
     const auto currentTimestamp =
@@ -428,7 +427,7 @@ TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkExtendsBelowSpan
 TEST_F(MigrationDestinationManagerTest,
        PITReachableUnownedChunkExtendsBelowSpanMin_TestEnvironment) {
     unittest::ServerParameterGuard overriddenPitWindowToPreserve(
-        "migrationRecipientPITHistoryToPreserveInSecs", 1);
+        "migrationRecipientPITHistoryToPreserveInSecs", 2);
 
     const auto collUuid = UUID::gen();
     const auto currentOwnershipTimestamp =
@@ -555,7 +554,7 @@ TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedAbortsByDefault
 
 TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedAbortsByDefault_TestEnvironment) {
     unittest::ServerParameterGuard overriddenPitWindowToPreserve(
-        "migrationRecipientPITHistoryToPreserveInSecs", 1);
+        "migrationRecipientPITHistoryToPreserveInSecs", 2);
 
     const auto collUuid = UUID::gen();
     const auto currentOwnershipTimestamp =
