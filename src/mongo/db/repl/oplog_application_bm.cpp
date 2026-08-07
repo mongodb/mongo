@@ -730,6 +730,7 @@ void validationHashBMConfig(benchmark::internal::Benchmark* bm) {
     bm->ArgNames({"batchSize", "docBytes", "hashEnabled"})
         ->UseManualTime()
         ->MeasureProcessCPUTime()
+        ->Iterations(20)
         ->Unit(benchmark::kMillisecond);
 }
 
