@@ -59,17 +59,12 @@ void documentToBsonWithPaths(const Document& input,
 
 /**
  * Converts a 'Document' to a BSON object.
- *
- * The template parameter 'PathsHaveUniqueFirstFields' controls whether or not first fields in the
- * result BSONObj will be checked for uniqueness. Setting it to 'true' can be used as a performance
- * optimization in case it is known that all first fields in the result object will be unique.
  */
-template <typename BSONTraits = BSONObj::DefaultSizeTrait, bool PathsHaveUniqueFirstFields = false>
-BSONObj documentToBsonWithPaths(const Document& input, const OrderedPathSet& paths) {
+inline BSONObj documentToBsonWithPaths(const Document& input, const OrderedPathSet& paths) {
     BSONObjBuilder outputBuilder;
-    documentToBsonWithPaths<PathsHaveUniqueFirstFields>(input, paths, &outputBuilder);
-    BSONObj docBSONObj = outputBuilder.obj<BSONTraits>();
-    Document::validateDocumentBSONSize(docBSONObj, BSONTraits::MaxSize);
+    documentToBsonWithPaths(input, paths, &outputBuilder);
+    BSONObj docBSONObj = outputBuilder.obj<BSONObj::DefaultSizeTrait>();
+    Document::validateDocumentBSONSize(docBSONObj, BSONObj::DefaultSizeTrait::MaxSize);
     return docBSONObj;
 }
 

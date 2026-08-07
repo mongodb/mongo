@@ -35,9 +35,7 @@ TestData buildTestData(int numPrefixes) {
 void BM_DocumentToBsonWithPaths(benchmark::State& state) {
     auto [doc, paths] = buildTestData(state.range(0));
     for (auto _ : state) {
-        benchmark::DoNotOptimize(
-            document_path_support::documentToBsonWithPaths<BSONObj::LargeSizeTrait, false>(doc,
-                                                                                           paths));
+        benchmark::DoNotOptimize(document_path_support::documentToBsonWithPaths(doc, paths));
     }
 }
 
