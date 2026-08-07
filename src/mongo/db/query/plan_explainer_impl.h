@@ -73,6 +73,10 @@ public:
         return _explainData.ceSamplingMetadata;
     }
 
+    boost::optional<PlanRankerReason> getPlanRankerReason() const override {
+        return _explainData.planRankerReason;
+    }
+
 private:
     /**
      * The shared per-plan formatting core: serializes one plan's stats tree (depending on 'policy')

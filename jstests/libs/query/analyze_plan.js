@@ -200,19 +200,21 @@ export const ChosenRanker = {
 };
 
 /**
- * The reason a particular ranker was chosen for a query. These document the intended planner
- * decision for a test case. Not all reasons apply to every plan ranker or CE strategy.
+ * The reason a particular ranker was chosen for a query, as reported by the V3 explain
+ * queryPlanner.rankerChoice.reason field. These values mirror the C++ PlanRankerReason enum
+ * (src/mongo/db/query/plan_ranking/plan_ranker_reason.h) byte for byte. Not all reasons apply to
+ * every plan ranker or CE strategy.
+ * TODO SERVER-115714: add enum value kSmallCollection: "smallCollection"
  */
 export const PlanRankerReason = {
     kSinglePlan: "singlePlan",
-    kFeatureFlag: "featureFlag",
-    kQueryKnob: "queryKnob",
-    kInestimableNode: "inestimableNode",
+    kCBRFeatureFlagDisabled: "cbrFeatureFlagDisabled",
+    kQueryPlanRankerKnob: "queryPlanRankerKnob",
+    kCBRInestimableNode: "cbrInestimableNode",
     kHistogramCEInternalColl: "histogramCEInternalColl",
-    kSmallCollection: "smallCollection",
-    kMpEarlyExitOrResult: "mpEarlyExitOrResult",
+    kMpEarlyExit: "mpEarlyExit",
+    kMpFoundResult: "mpFoundResult",
     kNoMultiplanningResults: "noMultiplanningResults",
-    kMpEarlyExitEofOrFullBatch: "mpEarlyExitEofOrFullBatch",
     kInestimableMP: "inestimableMP",
     kMpCheaperThanCbr: "mpCheaperThanCbr",
     kCbrCheaperThanMp: "cbrCheaperThanMp",
@@ -228,10 +230,9 @@ export function getRankerChoice(explain) {
 /**
  * Asserts that the winning plan in 'explain' was produced by 'chosenRanker'.
  *
- * Optionally takes 'reason', which is validated against 'PlanRankerReason', but it is not yet
- * asserted against the explain output because the explain format does not surface it.
- *
- * TODO SERVER-130875: assert 'reason' directly against the v3 explain output.
+ * Optionally takes 'reason', which is validated against 'PlanRankerReason' and, for V3 explain
+ * output, asserted against queryPlanner.rankerChoice.reason. Legacy explain output does not
+ * surface the reason, so there it is validated only.
  */
 export function assertChosenRanker(explain, chosenRanker, reason = undefined) {
     assert(Object.values(ChosenRanker).includes(chosenRanker), "Unknown chosenRanker", {
@@ -263,8 +264,22 @@ export function assertChosenRanker(explain, chosenRanker, reason = undefined) {
             {rankerChoice},
         );
 
-        // TODO SERVER-132230 Assert on the reason for chosen ranker.
-        // TODO SERVER-132104 Assert on the requested ranker.
+        if (reason !== undefined) {
+            assert(rankerChoice.hasOwnProperty("reason"), "Expected reason in rankerChoice", {
+                rankerChoice,
+            });
+            assert(
+                rankerChoice.reason === reason,
+                'Unexpected reason in rankerChoice, expected: "' +
+                    reason +
+                    '", got: "' +
+                    rankerChoice.reason +
+                    '"',
+                {rankerChoice},
+            );
+        }
+
+        // TODO SERVER-132230 Assert on the requested ranker.
         return;
     }
 

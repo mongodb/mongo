@@ -9,6 +9,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
@@ -29,11 +30,14 @@ private:
      * Resumes the multi-planner and picks the best plan from it.
      * @param trialsConfig The trials configuration to use when resuming the multi-planner.
      * @param isExplain If true extract explain data from the multiplanner.
+     * @param reason The rankerChoice.reason of the calling branch point (each branch that resumes
+     *               the multi-planner passes its own); recorded on the extracted explain data.
      */
     StatusWith<PlanRankingResult> resumeMultiPlannerAndPickBestPlan(
         OperationContext* opCtx,
         const trial_period::TrialPhaseConfig& trialsConfig,
-        bool isExplain);
+        bool isExplain,
+        PlanRankerReason reason);
 };
 }  // namespace plan_ranking
 }  // namespace mongo

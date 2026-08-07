@@ -12,6 +12,7 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
@@ -182,13 +183,32 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         if (result.needsWorksMeasuredForPlanCache) {
             // CBR chose a single winning plan.
             CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
+            // When CBR choice was prescribed by configuration (planRanker == kCostBased) record
+            // that fact as rankerChoice.reason = kQueryPlanRankerKnob.
+            // When running as the inner engine of a mixed strategy (planRanker == kMixed, called
+            // via getBestCBRPlan) the config reason resolves to none and the calling strategy
+            // records the reason for its own decision.
+            if (result.maybeExplainData) {
+                const auto reason = plannerParams.getPlanRankerReasonFromConfig();
+                if (reason.has_value()) {
+                    result.maybeExplainData->planRankerReason = reason;
+                }
+            }
         } else if (result.solutions.size() > 1) {
-            // CBR could not estimate all plans (e.g. an inestimable node such as RETURN_KEY) and
-            // returned multiple solutions to be ranked by the multi-planner downstream. Record that
-            // MP, not CBR, decides the winner. Mirrors MPPlanRankingStrategy, which sets this at
+            // CBR could not estimate all plans (a node rejected with UnsupportedCbrNode) and
+            // returned multiple solutions to be ranked by the multi-planner. Record that MP, not
+            // CBR, decides the winner. Mirrors MPPlanRankingStrategy, which sets this at
             // ranking time; the classic runtime MultiPlanner does not set it itself.
             // TODO SERVER-132079 Stop sourcing plan selection method from OpDebug.
             CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+            // All three callers of this strategy - the strict costBased knob, and the two mixed
+            // strategies (NoMultiplanningResults, EstimateRankingEffort) calling via
+            // getBestCBRPlan - report the same reason for this outcome, so this inner site
+            // records it unconditionally; the callers leave it untouched when the multi-planner
+            // finishes ranking downstream.
+            if (result.maybeExplainData) {
+                result.maybeExplainData->planRankerReason = PlanRankerReason::kCBRInestimableNode;
+            }
         }
     }
 

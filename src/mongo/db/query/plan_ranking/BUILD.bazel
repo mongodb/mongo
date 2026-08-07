@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "plan_ranker_method",
     hdrs = [
         "plan_ranker_method.h",
+        "plan_ranker_reason.h",
     ],
     deps = [],
 )

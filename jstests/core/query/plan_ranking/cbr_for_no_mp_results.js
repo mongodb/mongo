@@ -167,8 +167,7 @@ function testResultsQueryIsPlannedWithMultiPlanner() {
     if (getEngine(explain) !== "classic") {
         return;
     }
-    // MP found results, so CBR was not invoked and MP picked the winner.
-    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExitOrResult);
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExit);
     // 1 rejected plan per shard (the MP loser).
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
@@ -198,7 +197,7 @@ function testEOFIsPlannedWithMultiPlanner() {
         return;
     }
     // MP early-exited (EOF), so it picked the winner without engaging CBR.
-    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExitOrResult);
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExit);
     // 1 rejected plan per shard (the MP loser).
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
@@ -224,7 +223,11 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         }
         // No MP results, so CBR was engaged, but every plan is inestimable due to RETURN_KEY, so
         // CBR fell back to MP.
-        assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kInestimableNode);
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kMultiPlanning,
+            PlanRankerReason.kCBRInestimableNode,
+        );
         const rejectedPlans = getRejectedPlans(explain);
         if (isExecutionSplitInShards(explain)) {
             const numShards = getNumShardsFromExplain(explain);

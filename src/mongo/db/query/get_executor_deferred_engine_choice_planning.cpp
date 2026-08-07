@@ -320,10 +320,22 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         return buildSingleSolutionPlanner(std::move(solutions[0]), cachedPlanHash);
     }
     // CBR is disabled; multiple candidate plans will be ranked by the classic multi-planner.
+    boost::optional<PlanExplainerData> maybeExplainData;
     if (solutions.size() > 1) {
         CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+        // Mirrors MPPlanRankingStrategy on the non-deferred path; see the comment there.
+        if (cq->getExplain()) {
+            const auto reason = plannerParams->getPlanRankerReasonFromConfig();
+            if (reason.has_value()) {
+                maybeExplainData.emplace();
+                maybeExplainData->planRankerReason = reason;
+            }
+        }
     }
-    return std::make_unique<MultiPlanner>(makePlannerData(cachedPlanHash), std::move(solutions));
+    return std::make_unique<MultiPlanner>(makePlannerData(cachedPlanHash),
+                                          std::move(solutions),
+                                          false /* addingCBRChosenPlanToPlanCache */,
+                                          std::move(maybeExplainData));
 }
 
 PlanRankingResult planRanking(OperationContext* opCtx,

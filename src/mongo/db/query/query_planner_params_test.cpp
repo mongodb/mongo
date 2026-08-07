@@ -20,6 +20,7 @@
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -302,7 +303,8 @@ TEST_F(QueryPlannerParamsTest, isComponentOfProjectionMultikeyWithMetadata) {
 // ---------------------------------------------------------------------------
 
 // When gFeatureFlagCostBasedRanker is disabled the constructor must override any configured
-// planRanker back to kMultiPlanner, regardless of what was passed in args.
+// planRanker back to kMultiPlanner, regardless of what was passed in args. The rewrite destroys
+// the knob's provenance, so it must also record kCBRFeatureFlagDisabled as the overwrite reason.
 TEST_F(QueryPlannerParamsTest, PlanRankerForcedToMultiPlannerWhenFlagDisabled) {
     unittest::ServerParameterGuard flagGuard{"featureFlagCostBasedRanker", false};
     auto cq = canonicalize("{}", "{}", "{}");
@@ -315,9 +317,14 @@ TEST_F(QueryPlannerParamsTest, PlanRankerForcedToMultiPlannerWhenFlagDisabled) {
     });
     ASSERT_EQ(params.planRanker, QueryPlanRankerEnum::kMultiPlanner);
     ASSERT_FALSE(params.isCBREnabled());
+    ASSERT_TRUE(params.planRankerOverwriteReason.has_value());
+    ASSERT_EQ(*params.planRankerOverwriteReason, PlanRankerReason::kCBRFeatureFlagDisabled);
+    ASSERT_EQ(*params.getPlanRankerReasonFromConfig(), PlanRankerReason::kCBRFeatureFlagDisabled);
 }
 
-// When gFeatureFlagCostBasedRanker is enabled the configured planRanker is left untouched.
+// When gFeatureFlagCostBasedRanker is enabled the configured planRanker is left untouched: no
+// overwrite reason is recorded, and the config reason resolves to kQueryPlanRankerKnob (an explicit
+// knob value).
 TEST_F(QueryPlannerParamsTest, PlanRankerPreservedWhenFlagEnabled) {
     auto cq = canonicalize("{}", "{}", "{}");
     QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
@@ -329,6 +336,24 @@ TEST_F(QueryPlannerParamsTest, PlanRankerPreservedWhenFlagEnabled) {
     });
     ASSERT_EQ(params.planRanker, QueryPlanRankerEnum::kCostBased);
     ASSERT_TRUE(params.isCBREnabled());
+    ASSERT_FALSE(params.planRankerOverwriteReason.has_value());
+    ASSERT_EQ(*params.getPlanRankerReasonFromConfig(), PlanRankerReason::kQueryPlanRankerKnob);
+}
+
+// An unrewritten kMixed ranker has no config-fixed reason: the ranker choice is decided by the
+// mixed strategy at planning time, which records its own reason.
+TEST_F(QueryPlannerParamsTest, MixedPlanRankerHasNoConfigReason) {
+    auto cq = canonicalize("{}", "{}", "{}");
+    QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
+        .opCtx = _opCtx.get(),
+        .canonicalQuery = *cq,
+        .collections = MultipleCollectionAccessor{},
+        .plannerOptions = QueryPlannerParams::DEFAULT,
+        .planRanker = QueryPlanRankerEnum::kMixed,
+    });
+    ASSERT_EQ(params.planRanker, QueryPlanRankerEnum::kMixed);
+    ASSERT_FALSE(params.planRankerOverwriteReason.has_value());
+    ASSERT_FALSE(params.getPlanRankerReasonFromConfig().has_value());
 }
 
 }  // namespace

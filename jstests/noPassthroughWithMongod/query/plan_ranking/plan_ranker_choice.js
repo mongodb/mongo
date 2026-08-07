@@ -144,15 +144,21 @@ try {
         cName: "100",
         query: {f1: {$gte: 0}, f2: {$lte: 0}},
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
+        reason: PlanRankerReason.kMpEarlyExit,
     });
+    // The strategy logs its decision ("Mixed plan ranker chooses MP (1)"). The suite's mongod is
+    // shared across tests, so assert the line appeared at least once, never a count.
+    assert(
+        checkLog.checkContainsOnceJson(db, 11306807),
+        "expected the EstimateRankingEffort chooses-MP-on-early-exit decision log line (id 11306807)",
+    );
     checkRanker({
         qID: "1.1.2",
         cName: "100",
         query: {f1: {$gte: 0}, f2: {$lte: 0}},
         order: {f1: 1, x1: 1},
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
+        reason: PlanRankerReason.kMpEarlyExit,
     });
     checkRanker({
         qID: "1.1.3",
@@ -181,7 +187,7 @@ try {
         },
         order: {f3: 1, f1: 1},
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
+        reason: PlanRankerReason.kMpEarlyExit,
     });
     // 1.2 EOF big collection
     checkRanker({
@@ -189,7 +195,7 @@ try {
         cName: "20k",
         query: {f1: 500, f2: {$gt: 300}},
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
+        reason: PlanRankerReason.kMpEarlyExit,
     });
     checkRanker({
         qID: "1.2.2",
@@ -198,7 +204,7 @@ try {
         order: {f1: 1},
         limit: batchSize,
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
+        reason: PlanRankerReason.kMpEarlyExit,
     });
 
     // 1.3 full batch
@@ -207,7 +213,7 @@ try {
         cName: "20k",
         query: {f1: {$lt: 505}, f2: {$gt: 990}},
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
+        reason: PlanRankerReason.kMpEarlyExit,
     });
     checkRanker({
         qID: "1.3.2",
@@ -216,7 +222,7 @@ try {
         order: {f3: 1},
         limit: batchSize + 1,
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kMpEarlyExitEofOrFullBatch,
+        reason: PlanRankerReason.kMpEarlyExit,
     });
 
     // (2) "The mixed plan ranker chooses MP because plan contains inestimable node(s)"
@@ -300,8 +306,10 @@ try {
     // candidate plans, so it runs the brief MP estimation trial to compare MP against CBR) but a
     // plan contains an inestimable node. A '$near' predicate forces a GEO_NEAR_2DSPHERE stage,
     // which neither the exact CE used to estimate MP nor CBR can estimate, so estimateAllPlans()
-    // fails and the mixed plan ranker falls back to MP. Uses a dedicated geo collection so the shared 'f1..'
-    // collections (and the finely-tuned productivity cases) are left untouched.
+    // fails and the mixed plan ranker falls back to MP. The reason is inestimableMP (the MP-cost
+    // estimation itself failed) rather than inestimableNode (CBR engaged and could not cost a
+    // node): the strategy exits before CBR is ever engaged. Uses a dedicated geo collection so
+    // the shared 'f1..' collections (and the finely-tuned productivity cases) are left untouched.
     {
         const geoColl = db[collName("geo")];
         geoColl.drop();
@@ -336,8 +344,13 @@ try {
         cName: "geo",
         query: {loc: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}}}, f1: {$gt: 100}},
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kInestimableNode,
+        reason: PlanRankerReason.kInestimableMP,
     });
+    // The strategy logs the inestimable-MP fallback ("Mixed plan ranker chooses MP (2)").
+    assert(
+        checkLog.checkContainsOnceJson(db, 12023300),
+        "expected the EstimateRankingEffort inestimable-MP decision log line (id 12023300)",
+    );
 
     // (3) The mixed plan ranker chooses CBR because of very low productivity
     checkRanker({
@@ -347,6 +360,12 @@ try {
         chosenRanker: ChosenRanker.kCostBased,
         reason: PlanRankerReason.kCbrCheaperThanMp,
     });
+    // The strategy logs its decision ("Mixed plan ranker chooses CBR (3)", the low-productivity
+    // fast path).
+    assert(
+        checkLog.checkContainsOnceJson(db, 11306804),
+        "expected the EstimateRankingEffort low-productivity decision log line (id 11306804)",
+    );
     checkRanker({
         qID: "3.2",
         cName: "20k",
@@ -390,6 +409,11 @@ try {
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpCheaperThanCbr,
     });
+    // The strategy logs its decision ("Mixed plan ranker chooses MP (4)").
+    assert(
+        checkLog.checkContainsOnceJson(db, 11306802),
+        "expected the EstimateRankingEffort MP-cheaper decision log line (id 11306802)",
+    );
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
@@ -405,6 +429,11 @@ try {
         chosenRanker: ChosenRanker.kCostBased,
         reason: PlanRankerReason.kCbrCheaperThanMp,
     });
+    // The strategy logs its decision ("Mixed plan ranker chooses CBR (5)").
+    assert(
+        checkLog.checkContainsOnceJson(db, 11306800),
+        "expected the EstimateRankingEffort CBR-cheaper decision log line (id 11306800)",
+    );
     checkRanker({
         qID: "5.2",
         cName: "20k",
@@ -451,15 +480,27 @@ try {
             chosenRanker: ChosenRanker.kCostBased,
             reason: PlanRankerReason.kNoMultiplanningResults,
         });
-        // The same predicates without the impossible 'c' clause match every document, so MP finds
-        // results during the trial phase and picks the winner without engaging CBR.
+        // The strategy logs its decision ("NoMPResults plan ranker chooses CBR (2)"). The suite's
+        // mongod is shared across tests, so assert that the log line appeared at least once.
+        assert(
+            checkLog.checkContainsOnceJson(db, 13237702),
+            "expected the NoMPResults chooses-CBR decision log line (id 13237702)",
+        );
+        // The same predicates without the impossible 'c' clause match every document, so MP fills
+        // a batch during the trial phase (an early exit) and picks the winner without engaging
+        // CBR.
         checkRanker({
             qID: "6.2",
             cName: "20k",
             query: {f1: {$gte: 0}, f2: {$gte: 0}},
             chosenRanker: ChosenRanker.kMultiPlanning,
-            reason: PlanRankerReason.kMpEarlyExitOrResult,
+            reason: PlanRankerReason.kMpEarlyExit,
         });
+        // The strategy logs its decision ("NoMPResults plan ranker chooses MP (1)").
+        assert(
+            checkLog.checkContainsOnceJson(db, 13237701),
+            "expected the NoMPResults chooses-MP decision log line (id 13237701)",
+        );
         // 'c' is not indexed, so there is a single candidate plan (a collection scan) and no ranking
         // is needed.
         checkRanker({
@@ -476,7 +517,7 @@ try {
             cName: "20k",
             query: {f1: 100000, f2: 100000},
             chosenRanker: ChosenRanker.kMultiPlanning,
-            reason: PlanRankerReason.kMpEarlyExitOrResult,
+            reason: PlanRankerReason.kMpEarlyExit,
         });
         // No MP results, so CBR is engaged, but $returnKey makes every plan inestimable
         // (RETURN_KEY), so CBR falls back to MP.
@@ -486,7 +527,24 @@ try {
             query: noResultsQuery,
             returnKey: true,
             chosenRanker: ChosenRanker.kMultiPlanning,
-            reason: PlanRankerReason.kInestimableNode,
+            reason: PlanRankerReason.kCBRInestimableNode,
+        });
+        // The strategy logs the CBR-uncostable fallback ("NoMPResults plan ranker chooses MP
+        // (3)").
+        assert(
+            checkLog.checkContainsOnceJson(db, 13237703),
+            "expected the NoMPResults CBR-uncostable decision log line (id 13237703)",
+        );
+        // 'f1 >= 0' scans the whole index while the unindexed 'x2 >= 998' matches ~0.2% of
+        // documents: the capped trial produces a few results (so CBR is not engaged) but neither
+        // reaches EOF nor fills a batch within its works budget - the multi-planner decides
+        // because it found results, not because it exited early.
+        checkRanker({
+            qID: "6.6",
+            cName: "20k",
+            query: {f1: {$gte: 0}, x2: {$gte: 998}},
+            chosenRanker: ChosenRanker.kMultiPlanning,
+            reason: PlanRankerReason.kMpFoundResult,
         });
     } finally {
         assert.commandWorked(
@@ -513,7 +571,7 @@ try {
         cName: "20k",
         query: configMultiPlanQuery,
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kFeatureFlag,
+        reason: PlanRankerReason.kCBRFeatureFlagDisabled,
     });
 
     // A concrete CE mode forces CBR to rank every multi-plan query directly. Deterministic sample
@@ -535,7 +593,7 @@ try {
             cName: "20k",
             query: configMultiPlanQuery,
             chosenRanker: ChosenRanker.kCostBased,
-            reason: PlanRankerReason.kQueryKnob,
+            reason: PlanRankerReason.kQueryPlanRankerKnob,
         });
         // CBR is forced on, but $returnKey introduces a RETURN_KEY stage that CBR cannot estimate,
         // so it falls back to the multi-planner.
@@ -545,7 +603,7 @@ try {
             query: configMultiPlanQuery,
             returnKey: true,
             chosenRanker: ChosenRanker.kMultiPlanning,
-            reason: PlanRankerReason.kInestimableNode,
+            reason: PlanRankerReason.kCBRInestimableNode,
         });
     } finally {
         assert.commandWorked(
@@ -570,8 +628,48 @@ try {
         cName: "20k",
         query: configMultiPlanQuery,
         chosenRanker: ChosenRanker.kMultiPlanning,
-        reason: PlanRankerReason.kQueryKnob,
+        reason: PlanRankerReason.kQueryPlanRankerKnob,
     });
+
+    // CBR is forced on with histogramCE, but the collection lives in an internal database
+    // (config), where histograms are never created, so planning is rewritten to the
+    // multi-planner. Uses a dedicated collection in the config database; the checkRanker
+    // helper is bound to the test database, so this case runs assertChosenRanker directly.
+    {
+        const internalDbColl = db.getSiblingDB("config")[collName("internal")];
+        internalDbColl.drop();
+        const docs = [];
+        for (let i = 0; i < 100; i++) {
+            docs.push({_id: i, f1: i % 10, f2: i % 20});
+        }
+        assert.commandWorked(internalDbColl.insertMany(docs));
+        assert.commandWorked(internalDbColl.createIndex({f1: 1}));
+        assert.commandWorked(internalDbColl.createIndex({f2: 1}));
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
+                internalQueryCBRCEMode: "histogramCE",
+            }),
+        );
+        try {
+            jsTest.log.info("Testing case: 7.5 - histogramCE-internal-db", {
+                chosenRanker: ChosenRanker.kMultiPlanning,
+                reason: PlanRankerReason.kHistogramCEInternalColl,
+            });
+            const explain = assert.commandWorked(
+                internalDbColl.find({f1: {$gte: 0}, f2: {$gte: 0}}).explain("plannerStats"),
+            );
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kMultiPlanning,
+                PlanRankerReason.kHistogramCEInternalColl,
+            );
+        } finally {
+            internalDbColl.drop();
+        }
+    }
 } finally {
     // Restore the CBR parameters this test changed. We restore them directly (rather than via
     // setCBRConfig) to avoid touching internalSamplingSizeOverride, which this test never modifies.

@@ -565,6 +565,11 @@ TEST_F(PlanExplainerTest, V3ExecStatsSectionMatchesLegacyExecStatsSection) {
     // Only the wall-clock totals, which generateExecutionInfo() reads from the operation timer at
     // serialization time, are excluded from the comparison. The jstest explain_exec_stats_parity.js
     // carries the system-level form of the guarantee.
+    //
+    // Plan under explain, as the explain command does before serializing at any V3 verbosity: the
+    // ranking strategies record rankerChoice.reason only for explain-planned queries, and V3
+    // emission tasserts (13237700) if a strategy decided the winner but no reason was carried.
+    expCtx->setExplain(ExplainOptions::Verbosity::kExecStatsV3);
     auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
     while (exec->getNext(nullptr, nullptr) != PlanExecutor::IS_EOF) {
     }

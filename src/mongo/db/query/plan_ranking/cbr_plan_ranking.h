@@ -6,6 +6,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -37,7 +38,8 @@ StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              const MultipleCollectionAccessor& collections,
                                              StringSet topLevelSampleFieldNames,
-                                             bool hasRelevantMultikeyIndex);
+                                             bool hasRelevantMultikeyIndex,
+                                             PlanRankerReason reasonIfChoseWinner);
 
 
 }  // namespace plan_ranking

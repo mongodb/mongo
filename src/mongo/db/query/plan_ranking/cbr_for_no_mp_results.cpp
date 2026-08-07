@@ -9,10 +9,14 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo {
 namespace plan_ranking {
@@ -99,15 +103,20 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     // 2. Otherwise, try CBR: If CBR picks a single best plan, return that.
     // 3. Otherwise, resume multiplanner to completion and pick best plan from it.
     if (stats->earlyExit || stats->numResultsFound > 0) {
+        LOGV2_INFO(13237701,
+                   "NoMPResults plan ranker chooses MP (1)",
+                   "Reason"_attr = "the trial exited early or found results");
         auto remainingMultiPlannerWorksPerPlan =
             trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
         // The best plan, once chosen by the multiplanner, will be inserted into the plan cache by
-        // the multiplanner here.
+        // the multiplanner here. Early exit takes precedence over found results, mirroring this
+        // branch's condition.
         return resumeMultiPlannerAndPickBestPlan(
             opCtx,
             {.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
              .targetNumResults = trialsConfig.targetNumResults},
-            isExplain);
+            isExplain,
+            stats->earlyExit ? PlanRankerReason::kMpEarlyExit : PlanRankerReason::kMpFoundResult);
     }
     tassert(11737001,
             "Expected multi-planner to have produced zero results during trials phase",
@@ -120,7 +129,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
                                     yieldPolicy,
                                     collections,
                                     std::move(rctx.topLevelSampleFieldNames),
-                                    rctx.hasRelevantMultikeyIndex);
+                                    rctx.hasRelevantMultikeyIndex,
+                                    PlanRankerReason::kNoMultiplanningResults);
     if (!cbrResult.isOK()) {
         return cbrResult.getStatus();
     }
@@ -128,6 +138,10 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     if (cbrResult.getValue().solutions.size() == 1) {
         auto resultValue = std::move(cbrResult.getValue());
         auto& cbrWinningSolution = resultValue.solutions[0];
+
+        LOGV2_INFO(13237702,
+                   "NoMPResults plan ranker chooses CBR (2)",
+                   "Reason"_attr = "MP found no results within the trial budget");
 
         // Notify the multi-planner that CBR has chosen a plan. The finishing-up trial's work/time
         // will be excluded from the multiplanning stats.
@@ -181,6 +195,13 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
 
     // CBR could not decide either (there are uncostable solutions).
     // Abandon all plans not among the ones returned by CBR.
+    // Unlike the branches above, this one sets no planRankerReason to co-locate the log with: the
+    // reason for this outcome (kCBRInestimableNode) was already recorded by the inner CBR strategy
+    // and is carried into the returned result by the merge below. The log stays at the branch
+    // point so the decision is visible even if resuming the multi-planner fails.
+    LOGV2_INFO(13237703,
+               "NoMPResults plan ranker chooses MP (3)",
+               "Reason"_attr = "plan contains inestimable node(s)");
     auto computeCBRSolutionHashes = [&]() {
         boost::container::flat_set<size_t> cbrSolutionHashes;
         std::transform(cbrResult.getValue().solutions.begin(),
@@ -208,17 +229,24 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         resumeMultiPlannerAndPickBestPlan(opCtx,
                                           {.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
                                            .targetNumResults = trialsConfig.targetNumResults},
-                                          isExplain);
+                                          isExplain,
+                                          PlanRankerReason::kCBRInestimableNode);
     if (!result.isOK()) {
         return result;
     }
 
+    // Both sides carry kCBRInestimableNode - recorded at this branch point on the multi-planner
+    // result, and by the inner CBR strategy on cbrResult; the keep-first merge keeps the branch's
+    // value.
     result.getValue().maybeExplainData << std::move(cbrResult.getValue().maybeExplainData);
     return std::move(result.getValue());
 }
 
 StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPickBestPlan(
-    OperationContext* opCtx, const trial_period::TrialPhaseConfig& trialsConfig, bool isExplain) {
+    OperationContext* opCtx,
+    const trial_period::TrialPhaseConfig& trialsConfig,
+    bool isExplain,
+    PlanRankerReason reason) {
     auto stats = _multiPlanner->getSpecificStats();
 
     if (!stats->earlyExit) {
@@ -242,6 +270,7 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPi
 
     if (isExplain) {
         result.maybeExplainData.emplace(_multiPlanner->extractExplainData());
+        result.maybeExplainData->planRankerReason = reason;
     }
     result.execState = std::move(*_multiPlanner).extractExecState();
     return std::move(result);

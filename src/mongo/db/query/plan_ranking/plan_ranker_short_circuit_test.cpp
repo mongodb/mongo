@@ -5,6 +5,7 @@
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -168,6 +169,11 @@ TEST_F(PlanRankerTest, InestimableReturnKeyRecordsMultiPlanner) {
     ASSERT_FALSE(status.getValue().needsWorksMeasuredForPlanCache);
     ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
               PlanRankerMethod::kMultiPlanner);
+    // The inestimable-node fallback is recorded on the explain data for rankerChoice.reason.
+    ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
+    ASSERT_TRUE(status.getValue().maybeExplainData->planRankerReason.has_value());
+    ASSERT_EQ(*status.getValue().maybeExplainData->planRankerReason,
+              PlanRankerReason::kCBRInestimableNode);
 }
 
 // When CBR can estimate all plans and choose a single winner, the operation records itself as
@@ -191,6 +197,29 @@ TEST_F(PlanRankerTest, EstimablePlansRecordCostBasedRanker) {
     ASSERT_TRUE(status.getValue().needsWorksMeasuredForPlanCache);
     ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
               PlanRankerMethod::kCostBasedRanker);
+    // Strict CBR (planRanker == kCostBased) is a configuration-fixed choice: the recorded reason
+    // is the config provenance, kQueryPlanRankerKnob.
+    ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
+    ASSERT_TRUE(status.getValue().maybeExplainData->planRankerReason.has_value());
+    ASSERT_EQ(*status.getValue().maybeExplainData->planRankerReason,
+              PlanRankerReason::kQueryPlanRankerKnob);
+}
+
+// The single-solution short circuit runs no strategy: planRankerMethod stays kNone and no reason
+// is recorded (there is no explain data at all). Explain emission derives "singlePlan" for the
+// kNone case instead of reading a recorded reason.
+TEST_F(PlanRankerTest, ShortCircuitLeavesMethodNoneAndReasonUnset) {
+    insertNDocuments(10);
+    auto colls = getCollsAccessor();
+
+    auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << 42 << "b" << 7));
+    plannerData.plannerParams = makePlannerParams(/* cbrEnabled */ false);
+
+    auto status = rankPlans(*cq, std::move(plannerData), /* isClassic */ true);
+    ASSERT_OK(status.getStatus());
+    ASSERT_EQ(status.getValue().solutions.size(), 1);
+    ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
+    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod, PlanRankerMethod::kNone);
 }
 
 }  // namespace

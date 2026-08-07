@@ -11,6 +11,7 @@
 #include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/util/duration.h"
@@ -61,6 +62,11 @@ struct PlanExplainerData {
     bool fromPlanCache = false;
     // Hash of the join plan cache key. Populated on the explain path of a join eligible query.
     boost::optional<uint32_t> joinPlanCacheKeyHash;
+    // The reason the deciding plan ranker was chosen, recorded by the ranking strategy at the
+    // branch point where it made its final decision. Emitted in V3 explain as the
+    // queryPlanner.rankerChoice.reason value. boost::none when no strategy recorded a decision.
+    // Explain derives "singlePlan" for the no-ranking (kNone) case instead.
+    boost::optional<PlanRankerReason> planRankerReason;
 };
 
 inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&& rhs) {
@@ -76,6 +82,10 @@ inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&&
                 "ceSamplingMetadata already has an entry for namespace during merge",
                 !lhs.ceSamplingMetadata.contains(ns));
         lhs.ceSamplingMetadata.emplace(ns, std::move(meta));
+    }
+    // Keep the first set value: the strategy that made the ranking decision owns the field.
+    if (!lhs.planRankerReason) {
+        lhs.planRankerReason = rhs.planRankerReason;
     }
     return lhs;
 }
@@ -333,6 +343,16 @@ public:
      */
     virtual boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
         const {
+        return boost::none;
+    }
+
+    /**
+     * Returns the reason the deciding plan ranker was chosen, as recorded by the ranking strategy
+     * at its decision site (see PlanExplainerData::planRankerReason). Returns boost::none when no
+     * strategy recorded a decision - explainers without classic ranking data (SBE, Express, the
+     * pipeline explainer) inherit this default, mirroring getPlanEntries' default-empty contract.
+     */
+    virtual boost::optional<PlanRankerReason> getPlanRankerReason() const {
         return boost::none;
     }
 

@@ -24,6 +24,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -351,12 +352,31 @@ BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
  * Appends the 'rankerChoice' object to 'out', which contains details the ranker that decided the
  * winning plan, the reason for this choice, and the ranker that was requested.
  */
-void appendPlanRankerChoice(const PlanRankerMethod decidingPlanRanker, BSONObjBuilder& out) {
+void appendPlanRankerChoice(const PlanRankerMethod decidingPlanRanker,
+                            const boost::optional<PlanRankerReason> reason,
+                            BSONObjBuilder& out) {
     BSONObjBuilder planRankerBob(out.subobjStart("rankerChoice"));
 
+    // TODO SERVER-132230: populate requestedRanker.
     planRankerBob.append("requestedRanker", "");
     planRankerBob.append("chosenRanker", getPlanRankerMethodName(decidingPlanRanker));
-    planRankerBob.append("reason", "");
+    if (decidingPlanRanker == PlanRankerMethod::kNone) {
+        // No ranking took place (single candidate solution, count scan, cached plan). singlePlan
+        // is the only valid reason for "none", so it is derived here as a constant function of the
+        // recorded method - collapsing the plumbing for the several no-ranking paths to zero -
+        // rather than reconstructed from which statistics happen to be present.
+        // TODO SERVER-132012 SERVER-132079: make the caller pass kSinglePlan at the point of
+        // decision.
+        planRankerBob.append("reason", getPlanRankerReasonName(PlanRankerReason::kSinglePlan));
+    } else {
+        // A strategy decided, so it must have recorded why (it populated the same explain data
+        // this value rides on). This can only fire on the classic V3 path: SBE and Express fall
+        // back to legacy-shaped output before rankerChoice is emitted.
+        tassert(13237700,
+                "a ranking strategy decided the winning plan but recorded no reason",
+                reason.has_value());
+        planRankerBob.append("reason", getPlanRankerReasonName(reason.value()));
+    }
     planRankerBob.doneFast();
 }
 
@@ -426,7 +446,7 @@ void generatePlannerInfoV3(PlanExecutor* exec,
     appendQueryPlannerCommonInfo(exec, plannerContext, extraInfo, serializationContext, plannerBob);
 
     // Append the rankerChoice sub-object including details around the chosen ranker and reasoning.
-    appendPlanRankerChoice(decidingPlanRanker, plannerBob);
+    appendPlanRankerChoice(decidingPlanRanker, explainer.getPlanRankerReason(), plannerBob);
 
     BSONArrayBuilder plansBob(plannerBob.subarrayStart("plans"));
     for (auto&& entry : entries) {
