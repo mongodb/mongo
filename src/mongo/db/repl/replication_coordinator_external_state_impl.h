@@ -126,8 +126,7 @@ public:
 
 
     // Methods from JournalListener.
-    std::unique_ptr<JournalListener::Token> getToken(OperationContext* opCtx,
-                                                     TokenMode mode) override;
+    std::unique_ptr<JournalListener::Token> getToken(OperationContext* opCtx) override;
     void onDurable(const JournalListener::Token& token) override;
 
     void setupNoopWriter(Seconds waitTime) override;
