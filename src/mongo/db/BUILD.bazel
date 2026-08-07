@@ -2790,6 +2790,13 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }) + select({
+        # Not gated on any one enterprise feature: the enterprise Landlock policy
+        # names paths from several of them but links against none.
+        "//bazel/config:build_enterprise_linux_enabled": [
+            "//src/mongo/db/modules/enterprise/src/landlock:landlock_enterprise",
+        ],
+        "//conditions:default": [],
+    }) + select({
         "//bazel/config:build_atlas_required_settings": [
             "//src/mongo/db/modules/atlas/src/disagg_storage/encryption:sls_log_encryption_manager",
         ],
@@ -4018,6 +4025,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "landlock_init",
     srcs = ["landlock_init.cpp"],
+    hdrs = ["landlock_init.h"],
     deps = [
         ":server_base",
         ":serverinit",

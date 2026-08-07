@@ -575,6 +575,13 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }) + select({
+        # Not gated on any one enterprise feature: the enterprise Landlock policy
+        # names paths from several of them but links against none.
+        "//bazel/config:build_enterprise_linux_enabled": [
+            "//src/mongo/db/modules/enterprise/src/landlock:landlock_enterprise",
+        ],
+        "//conditions:default": [],
+    }) + select({
         "//bazel/config:server_js_engine_allowed": [
             "//src/mongo/scripting:scripting_server",
         ],

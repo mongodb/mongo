@@ -498,6 +498,7 @@ security:
     - src/mongo/db/landlock*
     - src/mongo/db/modules/enterprise/src/fips
     - src/mongo/db/modules/enterprise/src/kmip
+    - src/mongo/db/modules/enterprise/src/landlock
     - src/mongo/db/system_index*
     - src/mongo/util/landlock
 

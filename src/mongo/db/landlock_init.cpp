@@ -32,6 +32,8 @@
 
 #if defined(__linux__)
 
+#include "mongo/db/landlock_init.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -48,6 +50,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -111,9 +114,9 @@ std::string_view landlockModeName(LandlockMode mode) {
 // ("active"), and the filesystem access-right masks the enforced ruleset
 // handles and had to degrade (meaningful only while active).
 //
-// Deliberately not atomic: written once, from the single-threaded
-// EnableLandlockSandbox startup initializer, before any thread that could read
-// them (command threads serving serverStatus) is spawned -- thread creation
+// Deliberately not atomic: written once, from the single-threaded startup
+// initializers that build and enforce the sandbox, before any thread that could
+// read them (command threads serving serverStatus) is spawned -- thread creation
 // establishes the necessary happens-before. Must become atomic if enforcement
 // ever moves out of single-threaded startup.
 LandlockMode gLandlockMode = LandlockMode::kDisabled;
@@ -122,9 +125,41 @@ bool gLandlockActive = false;
 uint64_t gLandlockHandledFsAccess = 0;
 uint64_t gLandlockDegradedFsAccess = 0;
 
+// The ruleset the policy is assembled into, between the
+// BeginLandlockSandboxInitialization and EndLandlockSandboxInitialization
+// initializers; see globalLandlockRuleset() for the contract and the same
+// single-threaded-startup rationale as the globals above. Null means no sandbox
+// is being built: either sandboxing is disabled or this host cannot enforce it.
+std::unique_ptr<LandlockRuleset> gLandlockRuleset;
+
 }  // namespace
 
+LandlockRuleset* globalLandlockRuleset() {
+    return gLandlockRuleset.get();
+}
 
+void addGlobalLandlockRules(const std::vector<LandlockFilesystemRule>& rules) {
+    invariant(gLandlockRuleset,
+              "Attempted to contribute to the Landlock policy with no ruleset being assembled; a "
+              "contributor must declare BeginLandlockSandboxInitialization as a prerequisite and "
+              "EndLandlockSandboxInitialization as a dependent, and check globalLandlockRuleset()");
+
+    for (const auto& rule : rules) {
+        // An empty path marks a feature not in use under the current
+        // configuration (no UNIX socket, no TLS, ...); nothing to grant.
+        if (rule.path().empty()) {
+            continue;
+        }
+        if (Status status = gLandlockRuleset->addPathRule(rule); !status.isOK()) {
+            LOGV2_FATAL(13118809,
+                        "Failed to add Landlock rule",
+                        "path"_attr = rule.path(),
+                        "error"_attr = status);
+        }
+    }
+}
+
+namespace landlock_policy {
 namespace {
 
 // Resolves a configured path the way Landlock will see it, in two steps that
@@ -149,6 +184,8 @@ boost::filesystem::path canonicalStartupPath(const std::string& path) {
     const auto canonicalPath = boost::filesystem::weakly_canonical(absolutePath, ec);
     return ec ? absolutePath : canonicalPath;
 }
+
+}  // namespace
 
 // A configured path resolved for a rule (see canonicalStartupPath). Empty stays
 // empty (option not in use).
@@ -190,7 +227,7 @@ std::string configDirCreatedIfMissing(const std::string& path) {
 
 // The value of a setParameter given at startup, or empty when not set. Server
 // parameters live with their owning subsystem; reading the parsed option
-// instead keeps this policy free of link dependencies on those subsystems.
+// instead keeps a policy free of link dependencies on those subsystems.
 std::string setParameterStartupValue(const std::string& name) {
     const auto& params = optionenvironment::startupOptionsParsed;
     if (!params.count("setParameter")) {
@@ -201,14 +238,21 @@ std::string setParameterStartupValue(const std::string& name) {
     return it != parameters.end() ? it->second : std::string{};
 }
 
-// A string-valued startup option that only some binaries register (e.g. the
-// enterprise audit log path), read from the parsed options so this file needs
-// no link dependency on the module that owns it. Unregistered or unset gives
-// empty.
+// A string-valued startup option, read from the parsed options rather than from
+// the global its subsystem parses it into, so a policy needs no link dependency
+// on the module that owns the option -- including options only some binaries
+// register at all (e.g. the enterprise audit log path). Unregistered or unset
+// gives empty.
 std::string startupOptionValue(const std::string& key) {
     const auto& params = optionenvironment::startupOptionsParsed;
     return params.count(key) ? params[key].as<std::string>() : std::string{};
 }
+
+}  // namespace landlock_policy
+
+namespace {
+
+using namespace landlock_policy;
 
 /**
  * The filesystem policy for mongod and mongos: every hierarchy the server
@@ -294,11 +338,6 @@ std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
         LandlockFilesystemRule::readWrite(configDirCreatedIfMissing(
             setParameterStartupValue("diagnosticDataCollectionDirectoryPath"))),
 
-        // The enterprise audit log (auditLog.path) is created and
-        // rename-rotated after the sandbox engages, so its parent directory
-        // gets the grant; only enterprise binaries register the option.
-        LandlockFilesystemRule::readWrite(configParentDir(startupOptionValue("auditLog.path"))),
-
         // The time zone database (processManagement.timeZoneInfo) is loaded
         // during startup, after the sandbox engages.
         LandlockFilesystemRule::readOnly(resolvedConfigPath(serverGlobalParams.timeZoneInfoPath)),
@@ -325,84 +364,24 @@ std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
     };
 }
 
-/**
- * Builds the server's ruleset and enforces it. Never enforces an incomplete
- * policy: either the whole policy applies or the process dies.
- *
- * Only called once the caller has established that this host supports Landlock,
- * so every failure here means the sandbox was available and could not be
- * applied -- a bug in the policy, or a filesystem that defeats it.
- */
-void initializeLandlock() {
-    auto swRuleset = LandlockRuleset::create();
-    if (!swRuleset.isOK()) {
-        LOGV2_FATAL(
-            13118806, "Failed to create Landlock ruleset", "error"_attr = swRuleset.getStatus());
-    }
-    auto& ruleset = *swRuleset.getValue();
-
-    const auto rules = sandboxFilesystemRules();
-
-    LOGV2(
-        13118808, "Applying Landlock filesystem sandbox", "abiVersion"_attr = ruleset.abiVersion());
-
-    for (const auto& rule : rules) {
-        // An empty path marks a feature not in use under the current
-        // configuration (no UNIX socket, no TLS, ...); nothing to grant.
-        if (rule.path().empty()) {
-            continue;
-        }
-        if (Status status = ruleset.addPathRule(rule); !status.isOK()) {
-            LOGV2_FATAL(13118809,
-                        "Failed to add Landlock rule",
-                        "path"_attr = rule.path(),
-                        "error"_attr = status);
-        }
-    }
-
-    if (ruleset.abiVersion() < 7) {
-        LOGV2(13118810,
-              "Landlock ABI does not support audit logging of denials (requires ABI 7, Linux "
-              "6.15+); denied operations will not appear in the kernel audit log",
-              "abiVersion"_attr = ruleset.abiVersion());
-    }
-
-    if (Status status = ruleset.restrictSelf(); !status.isOK()) {
-        LOGV2_FATAL(13118811, "Failed to enforce Landlock ruleset", "error"_attr = status);
-    }
-
-    gLandlockActive = true;
-    gLandlockHandledFsAccess = ruleset.handledFsAccess();
-    gLandlockDegradedFsAccess = ruleset.degradedFsAccess();
-
-    // The sandbox is now permanently in force. The handled arrays list only the
-    // rights the running kernel actually restricts; rights that were requested
-    // but unavailable on this ABI appear in degradedRights. Network and scope
-    // restrictions are not handled yet (this ruleset is filesystem-only), so
-    // those arrays are empty.
-    BSONObjBuilder handledRights;
-    handledRights.append("fs", LandlockRuleset::fsAccessRightNames(ruleset.handledFsAccess()));
-    handledRights.append("net", std::vector<std::string>{});
-    handledRights.append("scope", std::vector<std::string>{});
-    LOGV2(13118812,
-          "Landlock ruleset applied",
-          "abiVersion"_attr = ruleset.abiVersion(),
-          "handledAccessRights"_attr = handledRights.obj(),
-          "degradedRights"_attr = LandlockRuleset::fsAccessRightNames(ruleset.degradedFsAccess()));
-}
-
-// Applies the Landlock sandbox as directed by --landlockMode /
-// security.landlock.mode (default: disabled).
+// Opens the sandbox for assembly as directed by --landlockMode /
+// security.landlock.mode (default: disabled): creates the ruleset every later
+// contributor adds to, and grants the community policy. Never enforces an
+// incomplete policy -- either the whole policy applies or the process dies (see
+// addGlobalLandlockRules).
 //
 // Runs after the known file-touching initializers (ServerLogRedirection opens
 // the log and backtrace files; ForkServer reopens the standard streams and
-// chdirs) and before the "default" group. Everything gated on "default" is
-// guaranteed to run sandboxed. Other pre-"default" initializers stay unordered
-// against this one on purpose: test builds shuffle them, so an unlisted
-// file-toucher fails loudly in testing and gets added as a prerequisite here.
-MONGO_INITIALIZER_GENERAL(EnableLandlockSandbox,
+// chdirs), because the policy is derived from paths they finalize. Other
+// pre-"default" initializers stay unordered against this one on purpose: test
+// builds shuffle them, so an unlisted file-toucher fails loudly in testing and
+// gets added as a prerequisite here. Note the shuffle can also land one between
+// this initializer and EndLandlockSandboxInitialization, where it runs
+// unsandboxed and says nothing -- the window is meant to hold policy
+// contributors only, and nothing else may rely on being in it.
+MONGO_INITIALIZER_GENERAL(BeginLandlockSandboxInitialization,
                           ("EndStartupOptionHandling", "ForkServer", "ServerLogRedirection"),
-                          ("default"))
+                          ())
 (InitializerContext*) {
     const auto& params = optionenvironment::startupOptionsParsed;
     if (auto value = params["security.landlock.mode"]; !value.isEmpty()) {
@@ -421,7 +400,8 @@ MONGO_INITIALIZER_GENERAL(EnableLandlockSandbox,
 
     // A failed probe means this host cannot enforce Landlock at all: no support in
     // the kernel (ENOSYS), the LSM left out of the boot-time stack (EOPNOTSUPP).
-    // A host without Landlock never reaches initializeLandlock() at all.
+    // A host without Landlock never gets a ruleset, so every later contributor
+    // sees a null globalLandlockRuleset() and grants nothing.
     if (!swAbi.isOK()) {
         if (gLandlockMode == LandlockMode::kEnforce) {
             LOGV2_ERROR(13253500,
@@ -447,7 +427,65 @@ MONGO_INITIALIZER_GENERAL(EnableLandlockSandbox,
 
     // Landlock is available here. A failure from this point is the policy failing to apply,
     // which is fatal rather than something a mode gets to tolerate.
-    initializeLandlock();
+    auto swRuleset = LandlockRuleset::create();
+    if (!swRuleset.isOK()) {
+        LOGV2_FATAL(
+            13118806, "Failed to create Landlock ruleset", "error"_attr = swRuleset.getStatus());
+    }
+    gLandlockRuleset = std::move(swRuleset.getValue());
+
+    LOGV2(13118808,
+          "Applying Landlock filesystem sandbox",
+          "abiVersion"_attr = gLandlockRuleset->abiVersion());
+
+    addGlobalLandlockRules(sandboxFilesystemRules());
+}
+
+// The point of no return: enforces whatever policy the initializers above
+// assembled, and reports it. Gated on "default", so everything in that group --
+// which is the rest of startup -- is guaranteed to run sandboxed, while every
+// contributor to the policy must run before this one (see globalLandlockRuleset).
+//
+// Does nothing when no ruleset was assembled: sandboxing is disabled, or this
+// host cannot enforce it. Both have already been logged.
+MONGO_INITIALIZER_GENERAL(EndLandlockSandboxInitialization,
+                          ("BeginLandlockSandboxInitialization"),
+                          ("default"))
+(InitializerContext*) {
+    if (!gLandlockRuleset) {
+        return;
+    }
+    auto& ruleset = *gLandlockRuleset;
+
+    if (ruleset.abiVersion() < 7) {
+        LOGV2_WARNING(13118810,
+                      "Landlock ABI does not support audit logging of denials (requires ABI 7, "
+                      "Linux 6.15+); denied operations will not appear in the kernel audit log",
+                      "abiVersion"_attr = ruleset.abiVersion());
+    }
+
+    if (Status status = ruleset.restrictSelf(); !status.isOK()) {
+        LOGV2_FATAL(13118811, "Failed to enforce Landlock ruleset", "error"_attr = status);
+    }
+
+    gLandlockActive = true;
+    gLandlockHandledFsAccess = ruleset.handledFsAccess();
+    gLandlockDegradedFsAccess = ruleset.degradedFsAccess();
+
+    // The sandbox is now permanently in force. The handled arrays list only the
+    // rights the running kernel actually restricts; rights that were requested
+    // but unavailable on this ABI appear in degradedRights. Network and scope
+    // restrictions are not handled yet (this ruleset is filesystem-only), so
+    // those arrays are empty.
+    BSONObjBuilder handledRights;
+    handledRights.append("fs", LandlockRuleset::fsAccessRightNames(ruleset.handledFsAccess()));
+    handledRights.append("net", std::vector<std::string>{});
+    handledRights.append("scope", std::vector<std::string>{});
+    LOGV2(13118812,
+          "Landlock ruleset applied",
+          "abiVersion"_attr = ruleset.abiVersion(),
+          "handledAccessRights"_attr = handledRights.obj(),
+          "degradedRights"_attr = LandlockRuleset::fsAccessRightNames(ruleset.degradedFsAccess()));
 }
 
 // Read-only diagnostic for monitoring and tests:
