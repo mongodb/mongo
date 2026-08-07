@@ -251,9 +251,13 @@ void tagForSort(MatchExpression* tree) {
     }
 }
 
-bool isNodeEligibleForContainedOrPushdown(MatchExpression* node) {
+// 'currentElemMatchExpr' is the $elemMatch context of the $and being enumerated. A negation may
+// still be pushed into a sibling $or under that same $elemMatch, as both see the same array
+// element.
+bool isNodeEligibleForContainedOrPushdown(MatchExpression* node,
+                                          const MatchExpression* currentElemMatchExpr) {
     auto* rt = indexTagCast<RelevantTag>(node->getTag());
-    if (rt->elemMatchExpr && rt->notExpr) {
+    if (rt->elemMatchExpr && rt->notExpr && rt->elemMatchExpr != currentElemMatchExpr) {
         // Do not extract an index predicate which is a negation inside the $elemMatch. For example,
         // do not extract {a.b: {$ne: 2}} from {a: {$elemMatch: {b: {$ne: 2}}}. Due to the potential
         // presence of arrays at "a", the negation predicate itself is an "under-approximation" of
@@ -493,7 +497,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
         if (MONGO_likely(!_disableOrPushdown)) {
             auto& hashIdx = getOutsidePredHashedIdx(childContextCopy.outsidePreds);
             for (auto pred : indexedPreds) {
-                if (!isNodeEligibleForContainedOrPushdown(pred)) {
+                if (!isNodeEligibleForContainedOrPushdown(pred, context.elemMatchExpr)) {
                     continue;
                 }
                 auto [it, inserted] = hashIdx.insert({pred, OutsidePredRoute{}});

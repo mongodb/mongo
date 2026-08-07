@@ -917,50 +917,50 @@ protected:
         addIndex(BSON("_id" << 1), std::string{IndexConstants::kIdIndexName});
     }
 
-    void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {
-        params.mainCollectionInfo.indexes.push_back(
-            IndexEntry(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       IndexConfig::kLatestIndexVersion,
-                       multikey,
-                       {},
-                       {},
-                       false,
-                       false,
-                       IndexEntry::Identifier{indexName},
-                       BSONObj(),
-                       nullptr));
-    }
-
-    void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey, bool sparse) {
-        params.mainCollectionInfo.indexes.push_back(
-            IndexEntry(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       IndexConfig::kLatestIndexVersion,
-                       multikey,
-                       {},
-                       {},
-                       sparse,
-                       false,
-                       IndexEntry::Identifier{indexName},
-                       BSONObj(),
-                       nullptr));
-    }
-
-    void addIndex(BSONObj keyPattern, const std::string& indexName, CollatorInterface* collator) {
+    void addIndexEntry(BSONObj keyPattern,
+                       const std::string& indexName,
+                       bool multikey,
+                       MultikeyPaths multikeyPaths,
+                       bool sparse,
+                       const CollatorInterface* collator) {
         IndexEntry entry(keyPattern,
                          IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                          IndexConfig::kLatestIndexVersion,
-                         false,
+                         multikey,
+                         std::move(multikeyPaths),
                          {},
-                         {},
-                         false,
+                         sparse,
                          false,
                          IndexEntry::Identifier{indexName},
                          BSONObj(),
                          nullptr);
         entry.collator = collator;
-        params.mainCollectionInfo.indexes.push_back(entry);
+        params.mainCollectionInfo.indexes.push_back(std::move(entry));
+    }
+
+    void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {
+        addIndexEntry(keyPattern, indexName, multikey, {}, false /*sparse*/, nullptr /*collator*/);
+    }
+
+    // Adds an index with path-level multikey info. The multikey flag is derived from it.
+    void addIndex(BSONObj keyPattern,
+                  const std::string& indexName,
+                  const MultikeyPaths& multikeyPaths) {
+        invariant(multikeyPaths.size() == static_cast<size_t>(keyPattern.nFields()));
+        const bool multikey =
+            std::any_of(multikeyPaths.cbegin(),
+                        multikeyPaths.cend(),
+                        [](const MultikeyComponents& components) { return !components.empty(); });
+        addIndexEntry(
+            keyPattern, indexName, multikey, multikeyPaths, false /*sparse*/, nullptr /*collator*/);
+    }
+
+    void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey, bool sparse) {
+        addIndexEntry(keyPattern, indexName, multikey, {}, sparse, nullptr /*collator*/);
+    }
+
+    void addIndex(BSONObj keyPattern, const std::string& indexName, CollatorInterface* collator) {
+        addIndexEntry(keyPattern, indexName, false /*multikey*/, {}, false /*sparse*/, collator);
     }
 
     //
@@ -1816,6 +1816,25 @@ TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
         "{ixscan: {pattern: {c: 1}, bounds: {c: [[7, 7, true, true]]}}}]}},"
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [['MinKey', "
         "'MaxKey', true, true]]}}}"
+        "]}}}}");
+}
+
+// Verify the PlanCacheIndexTree::OrPushdown for this shape survives the cache round trip, so the
+// recovered plan keeps the compounded 'arr.b' bounds.
+TEST_F(CachePlanSelectionTest, ContainedOrWithNegationUnderSameElemMatch) {
+    addIndex(BSON("arr.a" << 1 << "arr.b" << 1), "arr.a_1_arr.b_1", MultikeyPaths{{0U}, {0U}});
+    BSONObj query =
+        fromjson("{arr: {$elemMatch: {a: {$ne: 1}, $or: [{b: {$lt: 2}}, {b: {$gt: 3}}]}}}");
+    runQuery(query);
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {node: {or: {nodes: ["
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [[-Infinity, 2, true, false]]}}},"
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [[3, Infinity, false, true]]}}}"
         "]}}}}");
 }
 
