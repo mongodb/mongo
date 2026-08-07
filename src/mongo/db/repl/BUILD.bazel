@@ -28,11 +28,13 @@ mongo_cc_library(
     hdrs = [
         "internode_validation_hash_utils.h",
     ],
+    local_defines = [
+        "XXH_INLINE_ALL",
+    ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/crypto:sha256_block",
-        "//src/mongo/crypto:sha_block",
         "//src/mongo/db:server_feature_flags",
+        "//src/third_party/xxhash",
     ],
 )
 

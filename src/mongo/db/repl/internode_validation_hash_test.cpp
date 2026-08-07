@@ -19,6 +19,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 namespace repl {
@@ -837,6 +838,63 @@ DEATH_TEST_F(PreparedTransactionValidationHashDeathTest,
     const int64_t wrongHash = computeDocValidationHash(doc) ^ 0x1;
     std::ignore = runPreparedTransactionSteadyState(
         {makeInnerOp(OpTypeEnum::kDelete, BSON("_id" << 1), boost::none, rid, wrongHash)});
+}
+
+/**
+ * Ensure the xxHash library does not change its output for known inputs, so that the document
+ * validation hash is stable across versions. xxHash branches its implementation based on the input
+ * size, so we test documents of different sizes to cover all the code paths.
+ *
+ */
+class DocValidationHashKnownAnswerTest : public unittest::Test {
+protected:
+    /**
+     * Asserts that 'doc' has exactly the expected on-disk bytes and hashes to the expected value.
+     */
+    void assertKnownHash(const BSONObj& doc, std::string_view expectedHex, int64_t expectedHash) {
+        EXPECT_EQ(hexblob::encodeLower(std::string_view(doc.objdata(), doc.objsize())),
+                  expectedHex);
+        EXPECT_EQ(computeDocValidationHash(doc), expectedHash);
+    }
+};
+
+// Sized to land in xxHash's 0-to-16-byte path.
+TEST_F(DocValidationHashKnownAnswerTest, TinyDoc) {
+    assertKnownHash(BSON("a" << 1), "0c0000001061000100000000", 8182952154619646941LL);
+}
+
+// Sized to land in xxHash's 17-to-128-byte path.
+TEST_F(DocValidationHashKnownAnswerTest, SmallDoc) {
+    assertKnownHash(BSON("_id" << 1 << "x" << 100 << "s"
+                               << "abc"),
+                    "20000000105f6964000100000010780064000000027300040000006162630000",
+                    -4811079693095661071LL);
+}
+
+// Sized to land in xxHash's 129-to-240-byte path.
+TEST_F(DocValidationHashKnownAnswerTest, MediumDoc) {
+    const BSONObj doc = BSON("_id" << 5 << "pad" << std::string(150, 'z'));
+    EXPECT_EQ(doc.objsize(), 174);
+    EXPECT_EQ(computeDocValidationHash(doc), 3310436893767801287LL);
+}
+
+// Sized to land in xxHash's over-240-byte path.
+TEST_F(DocValidationHashKnownAnswerTest, LargeDoc) {
+    const BSONObj doc = BSON("_id" << 4 << "pad" << std::string(2576, 'm'));
+    EXPECT_EQ(doc.objsize(), 2600);
+    EXPECT_EQ(computeDocValidationHash(doc), 7043491338923751776LL);
+}
+
+TEST_F(DocValidationHashKnownAnswerTest, UpdateHashIsXorOfDocHashes) {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    EXPECT_EQ(computeUpdateValidationHash(preImage, postImage),
+              computeDocValidationHash(preImage) ^ computeDocValidationHash(postImage));
+
+    // XOR-ing is symmetric.
+    EXPECT_EQ(computeUpdateValidationHash(preImage, postImage),
+              computeUpdateValidationHash(postImage, preImage));
+    EXPECT_EQ(computeUpdateValidationHash(preImage, preImage), 0);
 }
 
 }  // namespace
