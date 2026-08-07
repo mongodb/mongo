@@ -5,12 +5,15 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -40,7 +43,8 @@ void deleteAllDocumentsFromCollection(OperationContext* opCtx,
     write_ops::checkWriteErrors(client.remove(std::move(deleteOp)));
 }
 
-void dropShardCatalogMetadata(OperationContext* opCtx) {
+void dropShardCatalogMetadata(OperationContext* opCtx,
+                              AuthoritativeMetadataAccessLevelEnum accessLevel) {
     LOGV2(9194400, "Dropping shard catalog metadata before shard removal");
 
     const auto& sessionsNss = NamespaceString::kLogicalSessionsNamespace;
@@ -57,14 +61,9 @@ void dropShardCatalogMetadata(OperationContext* opCtx) {
         opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace, allButSessionsNssFilter);
     deleteAllDocumentsFromCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
 
-    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->clearCollectionMetadata(opCtx);
-    }
-
-    for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-        scopedDsr->clearDbMetadata(opCtx);
+    if (accessLevel >= AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+        shard_catalog_commit::commitInvalidateAllDatabaseMetadata(opCtx);
+        shard_catalog_commit::commitInvalidateAllCollectionMetadata(opCtx);
     }
 }
 
@@ -239,7 +238,7 @@ void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx
         // Once the config server is no longer a shard, its local shard catalog must not retain
         // authoritative ownership metadata. Clear both durable metadata and in-memory CSR/DSR state
         // so stale entries cannot be reused if the config server is later re-added as a shard.
-        dropShardCatalogMetadata(opCtx);
+        dropShardCatalogMetadata(opCtx, _doc.getAuthoritativeMetadataAccessLevel());
     }
 }
 

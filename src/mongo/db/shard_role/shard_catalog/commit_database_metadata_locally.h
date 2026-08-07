@@ -36,5 +36,11 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
  */
 void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseName& dbName);
 
+/**
+ * Clears every known DSR entry on the node, based on local DSS knowledge, without changing
+ * durable shard catalog metadata (config.shard.catalog.databases).
+ */
+void commitInvalidateAllDatabaseMetadata(OperationContext* opCtx);
+
 }  // namespace shard_catalog_commit
 }  // namespace mongo

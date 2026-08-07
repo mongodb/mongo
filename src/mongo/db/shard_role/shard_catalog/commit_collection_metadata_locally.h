@@ -110,6 +110,12 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
                                           const std::vector<BSONObj>& newChunks,
                                           bool receivingFirstChunk = false);
 
+/**
+ * Clears every known CSR entry on the node, based on local CSS knowledge, without changing
+ * durable shard catalog metadata (config.shard.catalog.collections/chunks).
+ */
+void commitInvalidateAllCollectionMetadata(OperationContext* opCtx);
+
 }  // namespace shard_catalog_commit
 
 /**

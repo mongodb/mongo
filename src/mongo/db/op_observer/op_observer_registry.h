@@ -697,6 +697,18 @@ public:
             o->onDropDatabaseMetadata(opCtx, op);
     }
 
+    void onInvalidateAllCollectionMetadata(OperationContext* opCtx,
+                                           const repl::OplogEntry& op) override {
+        for (auto& o : _observers)
+            o->onInvalidateAllCollectionMetadata(opCtx, op);
+    }
+
+    void onInvalidateAllDatabaseMetadata(OperationContext* opCtx,
+                                         const repl::OplogEntry& op) override {
+        for (auto& o : _observers)
+            o->onInvalidateAllDatabaseMetadata(opCtx, op);
+    }
+
     void onInvalidateCollectionMetadata(OperationContext* opCtx,
                                         const repl::OplogEntry& op) override {
         for (auto& o : _observers)

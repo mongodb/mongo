@@ -1280,6 +1280,18 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          opCtx->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
+    {"invalidateAllCollectionMetadata",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         opCtx->getServiceContext()->getOpObserver()->onInvalidateAllCollectionMetadata(opCtx, *op);
+         return Status::OK();
+     }}},
+    {"invalidateAllDatabaseMetadata",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         opCtx->getServiceContext()->getOpObserver()->onInvalidateAllDatabaseMetadata(opCtx, *op);
+         return Status::OK();
+     }}},
     {"invalidateCollectionMetadata",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

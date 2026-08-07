@@ -157,5 +157,18 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
         .databaseShardingMetadataStatistics.registerLocalDatabaseMetadataDrop();
 }
 
+void commitInvalidateAllDatabaseMetadata(OperationContext* opCtx) {
+    LOGV2_DEBUG(13169800, 1, "Emitting invalidateAllDatabaseMetadata oplog entry");
+
+    InvalidateAllDatabaseMetadataOplogEntry entry;
+    entry.setInvalidateAllDatabaseMetadata(1);
+    auto oplogEntry = makeDatabaseMetadataOplogEntry(opCtx, DatabaseName::kAdmin, entry.toBSON());
+
+    writeDatabaseMetadataOplogEntry(opCtx, oplogEntry, "invalidateAllDatabaseMetadata");
+
+    opCtx->getServiceContext()->getOpObserver()->onInvalidateAllDatabaseMetadata(
+        opCtx, repl::OplogEntry(oplogEntry.toBSON()));
+}
+
 }  // namespace shard_catalog_commit
 }  // namespace mongo

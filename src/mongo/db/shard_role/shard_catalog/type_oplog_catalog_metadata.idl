@@ -36,6 +36,22 @@ structs:
                 type: database_name
                 description: "Database name"
 
+    InvalidateAllCollectionMetadataOplogEntry:
+        description: "Oplog entry format for clearing every CSS entry, based on local CSS knowledge"
+        strict: false
+        fields:
+            invalidateAllCollectionMetadata:
+                type: safeInt
+                description: "Always 1; identifies the command"
+
+    InvalidateAllDatabaseMetadataOplogEntry:
+        description: "Oplog entry format for clearing every DSS entry, based on local DSS knowledge"
+        strict: false
+        fields:
+            invalidateAllDatabaseMetadata:
+                type: safeInt
+                description: "Always 1; identifies the command"
+
     InvalidateCollectionMetadataOplogEntry:
         description: "Oplog entry format for a metadata operation that triggers a CSS recovery from the durable state"
         strict: false

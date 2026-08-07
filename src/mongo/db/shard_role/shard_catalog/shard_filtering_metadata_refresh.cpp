@@ -1027,7 +1027,6 @@ void FilteringMetadataCache::fixPotentiallyStaleShardingStatesAfterUpgrade(
     // confidence that the CSS/DSS is kept in sync with the durable state.
     if (feature_flags::gAuthoritativeShardsCRUD.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
             newVersion, prevVersion)) {
-
         // A legacy refresh could install into the DSS metadata that says another shard is
         // the dbPrimary. The authoritative model tries to maintain the invariant that the
         // DSS only has data IF it is the dbPrimary. Note that this is safe to not do as
@@ -1043,16 +1042,16 @@ void FilteringMetadataCache::fixPotentiallyStaleShardingStatesAfterUpgrade(
             }
         }
 
-        // A legacy refresh could install metadata saying the collection is either
-        // UNTRACKED/UNOWNED. TRACKED and OWNED collections are safe since the content must
-        // be the same before and after the legacy refresh. We only know of a single bug so
-        // far where an aggregation wouldn't converge and return a StaleConfig error due to
-        // this stale data (SERVER-132477). However, in order to avoid any more issues like
-        // this we force a clear of the metadata to force an authoritative recovery to
-        // happen.
+        // A legacy refresh could install metadata saying the collection is UNTRACKED, UNOWNED, or
+        // TRACKED with zero chunks owned by this shard. TRACKED collections that this shard owns
+        // chunks for are safe since the content must be the same before and after the legacy
+        // refresh. In order to avoid any misuse of the metadata, we force a clear of it to force an
+        // authoritative resync from disk.
         for (const auto& nss : CollectionShardingRuntime::getCollectionNames(opCtx)) {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-            if (auto cm = scopedCsr->getCurrentMetadataIfKnown(); cm && !cm->hasRoutingTable()) {
+            // TODO(SERVER-133001): Consider installing empty CSS on new shards for addShard instead
+            if (auto cm = scopedCsr->getCurrentMetadataIfKnown();
+                cm && (!cm->hasRoutingTable() || !cm->getShardPlacementVersion().isSet())) {
                 scopedCsr->clearCollectionMetadata(opCtx);
             }
         }

@@ -265,6 +265,47 @@ TEST_F(CommitDatabaseMetadataLocallyTest, DropDeletesMetadataAndClearsDSR) {
     ASSERT_EQ(counters.getIntField("countLocalDatabaseMetadataCommits"), 1);
 }
 
+TEST_F(CommitDatabaseMetadataLocallyTest, InvalidateAllDatabaseMetadataClearsAllDSRs) {
+    // Seed two databases so we can confirm both are cleared.
+    const auto dbType1 = makeDatabaseType();
+    commitCreate(dbType1);
+
+    const auto dbName2 = DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2");
+    const DatabaseType dbType2{dbName2,
+                               ShardingState::get(operationContext())->shardId(),
+                               DatabaseVersion(UUID::gen(), Timestamp(20, 0))};
+    {
+        BypassDatabaseMetadataAccess bypass(  // NOLINT
+            operationContext(),
+            BypassDatabaseMetadataAccess::Type::kWriteOnly);
+        shard_catalog_commit::commitCreateDatabaseMetadataLocally(operationContext(), dbType2);
+    }
+
+    ASSERT_TRUE(getInstalledDbVersion());
+    {
+        const auto scopedDsr = DatabaseShardingRuntime::acquireShared(operationContext(), dbName2);
+        ASSERT_TRUE(scopedDsr->getDbVersion(operationContext()));
+    }
+
+    {
+        BypassDatabaseMetadataAccess bypass(  // NOLINT
+            operationContext(),
+            BypassDatabaseMetadataAccess::Type::kWriteOnly);
+        shard_catalog_commit::commitInvalidateAllDatabaseMetadata(operationContext());
+    }
+
+    // Exactly one 'c' oplog entry with an `invalidateAllDatabaseMetadata` field is emitted.
+    ASSERT_EQ(countCommandOplogEntries("invalidateAllDatabaseMetadata"), 1);
+
+    // Every DSR is cleared, but the durable catalog is untouched.
+    ASSERT_FALSE(getInstalledDbVersion());
+    {
+        const auto scopedDsr = DatabaseShardingRuntime::acquireShared(operationContext(), dbName2);
+        ASSERT_FALSE(scopedDsr->getDbVersion(operationContext()));
+    }
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogDatabasesNamespace), 2);
+}
+
 TEST_F(CommitDatabaseMetadataLocallyTest, DropIsNoOpOnEmptyCatalog) {
     dropDatabase();
 

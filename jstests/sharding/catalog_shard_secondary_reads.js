@@ -111,15 +111,6 @@ assert.commandFailedWithCode(
     ErrorCodes.StaleDbVersion,
 );
 
-// With the incremental authoritative commit, a shard drained to zero chunks keeps KNOWN
-// "tracked-unowned" metadata on secondaries: the collection version is known, the shard version is
-// 0|0, and it owns no chunks. (The old invalidation commit cleared this to {}.)
-let version = assert.commandWorked(
-    configConn.adminCommand({getShardVersion: "sharded.user", fullMetadata: true}),
-);
-assert.eq(1, timestampCmp(version.metadata.collVersion, shardVersion.v), tojson(version));
-assert.eq(0, timestampCmp(version.metadata.shardVersion, Timestamp(0, 0)), tojson(version));
-
 findCmd = {
     find: "user",
     filter: {_id: 54321},
@@ -130,12 +121,6 @@ assert.commandFailedWithCode(
     configConn.getDB("sharded").runCommand(findCmd),
     ErrorCodes.StaleConfig,
 );
-
-version = assert.commandWorked(
-    configConn.adminCommand({getShardVersion: "sharded.user", fullMetadata: true}),
-);
-assert.eq(1, timestampCmp(version.metadata.collVersion, shardVersion.v), tojson(version));
-assert.eq(0, timestampCmp(version.metadata.shardVersion, Timestamp(0, 0)), tojson(version));
 
 // Should be able to do secondary reads on the config server after transitioning back.
 

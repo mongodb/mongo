@@ -283,6 +283,12 @@ public:
 
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {}
 
+    void onInvalidateAllCollectionMetadata(OperationContext* opCtx,
+                                           const repl::OplogEntry& op) final {}
+
+    void onInvalidateAllDatabaseMetadata(OperationContext* opCtx,
+                                         const repl::OplogEntry& op) final {}
+
     void onInvalidateCollectionMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {
     }
 

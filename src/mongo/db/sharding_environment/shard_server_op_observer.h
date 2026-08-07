@@ -119,6 +119,12 @@ public:
 
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override;
 
+    void onInvalidateAllCollectionMetadata(OperationContext* opCtx,
+                                           const repl::OplogEntry& op) override;
+
+    void onInvalidateAllDatabaseMetadata(OperationContext* opCtx,
+                                         const repl::OplogEntry& op) override;
+
     void onInvalidateCollectionMetadata(OperationContext* opCtx,
                                         const repl::OplogEntry& op) override;
 

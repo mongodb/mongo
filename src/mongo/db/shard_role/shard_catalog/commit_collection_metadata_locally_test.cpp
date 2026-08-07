@@ -2479,5 +2479,39 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameUnownedNonPrimaryClearsTargetM
     ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
 }
 
+TEST_F(CommitCollectionMetadataLocallyTest, InvalidateAllCollectionMetadataClearsAllCSRs) {
+    // Seed two collections and confirm each has installed metadata.
+    auto [collType1, chunks1] = makeCollectionMetadata(kTestNss, 2);
+    mockCatalogClient()->setCollectionMetadata(collType1, chunks1);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    const auto secondNss = NamespaceString::createNamespaceString_forTest("TestDB", "OtherColl");
+    createTestCollection(operationContext(), secondNss);
+    auto [collType2, chunks2] = makeCollectionMetadata(secondNss, 2);
+    mockCatalogClient()->setCollectionMetadata(collType2, chunks2);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), secondNss);
+
+    ASSERT_TRUE(CollectionShardingRuntime::acquireShared(operationContext(), kTestNss)
+                    ->getCurrentMetadataIfKnown());
+    ASSERT_TRUE(CollectionShardingRuntime::acquireShared(operationContext(), secondNss)
+                    ->getCurrentMetadataIfKnown());
+
+    shard_catalog_commit::commitInvalidateAllCollectionMetadata(operationContext());
+
+    // Exactly one 'c' oplog entry with an `invalidateAllCollectionMetadata` field is emitted.
+    auto entries =
+        findLocalDocs(NamespaceString::kRsOplogNamespace,
+                      BSON("op" << "c"
+                                << "o.invalidateAllCollectionMetadata" << BSON("$exists" << true)));
+    ASSERT_EQ(entries.size(), 1u);
+
+    // Every CSR is cleared, but durable state is untouched.
+    ASSERT_FALSE(CollectionShardingRuntime::acquireShared(operationContext(), kTestNss)
+                     ->getCurrentMetadataIfKnown());
+    ASSERT_FALSE(CollectionShardingRuntime::acquireShared(operationContext(), secondNss)
+                     ->getCurrentMetadataIfKnown());
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 2);
+}
+
 }  // namespace
 }  // namespace mongo

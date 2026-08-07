@@ -1798,6 +1798,56 @@ TEST_F(AuthoritativeRefreshFixture, UntrackedIsClearedOutAfterUpgrade) {
     }
 }
 
+TEST_F(AuthoritativeRefreshFixture, TrackedWithZeroOwnedChunksIsClearedOutAfterUpgrade) {
+    auto* opCtx = operationContext();
+
+    // Install TRACKED filtering metadata whose routing table has chunks only on another
+    // shard, so this shard's placement version is unset.
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        auto metadata =
+            makeShardedMetadataInMemory(opCtx, UUID::gen(), ShardId("other"), kMyShardName);
+        ASSERT_TRUE(metadata.hasRoutingTable());
+        ASSERT_FALSE(metadata.getShardPlacementVersion().isSet());
+        csr->setCollectionMetadata(opCtx, std::move(metadata));
+    }
+
+    FilteringMetadataCache::get(opCtx)->fixPotentiallyStaleShardingStatesAfterUpgrade(
+        opCtx,
+        multiversion::FeatureCompatibilityVersion::kVersion_8_0,
+        multiversion::FeatureCompatibilityVersion::kVersion_9_0);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown().has_value());
+    }
+}
+
+TEST_F(AuthoritativeRefreshFixture, TrackedWithOwnedChunksIsPreservedAfterUpgrade) {
+    auto* opCtx = operationContext();
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        auto metadata = makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
+        ASSERT_TRUE(metadata.hasRoutingTable());
+        ASSERT_TRUE(metadata.getShardPlacementVersion().isSet());
+        csr->setCollectionMetadata(opCtx, std::move(metadata));
+    }
+
+    FilteringMetadataCache::get(opCtx)->fixPotentiallyStaleShardingStatesAfterUpgrade(
+        opCtx,
+        multiversion::FeatureCompatibilityVersion::kVersion_8_0,
+        multiversion::FeatureCompatibilityVersion::kVersion_9_0);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        auto metadataOpt = csr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadataOpt.has_value());
+        ASSERT_TRUE(metadataOpt->hasRoutingTable());
+        ASSERT_TRUE(metadataOpt->getShardPlacementVersion().isSet());
+    }
+}
+
 TEST_F(AuthoritativeRefreshFixture, NonDbPrimaryMetadataIsClearedOutAfterUpgrade) {
     auto* opCtx = operationContext();
 

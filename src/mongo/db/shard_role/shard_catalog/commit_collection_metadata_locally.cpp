@@ -314,6 +314,18 @@ void setAllowChunkOperationsOnSecondaries(OperationContext* opCtx,
     logShardCatalogCommandOplogEntry(opCtx, oplogEntry, "setAllowChunkOperations");
 }
 
+repl::MutableOplogEntry makeGlobalShardCatalogCommandOplogEntry(OperationContext* opCtx,
+                                                                BSONObj object) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
+    oplogEntry.setNss(NamespaceString::makeCommandNamespace(DatabaseName::kAdmin));
+    oplogEntry.setObject(std::move(object));
+    oplogEntry.setOpTime(OplogSlot());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+    return oplogEntry;
+}
+
 CollectionMetadata buildOwnedCollectionMetadata(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const CollectionType& coll,
@@ -626,6 +638,19 @@ void logShardCatalogCommandOplogEntry(OperationContext* opCtx,
     // reused on a write-conflict retry. Restore the OpTime to the actual value after the oplog
     // entry is successfully committed; otherwise, it will remain 0.
     oplogEntry.setOpTime(slot);
+}
+
+void commitInvalidateAllCollectionMetadata(OperationContext* opCtx) {
+    LOGV2_DEBUG(13169803, 1, "Emitting invalidateAllCollectionMetadata oplog entry");
+
+    InvalidateAllCollectionMetadataOplogEntry entry;
+    entry.setInvalidateAllCollectionMetadata(1);
+    auto oplogEntry = makeGlobalShardCatalogCommandOplogEntry(opCtx, entry.toBSON());
+
+    logShardCatalogCommandOplogEntry(opCtx, oplogEntry, "invalidateAllCollectionMetadata");
+
+    opCtx->getServiceContext()->getOpObserver()->onInvalidateAllCollectionMetadata(
+        opCtx, repl::OplogEntry(oplogEntry.toBSON()));
 }
 
 void commitDropCollectionLocally(OperationContext* opCtx,

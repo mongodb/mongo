@@ -753,6 +753,18 @@ public:
                                                 const repl::OplogEntry& op) = 0;
 
     /**
+     * Called to clear every CSS entry on the applying node.
+     */
+    virtual void onInvalidateAllCollectionMetadata(OperationContext* opCtx,
+                                                   const repl::OplogEntry& op) = 0;
+
+    /**
+     * Called to clear every DSS entry on the applying node.
+     */
+    virtual void onInvalidateAllDatabaseMetadata(OperationContext* opCtx,
+                                                 const repl::OplogEntry& op) = 0;
+
+    /**
      * Called when the authoritative CSS needs to update the value of allowChunkOperations.
      */
     virtual void onSetAllowChunkOperations(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
