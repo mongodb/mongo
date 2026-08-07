@@ -71,6 +71,8 @@ void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
                 ErrorCodes::isShutdownError(ex.code())) {
+                // The tailer is a primary-only thread. Stop the thread when stepping down or
+                // shutting down.
                 LOGV2(12917802,
                       "SizeCountCheckpointOplogTailer interrupted",
                       "error"_attr = ex.toStatus());

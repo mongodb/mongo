@@ -51,9 +51,11 @@ void SizeCountCheckpointFlusher::run(OperationContext* opCtx, SizeCountCheckpoin
             _runOneFlushCycle(opCtx, buffer);
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-                ex.code() == ErrorCodes::NotWritablePrimary) {
+                ErrorCodes::isShutdownError(ex.code())) {
+                // The flusher is a primary-only thread. Stop the thread when stepping down or
+                // shutting down.
                 LOGV2(12917804,
-                      "SizeCountCheckpointFlusher interrupted due to replication state",
+                      "SizeCountCheckpointFlusher interrupted",
                       "error"_attr = ex.toStatus());
                 return;
             } else {
