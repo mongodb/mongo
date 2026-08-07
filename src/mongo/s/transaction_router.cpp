@@ -70,6 +70,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -677,6 +678,10 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
     auto txnResponseMetadata =
         TxnResponseMetadata::parse(IDLParserContext{"processParticipantResponse"}, responseObj);
 
+    // The replication term the responding participant reported in $replData.term, if any. Absent
+    // when the participant is an older binary that does not send it.
+    auto observedTerm = rpc::ReplSetMetadata::readTermOnly(responseObj);
+
     auto setReadOnly = [&](const ShardId& shardIdToUpdate,
                            Participant::ReadOnly readOnlyCurrent,
                            boost::optional<bool> readOnlyResponse,
@@ -810,6 +815,10 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                             participantElem.getReadOnly(),
                             true /* isAdditionalParticipant */);
             }
+
+            // Validate the term the sub-router observed for this participant against the
+            // term we already recorded for it (if any).
+            _validateAndRecordParticipantTerm(opCtx, participantToAdd, participantElem.getTerm());
         }
     };
 
@@ -820,6 +829,9 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
         // We should still add any participants added to the transaction to ensure they will be
         // aborted
         processAdditionalParticipants(false /* okResponse */);
+
+        // Validate the responder's own replication term against the one we previously recorded.
+        _validateAndRecordParticipantTerm(opCtx, shardId, observedTerm);
         return;
     }
 
@@ -831,6 +843,9 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
 
     // Create any participants added by the shard 'shardId'
     processAdditionalParticipants(true /* okResponse */);
+
+    // Validate the responder's own replication term against the one we previously recorded.
+    _validateAndRecordParticipantTerm(opCtx, shardId, observedTerm);
 }
 
 LogicalTime TransactionRouter::AtClusterTime::getTime() const {
@@ -873,9 +888,9 @@ const boost::optional<ShardId>& TransactionRouter::Router::getRecoveryShardId() 
     return p().recoveryShardId;
 }
 
-boost::optional<StringMap<boost::optional<bool>>>
+boost::optional<StringMap<TransactionRouter::AdditionalParticipantInfoLocal>>
 TransactionRouter::Router::getAdditionalParticipantsForResponse(OperationContext* opCtx) {
-    boost::optional<StringMap<boost::optional<bool>>> participants = boost::none;
+    boost::optional<StringMap<AdditionalParticipantInfoLocal>> participants = boost::none;
 
     if (!o().subRouter || (opCtx->getTxnNumber() != o().txnNumberAndRetryCounter.getTxnNumber()) ||
         (opCtx->getTxnRetryCounter() &&
@@ -885,12 +900,12 @@ TransactionRouter::Router::getAdditionalParticipantsForResponse(OperationContext
 
     participants.emplace();
     for (const auto& participant : o().participants) {
-        boost::optional<bool> readOnly = boost::none;
+        AdditionalParticipantInfoLocal info;
         if (participant.second.readOnly != Participant::ReadOnly::kUnset) {
-            readOnly = (participant.second.readOnly == Participant::ReadOnly::kReadOnly);
+            info.readOnly = (participant.second.readOnly == Participant::ReadOnly::kReadOnly);
         }
-
-        participants->try_emplace(participant.first, readOnly);
+        info.term = participant.second.term;
+        participants->try_emplace(participant.first, info);
     }
 
     return participants;
@@ -1032,10 +1047,47 @@ void TransactionRouter::Router::_setReadOnlyForParticipant(OperationContext* opC
                                        currentParticipant.stmtIdCreatedAt,
                                        readOnly,
                                        std::move(currentParticipant.sharedOptions));
+    // Preserve the previously-observed replication term across the erase/emplace.
+    newParticipant.term = currentParticipant.term;
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     o(lk).participants.erase(iter);
     o(lk).participants.try_emplace(shard.toString(), std::move(newParticipant));
+}
+
+void TransactionRouter::Router::_validateAndRecordParticipantTerm(
+    OperationContext* opCtx, const ShardId& shard, boost::optional<std::int64_t> observedTerm) {
+    // observedTerm is absent when the responding participant does not report a term in $replData
+    // (e.g. an older binary). There is nothing to validate then.
+    // TODO SERVER-130162: Once 9.0 becomes lastLTS, all participants are guaranteed to send
+    // $replData.term; make observedTerm required and remove this early return.
+    if (!observedTerm) {
+        return;
+    }
+
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    const auto iter = o(lk).participants.find(shard.toString());
+    invariant(iter != o().participants.end());
+
+    if (iter->second.term) {
+        uassert(ErrorCodes::NoSuchTransaction,
+                str::stream() << "Participant " << shard
+                              << " changed primaries during the transaction "
+                              << "(previously observed term " << *iter->second.term << ", now "
+                              << *observedTerm
+                              << "); unprepared transaction state on the old primary was lost",
+                *iter->second.term == *observedTerm);
+        return;
+    }
+
+    LOGV2_DEBUG(12812800,
+                3,
+                "Recording participant replication term on first observation",
+                "sessionId"_attr = _sessionId(),
+                "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                "shardId"_attr = shard,
+                "term"_attr = *observedTerm);
+    iter->second.term = *observedTerm;
 }
 
 void TransactionRouter::Router::_assertAbortStatusIsOkOrNoSuchTransaction(

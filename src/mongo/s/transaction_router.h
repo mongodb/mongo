@@ -150,6 +150,21 @@ public:
 
         // The highest statement id of the request during which this participant was created.
         const StmtId stmtIdCreatedAt;
+
+        // The replication term observed for this participant. Set on the first reply that
+        // carries a term (in the `term` sub-field of `$replData`, or for additional
+        // participants, in AdditionalParticipantInfo.term). A subsequent reply with a
+        // different term means the participant's primary changed mid-transaction; under
+        // unprepared 2PC that means the in-memory transaction state on the old primary was
+        // lost, so the router aborts the transaction.
+        boost::optional<std::int64_t> term;
+    };
+
+    // Forwarded by a sub-router in its TxnResponseMetadata.additionalParticipants reply, so
+    // the upstream router can detect a participant that changed primaries mid-transaction.
+    struct AdditionalParticipantInfoLocal {
+        boost::optional<bool> readOnly;
+        boost::optional<std::int64_t> term;
     };
 
     // Container for timing stats for the current transaction. Includes helpers for calculating some
@@ -525,15 +540,17 @@ public:
 
         /**
          * If this router is a sub-router and the txnNumber and retryCounter match that on the
-         * opCtx, returns a map containing {participantShardId : readOnly} for each participant
-         * added by this router. It's possible that readOnly is not set if either an error occured
-         * before receiving a response from a particular shard, or a shard returned an error.
+         * opCtx, returns a map containing {participantShardId : {readOnly, term}} for each
+         * participant added by this router. It's possible that readOnly is not set if either an
+         * error occurred before receiving a response from a particular shard, or a shard returned
+         * an error. `term` is the replication term most recently observed for that participant; it
+         * is empty until the first response from the participant has been processed.
          *
          * Returns boost::none if this router is not a sub-router, or if the txnNumber or
          * retryCounter on this router do not match that on the opCtx.
          */
-        boost::optional<StringMap<boost::optional<bool>>> getAdditionalParticipantsForResponse(
-            OperationContext* opCtx);
+        boost::optional<StringMap<AdditionalParticipantInfoLocal>>
+        getAdditionalParticipantsForResponse(OperationContext* opCtx);
 
         /**
          * Commits the transaction.
@@ -699,6 +716,17 @@ public:
         void _setReadOnlyForParticipant(OperationContext* opCtx,
                                         const ShardId& shard,
                                         Participant::ReadOnly readOnly);
+
+        /**
+         * Records the replication term observed for `shard` on first contact, or asserts
+         * `NoSuchTransaction` if the participant's previously-recorded term differs. A term
+         * change always indicates the participant's primary changed mid-transaction — unprepared
+         * 2PC state on the old primary was lost — so the transaction must abort with a
+         * retryable error rather than commit a partial result.
+         */
+        void _validateAndRecordParticipantTerm(OperationContext* opCtx,
+                                               const ShardId& shard,
+                                               boost::optional<std::int64_t> observedTerm);
 
         /**
          * Updates relevant metrics when the router receives an explicit abort from the client.
