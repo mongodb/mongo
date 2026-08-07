@@ -77,6 +77,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const std::vector<CollectionPtr>& localCatalogCollections,
     bool checkRangeDeletionIndexes,
     bool optionalCheckIndexes,
+    int64_t strictChunkChecksThreshold,
     bool asRSPrimaryNode = true);
 
 /**
@@ -162,6 +163,7 @@ std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
     const ShardId& primaryShardId,
     bool checkRangeDeletionIndexes,
     bool checkIndexes,
+    int64_t strictChunkChecksThreshold,
     bool asRSPrimaryNode);
 
 }  // namespace metadata_consistency_util
