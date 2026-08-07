@@ -72,9 +72,11 @@ void IncrementalFeatureRolloutContext::set(OperationContext* opCtx,
     // Install-once invariant: replacing a context that already cached its egress serialization
     // would silently drop that resolved state. Only a materialized context can have cached it.
     if (deferred.isInitialized()) {
-        tassert(13002310,
-                "Refusing to replace an IFRContext whose egress metadata has already been cached",
-                !(*deferred)->hasCachedEgressMetadataForTest());
+        // TODO SERVER-133148: temporary invariant for BF-45368 repro (crash-on-hit for a core
+        // dump); revert to tassert(13002310, ...) once a core dump has been captured.
+        invariant(
+            !(*deferred)->hasCachedEgressMetadataForTest(),
+            "Refusing to replace an IFRContext whose egress metadata has already been cached");
     }
     // Eager install: value is materialized immediately, so it is visible to tryGet()/isInstalled()
     // and serialized on egress.
