@@ -74,6 +74,8 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
 
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(WTStepDownRollbackAtCommit);
+
 Atomic<std::int64_t> snapshotTooOldErrorCount{0};
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
@@ -152,32 +154,48 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
 void WiredTigerRecoveryUnit::_commit(boost::optional<Timestamp> commitTime) {
     bool notifyDone = !_prepareTimestamp.isNull();
     if (_session && _isActive()) {
-        auto* kvEngine = _connection->getKVEngine();
-        if (!_createdTables.empty() && kvEngine && kvEngine->usesSchemaEpochs()) {
-            // In disaggregated storage mode, if this transaction created tables and has a
-            // timestamp, pin all_durable before committing to prevent stable from advancing past
-            // our commit timestamp before we can publish the tables.
-            // This is only needed on primaries, where stable is derived from all_durable.
-            // On secondaries, the stable timestamp is controlled by the replication machinery and
-            // only advances after oplog batch application completes. We detect this case via
-            // _commitTimestamp being set (by TimestampBlock before the WUOW on secondaries).
-            bool needsAllDurablePin = _commitTimestamp.isNull();
-            uint64_t schemaEpoch = [&] {
-                if (commitTime && !commitTime->isNull()) {
-                    invariant(!_schemaEpoch);
-                    invariant(_opCtx);
-                    return rss::ReplicatedStorageService::get(_opCtx)
-                        .getPersistenceProvider()
-                        .getSchemaEpochForTimestamp(*commitTime);
-                }
-                // If this invariant fails, a transaction without a timestamp created a table
-                invariant(_schemaEpoch);
-                needsAllDurablePin = false;
-                return *_schemaEpoch;
-            }();
-            _commitAndPublishTables(kvEngine, schemaEpoch, needsAllDurablePin);
-        } else {
-            _txnClose(true);
+        try {
+            auto* kvEngine = _connection->getKVEngine();
+            if (!_createdTables.empty() && kvEngine && kvEngine->usesSchemaEpochs()) {
+                // In disaggregated storage mode, if this transaction created tables and has a
+                // timestamp, pin all_durable before committing to prevent stable from advancing
+                // past our commit timestamp before we can publish the tables. This is only needed
+                // on primaries, where stable is derived from all_durable. On secondaries, the
+                // stable timestamp is controlled by the replication machinery and only advances
+                // after oplog batch application completes. We detect this case via _commitTimestamp
+                // being set (by TimestampBlock before the WUOW on secondaries).
+                bool needsAllDurablePin = _commitTimestamp.isNull();
+                uint64_t schemaEpoch = [&] {
+                    if (commitTime && !commitTime->isNull()) {
+                        invariant(!_schemaEpoch);
+                        invariant(_opCtx);
+                        return rss::ReplicatedStorageService::get(_opCtx)
+                            .getPersistenceProvider()
+                            .getSchemaEpochForTimestamp(*commitTime);
+                    }
+                    // If this invariant fails, a transaction without a timestamp created a table
+                    invariant(_schemaEpoch);
+                    needsAllDurablePin = false;
+                    return *_schemaEpoch;
+                }();
+                _commitAndPublishTables(kvEngine, schemaEpoch, needsAllDurablePin);
+            } else {
+                _txnClose(true);
+            }
+        } catch (const StorageUnavailableException&) {
+            if (_wtTransactionReleasedOnCommitFailure) {
+                // WT_ROLLBACK from commit_transaction: the WT transaction is already released, but
+                // the state is still kActiveInUnitOfWork.
+                // Transition to kInactiveInUnitOfWork so that:
+                //  - _isActive() returns false, preventing _abort() from calling
+                //    rollback_transaction on the already-released WT session.
+                //  - _inUnitOfWork() returns true, satisfying doAbortUnitOfWork() invariant
+                //    when the WUOW/StorageWriteTransaction destructor calls abort().
+                _setState(State::kInactiveInUnitOfWork);
+                // Reset the flag.
+                _wtTransactionReleasedOnCommitFailure = false;
+            }
+            throw;
         }
     } else {
         invariant(_createdTables.empty());
@@ -332,6 +350,38 @@ void WiredTigerRecoveryUnit::preallocateSnapshot(const OpenSnapshotOptions& opti
     }
 }
 
+void WiredTigerRecoveryUnit::_resetPerTransactionState() {
+    // We reset the _lastTimestampSet between transactions. Since it is legal for one
+    // transaction on a RecoveryUnit to call setTimestamp() and another to call
+    // setCommitTimestamp().
+    _lastTimestampSet = boost::none;
+    _multiTimestampConstraintTracker.isTxnModified = false;
+    _multiTimestampConstraintTracker.txnHasNonTimestampedWrite = false;
+    _multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints = false;
+    while (!_multiTimestampConstraintTracker.timestampOrder.empty()) {
+        _multiTimestampConstraintTracker.timestampOrder.pop();
+    }
+    _prepareTimestamp = Timestamp();
+    _durableTimestamp = Timestamp();
+    _rollbackTimestamp = Timestamp();
+    _preparedId = boost::none;
+    _oplogVisibleTs = boost::none;
+    _schemaEpoch = boost::none;
+    _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
+    _noEvictionAfterCommitOrRollback = false;
+    if (_untimestampedWriteAssertionLevel !=
+        RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways) {
+        _untimestampedWriteAssertionLevel =
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce;
+    }
+    // Reset the kLastApplied read source back to the default of kNoTimestamp. Any reader requiring
+    // kLastApplied will set the read source again before reading. Resetting this read source
+    // simplifies the handling when stepup happens concurrently with read operations.
+    if (_timestampReadSource == ReadSource::kLastApplied) {
+        _timestampReadSource = ReadSource::kNoTimestamp;
+    }
+}
+
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_isActive(), toString(_getState()));
     WiredTigerConnection::BlockShutdown blockShutdown(_connection);
@@ -434,6 +484,13 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             _forceCheckpointOnTableCreateForTestingIfEnabled();
         }
 
+        if (MONGO_unlikely(WTStepDownRollbackAtCommit.shouldFail())) {
+            // Simulate a WT_ROLLBACK error with WT_STEP_DOWN sub-error from commit_transaction.
+            _session->rollback_transaction(nullptr);
+            _resetPerTransactionState();
+            _wtTransactionReleasedOnCommitFailure = true;
+            throwWriteConflictException("WT_ROLLBACK due to WT_STEP_DOWN at commit_transaction");
+        }
         wtRet = _session->commit_transaction(nullptr);
 
         LOGV2_DEBUG(
@@ -476,6 +533,22 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         }
         _isTimestamped = false;
     }
+    // TODO SERVER-132427: Handle prepared transactions during disagg stepdown.
+    //
+    // If the commit_transaction fails due to a concurrent stepdown, clean up the
+    // per-transaction state so the recovery unit can be reused for a retry, and throw a
+    // WriteConflictException so that callers (e.g. writeConflictRetry) can retry. We need to
+    // clean up the per-transaction state because WT has already released the transaction
+    // internally.
+    if (commit && wtRet == WT_ROLLBACK) {
+        auto gle = _session->getLastError();
+        if (gle.sub_level_err == WT_STEP_DOWN) {
+            _resetPerTransactionState();
+            _wtTransactionReleasedOnCommitFailure = true;
+            throwWriteConflictException(
+                "Storage engine no longer in primary mode when committing storage transaction");
+        }
+    }
     invariantWTOK(wtRet, *_session);
 
     invariant(!_lastTimestampSet || _commitTimestamp.isNull(),
@@ -484,30 +557,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
                             << _lastTimestampSet->toString()
                             << ". _commitTimestamp: " << _commitTimestamp.toString());
 
-    // We reset the _lastTimestampSet between transactions. Since it is legal for one
-    // transaction on a RecoveryUnit to call setTimestamp() and another to call
-    // setCommitTimestamp().
-    _lastTimestampSet = boost::none;
-    _multiTimestampConstraintTracker = {};
-    _prepareTimestamp = Timestamp();
-    _durableTimestamp = Timestamp();
-    _rollbackTimestamp = Timestamp();
-    _preparedId = boost::none;
-    _oplogVisibleTs = boost::none;
-    _schemaEpoch = boost::none;
-    _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
-    _noEvictionAfterCommitOrRollback = false;
-    if (_untimestampedWriteAssertionLevel !=
-        RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways) {
-        _untimestampedWriteAssertionLevel =
-            RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce;
-    }
-    // Reset the kLastApplied read source back to the default of kNoTimestamp. Any reader requiring
-    // kLastApplied will set the read source again before reading. Resetting this read source
-    // simplifies the handling when stepup happens concurrently with read operations.
-    if (_timestampReadSource == ReadSource::kLastApplied) {
-        _timestampReadSource = ReadSource::kNoTimestamp;
-    }
+    _resetPerTransactionState();
 }
 
 void WiredTigerRecoveryUnit::_forceCheckpointOnTableCreateForTestingIfEnabled() {

@@ -242,6 +242,7 @@ private:
                                  bool needsAllDurablePin);
 
     void _ensureSession();
+    void _resetPerTransactionState();
     void _txnClose(bool commit);
     void _txnOpen();
 
@@ -308,6 +309,11 @@ private:
     // Commits are assumed ordered.  Unordered commits are assumed to always need to reserve a
     // new optime, and thus always call oplogDiskLocRegister() on the record store.
     bool _orderedCommit = true;
+
+    // True if the WT transaction was already released due to commit_transaction failure.
+    // We track this to transition the RecoveryUnit to the correct state, to prevent trying to
+    // rollback the WT transaction that was already released.
+    bool _wtTransactionReleasedOnCommitFailure = false;
 
     // When 'true', data read from disk should not be kept in the storage engine cache.
     bool _readOnce = false;

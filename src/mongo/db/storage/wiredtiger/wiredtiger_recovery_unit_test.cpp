@@ -14,6 +14,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
@@ -26,6 +27,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 #include <cstring>
@@ -1405,6 +1407,51 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
     ru1->onCreateTable("my-table");
     txn.commit();
     ru1->clearCommitTimestamp();
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, CommitRollbackThrowsWriteConflictAndCleansUpState) {
+    bool onCommitCalled = false;
+    bool onRollbackCalled = false;
+
+    {
+        FailPointEnableBlock fp("WTStepDownRollbackAtCommit");
+
+        StorageWriteTransaction txn(*ru1);
+
+        // Set up a write that will fail on commit.
+        WT_CURSOR* cursor;
+        getCursor(ru1, &cursor);
+        cursor->set_key(cursor, "key");
+        cursor->set_value(cursor, "value");
+        ASSERT_EQ(wiredTigerCursorInsert(*ru1, cursor), 0);
+
+        ru1->onCommit(
+            [&](OperationContext*, boost::optional<Timestamp>) { onCommitCalled = true; });
+        ru1->onRollback([&](OperationContext*) { onRollbackCalled = true; });
+
+        ASSERT_THROWS_CODE(txn.commit(), StorageUnavailableException, ErrorCodes::WriteConflict);
+    }
+
+    EXPECT_FALSE(onCommitCalled);
+    EXPECT_TRUE(onRollbackCalled);
+
+    // The RU must be in a clean state so it can be reused for a new transaction.
+    {
+        StorageWriteTransaction txn(*ru1);
+        WT_CURSOR* cursor;
+        getCursor(ru1, &cursor);
+        cursor->set_key(cursor, "retry_key");
+        cursor->set_value(cursor, "retry_value");
+        ASSERT_EQ(wiredTigerCursorInsert(*ru1, cursor), 0);
+        txn.commit();
+    }
+
+    // Verify the retried write is visible.
+    auto session = ru1->getSession();
+    WT_CURSOR* cursor;
+    getCursor(*session, cursor);
+    cursor->set_key(cursor, "retry_key");
+    EXPECT_EQ(cursor->search(cursor), 0);
 }
 
 using WiredTigerRecoveryUnitPublishTableCreationTestDeathTest =

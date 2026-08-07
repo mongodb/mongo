@@ -326,6 +326,12 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
                   "ident"_attr = identInfo->identName,
                   "dropTimestamp"_attr = identInfo->dropTime,
                   "error"_attr = status);
+        } else if (status == ErrorCodes::WriteConflict) {
+            LOGV2(13285200,
+                  "WriteConflict while dropping ident, will retry later",
+                  "ident"_attr = identInfo->identName,
+                  "dropTimestamp"_attr = identInfo->dropTime,
+                  "error"_attr = status);
         } else if (status.isA<ErrorCategory::Interruption>()) {
             LOGV2(11873702,
                   "Interruption while dropping ident",

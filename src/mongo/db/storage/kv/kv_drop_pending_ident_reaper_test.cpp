@@ -568,6 +568,37 @@ DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest,
     reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
 }
 
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanRetriesOnWriteConflict) {
+    Timestamp dropTimestamp{Seconds{1}, 0};
+    std::string identName = "myident";
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    {
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{dropTimestamp}, ident);
+    }
+
+    int attempts = 0;
+    engine->dropIdentFn = [&](RecoveryUnit&, std::string_view) -> Status {
+        if (++attempts < 2) {
+            return Status(ErrorCodes::WriteConflict, "simulated write conflict at commit");
+        }
+        return Status::OK();
+    };
+
+    auto opCtx = makeOpCtx();
+    // First call: WriteConflict should not crash, ident remains pending.
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_TRUE(engine->droppedIdents.empty());
+    EXPECT_EQ(1, attempts);
+
+    // Second call: succeeds.
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_EQ(1U, engine->droppedIdents.size());
+    EXPECT_EQ(identName, engine->droppedIdents[0].identName);
+}
+
 TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropUnknownIdent) {
     auto engine = getEngine();
     KVDropPendingIdentReaper reaper(engine);
