@@ -31,6 +31,15 @@ struct __wt_cache_eviction_controls {
     wt_shared uint8_t
       app_eviction_min_cache_fill_ratio; /* Application eviction minimum cache fill ratio */
 
+/* Configuration control for checkpoint scrub-evicting reconciled leaf pages. */
+#define WT_CACHE_CHECKPOINT_SCRUB_EVICT_AUTO 0
+#define WT_CACHE_CHECKPOINT_SCRUB_EVICT_OFF 1
+#define WT_CACHE_CHECKPOINT_SCRUB_EVICT_ON 2
+    wt_shared uint8_t checkpoint_scrub_eviction;
+
+    /* Percentage of the cache checkpoint may fill with retained scrub images. */
+    wt_shared uint8_t checkpoint_scrub_image_max;
+
 /* cache eviction controls bit positions */
 #define WT_CACHE_EVICT_INCREMENTAL_APP 0x1u
 #define WT_CACHE_PREFER_SCRUB_EVICTION 0x2u
@@ -122,6 +131,9 @@ struct __wt_cache {
     wt_shared uint64_t bytes_image_leaf; /* Bytes of disk images (leaf) */
     wt_shared uint64_t bytes_image_leaf_ingest;
     wt_shared uint64_t bytes_image_leaf_stable;
+    /* Clean re-instantiation images retained in cache by checkpoint scrub. */
+    wt_shared uint64_t bytes_scrub_image;
+    wt_shared uint64_t pages_scrub_image;
     /* Shared disk image bytes charged to more than one btree's in-memory total. */
     wt_shared uint64_t bytes_shared_dsk_duplicate;
     wt_shared uint64_t bytes_inmem; /* Bytes/pages in memory */

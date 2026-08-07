@@ -542,6 +542,9 @@ struct __wt_page_modify {
 #define WT_PAGE_DIRTY_FIRST 1
     wt_shared uint32_t page_state;
 
+    /* Size of the disk image checkpoint scrub is keeping in cache, zero if none is tracked. */
+    uint32_t scrub_image_bytes;
+
     /* Kept with the trailing byte fields to avoid alignment padding before inst_updates. */
     bool instantiated; /* True if this is a newly instantiated page. */
 

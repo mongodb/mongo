@@ -47,8 +47,9 @@ __curhs_file_cursor_open(WT_SESSION_IMPL *session, const char *uri, const char *
         WT_ERR(__wt_snprintf(tmp, len, "checkpoint=%s", session->hs_checkpoint));
         open_cursor_cfg[2] = tmp;
     } else if (checkpoint_name != NULL) {
-        WT_ASSERT(
-          session, __wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader);
+        WT_ASSERT(session,
+          __wt_conn_is_disagg(session) &&
+            !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
         WT_ERR(__wt_scr_alloc(session, 0, &stable_uri_buf));
         /*
          * Use a URI with a "/<checkpoint name> suffix. This is interpreted as reading from the
@@ -160,7 +161,8 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
      * reconciliation for shared tables. It is also unsafe to cache the shared history store on the
      * standby as the sweep server may close the outdated history store dhandles.
      */
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
+    if (__wt_conn_is_disagg(session) &&
+      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         WT_RET(__curhs_file_cursor_open(session, WT_HS_URI_SHARED, NULL, NULL, &cursor));
         WT_RET(cursor->close(cursor));
     }
@@ -1041,7 +1043,7 @@ __curhs_insert(WT_CURSOR *cursor)
 
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) || !F_ISSET(CUR2BT(file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /*
      * Disable bulk loads into history store. This would normally occur when updating a record with
@@ -1183,7 +1185,7 @@ __curhs_remove(WT_CURSOR *cursor)
 
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) || !F_ISSET(CUR2BT(file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /* Remove must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(file_cursor, WT_CURSTD_KEY_INT));
@@ -1229,7 +1231,7 @@ __curhs_update(WT_CURSOR *cursor)
 
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) || !F_ISSET(CUR2BT(file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /* Update must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(file_cursor, WT_CURSTD_KEY_INT));
@@ -1306,7 +1308,7 @@ __curhs_range_truncate(WT_TRUNCATE_INFO *trunc_info)
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) ||
         !F_ISSET(CUR2BT(start_file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     WT_STAT_DSRC_INCR(session, cursor_truncate);
 

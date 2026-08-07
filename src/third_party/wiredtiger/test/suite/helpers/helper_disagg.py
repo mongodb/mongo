@@ -869,6 +869,40 @@ class DisaggSchemaEpochMixin:
         self.set_stable_epoch(epoch, conn)
         return conn, session
 
+    def stable_config(self, conn, uri):
+        """Return the local metadata configuration of a table's stable constituent."""
+        session = conn.open_session('')
+        cursor = session.open_cursor('metadata:')
+        cursor.set_key(self.stable_uri(uri))
+        assert cursor.search() == 0, f'no local metadata for {self.stable_uri(uri)}'
+        config = cursor.get_value()
+        cursor.close()
+        session.close()
+        return config
+
+    def inject_stable_entry(self, conn, key, config):
+        """
+        Write a stable file entry straight into a node's local metadata, bypassing the read-only
+        metadata cursor. Used to plant metadata a node could not have reached legitimately.
+        """
+        session = conn.open_session('')
+        cursor = session.open_cursor('file:WiredTiger.wt')
+        cursor.set_key(key)
+        cursor.set_value(config)
+        cursor.insert()
+        cursor.close()
+        session.close()
+
+    def run_panic_subprocess(self, name, expected_message):
+        """
+        Run subprocess_<name> in a subprocess and assert it died from the expected panic rather
+        than an unrelated failure. Requires the test class to mix in suite_subprocess.
+        """
+        [returncode, home] = self.run_subprocess_function(f'SUBPROCESS_{name}',
+            f'{self.test_name}.{self.test_name}.subprocess_{name}', silent=True)
+        self.assertNotEqual(returncode, 0)
+        self.check_file_contains(os.path.join(home, 'stderr.txt'), expected_message)
+
 class DisaggSizeTestMixin:
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True

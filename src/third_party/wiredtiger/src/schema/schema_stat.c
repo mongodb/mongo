@@ -55,68 +55,6 @@ err:
 }
 
 /*
- * __curstat_size_only --
- *     For very simple tables we can avoid getting table handles if configured to only retrieve the
- *     size. It's worthwhile because workloads that create and drop a lot of tables can put a lot of
- *     pressure on the table list lock.
- */
-static int
-__curstat_size_only(WT_SESSION_IMPL *session, const char *uri, bool *was_fast, WT_CURSOR_STAT *cst)
-{
-    WT_CONFIG cparser;
-    WT_CONFIG_ITEM ckey, colconf, cval;
-    WT_DECL_RET;
-    WT_ITEM namebuf;
-    int64_t size;
-    char *tableconf;
-    const char *table_name;
-
-    WT_CLEAR(namebuf);
-    size = 0;
-    table_name = uri + strlen("table:");
-    *was_fast = false;
-
-    /* Retrieve the metadata for this table. */
-    WT_RET(__wt_metadata_search(session, uri, &tableconf));
-
-    /*
-     * The fast path only works if the table consists of a single file and does not have any
-     * indexes. The absence of named columns is how we determine that neither of those conditions
-     * can be satisfied.
-     */
-    WT_ERR(__wt_config_getones(session, tableconf, "columns", &colconf));
-    __wt_config_subinit(session, &cparser, &colconf);
-    if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
-        goto err;
-
-    /* Only probe for a stable file on a connection that can create one. */
-    if (__wt_conn_is_disagg(session)) {
-        WT_ERR(__wt_buf_fmt(session, &namebuf, "file:%s.wt_stable", table_name));
-        WT_ERR(__wt_curstat_size_disagg(session, namebuf.data, was_fast, &size));
-    }
-
-    /*
-     * At this point, disagg or not, fall back to the local non-layered file.
-     */
-    if (!*was_fast) {
-        WT_ERR(__wt_buf_fmt(session, &namebuf, "%s.wt", table_name));
-        WT_ERR(__wt_curstat_size_local(session, namebuf.data, was_fast, &size));
-    }
-
-    if (*was_fast) {
-        __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
-        cst->u.dsrc_stats.block_size = size;
-        __wt_curstat_dsrc_final(cst);
-    }
-
-err:
-    __wt_free(session, tableconf);
-    __wt_buf_free(session, &namebuf);
-
-    return (ret);
-}
-
-/*
  * __wt_curstat_table_init --
  *     Initialize the statistics for a table.
  */
@@ -131,17 +69,6 @@ __wt_curstat_table_init(
     WT_TABLE *table;
     u_int i;
     const char *name;
-    bool was_fast;
-
-    /*
-     * If only gathering table size statistics, try a fast path that avoids the schema and table
-     * list locks.
-     */
-    if (F_ISSET(cst, WT_STAT_TYPE_SIZE)) {
-        WT_RET(__curstat_size_only(session, uri, &was_fast, cst));
-        if (was_fast)
-            return (0);
-    }
 
     name = uri + strlen("table:");
     WT_RET(__wt_schema_get_table(session, name, strlen(name), false, 0, &table));

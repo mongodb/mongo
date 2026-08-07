@@ -1219,7 +1219,7 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     WT_ERR(__wt_schema_create(session, ingest_uri, constituent_cfg));
     __wt_free(session, constituent_cfg);
 
-    if (conn->layered_table_manager.leader) {
+    if (__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         stable_cfg[1] = disagg_config->data;
 
         /* Disable logging on the stable table to ensure we have timestamps. */

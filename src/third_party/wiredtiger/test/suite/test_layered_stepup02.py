@@ -64,8 +64,8 @@ class test_layered_stepup02(wttest.WiredTigerTestCase):
             # in the same directory, insert some new items and see them.
 
             self.session.checkpoint()
-            self.reopen_conn(config=self.conn_base_config +
-                    f'disaggregated=(role="follower",checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")')
+            # Step down to a follower via a live reconfigure instead of restarting.
+            self.conn.reconfigure('disaggregated=(role="follower")')
 
             first_row = ds.rows + 1
             ds.rows += 1000

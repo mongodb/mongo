@@ -9,6 +9,55 @@
 #include "wt_internal.h"
 
 /*
+ * __sync_scrub_checkpoint_enabled --
+ *     Return true if checkpoint reconciliation should retain clean disk images for scrub eviction.
+ */
+static bool
+__sync_scrub_checkpoint_enabled(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    /* Skip during recovery or checkpoint shutdown: the scrubbed image would never be consumed. */
+    if (F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT))
+        return (false);
+
+    /* Skip the metadata file when generating images. */
+    if (WT_IS_METADATA(S2BT(session)->dhandle) || WT_IS_DISAGG_META(S2BT(session)->dhandle))
+        return (false);
+
+    switch (__wt_atomic_load_uint8_relaxed(
+      &conn->cache->cache_eviction_controls.checkpoint_scrub_eviction)) {
+    case WT_CACHE_CHECKPOINT_SCRUB_EVICT_OFF:
+        return (false);
+    case WT_CACHE_CHECKPOINT_SCRUB_EVICT_ON:
+        return (true);
+    default:
+        /* Only retain an image while eviction is in scrub mode. */
+        return (
+          F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && F_ISSET(conn->evict, WT_EVICT_CACHE_SCRUB));
+    }
+}
+
+/*
+ * __sync_page_rec_flags --
+ *     Add a scrub-image request to a page's reconciliation flags. Only a row-store leaf can be
+ *     swapped for its image, and the cache budget is re-read per page because pages queued for a
+ *     reconciliation worker have not consumed their image yet.
+ */
+static uint32_t
+__sync_page_rec_flags(
+  WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t rec_flags, bool checkpoint_scrub)
+{
+    if (checkpoint_scrub && page->type == WT_PAGE_ROW_LEAF &&
+      __wt_cache_scrub_image_budget_ok(session))
+        FLD_SET(rec_flags, WT_REC_SAVE_IMAGE_CLEAN);
+
+    return (rec_flags);
+}
+
+/*
  * __sync_checkpoint_can_skip --
  *     There are limited conditions under which we can skip writing a dirty page during checkpoint.
  */
@@ -166,7 +215,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     uint64_t reconcile_time_pct, reconcile_time, reconcile_start;
     uint64_t saved_pinned_id, t, time_start, time_stop;
     uint32_t flags, rec_flags;
-    bool dirty, is_hs, is_internal, tried_eviction;
+    bool checkpoint_scrub, dirty, is_hs, is_internal, tried_eviction;
 
     conn = S2C(session);
     btree = S2BT(session);
@@ -176,6 +225,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
     /* Don't bump page read generations. */
     flags = WT_READ_INTERNAL_OP;
+
+    /*
+     * The scrub-eviction configuration is fixed for the checkpoint, but whether a given page gets
+     * an image also depends on its type and on the cache budget, so that is decided per page.
+     */
+    checkpoint_scrub = __sync_scrub_checkpoint_enabled(session);
 
     internal_bytes = leaf_bytes = 0;
     internal_pages = leaf_pages = 0;
@@ -211,6 +266,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
             LF_SET(WT_READ_VISIBLE_ALL);
 
+        rec_flags = WT_REC_CHECKPOINT;
+
         for (;;) {
             WT_ERR(__wt_tree_walk(session, &walk, flags));
             if (walk == NULL)
@@ -229,7 +286,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 leaf_bytes += __wt_atomic_load_size_relaxed(&page->memory_footprint);
                 ++leaf_pages;
                 reconcile_start = __wt_clock(session);
-                WT_ERR(__wt_reconcile(session, walk, NULL, WT_REC_CHECKPOINT));
+                WT_ERR(__wt_reconcile(session, walk, NULL,
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub)));
                 reconcile_time += __wt_clock(session) - reconcile_start;
             }
         }
@@ -408,10 +466,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                  */
                 WT_REF *walk_dup = NULL;
                 WT_ERR(__sync_dup_walk(session, walk, 0, &walk_dup));
-                WT_ERR(__wt_checkpoint_parallel_push_work(session, walk_dup, rec_flags, flags));
+                WT_ERR(__wt_checkpoint_parallel_push_work(session, walk_dup,
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub), flags));
             } else {
                 reconcile_start = __wt_clock(session);
-                WT_ERR(__wt_reconcile(session, walk, NULL, rec_flags));
+                WT_ERR(__wt_reconcile(session, walk, NULL,
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub)));
                 reconcile_time += __wt_clock(session) - reconcile_start;
             }
 

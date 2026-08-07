@@ -67,9 +67,7 @@ class test_layered_fast_truncate07(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.session.create(self.uri, self.session_create_config())
         self.insert_range(1, self.nitems)
         self.session.checkpoint()
-        follower_config = ('verbose=[layered:3],disaggregated=(role="follower",'
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")')
-        self.reopen_conn(config=follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
     def insert_range(self, lo, hi):
         c = self.session.open_cursor(self.uri)

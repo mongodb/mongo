@@ -38,7 +38,6 @@
 # strict mode would reject by design). Subsequent pickups pass only
 # checkpoint_meta to reconfigure, so they also exercise the flag's stickiness.
 
-import os
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, DisaggSchemaEpochMixin
 from suite_subprocess import suite_subprocess
@@ -58,6 +57,9 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
+
+    # The panic every negative case below expects from strict validation.
+    panic_message = 'strict checkpoint metadata validation failed'
 
     #
     # Helper methods
@@ -91,17 +93,6 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """Advance the leader's stable schema epoch and take a new checkpoint."""
         self.set_stable_epoch(epoch)
         self.leader_checkpoint(stable_ts)
-
-    def run_panic_subprocess(self, name):
-        """
-        Run subprocess_<name> in a subprocess and assert it died from the strict
-        checkpoint metadata validation panic (not from an unrelated failure).
-        """
-        [returncode, home] = self.run_subprocess_function(f'SUBPROCESS_{name}',
-            f'{self.test_name}.{self.test_name}.subprocess_{name}', silent=True)
-        self.assertNotEqual(returncode, 0)
-        self.check_file_contains(os.path.join(home, 'stderr.txt'),
-            'strict checkpoint metadata validation failed')
 
     #
     # Positive tests: explained (or no) differences do not panic under strict mode.
@@ -219,7 +210,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         # Initialize self.conn so the test fixture can close it cleanly; the real test runs
         # in a subprocess so that the panic/abort does not kill the test runner.
         self.setup_leader_empty()
-        self.run_panic_subprocess('shared_only_panics')
+        self.run_panic_subprocess('shared_only_panics', self.panic_message)
 
     def subprocess_stale_create_panics(self):
         """Subprocess body for the stale-create panic test; expected to panic/abort."""
@@ -248,7 +239,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         # Initialize self.conn so the test fixture can close it cleanly; the real test runs
         # in a subprocess so that the panic/abort does not kill the test runner.
         self.setup_leader_empty()
-        self.run_panic_subprocess('stale_create_panics')
+        self.run_panic_subprocess('stale_create_panics', self.panic_message)
 
     def subprocess_stale_remove_panics(self):
         """Subprocess body for the stale-remove panic test; expected to panic/abort."""
@@ -276,7 +267,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         # Initialize self.conn so the test fixture can close it cleanly; the real test runs
         # in a subprocess so that the panic/abort does not kill the test runner.
         self.setup_leader_empty()
-        self.run_panic_subprocess('stale_remove_panics')
+        self.run_panic_subprocess('stale_remove_panics', self.panic_message)
 
     def subprocess_strict_at_open_panics(self):
         """Subprocess body for the strict-at-open panic test; expected to panic/abort."""
@@ -300,7 +291,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         # Initialize self.conn so the test fixture can close it cleanly; the real test runs
         # in a subprocess so that the panic/abort does not kill the test runner.
         self.setup_leader_empty()
-        self.run_panic_subprocess('strict_at_open_panics')
+        self.run_panic_subprocess('strict_at_open_panics', self.panic_message)
 
     #
     # Step-down tests: stepping down clears the metadata queue, so a table created
@@ -350,7 +341,7 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         # Initialize self.conn so the test fixture can close it cleanly; the real test runs
         # in a subprocess so that the panic/abort does not kill the test runner.
         self.setup_leader_empty()
-        self.run_panic_subprocess('step_down_pending_create_panics')
+        self.run_panic_subprocess('step_down_pending_create_panics', self.panic_message)
 
     def test_strict_step_down_drop_then_pickup(self):
         """

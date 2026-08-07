@@ -285,7 +285,7 @@ __wti_evict_page(WT_SESSION_IMPL *session, bool is_server)
  */
 int
 __wti_evict_app_assist_worker(
-  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible)
+  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible, bool bounded)
 {
     WT_DECL_RET;
     WT_TRACK_OP_DECL;
@@ -297,6 +297,13 @@ __wti_evict_app_assist_worker(
     uint64_t time_start = 0;
     WT_TXN_GLOBAL *txn_global = &conn->txn_global;
     WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
+
+    /*
+     * Time a bounded caller independently of the session's cache wait budget: that budget is shared
+     * with the rest of the enclosing API call and is not tracked at all for internal sessions.
+     */
+    uint64_t bound_start = bounded ? __wt_clock(session) : 0;
+    uint64_t bound_limit_us = bounded ? __evict_bounded_wait_limit_us(session) : 0;
 
     uint64_t cache_max_wait_us =
       session->cache_max_wait_us != 0 ? session->cache_max_wait_us : evict->cache_max_wait_us;
@@ -381,6 +388,18 @@ __wti_evict_app_assist_worker(
         if (!__evict_check_user_ok_with_eviction(session, interruptible))
             break;
 
+        /*
+         * A bounded caller stops assisting rather than waiting for the cache to recover. It cannot
+         * be rolled back to relieve the pressure, so this is the only thing that releases it.
+         */
+        if (bounded) {
+            uint64_t elapsed_us = WT_CLOCKDIFF_US(__wt_clock(session), bound_start);
+            if (__evict_bounded_wait_remaining_us(elapsed_us, bound_limit_us) == 0) {
+                WT_STAT_CONN_INCR(session, eviction_app_bounded_wait_exceeded);
+                break;
+            }
+        }
+
         /* Evict a page. */
         ret = __wti_evict_page(session, false);
         if (ret == 0) {
@@ -388,8 +407,21 @@ __wti_evict_app_assist_worker(
             if (busy)
                 break;
         } else if (ret == WT_NOTFOUND) {
+            uint64_t wait_us = 10 * WT_THOUSAND;
+            if (bounded) {
+                uint64_t elapsed_us = WT_CLOCKDIFF_US(__wt_clock(session), bound_start);
+                uint64_t remaining_us =
+                  __evict_bounded_wait_remaining_us(elapsed_us, bound_limit_us);
+                if (remaining_us == 0) {
+                    WT_STAT_CONN_INCR(session, eviction_app_bounded_wait_exceeded);
+                    ret = 0;
+                    break;
+                }
+                wait_us = WT_MIN(wait_us, remaining_us);
+            }
+
             /* Allow the queue to re-populate before retrying. */
-            __wt_cond_wait(session, conn->evict_config.threads.wait_cond, 10 * WT_THOUSAND, NULL);
+            __wt_cond_wait(session, conn->evict_config.threads.wait_cond, wait_us, NULL);
             __wt_tsan_suppress_add_uint64(&evict->app_waits, 1);
         } else if (ret != EBUSY)
             WT_ERR(ret);

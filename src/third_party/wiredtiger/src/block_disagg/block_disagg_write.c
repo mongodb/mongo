@@ -117,8 +117,8 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     page_id = block_meta->page_id;
 
     /* Check that we are the leader (only leaders can write). */
-    WT_ASSERT_ALWAYS(
-      session, conn->layered_table_manager.leader, "Trying to write the page from a follower");
+    WT_ASSERT_ALWAYS(session, __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader),
+      "Trying to write the page from a follower");
 
     /*
      * Update the block's checksum: if our caller specifies, checksum the complete data, otherwise

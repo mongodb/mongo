@@ -66,9 +66,7 @@ class test_layered_cursor06(wttest.WiredTigerTestCase):
         self.assertEqual(random_cursor.next(), 0)
         random_cursor.close()
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         random_cursor = self.session.open_cursor(self.uri, None, "next_random=true")
         self.assertEqual(random_cursor.next(), 0)

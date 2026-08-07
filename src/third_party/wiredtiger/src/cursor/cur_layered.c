@@ -447,8 +447,9 @@ __clayered_enter(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP_MODE mode, WTI_CL
 {
     WT_SESSION_IMPL *const session = CUR2S(clayered);
     WT_CONNECTION_IMPL *conn = S2C(session);
-    WTI_CLAYERED_ROLE role =
-      conn->layered_table_manager.leader ? WTI_CLAYERED_ROLE_LEADER : WTI_CLAYERED_ROLE_FOLLOWER;
+    WTI_CLAYERED_ROLE role = __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) ?
+      WTI_CLAYERED_ROLE_LEADER :
+      WTI_CLAYERED_ROLE_FOLLOWER;
     uint32_t flags = __clayered_enter_flags(clayered, mode, role);
 
     /*
@@ -1327,7 +1328,7 @@ __wt_clayered_range_truncate_stable_replay(WT_TRUNCATE_INFO *trunc_info)
     /* Only valid on stable tables during step up to leader, routed via WT_SESSION_INGEST_REPLAY. */
     WT_ASSERT(session, F_ISSET(session, WT_SESSION_INGEST_REPLAY));
     WT_ASSERT(session, WT_URI_IS_STABLE(trunc_info->start->internal_uri));
-    WT_ASSERT(session, S2C(session)->layered_table_manager.leader);
+    WT_ASSERT(session, __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /* Both boundary cursors must be fully positioned. */
     WT_ASSERT(session, F_ISSET(trunc_info->start, WT_CURSTD_KEY_INT));
@@ -1364,7 +1365,7 @@ __wt_layered_truncate(WT_TRUNCATE_INFO *trunc_info)
      * mode, we need to perform truncate on the ingest table and add an entry inside the truncate
      * list.
      */
-    if (S2C(session)->layered_table_manager.leader)
+    if (__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
         WT_RET(__clayered_truncate_leader(trunc_info));
     else {
         WT_ASSERT(session,

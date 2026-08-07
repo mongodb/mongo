@@ -8,6 +8,39 @@
 
 #pragma once
 
+/*
+ * __evict_bounded_wait_limit_us --
+ *     Return how long a bounded caller may wait.
+ */
+static WT_INLINE uint64_t
+__evict_bounded_wait_limit_us(WT_SESSION_IMPL *session)
+{
+    uint64_t elapsed_us;
+
+    /*
+     * Prefer what remains of the caller's own operation timeout: it has already agreed to wait that
+     * long, and returning sooner only pushes the cache work onto threads that cannot do as much of
+     * it. The transaction timer is cleared by transaction release, but the session's copy belongs
+     * to the enclosing API call and is still running here.
+     */
+    if (session->operation_timeout_us == 0 || session->operation_start_us == 0)
+        return (WTI_EVICT_BOUNDED_WAIT_US);
+
+    elapsed_us = WT_CLOCKDIFF_US(__wt_clock(session), session->operation_start_us);
+    return (
+      elapsed_us > session->operation_timeout_us ? 0 : session->operation_timeout_us - elapsed_us);
+}
+
+/*
+ * __evict_bounded_wait_remaining_us --
+ *     Return the remaining bounded eviction wait time.
+ */
+static WT_INLINE uint64_t
+__evict_bounded_wait_remaining_us(uint64_t elapsed_us, uint64_t limit_us)
+{
+    return (elapsed_us > limit_us ? 0 : limit_us - elapsed_us);
+}
+
 /* !!!
  * __wt_evict_aggressive --
  *     Check whether eviction is unable to make any progress for some amount of time.
@@ -582,7 +615,7 @@ __wt_evict_needed(
          * work that cannot succeed. Log a message if the cache fills with updates or dirty pages.
          */
         if (ignore_updates_dirty && __wt_conn_is_disagg(session) &&
-          (!conn->layered_table_manager.leader ||
+          (!__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) ||
             F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP) ||
             __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)) {
             double cache_full = (evict->eviction_target + evict->eviction_trigger) / 2;
@@ -811,14 +844,16 @@ __evict_is_session_cache_trigger_tolerant(WT_SESSION_IMPL *session, uint8_t cach
  *       (2) `readonly`: A flag indicating if the session is read-only, in which case dirty and
  *          update triggers are ignored.
  *       (3) `interruptible`: A flag indicating if the user is allowed to interrupt eviction.
- *       (4) `didworkp`: A pointer to indicate whether eviction work was done (optional).
+ *       (4) `bounded`: A flag indicating the caller pins no transaction state, in which case the
+ *            wait is capped rather than continuing until the cache drops below its triggers.
+ *       (5) `didworkp`: A pointer to indicate whether eviction work was done (optional).
  *
  *     Return an error code from `__wti_evict_app_assist_worker` if it is unable to perform
  *     meaningful work (eviction cache stuck).
  */
 static WT_INLINE int
-__wt_evict_app_assist_worker_check(
-  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible, bool *didworkp)
+__wt_evict_app_assist_worker_check(WT_SESSION_IMPL *session, bool busy, bool readonly,
+  bool interruptible, bool bounded, bool *didworkp)
 {
     if (didworkp != NULL)
         *didworkp = false;
@@ -867,6 +902,9 @@ __wt_evict_app_assist_worker_check(
      */
     WT_TXN_GLOBAL *txn_global = &conn->txn_global;
     WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
+
+    /* A bounded caller is at a transaction boundary, with nothing left to roll back. */
+    WT_ASSERT(session, !bounded || session->txn->mod_count == 0);
     busy = busy || __wt_atomic_load_uint64_v_relaxed(&txn_shared->id) != WT_TXN_NONE ||
       session->hazards.num_active > 0 ||
       (__wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id) != WT_TXN_NONE &&
@@ -947,7 +985,7 @@ __wt_evict_app_assist_worker_check(
     if (didworkp != NULL)
         *didworkp = true;
 
-    return (__wti_evict_app_assist_worker(session, busy, readonly, interruptible));
+    return (__wti_evict_app_assist_worker(session, busy, readonly, interruptible, bounded));
 }
 
 /*

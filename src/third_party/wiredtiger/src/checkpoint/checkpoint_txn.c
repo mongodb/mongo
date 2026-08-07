@@ -513,7 +513,8 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
         if (WT_IS_DISAGG_META(btree->dhandle))
             return (0);
         /* Skip checkpointing shared tables if we are not a leader. */
-        if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && !S2C(session)->layered_table_manager.leader)
+        if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
+          !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
             return (0);
         /* Skip checkpointing outdated trees. */
         if (F_ISSET(btree->dhandle, WT_DHANDLE_OUTDATED))
@@ -1420,7 +1421,8 @@ __checkpoint_parse_config(
     WT_RET(__wt_config_gets(session, cfg, "debug.database_size_fix", &cval));
     ckpt_cfg->database_size_fix = cval.val != 0;
     if (ckpt_cfg->database_size_fix &&
-      !(__wt_conn_is_disagg(session) && S2C(session)->layered_table_manager.leader))
+      !(__wt_conn_is_disagg(session) &&
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader)))
         WT_RET_MSG(
           session, ENOTSUP, "database_size_fix requires a disaggregated leader connection");
 
@@ -1833,7 +1835,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      */
     conn->disaggregated_storage.cur_checkpoint_timestamp = ckpt_tmp_ts;
     conn->disaggregated_storage.cur_schema_epoch = ckpt_disagg_schema_epoch;
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader)
+    if (__wt_conn_is_disagg(session) &&
+      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
           "Starting disaggregated storage checkpoint with timestamp: %" PRIu64
           " %s and schema epoch: %" PRIu64 " %s",
@@ -1862,7 +1865,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     __checkpoint_timing_stress(session, WT_TIMING_STRESS_HS_CHECKPOINT_DELAY, &tsp);
 
     /* Get the handle to the shared history store. */
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
+    if (__wt_conn_is_disagg(session) &&
+      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         WT_ERR_ERROR_OK(
           __wt_session_get_dhandle(session, WT_HS_URI_SHARED, NULL, NULL, 0), ENOENT, false);
         hs_dhandle_shared = session->dhandle;
@@ -1883,7 +1887,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * Copy any updated metadata to the shared metadata table. Compute the drop size first so we can
      * adjust the overall database size after the checkpoint completes.
      */
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
+    if (__wt_conn_is_disagg(session) &&
+      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         WT_WITH_SCHEMA_LOCK(session,
           ret = __wt_disagg_shared_metadata_queue_process(
             session, ckpt_disagg_schema_epoch, &drop_size));
@@ -2923,7 +2928,8 @@ __checkpoint_disagg_put(
 
     WT_CONNECTION_IMPL *conn = S2C(session);
 
-    if (!__wt_conn_is_disagg(session) || !conn->layered_table_manager.leader)
+    if (!__wt_conn_is_disagg(session) ||
+      !__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
         return (0);
 
     /*
@@ -3457,7 +3463,8 @@ __checkpoint_metadata(WT_SESSION_IMPL *session, const char *cfg[], WT_TXN *txn)
      * uncommitted updates). In that case, we may evict it and the checkpoint transaction cannot
      * commit as the updates have gone from memory.
      */
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
+    if (__wt_conn_is_disagg(session) &&
+      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         WT_RET(__wt_session_get_dhandle(session, WT_DISAGG_METADATA_URI, NULL, NULL, 0));
         if (S2BT(session)->modified)
             WT_RET(__wt_checkpoint_file(session, cfg));

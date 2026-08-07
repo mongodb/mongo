@@ -554,7 +554,8 @@ __sweep_server(void *arg)
         __sweep_check_session_sweep(session, now);
 
         /* On a stepped-up leader, mark the shared disk cache dead once its reuse window elapses. */
-        if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader &&
+        if (__wt_conn_is_disagg(session) &&
+          __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) &&
           __wt_atomic_load_uint8_acquire(&conn->cache->shared_dsk_cache.state) ==
             WT_DSK_CACHE_READONLY) {
             uint64_t readonly_since =

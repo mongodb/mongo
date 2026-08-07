@@ -167,6 +167,10 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__wti_evict_readgen_is_soon_or_wont_need(&page->read_gen))
         return (WT_READGEN_EVICT_SOON);
 
+    /* Pages with a retained reconciliation image can be replaced with a clean in-memory image. */
+    if (__wt_page_evict_swap(page))
+        return (WT_READGEN_EVICT_SOON);
+
     /* Any page from a dead tree is a great choice. */
     if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
         return (WT_READGEN_EVICT_SOON);

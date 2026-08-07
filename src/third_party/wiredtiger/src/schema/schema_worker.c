@@ -121,7 +121,7 @@ __schema_layered_stable_worker_verify(WT_SESSION_IMPL *session, const char *stab
     WT_ASSERT(session, stable_uri != NULL);
 
     /* Sample the role once so the open and the error message below agree if it changes. */
-    leader = S2C(session)->layered_table_manager.leader;
+    leader = __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader);
 
     if (leader) {
         /* Verify the stable table of the layered table. */
@@ -174,7 +174,7 @@ __schema_layered_ingest_worker_verify(WT_SESSION_IMPL *session, const char *inge
     WT_ASSERT(session, ingest_uri != NULL);
 
     /* We don't verify the ingest table on a follower. */
-    if (!conn->layered_table_manager.leader)
+    if (!__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
         return (0);
 
     /*

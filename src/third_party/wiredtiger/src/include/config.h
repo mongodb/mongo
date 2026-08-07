@@ -199,6 +199,7 @@ extern const char __WT_CONFIG_CHOICE_all[];
 extern const char __WT_CONFIG_CHOICE_all_durable[];
 extern const char __WT_CONFIG_CHOICE_always[];
 extern const char __WT_CONFIG_CHOICE_api[];
+extern const char __WT_CONFIG_CHOICE_auto[];
 extern const char __WT_CONFIG_CHOICE_backup[];
 extern const char __WT_CONFIG_CHOICE_backup_checkpoint[];
 extern const char __WT_CONFIG_CHOICE_backup_rename[];

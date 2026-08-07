@@ -420,7 +420,7 @@ __wt_truncate_delete_visible_check(WT_SESSION_IMPL *session, WT_TRUNCATE_LIST *t
     bool is_found = false;
 
     /* The truncate list is only populated on followers; leaders truncate stable directly. */
-    if (S2C(session)->layered_table_manager.leader)
+    if (__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
         return (WT_NOTFOUND);
 
     /* In follower-slow truncate mode the list is empty; nothing to find. */

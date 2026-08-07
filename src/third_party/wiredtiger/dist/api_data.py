@@ -805,6 +805,17 @@ connection_runtime_config = [
                 cache. The number of threads currently running will vary depending on the
                 current eviction load''',
                 min=1, max=64),
+            Config('checkpoint_scrub_eviction', 'auto',
+                r'''Control whether checkpoint replaces a reconciled leaf page in cache with a clean
+                copy of its just-written on-disk image. \c on always attempts the replacement,
+                \c off never does, and \c auto lets eviction decide based on cache pressure.
+                Most applications should leave this at \c auto.''',
+                choices=['auto', 'off', 'on']),
+            Config('checkpoint_scrub_image_max', '10', r'''
+                maximum percentage of the cache that checkpoint may consume with the clean
+                images it retains for that replacement. Checkpoint stops retaining new images
+                once the limit is reached; a value of \c 0 disables retention entirely''',
+                min=0, max=100),
             Config('evict_sample_inmem', 'true', r'''
                 If no in-memory ref is found on the root page, attempt to locate a random
                 in-memory page by examining all entries on the root page.''',

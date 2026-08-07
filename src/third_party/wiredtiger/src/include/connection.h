@@ -145,11 +145,7 @@ struct __wt_layered_table_manager {
     WT_LAYERED_TABLE_MANAGER_ENTRY **entries;
     size_t entries_allocated_bytes;
 
-    /*
-     * FIXME-WT-18205: written on role reconfigure while other threads read it unsynchronised;
-     * convert to atomic accesses.
-     */
-    bool leader;
+    wt_shared bool leader; /* The node's disaggregated role, written on role reconfigure */
 };
 
 /*

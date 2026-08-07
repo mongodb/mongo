@@ -73,7 +73,7 @@ util_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, WT_SESSION *session)
      * Leader-mode pickup is handled inside wiredtiger_open by __wti_disagg_conn_config. Connections
      * without a page log don't need pickup.
      */
-    if (conn_impl->layered_table_manager.leader ||
+    if (__wt_atomic_load_bool_relaxed(&conn_impl->layered_table_manager.leader) ||
       conn_impl->disaggregated_storage.npage_log == NULL)
         return (0);
 

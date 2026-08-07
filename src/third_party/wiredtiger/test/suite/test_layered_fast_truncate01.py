@@ -73,9 +73,7 @@ class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.session.checkpoint()
 
         # Switch to follower.
-        follower_config = 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         c1 = self.session.open_cursor(self.uri)
         c1.set_key(str(100))
@@ -127,9 +125,7 @@ class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.session.checkpoint()
 
         # Switch to follower.
-        follower_config = 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         c1 = self.session.open_cursor(self.uri)
         c1.set_key(str(100))
@@ -167,9 +163,7 @@ class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.session.checkpoint()
 
         # Switch to follower.
-        follower_config = 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         c1 = self.session.open_cursor(self.uri)
         c1.set_key(str(100))

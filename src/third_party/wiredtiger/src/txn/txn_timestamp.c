@@ -401,7 +401,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
      * one is already set. These are hard invariants, so validate them even under force.
      */
     if (has_step_down) {
-        if (!S2C(session)->layered_table_manager.leader)
+        if (!__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
             WT_RET_MSG(session, EINVAL,
               "set_timestamp: step down timestamp can only be set on a disaggregated leader");
         if (__wt_atomic_load_uint64_relaxed(&txn_global->step_down_timestamp) != WT_TS_NONE)

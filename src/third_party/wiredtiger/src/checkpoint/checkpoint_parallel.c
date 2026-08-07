@@ -194,6 +194,7 @@ __checkpoint_parallel_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_CHECKPOINT_RECONCILE_THREADS *ckpt_threads;
     WT_DECL_RET;
     uint64_t time_rec_start;
+    uint32_t reconcile_flags;
     bool signalled;
 
     ckpt_threads = S2C(session)->ckpt_reconcile_threads;
@@ -225,9 +226,14 @@ __checkpoint_parallel_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         session->isolation = session->txn->isolation = entry->isolation;
 
         /* Reconcile the page. */
+        reconcile_flags = entry->reconcile_flags;
+        if (FLD_ISSET(reconcile_flags, WT_REC_SAVE_IMAGE_CLEAN) &&
+          !__wt_cache_scrub_image_budget_ok(session))
+            FLD_CLR(reconcile_flags, WT_REC_SAVE_IMAGE_CLEAN);
+
         time_rec_start = __wt_clock(session);
         WT_WITH_DHANDLE(session, entry->dhandle,
-          ret = __wt_reconcile(session, entry->ref, NULL, entry->reconcile_flags));
+          ret = __wt_reconcile(session, entry->ref, NULL, reconcile_flags));
 
         /* Update the reconciliation time and the statistics. */
         entry->reconcile_time = __wt_clock(session) - time_rec_start;

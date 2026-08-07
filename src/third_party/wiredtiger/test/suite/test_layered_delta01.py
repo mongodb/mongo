@@ -100,11 +100,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
         for i in range(self.nitems):
@@ -148,11 +144,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
         for i in range(self.nitems):
@@ -195,11 +187,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
         for i in range(self.nitems):
@@ -241,11 +229,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
         for i in range(self.nitems):
@@ -298,11 +282,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
         for i in range(self.nitems):
@@ -364,11 +344,7 @@ class test_layered_delta01(wttest.WiredTigerTestCase):
 
         self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
         for i in range(self.nitems):

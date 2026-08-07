@@ -171,6 +171,10 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(session, stats, cache_shared_dsk_bytes_duplicate,
       __wt_atomic_load_uint64_relaxed(&cache->bytes_shared_dsk_duplicate));
     WT_STATP_CONN_SET(session, stats, cache_bytes_image, __wt_cache_bytes_image(cache));
+    WT_STATP_CONN_SET(session, stats, cache_scrub_image_bytes,
+      __wt_atomic_load_uint64_relaxed(&cache->bytes_scrub_image));
+    WT_STATP_CONN_SET(session, stats, cache_scrub_image_pages,
+      __wt_atomic_load_uint64_relaxed(&cache->pages_scrub_image));
     WT_STATP_CONN_SET(
       session, stats, cache_bytes_image_ingest, __wt_cache_bytes_image_ingest(cache));
     WT_STATP_CONN_SET(
@@ -269,6 +273,19 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
           __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_intl) +
             __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_leaf),
           cache->pages_dirty_intl + cache->pages_dirty_leaf);
+
+    /*
+     * Every page has been discarded and every dhandle closed by this point, so any image checkpoint
+     * scrub retained has been freed with its page. A non-zero count means a path freed an image
+     * without releasing its accounting.
+     */
+    if (__wt_atomic_load_uint64_relaxed(&cache->bytes_scrub_image) != 0 ||
+      __wt_atomic_load_uint64_relaxed(&cache->pages_scrub_image) != 0)
+        __wt_errx(session,
+          "cache server: exiting with %" PRIu64 " scrub image bytes and %" PRIu64
+          " scrub image pages",
+          __wt_atomic_load_uint64_relaxed(&cache->bytes_scrub_image),
+          __wt_atomic_load_uint64_relaxed(&cache->pages_scrub_image));
 
     /* Destroy the shared disk cache if it was initialized. */
     if (conn->cache->shared_dsk_cache.hash != NULL)

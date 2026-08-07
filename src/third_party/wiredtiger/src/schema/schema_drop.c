@@ -72,7 +72,8 @@ __drop_file(
      */
     WT_ERR(ret);
     if (id_found && !F_ISSET(conn, WT_CONN_IN_MEMORY) && F_ISSET_ATOMIC_32(conn, WT_CONN_READY) &&
-      (!__wt_conn_is_disagg(session) || conn->layered_table_manager.leader ||
+      (!__wt_conn_is_disagg(session) ||
+        __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) ||
         !WT_BTREE_ID_SHARED(id)))
         if (__wt_hs_btree_truncate(session, id) != 0)
             __wt_verbose_warning(
@@ -203,7 +204,7 @@ __drop_layered(
     stable_uri = stable_uri_buf->data;
 
     /* Only the leader can issue a trim command. */
-    if (S2C(session)->layered_table_manager.leader)
+    if (__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
         WT_ERR(__drop_issue_trim(session, stable_uri));
 
     /* Remove all the associated metadata from shared metadata table. */
@@ -219,7 +220,8 @@ __drop_layered(
      * treat ENOENT as an error for them.
      */
     WT_ERR_ERROR_OK(__wt_schema_drop(session, stable_uri, cfg, check_visibility), ENOENT, true);
-    if (WT_CHECK_AND_RESET(ret, ENOENT) && S2C(session)->layered_table_manager.leader)
+    if (WT_CHECK_AND_RESET(ret, ENOENT) &&
+      __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
         WT_ERR_MSG(session, ENOENT,
           "stable constituent \"%s\" not found when dropping \"%s\" on leader", stable_uri, uri);
     WT_ERR(__wt_schema_drop(session, ingest_uri, cfg, check_visibility));

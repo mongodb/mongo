@@ -170,6 +170,8 @@ class test_layered_prepare05(test_prepare_preserve_prepare_base):
         # Make the delete globally visible
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(30)},oldest_timestamp={self.timestamp_str(22)}')
 
+        restores = self.get_stat(wiredtiger.stat.conn.cache_scrub_restore)
+
         # Verify checkpoint writes no prepared to disk
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
@@ -200,13 +202,19 @@ class test_layered_prepare05(test_prepare_preserve_prepare_base):
         session_prepare.rollback_transaction(f'rollback_timestamp={self.timestamp_str(45)}')
         session_prepare.close()
 
-        # Verify checkpoint skips writing a page to disk. When the page was evicted before the
-        # prepare, the prior committed delete tombstone is gone from memory, so the prepare
-        # rollback appends a fresh tail tombstone with no durable flag set; that tombstone gets
-        # re-saved and causes one extra write here.
+        # When the page was evicted before the prepare, the prior committed delete tombstone is gone
+        # from memory, so the prepare rollback appends a fresh tail tombstone with no durable flag
+        # set; that tombstone gets re-saved and causes one extra write here.
+        #
+        # Precise-checkpoint scrub can re-instantiate a page still in cache from its retained disk
+        # image, dropping the in-memory tombstone the same way eviction does and costing the same
+        # one-off write. It depends on eviction state this test does not control, so measure it
+        # here rather than assume it: the swap can happen at any point up to this checkpoint.
+        scrub_rewrote = (not self.delta and
+          self.get_stat(wiredtiger.stat.conn.cache_scrub_restore) > restores)
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-            stat: self.evict,
+            stat: self.evict or scrub_rewrote,
         }, self.uri)
 
         # Make stable timestamp equal to prepare timestamp - this should allow checkpoint to reconcile prepared update
@@ -310,3 +318,60 @@ class test_layered_prepare05(test_prepare_preserve_prepare_base):
 
         # Verify the key
         self.assertEqual(cursor[19], 'commit_value')
+
+    def test_no_repeated_leaf_writes(self):
+        # Regression guard for WT-16244: after a prepared update is rolled back and nothing further
+        # changes, the durable content at the stable timestamp is unchanged, so repeated checkpoints
+        # must not keep rewriting the leaf. A one-to-one replacement that makes no progress is
+        # skipped, so over many no-op checkpoints the page must be written at most once.
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(20)}')
+
+        create_params = 'key_format=i,value_format=S,type=layered'
+        self.session.create(self.uri, create_params)
+
+        # Insert keys 1-19, then delete key 19 and make the delete globally visible.
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
+        for i in range(1, 20):
+            cursor.set_key(i)
+            cursor.set_value('commit_value')
+            cursor.insert()
+        self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(21)}')
+
+        self.session.begin_transaction()
+        cursor.set_key(19)
+        cursor.remove()
+        self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(22)}')
+
+        self.conn.set_timestamp(
+            f'oldest_timestamp={self.timestamp_str(22)},stable_timestamp={self.timestamp_str(30)}')
+        self.session.checkpoint()
+
+        # Prepare an update to key 19 and roll it back after the stable timestamp.
+        session_prepare = self.conn.open_session()
+        cursor_prepare = session_prepare.open_cursor(self.uri)
+        session_prepare.begin_transaction()
+        cursor_prepare.set_key(19)
+        cursor_prepare.set_value('prepared_value')
+        cursor_prepare.insert()
+        session_prepare.prepare_transaction(
+            f'prepare_timestamp={self.timestamp_str(35)},prepared_id={self.prepared_id_str(1)}')
+        session_prepare.rollback_transaction(f'rollback_timestamp={self.timestamp_str(45)}')
+        session_prepare.close()
+
+        # The stable timestamp is unchanged, so nothing new is durable. Count leaf writes across
+        # several checkpoints: the page must not be rewritten on every checkpoint.
+        def leaf_writes():
+            return (self.get_stat(wiredtiger.stat.dsrc.rec_page_full_image_leaf, self.uri) +
+              self.get_stat(wiredtiger.stat.dsrc.rec_page_delta_leaf, self.uri))
+
+        base = leaf_writes()
+        for _ in range(5):
+            self.session.checkpoint()
+        writes = leaf_writes() - base
+        self.assertLessEqual(writes, 1,
+          f"leaf written {writes} times over 5 no-op checkpoints; expected at most 1")
+
+        # Resolve the rolled-back prepare so the database verifies cleanly at teardown.
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(45)}')
+        self.session.checkpoint()

@@ -111,11 +111,7 @@ class test_layered_delta04(wttest.WiredTigerTestCase):
 
             self.session.checkpoint()
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         if self.ts:
             self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))

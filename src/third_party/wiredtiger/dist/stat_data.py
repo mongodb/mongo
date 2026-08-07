@@ -351,6 +351,8 @@ conn_stats = [
     CacheStat('cache_pages_inuse_stable', 'pages currently held in the cache from the stable btrees', 'no_clear,no_scale'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
+    CacheStat('cache_scrub_image_bytes', 'bytes of clean re-instantiation images retained by checkpoint scrub', 'no_clear,no_scale,size'),
+    CacheStat('cache_scrub_image_pages', 'pages with a clean re-instantiation image retained by checkpoint scrub', 'no_clear,no_scale'),
     CacheStat('cache_shared_dsk_bytes_duplicate', 'shared disk bytes saved by sharing duplicate disk images', 'no_clear,no_scale,size'),
     CacheStat('cache_shared_dsk_hash_size', 'shared disk hash table size', 'no_clear,no_scale'),
     CacheStat('cache_shared_dsk_hit', 'shared disk hit'),
@@ -370,6 +372,7 @@ conn_stats = [
     EvictStat('eviction_active_workers', 'eviction worker thread active', 'no_clear'),
     EvictStat('eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
     EvictStat('eviction_app_attempt', 'page evict attempts by application threads'),
+    EvictStat('eviction_app_bounded_wait_exceeded', 'application eviction assists stopped when the bounded wait was exhausted'),
     EvictStat('eviction_app_dirty_attempt', 'modified page evict attempts by application threads'),
     EvictStat('eviction_app_dirty_fail', 'modified page evict failures by application threads'),
     EvictStat('eviction_app_fail', 'page evict failures by application threads'),
@@ -1350,6 +1353,8 @@ conn_dsrc_stats = [
     CacheStat('cache_write_hs', 'page written requiring history store records'),
     CacheStat('cache_write_restore_invisible', 'pages written requiring in-memory restoration due to invisible updates'),
     CacheStat('cache_write_restore_scrub', 'pages written requiring in-memory restoration due to scrub eviction'),
+    CacheStat('cache_write_restore_scrub_checkpoint', 'pages written requiring in-memory restoration due to checkpoint scrub'),
+    CacheStat('cache_write_restore_scrub_skipped_dirty', 'checkpoint scrub skipped because the page will be left dirty'),
 
     ##########################################
     # Checkpoint Cleanup statistics

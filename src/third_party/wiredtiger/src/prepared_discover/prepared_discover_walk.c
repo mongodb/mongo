@@ -16,7 +16,8 @@
 static WT_INLINE bool
 __prepared_discover_is_follower_stable_walk(WT_SESSION_IMPL *session, const char *uri)
 {
-    return (__wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader &&
+    return (__wt_conn_is_disagg(session) &&
+      !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader) &&
       WT_URI_IS_STABLE(uri));
 }
 

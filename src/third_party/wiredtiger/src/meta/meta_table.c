@@ -385,6 +385,88 @@ err:
 }
 
 /*
+ * __btree_id_cmp --
+ *     Compare two btree IDs for qsort, sorts in ascending order.
+ */
+static int
+__btree_id_cmp(const void *a, const void *b)
+{
+    uint32_t id_a, id_b;
+
+    id_a = *(const uint32_t *)a;
+    id_b = *(const uint32_t *)b;
+    return (id_a < id_b ? -1 : (id_a == id_b ? 0 : 1));
+}
+
+/*
+ * __wt_metadata_btree_ids_find_duplicate --
+ *     Sort a list of btree IDs and return whether any two of them are the same, setting the shared
+ *     ID when they are.
+ */
+bool
+__wt_metadata_btree_ids_find_duplicate(uint32_t *btree_ids, size_t count, uint32_t *dup_idp)
+{
+    size_t i;
+
+    *dup_idp = 0;
+
+    __wt_qsort(btree_ids, count, sizeof(uint32_t), __btree_id_cmp);
+    for (i = 0; i + 1 < count; ++i)
+        if (btree_ids[i] == btree_ids[i + 1]) {
+            *dup_idp = btree_ids[i];
+            return (true);
+        }
+
+    return (false);
+}
+
+/*
+ * __wt_metadata_stable_uris_for_id --
+ *     Find the two stable files in the metadata carrying the given btree ID, returning WT_NOTFOUND
+ *     if fewer than two do. Callers only ask in order to name a conflict they have already
+ *     detected, so the scan falls on a path that is already failing. Uses a private cursor: a
+ *     caller failing mid-transaction may need the session's cached one to unroll.
+ */
+int
+__wt_metadata_stable_uris_for_id(
+  WT_SESSION_IMPL *session, uint32_t btree_id, char **first_urip, char **second_urip)
+{
+    WT_CONFIG_ITEM id_val;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    const char *key, *value;
+
+    *first_urip = *second_urip = NULL;
+    cursor = NULL;
+
+    WT_ERR(__wt_metadata_cursor_open(session, NULL, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_key(cursor, &key));
+        if (!WT_PREFIX_MATCH(key, "file:") || !WT_URI_IS_STABLE(key))
+            continue;
+        WT_ERR(cursor->get_value(cursor, &value));
+        WT_ERR(__wt_config_getones(session, value, "id", &id_val));
+        if ((uint32_t)id_val.val != btree_id)
+            continue;
+        WT_ERR(__wt_strdup(session, key, *first_urip == NULL ? first_urip : second_urip));
+        if (*second_urip != NULL)
+            break;
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    if (*second_urip == NULL)
+        ret = WT_NOTFOUND;
+
+err:
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    if (ret != 0) {
+        __wt_free(session, *first_urip);
+        __wt_free(session, *second_urip);
+    }
+    return (ret);
+}
+
+/*
  * __wt_verbose_dump_metadata --
  *     Output diagnostic information about metadata contents.
  */

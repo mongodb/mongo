@@ -87,7 +87,8 @@ __wt_evict_page_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_sp
      */
     if (__wt_evict_page_is_soon_or_wont_need(page) && btree->evict_disabled == 0 &&
       __wt_page_can_evict(session, ref, inmem_split) &&
-      (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page)))
+      (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page) ||
+        __wt_page_evict_swap(page)))
         return (true);
     return (false);
 }
@@ -118,9 +119,27 @@ __wt_page_evict_clean(WT_PAGE *page)
      * and we're not blocking checkpoints (although we must block eviction as it might clear and
      * free these structures).
      */
-    return (page->modify == NULL ||
-      (__wt_atomic_load_uint32_relaxed(&page->modify->page_state) == WT_PAGE_CLEAN &&
-        page->modify->rec_result == 0));
+    return (
+      page->modify == NULL || (!__wt_page_is_modified(page) && page->modify->rec_result == 0));
+}
+
+/*
+ * __wt_page_evict_swap --
+ *     Check whether a page is clean with a retained reconciliation image that eviction can swap
+ *     into place as a clean in-memory image.
+ */
+static WT_INLINE bool
+__wt_page_evict_swap(WT_PAGE *page)
+{
+    WT_PAGE_MODIFY *mod;
+
+    /*
+     * The disk image shares a union with the multi-block array, so the reconciliation result has to
+     * be checked before the image pointer is read.
+     */
+    return (!WT_PAGE_IS_INTERNAL(page) && (mod = page->modify) != NULL &&
+      !__wt_page_is_modified(page) && mod->rec_result == WT_PM_REC_REPLACE &&
+      mod->mod_disk_image != NULL);
 }
 
 /*
@@ -134,9 +153,12 @@ __wt_page_is_modified(WT_PAGE *page)
      * Be cautious modifying this function: it's reading fields set by checkpoint reconciliation,
      * and we're not blocking checkpoints (although we must block eviction as it might clear and
      * free these structures).
+     *
+     * Without the stronger acquire used here, the reads might be from an earlier reconciliation
+     * that don't reflect the current clean in-memory state.
      */
     return (page->modify != NULL &&
-      __wt_atomic_load_uint32_relaxed(&page->modify->page_state) != WT_PAGE_CLEAN);
+      __wt_atomic_load_uint32_acquire(&page->modify->page_state) != WT_PAGE_CLEAN);
 }
 
 /*
@@ -399,6 +421,31 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size,
 }
 
 /*
+ * __wt_cache_page_footprint_incr --
+ *     Add memory to a leaf page's footprint in the cache. The dirty and updates totals are left
+ *     alone.
+ */
+static WT_INLINE void
+__wt_cache_page_footprint_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+{
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+
+    /* Callers reach this with nothing to move when the page has no retained image. */
+    if (size == 0)
+        return;
+
+    WT_ASSERT(session, !WT_PAGE_IS_INTERNAL(page) && size < WT_EXABYTE);
+
+    btree = S2BT(session);
+    cache = S2C(session)->cache;
+
+    WT_CACHE_INCR(__wt_conn_is_disagg(session), btree, cache, bytes_inmem, size);
+    (void)__wt_atomic_add_uint64_relaxed(&btree->bytes_inmem, size);
+    (void)__wt_atomic_add_size_relaxed(&page->memory_footprint, size);
+}
+
+/*
  * __wt_cache_decr_check_size --
  *     Decrement a size_t cache value and check for underflow.
  */
@@ -445,6 +492,71 @@ __wt_cache_decr_check_uint64(WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v,
 #ifdef HAVE_DIAGNOSTIC
     __wt_abort(session);
 #endif
+}
+
+/*
+ * __wt_cache_scrub_image_incr --
+ *     Account for a clean re-instantiation image retained in cache by checkpoint scrub.
+ */
+static WT_INLINE void
+__wt_cache_scrub_image_incr(WT_SESSION_IMPL *session, uint32_t image_size)
+{
+    WT_CACHE *cache;
+
+    cache = S2C(session)->cache;
+    (void)__wt_atomic_add_uint64_relaxed(&cache->bytes_scrub_image, (uint64_t)image_size);
+    (void)__wt_atomic_add_uint64_relaxed(&cache->pages_scrub_image, 1);
+}
+
+/*
+ * __wt_cache_scrub_image_decr --
+ *     Release accounting for a checkpoint-scrub image no longer retained in cache, guarding from
+ *     underflow.
+ */
+static WT_INLINE void
+__wt_cache_scrub_image_decr(WT_SESSION_IMPL *session, uint32_t image_size)
+{
+    WT_CACHE *cache;
+
+    cache = S2C(session)->cache;
+    __wt_cache_decr_check_uint64(
+      session, &cache->bytes_scrub_image, (uint64_t)image_size, "WT_CACHE.bytes_scrub_image");
+    __wt_cache_decr_check_uint64(
+      session, &cache->pages_scrub_image, 1, "WT_CACHE.pages_scrub_image");
+}
+
+/*
+ * __wt_cache_scrub_image_budget_ok --
+ *     Return true if the cache has room for another checkpoint-scrub image. Checkpoint checks this
+ *     immediately before reconciling a page.
+ */
+static WT_INLINE bool
+__wt_cache_scrub_image_budget_ok(WT_SESSION_IMPL *session)
+{
+    WT_CACHE *cache;
+    uint64_t image_max_bytes;
+
+    cache = S2C(session)->cache;
+    image_max_bytes = (S2C(session)->cache_size / 100) *
+      __wt_atomic_load_uint8_relaxed(&cache->cache_eviction_controls.checkpoint_scrub_image_max);
+
+    return (__wt_atomic_load_uint64_relaxed(&cache->bytes_scrub_image) < image_max_bytes);
+}
+
+/*
+ * __wt_page_image_discard --
+ *     Free a page's retained re-instantiation image, releasing scrub accounting if it was tracked.
+ *     A caller whose page stays in cache must also shrink the page's footprint by the image; a page
+ *     being discarded must not, its footprint is subtracted as a whole before it is freed.
+ */
+static WT_INLINE void
+__wt_page_image_discard(WT_SESSION_IMPL *session, WT_PAGE_MODIFY *mod)
+{
+    if (mod->scrub_image_bytes != 0) {
+        __wt_cache_scrub_image_decr(session, mod->scrub_image_bytes);
+        mod->scrub_image_bytes = 0;
+    }
+    __wt_free(session, mod->mod_disk_image);
 }
 
 /*
@@ -561,15 +673,38 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
     WT_CACHE_DECR(session, is_disagg, btree, cache, bytes_inmem, size);
     if (page->modify != NULL && !WT_PAGE_IS_INTERNAL(page))
         __wt_cache_page_byte_updates_decr(session, page, size);
-    if (__wt_page_is_modified(page)) {
+    if (__wt_page_is_modified(page))
         __wt_cache_page_byte_dirty_decr(session, page, size);
-    }
     /* Track internal size in cache. */
     if (WT_PAGE_IS_INTERNAL(page)) {
         __wt_cache_decr_check_uint64(
           session, &btree->bytes_internal, size, "WT_BTREE.bytes_internal");
         WT_CACHE_DECR(session, is_disagg, btree, cache, bytes_internal, size);
     }
+}
+
+/*
+ * __wt_cache_page_footprint_decr --
+ *     Remove engine-owned memory from a page's footprint, reversing footprint incr.
+ */
+static WT_INLINE void
+__wt_cache_page_footprint_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+{
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+
+    /* Callers reach this with nothing to move when the page has no retained image. */
+    if (size == 0)
+        return;
+
+    WT_ASSERT(session, !WT_PAGE_IS_INTERNAL(page) && size < WT_EXABYTE);
+
+    btree = S2BT(session);
+    cache = S2C(session)->cache;
+
+    __wt_cache_decr_check_size(session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
+    __wt_cache_decr_check_uint64(session, &btree->bytes_inmem, size, "WT_BTREE.bytes_inmem");
+    WT_CACHE_DECR(session, __wt_conn_is_disagg(session), btree, cache, bytes_inmem, size);
 }
 
 /*
@@ -856,7 +991,8 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
         return;
 
     WT_ASSERT(session,
-      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || S2C(session)->layered_table_manager.leader);
+      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /*
      * This is a relatively complex dance of operations so pay attention prior to modifying the code
@@ -967,8 +1103,9 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
     if (F_ISSET(btree, WT_BTREE_READONLY))
         return;
 
-    WT_ASSERT(
-      session, !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || conn->layered_table_manager.leader);
+    WT_ASSERT(session,
+      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
+        __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader));
 
     /*
      * Test before setting the dirty flag, it's a hot cache line.
@@ -1069,7 +1206,8 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
         return;
 
     WT_ASSERT(session,
-      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || S2C(session)->layered_table_manager.leader);
+      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /*
      * Mark the tree dirty (even if the page is already marked dirty), newly created pages to
@@ -1109,7 +1247,8 @@ __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_onl
         return (0);
 
     WT_ASSERT(session,
-      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || S2C(session)->layered_table_manager.leader);
+      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /*
      * This function exists as a place to stash this comment. There are a few places where we need
@@ -2185,7 +2324,7 @@ __wt_btree_can_discard(WT_SESSION_IMPL *session)
     if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED))
         return (true);
 
-    if (!conn->layered_table_manager.leader)
+    if (!__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
         return (true);
 
     rec_lsn_max = __wt_atomic_load_uint64_relaxed(&btree->rec_lsn_max);
@@ -2393,10 +2532,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     modified = __wt_page_is_modified(page);
 
     /*
-     * Clean pages that are in front of the materialization check should not proceed to eviction.
-     * They would not go through reconciliation, but just be discarded which isn't OK.
+     * Clean pages that are in front of the materialization check should not proceed to eviction:
+     * they would be discarded without reconciliation, which is unsafe. Pages with a retained disk
+     * image are exempt because eviction re-instantiates them in cache rather than discarding.
      */
-    if (!modified && page->disagg_info != NULL &&
+    if (!modified && page->disagg_info != NULL && !__wt_page_evict_swap(page) &&
       !__wt_materialization_check(session, page->disagg_info->rec_lsn_max)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_materialization);
         return (false);
@@ -2491,6 +2631,11 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
             WT_RET_BUSY_OK(__wt_page_release_evict(session, ref, flags));
             return (0);
         }
+    } else if (!LF_ISSET(WT_READ_NO_EVICT) &&
+      __wt_atomic_load_int32_relaxed(&btree->evict_disabled) == 0 &&
+      !F_ISSET(session, WT_SESSION_NO_RECONCILE) && __wt_page_evict_swap(ref->page)) {
+        WT_RET_BUSY_OK(__wt_page_release_evict(session, ref, flags));
+        return (0);
     }
 
     return (__wt_hazard_clear(session, ref));

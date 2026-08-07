@@ -836,7 +836,8 @@ __checkpoint_cleanup(void *arg)
         __wt_seconds(session, &now);
 
         /* Skip running checkpoint cleanup if we are the follower. */
-        if (__wt_conn_is_disagg(session) && !conn->layered_table_manager.leader)
+        if (__wt_conn_is_disagg(session) &&
+          !__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
             continue;
 
         /*

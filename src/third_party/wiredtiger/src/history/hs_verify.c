@@ -169,7 +169,8 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
     btree_id = WT_BTREE_ID_INVALID;
     uri_data = NULL;
     ds_checkpoint_name = hs_checkpoint_name = hs_uri = NULL;
-    is_follower = __wt_conn_is_disagg(session) && !conn->layered_table_manager.leader;
+    is_follower = __wt_conn_is_disagg(session) &&
+      !__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader);
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
