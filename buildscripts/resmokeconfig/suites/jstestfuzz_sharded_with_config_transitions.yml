@@ -24,7 +24,6 @@ executor:
           shardsAddedRemoved: true
           runningWithBalancer: true
       crashOnInvalidBSONError: ""
-      objcheck: ""
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true

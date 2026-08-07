@@ -12,7 +12,6 @@ executor:
   config:
     shell_options:
       crashOnInvalidBSONError: ""
-      objcheck: ""
       global_vars:
         TestData:
           ignoreCommandsIncompatibleWithRollback: true

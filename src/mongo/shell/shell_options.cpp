@@ -118,18 +118,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
     logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
         mongo::logv2::LogComponent::kDefault, minimumLoggedSeveity);
 
-    // `objcheck` option is part of `serverGlobalParams` to avoid making common parts depend upon
-    // the client options.  The option is set to false in clients by default.
-    if (params.count("objcheck")) {
-        serverGlobalParams.objcheck = true;
-    } else if (params.count("noobjcheck")) {
-        serverGlobalParams.objcheck = false;
-    } else {
-        serverGlobalParams.objcheck = false;
-    }
-
-    // Similar to 'objcheck' above, 'crashOnInvalidBSONError' must be common to both the server
-    // and shell for linking reasons.
+    // `crashOnInvalidBSONError` option is part of `serverGlobalParams` to avoid making common parts
+    // depend upon the client options.
     if (params.count("crashOnInvalidBSONError")) {
         serverGlobalParams.crashOnInvalidBSONError = true;
     }

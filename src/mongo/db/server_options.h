@@ -80,10 +80,7 @@ struct [[MONGO_MOD_PUBLIC]] ServerGlobalParams {
     boost::optional<int> priorityPort;    // --priorityPort
     bool doAutoBootstrapSharding{false};  // This is derived from other settings during startup.
 
-    bool objcheck = true;  // --objcheck
-
     // Shell parameter, used for testing only, to tell the shell to crash on InvalidBSON errors.
-    // Can be paired with --objcheck so that extra BSON validation occurs.
     bool crashOnInvalidBSONError = false;  // --crashOnInvalidBSONError
 
     // When specified, deterministically reproduces the execution order of mongo initializers.

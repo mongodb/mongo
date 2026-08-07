@@ -212,13 +212,9 @@ Status canonicalizeServerOptions(moe::Environment* params) {
     if (!ret.isOK())
         return ret;
 
-    // "net.wireObjectCheck" comes from the config file, so override it if either "objcheck" or
-    // "noobjcheck" are set, since those come from the command line.
+    // objcheck and noobjcheck are deprecated now, so if either are set, log a warning.
     if (params->count("objcheck")) {
-        ret = params->set("net.wireObjectCheck", moe::Value((*params)["objcheck"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        LOGV2_WARNING(13047401, "Deprecated option \"objcheck\" was set");
         ret = params->remove("objcheck");
         if (!ret.isOK()) {
             return ret;
@@ -226,10 +222,7 @@ Status canonicalizeServerOptions(moe::Environment* params) {
     }
 
     if (params->count("noobjcheck")) {
-        ret = params->set("net.wireObjectCheck", moe::Value(!(*params)["noobjcheck"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        LOGV2_WARNING(13047402, "Deprecated option \"noobjcheck\" was set");
         ret = params->remove("noobjcheck");
         if (!ret.isOK()) {
             return ret;
@@ -349,7 +342,7 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("net.wireObjectCheck")) {
-        serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
+        LOGV2_WARNING(13047403, "Deprecated option \"net.wireObjectCheck\" was set");
     }
 
     if (params.count("net.bindIp")) {

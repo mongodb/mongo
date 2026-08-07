@@ -14,7 +14,6 @@ executor:
     shell_options:
       eval: await import("jstests/libs/override_methods/enable_causal_consistency.js")
       crashOnInvalidBSONError: ""
-      objcheck: ""
       global_vars:
         TestData:
           runningWithCausalConsistency: true

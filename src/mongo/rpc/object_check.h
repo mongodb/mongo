@@ -20,9 +20,6 @@ namespace rpc {
 /**
  * Calls validateBSON, but controllable by server parameters.
  *
- *  - `objcheck`:
- *     controls whether the check is actually performed.
- *
  *  - `crashOnInvalidBSONError`:
  *     controls whether a verbose fassert is triggered on failure.
  */

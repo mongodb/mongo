@@ -22,10 +22,6 @@ namespace mongo {
 namespace rpc {
 
 Status checkBSONObj(const char* ptr, size_t length) {
-    if (!serverGlobalParams.objcheck) {
-        return Status::OK();
-    }
-
     auto status = validateBSON(ptr, length);
     if (serverGlobalParams.crashOnInvalidBSONError && !status.isOK()) {
         std::string msg = "Invalid BSON was received: " + status.toString() +

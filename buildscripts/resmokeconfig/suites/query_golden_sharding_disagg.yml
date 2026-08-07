@@ -8,7 +8,6 @@ executor:
   config:
     shell_options:
       crashOnInvalidBSONError: ""
-      objcheck: ""
       eval: |
         // enables disagg
         await import("src/mongo/db/modules/atlas/jstests/disagg_storage/libs/disagg_storage_override.js");
