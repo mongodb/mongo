@@ -41,7 +41,12 @@ import git
 
 sys.path.append(os.getcwd())
 
-import packager
+try:
+    import packager
+except ModuleNotFoundError as exc:
+    if exc.name != "packager":
+        raise
+    from buildscripts import packager
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64", "aarch64"]
