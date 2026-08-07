@@ -61,6 +61,12 @@ describe("range deleter MaxKey orphan guard", function () {
         );
     }
 
+    // Waits for the guarded-task counter to rise above 'before'. The counter is incremented only
+    // after the persistent task has been removed and majority committed, so there is a lag.
+    function assertGuardedTaskCountAdvanced(before, msg) {
+        assert.soon(() => guardedTaskCount() > before, msg);
+    }
+
     // Enables (value=true) or disables (value=false) the guard on every rs0 node by toggling the
     // skipRangeDeletionForMaxKeyChunks server parameter. Enabled => blocked tasks preserve their
     // MaxKey-prefixed docs; disabled => the range deleter deletes them normally (the escape hatch).
@@ -273,8 +279,7 @@ describe("range deleter MaxKey orphan guard", function () {
             primary().getDB(dbName).getCollection("guarded").find({a: 50}).itcount(),
             "ordinary orphan in the global-max chunk must be deleted",
         );
-        assert.gt(
-            guardedTaskCount(),
+        assertGuardedTaskCountAdvanced(
             guardedBefore,
             "guarded-task counter must advance for the guarded task",
         );
@@ -368,8 +373,7 @@ describe("range deleter MaxKey orphan guard", function () {
             primary().getDB(dbName).getCollection("failover").find({a: MaxKey}).itcount(),
             "orphan must remain after failover",
         );
-        assert.gt(
-            guardedTaskCount(),
+        assertGuardedTaskCountAdvanced(
             guardedBefore,
             "counter must advance for the guarded task (possibly more than once across the failover)",
         );
@@ -406,8 +410,7 @@ describe("range deleter MaxKey orphan guard", function () {
             primary().getDB(dbName).getCollection("concurrentB").find({a: MaxKey}).itcount(),
             "post-classification task B's orphan must be deleted",
         );
-        assert.gt(
-            guardedTaskCount(),
+        assertGuardedTaskCountAdvanced(
             guardedBefore,
             "the classified task must advance the guarded-task counter",
         );
