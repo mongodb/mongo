@@ -52,17 +52,17 @@ Status checkSortClause(const BSONObj& sortObject) {
 PatternElementCmp::PatternElementCmp() = default;
 
 PatternElementCmp::PatternElementCmp(const BSONObj& pattern, const CollatorInterface* collator)
-    : sortPattern(pattern.copy()), useWholeValue(sortPattern.hasField("")), collator(collator) {}
+    : sortPattern(pattern.copy()),
+      useWholeValue(sortPattern.hasField("")),
+      descending(sortPattern.firstElement().number() < 0),
+      collator(collator) {}
 
 bool PatternElementCmp::operator()(const mutablebson::Element& lhs,
                                    const mutablebson::Element& rhs) const {
     namespace dps = ::mongo::bson;
     if (useWholeValue) {
         const int comparedValue = lhs.compareWithElement(rhs, collator, false);
-
-        const bool reversed = (sortPattern.firstElement().number() < 0);
-
-        return (reversed ? comparedValue > 0 : comparedValue < 0);
+        return (descending ? comparedValue > 0 : comparedValue < 0);
     } else {
         BSONObj lhsObj =
             lhs.getType() == BSONType::object ? lhs.getValueObject() : lhs.getValue().wrap("");
@@ -83,8 +83,10 @@ PatternValueCmp::PatternValueCmp(const BSONObj& pattern,
                                  const CollatorInterface* collator)
     : sortPattern(pattern.copy()),
       useWholeValue(sortPattern.hasField("")),
+      descending(sortPattern.firstElement().number() < 0),
       originalObj(BSONObj().addField(originalElement).copy()),
-      collator(collator) {}
+      collator(collator),
+      valueComparator(collator) {}
 
 BSONObj PatternValueCmp::extractSortKey(const Value& val) const {
     namespace dps = ::mongo::bson;
@@ -95,9 +97,8 @@ BSONObj PatternValueCmp::extractSortKey(const Value& val) const {
 
 bool PatternValueCmp::operator()(const Value& lhs, const Value& rhs) const {
     if (useWholeValue) {
-        const bool descending = (sortPattern.firstElement().number() < 0);
-        return (descending ? ValueComparator(collator).getLessThan()(rhs, lhs)
-                           : ValueComparator(collator).getLessThan()(lhs, rhs));
+        return (descending ? valueComparator.getLessThan()(rhs, lhs)
+                           : valueComparator.getLessThan()(lhs, rhs));
     } else {
         BSONObj lhsKey = extractSortKey(lhs);
         BSONObj rhsKey = extractSortKey(rhs);

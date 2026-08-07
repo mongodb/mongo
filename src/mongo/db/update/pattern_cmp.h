@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -41,6 +42,7 @@ public:
 
     BSONObj sortPattern;
     bool useWholeValue = true;
+    bool descending = false;
     const CollatorInterface* collator = nullptr;
 };
 
@@ -64,6 +66,7 @@ public:
 
     BSONObj sortPattern;
     bool useWholeValue = true;
+    bool descending = false;
 
     /**
      * We store the original element as an object so that we can call the copy() method on it.
@@ -71,6 +74,7 @@ public:
      */
     BSONObj originalObj;
     const CollatorInterface* collator = nullptr;
+    ValueComparator valueComparator;
 };
 
 }  // namespace mongo
