@@ -15,6 +15,7 @@ py_library(
         "install_modules.py",
         "lint.py",
         "plus_interface.py",
+        "query_failure_diagnostic.py",
         "wrapper_debug.py",
         "wrapper_hook.py",
         "wrapper_util.py",
@@ -64,6 +65,17 @@ py_test(
     name = "install_modules_test",
     srcs = [
         "install_modules_test.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "query_failure_diagnostic_test",
+    srcs = [
+        "query_failure_diagnostic_test.py",
     ],
     visibility = ["//visibility:public"],
     deps = [

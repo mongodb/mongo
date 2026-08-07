@@ -252,6 +252,16 @@ if [[ "$python" = "" ]] || [ ! -f $python ]; then
   python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
 fi
 
+run_bazel_command() {
+  # Legacy `query` cannot evaluate select() branches. Keep the real Bazel
+  # process's output and status while adding a targeted cquery hint on failure.
+  if [[ "$current_bazel_command" == "query" ]]; then
+    "$python" "$REPO_ROOT/bazel/wrapper_hook/query_failure_diagnostic.py" "$bazel_real" "$@"
+  else
+    "$bazel_real" "$@"
+  fi
+}
+
 autocomplete_query=0
 # bash autocomplete detection
 if [[ $* =~ ^.*--output_base=/tmp/.*-completion-$USER.*$ ]]; then
@@ -285,7 +295,7 @@ fi
 if [[ $exit_code != 0 ]]; then
   if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."
-    "$bazel_real" "$@"
+    run_bazel_command "$@"
     exit $?
   else
     exit $? 
@@ -323,7 +333,7 @@ else
 
   bazel_exit_code=0
   if [[ ${#new_args[@]} -ne 0 ]]; then
-    $bazel_real "${new_args[@]}"
+    run_bazel_command "${new_args[@]}"
     bazel_exit_code=$?
   fi
   ( >&2 $python $REPO_ROOT/bazel/wrapper_hook/post_bazel_hook.py $bazel_real )  

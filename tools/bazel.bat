@@ -66,6 +66,9 @@ for /L %%i in (1,1,%argCount%) do (
 :found_command
 if !current_bazel_command!=="" set skip_python="1"
 
+set "is_query_command=0"
+for %%Q in ("query") do if /I !current_bazel_command!==%%Q set "is_query_command=1"
+
 if !skip_python!=="0" if !current_bazel_command!=="clean" set skip_python="1"
 if !skip_python!=="0" if !current_bazel_command!=="version" set skip_python="1"
 if !skip_python!=="0" if !current_bazel_command!=="shutdown" set skip_python="1"
@@ -201,7 +204,11 @@ if %exit_code% NEQ 0 (
         exit /b %exit_code%
     )
     echo wrapper script failed! falling back to normal bazel call... 1>&2  
-    "%BAZEL_REAL%" %*  
+    if "!is_query_command!"=="1" (
+        "%python%" "%REPO_ROOT%\bazel\wrapper_hook\query_failure_diagnostic.py" "%BAZEL_REAL%" %*
+    ) else (
+        "%BAZEL_REAL%" %*
+    )
     set "fallback_exit=%ERRORLEVEL%"
     call :cleanup_logfile
     exit /b %fallback_exit%
@@ -222,7 +229,12 @@ if "%MONGO_BAZEL_WRAPPER_DEBUG%"=="1" (
     echo [WRAPPER_HOOK_DEBUG]: wrapper hook script took %mm%m and %ss%.%cc%s 1>&2
 )
 
-"%BAZEL_REAL%" !new_args!
+rem Add the same targeted cquery hint as the Unix wrapper for legacy query failures.
+if "!is_query_command!"=="1" (
+    "%python%" "%REPO_ROOT%\bazel\wrapper_hook\query_failure_diagnostic.py" "%BAZEL_REAL%" !new_args!
+) else (
+    "%BAZEL_REAL%" !new_args!
+)
 set "bazel_exit=%ERRORLEVEL%"
 call :cleanup_logfile
 exit /b %bazel_exit%
