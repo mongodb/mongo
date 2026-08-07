@@ -13,6 +13,15 @@ export var MetadataConsistencyChecker = (function () {
                 return true;
             }
 
+            const isStepdownSuite =
+                Boolean(TestData.runningWithShardStepdowns) ||
+                Boolean(TestData.runningWithStepdowns);
+            if (isStepdownSuite && e.code === ErrorCodes.CallbackCanceled) {
+                // Metadata consistency check can fail with CallbackCanceled if a node gets
+                // killed or steps down while the check is establishing cursors on it.
+                return true;
+            }
+
             if (
                 ErrorCodes.isRetriableError(e.code) ||
                 ErrorCodes.isInterruption(e.code) ||
