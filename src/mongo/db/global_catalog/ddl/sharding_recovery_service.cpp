@@ -62,6 +62,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(pauseShardingRecoveryServiceAfterLockBegin);
+MONGO_FAIL_POINT_DEFINE(forceTriggerShardingRecoveryRollbackReset);
 
 namespace {
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
@@ -567,7 +568,8 @@ void ShardingRecoveryService::onReplicationRollback(
         return it != rollbackCommandCounts.end() && it->second > 0;
     };
 
-    if (std::ranges::any_of(kShardingRecoveryTriggerNamespaces, rolledBack) ||
+    if (MONGO_unlikely(forceTriggerShardingRecoveryRollbackReset.shouldFail()) ||
+        std::ranges::any_of(kShardingRecoveryTriggerNamespaces, rolledBack) ||
         std::ranges::any_of(kCsrMaintenanceCommands, commandRolledBack)) {
         _resetInMemoryStates(opCtx, gClearCollectionShardingRuntimesOnRecovery.load());
         _recoverDatabaseShardingState(opCtx);

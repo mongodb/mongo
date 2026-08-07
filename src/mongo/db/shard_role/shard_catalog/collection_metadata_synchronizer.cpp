@@ -29,6 +29,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(sleepPerChunkDuringCollectionMetadataDiskRecovery);
+
 namespace {
 
 CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
@@ -69,6 +72,22 @@ CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
             "catalog");
         while (cursor->more()) {
             aggResult.emplace_back(cursor->nextSafe().getOwned());
+
+            // Failpoint to simulate scanning a large chunk table from the disk.
+            sleepPerChunkDuringCollectionMetadataDiskRecovery.executeIf(
+                [&](const BSONObj& data) {
+                    const auto sleepMillis = data["sleepMillisPerChunk"].safeNumberLong();
+                    if (sleepMillis > 0) {
+                        sleepmillis(sleepMillis);
+                    }
+                },
+                [&](const BSONObj& data) {
+                    const auto& nssElem = data["nss"];
+                    return !nssElem ||
+                        NamespaceStringUtil::deserialize(
+                            boost::none, nssElem.str(), SerializationContext::stateDefault()) ==
+                        nss;
+                });
         }
     }
 
