@@ -96,6 +96,7 @@ include:
 
   - filename: src/mongo/db/modules/atlas/atlas_dev.yml
   - filename: src/mongo/db/modules/atlas/atlas_sls_pin_bump.yml
+  - filename: src/mongo/db/modules/atlas/atlas_commit_queue.yml
   - filename: etc/evergreen_yml_components/copybara/copybara.yml
   - filename: etc/evergreen_yml_components/copybara/copybara_gen.yml
 
