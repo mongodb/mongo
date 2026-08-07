@@ -716,13 +716,6 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardEndpoint {
 };
 
 /**
- * Compares shard endpoints in a map.
- */
-struct [[MONGO_MOD_NEEDS_REPLACEMENT]] EndpointComp {
-    bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
-};
-
-/**
  * Wrapper around a RoutingTableHistory, which pins it to a particular point in time.
  *
  * The ChunkManager class hierarchy represents routing information for MongoDB sharded collections.
