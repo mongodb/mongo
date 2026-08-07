@@ -21,6 +21,8 @@
  *   # shard.
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
+ *   # internalQueryAllowForcedPlanByHash landed in 8.3
+ *   requires_fcv_83,
  * ]
  */
 import {
