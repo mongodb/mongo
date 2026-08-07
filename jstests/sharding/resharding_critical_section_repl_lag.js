@@ -121,11 +121,4 @@ jsTest.log("Re-enable replication on the remaining secondaries on both the donor
 restartServerReplication(st.rs0.getSecondaries());
 restartServerReplication(st.rs1.getSecondaries());
 
-// TODO SERVER-132424: Remove this once checkMetadata is fixed to handle lagged nodes.
-// Wait for the secondaries to catch up before stopping. Otherwise, the metadata consistency check
-// run by st.stop() may target a lagging secondary that has not yet applied the donor's drop of the
-// old collection, producing a spurious CollectionOptionsMismatch.
-st.rs0.awaitReplication();
-st.rs1.awaitReplication();
-
 st.stop();
