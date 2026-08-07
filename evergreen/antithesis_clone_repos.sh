@@ -38,6 +38,11 @@ clone_repo() {
         echo "Failed to clone github.com/10gen/${repo}.git"
         exit $RET
     fi
+
+    # `git clone` persists the tokenized URL in `$destination/.git/config`, and this directory ends
+    # up in the workload image build context. Drop the token from the remote so it is not baked into
+    # an image layer.
+    git -C "$destination" remote set-url origin "https://github.com/10gen/${repo}.git"
 }
 
 clone_repo "QA" "${github_token_qa_temp}"
