@@ -58,11 +58,7 @@ void WriteThrottler::admitOperation(OperationContext* opCtx) {
     // (rate == kMaxRate) the token bucket admits immediately. The wait, if any, is attributed to
     // the WriteThrottlerAdmissionContext so curOp/serverStatus report the write-throttle queue.
     auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx);
-    {
-        WaitingForAdmissionGuard admissionGuard(&admCtx,
-                                                opCtx->getServiceContext()->getTickSource());
-        uassertStatusOK(_rateLimiter->acquireToken(opCtx));
-    }
+    uassertStatusOK(_rateLimiter->acquireToken(opCtx, &admCtx));
     admCtx.recordAdmission();
 }
 

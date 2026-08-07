@@ -20,6 +20,8 @@ public:
      * Retrieve the IngressAdmissionContext decoration the provided OperationContext
      */
     static IngressAdmissionContext& get(OperationContext* opCtx);
+
+    OperationContext* getOperationContext() override;
 };
 
 }  // namespace mongo

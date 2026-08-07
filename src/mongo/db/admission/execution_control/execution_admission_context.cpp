@@ -28,6 +28,10 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCt
     return contextDecoration(opCtx);
 }
 
+OperationContext* ExecutionAdmissionContext::getOperationContext() {
+    return contextDecoration.owner(this);
+}
+
 ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionContext& other)
     : AdmissionContext(other),
       _readDelinquencyStats(other._readDelinquencyStats),

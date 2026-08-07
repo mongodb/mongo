@@ -17,6 +17,10 @@ WriteThrottlerAdmissionContext& WriteThrottlerAdmissionContext::get(OperationCon
     return contextDecoration(opCtx);
 }
 
+OperationContext* WriteThrottlerAdmissionContext::getOperationContext() {
+    return contextDecoration.owner(this);
+}
+
 void recordWriteThrottlerCostForReconciliation(OperationContext* opCtx, CurOp* curOp) {
     const auto& metrics = curOp->debug().getAdditiveMetrics();
     const int64_t docs = metrics.ninserted.value_or(0) + metrics.nModified.value_or(0) +

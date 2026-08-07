@@ -30,6 +30,8 @@ void RateLimiterCounterMetricsRecorder::record(
                 _exemptedAdmissions.incrementRelaxed();
             } else if constexpr (std::is_same_v<TypedEvent, AverageTimeQueuedMicros>) {
                 _averageTimeQueuedMicros.addSample(typedEvent.sample);
+            } else if constexpr (std::is_same_v<TypedEvent, TimeQueuedMicros>) {
+                _totalTimeQueuedMicros.incrementRelaxed(typedEvent.micros);
             } else if constexpr (std::is_same_v<TypedEvent, TokensAcquired>) {
                 _tokensAcquired.fetchAndAddRelaxed(typedEvent.tokens);
             } else if constexpr (std::is_same_v<TypedEvent, TokensAvailable>) {
@@ -69,6 +71,10 @@ int64_t RateLimiterCounterMetricsRecorder::attemptedAdmissions() const {
 
 boost::optional<double> RateLimiterCounterMetricsRecorder::averageTimeQueuedMicros() const {
     return _averageTimeQueuedMicros.get();
+}
+
+int64_t RateLimiterCounterMetricsRecorder::totalTimeQueuedMicros() const {
+    return _totalTimeQueuedMicros.get();
 }
 
 double RateLimiterCounterMetricsRecorder::tokensAcquired() const {

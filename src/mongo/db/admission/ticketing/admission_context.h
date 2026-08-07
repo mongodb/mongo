@@ -66,6 +66,17 @@ public:
     Microseconds totalTimeQueuedMicros() const;
 
     /**
+     * Returns total admission queueing time accumulated in the per-operation aggregate counter for
+     * this OperationContext.
+     */
+    static Microseconds getTotalTimeQueuedForAdmission(const OperationContext* opCtx);
+
+    /** Returns the operation context associated with this admission context, if any. */
+    virtual OperationContext* getOperationContext() {
+        return nullptr;
+    }
+
+    /**
      * Returns the time this admission context started waiting to be queued, if it is currently
      * queued.
      */

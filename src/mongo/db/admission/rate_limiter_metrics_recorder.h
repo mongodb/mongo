@@ -49,6 +49,8 @@ public:
      * excluding rejected and interrupted calls. Returns boost::none until the first sample.
      */
     virtual boost::optional<double> averageTimeQueuedMicros() const = 0;
+    /** Cumulative microseconds callers actually spent held at this limiter. */
+    virtual int64_t totalTimeQueuedMicros() const = 0;
     /** Cumulative sum of tokens consumed across all successful acquireToken calls. */
     virtual double tokensAcquired() const = 0;
     /**

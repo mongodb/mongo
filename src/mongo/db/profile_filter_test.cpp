@@ -74,6 +74,7 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
                                                                   "locks",
                                                                   "authorization",
                                                                   "flowControl",
+                                                                  "queues",
                                                                   "writeConcern",
                                                                   "storage",
                                                                   "ok",

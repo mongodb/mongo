@@ -62,6 +62,8 @@ public:
      */
     static ExecutionAdmissionContext& get(OperationContext* opCtx);
 
+    OperationContext* getOperationContext() override;
+
     /**
      * Deprioritization heuristic. Returns true if an operation should be de-prioritized based on
      * the number of ticket acquisitions.

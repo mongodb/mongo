@@ -28,6 +28,8 @@ public:
      */
     static WriteThrottlerAdmissionContext& get(OperationContext* opCtx);
 
+    OperationContext* getOperationContext() override;
+
     /**
      * Adds successful written documents to the command-level reconciliation accumulator. If this
      * OperationContext did not pass through write-throttler admission, recording is skipped so

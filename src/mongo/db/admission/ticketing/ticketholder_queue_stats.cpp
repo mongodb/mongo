@@ -8,6 +8,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
+#include "mongo/db/admission/ingress_request_admission_context.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/operation_context.h"
@@ -18,13 +19,16 @@
 namespace mongo {
 namespace {
 
-std::map<TicketHolderQueueStats::QueueType, std::function<AdmissionContext*(OperationContext*)>>
-    gQueueMetricsRegistry;
+TicketHolderQueueStats::QueueMetricsRegistry gQueueMetricsRegistry;
 
 MONGO_INITIALIZER(InitGlobalQueueLookupTable)(InitializerContext*) {
     gQueueMetricsRegistry[TicketHolderQueueStats::QueueType::Ingress] =
         [](OperationContext* opCtx) {
             return &IngressAdmissionContext::get(opCtx);
+        };
+    gQueueMetricsRegistry[TicketHolderQueueStats::QueueType::IngressRequest] =
+        [](OperationContext* opCtx) {
+            return &IngressRequestAdmissionContext::get(opCtx);
         };
     gQueueMetricsRegistry[TicketHolderQueueStats::QueueType::Execution] =
         [](OperationContext* opCtx) {
@@ -37,11 +41,10 @@ MONGO_INITIALIZER(InitGlobalQueueLookupTable)(InitializerContext*) {
 }
 }  // namespace
 
-std::map<TicketHolderQueueStats::QueueType, std::function<AdmissionContext*(OperationContext*)>>
+const TicketHolderQueueStats::QueueMetricsRegistry&
 TicketHolderQueueStats::getQueueMetricsRegistry() {
     return gQueueMetricsRegistry;
 }
-
 
 TicketHolderQueueStats::TicketHolderQueueStats(OperationContext* opCtx) {
     for (auto&& [queueName, lookup] : gQueueMetricsRegistry) {

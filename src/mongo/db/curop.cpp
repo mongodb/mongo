@@ -261,9 +261,7 @@ private:
         // of the current operation. Also store the current ticket wait time as the base ticket
         // wait time.
         if (_top) {
-            const boost::optional<ExecutionAdmissionContext> admCtx =
-                ExecutionAdmissionContext::get(opCtx());
-            curOp->_resourceStatsBase = curOp->getAdditiveResourceStats(admCtx);
+            curOp->_resourceStatsBase = curOp->getAdditiveResourceStats();
         }
 
         _top = curOp;
@@ -626,7 +624,7 @@ void CurOp::updateStatsOnTransactionUnstash(WithLock) {
     // These stats have accrued outside of this CurOp instance so we will ignore/subtract them when
     // reporting on this operation.
     _initializeResourceStatsBaseIfNecessary();
-    _resourceStatsBase->addForUnstash(getAdditiveResourceStats(boost::none));
+    _resourceStatsBase->addForUnstash(getAdditiveResourceStats());
 }
 
 void CurOp::updateStatsOnTransactionStash(WithLock) {
@@ -635,7 +633,7 @@ void CurOp::updateStatsOnTransactionStash(WithLock) {
     // stats which includes the snapshot of stats when it was unstashed. This stats delta on
     // stashing is added when reporting on this operation.
     _initializeResourceStatsBaseIfNecessary();
-    _resourceStatsBase->subtractForStash(getAdditiveResourceStats(boost::none));
+    _resourceStatsBase->subtractForStash(getAdditiveResourceStats());
 }
 
 void CurOp::setMemoryTrackingStats(const int64_t inUseTrackedMemoryBytes,
@@ -734,16 +732,16 @@ Milliseconds CurOp::_sumBlockedTimeTotal() {
                                              ->getPrepareConflictTracker()
                                              .getThisOpPrepareConflictDuration();
     auto cumulativeLockWaitTime = Microseconds(locker->stats().getCumulativeWaitTimeMicros());
-    auto timeQueuedForTickets = ExecutionAdmissionContext::get(opCtx()).totalTimeQueuedMicros();
+    auto timeQueuedForAdmission = AdmissionContext::getTotalTimeQueuedForAdmission(opCtx());
     auto timeQueuedForFlowControl = Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
 
     if (_resourceStatsBase) {
         cumulativeLockWaitTime -= _resourceStatsBase->cumulativeLockWaitTime;
-        timeQueuedForTickets -= _resourceStatsBase->timeQueuedForTickets;
+        timeQueuedForAdmission -= _resourceStatsBase->timeQueuedForAdmission;
         timeQueuedForFlowControl -= _resourceStatsBase->timeQueuedForFlowControl;
     }
 
-    return duration_cast<Milliseconds>(cumulativeLockWaitTime + timeQueuedForTickets +
+    return duration_cast<Milliseconds>(cumulativeLockWaitTime + timeQueuedForAdmission +
                                        timeQueuedForFlowControl + prepareConflictDurationMicros);
 }
 
@@ -1262,8 +1260,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
     }
 }
 
-CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(
-    const boost::optional<ExecutionAdmissionContext>& admCtx) {
+CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats() {
     CurOp::AdditiveResourceStats stats;
 
     auto locker = shard_role_details::getLocker(opCtx());
@@ -1272,9 +1269,10 @@ CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(
     stats.timeQueuedForFlowControl =
         Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
 
-    if (admCtx != boost::none) {
-        stats.timeQueuedForTickets = admCtx->totalTimeQueuedMicros();
-    }
+    // Snapshot the admission wait time over the same set of queues that _sumBlockedTimeTotal sums,
+    // so that a sub-operation's base does not leave the enclosing operation's queueing time
+    // attributed to it.
+    stats.timeQueuedForAdmission = AdmissionContext::getTotalTimeQueuedForAdmission(opCtx());
 
     return stats;
 }
@@ -1319,13 +1317,13 @@ void CurOp::AdditiveResourceStats::addForUnstash(const CurOp::AdditiveResourceSt
     lockStats.append(other.lockStats);
     cumulativeLockWaitTime += other.cumulativeLockWaitTime;
     timeQueuedForFlowControl += other.timeQueuedForFlowControl;
-    // timeQueuedForTickets is intentionally excluded as it is tracked separately
+    // timeQueuedForAdmission is intentionally excluded as it is tracked separately
 }
 
 void CurOp::AdditiveResourceStats::subtractForStash(const CurOp::AdditiveResourceStats& other) {
     lockStats.subtract(other.lockStats);
     cumulativeLockWaitTime -= other.cumulativeLockWaitTime;
     timeQueuedForFlowControl -= other.timeQueuedForFlowControl;
-    // timeQueuedForTickets is intentionally excluded as it is tracked separately
+    // timeQueuedForAdmission is intentionally excluded as it is tracked separately
 }
 }  // namespace mongo

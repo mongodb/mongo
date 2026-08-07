@@ -128,10 +128,16 @@ export function makeAuthConn(host) {
 
 /**
  * Returns a new authenticated exempt connection to host.
+ *
+ * Pass `{authenticate: false}` when the connection is opened before the admin user exists, which is
+ * the case for the exempt connection that is then handed to `setupAuth`. Authenticating such a connection
+ * here would silently fail rather than throw.
  */
-export function makeExemptConn(host) {
+export function makeExemptConn(host, {authenticate = true} = {}) {
     const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
-    authenticateConnection(conn);
+    if (authenticate) {
+        authenticateConnection(conn);
+    }
     return conn;
 }
 
