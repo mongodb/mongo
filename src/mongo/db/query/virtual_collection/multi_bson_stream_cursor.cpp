@@ -14,6 +14,7 @@
 #include "mongo/platform/compiler.h"
 
 #include <cstring>
+#include <string>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -28,10 +29,10 @@ namespace mongo {
  * and updates bookkeeping. This can never expand the buffer larger than (2 * BSONObjMaxUserSize).
  */
 void MultiBsonStreamCursor::expandBuffer(int32_t bsonSize) {
-    uassert(6968308,
+    tassert(6968308,
             fmt::format("bsonSize {} > BSONObjMaxUserSize {}", bsonSize, BSONObjMaxUserSize),
             (bsonSize <= BSONObjMaxUserSize));
-    uassert(6968309, fmt::format("bsonSize {} < 0", bsonSize), (bsonSize >= 0));
+    tassert(6968309, fmt::format("bsonSize {} < 0", bsonSize), (bsonSize >= 0));
 
     int newSizeTarget = 2 * bsonSize;
     do {
@@ -46,6 +47,28 @@ void MultiBsonStreamCursor::expandBuffer(int32_t bsonSize) {
     _bufBegin = 0;
 }
 
+namespace {
+/**
+ * The throw paths for the read loop's invariant checks. MONGO_COMPILER_NORETURN carries both facts
+ * the caller needs: control never comes back, and the function is cold, which keeps its message
+ * formatting out of the middle of the hot loop.
+ */
+MONGO_COMPILER_NORETURN void throwInvalidBsonSize(int32_t bsonSize, const std::string& url) {
+    uasserted(
+        13251201,
+        fmt::format("Invalid BSON size {} in external data source {}: must be >= {} and <= {}",
+                    bsonSize,
+                    url,
+                    static_cast<int>(BSONObj::kMinBSONLength),
+                    BSONObjMaxUserSize));
+}
+
+MONGO_COMPILER_NORETURN void throwInvalidBufferState(int bufBegin, int bufEnd) {
+    tasserted(13251202,
+              fmt::format("Invalid buffer state: _bufBegin {} > _bufEnd {}", bufBegin, bufEnd));
+}
+}  // namespace
+
 /**
  * Returns the next record from the current stream or boost::none if exhausted or error.
  */
@@ -55,8 +78,9 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
     int remBytes;      // number of remainder bytes to read for either size field or object body
     int availBytes;    // number of unconsumed bytes in '_buffer'
 
-    // The while loop enables dynamically expanding the buffer as needed. If the buffer ever reaches
-    // (2 * BSONObjMaxUserSize) bytes it will not need to expand any more.
+    // The while loop enables refilling the buffer from the stream and dynamically expanding it as
+    // needed. If the buffer ever reaches (2 * BSONObjMaxUserSize) bytes it will not need to expand
+    // any more.
     while (true) {
         // There are four cases, but for performance they are not fully independent in code:
         //   1. Next full object (size and data) is already in the buffer.
@@ -64,47 +88,12 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
         //   3. Next size is only partly present in the buffer.
         //   4. No part of the next object is in the buffer. Reset buffer and read a big block.
         availBytes = _bufEnd - _bufBegin;
-        if (availBytes > 0) {  // Cases 1-3
-            // Cases 3: get the rest of size. This collapses case 3 into case 2.
-            if (availBytes < kSizeSize) {
-                remBytes = kSizeSize - availBytes;
-                // No space check needed: we are looking at whether there is guaranteed to be room
-                // in the buffer for just the 4-byte word (encoding the total number of bytes in the
-                // object) that appears before the actual BSON object. remBytes is at most 3 (since
-                // availBytes >= 1), and _bufEnd is at most _bufSize/2 here because these leftover
-                // bytes can only originate from a block read, which fills only the first half of
-                // the buffer. Since _bufSize >= 8KB, there is always room to spare.
-                readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
-                if (MONGO_unlikely(readBytes < remBytes)) {
-                    uasserted(
-                        6968303,
-                        fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
-                    return boost::none;
-                }
-                _bufEnd += readBytes;
-                availBytes += readBytes;
-            }
-            bsonSize = ConstDataView(_buffer.get() + _bufBegin).read<LittleEndian<int32_t>>();
+        if (MONGO_unlikely(availBytes < 0)) {
+            throwInvalidBufferState(_bufBegin, _bufEnd);
+        }
 
-            // Cases 2-3: get the rest of the object. This collapses cases 2-3 into case 1.
-            if (availBytes < bsonSize) {
-                remBytes = bsonSize - availBytes;
-                if (MONGO_likely(remBytes <= _bufSize - _bufEnd)) {  // 'remBytes' will fit
-                    readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
-                    if (MONGO_unlikely(readBytes < remBytes)) {
-                        uasserted(
-                            6968304,
-                            fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
-                        return boost::none;
-                    }
-                    _bufEnd += readBytes;
-                    // Not used again: availBytes += readBytes;
-                } else {
-                    expandBuffer(bsonSize);
-                    continue;
-                }
-            }
-        } else {  // Case 4: availBytes == 0; do a block read
+        // Case 4: do a block read. This collapses case 4 into cases 1-2.
+        if (MONGO_unlikely(availBytes == 0)) {
             _bufBegin = 0;
             _bufEnd = _streamReader->readBytes(_blockReadSize, _buffer.get());
             if (_bufEnd == 0) {  // EOF: okay here as the pipe ended at an object boundary
@@ -115,17 +104,50 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
                           fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
                 return boost::none;
             }
-            // Not used again: availBytes += _bufEnd;
-            bsonSize = ConstDataView(_buffer.get()).read<LittleEndian<int32_t>>();
 
-            if (MONGO_unlikely(_bufEnd < bsonSize)) {
-                if (MONGO_likely(_bufEnd == _blockReadSize)) {  // got all the bytes we requested
-                    expandBuffer(bsonSize);
-                    continue;
-                }
-                uasserted(6968306,
+            // Fall through and consume the rest with the other cases.
+            availBytes = _bufEnd;
+        }
+
+        // Cases 3: get the rest of size. This collapses case 3 into case 2.
+        if (availBytes < kSizeSize) {
+            remBytes = kSizeSize - availBytes;
+            // No space check needed: we are looking at whether there is guaranteed to be room
+            // in the buffer for just the 4-byte word (encoding the total number of bytes in the
+            // object) that appears before the actual BSON object. remBytes is at most 3 (since
+            // availBytes >= 1), and _bufEnd is at most _bufSize/2 here because these leftover
+            // bytes can only originate from a block read, which fills only the first half of
+            // the buffer. Since _bufSize >= 8KB, there is always room to spare.
+            readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
+            if (MONGO_unlikely(readBytes < remBytes)) {
+                uasserted(6968303,
                           fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
                 return boost::none;
+            }
+            _bufEnd += readBytes;
+            availBytes += readBytes;
+        }
+        bsonSize = ConstDataView(_buffer.get() + _bufBegin).read<LittleEndian<int32_t>>();
+        if (MONGO_unlikely(bsonSize < BSONObj::kMinBSONLength || bsonSize > BSONObjMaxUserSize)) {
+            throwInvalidBsonSize(bsonSize, _vopts.dataSources[_streamIdx].url);
+        }
+
+        // Cases 2-3: get the rest of the object. This collapses cases 2-3 into case 1.
+        if (availBytes < bsonSize) {
+            remBytes = bsonSize - availBytes;
+            if (MONGO_likely(remBytes <= _bufSize - _bufEnd)) {  // 'remBytes' will fit
+                readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
+                if (MONGO_unlikely(readBytes < remBytes)) {
+                    uasserted(
+                        6968304,
+                        fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
+                    return boost::none;
+                }
+                _bufEnd += readBytes;
+                // Not used again: availBytes += readBytes;
+            } else {
+                expandBuffer(bsonSize);
+                continue;
             }
         }
         break;  // reaching here means we have the whole object in '_buffer' now
@@ -136,9 +158,9 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
     // Validate nested element structure before exposing external BSON to the query engine.
     // Top-level size checks above are insufficient — a crafted document can embed negative element
     // sizes that cause signed-to-unsigned overflow downstream.
+    // Scoped to 'bsonSize', not to all buffered bytes, so it cannot read past this object.
     const char* objBuf = _buffer.get() + _bufBegin;
-    const auto maxLen = static_cast<uint64_t>(_bufEnd - _bufBegin);
-    if (auto s = validateBSON(objBuf, maxLen); !s.isOK()) {
+    if (auto s = validateBSON(objBuf, static_cast<uint64_t>(bsonSize)); !s.isOK()) {
         uasserted(12849400,
                   fmt::format("Invalid BSON in external data source {}: {}",
                               _vopts.dataSources[_streamIdx].url,
@@ -148,9 +170,11 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
     // 'recordData.data' includes the size in the first four bytes.
     boost::optional<RecordData> recordData = RecordData{(_buffer.get() + _bufBegin), bsonSize};
     _bufBegin += bsonSize;
+    // Tighter than '_bufBegin <= _bufSize', since '_bufEnd' never exceeds '_bufSize': the object
+    // just consumed was wholly buffered, so '_bufBegin' cannot pass the end of the buffered data.
     tassert(6968307,
-            fmt::format("_bufBegin {} > _bufSize {}", _bufBegin, _bufSize),
-            (_bufBegin <= _bufSize));
+            fmt::format("_bufBegin {} > _bufEnd {}", _bufBegin, _bufEnd),
+            (_bufBegin <= _bufEnd));
 
     return {{RecordId{_nextRecordId++}, std::move(*recordData)}};
 }
