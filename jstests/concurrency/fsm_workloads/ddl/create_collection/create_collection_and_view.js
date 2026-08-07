@@ -5,8 +5,8 @@
  * @tags: [
  *   catches_command_failures,
  *   antithesis_incompatible,
- *   # TODO SERVER-127099: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
+ *   # TODO SERVER-132934: Enable test on the sharded TSAN variant.
+ *   incompatible_disaggregated_storage_sharded_tsan,
  * ]
  */
 
