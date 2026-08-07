@@ -100,6 +100,41 @@ public:
         return _decompressBytesOut.loadRelaxed();
     }
 
+    /*
+     * Replication-only views of the same counters. These accumulate ONLY the bytes that flowed on
+     * replication data-plane connections: the oplog fetcher, initial-sync cloner, and rollback
+     * remote oplog reader on the syncing side, and the sync source's responses to them on the
+     * serving side. They are a SUBSET of the counters above: replication traffic is still counted in
+     * the process-wide (net) totals as well, so the existing serverStatus().network.compression
+     * numbers are unchanged; these extra counters just let serverStatus().repl.compression report
+     * the replication portion independently.
+     */
+    int64_t getReplicationCompressorBytesIn() const {
+        return _replCompressBytesIn.loadRelaxed();
+    }
+    int64_t getReplicationCompressorBytesOut() const {
+        return _replCompressBytesOut.loadRelaxed();
+    }
+    int64_t getReplicationDecompressorBytesIn() const {
+        return _replDecompressBytesIn.loadRelaxed();
+    }
+    int64_t getReplicationDecompressorBytesOut() const {
+        return _replDecompressBytesOut.loadRelaxed();
+    }
+
+    /*
+     * Bump the replication-only counters. Called by MessageCompressorManager after a successful
+     * compress/decompress when the connection is attributed to replication data-plane traffic, in
+     * addition to the process-wide counterHit* below. Thread-safe (atomic).
+     */
+    void counterHitReplicationCompress(int64_t bytesIn, int64_t bytesOut) {
+        _replCompressBytesIn.addAndFetch(bytesIn);
+        _replCompressBytesOut.addAndFetch(bytesOut);
+    }
+    void counterHitReplicationDecompress(int64_t bytesIn, int64_t bytesOut) {
+        _replDecompressBytesIn.addAndFetch(bytesIn);
+        _replDecompressBytesOut.addAndFetch(bytesOut);
+    }
 
 protected:
     /*
@@ -134,5 +169,13 @@ private:
 
     Atomic<long long> _decompressBytesIn;
     Atomic<long long> _decompressBytesOut;
+
+    // Replication-data-plane subset counters; these bytes are also included in the process-wide
+    // counters above.
+    Atomic<long long> _replCompressBytesIn;
+    Atomic<long long> _replCompressBytesOut;
+
+    Atomic<long long> _replDecompressBytesIn;
+    Atomic<long long> _replDecompressBytesOut;
 };
 }  // namespace mongo
