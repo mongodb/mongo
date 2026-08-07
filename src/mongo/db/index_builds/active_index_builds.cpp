@@ -162,28 +162,31 @@ void ActiveIndexBuilds::verifyNoIndexBuilds_forTestOnly() const {
     invariant(_allIndexBuilds.empty());
 }
 
-void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
-                                                                 const UUID& collectionUUID,
-                                                                 IndexBuildProtocol protocol) {
+void ActiveIndexBuilds::_awaitNoIndexBuildInProgressForFilter(OperationContext* opCtx,
+                                                              IndexBuildFilterFn indexBuildFilter) {
     std::unique_lock<std::mutex> lk(_mutex);
     auto noIndexBuildsPred = [&, this]() {
-        auto indexBuilds = _filterIndexBuilds_inlock(lk, [&](const auto& replState) {
-            return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
-        });
+        auto indexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
         return indexBuilds.empty();
     };
     opCtx->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, noIndexBuildsPred);
 }
 
 void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
-                                                                 const UUID& collectionUUID) {
-    std::unique_lock<std::mutex> lk(_mutex);
-    auto pred = [&, this]() {
-        auto indexBuilds = _filterIndexBuilds_inlock(
-            lk, [&](const auto& replState) { return collectionUUID == replState.collectionUUID; });
-        return indexBuilds.empty();
+                                                                 const UUID& collectionUUID,
+                                                                 IndexBuildProtocol protocol) {
+    auto collAndProtocolFilter = [&](const auto& replState) {
+        return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
     };
-    _indexBuildsCondVar.wait(lk, pred);
+    _awaitNoIndexBuildInProgressForFilter(opCtx, collAndProtocolFilter);
+}
+
+void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
+                                                                 const UUID& collectionUUID) {
+    auto collFilter = [&](const auto& replState) {
+        return collectionUUID == replState.collectionUUID;
+    };
+    _awaitNoIndexBuildInProgressForFilter(opCtx, collFilter);
 }
 
 StatusWith<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getIndexBuild(
@@ -254,15 +257,10 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::_filterInde
 
 void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
                                                const DatabaseName& dbName) {
-    std::unique_lock<std::mutex> lk(_mutex);
-    auto indexBuildFilter = [dbName](const auto& replState) {
+    auto dbFilter = [dbName](const auto& replState) {
         return dbName == replState.dbName;
     };
-    auto pred = [&, this]() {
-        auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
-        return dbIndexBuilds.empty();
-    };
-    _indexBuildsCondVar.wait(lk, pred);
+    _awaitNoIndexBuildInProgressForFilter(opCtx, dbFilter);
 }
 
 Status ActiveIndexBuilds::registerIndexBuild(

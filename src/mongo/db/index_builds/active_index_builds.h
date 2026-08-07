@@ -128,6 +128,12 @@ public:
 
 private:
     /**
+     * Waits until no index builds matching the criteria 'indexBuildFilter' are in progress.
+     */
+    void _awaitNoIndexBuildInProgressForFilter(OperationContext* opCtx,
+                                               IndexBuildFilterFn indexBuildFilter);
+
+    /**
      * Helper function for filterIndexBuilds. This function is necessary because some callers
      * already hold the mutex before calling this function.
      */

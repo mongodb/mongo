@@ -4,9 +4,11 @@
 #include "mongo/db/index_builds/index_builds_coordinator_mongod.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
@@ -18,12 +20,17 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <functional>
+#include <mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -200,6 +207,125 @@ std::vector<IndexBuildInfo> IndexBuildsCoordinatorMongodTest::makeSpecs(
     return indexes;
 }
 
+/**
+ * Tests the IndexBuildsCoordinator methods that wait and block until index builds finish
+ * (assertNoIndexBuildInProgForCollection() and assertNoBgOpInProgForDb()). They must honour
+ * interruption of the waiter's OperationContext.
+ */
+class IndexBuildsCoordinatorMongodInterruptibleWaitTest : public IndexBuildsCoordinatorMongodTest {
+public:
+    static constexpr auto kInterruptCode = ErrorCodes::InterruptedDueToReplStateChange;
+    // The protocol used by builds started with _indexBuildOptions, which leaves
+    // IndexBuildOptions::indexBuildProtocol at its kTwoPhase default.
+    static constexpr auto kProtocol = IndexBuildProtocol::kTwoPhase;
+
+    struct WaiterResult {
+        // Whether the waiter was observed inside an interruptible wait. False means the wait never
+        // consulted its OperationContext.
+        bool reachedInterruptibleWait = false;
+        // Whether the test had to abort the index build to get the waiter moving again. True means
+        // the interrupt was ignored.
+        bool neededEscapeHatch = false;
+        // What the wait threw, or Status::OK() if it returned normally.
+        Status status = Status::OK();
+    };
+
+    /**
+     * Starts a paused index build on _testFooNss, runs 'waitFn' on a separate thread with its own
+     * OperationContext, and once that thread is observed to be waiting on the opCtx, interrupts it
+     * and checks waitFn() correctly threw an exception.
+     *
+     * Always joins the waiter thread and leaves no index build in progress, so callers can assert
+     * on the result without leaking a wedged thread.
+     */
+    WaiterResult runInterruptedWaiter(std::function<void(OperationContext*)> waitFn) {
+        static constexpr auto kTimeout = Seconds(10);
+
+        // Hold an index build in progress for the duration of the wait.
+        _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
+        const auto buildUUID = UUID::gen();
+        auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                        _testFooNss.dbName(),
+                                                                        _testFooUUID,
+                                                                        makeSpecs({"a"}, {1}),
+                                                                        buildUUID,
+                                                                        _indexBuildOptions));
+
+        // Releases the index build, so if we ignore the interrupt, we abort the index build and
+        // fail the test instead of hanging forever.
+        auto escapeHatch = [&] {
+            _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+            _indexBuildsCoord->abortIndexBuildByBuildUUID(
+                operationContext(),
+                buildUUID,
+                IndexBuildAction::kPrimaryAbort,
+                Status{ErrorCodes::IndexBuildAborted, "interruptibility test cleanup"});
+            buildFuture.getNoThrow().getStatus().ignore();
+        };
+
+        WaiterResult result;
+        auto [finishedPromise, finishedFuture] = makePromiseFuture<void>();
+
+        auto waiterClient = getServiceContext()->getService()->makeClient("indexBuildWaiter");
+        auto waiterOpCtx = waiterClient->makeOperationContext();
+
+        stdx::thread waiter([&]() {
+            try {
+                waitFn(waiterOpCtx.get());
+            } catch (const DBException& ex) {
+                result.status = ex.toStatus();
+            }
+            finishedPromise.emplaceValue();
+        });
+
+        result.reachedInterruptibleWait = waitForPredicate(
+            [&] { return waiterOpCtx->isWaitingForConditionOrInterrupt(); }, kTimeout);
+        markKilled(waiterOpCtx.get());
+
+        // Give the waiter a bounded chance to unwind. Timing out means the interrupt was ignored.
+        if (!waitForPredicate([&] { return finishedFuture.isReady(); }, kTimeout)) {
+            result.neededEscapeHatch = true;
+            escapeHatch();
+        }
+        waiter.join();
+
+        if (!result.neededEscapeHatch) {
+            // Clean up the index build.
+            escapeHatch();
+        }
+        return result;
+    }
+
+    void assertWasInterrupted(const WaiterResult& result) {
+        EXPECT_TRUE(result.reachedInterruptibleWait)
+            << "the waiter never entered an interruptible wait; the wait is ignoring its "
+               "OperationContext";
+        EXPECT_FALSE(result.neededEscapeHatch)
+            << "the wait ignored the interrupt and only unwound once the index build completed";
+        EXPECT_EQ(result.status.code(), kInterruptCode);
+    }
+
+private:
+    static void markKilled(OperationContext* opCtx) {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        opCtx->markKilled(kInterruptCode);
+    }
+
+    // Polls 'pred' until it returns true or 'timeout' elapses, and returns its final value.
+    static bool waitForPredicate(const std::function<bool()>& pred, Milliseconds timeout) {
+        static constexpr auto kSleepInterval = Milliseconds(10);
+
+        const auto deadline = Date_t::now() + timeout;
+        while (Date_t::now() < deadline) {
+            if (pred()) {
+                return true;
+            }
+            sleepFor(kSleepInterval);
+        }
+        return pred();
+    }
+};
+
 TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
@@ -369,6 +495,34 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
 
     EXPECT_NE(_testFooNss, _testBarNss);
     EXPECT_NE(_testFooNss, _othertestFooNss);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest,
+       AwaitNoIndexBuildInProgressForCollectionIsInterruptible) {
+    // Test awaitNoIndexBuildInProgressForCollection() 2-arguments overload.
+    auto result = runInterruptedWaiter([&](OperationContext* opCtx) {
+        _indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, _testFooUUID);
+    });
+
+    assertWasInterrupted(result);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest,
+       AwaitNoIndexBuildInProgressForCollectionWithProtocolIsInterruptible) {
+    // Test awaitNoIndexBuildInProgressForCollection() 3-arguments overload.
+    auto result = runInterruptedWaiter([&](OperationContext* opCtx) {
+        _indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, _testFooUUID, kProtocol);
+    });
+
+    assertWasInterrupted(result);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest, AwaitNoBgOpInProgForDbIsInterruptible) {
+    auto result = runInterruptedWaiter([&](OperationContext* opCtx) {
+        _indexBuildsCoord->awaitNoBgOpInProgForDb(opCtx, _testFooNss.dbName());
+    });
+
+    assertWasInterrupted(result);
 }
 
 TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
