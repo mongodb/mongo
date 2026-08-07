@@ -11,6 +11,7 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 class StubIntegerKeyedContainer final : public IntegerKeyedContainerBase {
 public:
     StubIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
+    using IntegerKeyedContainerBase::insert;
     Status insert(RecoveryUnit& ru,
                   int64_t key,
                   std::span<const char> value,
@@ -31,6 +32,7 @@ public:
 class StubStringKeyedContainer final : public StringKeyedContainerBase {
 public:
     StubStringKeyedContainer() : StringKeyedContainerBase(nullptr) {}
+    using StringKeyedContainerBase::insert;
     Status insert(RecoveryUnit& ru,
                   std::span<const char> key,
                   std::span<const char> value,

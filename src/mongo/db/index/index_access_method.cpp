@@ -947,11 +947,21 @@ private:
      * Inserts key into the index. Returns true if successfully inserted, or false on a KeyExists
      * error.
      */
-    bool _addKeyForCommit(OperationContext* opCtx,
-                          RecoveryUnit& ru,
-                          const CollectionPtr& coll,
-                          const key_string::View& key,
-                          boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg);
+    bool _addKeyForCommit(
+        OperationContext* opCtx,
+        RecoveryUnit& ru,
+        const CollectionPtr& coll,
+        const key_string::View& key,
+        boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg = boost::none);
+
+    /**
+     * Inserts a range of keys into the index. Returns the number of keys inserted, which is less
+     * than 'keys.size()' if any of them was already present in the container.
+     */
+    int64_t _addKeysForCommit(OperationContext* opCtx,
+                              RecoveryUnit& ru,
+                              const CollectionPtr& coll,
+                              std::span<const key_string::Value> keys);
 
     void _debugEnsureSorted(const Data& data);
 
@@ -987,6 +997,12 @@ private:
     // Once we're past any keys that already exist in the table, we can set this as a performance
     // optimization.
     boost::optional<container_write::NonexistentKeyGuarantee> _nonexistentKeyGuarantee;
+
+    // Scratch space for the batched container insert in _addKeysForCommit(), which needs the keys
+    // and their type bits as two parallel arrays of spans. Held as members purely so the storage is
+    // reused across batches rather than reallocated for every one.
+    std::vector<std::span<const char>> _batchedKeyViews;
+    std::vector<std::span<const char>> _batchedTypeBitsViews;
 };
 
 BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
@@ -1219,17 +1235,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         }
         auto keysInserted = writeConflictRetry(opCtx, "addingKey", _ns, [&] {
             WriteUnitOfWork wunit(opCtx);
-            boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg = boost::none;
-            if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-                wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
-                               assertCanAcceptContainerWrites(opCtx));
-            }
-            int64_t keysAdded{0};
-            for (auto&& key : batch) {
-                if (_addKeyForCommit(opCtx, ru, *collection, key, wg)) {
-                    keysAdded++;
-                }
-            }
+            int64_t keysAdded = _addKeysForCommit(opCtx, ru, *collection, batch);
             wunit.commit();
             return keysAdded;
         });
@@ -1417,6 +1423,56 @@ bool BulkBuilderImpl::_addKeyForCommit(
     }
     _builder->addKey(ru, key);
     return true;
+}
+
+int64_t BulkBuilderImpl::_addKeysForCommit(OperationContext* opCtx,
+                                           RecoveryUnit& ru,
+                                           const CollectionPtr& coll,
+                                           std::span<const key_string::Value> keys) {
+    int64_t keysAdded = 0;
+    size_t i = 0;
+    const auto writeGuarantee = _containerWriteBehavior == ContainerWriteBehavior::kReplicate
+        ? boost::make_optional(
+              container_write::CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(
+                  opCtx))
+        : boost::none;
+    // Until the NonexistentKeyGuarantee is established the keys have to go in one at a time, via
+    // the single-key path.
+    for (; !_nonexistentKeyGuarantee && i < keys.size(); ++i) {
+        if (_addKeyForCommit(opCtx, ru, coll, keys[i], writeGuarantee)) {
+            ++keysAdded;
+        }
+    }
+
+    // Early exit if this inserted all keys.
+    if (i == keys.size()) {
+        return keysAdded;
+    }
+
+    // Past that point the writes are blind, so the whole remaining range can go in as one batched
+    // insert sharing a single cursor.
+    _batchedKeyViews.clear();
+    _batchedTypeBitsViews.clear();
+    _batchedKeyViews.reserve(keys.size() - i);
+    _batchedTypeBitsViews.reserve(keys.size() - i);
+
+    for (const auto& key : keys.subspan(i)) {
+        // The View borrows from the Value, which lives in the caller's batch for the duration of
+        // this call, so the spans collected here stay valid through the insert below.
+        key_string::View view{key};
+        _batchedKeyViews.push_back(view.getKeyAndRecordIdView());
+        _batchedTypeBitsViews.push_back(view.getTypeBitsView());
+    }
+
+    uassertStatusOK(container_write::insert(opCtx,
+                                            ru,
+                                            _iam->getSortedDataInterface()->getContainer(),
+                                            _batchedKeyViews,
+                                            _batchedTypeBitsViews,
+                                            writeGuarantee,
+                                            _nonexistentKeyGuarantee));
+
+    return keysAdded + static_cast<int64_t>(_batchedKeyViews.size());
 }
 
 std::unique_ptr<BulkBuilderImpl::Sorter> BulkBuilderImpl::_makeSorter(

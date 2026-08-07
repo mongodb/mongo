@@ -78,6 +78,10 @@ public:
                           int64_t key,
                           std::span<const char> value,
                           container::ExistingKeyPolicy policy) = 0;
+    virtual Status insert(RecoveryUnit& ru,
+                          std::span<const int64_t> keys,
+                          std::span<const std::span<const char>> values,
+                          container::ExistingKeyPolicy policy) = 0;
 
     /**
      * Updates the value at the given key. The key must already exist. Must be in an active storage
@@ -137,6 +141,10 @@ public:
     virtual Status insert(RecoveryUnit& ru,
                           std::span<const char> key,
                           std::span<const char> value,
+                          container::ExistingKeyPolicy policy) = 0;
+    virtual Status insert(RecoveryUnit& ru,
+                          std::span<const std::span<const char>> keys,
+                          std::span<const std::span<const char>> values,
                           container::ExistingKeyPolicy policy) = 0;
 
     /**

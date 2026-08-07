@@ -9,6 +9,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/version_context.h"
 
+#include <algorithm>
 #include <tuple>
 
 namespace mongo::container_write {
@@ -76,6 +77,76 @@ Status insert(OperationContext* opCtx,
 
     opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
         opCtx, container.ident()->getIdent(), key, value);
+
+    return Status::OK();
+}
+
+Status insert(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              IntegerKeyedContainer& container,
+              std::span<const int64_t> keys,
+              std::span<const std::span<const char>> values,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
+              boost::optional<NonexistentKeyGuarantee> nkg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
+    massert(13274502,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    auto status = container.insert(ru,
+                                   keys,
+                                   values,
+                                   nkg ? container::ExistingKeyPolicy::overwrite
+                                       : container::ExistingKeyPolicy::reject);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto* opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto ident = container.ident()->getIdent();
+
+    // The storage write above is batched -- the container reuses one cursor for the whole range --
+    // but the oplog entries are not.
+    // TODO SERVER-133068 emit batched oplog entries directly
+    for (size_t i = 0; i < keys.size(); ++i) {
+        opObserver->onContainerInsert(opCtx, ident, keys[i], values[i]);
+    }
+
+    return Status::OK();
+}
+
+Status insert(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              StringKeyedContainer& container,
+              std::span<const std::span<const char>> keys,
+              std::span<const std::span<const char>> values,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
+              boost::optional<NonexistentKeyGuarantee> nkg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
+    massert(13274503,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    auto status = container.insert(ru,
+                                   keys,
+                                   values,
+                                   nkg ? container::ExistingKeyPolicy::overwrite
+                                       : container::ExistingKeyPolicy::reject);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto* opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto ident = container.ident()->getIdent();
+
+    // The storage write above is batched -- the container reuses one cursor for the whole range --
+    // but the oplog entries are not.
+    // TODO SERVER-133068 emit batched oplog entries directly
+    for (size_t i = 0; i < keys.size(); ++i) {
+        opObserver->onContainerInsert(opCtx, ident, keys[i], values[i]);
+    }
 
     return Status::OK();
 }

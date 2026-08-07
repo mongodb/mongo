@@ -69,6 +69,27 @@ Status WiredTigerIntegerKeyedContainer::insert(RecoveryUnit& ru,
     return wtRCToStatus(ret, cursor->session);
 }
 
+Status WiredTigerIntegerKeyedContainer::insert(RecoveryUnit& ru,
+                                               std::span<const int64_t> keys,
+                                               std::span<const std::span<const char>> values,
+                                               container::ExistingKeyPolicy policy) {
+    massert(13274504,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    WiredTigerCursor cursor{
+        getWiredTigerCursorParams(wtRu, tableId(), overwrite(policy)), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
+    int ret = 0;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        ret = insert(wtRu, *cursor.get(), keys[i], values[i]);
+        if (ret != 0) {
+            break;
+        }
+    }
+    return wtRCToStatus(ret, cursor->session);
+}
+
 int WiredTigerIntegerKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
                                             WT_CURSOR& cursor,
                                             int64_t key,
@@ -161,6 +182,28 @@ Status WiredTigerStringKeyedContainer::insert(RecoveryUnit& ru,
         getWiredTigerCursorParams(wtRu, tableId(), overwrite(policy)), uri(), *wtRu.getSession()};
     wtRu.assertInActiveTxn();
     int ret = insert(wtRu, *cursor.get(), key, value);
+    return wtRCToStatus(ret, cursor->session);
+}
+
+
+Status WiredTigerStringKeyedContainer::insert(RecoveryUnit& ru,
+                                              std::span<const std::span<const char>> keys,
+                                              std::span<const std::span<const char>> values,
+                                              container::ExistingKeyPolicy policy) {
+    massert(13274505,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    WiredTigerCursor cursor{
+        getWiredTigerCursorParams(wtRu, tableId(), overwrite(policy)), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
+    int ret = 0;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        ret = insert(wtRu, *cursor.get(), keys[i], values[i]);
+        if (ret != 0) {
+            break;
+        }
+    }
     return wtRCToStatus(ret, cursor->session);
 }
 

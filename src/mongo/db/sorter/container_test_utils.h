@@ -4,7 +4,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/storage/container.h"
+#include "mongo/db/storage/container_base.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 
@@ -19,7 +19,7 @@
 
 namespace mongo::sorter {
 
-class ViewableIntegerKeyedContainer final : public IntegerKeyedContainer {
+class ViewableIntegerKeyedContainer final : public IntegerKeyedContainerBase {
 public:
     using Entry = std::pair<int64_t, std::string>;
 
@@ -63,18 +63,12 @@ public:
         boost::optional<int64_t> _position;
     };
 
-    ViewableIntegerKeyedContainer() = default;
+    ViewableIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
 
     explicit ViewableIntegerKeyedContainer(std::shared_ptr<Ident> ident)
-        : _ident(std::move(ident)) {}
+        : IntegerKeyedContainerBase(std::move(ident)) {}
 
-    std::shared_ptr<Ident> ident() const override {
-        return _ident;
-    }
-
-    void setIdent(std::shared_ptr<Ident> ident) override {
-        _ident = std::move(ident);
-    }
+    using IntegerKeyedContainerBase::insert;
 
     Status insert(RecoveryUnit&,
                   int64_t key,
@@ -108,7 +102,6 @@ public:
     }
 
 private:
-    std::shared_ptr<Ident> _ident;
     std::vector<Entry> _entries;
 };
 

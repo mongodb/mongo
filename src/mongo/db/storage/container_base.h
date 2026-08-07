@@ -16,6 +16,12 @@ public:
 
     void setIdent(std::shared_ptr<Ident> ident) final;
 
+    using IntegerKeyedContainer::insert;
+    Status insert(RecoveryUnit& ru,
+                  std::span<const int64_t> keys,
+                  std::span<const std::span<const char>> values,
+                  container::ExistingKeyPolicy policy) override;
+
 private:
     std::shared_ptr<Ident> _ident;
 };
@@ -27,6 +33,12 @@ public:
     std::shared_ptr<Ident> ident() const final;
 
     void setIdent(std::shared_ptr<Ident> ident) final;
+
+    using StringKeyedContainer::insert;
+    Status insert(RecoveryUnit& ru,
+                  std::span<const std::span<const char>> keys,
+                  std::span<const std::span<const char>> values,
+                  container::ExistingKeyPolicy policy) override;
 
 private:
     std::shared_ptr<Ident> _ident;
