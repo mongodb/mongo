@@ -4,60 +4,109 @@
 #include "mongo/logv2/ramlog.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/observable_mutex_registry.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/synchronized_value.h"
 
-#include <map>
-#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
 
 namespace mongo::logv2 {
 
-using std::string;
-
 namespace {
-typedef std::map<string, RamLog*> RM;
-std::mutex* _namedLock = NULL;
-RM* _named = NULL;
-// TODO(SERVER-113226): Move these globals into a single structure to manage them better.
-Atomic<size_t> _globalMaxLines = 1024;
-Atomic<size_t> _globalMaxSizeBytes = 1024 * 1024;
+
+struct GlobalState {
+    stdx::unordered_map<std::string, RamLog*> named;
+    size_t maxLines{1024};
+    size_t maxSizeBytes{1024 * 1024};
+};
+
+synchronized_value<GlobalState>& globalState() {
+    static StaticImmortal<synchronized_value<GlobalState>> state;
+    return *state;
+}
 
 }  // namespace
 
-RamLog::RamLog(std::string_view name, size_t maxLines, size_t maxSizeBytes)
-    : _maxLines(maxLines), _maxSizeBytes(maxSizeBytes), _name(name) {
-    std::string tagName{name};
-    if (!tagName.empty()) {
-        tagName.front() = ctype::toUpper(tagName.front());
+RamLog* RamLog::get(std::string_view name) {
+    auto g = globalState().synchronize();
+    auto [iter, isNew] = g->named.try_emplace(name);
+    if (isNew) {
+        iter->second = new RamLog(std::string{name}, g->maxLines, g->maxSizeBytes);
     }
-    ObservableMutexRegistry::get().add(fmt::format("logv2RamLog{}Mutex", tagName), _mutex);
-    _lines.resize(_maxLines);
-    clear();
+    return iter->second;
 }
 
-RamLog::~RamLog() {}
+RamLog* RamLog::getIfExists(std::string_view name) {
+    auto g = globalState().synchronize();
+    auto iter = g->named.find(name);
+    return iter == g->named.end() ? nullptr : iter->second;
+}
 
+std::vector<std::string> RamLog::getNames() {
+    std::vector<std::string> names;
+    auto g = globalState().synchronize();
+    names.reserve(g->named.size());  // could be more than needed but small either way
+    for (const auto& [name, rmlog] : g->named) {
+        std::lock_guard lk{rmlog->_mutex};
+        if (rmlog->getLineCount(lk) > 0) {
+            names.push_back(name);
+        }
+    }
+
+    return names;
+}
+
+void RamLog::setGlobalMaxLines(size_t maxLines) {
+    uassert(ErrorCodes::BadValue, "ramLogMaxLines must be greater than 0", maxLines > 0);
+    auto g = globalState().synchronize();
+    g->maxLines = maxLines;
+    for (auto& [_name, ramlog] : g->named) {
+        ramlog->updateMaxLines(maxLines);
+    }
+}
+
+void RamLog::setGlobalMaxSizeBytes(size_t maxSizeBytes) {
+    auto g = globalState().synchronize();
+    g->maxSizeBytes = maxSizeBytes;
+    for (auto& [_name, ramlog] : g->named) {
+        ramlog->updateMaxSizeBytes(maxSizeBytes);
+    }
+}
+
+size_t RamLog::getGlobalMaxLines() {
+    return globalState()->maxLines;
+}
+
+size_t RamLog::getGlobalMaxSizeBytes() {
+    return globalState()->maxSizeBytes;
+}
+
+// In another world, this would take a std::string by value rather than const reference, since
+// it's taking ownership of the string and can move it into its internal buffer.
+// However, the API that calls this function in ramlog_sink.h itself takes a const std::string&,
+// and is meant to share a signature with other sinks, so it shouldn't be changed.
+// Therefore, taking the string by const reference and maybe being able to do a memcpy into an
+// existing string buffer internally is the best solution.
 void RamLog::write(const std::string& str) {
+    const auto len = str.size();
     std::lock_guard lk(_mutex);
     _totalLinesWritten++;
 
-    if (0 == str.size()) {
+    if (len == 0) {
         return;
     }
 
     // Trim if we are going to go above the threshold
-    trimIfNeeded(str.size());
+    trimIfNeeded(len, lk);
 
     // Add the new line and adjust the space accounting
     _totalSizeBytes -= _lines[_lastLinePosition].size();
     _lines[_lastLinePosition] = str;
-    _totalSizeBytes += str.size();
+    _totalSizeBytes += len;
 
     // Advance the last line position to the next entry
     _lastLinePosition = (_lastLinePosition + 1) % _maxLines;
@@ -69,26 +118,45 @@ void RamLog::write(const std::string& str) {
     }
 }
 
-// warning: this function must be invoked under existing mutex
-void RamLog::trimIfNeeded(size_t newStr) {
+void RamLog::clear() {
+    std::lock_guard lk(_mutex);
+    _totalLinesWritten = 0;
+    _firstLinePosition = 0;
+    _lastLinePosition = 0;
+    _totalSizeBytes = 0;
+
+    for (auto& line : _lines) {
+        line.clear();
+        line.shrink_to_fit();
+    }
+}
+
+RamLog::RamLog(std::string name, size_t maxLines, size_t maxSizeBytes)
+    : _maxLines(maxLines), _maxSizeBytes(maxSizeBytes), _lines(maxLines), _name(std::move(name)) {
+    std::string tagName{_name};
+    if (!tagName.empty()) {
+        tagName.front() = ctype::toUpper(tagName.front());
+    }
+    ObservableMutexRegistry::get().add(fmt::format("logv2RamLog{}Mutex", tagName), _mutex);
+}
+
+void RamLog::trimIfNeeded(size_t spaceNeeded, WithLock lk) {
+    size_t totalSpaceNeeded = _totalSizeBytes + spaceNeeded;
     // Check if we are going to go past the size limit
-    if ((_totalSizeBytes + newStr) < _maxSizeBytes) {
+    if (totalSpaceNeeded < _maxSizeBytes) {
         return;
     }
 
     // Worst case, if the user adds a really large line, we will keep just one line
-    if (getLineCount() == 0) {
+    if (getLineCount(lk) == 0) {
         return;
     }
 
-    // The buffer has grown large, so trim back enough to fit our new string
-    size_t trimmedSpace = 0;
-
     // Trim down until we make enough space, keep at least one line though
     // This means with the line we are about to have, the log will actually have 2 lines
-    while (getLineCount() > 1 && trimmedSpace < newStr) {
+    while (getLineCount(lk) > 1 && totalSpaceNeeded >= _maxSizeBytes) {
         size_t size = _lines[_firstLinePosition].size();
-        trimmedSpace += size;
+        totalSpaceNeeded -= size;
         _totalSizeBytes -= size;
 
         _lines[_firstLinePosition].clear();
@@ -98,128 +166,59 @@ void RamLog::trimIfNeeded(size_t newStr) {
     }
 }
 
-void RamLog::clear() {
+void RamLog::updateMaxLines(size_t newMaxLines) {
     std::lock_guard lk(_mutex);
-    _totalLinesWritten = 0;
-    _firstLinePosition = 0;
-    _lastLinePosition = 0;
-    _totalSizeBytes = 0;
+    if (newMaxLines == _maxLines) {
+        return;
+    }
 
-    for (size_t i = 0; i < _maxLines; i++) {
-        _lines[i].clear();
-        _lines[i].shrink_to_fit();
+    // migrate the lines from newest to oldest
+    std::vector<std::string> newLines{newMaxLines};
+    auto currentSrc = _lastLinePosition;
+    auto currentDst = newMaxLines;
+
+    while (currentSrc != _firstLinePosition && currentDst > 1) {
+        if (currentSrc == 0) {
+            currentSrc = _maxLines;
+        }
+
+        newLines[--currentDst] = std::move(_lines[--currentSrc]);
+    }
+
+    _lines = std::move(newLines);
+    _maxLines = newMaxLines;
+
+    if (currentDst == newMaxLines) {
+        _firstLinePosition = 0;
+        _lastLinePosition = 0;
+    } else {
+        _firstLinePosition = currentDst;
+        _lastLinePosition = 0;
     }
 }
 
-std::string_view RamLog::getLine(size_t lineNumber) const {
-    if (lineNumber >= getLineCount()) {
+void RamLog::updateMaxSizeBytes(size_t newMaxSizeBytes) {
+    std::lock_guard lk{_mutex};
+    _maxSizeBytes = newMaxSizeBytes;
+    if (_totalSizeBytes > newMaxSizeBytes) {
+        trimIfNeeded(0, lk);
+    }
+}
+
+std::string_view RamLog::getLine(size_t lineNumber, WithLock lk) const {
+    if (lineNumber >= getLineCount(lk)) {
         return "";
     }
 
-    std::lock_guard lk(_mutex);
-    return _lines[(lineNumber + _firstLinePosition) % _maxLines].c_str();
+    return _lines[(lineNumber + _firstLinePosition) % _maxLines];
 }
 
-size_t RamLog::getLineCount() const {
-    std::lock_guard lk(_mutex);
-
+size_t RamLog::getLineCount(WithLock) const {
     if (_lastLinePosition < _firstLinePosition) {
         return (_maxLines - _firstLinePosition) + _lastLinePosition;
     }
 
     return _lastLinePosition - _firstLinePosition;
-}
-
-RamLog::LineIterator::LineIterator(RamLog* ramlog)
-    : _ramlog(ramlog), _lock(ramlog->_mutex), _nextLineIndex(0) {}
-
-size_t RamLog::LineIterator::getTotalLinesWritten() {
-    std::lock_guard lk(_ramlog->_mutex);
-
-    return _ramlog->_totalLinesWritten;
-}
-
-// ---------------
-// static things
-// ---------------
-
-RamLog* RamLog::get(const std::string& name) {
-    return getImpl(name);
-}
-
-RamLog* RamLog::get(const std::string& name, size_t maxLines, size_t maxSizeBytes) {
-    return getImpl(name, maxLines, maxSizeBytes);
-}
-
-RamLog* RamLog::getImpl(const std::string& name, size_t maxLines, size_t maxSizeBytes) {
-    if (!_namedLock) {
-        // Guaranteed to happen before multi-threaded operation.
-        _namedLock = new std::mutex();
-    }
-
-    std::lock_guard<std::mutex> lk(*_namedLock);
-    if (!_named) {
-        // Guaranteed to happen before multi-threaded operation.
-        _named = new RM();
-    }
-
-    auto [iter, isNew] = _named->try_emplace(name);
-    if (isNew)
-        iter->second = new RamLog(name, maxLines, maxSizeBytes);
-    return iter->second;
-}
-
-RamLog* RamLog::getIfExists(const std::string& name) {
-    if (!_named) {
-        return NULL;
-    }
-    std::lock_guard<std::mutex> lk(*_namedLock);
-    auto iter = _named->find(name);
-    return iter == _named->end() ? nullptr : iter->second;
-}
-
-void RamLog::getNames(std::vector<string>& names) {
-    if (!_named) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lk(*_namedLock);
-    for (RM::iterator i = _named->begin(); i != _named->end(); ++i) {
-        if (i->second->getLineCount()) {
-            names.push_back(i->first);
-        }
-    }
-}
-
-void RamLog::setGlobalMaxLines(size_t maxLines) {
-    _globalMaxLines.store(maxLines);
-}
-
-void RamLog::setGlobalMaxSizeBytes(size_t maxSizeBytes) {
-    _globalMaxSizeBytes.store(maxSizeBytes);
-}
-
-size_t RamLog::getGlobalMaxLines() {
-    return _globalMaxLines.load();
-}
-
-size_t RamLog::getGlobalMaxSizeBytes() {
-    return _globalMaxSizeBytes.load();
-}
-
-/**
- * Ensures that RamLog::get() is called at least once during single-threaded operation,
- * ensuring that _namedLock and _named are initialized safely.
- */
-MONGO_INITIALIZER(RamLogCatalogV2)(InitializerContext*) {
-    if (!_namedLock) {
-        if (_named) {
-            uasserted(ErrorCodes::InternalError, "Inconsistent intiailization of RamLogCatalog.");
-        }
-
-        _namedLock = new std::mutex();
-        _named = new RM();
-    }
 }
 
 }  // namespace mongo::logv2

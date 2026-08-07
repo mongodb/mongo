@@ -317,8 +317,7 @@ public:
         auto request = GetLogCommand::parse(cmdObj, IDLParserContext{"getLog"});
         auto logName = request.getCommandParameter();
         if (logName == "*") {
-            std::vector<std::string> names;
-            logv2::RamLog::getNames(names);
+            auto names = logv2::RamLog::getNames();
 
             BSONArrayBuilder arr(result.subarrayStart("names"sv));
             for (const auto& name : names) {
@@ -327,7 +326,7 @@ public:
             arr.doneFast();
 
         } else {
-            logv2::RamLog* ramlog = logv2::RamLog::getIfExists(std::string{logName});
+            logv2::RamLog* ramlog = logv2::RamLog::getIfExists(logName);
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << "No log named '" << logName << "'",
                     ramlog != nullptr);
