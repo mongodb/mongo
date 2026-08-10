@@ -668,7 +668,7 @@ TargetOpResult targetDelete(OperationContext* opCtx,
     result.useTwoPhaseWriteProtocol = multipleEndpoints && (!isExactId || isFindAndModify);
 
     result.isNonTargetedRetryableWriteWithId =
-        isExactId && multipleEndpoints && isRetryableWrite(opCtx);
+        isExactId && multipleEndpoints && !isFindAndModify && isRetryableWrite(opCtx);
 
     // Increment query counters as appropriate.
     if (!multipleEndpoints) {
