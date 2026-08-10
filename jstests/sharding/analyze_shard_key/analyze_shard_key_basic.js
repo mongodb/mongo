@@ -145,9 +145,12 @@ if (!TestData.auth) {
 {
     const mongod = MongoRunner.runMongod();
 
-    // The analyzeShardKey command is not supported on standalone mongod.
-    const testCases = [{conn: mongod, isSupported: false}];
-    testExistingUnshardedCollection(dbNameBase, mongod, testCases);
+    // Some suites implicitly converts standalone to a replica set, so we need to make sure.
+    if (FixtureHelpers.isStandalone(mongod.getDB("admin"))) {
+        // The analyzeShardKey command is not supported on standalone mongod.
+        const testCases = [{conn: mongod, isSupported: false}];
+        testExistingUnshardedCollection(dbNameBase, mongod, testCases);
+    }
 
     MongoRunner.stopMongod(mongod);
 }

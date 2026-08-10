@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -156,11 +157,14 @@ if (!TestData.auth) {
 {
     const mongod = MongoRunner.runMongod();
 
-    // The configureQueryAnalyzer command is not supported on standalone mongod.
-    const testCases = [
-        {conn: mongod, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation},
-    ];
-    testNonExistingCollection(testCases, dbNameBase);
+    // Some suites implicitly converts standalone to a replica set, so we need to make sure.
+    if (FixtureHelpers.isStandalone(mongod.getDB("admin"))) {
+        // The configureQueryAnalyzer command is not supported on standalone mongod.
+        const testCases = [
+            {conn: mongod, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation},
+        ];
+        testNonExistingCollection(testCases, dbNameBase);
+    }
 
     MongoRunner.stopMongod(mongod);
 }
