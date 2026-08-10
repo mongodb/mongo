@@ -146,6 +146,43 @@ maybe_generate_burn_in_targets() {
     ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:bazel_burn_in -- generate-targets "$base_revision" || echo "Failed to generate burn-in targets"
 }
 
+# Targets whose build is deferred to the `bazel test` phase below, skipping the retried
+# pre-build. Their inputs come from build actions with very long downloads (the
+# query_correctness test corpora), so building them up front serializes that download ahead of
+# all test execution instead of overlapping with it.
+# The tradeoff is that a build failure in one of these targets is not retried.
+DEFERRED_BUILD_TARGETS=(
+    "//jstests/suites/query-optimization:query_correctness_generated_test_1"
+    "//jstests/suites/query-optimization:query_correctness_generated_test_2"
+    "//jstests/suites/query-optimization:query_correctness_generated_test_3"
+    "//jstests/suites/query-optimization:query_correctness_generated_test_4"
+    "//jstests/suites/query-execution:query_correctness_query_shape_hash_stability_generated_test_1"
+    "//jstests/suites/query-execution:query_correctness_query_shape_hash_stability_generated_test_2"
+    "//jstests/suites/query-execution:query_correctness_query_shape_hash_stability_generated_test_3"
+    "//jstests/suites/query-execution:query_correctness_query_shape_hash_stability_generated_test_4"
+)
+
+targets_for_build_phase() {
+    local target deferred kept=0
+    for target in ${targets}; do
+        for deferred in "${DEFERRED_BUILD_TARGETS[@]}"; do
+            if [[ "$target" == "$deferred" ]]; then
+                continue 2
+            fi
+        done
+        printf '%s ' "$target"
+        kept=1
+    done
+
+    if [[ "$kept" == "0" ]]; then
+        return
+    fi
+
+    for deferred in "${DEFERRED_BUILD_TARGETS[@]}"; do
+        printf -- '-%s ' "$deferred"
+    done
+}
+
 # Build with retries, then test. Leaves the result in the global RET.
 run_build_and_test() {
     local build_attempts=3
@@ -176,13 +213,24 @@ run_build_and_test() {
     # them straight from the CAS and downloads only what its own policy requires. The default
     # is "all" outside the remote_test config, hence the explicit override; it is a no-op for
     # local exec (no remote executor).
-    export RETRY_ON_FAIL=1
-    bazel_evergreen_shutils::retry_bazel_cmd $build_attempts "$BAZEL_BINARY" \
-        build --build_tests_only --remote_download_outputs=minimal ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} ${targets}
-    RET=$?
+    #
+    # The build of some resmoke_suite_test data requires long downloads from repository rules.
+    # To avoid destroying the full makespan, defer them so they overlap with test execution. This
+    # should still preserve the importance of the retried build for sporadic compiler failures.
+    local build_targets
+    build_targets="$(targets_for_build_phase)"
 
-    if [[ "$RET" != "0" ]]; then
-        return
+    if [[ -n "$build_targets" ]]; then
+        export RETRY_ON_FAIL=1
+        bazel_evergreen_shutils::retry_bazel_cmd $build_attempts "$BAZEL_BINARY" \
+            build --build_tests_only --remote_download_outputs=minimal ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} -- ${build_targets}
+        RET=$?
+
+        if [[ "$RET" != "0" ]]; then
+            return
+        fi
+    else
+        echo "All requested targets are deferred to the test phase; skipping the pre-build."
     fi
 
     export RETRY_ON_FAIL=0

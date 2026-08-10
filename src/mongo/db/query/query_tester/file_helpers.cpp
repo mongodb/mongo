@@ -103,6 +103,26 @@ std::filesystem::path resolveSymlinks(const std::filesystem::path& path) {
     }
     return path;
 }
+
+/**
+ * Gives `actual` the same permissions as `expected`, plus owner write.
+ *
+ * `git diff --no-index` otherwise reports a file-mode difference as a diff even when the contents
+ * are identical.
+ *
+ * If the status of `expected` cannot be checked or the permissions of `actual` fail to set, the
+ * `actual` file is left unmodified. The testcase may then fail due to the file-mode differences.
+ */
+void matchPermissions(const std::filesystem::path& expected, const std::filesystem::path& actual) {
+    auto ec = std::error_code{};
+    if (const auto expectedStatus = std::filesystem::status(expected, ec); !ec) {
+
+        // Error code from setting permissions is unchecked. If it fails, the diff may report
+        // file-mode differences only.
+        std::filesystem::permissions(
+            actual, expectedStatus.permissions() | std::filesystem::perms::owner_write, ec);
+    }
+}
 }  // namespace
 
 ConditionalColor applyBold() {
@@ -164,6 +184,7 @@ std::string gitDiff(const std::filesystem::path& expected,
     // resolve both paths first to make sure we diff file contents.
     const auto expectedResolved = resolveSymlinks(expected);
     const auto actualResolved = resolveSymlinks(actual);
+    matchPermissions(expectedResolved, actualResolved);
     const auto gitDiffCmd =
         (std::stringstream{}
          << "git"

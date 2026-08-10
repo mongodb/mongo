@@ -100,7 +100,8 @@ def _resmoke_config_impl(ctx):
             target_file = base_config_file,
         )
     else:
-        # Generate a config with resolved roots from srcs.
+        # Generate a config with resolved roots from srcs, or from explicit root
+        # strings when those are supplied.
         test_list_file = ctx.actions.declare_file(base_name + ".txt")
 
         python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
@@ -111,7 +112,14 @@ def _resmoke_config_impl(ctx):
         python_path = py_exec_import_paths(ctx, [ctx.attr.generator])
         generator_deps = [ctx.attr.generator[PyInfo].transitive_sources]
 
-        if ctx.attr.test_root_granularity == "directory":
+        if ctx.attr.roots:
+            # Roots are supplied as explicit runfiles-relative path/glob strings
+            # (see the config_roots arg of resmoke_suite_test). Write them verbatim
+            # and take no dependency on srcs, so the config can be built without
+            # building the (potentially very large) test corpus.
+            # resmoke expands any glob patterns in roots at run time.
+            test_list = ctx.attr.roots
+        elif ctx.attr.test_root_granularity == "directory":
             # The test kind treats each directory as a single test case (e.g.
             # query_tester). Track the individual files as inputs for hermeticity
             # but write the deduped parent directories as roots. A directory tree
@@ -161,6 +169,11 @@ resmoke_config = rule(
             cfg = "exec",
         ),
         "srcs": attr.label_list(allow_files = True, doc = "Tests to write as the 'roots' of the selector"),
+        "roots": attr.string_list(
+            doc = "Explicit path/glob strings, relative to resmoke's working directory, " +
+                  "to write as the selector 'roots', " +
+                  "used instead of deriving them from srcs. Takes precedence over srcs.",
+        ),
         "test_root_granularity": attr.string(
             default = "file",
             values = ["file", "directory"],
@@ -212,6 +225,19 @@ _DEFAULT_PYTHON_DATA = [
     "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
 ]
 
+def _resolve_config_root(name, root):
+    """Resolves a '//path' config root to a path relative to resmoke's cwd.
+
+    resmoke_shim.py runs resmoke from a short working directory and symlinks the
+    main repo's runfiles entries into it at the top level, so a root is just the
+    workspace-relative path with the leading '//' stripped. Paths produced by a
+    rule are written the same way: runfiles drop the bazel-out prefix.
+    """
+    if not root.startswith("//"):
+        fail(("resmoke_suite_test '%s': config_roots entry '%s' must be a workspace-relative " +
+              "path written as '//path/to/tests/*/'.") % (name, root))
+    return root[len("//"):]
+
 def _dep_target_name(dep):
     """Extract the target name from a label string, e.g. '//pkg:name' → 'name'."""
     if ":" in dep:
@@ -225,6 +251,7 @@ def resmoke_suite_test(
         deps = [],
         resmoke_args = [],
         srcs = [],
+        config_roots = [],
         tags = [],
         target_compatible_with = [],
         test_root_granularity = "file",
@@ -247,6 +274,20 @@ def resmoke_suite_test(
         deps: Binary dependencies (mongod, mongos, etc.).
         resmoke_args: Additional command-line arguments for resmoke.
         srcs: Override for test source files. If empty, auto-derived from config.
+        config_roots: Explicit selector root path/glob strings for the generated
+            config, interpreted relative to resmoke's working directory. Each entry
+            must be a workspace-relative path written as '//path/to/tests/*/',
+            including a path produced by a rule (runfiles drop the bazel-out
+            prefix). When set, the *_config target writes these roots verbatim and
+            takes no dependency on srcs, so it can be built without building the
+            (potentially very large) test corpus; resmoke expands glob patterns at
+            run time. srcs is still used for the test's runtime data. Use for
+            suites whose corpus is a directory produced by a rule (e.g.
+            query_correctness), where the individual test files are not known at
+            analysis time.
+            Note that a root naming a directory must be written as a glob
+            ('.../*/'); resmoke silently discards non-glob roots that are not
+            existing files.
         test_root_granularity: Granularity of a test case: "file" (default, one
             root per src file) or "directory" (one root per src's parent
             directory). Use "directory" for test kinds that treat each directory
@@ -264,9 +305,10 @@ def resmoke_suite_test(
         **kwargs: Additional arguments passed to py_test (e.g., shard_count).
     """
 
-    # Auto-derive srcs from the suite YAML if not explicitly provided.
-    passthrough = not srcs
-    if not srcs:
+    # Auto-derive srcs from the suite YAML if neither srcs nor config_roots is
+    # explicitly provided.
+    passthrough = not srcs and not config_roots
+    if passthrough:
         resolved = _resolve_suite_srcs(config)
         if resolved == None:
             fail(("resmoke_suite_test '%s': no srcs provided and config '%s' not found in SUITE_SELECTORS. " +
@@ -276,7 +318,10 @@ def resmoke_suite_test(
     generated_config = name + "_config"
     resmoke_config(
         name = generated_config,
-        srcs = srcs,
+        # When config_roots is set, the config is generated from those strings and
+        # must not depend on srcs, so building *_config does not fetch the corpus.
+        srcs = [] if config_roots else srcs,
+        roots = [_resolve_config_root(name, root) for root in config_roots],
         base_config = config,
         passthrough = passthrough,
         test_root_granularity = test_root_granularity,

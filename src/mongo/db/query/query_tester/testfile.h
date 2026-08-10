@@ -34,13 +34,17 @@ class QueryFile {
 public:
     QueryFile(std::filesystem::path filePath,
               const bool optimizationsOff,
-              const OverrideOption overrideOption = OverrideOption::None)
+              const OverrideOption overrideOption = OverrideOption::None,
+              const std::filesystem::path& outputDir = {})
         : _filePath(filePath),
           _optimizationsOff(optimizationsOff),
           _overrideOption(overrideOption),
+          _outputBase(outputDir.empty()
+                          ? std::filesystem::path{filePath}
+                          : outputDir / std::filesystem::path{filePath}.relative_path()),
           _expectedPath(std::filesystem::path{filePath}.replace_extension(
               overrideOptionToExtensionPrefix(_overrideOption).get_value_or("") + ".results")),
-          _actualPath(std::filesystem::path{filePath}.replace_extension(
+          _actualPath(std::filesystem::path{_outputBase}.replace_extension(
               overrideOptionToExtensionPrefix(_overrideOption).get_value_or("") + ".actual")),
           _failedQueryCount(0) {}
 
@@ -140,6 +144,7 @@ protected:
     size_t _testsRun = 0;
     const bool _optimizationsOff;
     const OverrideOption _overrideOption;
+    const std::filesystem::path _outputBase;
     std::filesystem::path _expectedPath;
     std::filesystem::path _actualPath;
     struct {

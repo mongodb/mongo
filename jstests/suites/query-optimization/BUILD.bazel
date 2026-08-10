@@ -426,11 +426,14 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "query_correctness_generated_test_1",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_1"],
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_1/generated_tests/*/"],
+    shard_count = 4,
     tags = [
         "ci-default",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "incompatible_with_bazel_remote_test",  # Requires `git`
         "requires_all_feature_flags",
     ],
     target_compatible_with = select({
@@ -441,17 +444,21 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
         "//src/mongo/shell:mongo",
     ],
 )
 
 resmoke_suite_test(
     name = "query_correctness_generated_test_2",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_2"],
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_2/generated_tests/*/"],
+    shard_count = 4,
     tags = [
         "ci-default",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "incompatible_with_bazel_remote_test",  # Requires `git`
         "requires_all_feature_flags",
     ],
     target_compatible_with = select({
@@ -462,17 +469,21 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
         "//src/mongo/shell:mongo",
     ],
 )
 
 resmoke_suite_test(
     name = "query_correctness_generated_test_3",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_3"],
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_3/generated_tests/*/"],
+    shard_count = 4,
     tags = [
         "ci-default",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "incompatible_with_bazel_remote_test",  # Requires `git`
         "requires_all_feature_flags",
     ],
     target_compatible_with = select({
@@ -483,17 +494,21 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
         "//src/mongo/shell:mongo",
     ],
 )
 
 resmoke_suite_test(
     name = "query_correctness_generated_test_4",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_4"],
     config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_4/generated_tests/*/"],
+    shard_count = 4,
     tags = [
         "ci-default",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Requires test setup from 10gen/query-correctness-tests
+        "incompatible_with_bazel_remote_test",  # Requires `git`
         "requires_all_feature_flags",
     ],
     target_compatible_with = select({
@@ -504,6 +519,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
         "//src/mongo/shell:mongo",
     ],
 )

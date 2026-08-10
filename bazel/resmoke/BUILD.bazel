@@ -215,6 +215,13 @@ py_binary(
 )
 
 py_binary(
+    name = "query_correctness_corpus_fetch",
+    srcs = ["query_correctness_corpus_fetch.py"],
+    main = "query_correctness_corpus_fetch.py",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "derive_suite_selectors",
     srcs = [
         "derive_suite_selectors.py",

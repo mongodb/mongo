@@ -107,7 +107,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const bool populateAndExit,
                    const ErrorLogLevel errorLogLevel,
                    const DiffStyle diffStyle,
-                   const OverrideOption overrideOption) {
+                   const OverrideOption overrideOption,
+                   const std::filesystem::path& outputDir) {
     // Run the tests.
     auto versionInfo = MockVersionInfo{};
     auto conn = buildConn(uriString, &versionInfo, mode);
@@ -123,7 +124,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     auto failedQueryCount = size_t{0};
     auto totalTestsRun = size_t{0};
     for (const auto& [testPath, startRange, endRange] : testsToRun) {
-        auto currFile = query_tester::QueryFile(testPath, optimizationsOff, overrideOption);
+        auto currFile =
+            query_tester::QueryFile(testPath, optimizationsOff, overrideOption, outputDir);
 
         // Treat data load errors as failures, too.
         try {
@@ -251,6 +253,9 @@ void printHelpString() {
          "each document on its own line; `oneline` puts the entire result set on one line. "
          "Overwrites existing .results files. Not available with --mode compare or when using "
          "-n or -r."},
+        {"--outputDir",
+         "Directory to write files from a test (.actual, .fail, and the .narrowed "
+         "expected results). Defaults to writing them alongside the test."},
         {"--populateAndExit",
          "Drop and reload collection data, then exit without running any tests. Implicitly "
          "applies --drop and --load. Accepts exactly one -t argument."},
@@ -300,6 +305,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto modeExplicitlySet = false;
     auto optimizationsOff = false;
     auto outOpt = WriteOutOptions::kNone;
+    auto outputDir = std::filesystem::path{};
     auto populateAndExit = false;
     auto verbose = false;
     auto diffStyle = DiffStyle::kWord;
@@ -330,6 +336,10 @@ int queryTesterMain(const int argc, const char** const argv) {
         } else if (parsedArgs[argNum] == "--out") {
             assertNextArgExists(parsedArgs, argNum, "--out");
             outOpt = stringToWriteOutOpt(parsedArgs[argNum + 1]);
+            ++argNum;
+        } else if (parsedArgs[argNum] == "--outputDir") {
+            assertNextArgExists(parsedArgs, argNum, "--outputDir");
+            outputDir = parsedArgs[argNum + 1];
             ++argNum;
         } else if (parsedArgs[argNum] == "--populateAndExit") {
             std::tie(dropOpt, loadOpt, populateAndExit) = std::tuple{true, true, true};
@@ -452,7 +462,8 @@ int queryTesterMain(const int argc, const char** const argv) {
                               populateAndExit,
                               errorLogLevel,
                               diffStyle,
-                              overrideOption);
+                              overrideOption,
+                              outputDir);
     } catch (AssertionException& ex) {
         exitWithError(1, ex.reason());
     }

@@ -1,9 +1,5 @@
 """Fetches the private 10gen/jstestfuzz repo via the canonical git_repository rule.
 
-Evergreen installs a git url.insteadOf credential rewrite for this repo's remote before
-Bazel runs (see evergreen/write_github_repo_credentials.sh); this extension does not
-handle authentication itself.
-
 To fetch a specific commit without editing MODULE.bazel:
     bazel sync --repo_env=JSTESTFUZZ_COMMIT=abc123def456...
 """
@@ -51,7 +47,6 @@ jstestfuzz_repository = module_extension(
     implementation = _jstestfuzz_repository_impl,
     doc = (
         "Fetches 10gen/jstestfuzz via git_repository. Set JSTESTFUZZ_COMMIT to override " +
-        "the fetched ref without editing MODULE.bazel. Requires credentials already " +
-        "configured for the system git (see evergreen/write_github_repo_credentials.sh)."
+        "the fetched ref without editing MODULE.bazel."
     ),
 )

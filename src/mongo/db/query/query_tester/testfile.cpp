@@ -525,7 +525,10 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
     if (mode == ModeOption::Compare && partialTestRun) {
         // Guard against .results files that were produced from a partial run.
         checkForPartialRunSentinel(_expectedPath);
-        const auto narrowedPath = std::filesystem::path{_expectedPath}.concat(".narrowed");
+        const auto narrowedPath = std::filesystem::path{_outputBase}.replace_extension(
+            overrideOptionToExtensionPrefix(_overrideOption).get_value_or("") +
+            ".results.narrowed");
+        std::filesystem::create_directories(std::filesystem::absolute(narrowedPath).parent_path());
         auto narrowedStream = std::fstream{narrowedPath, std::ios::out | std::ios::trunc};
 
         auto testsWithResults = QueryFile{_expectedPath, false, _overrideOption};
@@ -653,7 +656,8 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
 
 std::filesystem::path QueryFile::writeOutFailedQueries(
     const std::set<size_t>& failedTestNums) const {
-    auto failPath = std::filesystem::path{_filePath}.replace_extension(".fail");
+    auto failPath = std::filesystem::path{_outputBase}.replace_extension(".fail");
+    std::filesystem::create_directories(std::filesystem::absolute(failPath).parent_path());
     auto ofs = std::fstream{failPath, std::ios::out | std::ios::trunc};
 
     // Write out header without comments.

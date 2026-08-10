@@ -466,7 +466,7 @@
     },
     "//bazel/repository_rules:jstestfuzz_repository.bzl%jstestfuzz_repository": {
       "general": {
-        "bzlTransitiveDigest": "fWIp91dfr9+kScoAejIhlAHI5dZATVijfdWxmKZNO+w=",
+        "bzlTransitiveDigest": "qIdw1NjC9bsqZR+blMT6XRPKKx7JJpSrUOTemf/PF2Q=",
         "usagesDigest": "hfv5GZCbjEm9mqVjqsLkZAo40qQLmsIZVIL6T+or5E4=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
