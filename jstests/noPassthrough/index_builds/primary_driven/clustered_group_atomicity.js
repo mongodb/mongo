@@ -59,7 +59,7 @@ assert.commandWorked(coll.insert({_id: -1, x: -1}));
 const indexName = "x_1";
 IndexBuildTest.pauseIndexBuilds(primary);
 const awaitIndex = IndexBuildTest.startIndexBuild(primary, nss, {x: 1}, {name: indexName});
-IndexBuildTest.waitForIndexBuildToStart(db, collName, indexName);
+IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, indexName);
 
 assert.commandWorked(coll.insertMany(docs, {ordered: true}));
 
