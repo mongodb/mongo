@@ -10,7 +10,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.record_store_count;
 coll.drop();
@@ -27,15 +27,15 @@ assert.commandWorked(coll.createIndex({x: 1}));
 // shard filtering to avoid counting data that is not logically owned by the shard.
 //
 let explain = coll.explain().count({});
-assert(!planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
+assert(!planHasStage(db, getWinningPlanFromExplain(explain), "COLLSCAN"));
 if (!FixtureHelpers.isMongos(db) || !FixtureHelpers.isSharded(coll)) {
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "RECORD_STORE_FAST_COUNT"));
+    assert(planHasStage(db, getWinningPlanFromExplain(explain), "RECORD_STORE_FAST_COUNT"));
 }
 
 explain = coll.explain().count({$comment: "hi"});
-assert(!planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
+assert(!planHasStage(db, getWinningPlanFromExplain(explain), "COLLSCAN"));
 if (!FixtureHelpers.isMongos(db) || !FixtureHelpers.isSharded(coll)) {
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "RECORD_STORE_FAST_COUNT"));
+    assert(planHasStage(db, getWinningPlanFromExplain(explain), "RECORD_STORE_FAST_COUNT"));
 }
 
 //
@@ -53,10 +53,10 @@ function checkPlan(plan, expectedStages, unexpectedStages) {
 
 function testExplainAndExpectStage({expectedStages, unexpectedStages, hintIndex}) {
     explain = coll.explain().find({x: 0}).hint(hintIndex).count();
-    checkPlan(explain.queryPlanner.winningPlan, expectedStages, unexpectedStages);
+    checkPlan(getWinningPlanFromExplain(explain), expectedStages, unexpectedStages);
 
     explain = coll.explain().find({x: 0, $comment: "hi"}).hint(hintIndex).count();
-    checkPlan(explain.queryPlanner.winningPlan, expectedStages, unexpectedStages);
+    checkPlan(getWinningPlanFromExplain(explain), expectedStages, unexpectedStages);
 }
 
 if (!FixtureHelpers.isMongos(db) || !FixtureHelpers.isSharded(coll)) {

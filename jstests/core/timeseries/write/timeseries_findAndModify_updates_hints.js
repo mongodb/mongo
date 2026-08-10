@@ -11,7 +11,7 @@
  * ]
  */
 
-import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getSingleChildStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -96,17 +96,14 @@ const testUpdateHint = ({
         );
 
         // Verify that the query plan uses the expected index.
+        // The write stage's child is the COLLSCAN, or the FETCH above the IXSCAN.
+        const childStage = getSingleChildStage(winningPlan);
         if (expectedPlan.stage == "COLLSCAN") {
-            assert.eq(expectedPlan.stage, winningPlan.inputStage.stage);
+            assert.eq(expectedPlan.stage, childStage.stage);
         } else {
-            assert.eq(expectedPlan.stage, winningPlan.inputStage.inputStage.stage);
-            assert.eq(
-                bsonWoCompare(
-                    expectedPlan.keyPattern,
-                    winningPlan.inputStage.inputStage.keyPattern,
-                ),
-                0,
-            );
+            const ixscan = getSingleChildStage(childStage);
+            assert.eq(expectedPlan.stage, ixscan.stage);
+            assert.eq(bsonWoCompare(expectedPlan.keyPattern, ixscan.keyPattern), 0);
         }
     }
 
