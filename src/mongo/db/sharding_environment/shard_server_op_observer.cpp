@@ -845,6 +845,50 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
     }
 }
 
+void ShardServerOpObserver::onInvalidateAllCollectionMetadata(OperationContext* opCtx,
+                                                              const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
+    InvalidateAllCollectionMetadataOplogEntry::parse(
+        op.getObject(), IDLParserContext("InvalidateAllCollectionMetadataOplogEntryContext"));
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics
+        .registerInvalidateAllCollectionMetadataOplogEntryApplied();
+
+    LOGV2_DEBUG(13169801, 1, "Applying invalidateAllCollectionMetadata oplog entry");
+
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->clearCollectionMetadata(opCtx);
+    }
+}
+
+void ShardServerOpObserver::onInvalidateAllDatabaseMetadata(OperationContext* opCtx,
+                                                            const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
+    InvalidateAllDatabaseMetadataOplogEntry::parse(
+        op.getObject(), IDLParserContext("InvalidateAllDatabaseMetadataOplogEntryContext"));
+
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics
+        .registerInvalidateAllDatabaseMetadataOplogEntryApplied();
+
+    LOGV2_DEBUG(13169802, 1, "Applying invalidateAllDatabaseMetadata oplog entry");
+
+    for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->clearDbMetadata(opCtx);
+    }
+}
+
 void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opCtx,
                                                            const repl::OplogEntry& op) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.

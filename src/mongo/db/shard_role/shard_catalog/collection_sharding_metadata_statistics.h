@@ -29,6 +29,8 @@ public:
                        _countInvalidateCollectionMetadataOplogEntriesApplied.get());
         builder.append("countInvalidateCollectionMetadataOplogEntriesForDroppedCollections",
                        _countInvalidateCollectionMetadataOplogEntriesForDroppedCollections.get());
+        builder.append("countInvalidateAllCollectionMetadataOplogEntriesApplied",
+                       _countInvalidateAllCollectionMetadataOplogEntriesApplied.get());
         builder.append("countUpdateCollectionMetadataOplogEntriesApplied",
                        _countUpdateCollectionMetadataOplogEntriesApplied.get());
         builder.append("countUpdateCollectionMetadataChangedChunksApplied",
@@ -87,6 +89,10 @@ public:
         }
     }
 
+    void registerInvalidateAllCollectionMetadataOplogEntryApplied() {
+        _countInvalidateAllCollectionMetadataOplogEntriesApplied.incrementRelaxed();
+    }
+
     void registerUpdateCollectionMetadataOplogEntryApplied(long long numChangedChunks) {
         _countUpdateCollectionMetadataOplogEntriesApplied.incrementRelaxed();
         _countUpdateCollectionMetadataChangedChunksApplied.incrementRelaxed(numChangedChunks);
@@ -142,6 +148,8 @@ private:
     Counter64 _countInvalidateCollectionMetadataOplogEntriesApplied;
     // Subset of the above for dropped/untracked collection clears.
     Counter64 _countInvalidateCollectionMetadataOplogEntriesForDroppedCollections;
+    // invalidateAllCollectionMetadata ('c') oplog entries applied on replication secondaries.
+    Counter64 _countInvalidateAllCollectionMetadataOplogEntriesApplied;
     // updateCollectionMetadata ('c') oplog entries applied on replication secondaries.
     Counter64 _countUpdateCollectionMetadataOplogEntriesApplied;
     // Total changed chunks merged by those updateCollectionMetadata delta applications.

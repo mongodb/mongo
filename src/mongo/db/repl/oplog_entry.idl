@@ -80,6 +80,8 @@ enums:
             kImportCollection: "importCollection"
             kCreateDatabaseMetadata: "createDatabaseMetadata"
             kDropDatabaseMetadata: "dropDatabaseMetadata"
+            kInvalidateAllCollectionMetadata: "invalidateAllCollectionMetadata"
+            kInvalidateAllDatabaseMetadata: "invalidateAllDatabaseMetadata"
             kInvalidateCollectionMetadata: "invalidateCollectionMetadata"
             kSetAllowChunkOperations: "setAllowChunkOperations"
             kUpdateCollectionMetadata: "updateCollectionMetadata"

@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
@@ -103,6 +104,12 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const std::vector<BSONObj>& newChunks,
                                           bool receivingFirstChunk = false);
+
+/**
+ * Clears every known CSR entry on the node, based on local CSS knowledge, without changing
+ * durable shard catalog metadata (config.shard.catalog.collections/chunks).
+ */
+void commitInvalidateAllCollectionMetadata(OperationContext* opCtx);
 
 }  // namespace shard_catalog_commit
 

@@ -24,6 +24,8 @@ public:
                        _countCreateDatabaseMetadataOplogEntriesApplied.get());
         builder.append("countDropDatabaseMetadataOplogEntriesApplied",
                        _countDropDatabaseMetadataOplogEntriesApplied.get());
+        builder.append("countInvalidateAllDatabaseMetadataOplogEntriesApplied",
+                       _countInvalidateAllDatabaseMetadataOplogEntriesApplied.get());
         builder.append("countDbVersionMismatchWaits", _countDbVersionMismatchWaits.get());
         builder.append("totalDbVersionMismatchWaitMillis", _totalDbVersionMismatchWaitMillis.get());
         builder.append("countLocalDatabaseMetadataCommits",
@@ -64,6 +66,10 @@ public:
         _countDropDatabaseMetadataOplogEntriesApplied.incrementRelaxed();
     }
 
+    void registerInvalidateAllDatabaseMetadataOplogEntryApplied() {
+        _countInvalidateAllDatabaseMetadataOplogEntriesApplied.incrementRelaxed();
+    }
+
     void registerDbVersionMismatchWait(long long millis) {
         _countDbVersionMismatchWaits.incrementRelaxed();
         _totalDbVersionMismatchWaitMillis.incrementRelaxed(millis);
@@ -96,6 +102,8 @@ private:
     Counter64 _countCreateDatabaseMetadataOplogEntriesApplied;
     // dropDatabaseMetadata ('c') oplog entries applied on replication secondaries.
     Counter64 _countDropDatabaseMetadataOplogEntriesApplied;
+    // invalidateAllDatabaseMetadata ('c') oplog entries applied on replication secondaries.
+    Counter64 _countInvalidateAllDatabaseMetadataOplogEntriesApplied;
     // Waits for majority replication of a received database version on mismatch.
     Counter64 _countDbVersionMismatchWaits;
     // Wall-clock time spent waiting on dbVersion mismatches.
