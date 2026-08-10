@@ -417,7 +417,15 @@ MongoRunner.stopMongod(conn);
 //
 // Tests on a sharded cluster.
 //
-const st = new ShardingTest({shards: 2});
+// Non-deterministic query stats collection can lead to non-deterministic usedDisk in system.profile.
+const queryStatsDisabled = {internalQueryStatsRateLimit: 0, internalQueryStatsSampleRate: 0};
+const st = new ShardingTest({
+    shards: 2,
+    other: {
+        mongosOptions: {setParameter: queryStatsDisabled},
+        rsOptions: {setParameter: queryStatsDisabled},
+    },
+});
 const shardedDB = st.s.getDB(jsTestName());
 
 assert.commandWorked(
