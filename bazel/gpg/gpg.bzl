@@ -1,7 +1,7 @@
 """Repository rules for gpg bundle download"""
 
 load("//bazel:utils.bzl", "retry_download_and_extract")
-load("@bazel_rules_mongo//utils:platforms_normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP")
+load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP")
 
 URLS_MAP = {
     "linux_aarch64": {
@@ -70,10 +70,7 @@ filegroup(
 """,
     )
 
-_gpg_bundle_repo = repository_rule(
+gpg_bundle_repo = repository_rule(
     implementation = _gpg_bundle_repo_impl,
     attrs = {},
 )
-
-def gpg():
-    _gpg_bundle_repo(name = "gpg")

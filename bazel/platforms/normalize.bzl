@@ -1,3 +1,7 @@
+# NOTE: These maps are mirrored in
+# buildscripts/bazel_rules_mongo/utils/platforms_normalize.bzl. That directory is
+# a nested Bazel repo published as a standalone tarball to external consumers, so
+# it cannot load from the main repo and must keep its own copy.
 ARCH_NORMALIZE_MAP = {
     "amd64": "x86_64",
     "x86_64": "x86_64",
@@ -5,6 +9,14 @@ ARCH_NORMALIZE_MAP = {
     "aarch64": "aarch64",
     "ppc64le": "ppc64le",
     "s390x": "s390x",
+}
+
+OS_NORMALIZE_MAP = {
+    "macos": "macos",
+    "mac os x": "macos",
+    "linux": "linux",
+    "windows": "windows",
+    "windows server 2022": "windows",
 }
 
 ARCH_TO_PLATFORM_MAP = {

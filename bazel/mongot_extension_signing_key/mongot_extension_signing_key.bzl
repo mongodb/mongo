@@ -15,9 +15,6 @@ def _impl(ctx):
 
 mongot_extension_signing_key_repo = repository_rule(implementation = _impl)
 
-def mongot_extension_signing_key():
-    mongot_extension_signing_key_repo(name = "mongot_extension_signing_key")
-
 def _gpg_export_armored_key_impl(ctx):
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 

@@ -301,6 +301,132 @@ setup_mongo_native_toolchain(name = "mongo_native_toolchain")
 
 register_toolchains("@mongo_native_toolchain//:mongo_native_toolchain")
 
+# Shell formatter used by //bazel/format.
+shfmt = use_repo_rule("//bazel/format:shfmt.bzl", "shfmt")
+
+shfmt(name = "shfmt")
+
+# GPG bundle used by //bazel/signing and the mongot extension signing key rules.
+gpg_bundle_repo = use_repo_rule("//bazel/gpg:gpg.bzl", "gpg_bundle_repo")
+
+gpg_bundle_repo(name = "gpg")
+
+# db-contrib-tool, used to fetch multiversion server and mongot binaries.
+db_contrib_tool = use_repo_rule("//bazel/db_contrib_tool:db_contrib_tool.bzl", "db_contrib_tool")
+
+db_contrib_tool(name = "db_contrib_tool")
+
+# RBE sysroot dump. Consumed by @mongo_toolchain_v5's generated BUILD file only
+# when //bazel/config:use_rbe_sysroot_enabled is set.
+sysroot_dump = use_repo_rule("//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl", "sysroot_dump")
+
+sysroot_dump(name = "rbe_sysroot")
+
+# Parallel compressors used by //bazel/install_rules when building archives.
+setup_pigz = use_repo_rule("//bazel/install_rules:pigz.bzl", "setup_pigz")
+
+setup_pigz(name = "pigz")
+
+setup_zstd = use_repo_rule("//bazel/install_rules:zstd.bzl", "setup_zstd")
+
+setup_zstd(name = "zstd")
+
+# mongot extension public signing key, embedded into secure builds.
+mongot_extension_signing_key_repo = use_repo_rule(
+    "//bazel/mongot_extension_signing_key:mongot_extension_signing_key.bzl",
+    "mongot_extension_signing_key_repo",
+)
+
+mongot_extension_signing_key_repo(name = "mongot_extension_signing_key")
+
+# Prebuilt Windows Cyrus SASL. Not a bare http_archive because its generated
+# BUILD file has to embed this repo's canonical directory in a /LIBPATH: flag;
+# see the module docstring in windows_sasl.bzl.
+windows_sasl = use_repo_rule("//bazel/install_rules:windows_sasl.bzl", "windows_sasl")
+
+windows_sasl(name = "windows_sasl")
+
+# Locates the host's MSVC install and VC redistributables. Windows-only; the
+# generated BUILD file is empty elsewhere.
+windows_msvc = use_repo_rule("//bazel/install_rules:windows_msvc.bzl", "windows_msvc")
+
+windows_msvc(name = "local_windows_msvc")
+
+http_archive(
+    name = "aspect_rules_lint",
+    sha256 = "f60e4a737a5e09402f5fa3bd182efa80dac5523ca4b9bc5c6fa8c06fbfb46630",
+    strip_prefix = "rules_lint-1.1.0",
+    url = "https://github.com/aspect-build/rules_lint/releases/download/v1.1.0/rules_lint-v1.1.0.tar.gz",
+)
+
+http_file(
+    name = "windows_libclang",
+    downloaded_file_path = "libclang.dll",
+    sha256 = "fd77bdb8098cd82ab918bf50e9b12743e1fc8e524fa64cb90e729fbe9cee9c15",
+    urls = [
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/windows_libclang/libclang.dll",
+    ] * 5,
+)
+
+http_archive(
+    name = "wix_toolset",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "wix_binaries",
+    srcs = select({
+        "@platforms//os:windows": glob(["*"]),
+        "//conditions:default": [],
+    }),
+)
+
+filegroup(
+    name = "candle",
+    srcs = select({
+        "@platforms//os:windows": ["candle.exe"],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:windows": [":wix_binaries"],
+        "//conditions:default": [],
+    }),
+)
+
+filegroup(
+    name = "light",
+    srcs = select({
+        "@platforms//os:windows": ["light.exe"],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:windows": [":wix_binaries"],
+        "//conditions:default": [],
+    }),
+)
+    """,
+    sha256 = "6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31",
+    urls = [
+        "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip",
+    ] * 5,
+)
+
+# This repository is normally created by db-contrib-tool or manually extracting
+# the binaries at the proper location.
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+new_local_repository(
+    name = "mongot_localdev",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+filegroup(
+    name = "mongot_binaries",
+    srcs = glob(["**"], exclude = ["BUILD.bazel", "WORKSPACE", "MODULE.bazel", "MODULE.bazel.lock", "REPO.bazel"]),
+)
+""",
+    path = "mongot-localdev",
+)
+
 setup_mongo_apple_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "setup_mongo_apple_toolchain_extension")
 use_repo(setup_mongo_apple_toolchains_extension, "mongo_apple_toolchain")
 

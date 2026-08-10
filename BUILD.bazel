@@ -333,7 +333,7 @@ copy_to_directory(
         "//conditions:default": [],
     }),
     out = "mongot-localdev",
-    include_external_repositories = ["mongot_localdev"],
+    include_external_repositories = ["*mongot_localdev"],
     tags = [
         "local",
         "no-cache",

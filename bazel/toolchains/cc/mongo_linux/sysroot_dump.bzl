@@ -246,7 +246,3 @@ sysroot_dump = repository_rule(
     environ = [SYSROOT_ENV_VAR],
     configure = True,
 )
-
-def setup_sysroot_dump():
-    """Sets up the RBE sysroot dump repository."""
-    sysroot_dump(name = "rbe_sysroot")

@@ -1,7 +1,7 @@
 """Repository rules for db-contrib-tool"""
 
 load("//bazel:utils.bzl", "retry_download")
-load("@bazel_rules_mongo//utils:platforms_normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP")
+load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP")
 
 URLS_MAP = {
     "linux_aarch64": {
@@ -113,10 +113,7 @@ native_binary(
 
     return None
 
-_db_contrib_tool = repository_rule(
+db_contrib_tool = repository_rule(
     implementation = _db_contrib_tool_download,
     attrs = {},
 )
-
-def db_contrib_tool():
-    _db_contrib_tool(name = "db_contrib_tool")

@@ -1587,21 +1587,6 @@ def _impl(ctx):
             ],
         )
 
-        sasl_include_feature = feature(
-            name = "sasl_include",
-            enabled = True,
-            flag_sets = [
-                flag_set(
-                    actions = all_compile_actions,
-                    flag_groups = [
-                        flag_group(
-                            flags = ["-Iexternal/windows_sasl/include"],
-                        ),
-                    ],
-                ),
-            ],
-        )
-
         mongo_defines_feature = feature(
             name = "mongo_defines",
             enabled = True,
@@ -1695,7 +1680,6 @@ def _impl(ctx):
             stack_frame_error_checking_feature,
             pdb_page_size_feature,
             incremental_feature,
-            sasl_include_feature,
             mongo_defines_feature,
         ]
     else:
