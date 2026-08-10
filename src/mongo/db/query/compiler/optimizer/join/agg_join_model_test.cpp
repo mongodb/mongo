@@ -70,6 +70,11 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnSameField) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
+    // a single edge: trivially a clique, a chain, and a star.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -278,6 +283,11 @@ TEST_F(PipelineAnalyzerTest, PropagateSTPsThruJoinChain) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 4);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 3);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 3);
@@ -403,6 +413,11 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 12);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 4);
+    // every pair of nodes is joined, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 4);
@@ -521,6 +536,11 @@ TEST_F(PipelineAnalyzerTest, DoNotPropagateOrNorNinSingleTablePredicates) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a 3-node path, which is both a chain and a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 3);
@@ -663,6 +683,11 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 2);
+    // a 3-node path, which is both a chain and a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -758,6 +783,11 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemanticsInAJoinCycle) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 9);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 6);
+    // every pair of nodes is joined, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     auto& joinGraph = joinModel.getGraph();
 
@@ -1016,6 +1046,11 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -1050,6 +1085,11 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 
     const auto& joinModel = swJoinModel.getValue();
     const auto& joinGraph = joinModel.getGraph();
@@ -1970,6 +2010,11 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesEachOnDifferentCollection) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -2011,6 +2056,11 @@ TEST_F(PipelineAnalyzerTest, MatchBetweenTwoLookupUnwinds) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -2086,6 +2136,11 @@ TEST_F(PipelineAnalyzerTest, SingleMatchOnTwoDifferentAsFields) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -2127,6 +2182,11 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterOnChainedLookup) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a 3-node path, which is both a chain and a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
 
     const auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.getGraph().numNodes(), 3);
@@ -2304,6 +2364,11 @@ TEST_F(PipelineAnalyzerTest, CompatibleAsFields) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a 3-node path, which is both a chain and a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
 }
 
 TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
@@ -2405,6 +2470,11 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2453,6 +2523,11 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a 3-node path, which is both a chain and a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2818,6 +2893,11 @@ TEST_F(PipelineAnalyzerTest, TwoJoinsEachWithSubpipelineProjectOk) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -2879,6 +2959,11 @@ TEST_F(PipelineAnalyzerTest, tooManyNodes) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 7 edges: the inferred edges create cycles, but not a clique.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     // One $lookup with absorbed $unwind was left unoptimized.
     ASSERT_EQ(swJoinModel.getValue().getSuffix()->getSources().size(), 1);
 }
@@ -2909,6 +2994,12 @@ TEST_F(PipelineAnalyzerTest, tooManyEdges) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // every $lookup joins on the same base field, so this is a 5-node star. The edge cap blocked
+    // the inference that would have made it a clique.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     // One $lookup with absorbed $unwind was left unoptimized.
     ASSERT_EQ(swJoinModel.getValue().getSuffix()->getSources().size(), 1);
 }
@@ -3031,6 +3122,11 @@ TEST_F(PipelineAnalyzerTest, CompoundJoinKeyWithLocalForeignSyntax) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -3104,6 +3200,11 @@ TEST_F(PipelineAnalyzerTest, DuplicateExprEqAndEqEdges) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // every pair of nodes is joined, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -3162,6 +3263,11 @@ TEST_F(PipelineAnalyzerTest, ExprOnlyImplicitEdges) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // a triangle, which for 3 nodes is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }

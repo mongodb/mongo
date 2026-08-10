@@ -74,6 +74,13 @@ const kPerQueryMetrics = {
     numInferredSingleTablePredicates: 0,
 };
 
+const kPerQueryShapes = {
+    isClique: false,
+    isCycle: false,
+    isChain: true,
+    isStar: true,
+};
+
 // Timers recorded on every join-optimization attempt, regardless of whether we hit the join plan
 // cache: we always build the join model and always lower the chosen plan to SBE. Each one covers
 // enough real work (canonical query construction, SBE stage building) to round up to at least one
@@ -136,6 +143,17 @@ function assertJoinMetrics(joinMetrics, updateCount, enumerationCount, fallbackR
         joinMetrics.joinOptimizable,
         tojson(joinMetrics),
     );
+    for (const [name, expected] of Object.entries(kPerQueryShapes)) {
+        assert.docEq(
+            {
+                "true": NumberLong(expected ? updateCount : 0),
+                "false": NumberLong(expected ? 0 : updateCount),
+            },
+            joinMetrics[name],
+            `shape metric '${name}'`,
+            {joinMetrics},
+        );
+    }
     for (const [name, perQuery] of Object.entries(kPerQueryMetrics)) {
         const counter = joinMetrics[name];
         assert(counter, `missing counter '${name}'`, {joinMetrics});

@@ -440,6 +440,16 @@ public:
         // Number of inferred single-table predicates (one per predicate per table).
         int numInferredSingleTablePredicates = 0;
 
+        // Whether the join graph is complete, i.e. every pair of nodes is joined (post-inference).
+        bool isClique = false;
+        // Whether one hub node is joined to every other node, and there are no other edges
+        // (post-inference).
+        bool isStar = false;
+        // Whether the join graph contains at least one cycle between nodes (post-inference).
+        bool isCycle = false;
+        // Whether the nodes form a single path, each joined to at most two others (post-inference).
+        bool isChain = false;
+
         // Time taken to extract a join model from the query.
         int64_t joinModelingTimeMicros = 0;
         // Time taken to lower the chosen QSN to SBE.

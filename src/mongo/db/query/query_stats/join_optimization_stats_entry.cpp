@@ -50,6 +50,11 @@ void appendReasonCounts(BSONObjBuilder& builder,
     }
 }
 
+void combineBool(AggregatedBool& counts, const AggregatedBool& other) {
+    counts.trueCount += other.trueCount;
+    counts.falseCount += other.falseCount;
+}
+
 void combineReasonCounts(std::map<join_ordering::JoinFallbackReason, int64_t>& counts,
                          const std::map<join_ordering::JoinFallbackReason, int64_t>& other) {
     for (const auto& [reason, count] : other) {
@@ -76,6 +81,10 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
     numInferredEqJoinPredicates.appendTo(metricsEntryBuilder, "numInferredEqJoinPredicates");
     numInferredSingleTablePredicates.appendTo(metricsEntryBuilder,
                                               "numInferredSingleTablePredicates");
+    isClique.appendTo(metricsEntryBuilder, "isClique");
+    isStar.appendTo(metricsEntryBuilder, "isStar");
+    isCycle.appendTo(metricsEntryBuilder, "isCycle");
+    isChain.appendTo(metricsEntryBuilder, "isChain");
     joinModelingTimeMicros.appendTo(metricsEntryBuilder, "joinModelingTimeMicros");
     sbeLoweringTimeMicros.appendTo(metricsEntryBuilder, "sbeLoweringTimeMicros");
     if (planEnumerationMetrics) {
@@ -118,8 +127,11 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
     const JoinOptimizationStatsEntry* updateVal =
         dynamic_cast<const JoinOptimizationStatsEntry*>(other);
     tassert(11000100, "Unexpected type of statistic metric", updateVal != nullptr);
-    joinOptimizable.trueCount += updateVal->joinOptimizable.trueCount;
-    joinOptimizable.falseCount += updateVal->joinOptimizable.falseCount;
+    combineBool(joinOptimizable, updateVal->joinOptimizable);
+    combineBool(isClique, updateVal->isClique);
+    combineBool(isStar, updateVal->isStar);
+    combineBool(isCycle, updateVal->isCycle);
+    combineBool(isChain, updateVal->isChain);
     combineReasonCounts(fallbackReasonCounts, updateVal->fallbackReasonCounts);
     numNamespaces.combine(updateVal->numNamespaces);
     numLookupsInSuffix.combine(updateVal->numLookupsInSuffix);

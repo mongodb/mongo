@@ -36,6 +36,10 @@ public:
           joinModelingTimeMicros(metrics.joinModelingTimeMicros),
           sbeLoweringTimeMicros(metrics.sbeLoweringTimeMicros) {
         joinOptimizable.aggregate(metrics.joinOptimizable);
+        isClique.aggregate(metrics.isClique);
+        isStar.aggregate(metrics.isStar);
+        isCycle.aggregate(metrics.isCycle);
+        isChain.aggregate(metrics.isChain);
         if (metrics.fallbackReason) {
             fallbackReasonCounts[*metrics.fallbackReason] = 1;
         }
@@ -93,6 +97,13 @@ public:
     AggregatedMetric<int64_t> numSyntacticEqJoinPredicates;
     AggregatedMetric<int64_t> numInferredEqJoinPredicates;
     AggregatedMetric<int64_t> numInferredSingleTablePredicates;
+
+    // The topology of the join graph. These are not mutually exclusive: a two-node graph is a
+    // clique, a star and a chain at once, and a three-node path is both a chain and a star.
+    AggregatedBool isClique;
+    AggregatedBool isStar;
+    AggregatedBool isCycle;
+    AggregatedBool isChain;
 
     // Timing metrics for the phases that run on every join-optimized query. The phases that only
     // run on a join plan cache miss live in 'PlanEnumerationMetrics' below.

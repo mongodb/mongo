@@ -151,6 +151,11 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
     m1.numSyntacticEqJoinPredicates = 2;
     m1.numInferredEqJoinPredicates = 1;
     m1.numInferredSingleTablePredicates = 1;
+    // 4 nodes and 4 edges: there is a cycle, but the graph is not complete, a star or a path.
+    m1.isClique = false;
+    m1.isStar = false;
+    m1.isCycle = true;
+    m1.isChain = false;
     m1.joinModelingTimeMicros = 100;
     m1.sbeLoweringTimeMicros = 200;
     // On first hit, we're likely to have a plan enumerated.
@@ -191,6 +196,10 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "numSyntacticEqJoinPredicates": {"sum": 2, "max": 2, "min": 2, "sumOfSquares": {"$numberDecimal":"4"}},
                 "numInferredEqJoinPredicates": {"sum": 1, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"1"}},
                 "numInferredSingleTablePredicates": {"sum": 1, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"1"}},
+                "isClique": {"true": 0, "false": 1},
+                "isStar": {"true": 0, "false": 1},
+                "isCycle": {"true": 1, "false": 0},
+                "isChain": {"true": 0, "false": 1},
                 "joinModelingTimeMicros": {"sum": 100, "max": 100, "min": 100, "sumOfSquares": {"$numberDecimal":"10000"}},
                 "sbeLoweringTimeMicros": {"sum": 200, "max": 200, "min": 200, "sumOfSquares": {"$numberDecimal":"40000"}},
                 "numPlanEnumerations": 1,
@@ -229,6 +238,11 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
     m2.numSyntacticEqJoinPredicates = 1;
     m2.numInferredEqJoinPredicates = 1;
     m2.numInferredSingleTablePredicates = 0;
+    // 2 nodes joined by a single edge is a clique, a star and a chain all at once.
+    m2.isClique = true;
+    m2.isStar = true;
+    m2.isCycle = false;
+    m2.isChain = true;
     m2.joinModelingTimeMicros = 50;
     m2.sbeLoweringTimeMicros = 20;
     // On second hit, we're likely to have a cached plan (no enumeration metrics). Note that the
@@ -253,6 +267,10 @@ TEST(SupplementalMetricsStats, JoinOptimizationMetrics) {
                 "numSyntacticEqJoinPredicates": {"sum": 3, "max": 2, "min": 1, "sumOfSquares": {"$numberDecimal":"5"}},
                 "numInferredEqJoinPredicates": {"sum": 2, "max": 1, "min": 1, "sumOfSquares": {"$numberDecimal":"2"}},
                 "numInferredSingleTablePredicates": {"sum": 1, "max": 1, "min": 0, "sumOfSquares": {"$numberDecimal":"1"}},
+                "isClique": {"true": 1, "false": 1},
+                "isStar": {"true": 1, "false": 1},
+                "isCycle": {"true": 1, "false": 1},
+                "isChain": {"true": 1, "false": 1},
                 "joinModelingTimeMicros": {"sum": 150, "max": 100, "min": 50, "sumOfSquares": {"$numberDecimal":"12500"}},
                 "sbeLoweringTimeMicros": {"sum": 220, "max": 200, "min": 20, "sumOfSquares": {"$numberDecimal":"40400"}},
                 "numPlanEnumerations": 1,

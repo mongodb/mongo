@@ -74,6 +74,11 @@ TEST_F(AggJoinModelGoldenTest, longPrefix) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: the inferred edge closes a triangle, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 }
 
 TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
@@ -91,6 +96,11 @@ TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 64 nodes and 66 edges: cyclic, but far too sparse to be a clique.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 }
 
 /**
@@ -118,6 +128,11 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_OneImplictEdge) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -149,6 +164,11 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_MultipleImplictEdges) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 4 nodes and 6 edges: every pair is joined, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 4);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 6);
 }
@@ -191,6 +211,11 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_TwoConnectedComponents) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 4);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 9);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 6 nodes and 9 edges: cyclic, but neither a clique nor a tree.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 6);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 9);
 }
@@ -233,6 +258,11 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_NoImplicitEdges) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 5);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 6 nodes and 5 edges, each joined to the next: a chain. No node is a hub.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 6);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 5);
 }
@@ -280,6 +310,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEnd) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
 }
@@ -320,6 +355,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEndNonScalar) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 2 edges: a path, which for 3 nodes is also a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     // $match gets pushed up by optimization, then renders remaining suffix ineligible!
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 2);
@@ -364,6 +404,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetween) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
 }
@@ -401,6 +446,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetweenNonScalar) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 2 edges: a path, which for 3 nodes is also a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     // $match moves up, disqualifying 2 nodes.
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 2);
@@ -445,6 +495,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEnd) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -485,6 +540,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNumeric) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -525,6 +585,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNonScalar) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -569,6 +634,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdge) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 10);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
     ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 10);
@@ -605,6 +675,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdgeNonScalar) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 7 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     // Can't add potentially multikey edge "A.a" - "D.a".
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 7);
@@ -664,6 +739,11 @@ TEST_F(AggJoinModelGoldenTest, subPipelineEdge_addImplicitEdge) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 10);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
     ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 10);
@@ -712,6 +792,11 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_subPipelineEdge_addImplicitEdge)
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 4 nodes and 6 edges: every pair is joined, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 4);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 6);
     ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 8);

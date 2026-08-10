@@ -402,7 +402,7 @@ TEST(JoinGraphTests, IsConnected) {
         auto b = *mgraph.addNode(makeNSS("b"), nullptr, boost::none);
         mgraph.addSimpleEqualityEdge(a, b, 0, 1);
         JoinGraph graph(std::move(mgraph));
-        ASSERT_TRUE(graph.isConnected());
+        ASSERT_TRUE(graph.getShape() & JoinGraph::GraphShapeFlags::Connected);
     }
     {
         // Two nodes without an edge is not connected: a   b.
@@ -410,7 +410,7 @@ TEST(JoinGraphTests, IsConnected) {
         mgraph.addNode(makeNSS("a"), nullptr, boost::none);
         mgraph.addNode(makeNSS("b"), nullptr, boost::none);
         JoinGraph graph(std::move(mgraph));
-        ASSERT_FALSE(graph.isConnected());
+        ASSERT_FALSE(graph.getShape() & JoinGraph::GraphShapeFlags::Connected);
     }
     {
         // Three nodes in a line is connected: a -- b -- c.
@@ -421,7 +421,7 @@ TEST(JoinGraphTests, IsConnected) {
         mgraph.addSimpleEqualityEdge(a, b, 0, 1);
         mgraph.addSimpleEqualityEdge(b, c, 2, 3);
         JoinGraph graph(std::move(mgraph));
-        ASSERT_TRUE(graph.isConnected());
+        ASSERT_TRUE(graph.getShape() & JoinGraph::GraphShapeFlags::Connected);
     }
     {
         // Three nodes with one disconnected is not connected: a -- b   c.
@@ -431,7 +431,7 @@ TEST(JoinGraphTests, IsConnected) {
         mgraph.addNode(makeNSS("c"), nullptr, boost::none);
         mgraph.addSimpleEqualityEdge(a, b, 0, 1);
         JoinGraph graph(std::move(mgraph));
-        ASSERT_FALSE(graph.isConnected());
+        ASSERT_FALSE(graph.getShape() & JoinGraph::GraphShapeFlags::Connected);
     }
     {
         // Four nodes with a cycle is connected: a -- b -- c -- d and a -- d.
@@ -445,7 +445,7 @@ TEST(JoinGraphTests, IsConnected) {
         mgraph.addSimpleEqualityEdge(c, d, 4, 5);
         mgraph.addSimpleEqualityEdge(d, a, 6, 7);
         JoinGraph graph(std::move(mgraph));
-        ASSERT_TRUE(graph.isConnected());
+        ASSERT_TRUE(graph.getShape() & JoinGraph::GraphShapeFlags::Connected);
     }
     {
         // Four nodes with a cycle and one disconnected node is not connected, even though the
@@ -459,8 +459,165 @@ TEST(JoinGraphTests, IsConnected) {
         mgraph.addSimpleEqualityEdge(b, c, 2, 3);
         mgraph.addSimpleEqualityEdge(c, a, 4, 5);
         JoinGraph graph(std::move(mgraph));
-        ASSERT_FALSE(graph.isConnected());
+        ASSERT_FALSE(graph.getShape() & JoinGraph::GraphShapeFlags::Connected);
     }
+}
+
+namespace {
+// The topology predicates under test. These are not mutually exclusive.
+struct ExpectedShape {
+    bool isClique;
+    bool isStar;
+    bool isCycle;
+    bool isChain;
+};
+
+/**
+ * Builds a graph over 'numNodes' nodes joined by 'edges', given as (left, right) node pairs in the
+ * order they should be added. Each edge gets its own pair of path ids so that no two edges are
+ * merged.
+ */
+JoinGraph makeGraph(size_t numNodes, const std::vector<std::pair<NodeId, NodeId>>& edges) {
+    MutableJoinGraph mgraph{};
+    for (size_t i = 0; i < numNodes; ++i) {
+        mgraph.addNode(makeNSS("n" + std::to_string(i)), nullptr, boost::none);
+    }
+    size_t pathId = 0;
+    for (auto&& [left, right] : edges) {
+        mgraph.addSimpleEqualityEdge(left, right, pathId, pathId + 1);
+        pathId += 2;
+    }
+    return JoinGraph(std::move(mgraph));
+}
+
+void assertShape(const JoinGraph& graph, ExpectedShape expected) {
+    const auto shape = graph.getShape();
+    // Every case below is a connected graph, which the other flags imply.
+    ASSERT_TRUE(shape & JoinGraph::GraphShapeFlags::Connected);
+    ASSERT_EQ(bool(shape & JoinGraph::GraphShapeFlags::Clique), expected.isClique) << "isClique";
+    ASSERT_EQ(bool(shape & JoinGraph::GraphShapeFlags::Star), expected.isStar) << "isStar";
+    ASSERT_EQ(bool(shape & JoinGraph::GraphShapeFlags::Cycle), expected.isCycle) << "isCycle";
+    ASSERT_EQ(bool(shape & JoinGraph::GraphShapeFlags::Chain), expected.isChain) << "isChain";
+    // A chain or a star is always a tree, and a tree never contains a cycle.
+    if (expected.isChain || expected.isStar) {
+        ASSERT_TRUE(shape & JoinGraph::GraphShapeFlags::Tree);
+    }
+    ASSERT_EQ(bool(shape & JoinGraph::GraphShapeFlags::Tree),
+              !(shape & JoinGraph::GraphShapeFlags::Cycle))
+        << "isTree";
+}
+}  // namespace
+
+TEST(JoinGraphTests, ShapeSingleEdge) {
+    // a -- b. Trivially a clique, a star and a chain all at once.
+    assertShape(makeGraph(2, {{0, 1}}),
+                {.isClique = true, .isStar = true, .isCycle = false, .isChain = true});
+}
+
+TEST(JoinGraphTests, ShapeChain) {
+    // a -- b -- c. A three-node path is both a chain and a star centered on 'b'.
+    assertShape(makeGraph(3, {{0, 1}, {1, 2}}),
+                {.isClique = false, .isStar = true, .isCycle = false, .isChain = true});
+
+    // a -- b -- c -- d.
+    assertShape(makeGraph(4, {{0, 1}, {1, 2}, {2, 3}}),
+                {.isClique = false, .isStar = false, .isCycle = false, .isChain = true});
+
+    // The same four-node chain, but with the edges added in an order where the first two edges
+    // share no node: a -- b, c -- d, then b -- c.
+    assertShape(makeGraph(4, {{0, 1}, {2, 3}, {1, 2}}),
+                {.isClique = false, .isStar = false, .isCycle = false, .isChain = true});
+}
+
+TEST(JoinGraphTests, ShapeStar) {
+    // A hub 'a' joined to three leaves: a -- b, a -- c, a -- d.
+    assertShape(makeGraph(4, {{0, 1}, {0, 2}, {0, 3}}),
+                {.isClique = false, .isStar = true, .isCycle = false, .isChain = false});
+
+    // The same star, but with the hub on the right-hand side of every edge.
+    assertShape(makeGraph(4, {{1, 0}, {2, 0}, {3, 0}}),
+                {.isClique = false, .isStar = true, .isCycle = false, .isChain = false});
+
+    // A hub with four leaves, so that the hub has even degree.
+    assertShape(makeGraph(5, {{0, 1}, {0, 2}, {0, 3}, {0, 4}}),
+                {.isClique = false, .isStar = true, .isCycle = false, .isChain = false});
+}
+
+TEST(JoinGraphTests, ShapeTreeThatIsNeitherChainNorStar) {
+    // A tree with two branch points and three leaves, so no single node is the center and the
+    // nodes don't form a single path: a -- b, b -- c, b -- d, d -- e.
+    assertShape(makeGraph(5, {{0, 1}, {1, 2}, {1, 3}, {3, 4}}),
+                {.isClique = false, .isStar = false, .isCycle = false, .isChain = false});
+}
+
+TEST(JoinGraphTests, ShapeCycle) {
+    // A triangle is a cycle, and is also complete.
+    assertShape(makeGraph(3, {{0, 1}, {1, 2}, {2, 0}}),
+                {.isClique = true, .isStar = false, .isCycle = true, .isChain = false});
+
+    // A four-node ring is a cycle, but not complete.
+    assertShape(makeGraph(4, {{0, 1}, {1, 2}, {2, 3}, {3, 0}}),
+                {.isClique = false, .isStar = false, .isCycle = true, .isChain = false});
+
+    // A triangle with a tail contains a cycle even though not every node is on it.
+    assertShape(makeGraph(4, {{0, 1}, {1, 2}, {2, 0}, {2, 3}}),
+                {.isClique = false, .isStar = false, .isCycle = true, .isChain = false});
+}
+
+TEST(JoinGraphTests, ShapeClique) {
+    // Every pair of four nodes is joined. A clique this size also contains cycles.
+    assertShape(makeGraph(4, {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}}),
+                {.isClique = true, .isStar = false, .isCycle = true, .isChain = false});
+
+    // One edge short of a clique.
+    assertShape(makeGraph(4, {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}}),
+                {.isClique = false, .isStar = false, .isCycle = true, .isChain = false});
+}
+
+TEST(JoinGraphTests, ShapeDisconnected) {
+    // a -- b, c -- d. We don't track shapes of disconnected graphs.
+    ASSERT_EQ(makeGraph(4, {{0, 1}, {2, 3}}).getShape(), 0);
+}
+
+TEST(JoinGraphTests, ShapeSelfJoin) {
+    // A collection joined to itself gets one node per occurrence, so the shape only depends on how
+    // those nodes are connected, not on them sharing a namespace.
+    MutableJoinGraph mgraph{};
+    auto a1 = *mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto a2 = *mgraph.addNode(makeNSS("a"), nullptr, FieldPath("a2"));
+    auto a3 = *mgraph.addNode(makeNSS("a"), nullptr, FieldPath("a3"));
+    mgraph.addSimpleEqualityEdge(a1, a2, 0, 1);
+    mgraph.addSimpleEqualityEdge(a2, a3, 2, 3);
+
+    // a1 -- a2 -- a3, the same shape as the three-node chain over distinct collections.
+    assertShape(JoinGraph(std::move(mgraph)),
+                {.isClique = false, .isStar = true, .isCycle = false, .isChain = true});
+}
+
+TEST(JoinGraphTests, ShapeMultiplePredicatesPerEdge) {
+    // Several predicates between the same pair of nodes are merged into one edge, so they don't
+    // change the shape of the graph.
+    MutableJoinGraph mgraph{};
+    auto a = *mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *mgraph.addNode(makeNSS("b"), nullptr, FieldPath("b"));
+    auto c = *mgraph.addNode(makeNSS("c"), nullptr, FieldPath("c"));
+
+    // Three predicates on a -- b: a second one in the reverse node order and one of a different
+    // operator type.
+    auto ab = *mgraph.addSimpleEqualityEdge(a, b, 0, 1);
+    ASSERT_EQ(mgraph.addSimpleEqualityEdge(b, a, 3, 2), ab);
+    ASSERT_EQ(mgraph.addExprEqualityEdge(a, b, 4, 5), ab);
+    // Two predicates on b -- c.
+    auto bc = *mgraph.addSimpleEqualityEdge(b, c, 1, 6);
+    ASSERT_EQ(mgraph.addSimpleEqualityEdge(b, c, 7, 8), bc);
+
+    ASSERT_EQ(mgraph.numEdges(), 2);
+    ASSERT_EQ(mgraph.getEdge(ab).predicates.size(), 3);
+    ASSERT_EQ(mgraph.getEdge(bc).predicates.size(), 2);
+
+    // a -- b -- c, a chain despite the five predicates.
+    assertShape(JoinGraph(std::move(mgraph)),
+                {.isClique = false, .isStar = true, .isCycle = false, .isChain = true});
 }
 
 ASSERT_DOES_NOT_COMPILE(NodeSetNotConstructibleFromNodeIdDirectInit,

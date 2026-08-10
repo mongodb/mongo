@@ -413,13 +413,40 @@ public:
     }
 
     /**
-     * Return true if each node in this graph is reachable from every other node by the edges in the
-     * graph. If a join graph is connected, then a plan can be constructed that satisfies the query
-     * without using any cross products. Once we support cross products, we may remove this method.
+     * The topologies a join graph may have. These are not mutually exclusive: a two-node graph is a
+     * clique, a star and a chain at once, and a three-node path is both a chain and a star.
+     */
+    enum GraphShapeFlags : uint8_t {
+        Connected = 1 << 0,
+        Tree = 1 << 1,
+        Clique = 1 << 2,
+        Cycle = 1 << 3,
+        Chain = 1 << 4,
+        Star = 1 << 5,
+    };
+
+    /**
+     * Returns the set of shapes this graph has. Computing them together lets us share the
+     * connectedness and edge-count checks that they all depend on.
+     */
+    GraphShapeFlags getShape() const;
+
+private:
+    /**
+     * Returns true if each node in this graph is reachable from every other node by the edges in
+     * the graph. If a join graph is connected, then a plan can be constructed that satisfies the
+     * query without using any cross products.
      */
     bool isConnected() const;
 
-private:
+    // Returns true if the graph is a chain/linear, e.g. A - B - C - D. Assumes this graph is a
+    // tree.
+    bool isChain() const;
+
+    // Returns true if the graph is a star, e.g. one central node has an edge to every other node,
+    // with no cycles. Assumes this graph is a tree.
+    bool isStar() const;
+
     std::vector<JoinNode> _nodes;
     std::vector<JoinEdge> _edges;
     // Maps a pair of nodeIds to the edge that connects them.

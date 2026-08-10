@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 #include "mongo/db/query/util/bitset_util.h"
+#include "mongo/db/query/util/disjoint_set.h"
 
 #include <string>
 #include <string_view>
@@ -262,4 +263,96 @@ BSONObj JoinGraph::toBSON() const {
     }
     return result.obj();
 }
+
+JoinGraph::GraphShapeFlags JoinGraph::getShape() const {
+    uint8_t shape = 0;
+    if (!isConnected()) {
+        return static_cast<GraphShapeFlags>(shape);
+    }
+    shape |= GraphShapeFlags::Connected;
+
+    // A connected graph is a tree if it has no cycles, which is true if it has just enough edges to
+    // connect all nodes, i.e. |edges| = |nodes| - 1.
+    if (numEdges() == numNodes() - 1) {
+        shape |= GraphShapeFlags::Tree;
+
+        // We know the graph is a tree, so the helpers below don't need to check it again.
+        if (isChain()) {
+            shape |= GraphShapeFlags::Chain;
+        }
+        if (isStar()) {
+            shape |= GraphShapeFlags::Star;
+        }
+    }
+
+    // In an undirected graph clique, |edges| == |nodes| choose 2.
+    if (numEdges() == (numNodes() * (numNodes() - 1) / 2)) {
+        shape |= GraphShapeFlags::Clique;
+    }
+
+    // A connected graph is acyclic for: |nodes| > |edges|.
+    if (numNodes() <= numEdges()) {
+        shape |= GraphShapeFlags::Cycle;
+    }
+
+    return static_cast<GraphShapeFlags>(shape);
+}
+
+bool JoinGraph::isChain() const {
+    // Note: this assumes each edge is between two nodes. In a chain query, every node appears twice
+    // in the edge list, except for the end points. This means that after XOR'ing all the edge
+    // NodeSets together, we see two bits set.
+    NodeSet seen;
+    for (auto&& [ns, edge] : _edgeMap) {
+        seen ^= ns;
+    }
+    return seen.count() == 2;
+}
+
+bool JoinGraph::isStar() const {
+    if (numEdges() < 2) {
+        // Two-node graphs are trivially stars.
+        return true;
+    }
+
+    auto edge0 = _edges[0];
+    auto edge1 = _edges[1];
+    NodeId center;
+    if (edge0.left == edge1.left || edge0.left == edge1.right) {
+        center = edge0.left;
+    } else if (edge0.right == edge1.left || edge0.right == edge1.right) {
+        center = edge0.right;
+    } else {
+        return false;
+    }
+
+    for (size_t i = 2; i < numEdges(); i++) {
+        if (_edges[i].left != center && _edges[i].right != center) {
+            return false;
+        }
+        // Otherwise, one of our edge end-points is the center! Continue.
+    }
+    return true;
+}
+
+bool JoinGraph::isConnected() const {
+    if (_edges.size() < _nodes.size() - 1) {
+        return false;
+    }
+
+    // We could implement the following with DFS. However, getting the neighbors of a node requires
+    // iterating over all edges, which is inefficient. Instead, we use union-find.
+    DisjointSet ds{_nodes.size()};
+    for (const auto& edge : _edges) {
+        ds.unite(edge.left, edge.right);
+    }
+    auto root = ds.find(0);
+    for (size_t i = 1; i < _nodes.size(); ++i) {
+        if (ds.find(i) != root) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace mongo::join_ordering

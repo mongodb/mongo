@@ -572,11 +572,17 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     metrics.numInferredEdges = graph.numEdges() - metrics.numSyntacticEdges;
 
     JoinGraph result = JoinGraph(std::move(graph));
-    if (!result.isConnected()) {
+    const auto shape = result.getShape();
+    if (!(shape & JoinGraph::GraphShapeFlags::Connected)) {
         metrics.fallbackReason = JoinFallbackReason::kGraphDisconnected;
         return Status(ErrorCodes::InternalErrorNotSupported,
                       "Join graph must be connected as cross-products are not yet supported");
     }
+
+    metrics.isClique = shape & JoinGraph::GraphShapeFlags::Clique;
+    metrics.isCycle = shape & JoinGraph::GraphShapeFlags::Cycle;
+    metrics.isChain = shape & JoinGraph::GraphShapeFlags::Chain;
+    metrics.isStar = shape & JoinGraph::GraphShapeFlags::Star;
 
     // Note: we may still bail out after the join model is constructed, but not for reasons related
     // to the query shape.
