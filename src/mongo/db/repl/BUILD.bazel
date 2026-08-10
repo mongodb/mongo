@@ -1998,6 +1998,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "db_repl_coordinator_test",
     srcs = [
+        "lock_guard_with_deferred_task_test.cpp",
         "replication_coordinator_applied_op_time_observer_test.cpp",
         "replication_coordinator_impl_elect_v1_test.cpp",
         "replication_coordinator_impl_heartbeat_v1_test.cpp",
