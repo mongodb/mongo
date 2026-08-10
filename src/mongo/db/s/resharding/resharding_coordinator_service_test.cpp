@@ -2465,13 +2465,18 @@ TEST_F(ReshardingCoordinatorServiceTest, SkipsParticipantWaitOnAbort) {
               ErrorCodes::ReshardCollectionAborted);
 }
 
+// The search index check is best effort, so resharding must proceed even when the check fails with
+// an error that is not retryable.
 TEST_F(ReshardingCoordinatorServiceTest,
-       ReshardingFailsWhenSearchIndexCheckThrowsUnrecoverableError) {
+       ReshardingSucceedsWhenSearchIndexCheckThrowsUnrecoverableError) {
     externalState()->pushSearchIndexError(ErrorCodes::InternalError);
-    auto opCtx = operationContext();
-    auto coordinator = initializeAndGetCoordinator();
-    ASSERT_THROWS_CODE(
-        coordinator->getCompletionFuture().get(opCtx), DBException, ErrorCodes::InternalError);
+    runReshardingToCompletion();
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       ReshardingSucceedsWhenSearchIndexCheckThrowsSearchIndexManagementHostUnreachable) {
+    externalState()->pushSearchIndexError(ErrorCodes::SearchIndexManagementHostUnreachable);
+    runReshardingToCompletion();
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingSucceedsAfterSearchIndexCheckRetryableError) {
