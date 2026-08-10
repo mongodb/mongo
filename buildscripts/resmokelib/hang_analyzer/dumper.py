@@ -5,6 +5,7 @@ import itertools
 import logging
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -926,7 +927,8 @@ class GDBDumper(Dumper):
             raise Exception("Bad exit code %d from %s" % (exit_code, " ".join(args)))
 
         cmds += [
-            f"core-file {core_file_path}",
+            # Quoted because gdb splits command arguments on whitespace.
+            f"core-file {shlex.quote(core_file_path)}",
             "python import gdbmongo",
             "python gdbmongo.register_printers()",
             "set width 0",
@@ -975,7 +977,8 @@ class GDBDumper(Dumper):
         if dbg is None:
             raise RuntimeError("Debugger not found, can't run get_binary_from_core_dump")
         process = subprocess.run(
-            [dbg, "-batch", "--quiet", "-ex", f"core {core_file_path}"],
+            # Passed via argv, not "-ex", so gdb does not split the path on whitespace.
+            [dbg, "-batch", "--quiet", "--core", core_file_path],
             check=True,
             capture_output=True,
             text=True,
