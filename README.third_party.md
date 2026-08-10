@@ -127,22 +127,6 @@ a notice will be included in
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
 
-## WiredTiger Vendored Test Libraries
-
-The following libraries are transitively included by WiredTiger,
-and are used by that component for testing. They don't appear in
-released binary artifacts.
-
-| Name                           |
-| ------------------------------ |
-| pkg:pypi/concurrencytest@0.1.2 |
-| pkg:pypi/discover@0.4.0        |
-| pkg:pypi/extras@0.0.3          |
-| pkg:pypi/iso8601@2.1.0         |
-| pkg:pypi/python-subunit@1.4.4  |
-| pkg:pypi/testscenarios@0.4     |
-| pkg:pypi/testtools@2.7.1       |
-
 ## Dynamically Linked Libraries
 
 Sometimes MongoDB needs to load libraries provided and managed by the
@@ -165,7 +149,7 @@ of these libraries' license in a file named
 | Cyrus SASL |       Yes       |                           Yes                           |
 | libldap    |       Yes       |                           No                            |
 | net-snmp   |       Yes       |                           Yes                           |
-| OpenSSL    |       No        | Yes<sup>\[<a href="#note_ssl" id="ref_ssl">3</a>]</sup> |
+| OpenSSL    |       No        | Yes<sup>\[<a href="#note_ssl" id="ref_ssl">2</a>]</sup> |
 | libcurl    |       No        |                           No                            |
 
 ## Notes:
@@ -175,10 +159,6 @@ of these libraries' license in a file named
    header file which is licensed under a BSD license. This BSD licensed header is the only
    file from Valgrind which is vendored and consumed by MongoDB.
 
-2. <a id="note_wt" href="#ref_wt">^</a>
-   WiredTiger is maintained by MongoDB in a separate repository. As a part of our
-   development process, we periodically ingest the latest snapshot of that repository.
-
-3. <a id="note_ssl" href="#ref_ssl">^</a>
+2. <a id="note_ssl" href="#ref_ssl">^</a>
    OpenSSL is only shipped as a dependency of the MongoDB tools written in Go. The MongoDB
    shell and server binaries use Windows' cryptography APIs.
