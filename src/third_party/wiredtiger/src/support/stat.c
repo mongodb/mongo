@@ -1567,6 +1567,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: bytes not belonging to page images in the cache",
   "cache: bytes read into cache",
   "cache: bytes written from cache",
+  "cache: cache tolerance configured",
   "cache: checkpoint blocked page eviction",
   "cache: checkpoint of history store file blocked non-history store page eviction",
   "cache: evict page attempts by eviction server",
@@ -2378,6 +2379,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing cache_bytes_other */
     stats->cache_bytes_read = 0;
     stats->cache_bytes_write = 0;
+    /* not clearing cache_tolerance_level */
     stats->cache_eviction_blocked_checkpoint = 0;
     stats->cache_eviction_blocked_checkpoint_hs = 0;
     stats->eviction_server_evict_attempt = 0;
@@ -3143,6 +3145,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_bytes_other += WT_STAT_READ(from, cache_bytes_other);
     to->cache_bytes_read += WT_STAT_READ(from, cache_bytes_read);
     to->cache_bytes_write += WT_STAT_READ(from, cache_bytes_write);
+    to->cache_tolerance_level += WT_STAT_READ(from, cache_tolerance_level);
     to->cache_eviction_blocked_checkpoint += WT_STAT_READ(from, cache_eviction_blocked_checkpoint);
     to->cache_eviction_blocked_checkpoint_hs +=
       WT_STAT_READ(from, cache_eviction_blocked_checkpoint_hs);

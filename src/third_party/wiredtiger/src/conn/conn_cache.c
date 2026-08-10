@@ -347,6 +347,8 @@ __wti_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
     WT_STAT_SET(session, stats, cache_bytes_inuse, inuse);
     WT_STAT_SET(session, stats, cache_overhead, cache->overhead_pct);
+    WT_STAT_SET(session, stats, cache_tolerance_level,
+      cache->cache_eviction_controls.cache_tolerance_for_app_eviction);
 
     WT_STAT_SET(session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
     WT_STAT_SET(session, stats, cache_bytes_dirty_leaf, __wt_cache_dirty_leaf_inuse(cache));

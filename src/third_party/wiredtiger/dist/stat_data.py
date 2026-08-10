@@ -385,6 +385,7 @@ conn_stats = [
     CacheStat('cache_hs_ondisk_max', 'history store table max on-disk size', 'no_clear,no_scale,size'),
     CacheStat('cache_reentry_hs_eviction_milliseconds', 'total milliseconds spent inside reentrant history store evictions in a reconciliation', 'no_clear,no_scale,size'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
+    CacheStat('cache_tolerance_level', 'cache tolerance configured', 'no_clear,no_scale,size'),
     CacheStat('cache_pages_dirty', 'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
