@@ -66,6 +66,7 @@
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -1011,6 +1012,20 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
 
 void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    auto limit = gMaxConcurrentMultiDocumentTransactions.load();
+    auto* client = opCtx->getClient();
+    bool isProcessInternal = client->isInDirectClient() || !client->session();
+    if (limit > 0 && !isProcessInternal) {
+        auto currentOpen =
+            ServerTransactionsMetrics::get(opCtx->getServiceContext())->getCurrentOpen();
+        uassert(ErrorCodes::TooManyOpenTransactions,
+                str::stream() << "cannot start a new multi-document transaction; there are already "
+                              << currentOpen
+                              << " open transactions, which meets or exceeds the limit of "
+                              << limit,
+                currentOpen < static_cast<decltype(currentOpen)>(limit));
+    }
+
     // Aborts any in-progress txns.
     _setNewTxnNumberAndRetryCounter(opCtx, txnNumberAndRetryCounter);
     p().autoCommit = false;

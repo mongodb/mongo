@@ -591,6 +591,8 @@ error_codes:
         name: OpCtxKilledOnMarkKillOpsExempt,
         categories: [CancellationError, InternalOnly],
       }
+    - {code: 509, name: TooManyOpenTransactions, categories: [Interruption]}
+
 
     # Reserved for future load-shedding specific rejection code.
     # Keep unused for now until mongo-side code is finalized and rolled out.
