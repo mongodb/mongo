@@ -130,6 +130,8 @@ double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSetMember*
     }
 
     if (nearParams.addPointMeta) {
+        tassert(
+            13286700, "winning geometry must be set when a distance was found", minDistanceStored);
         member->metadata().setGeoNearPoint(Value{minDistanceStored->element});
     }
 
