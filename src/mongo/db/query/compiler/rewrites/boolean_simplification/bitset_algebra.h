@@ -58,6 +58,26 @@ struct BitsetTerm {
         predicates.set(bitIndex, value);
     }
 
+    /**
+     * Sets the bit at 'bitIndex' to 'value', just like set(), but detects a conflict with the
+     * current content of the term: if the bit is already set to the opposite value, the bit is
+     * overwritten and false is returned. Otherwise returns true.
+     */
+    bool safeSet(size_t bitIndex, bool value) {
+        if (mask.size() <= bitIndex) {
+            // This is fine from the performance perspective, because DynamicBitset will increase
+            // the size by 1 block, not 1 bit.
+            resize(bitIndex + 1);
+        } else if (mask.test(bitIndex) && predicates.test(bitIndex) != value) {
+            predicates.set(bitIndex, value);
+            return false;
+        }
+
+        mask.set(bitIndex, true);
+        predicates.set(bitIndex, value);
+        return true;
+    }
+
     size_t size() const {
         return mask.size();
     }

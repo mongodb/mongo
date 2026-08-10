@@ -488,5 +488,33 @@ TEST(ExpressionSimplifierTests, NorAlwaysBoolean) {
     assertSimplification(*parse(query), alwaysFalse);
 }
 
+// (a & ~b) | ~a | (a & b) is a tautology: every assignment of 'a' and 'b' satisfies at least one
+// disjunct, so it must simplify to always-true. Note that the simplification produces the two
+// single-literal disjuncts 'a' and '~a', which is what SERVER-131802 mishandled.
+TEST(ExpressionSimplifierTests, OrWithComplementaryLiteralsIsAlwaysTrue) {
+    auto query = fromjson("{$or: [{a: 1, b: {$ne: 1}}, {a: {$ne: 1}}, {a: 1, b: 1}]}");
+    // Always-true is represented by an empty $and (matches every document).
+    auto expected = fromjson("{}");
+    assertSimplification(query, expected);
+}
+
+TEST(ExpressionSimplifierTests, OrOfComplementaryConjunctionsIsNotAlwaysTrue) {
+    // (~a & b) | (a & c) cannot be simplified
+    auto query = fromjson("{$or: [{a: {$ne: 1}, b: 1}, {a: 1, c: 1}]}");
+    assertSimplification(query);
+}
+
+TEST(ExpressionSimplifierTests, OrOfLiteralAndComplementaryConjunction) {
+    // a | (~a & b) cannot be simplified
+    auto query = fromjson("{$or: [{a: 1}, {a: {$ne: 1}, b: 1}]}");
+    assertSimplification(query);
+}
+
+TEST(ExpressionSimplifierTests, OrOfNegatedLiteralAndComplementaryConjunction) {
+    // ~a | (a & b) cannot be simplified
+    auto query = fromjson("{$or: [{a: {$ne: 1}}, {a: 1, b: 1}]}");
+    assertSimplification(query);
+}
+
 }  // namespace
 }  // namespace mongo

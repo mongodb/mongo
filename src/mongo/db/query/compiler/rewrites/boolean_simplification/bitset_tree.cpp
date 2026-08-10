@@ -172,7 +172,14 @@ BitsetTreeNode convertToBitsetTree(const Maxterm& maxterm) {
         for (const auto& minterm : maxterm.minterms) {
             if (minterm.mask.count() == 1) {
                 const size_t bitIndex = minterm.mask.findFirst();
-                node.leafChildren.set(bitIndex, minterm.predicates[bitIndex]);
+                // If this predicate already appears in the disjunction with the opposite polarity,
+                // then we have '(x) | (~x)', which is always true, so the entire disjunction is
+                // always true. Note that all single-literal disjuncts share the node's single
+                // 'leafChildren' term, which can only hold one polarity per bit; without this check
+                // the second polarity would silently overwrite the first and drop a disjunct.
+                if (!node.leafChildren.safeSet(bitIndex, minterm.predicates[bitIndex])) {
+                    return BitsetTreeNode{BitsetTreeNode::And, false};
+                }
             } else {
                 node.internalChildren.emplace_back(restoreBitsetTree(minterm));
             }

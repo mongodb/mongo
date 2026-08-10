@@ -27,6 +27,10 @@ last-patch:
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
       ticket: SERVER-83322
+    - test_file: jstests/core/query/boolean_simplifier_tautology.js
+      ticket: SERVER-131802
+    - test_file: jstests/core/query/bson_size_limit_agg.js
+      ticket: SERVER-130677
     - test_file: jstests/core/query/distinct/distinct_replanning.js
       ticket: SERVER-125858
     - test_file: jstests/core/query/group_sbe_accumulator_limit.js
@@ -88,6 +92,10 @@ last-continuous:
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
       ticket: SERVER-83322
+    - test_file: jstests/core/query/boolean_simplifier_tautology.js
+      ticket: SERVER-131802
+    - test_file: jstests/core/query/bson_size_limit_agg.js
+      ticket: SERVER-130677
     - test_file: jstests/core/query/distinct/distinct_replanning.js
       ticket: SERVER-125858
     - test_file: jstests/core/query/group_sbe_accumulator_limit.js
@@ -379,6 +387,10 @@ last-lts:
       ticket: SERVER-91616
     - test_file: jstests/core/query/boolean_simplifier_stress.js
       ticket: SERVER-114126
+    - test_file: jstests/core/query/boolean_simplifier_tautology.js
+      ticket: SERVER-131802
+    - test_file: jstests/core/query/bson_size_limit_agg.js
+      ticket: SERVER-130677
     - test_file: jstests/core/query/collation/collation.js
       ticket: SERVER-115810
     - test_file: jstests/core/query/collation/collation_mismatch_mapreduce.js
