@@ -17,3 +17,6 @@ filters:
   - "query_memory_*":
     approvers:
       - 10gen/query-execution
+  - "README.query_memory_*":
+    approvers:
+      - 10gen/query-execution

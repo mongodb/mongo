@@ -15,6 +15,42 @@ The feature is **off by default** (`queryMemoryLoadSheddingLowMarkPercent = -1`)
 Nothing runs — no monitor thread, and the hot-path check is a single relaxed atomic load — until an
 operator (or an external policy such as mongotune) enables it at runtime.
 
+## Server parameters
+
+The first three parameters below are runtime-settable.
+
+| Parameter                                   | Default         | Meaning                                                                                    |
+| ------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `queryMemoryLoadSheddingLowMarkPercent`     | `-1` (disabled) | RSS % of the memory limit at/below which nothing is shed. Enables the feature when `>= 0`. |
+| `queryMemoryLoadSheddingHighMarkPercent`    | `85`            | RSS % at/above which every eligible op is shed (probability 1).                            |
+| `queryMemoryLoadSheddingSizeReferenceBytes` | `32 MiB`        | "Medium-sized" reference point. Set this below your largest & above your typical queries.  |
+| `queryMemoryRssMonitorIntervalMillis`       | `100`           | RSS sampling interval (startup-only). Trades off shedding responsiveness versus overhead.  |
+
+## Observability
+
+`serverStatus().queryMemory.loadShedding` (present only while enabled) reports: `currentUsageBytes`
+(latest RSS), `lowMarkBytes`, `highMarkBytes`, `memLimitBytes`, and `operationsShed` (cumulative
+count of shed operations).
+
+For fleet-wide monitoring, `operationsShed` is also exported as an OpenTelemetry counter
+(`mongodb.serverStatus.queryMemory.loadShedding.operationsShed`), which appears in `serverStatus` by
+default and flows into the metrics ingestion/Grafana pipeline. RSS and the memory limit are _not_
+mirrored to OTel — process RSS is already `serverStatus().mem.resident`, and the memory limit is
+available from `hostInfo` (`system.memLimitMB`) — so a dashboard can compute RSS-vs-limit from those
+without a duplicate metric.
+
+Each shed also emits a log line (id `13033300`) that identifies the shed operation — namespace,
+redacted command, plan summary, and opId — alongside the pressure fields, rate-limited to one full
+line per second (the first at `Warning`, the rest at debug severity).
+
+## Why probabilistic?
+
+Probabilistic shedding lets a set of _decentralized_, per-operation, decisions give a globally
+ordered response; The largest queries are killed first, and the response is gradually ramped-up
+without the need for any centralized accounting or sorting. Each operation reads shared state (RSS,
+knobs) but decides alone, so there is no cross-core contention beyond the RSS monitor's occasional
+single-word write.
+
 ## Signal vs. reaction
 
 The design deliberately separates the _signal_ (how much memory pressure exists) from the _reaction_
@@ -28,14 +64,9 @@ The design deliberately separates the _signal_ (how much memory pressure exists)
   rolls a probability derived from the current pressure and its own footprint, and aborts itself if
   the roll succeeds.
 
-There is **no global reservation pool or shared accounting** — an earlier design had one and it was
-removed. Each operation reads shared state (RSS, knobs) but decides alone, so there is no cross-core
-contention beyond the monitor's occasional single-word store.
-
 ## The shed decision
 
-The per-check probability is a pure function (`query_memory_load_shedding_detail::shedProbability`,
-unit-tested in isolation):
+The per-check probability is a pure function (`query_memory_load_shedding_detail::shedProbability`)
 
 ```math
 \begin{aligned}
@@ -272,36 +303,6 @@ once it has begun a write.
 | `sbe/stages/stages.{h,cpp}`              | No-yield SBE call site: `sbe::checkForLoadShedding()` shim, called from `CanInterrupt::checkForInterruptNoYield()`.                                                                                                         |
 | `query_memory_server_status_section.cpp` | `serverStatus().queryMemory`.                                                                                                                                                                                               |
 | `mongod_main.cpp`                        | Calls `startQueryMemoryRssMonitor` at startup (data-bearing nodes only; a pure router never starts it).                                                                                                                     |
-
-## Server parameters
-
-All are runtime-settable unless noted.
-
-| Parameter                                   | Default         | Meaning                                                                                    |
-| ------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
-| `queryMemoryLoadSheddingLowMarkPercent`     | `-1` (disabled) | RSS % of the memory limit at/below which nothing is shed. Enables the feature when `>= 0`. |
-| `queryMemoryLoadSheddingHighMarkPercent`    | `85`            | RSS % at/above which every eligible op is shed (probability 1).                            |
-| `queryMemoryLoadSheddingSizeReferenceBytes` | `32 MiB`        | Tracked-memory size treated as one size unit; larger ops are shed proportionally faster.   |
-| `queryMemoryRssMonitorIntervalMillis`       | `100`           | RSS sampling interval (startup-only).                                                      |
-
-## Observability
-
-`serverStatus().queryMemory.loadShedding` (present only while enabled) reports: `currentUsageBytes`
-(latest RSS), `lowMarkBytes`, `highMarkBytes`, `memLimitBytes`, and `operationsShed` (cumulative
-count of shed operations).
-
-For fleet-wide monitoring, `operationsShed` is also exported as an OpenTelemetry counter
-(`mongodb.serverStatus.queryMemory.loadShedding.operationsShed`), which appears in `serverStatus` by
-default and flows into the metrics ingestion/Grafana pipeline. The in-process atomic remains the
-source of truth; the OTel counter is an export-only mirror (the opcounters pattern). RSS and the
-memory limit are _not_ mirrored to OTel — process RSS is already `serverStatus().mem.resident`, and
-the memory limit is available from `hostInfo` (`system.memLimitMB`) — so a dashboard can compute
-RSS-vs-limit from those without a duplicate metric.
-
-Each shed also emits a log line (id `13033300`) that identifies the shed operation — namespace,
-redacted command, plan summary, and opId — alongside the pressure fields, rate-limited via a
-`SeveritySuppressor` to one full line per second (the first at `Warning`, the rest at debug
-severity).
 
 ## Limitations & future work
 
