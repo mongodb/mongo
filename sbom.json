@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:2d7fbf85-c8b6-4f90-9966-70da88224a36",
-  "version": 13,
+  "version": 14,
   "metadata": {
-    "timestamp": "2026-07-27T20:41:34Z",
+    "timestamp": "2026-08-09T18:08:16Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -15,7 +15,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.1076"
+          "version": "v1.7.1098"
         }
       ]
     },
@@ -142,7 +142,7 @@
       "group": "intel",
       "name": "Intel\u00ae Decimal Floating-Point Math Library",
       "version": "2.0.1",
-      "description": "A a software implementation of the IEEE Standard 754-2019 Decimal Floating-Point Arithmetic specification.",
+      "description": "A software implementation of the IEEE Standard 754-2019 Decimal Floating-Point Arithmetic specification.",
       "scope": "required",
       "licenses": [
         {
@@ -609,6 +609,54 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/asio/scripts/import.sh"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/cyan4973/xxhash@v0.8.3",
+      "supplier": {
+        "name": "Yann Collet",
+        "url": [
+          "https://xxhash.com/"
+        ]
+      },
+      "author": "Yann Collet",
+      "group": "cyan4973",
+      "name": "xxHash",
+      "version": "0.8.3",
+      "description": "xxHash is an extremely fast non-cryptographic hash algorithm, working at RAM speed limits.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "copyright": "xxHash Library Copyright (c) 2012-2021 Yann Collet. All rights reserved.",
+      "purl": "pkg:github/cyan4973/xxhash@v0.8.3",
+      "externalReferences": [
+        {
+          "url": "https://github.com/Cyan4973/xxHash.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/xxhash"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/xxhash/scripts/import.sh"
         }
       ]
     },
@@ -1216,7 +1264,7 @@
       "purl": "pkg:github/google/snappy@1.1.10",
       "externalReferences": [
         {
-          "url": "https://github.com/google/tcmalloc.git",
+          "url": "https://github.com/google/snappy.git",
           "type": "distribution"
         }
       ],
@@ -1314,7 +1362,7 @@
           "https://opensource.google/"
         ]
       },
-      "author": "gpertools Project",
+      "author": "gperftools Project",
       "group": "google.opensource",
       "name": "gperftools",
       "version": "2.9.1",
@@ -2627,6 +2675,7 @@
         "pkg:github/boostorg/boost@boost-1.88.0",
         "pkg:github/c-ares/c-ares@cares-1_27_0",
         "pkg:github/chriskohlhoff/asio@asio-1-34-2",
+        "pkg:github/cyan4973/xxhash@v0.8.3",
         "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
         "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
         "pkg:github/dcleblanc/safeint@3.0.28a",
@@ -2727,6 +2776,10 @@
     },
     {
       "ref": "pkg:github/chriskohlhoff/asio@asio-1-34-2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/cyan4973/xxhash@v0.8.3",
       "dependsOn": []
     },
     {
