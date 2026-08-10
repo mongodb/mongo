@@ -658,6 +658,19 @@ pcre_env.Library(
 )
 
 env.Library(
+    target='pcre_params',
+    source=[
+        'pcre_parameters.idl',
+    ],
+    LIBDEPS=[
+        'pcre_wrapper',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
     target='pcre_util',
     source=[
         'pcre_util.cpp',
@@ -863,6 +876,7 @@ icuEnv.CppUnitTest(
         'icu',
         'latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'md5',
+        'pcre_params',
         'pcre_util',
         'pcre_wrapper',
         'periodic_runner_impl',

@@ -38,8 +38,14 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/pcre_parameters.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+namespace mongo {
+bool gCheckRegexMatchUTF8Boundary = true;
+}
 
 namespace mongo::pcre {
 namespace {
@@ -401,8 +407,26 @@ public:
                                   static_cast<uint32_t>(options),
                                   _data.get(),
                                   nullptr);
-        if (matched < 0)
+        if (matched < 0) {
             _error = toErrc(matched);
+            return;
+        }
+        if (gCheckRegexMatchUTF8Boundary && _input.rawData() != nullptr) {
+            const char* inputBegin = _input.rawData();
+            const char* inputEnd = inputBegin + _input.size();
+            const size_t n = captureCount();
+            // The 0th element is the full matched substring; the 'n' that follow are the captures.
+            for (size_t i = 0; i < n + 1; ++i) {
+                StringData group = (*this)[i];
+                if (group.rawData() == nullptr)
+                    continue;
+                const char* groupEnd = group.rawData() + group.size();
+                uassert(12407700,
+                        "regex match boundary falls inside a UTF-8 character",
+                        !(!group.empty() && str::isUTF8ContinuationByte(*group.rawData())) &&
+                            !(groupEnd < inputEnd && str::isUTF8ContinuationByte(*groupEnd)));
+            }
+        }
         _highestCaptureIndex = matched;
     }
 
