@@ -1,3 +1,0 @@
-base_suite: update_fuzzer_replication
-overrides:
-  - "multiversion.otel_tracing"

@@ -1,3 +1,0 @@
-base_suite: update_fuzzer
-overrides:
-  - "multiversion.otel_tracing"
