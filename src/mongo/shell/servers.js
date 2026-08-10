@@ -222,7 +222,7 @@ MongoRunner.binVersionSubs = [
     new MongoRunner.VersionSub("latest", shellVersion()),
     new MongoRunner.VersionSub("last-continuous", fcvConstants.lastContinuous),
     new MongoRunner.VersionSub("last-lts", fcvConstants.lastLTS),
-    new MongoRunner.VersionSub("last-patch", shellVersion()),
+    new MongoRunner.VersionSub("last-patch", fcvConstants.latest),
 ];
 
 MongoRunner.getBinVersionFor = function (version) {
