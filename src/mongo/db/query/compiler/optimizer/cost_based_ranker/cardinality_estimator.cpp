@@ -160,7 +160,7 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             ceRes = indexIntersectionCard(static_cast<const AndSortedNode*>(node));
             break;
         case STAGE_OR:
-            // Notice that his is not a conjunction breaker because the result can be combined with
+            // Notice that this is not a conjunction breaker because the result can be combined with
             // the parent's node estimates. Thus indexUnionCard is responsible for replacing the
             // selectivities of the union's children with the selectivity of the union as a whole.
             ceRes = indexUnionCard(static_cast<const OrNode*>(node));
@@ -320,7 +320,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
     /**
      * Estimate via heuristic CE any leaf match expression. Notice that there are other such nodes
      * besides LeafMatchExpression subclasses. Heuristic CE doesn't estimate non-leaf nodes. This
-     * is done be the switch statement below.
+     * is done by the switch statement below.
      */
     bool useHeuristic = _ceMode == QueryCBRCEModeEnum::kHeuristicCE;
     if (useHeuristic && heuristicIsEstimable(node)) {
