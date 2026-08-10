@@ -1520,8 +1520,7 @@ SlotBasedStageBuilder::buildGroupImplBlock(SbStage stage,  // moved in
     // - Query uses a collator
     // - Any accumulator does not support block mode
     // - Any accumulator has a variable (i.e. non-null, non-constant) initializer expression
-    if ((!feature_flags::gFeatureFlagSbeFull.isEnabled() &&
-         !feature_flags::gFeatureFlagSbeBlockHashAgg.isEnabled()) ||
+    if ((!feature_flags::gFeatureFlagSbeBlockHashAgg.isEnabled()) ||
         !childOutputs.hasBlockOutput() || _state.getCollatorSlot() ||
         !accsSupportBlockMode(groupNode) || hasVariableAccInit(groupNode)) {
         // Aborting. Move 'stage' back out to caller.
