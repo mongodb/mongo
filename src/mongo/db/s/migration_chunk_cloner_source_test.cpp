@@ -1989,48 +1989,44 @@ TEST(MigrationChunkClonerSourceOpObserverTest, ShouldLogBatchedWriteForSessionMi
     OpStateAccumulator withSingleOpTime;
     withSingleOpTime.opTime.writeOpTime = repl::OpTime(Timestamp(1, 1), 1);
 
+    // An accumulator for an atomic batch classified retryable (it carried a retryable statement).
+    OpStateAccumulator retryableAtomic;
+    retryableAtomic.batchOpTimes = {repl::OpTime(Timestamp(1, 1), 1)};
+    retryableAtomic.isRetryableAtomicBatch = true;
+
     // An accumulator that recorded no oplog entries.
     OpStateAccumulator empty;
 
-    // Both retryable grouping formats are logged when oplog entries exist and session info is
-    // present.
-    for (auto format : {WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
-                        WriteUnitOfWork::kGroupForRetryableAtomicWrite}) {
-        EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
-            &withBatchOpTimes, format, true /* hasTxnNumber */, true /* hasLogicalSessionId */));
-        EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
-            &withSingleOpTime, format, true /* hasTxnNumber */, true /* hasLogicalSessionId */));
-    }
+    // A possibly-retryable batch and a retryable atomic batch are both logged when oplog entries
+    // exist and session info is present.
+    EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
+        &withBatchOpTimes, WriteUnitOfWork::kGroupForPossiblyRetryableOperations, true, true));
+    EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
+        &withSingleOpTime, WriteUnitOfWork::kGroupForPossiblyRetryableOperations, true, true));
+    EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
+        &retryableAtomic, WriteUnitOfWork::kGroupForRetryableAtomicWrite, true, true));
 
-    // Non-retryable grouping formats are never logged.
-    for (auto format : {WriteUnitOfWork::kDontGroup, WriteUnitOfWork::kGroupForTransaction}) {
-        EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
-            &withBatchOpTimes, format, true /* hasTxnNumber */, true /* hasLogicalSessionId */));
-    }
+    // A non-retryable atomic batch is never logged, even with session info present.
+    EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
+        &withBatchOpTimes, WriteUnitOfWork::kGroupForRetryableAtomicWrite, true, true));
 
     // Missing session info (either txnNumber or lsid) is never logged.
     EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
         &withBatchOpTimes,
-        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
+        WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
         false /* hasTxnNumber */,
-        true /* hasLogicalSessionId */));
+        true));
     EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
         &withBatchOpTimes,
-        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
-        true /* hasTxnNumber */,
+        WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+        true,
         false /* hasLogicalSessionId */));
 
     // No oplog entries (null accumulator or no recorded op times) is never logged.
     EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
-        nullptr,
-        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
-        true /* hasTxnNumber */,
-        true /* hasLogicalSessionId */));
+        nullptr, WriteUnitOfWork::kGroupForRetryableAtomicWrite, true, true));
     EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
-        &empty,
-        WriteUnitOfWork::kGroupForRetryableAtomicWrite,
-        true /* hasTxnNumber */,
-        true /* hasLogicalSessionId */));
+        &empty, WriteUnitOfWork::kGroupForRetryableAtomicWrite, true, true));
 }
 
 }  // namespace

@@ -2207,6 +2207,7 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
                          std::vector<StmtId> stmtIdsWritten,
                          const bool updateTxnTable,
                          WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                         const bool isRetryableAtomicBatch,
                          OperationLogger* operationLogger) {
 
     const auto txnRetryCounter = opCtx->getTxnRetryCounter();
@@ -2224,29 +2225,35 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
             // No statement IDs; don't set prevWriteOpTimeInTransaction.
             oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
         }
-    } else if (oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite) {
-        // This mode is only used with retryable writes; the entry is tagged retryable
-        // (multiOpType) below, so it must carry session info (lsid + txnNumber).
-        invariant(opCtx->isRetryableWrite());
-        // The whole batch is one atomic, retryable unit. At most one operation carries a stmtId and
-        // it may sit in any entry, so most entries in the batch arrive with an empty
-        // stmtIdsWritten; set the session and multiOpType metadata manually rather than via
-        // appendOplogEntryChainInfo, which requires a non-empty stmtIdsWritten.
-        oplogEntry->setSessionId(opCtx->getLogicalSessionId());
-        oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-        oplogEntry->setMultiOpType(repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
-        oplogEntry->setPrevWriteOpTimeInTransaction(
-            oplogEntry->getPrevWriteOpTimeInTransaction().value_or(repl::OpTime()));
+    } else if (oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite ||
+               oplogGroupingFormat == WriteUnitOfWork::kGroupForTransaction) {
+        // An atomically-grouped batched write. A retryable batch is tagged retryable (multiOpType)
+        // below, so it must carry session info (lsid + txnNumber); a non-retryable batch carries
+        // neither.
+        if (isRetryableAtomicBatch) {
+            // The whole batch is one atomic, retryable unit. At most one operation carries a stmtId
+            // and it may sit in any entry, so most entries in the batch arrive with an empty
+            // stmtIdsWritten; set the session and multiOpType metadata manually rather than via
+            // appendOplogEntryChainInfo, which requires a non-empty stmtIdsWritten.
+            invariant(opCtx->isRetryableWrite());
+            oplogEntry->setSessionId(opCtx->getLogicalSessionId());
+            oplogEntry->setTxnNumber(opCtx->getTxnNumber());
+            oplogEntry->setMultiOpType(repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+            oplogEntry->setPrevWriteOpTimeInTransaction(
+                oplogEntry->getPrevWriteOpTimeInTransaction().value_or(repl::OpTime()));
+        } else {
+            // Non-retryable atomic batch: no session metadata.
+            oplogEntry->setSessionId(boost::none);
+            oplogEntry->setTxnNumber(boost::none);
+        }
     } else {
+        // Multi-document transaction.
         if (!stmtIdsWritten.empty()) {
             invariant(isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId()));
         }
 
         invariant(bool(txnRetryCounter) == bool(TransactionParticipant::get(opCtx)));
 
-        // Batched writes (that is, WUOWs with 'oplogGroupingFormat ==
-        // WriteUnitOfWork::kGroupForTransaction') are not associated with a txnNumber, so do not
-        // emit an lsid either.
         oplogEntry->setSessionId(opCtx->getTxnNumber() ? opCtx->getLogicalSessionId()
                                                        : boost::none);
         oplogEntry->setTxnNumber(opCtx->getTxnNumber());
@@ -2416,6 +2423,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
                 std::move(stmtIdsWritten),
                 /*updateTxnTable=*/(firstOp || lastOp),
                 oplogGroupingFormat,
+                /*isRetryableAtomicBatch=*/false,
                 operationLogger);
         };
 
@@ -2447,10 +2455,8 @@ void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
 void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                           WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
                                           OpStateAccumulator* opAccumulator) {
-    // A batched write with oplogGroupingFormat kGroupForTransaction is a one-shot non-retryable
-    // transaction without a transaction number, which is forbidden in retryable writes and
-    // multi-document transactions.
-    dassert(oplogGroupingFormat != WriteUnitOfWork::kGroupForTransaction || !opCtx->getTxnNumber());
+    // Grouping oplog entries is forbidden inside a multi-document transaction.
+    dassert(!opCtx->inMultiDocumentTransaction());
 
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     auto* batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
@@ -2458,6 +2464,25 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     // Ensure that no one previously reserved any timestamps for this operation.
     invariant(batchedOps->isEmpty() ||
               !shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+
+    // A batch is a retryable write only if it carries a retryable statement, not merely because it
+    // runs within one; an atomic batch may carry at most one.
+    bool isRetryableAtomicBatch = false;
+    if ((oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite ||
+         oplogGroupingFormat == WriteUnitOfWork::kGroupForTransaction) &&
+        batchedOps->hasStatementIds()) {
+        auto numOpsWithStatementIds = batchedOps->getNumberOfOperationsWithStatementIds();
+        tassert(12782600,
+                fmt::format(
+                    "an atomically-grouped batched write must contain at most one operation with "
+                    "retryable statements, but found {}",
+                    numOpsWithStatementIds),
+                numOpsWithStatementIds == 1);
+        isRetryableAtomicBatch = true;
+    }
+    if (opAccumulator) {
+        opAccumulator->isRetryableAtomicBatch = isRetryableAtomicBatch;
+    }
 
     if (batchedOps->isEmpty()) {
         return;
@@ -2503,16 +2528,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             default:
                 break;
         }
-    }
-
-    if (oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite) {
-        auto numOpsWithStatementIds = batchedOps->getNumberOfOperationsWithStatementIds();
-        tassert(12782600,
-                fmt::format(
-                    "kGroupForRetryableAtomicWrite WUOW must contain exactly one operation with "
-                    "retryable statements, but found {}",
-                    numOpsWithStatementIds),
-                numOpsWithStatementIds == 1);
     }
 
     // Serialize batched statements to BSON and determine their assignment to "applyOps"
@@ -2602,7 +2617,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     }
 
     auto logApplyOpsForBatchedWrite =
-        [opCtx, operationLogger = _operationLogger.get()](
+        [opCtx, operationLogger = _operationLogger.get(), isRetryableAtomicBatch](
             repl::MutableOplogEntry* oplogEntry,
             bool firstOp,
             bool lastOp,
@@ -2622,7 +2637,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             const bool updateTxnTable =
                 (oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations) ||
-                (oplogGroupingFormat == WriteUnitOfWork::kGroupForRetryableAtomicWrite && lastOp);
+                (isRetryableAtomicBatch && lastOp);
             return logApplyOps(opCtx,
                                oplogEntry,
                                /*txnState=*/boost::none,
@@ -2630,6 +2645,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                std::move(stmtIdsWritten),
                                updateTxnTable,
                                oplogGroupingFormat,
+                               isRetryableAtomicBatch,
                                operationLogger);
         };
 
@@ -2777,6 +2793,7 @@ void OpObserverImpl::onTransactionPrepare(
                     std::move(stmtIdsWritten),
                     /*updateTxnTable=*/(firstOp || lastOp),
                     oplogGroupingFormat,
+                    /*isRetryableAtomicBatch=*/false,
                     operationLogger);
             };
 
@@ -2821,6 +2838,7 @@ void OpObserverImpl::onTransactionPrepare(
                     /*stmtIdsWritten=*/{},
                     /*updateTxnTable=*/true,
                     WriteUnitOfWork::kDontGroup,
+                    /*isRetryableAtomicBatch=*/false,
                     _operationLogger.get());
     }
 }

@@ -174,6 +174,10 @@ std::size_t TransactionOperations::getNumberOfOperationsWithStatementIds() const
                                                   }));
 }
 
+bool TransactionOperations::hasStatementIds() const {
+    return !_transactionStmtIds.empty();
+}
+
 void TransactionOperations::clear() {
     _transactionOperations.clear();
     _transactionStmtIds.clear();

@@ -74,6 +74,9 @@ struct OpStateAccumulator : Decorable<OpStateAccumulator> {
     // ApplyOpsEntries used for changestreams with batched writes.
     std::vector<TransactionOperations::ApplyOpsInfo::ApplyOpsEntry> applyOpsEntries;
 
+    // Whether an atomically-grouped batched write is retryable.
+    bool isRetryableAtomicBatch = false;
+
 private:
     OpStateAccumulator(const OpStateAccumulator&) = delete;
     OpStateAccumulator& operator=(const OpStateAccumulator&) = delete;

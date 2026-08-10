@@ -170,6 +170,11 @@ public:
     std::size_t getNumberOfOperationsWithStatementIds() const;
 
     /**
+     * Returns true if any collected operation carries a statement id.
+     */
+    bool hasStatementIds() const;
+
+    /**
      * Clears the operations stored in this container along with corresponding statistics.
      */
     void clear();

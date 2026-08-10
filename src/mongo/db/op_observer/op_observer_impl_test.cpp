@@ -5160,6 +5160,55 @@ TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteWithMultipleStatementBearing
     });
 }
 
+// An atomically-grouped batch that runs within a retryable write but carries no retryable
+// statements is not itself retryable: it commits successfully and replicates as a plain atomic
+// applyOps with no session metadata.
+TEST_F(BatchedWriteOutputsTest, RetryableSessionAtomicBatchWithoutStatementIdsIsNotRetryable) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+
+    // Two ops with no statement ids, so the batch is a multi-op applyOps (not the single-op fast
+    // path) and carries no retryable statements despite running within a retryable write.
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForRetryableAtomicWrite);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto entry = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // Replicates as a plain atomic applyOps: no retryable multiOpType tag and no session metadata,
+    // despite running within a retryable write.
+    EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    EXPECT_FALSE(entry.getMultiOpType().has_value());
+    EXPECT_FALSE(entry.getSessionId().has_value());
+    EXPECT_FALSE(entry.getTxnNumber().has_value());
+
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(2u, innerEntries.size());
+    EXPECT_EQ(0, innerEntries[0].getStatementIds().size());
+    EXPECT_EQ(0, innerEntries[1].getStatementIds().size());
+}
+
 // Test to make sure vectored inserts work if the vectored inserts don't fit into an applyOps.  This
 // should never happen except in tests which specifically set the batching parameters, but it makes
 // the code simpler to assume it does happen, and testing that it works is simpler and more reliable
