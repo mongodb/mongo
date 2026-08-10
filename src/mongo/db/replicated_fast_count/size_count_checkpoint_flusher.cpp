@@ -89,7 +89,7 @@ void SizeCountCheckpointFlusher::runOneFlushCycle_ForTest(OperationContext* opCt
 void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
                                                    SizeCountCheckpointBuffer& buffer) {
     const Date_t flushStart = Date_t::now();
-    const size_t entryWriteCount = _doFlush(opCtx, buffer);
+    const boost::optional<FlushResult> result = _doFlush(opCtx, buffer);
 
     sleepAfterFlush.execute([](const BSONObj& data) {
         if (auto elem = data["sleepMs"]; elem) {
@@ -97,11 +97,25 @@ void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
         }
     });
 
-    recordFlush(flushStart, entryWriteCount);
+    const Milliseconds duration = Date_t::now() - flushStart;
+    if (result.has_value()) {
+        LOGV2(13195100,
+              "SizeCountCheckpointFlusher flushed successfully",
+              "previousValidAsOfTS"_attr = result->previousValidAsOfTS,
+              "newValidAsOfTS"_attr = result->newValidAsOfTS,
+              "checkpointBufferSize"_attr = result->checkpointBufferSize,
+              "entryWriteCount"_attr = result->entryWriteCount,
+              "flushAttempts"_attr = result->flushAttempts,
+              "duration"_attr = duration);
+        recordFlush(flushStart, result->entryWriteCount);
+    } else {
+        LOGV2_DEBUG(
+            13195101, 3, "SizeCountCheckpointFlusher did not flush", "duration"_attr = duration);
+    }
 }
 
-size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
-                                            SizeCountCheckpointBuffer& buffer) {
+boost::optional<SizeCountCheckpointFlusher::FlushResult> SizeCountCheckpointFlusher::_doFlush(
+    OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
     if (MONGO_unlikely(failDuringFlush.shouldFail())) {
         uasserted(12101802, "Injected failure in _runOneFlushCycle for testing");
     }
@@ -110,11 +124,10 @@ size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
     hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
 
     if (!batch) {
-        // No batch to flush, 0 flushed batch size.
-        return 0;
+        return boost::none;
     }
 
-    size_t entryWriteCount = 0;
+    boost::optional<FlushResult> result;
     size_t flushAttempts = 0;
     writeConflictRetry(opCtx, "flush", NamespaceString::kDefaultOplogCollectionNamespace, [&] {
         if (flushAttempts++ > 0) {
@@ -139,13 +152,22 @@ size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
         hangBeforePersistingNewFastCountEntries.pauseWhileSet();
 
         WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
-        entryWriteCount =
+        const size_t entryWriteCount =
             persistCheckpointSnapshot(opCtx, checkpoint, *_sizeCountStore, *_timestampStore);
         wuow.commit();
+
+        result = FlushResult{
+            .previousValidAsOfTS = currentValidAsOf,
+            .newValidAsOfTS = checkpoint.validAsOf,
+            .checkpointBufferSize = batch->deltas.size(),
+            .entryWriteCount = entryWriteCount,
+            .flushAttempts = flushAttempts,
+        };
     });
+
     buffer.acknowledgeFlushSuccess();
 
-    return entryWriteCount;
+    return result;
 }
 
 }  // namespace mongo::replicated_fast_count
