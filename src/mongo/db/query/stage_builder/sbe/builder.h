@@ -1066,6 +1066,9 @@ private:
     std::pair<SbStage, PlanStageSlots> buildIndexedJoinEmbeddingNode(const QuerySolutionNode* root,
                                                                      const PlanStageReqs& reqs);
 
+    std::pair<SbStage, PlanStageSlots> buildIndexedJoinIndexProbe(const QuerySolutionNode* root,
+                                                                  const PlanStageReqs& reqs);
+
     std::pair<SbStage, PlanStageSlots> buildUnpackTsBucket(const QuerySolutionNode* root,
                                                            const PlanStageReqs& reqs);
 

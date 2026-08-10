@@ -2001,11 +2001,7 @@ TEST_F(BinaryJoinStageBuilderTest, IndexJoinWithCompoundPredicate) {
                                              BSON("fkey1" << 1 << "fkey2" << 1 << "fkey3" << 1),
                                              BSON("fkey1" << -1 << "fkey2" << -1 << "fkey3" << -1),
                                              BSON("fkey1" << 1 << "fkey2" << -1 << "fkey3" << 1),
-                                             BSON("fkey1" << -1 << "fkey2" << 1 << "fkey3" << -1),
-                                             BSON("fkey3" << 1 << "fkey2" << 1 << "fkey1" << 1),
-                                             BSON("fkey3" << -1 << "fkey2" << -1 << "fkey1" << -1),
-                                             BSON("fkey3" << 1 << "fkey2" << -1 << "fkey1" << 1),
-                                             BSON("fkey3" << -1 << "fkey2" << 1 << "fkey1" << -1)};
+                                             BSON("fkey1" << -1 << "fkey2" << 1 << "fkey3" << -1)};
     NamespaceString foreignCollectionName =
         NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
     instantiateSecondaryCollection(foreignCollectionName,

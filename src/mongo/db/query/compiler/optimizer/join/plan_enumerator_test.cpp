@@ -468,7 +468,7 @@ TEST_F(JoinPlanEnumeratorTest, ZigZag3NodesINLJ) {
                     true /* withIndexes */);
 }
 
-// TODO SERVER-130392: delete this test.
+// TODO SERVER-132382: delete this test.
 TEST_F(JoinPlanEnumeratorTest, INLJNotEnumeratedWithProjectionOnRHS) {
     initGraph(2, true /* withIndexes */);
     graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
