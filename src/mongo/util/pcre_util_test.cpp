@@ -40,6 +40,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/pcre_parameters.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo::pcre_util {
 namespace {
@@ -138,6 +140,67 @@ TEST(PcreUtilTest, QuoteMeta) {
             ASSERT_EQ(out, in) << note;
         }
     }
+}
+
+TEST(PcreUtilTest, BackslashCKMatchAtContinuationByteThrows) {
+    using namespace pcre::options;
+    pcre::Regex re("\\C\\K\\C", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_THROWS_CODE(re.matchView("\xC3\xA9"_sd), DBException, 12407700);
+}
+
+TEST(PcreUtilTest, BackslashCMatchEndingMidCharacterThrows) {
+    using namespace pcre::options;
+    pcre::Regex re("\\C", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_THROWS_CODE(re.matchView("\xC3\xA9"_sd), DBException, 12407700);
+}
+
+TEST(PcreUtilTest, BackslashCCaptureGroupMidCharacterThrows) {
+    using namespace pcre::options;
+    pcre::Regex re("(\\C)(\\C)", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_THROWS_CODE(re.matchView("\xC3\xA9"_sd), DBException, 12407700);
+}
+
+TEST(PcreUtilTest, MatchViewNullInputEmptyMatch) {
+    using namespace pcre::options;
+    // "a*" matches the empty string; with a default-constructed (null-data)
+    // StringData the old code did nullptr+0 (UB). Verified clean by UBSAN.
+    pcre::Regex re("a*", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    auto m = re.matchView(StringData{});
+    ASSERT_TRUE(!!m);
+}
+
+TEST(PcreUtilTest, BackslashCKMatchSucceedsWhenFlagDisabled) {
+    const bool savedFlag = gCheckRegexMatchUTF8Boundary;
+    gCheckRegexMatchUTF8Boundary = false;
+    ScopeGuard restoreFlag([savedFlag] { gCheckRegexMatchUTF8Boundary = savedFlag; });
+    using namespace pcre::options;
+    pcre::Regex re("\\C\\K\\C", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_DOES_NOT_THROW(re.matchView("\xC3\xA9"_sd));
+}
+
+TEST(PcreUtilTest, BackslashCMatchSucceedsWhenFlagDisabled) {
+    const bool savedFlag = gCheckRegexMatchUTF8Boundary;
+    gCheckRegexMatchUTF8Boundary = false;
+    ScopeGuard restoreFlag([savedFlag] { gCheckRegexMatchUTF8Boundary = savedFlag; });
+    using namespace pcre::options;
+    pcre::Regex re("\\C", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_DOES_NOT_THROW(re.matchView("\xC3\xA9"_sd));
+}
+
+TEST(PcreUtilTest, BackslashCCaptureGroupSucceedsWhenFlagDisabled) {
+    const bool savedFlag = gCheckRegexMatchUTF8Boundary;
+    gCheckRegexMatchUTF8Boundary = false;
+    ScopeGuard restoreFlag([savedFlag] { gCheckRegexMatchUTF8Boundary = savedFlag; });
+    using namespace pcre::options;
+    pcre::Regex re("(\\C)(\\C)", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_DOES_NOT_THROW(re.matchView("\xC3\xA9"_sd));
 }
 
 }  // namespace

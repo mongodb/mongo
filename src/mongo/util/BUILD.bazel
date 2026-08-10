@@ -455,6 +455,15 @@ mongo_cc_library(
     ],
 )
 
+mongo_idl_library(
+    name = "pcre_params",
+    src = "pcre_parameters.idl",
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_library(
     name = "string_listset",
     srcs = [
@@ -819,6 +828,7 @@ mongo_cc_unit_test(
         ":future_util",
         ":icu",
         ":latch_analyzer",
+        ":pcre_params",
         ":pcre_util",
         ":pcre_wrapper",
         ":periodic_runner_impl",
