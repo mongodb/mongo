@@ -83,17 +83,11 @@ createIdx();
 // Let the index build continue running.
 IndexBuildTest.resumeIndexBuilds(primary);
 
-// Wait for the index build to stop.
-IndexBuildTest.waitForIndexBuildToStop(testDB);
-
-// With two phase index builds, a stepdown will not abort the index build, which should complete
-// after a new node becomes primary.
-rst.awaitReplication();
-
-// The old primary, now secondary, should process the commitIndexBuild oplog entry.
-
+// A stepdown does not abort a two phase index build; the new primary commits it. Wait for the
+// commitIndexBuild to be applied on the new primary and replicated to the secondary.
+const primaryColl = rst.getPrimary().getCollection(coll.getFullName());
 const secondaryColl = rst.getSecondary().getCollection(coll.getFullName());
-IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"], [], {includeBuildUUIDs: true});
-IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"], [], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_", "a_1"], [], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_", "a_1"], [], {includeBuildUUIDs: true});
 
 rst.stopSet();
