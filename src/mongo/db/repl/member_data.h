@@ -182,6 +182,15 @@ public:
         return _lastStableRecoveryTimestamp;
     }
 
+    // Records what this member most recently reported, where a null timestamp means it reported
+    // having no stable recovery timestamp at all. Unlike the optime fields this is not monotonic:
+    // the member reports whatever its storage engine currently holds, which can move backwards
+    // across a restart, so the last report is stored as-is. It could also move backwards due to
+    // out-of-order heartbeat responses.
+    void setLastStableRecoveryTimestamp(Timestamp ts) {
+        _lastStableRecoveryTimestamp = ts;
+    }
+
     /*
      * Returns true if the last heartbeat data explicilty stated that the node is not electable.
      */
