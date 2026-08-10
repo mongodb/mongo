@@ -47,6 +47,9 @@ struct SolutionWithPlanStage {
     // reproduces PlanRankingDecision::candidateOrder; QuerySolution::score remains the displayed
     // (bonus-free) trial score.
     boost::optional<double> adjustedScore;
+    // How this plan's multi-planner trial period ended. Set exactly when 'ranTrial' is true; a plan
+    // that never ran has no stop condition to report.
+    boost::optional<MultiPlannerStopCondition> stopCondition;
 };
 
 struct PlanExplainerData {
@@ -54,6 +57,9 @@ struct PlanExplainerData {
     std::vector<SolutionWithPlanStage> rejectedPlansWithStages;
     std::unique_ptr<mongo::PlanStageStats> multiPlannerWinningPlanTrialStats;
     boost::optional<double> multiPlannerWinningPlanScore;
+    // How the winning plan's trial period ended. Populated alongside
+    // 'multiPlannerWinningPlanTrialStats', i.e. only when the multi-planner chose the winner.
+    boost::optional<MultiPlannerStopCondition> multiPlannerWinningPlanStopCondition;
     stage_builder::PlanStageToQsnMap planStageQsnMap;
     cost_based_ranker::EstimateMap estimates;
     // Namespace-keyed map of sampling metadata emitted under queryPlanner.ceSamplingMetadata.
@@ -167,8 +173,15 @@ struct ExplainPlanEntry {
     // The plan's QuerySolution hash, when known. Emitted as "solutionHashUnstable" at plan level
     // in the V3 output when the forced-plan-by-hash knob is enabled.
     boost::optional<size_t> solutionHash;
+    // How this plan's multi-planner trial period ended, when it ran one. Present exactly when
+    // 'hasTrialStats' is true and the trial recorded a condition, and drawn from the same three
+    // provenance sources as 'hasTrialStats'. Emitted by the V3 assembler inside the plan-level
+    // "multiPlanStats" alongside the trial totals, as "stopCondition". Being optional
+    // independently of those totals, it can be absent from a multiPlanStats that is otherwise
+    // populated: SBE trials record no stop condition.
+    boost::optional<MultiPlannerStopCondition> stopCondition;
     // TODO SERVER-131545: attach additional per-plan data (e.g. planningResult,
-    // terminationReason, score) via a per-candidate record.
+    // stopCondition, score) via a per-candidate record.
 };
 
 

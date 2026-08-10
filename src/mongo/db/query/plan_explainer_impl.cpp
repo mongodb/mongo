@@ -1026,6 +1026,20 @@ boost::optional<double> getWinningPlanScore(PlanStage* root) {
     return {};
 }
 
+/**
+ * If 'root' has a MultiPlanStage returns how the trial period of its best plan ended.
+ */
+boost::optional<MultiPlannerStopCondition> getWinningPlanStopCondition(PlanStage* root) {
+    if (const auto mps = getMultiPlanStage(root); mps) {
+        auto bestPlanIdx = mps->bestPlanIdx();
+        tassert(13153001,
+                "Trying to get best plan index of a MultiPlanStage without winning plan",
+                bestPlanIdx);
+        return mps->getCandidate(*bestPlanIdx).stopCondition;
+    }
+    return {};
+}
+
 PlanExplainerImpl::PlanExplainerImpl(PlanStage* root,
                                      boost::optional<size_t> cachedPlanHash,
                                      boost::optional<std::string> replanReason,
@@ -1048,6 +1062,7 @@ PlanExplainerImpl::PlanExplainerImpl(PlanStage* root,
     if (isExplain && !_explainData.multiPlannerWinningPlanTrialStats && getMultiPlanStage(_root)) {
         _explainData.multiPlannerWinningPlanTrialStats = _root->getStats();
         _explainData.multiPlannerWinningPlanScore = getWinningPlanScore(_root);
+        _explainData.multiPlannerWinningPlanStopCondition = getWinningPlanStopCondition(_root);
     }
 }
 
@@ -1333,6 +1348,8 @@ struct NormalizedPlanInfo {
     boost::optional<size_t> planIdx;
     // Whether 'stats' carries multi-planning trial counters.
     bool ranTrial = false;
+    // How the plan's trial period ended, for plans that ran one.
+    boost::optional<MultiPlannerStopCondition> stopCondition;
     // The displayed trial score (QuerySolution::score; no tie-breaking bonuses).
     boost::optional<double> score;
     // The final ranking score (trial score plus tie-breaking bonuses): sorting by it descending
@@ -1455,6 +1472,7 @@ ExplainPlanEntry makeV3PlanEntry(const NormalizedPlanInfo& plan,
     entry.hasTrialStats = plan.ranTrial;
     entry.isCached = cachedPlanHash && plan.solutionHash && (*cachedPlanHash == *plan.solutionHash);
     entry.solutionHash = plan.solutionHash;
+    entry.stopCondition = plan.stopCondition;
     if (policy.hasExecStats() || policy.hasAllPlansStats()) {
         entry.summary = collectExecutionStatsSummary(plan.stats.get(), plan.planIdx);
         if (policy.hasAllPlansStats() && plan.score) {
@@ -1508,10 +1526,18 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
             _explainData.multiPlannerWinningPlanTrialStats->clone());
         winner.score = _explainData.multiPlannerWinningPlanScore;
         winner.ranTrial = true;
+        winner.stopCondition = _explainData.multiPlannerWinningPlanStopCondition;
     } else {
         winner.stats = _root->getStats();
         winner.score = getWinningPlanScore(_root);
         winner.ranTrial = winner.planIdx.has_value();
+        // The winner is still a candidate of the in-tree MultiPlanStage, which is also the only way
+        // 'ranTrial' can be true here, so its stop condition is read from the candidate itself.
+        if (winner.ranTrial) {
+            if (auto mps = getMultiPlanStage(_root)) {
+                winner.stopCondition = mps->getCandidate(*winner.planIdx).stopCondition;
+            }
+        }
     }
 
     // The remaining candidates: collect one NormalizedPlanInfo per plan first, so duplicates can
@@ -1543,6 +1569,7 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
             candidates.push_back(NormalizedPlanInfo{_root->getStats(),
                                                     i,
                                                     /*ranTrial*/ true,
+                                                    candidate.stopCondition,
                                                     mps->getCandidateScore(i),
                                                     candidate.adjustedScore,
                                                     rootCostOf(candidate.solution->root()),
@@ -1559,6 +1586,7 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
             NormalizedPlanInfo{rejected.planStage->getStats(),
                                boost::none,
                                rejected.ranTrial,
+                               rejected.ranTrial ? rejected.stopCondition : boost::none,
                                rejected.ranTrial ? rejected.solution->score : boost::none,
                                rejected.ranTrial ? rejected.adjustedScore : boost::none,
                                rootCostOf(rejected.solution->root()),

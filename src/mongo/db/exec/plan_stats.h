@@ -12,6 +12,8 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/record_id_range_list.h"
+#include "mongo/db/query/util/named_enum.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -750,6 +752,55 @@ struct MultiPlanStats : public SpecificStats {
     // True if we exited the multi-planner early due to one plan hitting EOF or filling a batch
     bool earlyExit = false;
 };
+
+/**
+ * How a candidate plan's multi-planner trial period ended. Recorded per candidate, unlike
+ * MultiPlanStats::earlyExit, which is a single trial-wide flag that conflates the two early-exit
+ * reasons and says nothing about which plan caused the exit.
+ *
+ * Recorded for every candidate that ran a trial, including one whose trial ended by failing
+ * (kFailed) - a partially executed candidate still carries trial counters and still appears among
+ * the rejected plans, so it has a stop condition to report like any other. Only a candidate that
+ * never ran at all (e.g. one built from a cached plan, or a plan the cost-based ranker rejected
+ * without executing) has none.
+ *
+ * Every condition states what happened to this candidate specifically: the trial period ends for
+ * all candidates at once, but the two conditions that do not describe an early exit of this
+ * candidate's own distinguish whether it ran out of budget or was cut short by a sibling.
+ */
+// clang-format off
+#define MULTI_PLANNER_STOP_CONDITION_TABLE(X)                                                    \
+    /* The candidate's execution tree reached EOF: it exhausted its results before the trial's */\
+    /* work budget. */                                                                           \
+    X(kEof, "EOF")                                                                               \
+    /* The candidate buffered a full batch without reaching EOF. */                              \
+    X(kFullBatch, "fullBatch")                                                                    \
+    /* The candidate met no early-exit condition and used up the trial's per-plan work budget. */ \
+    X(kExhaustedBudget, "exhaustedBudget")                                                        \
+    /* The candidate met no early-exit condition, but another candidate did and ended the trial */\
+    /* period for everyone. This candidate's trial was stopped short with budget left, so its  */ \
+    /* counters say nothing about how it would have fared over a full trial - typically only a */ \
+    /* handful of works. Distinct from kExhaustedBudget precisely because a plan that got three */\
+    /* works of a ten-thousand-work budget did not exhaust anything. */                           \
+    X(kTrialEndedEarly, "trialEndedEarly")                                                        \
+    /* The candidate's trial ended because the plan failed in a recoverable fashion (exceeding  */ \
+    /* an allowed resource consumption, e.g. a blocking sort over its memory limit with disk    */ \
+    /* use disallowed). The multi-planner keeps such a candidate - the trial continues for the  */ \
+    /* others and only an all-candidates failure is fatal - so it is ranked out but still shown */ \
+    /* among the rejected plans, with the partial counters it accumulated before failing and no */ \
+    /* score, since a failed candidate is never scored. */                                        \
+    X(kFailed, "failed")
+// clang-format on
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(MultiPlannerStopCondition, MULTI_PLANNER_STOP_CONDITION_TABLE)
+#undef MULTI_PLANNER_STOP_CONDITION_TABLE
+
+/**
+ * The stop condition's name, as reported by explain.
+ */
+inline std::string_view toStringView(MultiPlannerStopCondition condition) {
+    return toStringData(condition);
+}
 
 struct OrStats : public SpecificStats {
     OrStats() = default;

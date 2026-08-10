@@ -401,6 +401,101 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3MultiPlannerNodeGrouping) {
     }
 }
 
+TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionFullBatch) {
+    // A multi-planned query whose candidates each return far more than the trial's result target
+    // and never reach EOF within it: every plan that ran a trial reports a stop condition, and the
+    // plans that ended the trial did so by filling a batch.
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanRankerMethod::kMultiPlanner);
+    ASSERT_GTE(entries.size(), 2u);
+
+    bool sawFullBatch = false;
+    for (const auto& entry : entries) {
+        // The stop condition is reported for exactly the plans that ran a trial.
+        ASSERT_EQ(entry.hasTrialStats, entry.stopCondition.has_value()) << entry.planStatsTree;
+        // Each candidate either filled the batch itself or was stopped when a sibling did. No
+        // candidate can reach EOF here (each index scan covers all 200 documents, more than the
+        // trial's result target), and none can run out of budget, since filling a batch ends the
+        // trial long before the budget is spent.
+        ASSERT(entry.stopCondition == MultiPlannerStopCondition::kFullBatch ||
+               entry.stopCondition == MultiPlannerStopCondition::kTrialEndedEarly)
+            << entry.planStatsTree;
+        sawFullBatch |= entry.stopCondition == MultiPlannerStopCondition::kFullBatch;
+    }
+    ASSERT(sawFullBatch) << "expected a plan to have filled the trial's result batch";
+}
+
+TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionTrialEndedEarly) {
+    // A candidate that met no early-exit condition of its own reports why it stopped anyway, and
+    // that reason distinguishes the two ways it can happen. Here the winner reaches EOF, which ends
+    // the trial period for everyone: the remaining candidates were cut short with budget to spare
+    // ('kTrialEndedEarly'), which is a different fact from having spent the budget
+    // ('kExhaustedBudget', asserted below) even though neither exited early. Their trial counters
+    // are tiny - a handful of works out of thousands - which is exactly why the two must not be
+    // conflated.
+    auto exec = buildFindExecAndIter(fromjson("{a: {$eq: 5}, b: {$eq: 5}}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanRankerMethod::kMultiPlanner);
+    ASSERT_GTE(entries.size(), 2u);
+    ASSERT_EQ(entries[0].stopCondition, MultiPlannerStopCondition::kEof)
+        << entries[0].planStatsTree;
+    for (size_t i = 1; i < entries.size(); ++i) {
+        ASSERT_EQ(entries[i].stopCondition, MultiPlannerStopCondition::kTrialEndedEarly)
+            << entries[i].planStatsTree;
+        // The budget is nowhere near spent: the trial stopped as soon as the winner hit EOF, after
+        // a few works out of a per-plan budget of at least 'internalQueryPlanEvaluationWorks'
+        // (10000 by default).
+        ASSERT_LT(entries[i].summary->totalKeysExamined, 1000u) << entries[i].planStatsTree;
+    }
+}
+
+TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionEof) {
+    // The winning plan of a multi-planned query whose candidates exhaust their results well before
+    // a batch is filled.
+    auto exec = buildFindExecAndIter(fromjson("{a: {$eq: 5}, b: {$eq: 5}}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanRankerMethod::kMultiPlanner);
+    ASSERT_GTE(entries.size(), 2u);
+    ASSERT_EQ(entries[0].stopCondition, MultiPlannerStopCondition::kEof)
+        << entries[0].planStatsTree;
+}
+
+TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionExhaustedBudget) {
+    // With the trial's work budget squeezed to a single work per plan, no candidate can meet an
+    // early-exit condition, so every candidate ran out of budget.
+    unittest::ServerParameterGuard worksGuard("internalQueryPlanEvaluationWorks", 1);
+    unittest::ServerParameterGuard collFractionGuard("internalQueryPlanEvaluationCollFraction",
+                                                     0.0);
+    unittest::ServerParameterGuard totalCollFractionGuard(
+        "internalQueryPlanTotalEvaluationCollFraction", 0.0);
+
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanRankerMethod::kMultiPlanner);
+    ASSERT_GTE(entries.size(), 2u);
+    for (const auto& entry : entries) {
+        ASSERT_EQ(entry.stopCondition, MultiPlannerStopCondition::kExhaustedBudget)
+            << entry.planStatsTree;
+    }
+}
+
 TEST_F(PlanExplainerTest, GetPlanEntriesV3SingleSolutionSparseStatistics) {
     // Sparseness: a single-solution plan never ran a trial and was never costed, so no node has a
     // "statistics" subobject at all (absent, not empty), and there are no plan-level trial stats.

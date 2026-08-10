@@ -110,12 +110,13 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     const size_t maxTrialResultsFromPlanningRoot =
         plannerData.cq->cqPipeline().empty() ? 0 : maxNumResults;
 
-    sbe::plan_ranker::CandidatePlan candidate{std::move(solution),
-                                              std::move(root),
-                                              sbe::plan_ranker::CandidatePlanData{std::move(data)},
-                                              false /* exitedEarly*/,
-                                              Status::OK(),
-                                              true /*isCachedPlan*/};
+    sbe::plan_ranker::CandidatePlan candidate{
+        .solution = std::move(solution),
+        .root = std::move(root),
+        .data = sbe::plan_ranker::CandidatePlanData{std::move(data)},
+        .exitedEarly = false,
+        .status = Status::OK(),
+        .fromPlanCache = true};
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
 
     // Callback for the tracker when it exceeds any of the tracked metrics. If the tracker exceeds

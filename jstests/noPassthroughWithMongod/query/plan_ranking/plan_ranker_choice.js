@@ -10,7 +10,10 @@
  */
 import {
     assertChosenRanker,
+    assertStopCondition,
     ChosenRanker,
+    getV3Plans,
+    MultiPlannerStopCondition,
     PlanRankerReason,
 } from "jstests/libs/query/analyze_plan.js";
 import {
@@ -102,6 +105,7 @@ function checkRanker({
     returnKey = false,
     chosenRanker = "",
     reason = "",
+    stopCondition = undefined,
 }) {
     const coll = db[collName(cName)];
 
@@ -115,6 +119,12 @@ function checkRanker({
     jsTest.log.info(`Testing case: ${qID}`, {chosenRanker, reason});
     const explain = assert.commandWorked(cursor.explain("plannerStats"));
     assertChosenRanker(explain, chosenRanker, reason);
+    if (stopCondition !== undefined) {
+        // How the winning plan's own trial period ended. The winner is plans[0]. This is the
+        // per-plan counterpart of the ranker's reason: the reason says why a ranker was chosen for
+        // the query, the stop condition says what the winning plan's trial actually did.
+        assertStopCondition(getV3Plans(explain)[0], stopCondition);
+    }
 }
 
 populateCollection("100", 100, nFields, compoundIndexes);
@@ -145,6 +155,7 @@ try {
         query: {f1: {$gte: 0}, f2: {$lte: 0}},
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpEarlyExit,
+        stopCondition: MultiPlannerStopCondition.kEof,
     });
     // The strategy logs its decision ("Mixed plan ranker chooses MP (1)"). The suite's mongod is
     // shared across tests, so assert the line appeared at least once, never a count.
@@ -159,6 +170,7 @@ try {
         order: {f1: 1, x1: 1},
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpEarlyExit,
+        stopCondition: MultiPlannerStopCondition.kEof,
     });
     checkRanker({
         qID: "1.1.3",
@@ -188,6 +200,7 @@ try {
         order: {f3: 1, f1: 1},
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpEarlyExit,
+        stopCondition: MultiPlannerStopCondition.kEof,
     });
     // 1.2 EOF big collection
     checkRanker({
@@ -196,6 +209,7 @@ try {
         query: {f1: 500, f2: {$gt: 300}},
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpEarlyExit,
+        stopCondition: MultiPlannerStopCondition.kEof,
     });
     checkRanker({
         qID: "1.2.2",
@@ -205,6 +219,7 @@ try {
         limit: batchSize,
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpEarlyExit,
+        stopCondition: MultiPlannerStopCondition.kEof,
     });
 
     // 1.3 full batch
@@ -214,6 +229,7 @@ try {
         query: {f1: {$lt: 505}, f2: {$gt: 990}},
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpEarlyExit,
+        stopCondition: MultiPlannerStopCondition.kFullBatch,
     });
     checkRanker({
         qID: "1.3.2",
@@ -223,6 +239,9 @@ try {
         limit: batchSize + 1,
         chosenRanker: ChosenRanker.kMultiPlanning,
         reason: PlanRankerReason.kMpEarlyExit,
+        // The winning plan's own trial ends at EOF, not on a full batch: unlike 1.3.1 this query
+        // sorts, and the winner exhausts its input rather than stopping at the result target.
+        stopCondition: MultiPlannerStopCondition.kEof,
     });
 
     // (2) "The mixed plan ranker chooses MP because plan contains inestimable node(s)"
@@ -479,6 +498,7 @@ try {
             query: noResultsQuery,
             chosenRanker: ChosenRanker.kCostBased,
             reason: PlanRankerReason.kNoMultiplanningResults,
+            stopCondition: MultiPlannerStopCondition.kExhaustedBudget,
         });
         // The strategy logs its decision ("NoMPResults plan ranker chooses CBR (2)"). The suite's
         // mongod is shared across tests, so assert that the log line appeared at least once.
@@ -495,6 +515,7 @@ try {
             query: {f1: {$gte: 0}, f2: {$gte: 0}},
             chosenRanker: ChosenRanker.kMultiPlanning,
             reason: PlanRankerReason.kMpEarlyExit,
+            stopCondition: MultiPlannerStopCondition.kFullBatch,
         });
         // The strategy logs its decision ("NoMPResults plan ranker chooses MP (1)").
         assert(
@@ -518,6 +539,7 @@ try {
             query: {f1: 100000, f2: 100000},
             chosenRanker: ChosenRanker.kMultiPlanning,
             reason: PlanRankerReason.kMpEarlyExit,
+            stopCondition: MultiPlannerStopCondition.kEof,
         });
         // No MP results, so CBR is engaged, but $returnKey makes every plan inestimable
         // (RETURN_KEY), so CBR falls back to MP.

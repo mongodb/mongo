@@ -185,6 +185,22 @@ struct BaseCandidatePlan {
     // Indicates whether this candidate plan has completed the trial run early by achieving one
     // of the trial run metrics.
     bool exitedEarly{false};
+    // How this candidate's trial period ended, set once the candidate has run a trial. Refines
+    // 'exitedEarly', which only says whether the candidate met some early-exit condition and not
+    // which one; 'exitedEarly == false' corresponds to kExhaustedBudget or kTrialEndedEarly,
+    // depending on whether this candidate ran out of budget or a sibling ended the trial first.
+    // Remains boost::none for a candidate that never ran a trial (e.g. one constructed directly
+    // from a cached plan).
+    //
+    // TODO SERVER-132033: deduplicate with 'exitedEarly'. In the classic path the two are already
+    // equivalent once the trial is over ('exitedEarly' iff the condition is kEof or kFullBatch),
+    // but 'exitedEarly' cannot be dropped yet: the SBE trial executor sets only that flag - its
+    // sole functional reader being the SBE cached-plan replan decision - and its early exits do not
+    // decompose into these three conditions (the TrialRunTracker metrics and the stash size limit
+    // have no classic counterpart). Extending V3 explain to SBE forces those stop conditions to be
+    // named, at which point 'exitedEarly' becomes derivable from this field everywhere and should
+    // be removed.
+    boost::optional<MultiPlannerStopCondition> stopCondition;
     // If the candidate plan has failed in a recoverable fashion during the trial run, contains a
     // non-OK status.
     Status status{Status::OK()};

@@ -469,6 +469,14 @@ void generatePlannerInfoV3(PlanExecutor* exec,
             if (entry.summary->score) {
                 multiPlanStatsBob.appendNumber("score", *entry.summary->score);
             }
+            if (entry.stopCondition) {
+                // How this plan's trial period ended. Sourced from the trial itself rather than
+                // from 'summary', so it can legitimately be absent while the totals are present
+                // (SBE trials record no stop condition).
+                // TODO SERVER-132033: unify the trial stop condition with the summary, so that this
+                // field is always present when the totals are present.
+                multiPlanStatsBob.append("stopCondition", toStringView(*entry.stopCondition));
+            }
             multiPlanStatsBob.appendNumber("nReturned",
                                            static_cast<long long>(entry.summary->nReturned));
             appendExecutionTimeFields(multiPlanStatsBob, entry.summary->executionTime);

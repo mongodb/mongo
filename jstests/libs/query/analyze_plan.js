@@ -307,6 +307,57 @@ export function assertChosenRanker(explain, chosenRanker, reason = undefined) {
 }
 
 /**
+ * Returns the V3 per-plan array of 'explain', asserting it is present. The winning (or sole) plan is
+ * always the first entry; the rest follow in the deciding ranker's order.
+ */
+export function getV3Plans(explain) {
+    const queryPlanner = getQueryPlanner(explain);
+    const plans = queryPlanner.plans;
+    assert(Array.isArray(plans), "missing queryPlanner.plans", {explain});
+    assert.gte(plans.length, 1, "plans must hold at least the winning plan", {explain});
+    return plans;
+}
+
+/**
+ * How a candidate plan's multi-planner trial period ended.
+ *   kEof             - the plan exhausted its results before any trial bound could stop it.
+ *   kFullBatch       - the plan buffered the trial's target number of results, without hitting EOF.
+ *   kExhaustedBudget - the plan met no early-exit condition and used up the per-plan work budget.
+ *   kTrialEndedEarly - the plan met no early-exit condition, but another plan did and ended the
+ *                      trial period for everyone, so this plan was stopped short with budget left.
+ *   kFailed          - the plan's trial ended by failing recoverably (e.g. a blocking sort over its
+ *                      memory limit with disk use disallowed). Such a plan is ranked out but still
+ *                      appears among the rejected plans, with partial counters and no score.
+ */
+export const MultiPlannerStopCondition = {
+    kEof: "EOF",
+    kFullBatch: "fullBatch",
+    kExhaustedBudget: "exhaustedBudget",
+    kTrialEndedEarly: "trialEndedEarly",
+    kFailed: "failed",
+};
+
+/**
+ * Asserts that 'plan', one entry of a V3 explain's queryPlanner.plans[], ran a multi-planning trial
+ * that ended with the 'expected' condition, one of 'MultiPlannerStopCondition'. A plan that ran a
+ * trial is equivalently one carrying plan-level 'multiPlanStats'; a plan that never ran one (e.g. a
+ * CBR-rejected plan) has no stop condition to report and fails here.
+ *
+ * TODO SERVER-132033 Extend for SBE.
+ */
+export function assertStopCondition(plan, expected) {
+    assert(Object.values(MultiPlannerStopCondition).includes(expected), "Unknown stop condition", {
+        expected,
+    });
+    assert(
+        plan.hasOwnProperty("multiPlanStats"),
+        "expected a plan that ran a multi-planning trial",
+        {plan},
+    );
+    assert.eq(plan.multiPlanStats.stopCondition, expected, {plan});
+}
+
+/**
  * Returns an element of explain output which represents a rejected candidate plan.
  */
 export function getRejectedPlan(rejectedPlan) {
