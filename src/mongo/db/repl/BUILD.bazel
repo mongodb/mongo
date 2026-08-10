@@ -1477,6 +1477,7 @@ mongo_cc_library(
         "replication_coordinator_impl_heartbeat.cpp",
         "replication_coordinator_impl_step_up_step_down.cpp",
         "vote_requester.cpp",
+        "write_concern_waiter_list.cpp",
     ],
     deps = [
         "auto_get_rstl_for_stepup_stepdown",
@@ -1506,6 +1507,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/repl/clang_checked",
         "//src/mongo/db/repl/initial_sync:initial_syncer",
         "//src/mongo/db/repl/split_horizon",
         "//src/mongo/db/rss:disable_snapshotting_fail_point",
@@ -2005,6 +2007,7 @@ mongo_cc_unit_test(
         "replication_coordinator_impl_reconfig_test.cpp",
         "replication_coordinator_impl_test.cpp",
         "topology_coordinator_v1_test.cpp",
+        "write_concern_waiter_list_test.cpp",
     ],
     tags = [
         "mongo_unittest_fifth_group",

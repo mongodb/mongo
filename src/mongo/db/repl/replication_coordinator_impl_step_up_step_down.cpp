@@ -228,8 +228,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         // current term. Also see TopologyCoordinator::isSafeToStepDown.
         invariant(lastAppliedOpTime.getTerm() == currentTerm);
 
-        auto [future, waiter] =
-            _replicationWaiterList.add(lk, lastAppliedOpTime, waiterWriteConcern);
+        // Registering the waiter has to stay under _mutex: a secondary reaching lastAppliedOpTime
+        // in the gap would wake nobody, and with the node stepping down there may be no later
+        // advance to wake it. Removing it below does not need the mutex.
+        auto [future, waiter] = _replicationWaiterList.add(lastAppliedOpTime, waiterWriteConcern);
         lk.unlock();
 
         // Operations that can be interrupted through opCtx should be executed inside this try/catch
@@ -240,12 +242,11 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
 
             // Remove the waiter from the list if it times out before the future is ready.
-            // The replicationWaiterList does not support delayed removal with waiter->givenUp.
+            // The replicationWaiterList does not support delayed removal with waiter->givenUp. The
+            // list synchronizes itself, so removing does not need _mutex.
             if (!status.isOK() && !future.isReady()) {
-                lk.lock();
                 invariant(waiter);
-                _replicationWaiterList.remove(lk, lastAppliedOpTime, waiter);
-                lk.unlock();
+                _replicationWaiterList.remove(lastAppliedOpTime, waiter);
             }
 
             // We ignore the case where runWithDeadline returns timeoutError because in that case

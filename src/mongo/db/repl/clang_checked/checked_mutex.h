@@ -38,6 +38,17 @@ public:
         _m.unlock();
     }
 
+    /**
+     * Forwards the wrapped mutex's observation token, so that wrapping an ObservableMutex in a
+     * CheckedMutex -- which is what gives the members it guards a capability to name -- does not
+     * cost the ability to register it with the ObservableMutexRegistry.
+     */
+    const auto& token() const
+    requires Observable<mutex_type>
+    {
+        return _m.token();
+    }
+
 private:
     mutable mutex_type _m;
 };

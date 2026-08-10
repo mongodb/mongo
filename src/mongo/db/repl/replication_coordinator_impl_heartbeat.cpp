@@ -199,7 +199,7 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
 
     _handleHeartbeatResponse(cbData, replSetNameString);
     {
-        std::unique_lock lk(_mutex);
+        LockGuard lk(_mutex);
         invariant(!_heartbeatHandles.contains(handle));
     }
 }
@@ -212,7 +212,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             std::string_view dtarget = data["target"].valueStringDataSafe();
             return dtarget == cbData.request.target.toString();
         });
-    std::unique_lock lk(_mutex);
+    LockGuard lk(_mutex);
 
     // remove handle from queued heartbeats
     _untrackHeartbeatHandle(lk, cbData.myHandle);
@@ -436,14 +436,13 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     _scheduleHeartbeatToTarget(
         lk, target, std::max(now, action.getNextHeartbeatStartDate()), setName);
 
-    _handleHeartbeatResponseAction(action, hbStatusResponse, std::move(lk));
+    _handleHeartbeatResponseAction(action, hbStatusResponse, lk);
 }
 
-std::unique_lock<ObservableMutex<std::mutex>>
-ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
+void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
     const HeartbeatResponseAction& action,
     const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
-    std::unique_lock<ObservableMutex<std::mutex>> lock) {
+    LockGuard& lock) {
     invariant(lock.owns_lock());
     auto rsc = *_rsConfig.makeSnapshot();
     switch (action.getAction()) {
@@ -525,7 +524,6 @@ ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
         _externalState->notifyOtherMemberDataChanged();
         lock.lock();
     }
-    return lock;
 }
 
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
@@ -918,7 +916,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     auto opCtx = cc().makeOperationContext();
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
-    std::unique_lock lk(_mutex);
+    LockGuard lk(_mutex);
     auto rsc = *_rsConfig.makeSnapshot();
     if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
@@ -1138,7 +1136,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats(WithLock lk) {
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     const executor::TaskExecutor::CallbackArgs& cbData) {
-    std::unique_lock lk(_mutex);
+    LockGuard lk(_mutex);
     if (!cbData.status.isOK()) {
         return;
     }
@@ -1147,8 +1145,7 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     HeartbeatResponseAction action = _topCoord->checkMemberTimeouts(_replExecutor->now());
     // Don't mind potential asynchronous stepdown as this is the last step of
     // liveness check.
-    lk = _handleHeartbeatResponseAction(
-        action, StatusWith(ReplSetHeartbeatResponse()), std::move(lk));
+    _handleHeartbeatResponseAction(action, StatusWith(ReplSetHeartbeatResponse()), lk);
 
     _scheduleNextLivenessUpdate(lk, /* reschedule = */ false);
 }

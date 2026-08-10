@@ -22,5 +22,11 @@ concept TryLockable = requires(T obj) {
     { obj.try_lock() };
 };
 
+// A mutex that publishes an observation token, i.e. an ObservableMutex.
+template <typename T>
+concept Observable = requires(const T obj) {
+    { obj.token() };
+};
+
 }  // namespace clang_checked
 }  // namespace mongo

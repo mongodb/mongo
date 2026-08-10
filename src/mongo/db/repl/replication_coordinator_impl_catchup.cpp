@@ -226,7 +226,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     if (_getMemberState().primary() || newState.removed() || newState.rollback()) {
         // Wake up any threads blocked in awaitReplication, close connections, etc.
         _replicationWaiterList.setErrorAll(
-            lk,
             {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
 
         if (_getMemberState().primary()) {
@@ -379,7 +378,7 @@ void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) 
 }
 
 void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
-    WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
+    LockGuard& lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
     const auto opTime = opTimeAndWallTime.opTime;
 
     // The last applied opTime should never advance beyond the global timestamp (i.e. the latest
