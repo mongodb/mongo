@@ -430,6 +430,8 @@ protected:
     int delta = 0;
     BSONObj resumeToken;
     bool completed;
+
+    // Note: callback is not thread-safe. Don't try to pass it to more than one monitor at a time.
     ReshardingChangeStreamsMonitor::BatchProcessedCallback callback = [&](const auto& batch) {
         delta += batch.getDocumentsDelta();
         resumeToken = batch.getResumeToken().getOwned();
@@ -585,7 +587,11 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
 
     // Start a monitor.
     auto monitor0 = std::make_shared<TestReshardingChangeStreamsMonitorNoKill>(
-        reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);
+        reshardingUUID,
+        tempNss,
+        startAtTime,
+        boost::none /* startAfterResumeToken */,
+        [](const auto&) {});
     auto awaitCompletion0 =
         monitor0->startMonitoring(executor, cleanupExecutor, cancelSource.token(), factory);
 
@@ -603,8 +609,12 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
 
     auto teardownGuard = ScopeGuard([&] { tearDownExecutors({executor1, cleanupExecutor1}); });
 
-    auto monitor1 = std::make_shared<ReshardingChangeStreamsMonitor>(
-        reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);
+    auto monitor1 =
+        std::make_shared<ReshardingChangeStreamsMonitor>(reshardingUUID,
+                                                         tempNss,
+                                                         startAtTime,
+                                                         boost::none /* startAfterResumeToken */,
+                                                         [](const auto&) {});
     auto awaitCompletion1 =
         monitor1->startMonitoring(executor1, cleanupExecutor1, cancelSource1.token(), factory1);
 
