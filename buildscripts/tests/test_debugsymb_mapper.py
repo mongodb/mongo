@@ -1,7 +1,7 @@
 """Unit tests for debugsymb_mapper.py."""
 
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import buildscripts.debugsymb_mapper as under_test
 
@@ -120,6 +120,91 @@ class TestGetBinVersion(TestCmdOutputExtractor):
         bin_version_output = self.cmd_output_extractor.get_bin_version("path/to/bin")
         self.assertIsNone(bin_version_output.mongodb_version)
         self.assertEqual(bin_version_output.cmd_output, version_cmd_output)
+
+
+class TestSetupUrls(unittest.TestCase):
+    def _make_mapper(self, is_san_variant=False):
+        mapper = under_test.Mapper.__new__(under_test.Mapper)
+        mapper.evg_version = "version_id"
+        mapper.evg_variant = "variant"
+        mapper.is_san_variant = is_san_variant
+        mapper.logger = MagicMock()
+        mapper.multiversion_setup = MagicMock()
+        mapper.num_url_retries = 3
+        mapper.url_retry_initial_delay_secs = 15
+        mapper.url_retry_max_delay_secs = 120
+        return mapper
+
+    def _urlinfo(self, urls):
+        urlinfo = MagicMock()
+        urlinfo.urls = urls
+        return urlinfo
+
+    def test_setup_urls_success_without_retry(self):
+        mapper = self._make_mapper()
+        mapper.multiversion_setup.get_urls.return_value = self._urlinfo(
+            {"Binaries": "binaries_url", "mongo-debugsymbols.tgz": "symbols_url"}
+        )
+
+        mapper.setup_urls()
+
+        self.assertEqual(mapper.url, "binaries_url")
+        self.assertEqual(mapper.debug_symbols_url, "symbols_url")
+        mapper.multiversion_setup.get_urls.assert_called_once()
+
+    def test_setup_urls_retries_when_artifacts_are_missing(self):
+        mapper = self._make_mapper()
+        # Simulate Evergreen's secondary node returning a stale, partial
+        # artifact list before replication catches up.
+        mapper.multiversion_setup.get_urls.side_effect = [
+            self._urlinfo({"Pip Requirements": "pip_url"}),
+            self._urlinfo({"Binaries": "binaries_url"}),
+            self._urlinfo({"Binaries": "binaries_url", "mongo-debugsymbols.tgz": "symbols_url"}),
+        ]
+
+        with patch.object(under_test.time, "sleep") as sleep_mock:
+            mapper.setup_urls()
+
+        self.assertEqual(mapper.url, "binaries_url")
+        self.assertEqual(mapper.debug_symbols_url, "symbols_url")
+        self.assertEqual(mapper.multiversion_setup.get_urls.call_count, 3)
+        self.assertEqual(sleep_mock.call_count, 2)
+
+    def test_setup_urls_raises_after_exhausting_retries(self):
+        mapper = self._make_mapper()
+        mapper.multiversion_setup.get_urls.return_value = self._urlinfo(
+            {"Pip Requirements": "pip_url"}
+        )
+
+        with patch.object(under_test.time, "sleep"):
+            self.assertRaises(ValueError, mapper.setup_urls)
+
+        self.assertEqual(mapper.multiversion_setup.get_urls.call_count, 3)
+
+    def test_setup_urls_san_variant_uses_binaries_for_symbols(self):
+        mapper = self._make_mapper(is_san_variant=True)
+        mapper.multiversion_setup.get_urls.return_value = self._urlinfo(
+            {"Binaries": "binaries_url"}
+        )
+
+        mapper.setup_urls()
+
+        self.assertEqual(mapper.url, "binaries_url")
+        self.assertEqual(mapper.debug_symbols_url, "binaries_url")
+
+    def test_setup_urls_san_variant_retries_when_binaries_missing(self):
+        mapper = self._make_mapper(is_san_variant=True)
+        mapper.multiversion_setup.get_urls.side_effect = [
+            self._urlinfo({"mongo-debugsymbols.tgz": "symbols_url"}),
+            self._urlinfo({"Binaries": "binaries_url", "mongo-debugsymbols.tgz": "symbols_url"}),
+        ]
+
+        with patch.object(under_test.time, "sleep"):
+            mapper.setup_urls()
+
+        self.assertEqual(mapper.url, "binaries_url")
+        self.assertEqual(mapper.debug_symbols_url, "binaries_url")
+        self.assertEqual(mapper.multiversion_setup.get_urls.call_count, 2)
 
 
 if __name__ == "__main__":
