@@ -138,8 +138,6 @@ const tokenDB = tokenConn.getDB(kDbName);
                tojson(resultArray));
 
         // Also check that the resulting array contains views specific to our target database.
-        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)),
-               tojson(resultArray));
         assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kViewName)),
                tojson(resultArray));
 

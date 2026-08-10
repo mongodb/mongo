@@ -119,3 +119,35 @@ checkEntries(viewSimpleName, result, 'view', {viewOn: collSimple.getName()});
 checkEntries(collTimeseries.getName(), result, 'timeseries', {
     viewOn: 'system.buckets.' + collTimeseries.getName()
 });
+
+// Test that, when auth is disabled, internal namespaces (config.*/local.*/<db>.system.*)
+// are not filtered out from non-internal callers.
+// TODO(SERVER-129978): perform this test unconditionally for both auth and non-auth case once
+// the namespace filter workaround is removed.
+if (!TestData.auth) {
+    // Create a view so <testDB>.system.views exists as a system.* sentinel.
+    assert.commandWorked(testDB.createView('noAuthView', collSimple.getName(), []));
+
+    const noAuthResult = adminDB.aggregate([{$listCatalog: {}}]).toArray();
+
+    // Check system.views created by createView above.
+    assert(
+        noAuthResult.some((e) => e.db === testDB.getName() && e.name === 'system.views'),
+        'expected system.views entry when auth is disabled: ' + tojson(noAuthResult));
+
+    // Check local (local.startup_log is always created automatically).
+    assert(
+        noAuthResult.some((e) => e.db === 'local'),
+        'expected local.* entries when auth is disabled: ' + tojson(noAuthResult));
+
+    // Check config - config.* entries are reliably present only on replica sets and sharded
+    // clusters, where config.system.indexBuilds is created on step-up; on standalone 'config'
+    // might be missing, so skip it.
+    if (FixtureHelpers.isReplSet(adminDB) || FixtureHelpers.isMongos(adminDB)) {
+        assert(
+            noAuthResult.some((e) => e.db === 'config'),
+            'expected config.* entries when auth is disabled: ' + tojson(noAuthResult));
+    }
+
+    assert(testDB.noAuthView.drop());
+}
