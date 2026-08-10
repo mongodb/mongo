@@ -31,8 +31,21 @@
 
 #include <fmt/format.h>
 
-#include "mongo/db/feature_compatibility_version_documentation.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/server_options.h"
@@ -97,7 +110,7 @@ DocumentSourceListCatalog::DocumentSourceListCatalog(
     const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(kStageName, pExpCtx) {}
 
-intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
+std::list<intrusive_ptr<DocumentSource>> DocumentSourceListCatalog::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(6200600,
             "The $listCatalog stage specification must be an empty object",
@@ -115,7 +128,45 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
             feature_flags::gDocumentSourceListCatalog.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
-    return new DocumentSourceListCatalog(pExpCtx);
+    std::list<intrusive_ptr<DocumentSource>> result;
+    result.emplace_back(new DocumentSourceListCatalog(pExpCtx));
+
+    // For collectionless requests from non-internal callers, inject a server-owned $match that
+    // hides config.*, local.*, and system.* metadata (except system.js and system.buckets.*).
+    // Requests forwarded from a router to a shard have internal privileges, so the isInternal
+    // check below already prevents double-injection without a separate fromRouter guard.
+    //
+    // TODO(SERVER-129978): remove this workaround once mongosync uses
+    // listCollections/listIndexes/listDatabases instead of $listCatalog.
+    if (nss.isCollectionlessAggregateNS()) {
+        auto* authSession = AuthorizationSession::get(pExpCtx->opCtx->getClient());
+        const bool isInternal = authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::internal);
+        if (!isInternal) {
+            // $match predicate that hides restricted catalog entries from non-internal callers.
+            // The keep-set mirrors the auth privilege model for collectionless $listCatalog:
+            //  - anyNormalResource (any non-system collection in any non-config/local database)
+            //  - system.js
+            //  - anySystemBuckets (system.buckets.*)
+            // An entry is kept when BOTH:
+            //  1. db is neither "config" nor "local"
+            //  2. name does not start with "system.", OR is exactly "system.js",
+            //     OR starts with "system.buckets."
+            static const BSONObj kNamespaceFilter = fromjson(R"({
+                $and: [
+                    {db: {$nin: ["config", "local"]}},
+                    {$or: [
+                        {name: {$not: /^system\\./}},
+                        {name: "system.js"},
+                        {name: /^system\\.buckets\\./}
+                    ]}
+                ]
+            })");
+            result.emplace_back(DocumentSourceMatch::create(kNamespaceFilter, pExpCtx));
+        }
+    }
+
+    return result;
 }
 
 Value DocumentSourceListCatalog::serialize(const SerializationOptions& opts) const {

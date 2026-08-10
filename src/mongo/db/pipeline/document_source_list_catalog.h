@@ -30,6 +30,11 @@
 #pragma once
 
 #include <deque>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -98,7 +103,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
+    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
