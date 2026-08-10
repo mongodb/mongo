@@ -5,6 +5,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/modules.h"
 
 namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
@@ -23,9 +24,11 @@ public:
 
     // Counters tracking sort stats across all engines
     // The total number of spills from sort stages
-    Counter64& sortSpillsCounter = *MetricBuilder<Counter64>{"query.sort.spillToDisk"};
+    Counter64& sortSpillsCounter =
+        *MetricBuilder<Counter64>{"query.sort.spillToDisk"}.setRole(ClusterRole::ShardServer);
     // The total bytes spilled. This is the storage size after compression.
-    Counter64& sortSpillBytesCounter = *MetricBuilder<Counter64>{"query.sort.spillToDiskBytes"};
+    Counter64& sortSpillBytesCounter =
+        *MetricBuilder<Counter64>{"query.sort.spillToDiskBytes"}.setRole(ClusterRole::ShardServer);
     // The number of keys that we've sorted.
     Counter64& sortTotalKeysCounter = *MetricBuilder<Counter64>{"query.sort.totalKeysSorted"};
     // The amount of data we've sorted in bytes
@@ -42,7 +45,8 @@ public:
     // Current on-disk size of temporary spill files on the local dbpath. Incremented as sorter
     // files are written and decremented when they are destroyed.
     Counter64& fileSpilledStorageSize =
-        *MetricBuilder<Counter64>{"query.spilling.fileSpilledStorageSize"};
+        *MetricBuilder<Counter64>{"query.spilling.fileSpilledStorageSize"}.setRole(
+            ClusterRole::ShardServer);
 };
 extern FileSpillingMetrics fileSpillingMetrics;
 

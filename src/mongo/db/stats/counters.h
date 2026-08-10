@@ -340,14 +340,17 @@ public:
     enum SuffixStyle { kDotSuffix, kUpperCaseSuffix };
 
     SpillingCounters(std::string stageName, SuffixStyle suffixStyle = kDotSuffix)
-        : spills(
-              *MetricBuilder<Counter64>{"query." + stageName + _getSuffix(suffixStyle, "spills")}),
+        : spills(*MetricBuilder<Counter64>{"query." + stageName + _getSuffix(suffixStyle, "spills")}
+                      .setRole(ClusterRole::ShardServer)),
           spilledBytes(*MetricBuilder<Counter64>{"query." + stageName +
-                                                 _getSuffix(suffixStyle, "spilledBytes")}),
+                                                 _getSuffix(suffixStyle, "spilledBytes")}
+                            .setRole(ClusterRole::ShardServer)),
           spilledRecords(*MetricBuilder<Counter64>{"query." + stageName +
-                                                   _getSuffix(suffixStyle, "spilledRecords")}),
+                                                   _getSuffix(suffixStyle, "spilledRecords")}
+                              .setRole(ClusterRole::ShardServer)),
           spilledDataStorageSize(*MetricBuilder<Counter64>{
-              "query." + stageName + _getSuffix(suffixStyle, "spilledDataStorageSize")}) {}
+              "query." + stageName + _getSuffix(suffixStyle, "spilledDataStorageSize")}
+                                      .setRole(ClusterRole::ShardServer)) {}
 
     SpillingCounters(SpillingCounters&) = delete;
     SpillingCounters& operator=(const SpillingCounters&) = delete;
@@ -416,19 +419,25 @@ public:
     }
 
     // Counters for lookup join strategies.
-    Counter64& nestedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"};
-    Counter64& indexedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"};
-    Counter64& hashLookupCounter = *MetricBuilder<Counter64>{"query.lookup.hashLookup"};
+    Counter64& nestedLoopJoinCounter =
+        *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"}.setRole(ClusterRole::ShardServer);
+    Counter64& indexedLoopJoinCounter =
+        *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"}.setRole(ClusterRole::ShardServer);
+    Counter64& hashLookupCounter =
+        *MetricBuilder<Counter64>{"query.lookup.hashLookup"}.setRole(ClusterRole::ShardServer);
     Counter64& dynamicIndexedLoopJoinCounter =
-        *MetricBuilder<Counter64>{"query.lookup.dynamicIndexedLoopJoin"};
+        *MetricBuilder<Counter64>{"query.lookup.dynamicIndexedLoopJoin"}.setRole(
+            ClusterRole::ShardServer);
 
     // Duplicate spilling counters, not deleted to maintain backward compatibility.
     // Counter tracking hashLookup spills in lookup stages that get pushed down.
     Counter64& hashLookupSpillToDisk =
-        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDisk"};
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDisk"}.setRole(
+            ClusterRole::ShardServer);
     // Counter tracking hashLookup spilled bytes in lookup stages that get pushed down.
     Counter64& hashLookupSpillToDiskBytes =
-        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDiskBytes"};
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDiskBytes"}.setRole(
+            ClusterRole::ShardServer);
 };
 extern LookupPushdownCounters lookupPushdownCounters;
 
@@ -458,15 +467,25 @@ public:
         localComplexCounter.incrementRelaxed(luLocalComplex);
     }
 
-    Counter64& inljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.indexedLoopJoin"};
-    Counter64& nljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.nestedLoopJoin"};
-    Counter64& hjCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.hashLookup"};
+    Counter64& inljCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.indexedLoopJoin"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& nljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.nestedLoopJoin"}.setRole(
+        ClusterRole::ShardServer);
+    Counter64& hjCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.hashLookup"}.setRole(
+        ClusterRole::ShardServer);
     Counter64& dinljCounter =
-        *MetricBuilder<Counter64>{"query.lookupUnwind.dynamicIndexedLoopJoin"};
-    Counter64& localCollscanCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.localCollscan"};
+        *MetricBuilder<Counter64>{"query.lookupUnwind.dynamicIndexedLoopJoin"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& localCollscanCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.localCollscan"}.setRole(
+            ClusterRole::ShardServer);
     Counter64& localIxscanFetchCounter =
-        *MetricBuilder<Counter64>{"query.lookupUnwind.localIxscanFetch"};
-    Counter64& localComplexCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.localComplex"};
+        *MetricBuilder<Counter64>{"query.lookupUnwind.localIxscanFetch"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& localComplexCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.localComplex"}.setRole(
+            ClusterRole::ShardServer);
 };
 extern LookupUnwindPushdownCounters lookupUnwindPushdownCounters;
 
@@ -490,11 +509,17 @@ public:
             replaceRootCounter.incrementRelaxed(1);
     }
 
-    Counter64& matchCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.match"};
-    Counter64& projectCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.project"};
-    Counter64& addFieldsCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.addFields"};
+    Counter64& matchCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.match"}.setRole(
+        ClusterRole::ShardServer);
+    Counter64& projectCounter =
+        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.project"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& addFieldsCounter =
+        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.addFields"}.setRole(
+            ClusterRole::ShardServer);
     Counter64& replaceRootCounter =
-        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.replaceRoot"};
+        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.replaceRoot"}.setRole(
+            ClusterRole::ShardServer);
 };
 extern NonLeadingPushdownCounters nonLeadingPushdownCounters;
 
@@ -521,11 +546,14 @@ public:
     }
 
     Counter64& leadingFilterCounter =
-        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilter"};
+        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilter"}.setRole(
+            ClusterRole::ShardServer);
     Counter64& leadingFilterSimplifiedCounter =
-        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilterSimplified"};
+        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilterSimplified"}.setRole(
+            ClusterRole::ShardServer);
     Counter64& queriesFailedDueToInvalidationCounter =
-        *MetricBuilder<Counter64>{"query.pathArrayness.queriesFailedDueToInvalidation"};
+        *MetricBuilder<Counter64>{"query.pathArrayness.queriesFailedDueToInvalidation"}.setRole(
+            ClusterRole::ShardServer);
 };
 extern PathArraynessCounters pathArraynessCounters;
 
