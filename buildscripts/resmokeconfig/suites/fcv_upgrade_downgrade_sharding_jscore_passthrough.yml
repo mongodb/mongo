@@ -86,6 +86,12 @@ selector:
     # which is not the case if featureFlagPQSBackfill is on.
     - jstests/core/query/query_settings/query_settings_size_limits.js
 
+    # This test expects a large bulk insert to succeed, which is not guaranteed due to the auth
+    # shards FCV upgrade/downgrade.
+    # TODO (SERVER-98118): Remove this exclusion once FCV upgrade/downgrade does not clear unsharded
+    # collection filtering metadata.
+    - jstests/core/txns/bulk_write_getMore.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
