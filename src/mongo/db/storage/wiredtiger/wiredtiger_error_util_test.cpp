@@ -50,6 +50,10 @@ public:
                 return "WT_OLDEST_FOR_EVICTION";
             case WT_CACHE_OVERFLOW:
                 return "WT_CACHE_OVERFLOW";
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+            case WT_TXN_TOO_LARGE_FOR_CACHE:
+                return "WT_TXN_TOO_LARGE_FOR_CACHE";
+#endif
             case WT_NONE:
                 return "WT_NONE";
             default:
@@ -73,11 +77,24 @@ TEST_F(WiredTigerUtilHelperTest, transactionExceededCacheThreshold) {
     ASSERT_FALSE(txnExceededCacheThreshold(1, 2, 0.5));
 }
 
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+TEST_F(WiredTigerUtilHelperTest, cacheIsInsufficientForTransactionSkipsStatsForTxnTooLarge) {
+    // WT_TXN_TOO_LARGE_FOR_CACHE must short-circuit before touching the session, since WT has
+    // already made the determination itself; passing a null session would crash if the stats
+    // path were consulted instead.
+    ASSERT_TRUE(cacheIsInsufficientForTransaction(
+        /*session=*/nullptr, cacheThreshold, WT_TXN_TOO_LARGE_FOR_CACHE));
+}
+#endif
+
 TEST_F(WiredTigerUtilHelperTest, rollbackReasonWasCachePressure) {
     ASSERT_FALSE(rollbackReasonWasCachePressure(WT_BACKGROUND_COMPACT_ALREADY_RUNNING));
     ASSERT_FALSE(rollbackReasonWasCachePressure(WT_NONE));
     ASSERT_TRUE(rollbackReasonWasCachePressure(WT_OLDEST_FOR_EVICTION));
     ASSERT_TRUE(rollbackReasonWasCachePressure(WT_CACHE_OVERFLOW));
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+    ASSERT_TRUE(rollbackReasonWasCachePressure(WT_TXN_TOO_LARGE_FOR_CACHE));
+#endif
 }
 
 TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
@@ -87,6 +104,11 @@ TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
     std::vector<TestCase> transactionTooLargeTestCases = {
         {.txnTooLarge = true, .cacheInsufficient = true, .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true, .cacheInsufficient = true, .sub_level_err = WT_CACHE_OVERFLOW},
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+        {.txnTooLarge = true,
+         .cacheInsufficient = true,
+         .sub_level_err = WT_TXN_TOO_LARGE_FOR_CACHE},
+#endif
     };
 
     for (auto testCase : transactionTooLargeTestCases) {
@@ -105,6 +127,13 @@ TEST_F(WiredTigerUtilHelperTest, throwTemporarilyUnavailableException) {
         {.txnTooLarge = false, .cacheInsufficient = true, .sub_level_err = WT_CACHE_OVERFLOW},
         {.txnTooLarge = true, .cacheInsufficient = false, .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true, .cacheInsufficient = false, .sub_level_err = WT_CACHE_OVERFLOW},
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+        // cacheInsufficient is always forced true for this sub-level error in the real code path,
+        // so only txnTooLarge=false is a reachable case here.
+        {.txnTooLarge = false,
+         .cacheInsufficient = false,
+         .sub_level_err = WT_TXN_TOO_LARGE_FOR_CACHE},
+#endif
     };
 
     for (auto testCase : temporarilyUnavailableTestCases) {

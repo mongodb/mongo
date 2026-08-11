@@ -1116,9 +1116,25 @@ TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
         wtSession.get_last_error(&err, &sub_level_err, &err_msg);
 
         ASSERT_EQUALS(WT_ROLLBACK, err);
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+        // Depending on timing, WiredTiger may report either that this transaction had the oldest
+        // pinned transaction ID, or that its own dirty content alone exceeded the cache. Both
+        // reasons stem from the same test setup (a single transaction too large for the cache) and
+        // are treated identically by rollbackReasonWasCachePressure().
+        ASSERT(sub_level_err == WT_OLDEST_FOR_EVICTION ||
+               sub_level_err == WT_TXN_TOO_LARGE_FOR_CACHE);
+        if (sub_level_err == WT_OLDEST_FOR_EVICTION) {
+            ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"sv,
+                          std::string_view(err_msg));
+        } else {
+            ASSERT_EQUALS("Transaction dirty content alone exceeds the eviction updates trigger"sv,
+                          std::string_view(err_msg));
+        }
+#else
         ASSERT_EQUALS(WT_OLDEST_FOR_EVICTION, sub_level_err);
         ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"sv,
                       std::string_view(err_msg));
+#endif
         break;
     } while (tryCount <= kRetryLimit);
 
