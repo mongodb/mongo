@@ -93,6 +93,10 @@ void AdmissionContext::setAdmission_forTest(int32_t admissions) {
     _admissions.store(admissions);
 }
 
+bool AdmissionContext::waitUntilQueued_forTest(Nanoseconds timeout) {
+    return bool(_startQueueingTime.waitFor(kNotQueueing, timeout));
+}
+
 void AdmissionContext::setTotalTimeQueuedMicros_forTest(int64_t micros) {
     _totalTimeQueuedMicros.store(micros);
 }

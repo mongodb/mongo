@@ -4,6 +4,7 @@
 #include "mongo/s/service_entry_point_router_role.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/admission/ingress_request_admission_context.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -174,10 +175,9 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionRespectsMaxTimeMS) {
     // waitForAdmission. A background thread waits until the opCtx is blocking in waitForAdmission,
     // then advances the mock clock past the 5ms deadline (well under the ~1000ms napTime) to
     // trigger MaxTimeMSExpired.
+    auto& admCtx = IngressRequestAdmissionContext::get(opCtx.get());
     stdx::thread clockAdvancer([&] {
-        while (!opCtx->isWaitingForConditionOrInterrupt()) {
-            sleepmillis(1);
-        }
+        ASSERT(admCtx.waitUntilQueued_forTest(Seconds(30)));
         clockSource->advance(Milliseconds(6));
         tickSource->advance(Milliseconds(6));
     });
@@ -230,12 +230,13 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionWithLargeMaxTimeMSSucceed
     // handleRequest will block in waitForAdmission while the queued token's napTime (~1000ms at
     // 1 token/sec) elapses. A background thread waits until the opCtx is blocking, then advances
     // the mock clock past the napTime to release the token and let the command succeed.
+    auto& admCtx = IngressRequestAdmissionContext::get(opCtx.get());
     stdx::thread clockAdvancer([&] {
-        while (!opCtx->isWaitingForConditionOrInterrupt()) {
-            sleepmillis(1);
-        }
-        clockSource->advance(Milliseconds(1001));
+        ASSERT(admCtx.waitUntilQueued_forTest(Seconds(30)));
+        // Advance the tick source first so that when the queued thread wakes up (due to the
+        // clockSource advancing) it will always observe the correct tick count.
         tickSource->advance(Milliseconds(1001));
+        clockSource->advance(Milliseconds(1001));
     });
 
     auto msg = constructMessage(BSON(TestCmdRouterIngressSubject::kCommandName
