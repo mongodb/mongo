@@ -3,18 +3,21 @@
  * stream queries, causing getMore requests to return partial results with advancing post-batch
  * resume tokens (PBRTs) before the oplog tail is reached.
  *
- * The test simulates a slow oplog scan by using the 'hangCollScanDoWork' failpoint, which blocks
- * inside CollectionScan::doWork(). With the failpoint active for longer than operationResponseMaxMS,
- * the yield that fires after doWork() returns detects that the configured scan time limit has
- * been exceeded and interrupts the scan. Each such interrupted getMore returns an empty batch
- * (the watched collection has no events) with an updated PBRT that reflects the oplog position
- * reached before the interruption. A background thread issues each getMore so the main thread
- * can control the failpoint timing.
+ * The test slows down the oplog scan with the 'hangCollScanDoWork' failpoint configured to sleep a
+ * fixed amount on every CollectionScan::doWork() call. Because each doWork() is delayed, the scan
+ * reads several oplog entries before the 'operationResponseMaxMS' deadline fires and interrupts it.
+ * Each interrupted getMore returns an empty batch (the watched collection has no events) with a PBRT
+ * that reflects the oplog position reached before the interruption.
+ *
+ * Delaying every doWork() call - rather than blocking a single, fixed call - is deliberate:
+ * 'hangCollScanDoWork' is a global failpoint, so the number of doWork() calls that precede the first
+ * post-resume oplog entry (cursor creation, oplog-visibility yields, and unrelated background
+ * collection scans) is not deterministic. A per-call delay guarantees the scan advances past the
+ * resume-boundary entry before the deadline fires, so the PBRT reliably advances.
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {Thread} from "jstests/libs/parallelTester.js";
 
 describe("operationResponseMaxMS parameter", () => {
     const kScanMaxMS = 1000;
@@ -47,10 +50,8 @@ describe("operationResponseMaxMS parameter", () => {
         // is already behind the stream's start position.
         assert.commandWorked(testDB.createCollection(watchedCollName));
 
-        // Use an explicit session so the same lsid can be passed to background threads.
-        // getMore requires the same logical session as the cursor was created in.
+        // Use an explicit session so the change stream cursor and its getMores share one lsid.
         const session = primary.startSession();
-        const lsidJson = tojson(session.getSessionId());
         const sessionDB = session.getDatabase(jsTestName());
 
         // Open a change stream on the watched collection. Use batchSize:0 so the initial
@@ -79,56 +80,28 @@ describe("operationResponseMaxMS parameter", () => {
             unrelatedColl.insertMany(Array.from({length: kNumDocs}, (_, i) => ({_id: i}))),
         );
 
-        // Issues a getMore in a background thread while the hangCollScanDoWork failpoint keeps
-        // the oplog scan blocked inside CollectionScan::doWork() for longer than
-        // kScanMaxMS. The failpoint uses {skip: 1} to let the first doWork() call through
-        // freely (which processes the oplog entry at the stream's start position and may return
-        // ADVANCED, bypassing the yield check). The second doWork() call — on the first insert
-        // entry — is blocked by the failpoint for longer than kScanMaxMS. When the
-        // failpoint is released, that call returns NEED_TIME and the yield check fires the
-        // timeout, causing the getMore to complete with an empty batch and an updated PBRT.
+        // Runs a getMore whose oplog scan is slowed by delaying every CollectionScan::doWork()
+        // call by 'kDoWorkDelayMS'. The accumulated delay drives the scan past 'kScanMaxMS', so the
+        // 'operationResponseMaxMS' deadline interrupts it after it has read several oplog entries,
+        // and the getMore returns an empty batch with an advanced PBRT. The getMore self-interrupts
+        // once the deadline is reached, so it can be issued inline without a background thread.
+        const kDoWorkDelayMS = 50;
         const runSlowGetMore = (cId) => {
-            const fp = configureFailPoint(primary, "hangCollScanDoWork", {}, {skip: 1});
-
-            // Serialize both the cursor ID and lsid via tojson so the Thread can reconstruct
-            // them with eval. tojson preserves exact BSON types including BinData subtypes.
-            const cursorIdJson = tojson(cId);
-            const thread = new Thread(
-                function (host, dbName, collName, lsidJson, cursorIdJson) {
-                    const conn = new Mongo(host);
-                    const db = conn.getDB(dbName);
-                    return db.runCommand({
-                        getMore: eval("(" + cursorIdJson + ")"),
-                        collection: collName,
-                        lsid: eval("(" + lsidJson + ")"),
+            const fp = configureFailPoint(primary, "hangCollScanDoWork", {delay: kDoWorkDelayMS});
+            try {
+                return assert.commandWorked(
+                    sessionDB.runCommand({
+                        getMore: cId,
+                        collection: watchedCollName,
                         maxTimeMS: 30000,
-                    });
-                },
-                primary.host,
-                testDB.getName(),
-                watchedCollName,
-                lsidJson,
-                cursorIdJson,
-            );
-
-            thread.start();
-
-            // Wait until the scan has entered doWork() and is blocked on the failpoint.
-            fp.wait();
-
-            // Sleep for longer than the configured limit. The pauseWhileSet() loop inside
-            // doWork() polls the failpoint every ~200 ms, so add extra margin.
-            sleep(kScanMaxMS + 500);
-
-            // Unblock the scan. The yield that fires immediately after will detect that
-            // kScanMaxMS has elapsed and interrupt the scan.
-            fp.off();
-
-            thread.join();
-            return assert.commandWorked(thread.returnData());
+                    }),
+                );
+            } finally {
+                fp.off();
+            }
         };
 
-        // First getMore: the scan is interrupted after processing one oplog entry from
+        // First getMore: the scan is interrupted after reading several oplog entries from
         // unrelatedColl. The batch is empty (no matching events), but the PBRT has advanced.
         const res1 = runSlowGetMore(cursorId);
 
@@ -160,17 +133,16 @@ describe("operationResponseMaxMS parameter", () => {
             {res1},
         );
 
-        // Insert a second batch so the second getMore has new oplog entries to scan. The first
-        // getMore's second loadBatch() consumed the initial inserts while draining to the oplog
-        // tail after the timeout fired.
+        // Insert a second batch so the second getMore continues to have unscanned oplog entries
+        // past the position where the first getMore was interrupted.
         assert.commandWorked(
             unrelatedColl.insertMany(
                 Array.from({length: kNumDocs}, (_, i) => ({_id: kNumDocs + i})),
             ),
         );
 
-        // Second getMore: the scan resumes from where it was interrupted, processes the next
-        // oplog entry from unrelatedColl, and is interrupted again. The PBRT advances further.
+        // Second getMore: the scan resumes from where it was interrupted, reads further oplog
+        // entries from unrelatedColl, and is interrupted again. The PBRT advances further.
         const res2 = runSlowGetMore(cursorId);
 
         assert.eq(
