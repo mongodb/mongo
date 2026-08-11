@@ -157,6 +157,14 @@ public:
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
         esc = efc.getEscCollection()->toString();
     }
+
+    RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
+                const NamespaceString& nss,
+                const EncryptedFieldConfig& validatedConfig)
+        : expCtx(expCtx),
+          esc(validatedConfig.getEscCollection()->toString()),
+          dbName(nss.dbName()) {}
+
     virtual ~RewriteBase(){};
 
     virtual void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc){};
@@ -201,8 +209,9 @@ public:
                   const NamespaceString& nss,
                   const EncryptionInformation& encryptInfo,
                   const BSONObj toRewrite,
-                  EncryptedCollScanModeAllowed mode)
-        : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
+                  EncryptedCollScanModeAllowed mode,
+                  const EncryptedFieldConfig& validatedConfig)
+        : RewriteBase(expCtx, nss, validatedConfig), userFilter(toRewrite), _mode(mode) {}
 
     ~FilterRewrite() override{};
 
@@ -275,8 +284,10 @@ BSONObj rewriteQuery(OperationContext* opCtx,
                      const EncryptionInformation& info,
                      BSONObj filter,
                      GetTxnCallback getTransaction,
-                     EncryptedCollScanModeAllowed mode) {
-    auto sharedBlock = std::make_shared<FilterRewrite>(expCtx, nss, info, filter, mode);
+                     EncryptedCollScanModeAllowed mode,
+                     const EncryptedFieldConfig& validatedEfc) {
+    auto sharedBlock =
+        std::make_shared<FilterRewrite>(expCtx, nss, info, filter, mode, validatedEfc);
     doFLERewriteInTxn(opCtx, sharedBlock, getTransaction);
     return sharedBlock->rewrittenFilter.getOwned();
 }
@@ -295,13 +306,19 @@ void processFindCommand(OperationContext* opCtx,
                                           findCommand->getLegacyRuntimeConstants(),
                                           findCommand->getLet());
     expCtx->stopExpressionCounters();
+
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+        nss, findCommand->getEncryptionInformation().value());
+    FLEStatusSection::get().incrementFindCount(nss, efc);
+
     findCommand->setFilter(rewriteQuery(opCtx,
                                         expCtx,
                                         nss,
                                         findCommand->getEncryptionInformation().value(),
                                         findCommand->getFilter().getOwned(),
                                         getTransaction,
-                                        EncryptedCollScanModeAllowed::kAllow));
+                                        EncryptedCollScanModeAllowed::kAllow,
+                                        efc));
 
     findCommand->getEncryptionInformation()->setCrudProcessed(true);
 }
@@ -317,13 +334,17 @@ void processCountCommand(OperationContext* opCtx,
         opCtx, collatorFromBSON(opCtx, countCommand->getCollation().value_or(BSONObj())), nss);
     expCtx->stopExpressionCounters();
 
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+        nss, countCommand->getEncryptionInformation().value());
+
     countCommand->setQuery(rewriteQuery(opCtx,
                                         expCtx,
                                         nss,
                                         countCommand->getEncryptionInformation().value(),
                                         countCommand->getQuery().getOwned(),
                                         getTxn,
-                                        EncryptedCollScanModeAllowed::kAllow));
+                                        EncryptedCollScanModeAllowed::kAllow,
+                                        efc));
 
     countCommand->getEncryptionInformation()->setCrudProcessed(true);
 }

@@ -2374,8 +2374,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
             }
             if (coll->getCollectionOptions().encryptedFieldConfig) {
                 _stats.queryableEncryption += 1;
-                FLEStatusSection::get().updateIndexTypeStatsOnRegisterCollection(
-                    coll->getCollectionOptions().encryptedFieldConfig.value());
+                FLEStatusSection::get().updateStatsOnRegisterCollection(
+                    nss, coll->getCollectionOptions().encryptedFieldConfig.value());
             }
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle += 1;
@@ -2447,8 +2447,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
             }
             if (coll->getCollectionOptions().encryptedFieldConfig) {
                 _stats.queryableEncryption -= 1;
-                FLEStatusSection::get().updateIndexTypeStatsOnDeregisterCollection(
-                    coll->getCollectionOptions().encryptedFieldConfig.value());
+                FLEStatusSection::get().updateStatsOnDeregisterCollection(
+                    ns, coll->getCollectionOptions().encryptedFieldConfig.value());
             }
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle -= 1;
