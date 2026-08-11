@@ -17,11 +17,7 @@
  *   assumes_balancer_off,
  * ]
  */
-import {
-    getPlanStages,
-    getShardsFromExplain,
-    getWinningPlanFromExplain,
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "index_filter_collation";
 const coll = db[collName];
@@ -40,10 +36,8 @@ coll.drop();
 assert.commandWorked(db.createCollection(collName, {collation: caseInsensitive}));
 
 function checkIndexFilterSet(explain, shouldBeSet) {
-    // Null unless this is a mongos explain carrying per-shard plans.
-    const shards = getShardsFromExplain(explain);
-    if (shards) {
-        for (let shard of shards) {
+    if (explain.queryPlanner.winningPlan.shards) {
+        for (let shard of explain.queryPlanner.winningPlan.shards) {
             assert.eq(shard.indexFilterSet, shouldBeSet);
         }
     } else {

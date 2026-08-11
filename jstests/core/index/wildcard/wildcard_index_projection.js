@@ -10,7 +10,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getSingleChildStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -35,9 +35,8 @@ const hintExplainRes = coll
     .hint("$**_1")
     .explain();
 const winningPlan = getWinningPlanFromExplain(hintExplainRes);
-const childStage = getSingleChildStage(winningPlan);
-assert.eq(childStage.stage, "IXSCAN", childStage);
-assert.eq(childStage.keyPattern, {$_path: 1, _id: 1}, childStage);
+assert.eq(winningPlan.inputStage.stage, "IXSCAN", winningPlan.inputStage);
+assert.eq(winningPlan.inputStage.keyPattern, {$_path: 1, _id: 1}, winningPlan.inputStage);
 
 // Test that the results are correct.
 const hintedResults = coll

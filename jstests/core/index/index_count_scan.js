@@ -13,11 +13,7 @@
 //   # Explain for the aggregate command cannot run within a multi-document transaction.
 //   does_not_support_transactions,
 // ]
-import {
-    getPlanStage,
-    getSingleNodeExplain,
-    getWinningPlanFromExplain,
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_count;
 coll.drop();
@@ -48,7 +44,7 @@ const getQueryPlan = function (explain) {
     if (explain.stages) {
         explain = explain.stages[0].$cursor;
     }
-    let winningPlan = getWinningPlanFromExplain(explain);
+    let winningPlan = explain.queryPlanner.winningPlan;
     return winningPlan.queryPlan
         ? [winningPlan.queryPlan, winningPlan.slotBasedPlan]
         : [winningPlan, null];

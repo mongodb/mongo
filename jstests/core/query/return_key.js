@@ -12,7 +12,7 @@
 /**
  * Tests for returnKey.
  */
-import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 let results;
 let explain;
@@ -35,9 +35,9 @@ assert.eq(results, [{a: 3}, {a: 2}, {a: 1}]);
 
 // Check that the plan is covered.
 explain = coll.find().hint({a: 1}).sort({a: 1}).returnKey().explain();
-assert(isIndexOnly(db, getWinningPlanFromExplain(explain)));
+assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
 explain = coll.find().hint({a: 1}).sort({a: -1}).returnKey().explain();
-assert(isIndexOnly(db, getWinningPlanFromExplain(explain)));
+assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
 
 // returnKey with an in-memory sort.
 results = coll.find().hint({a: 1}).sort({b: 1}).returnKey().toArray();
@@ -47,23 +47,23 @@ assert.eq(results, [{a: 1}, {a: 2}, {a: 3}]);
 
 // Check that the plan is not covered.
 explain = coll.find().hint({a: 1}).sort({b: 1}).returnKey().explain();
-assert(!isIndexOnly(db, getWinningPlanFromExplain(explain)));
+assert(!isIndexOnly(db, explain.queryPlanner.winningPlan));
 explain = coll.find().hint({a: 1}).sort({b: -1}).returnKey().explain();
-assert(!isIndexOnly(db, getWinningPlanFromExplain(explain)));
+assert(!isIndexOnly(db, explain.queryPlanner.winningPlan));
 
 // returnKey takes precedence over other a regular inclusion projection. Should still be
 // covered.
 results = coll.find({}, {b: 1}).hint({a: 1}).sort({a: -1}).returnKey().toArray();
 assert.eq(results, [{a: 3}, {a: 2}, {a: 1}]);
 explain = coll.find({}, {b: 1}).hint({a: 1}).sort({a: -1}).returnKey().explain();
-assert(isIndexOnly(db, getWinningPlanFromExplain(explain)));
+assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
 
 // returnKey takes precedence over other a regular exclusion projection. Should still be
 // covered.
 results = coll.find({}, {a: 0}).hint({a: 1}).sort({a: -1}).returnKey().toArray();
 assert.eq(results, [{a: 3}, {a: 2}, {a: 1}]);
 explain = coll.find({}, {a: 0}).hint({a: 1}).sort({a: -1}).returnKey().explain();
-assert(isIndexOnly(db, getWinningPlanFromExplain(explain)));
+assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
 
 // Unlike other projections, sortKey meta-projection can co-exist with returnKey.
 results = coll

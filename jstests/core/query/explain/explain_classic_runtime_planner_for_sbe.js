@@ -11,7 +11,6 @@ import {
     getExecutionStages,
     getExecutionStats,
     getRejectedPlans,
-    getShardsFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_classic_runtime_planner_for_sbe;
@@ -40,9 +39,10 @@ assertExplainFormat(smallExplain, 10);
 assertExplainFormat(largeExplain, 490);
 
 function assertExplainFormat(explain, expectedNumReturned) {
-    // Null unless this is a mongos explain carrying per-shard plans.
-    const shards = getShardsFromExplain(explain);
-    const explainVersion = shards ? shards[0].explainVersion : explain.explainVersion;
+    const isSharded = explain.queryPlanner.winningPlan.hasOwnProperty("shards");
+    const explainVersion = isSharded
+        ? explain.queryPlanner.winningPlan.shards[0].explainVersion
+        : explain.explainVersion;
     assert.contains(explainVersion, ["2", "3"], explain);
 
     // Confirm the number of results is as expected

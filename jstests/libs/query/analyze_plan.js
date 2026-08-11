@@ -707,33 +707,6 @@ export function getAllPlanStages(root) {
 }
 
 /**
- * Given a stage of explain's JSON representation of a query plan, returns its immediate child
- * stages, in order.
- *
- * Use this instead of reading '.inputStage' directly: the legacy node shape nests a single child as
- * the 'inputStage' subdocument and multiple children as the 'inputStages' array, while the V3 node
- * shape always uses the array. Reading '.inputStage' therefore silently yields undefined on a V3
- * plan (queryPlanner.plans[]), even though the V3 executionStats section keeps the legacy nesting.
- */
-export function getChildStages(node) {
-    if (node.hasOwnProperty("inputStages")) {
-        return node.inputStages;
-    }
-    return node.hasOwnProperty("inputStage") ? [node.inputStage] : [];
-}
-
-/**
- * Given a stage of explain's JSON representation of a query plan, returns its only child stage,
- * asserting that it has exactly one. The node-shape-independent form of reading '.inputStage'; see
- * getChildStages().
- */
-export function getSingleChildStage(node) {
-    const children = getChildStages(node);
-    assert.eq(children.length, 1, "expected a stage with exactly one child", {node});
-    return children[0];
-}
-
-/**
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns the
  * subdocument with its stage as 'stage'. Returns null if the plan does not have such a stage.
  * Asserts that no more than one stage is a match.
