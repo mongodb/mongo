@@ -211,6 +211,14 @@ patch_aliases:
   - alias: cluster_scalability
     variant_tags: ["cluster_scalability_only"]
     task_tags: ["cluster_scalability_only"]
+  - alias: disagg
+    description: >
+      Runs the disagg (DSC) tests from every required variant that has them, a strict subset of the
+      `required` alias. Not yet a merge gate on its own as it skips packaging and the non-atlas
+      variants that a build-system or buildscripts change can break. Pair it with `required` until
+      SERVER-133156 lands the safeties.
+    variant_tags: ["disagg"]
+    task_tags: ["requires_extra_system_deps !streams_release_test"]
   - alias: streams
     description: "Runs all streams variants"
     variant: "^(enterprise-amazon2023-streams|enterprise-rhel8-streams-tsan|enterprise-rhel8-streams-aubsan)$"
