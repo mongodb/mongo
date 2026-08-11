@@ -179,6 +179,7 @@ pexpect = "^4.9.0"
 oauthlib = "^3.1.1"
 requests-oauthlib = "^2.0.0"
 packaging = "^25.0"
+protobuf = "5.29.3"
 docker = "^7.1.0"
 mongomock = "^4.1.2"
 pyjwt = "^2.9.0"
@@ -217,6 +218,7 @@ resmoke = "buildscripts.resmoke:entrypoint"
 
 [tool.ruff]
 extend-exclude = [
+    "buildscripts/bazel_spawn_pb2.py",
     "src/third_party",
 ]
 
@@ -245,6 +247,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # This file needs to support Python 3.5+ for old OS package testing
 "buildscripts/package_test_internal.py" = ["UP"]
+# Generated protobuf code is intentionally excluded from Ruff checks.
+"buildscripts/bazel_spawn_pb2.py" = ["ALL"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["buildscripts", "buildscripts/idl", "evergreen", "tools"]
@@ -255,6 +259,7 @@ include = [
     "src"
 ]
 exclude = [
+    "buildscripts/bazel_spawn_pb2.py",
     "**/third_party/**",
     "**/external/**"
 ]
