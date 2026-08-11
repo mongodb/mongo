@@ -1,6 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -639,6 +641,15 @@ TEST_F(ExternalRecordStoreTest, RejectsNegativeTopLevelSize) {
     ASSERT_THROWS_CODE(msbc.next(), DBException, 13251201);
 }
 
+// Appends 'value' to 'doc' as a little-endian int32, which is what BSON requires. Appending the
+// host representation instead would byte-swap it on big-endian platforms such as s390x, where the
+// cursor reads a size the test never intended (BF-45534).
+void appendLittleEndianInt32(std::string& doc, int32_t value) {
+    char buf[sizeof(int32_t)];
+    DataView(buf).write<LittleEndian<int32_t>>(value);
+    doc.append(buf, sizeof(buf));
+}
+
 // Builds a well-formed BSON document of exactly 'totalSize' bytes holding one string field "a".
 // Laid out by hand because BSONObjBuilder cannot produce sizes above BSONObjMaxUserSize:
 //   int32 totalSize | 0x02 (string) | "a\0" | int32 strLen | strLen bytes | 0x00 (doc terminator)
@@ -649,10 +660,10 @@ std::string makeRawStringBson(int32_t totalSize) {
 
     std::string doc;
     doc.reserve(totalSize);
-    doc.append(reinterpret_cast<const char*>(&totalSize), sizeof(totalSize));
+    appendLittleEndianInt32(doc, totalSize);
     doc.push_back('\x02');
     doc.append("a\0", 2);
-    doc.append(reinterpret_cast<const char*>(&strLen), sizeof(strLen));
+    appendLittleEndianInt32(doc, strLen);
     doc.append(strLen - 1, 'x');
     doc.push_back('\0');  // string terminator
     doc.push_back('\0');  // document terminator
