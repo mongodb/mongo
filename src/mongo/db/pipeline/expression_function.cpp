@@ -6,7 +6,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/expression/evaluate.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -81,6 +84,12 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
 
     // This element will be present when desugaring $where, only.
     BSONElement assignFirstArgToThis = expr["_internalSetObjToThis"];
+    if (assignFirstArgToThis) {
+        auto* opCtx = expCtx->getOperationContext();
+        uassert(13011000,
+                "_internalSetObjToThis cannot be set by external clients",
+                opCtx && isInternalClient(opCtx->getClient()));
+    }
 
     BSONElement langField = expr["lang"];
     uassert(31418, "The lang field must be specified.", langField);
