@@ -1231,12 +1231,13 @@ void RunCommandImpl::_epilogue() {
     // This fail point blocks all commands which are running on the specified namespace, or which
     // are present in the given list of commands, or which match a given comment. If no namespace,
     // command list, or comment are provided, then the failpoint will block all commands.
-    waitAfterCommandFinishesExecution.executeIf(
-        [&](const BSONObj& data) {
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &waitAfterCommandFinishesExecution, opCtx, "waitAfterCommandFinishesExecution");
-        },
-        [&](const BSONObj& data) {
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &waitAfterCommandFinishesExecution,
+        opCtx,
+        "waitAfterCommandFinishesExecution",
+        /*whileWaiting=*/nullptr,
+        /*nss=*/{},
+        /*extraPred=*/[&](const BSONObj& data) {
             auto& request = execContext.getRequest();
             auto commands =
                 data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();

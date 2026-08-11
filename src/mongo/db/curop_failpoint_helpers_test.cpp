@@ -164,5 +164,35 @@ TEST_F(CurOpFailpointHelpersTest, NssScopedFailPointDoesNotMatchDifferentNamespa
     ASSERT_EQ(0, timesEnteredWaitLoop);
 }
 
+TEST_F(CurOpFailpointHelpersTest, ExtraPredicateControlsWhetherFailPointRuns) {
+    FailPoint failPoint("testExtraPredicateFailPoint");
+    auto opCtx = makeOpCtx();
+    auto extraPred = [](const BSONObj& data) {
+        return data["shouldWait"].booleanSafe();
+    };
+
+    failPoint.setMode(FailPoint::alwaysOn, 0, BSON("shouldWait" << false << "sleepFor" << 1));
+    int timesEnteredWaitLoop = 0;
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &failPoint,
+        opCtx.get(),
+        "testFailpointMsg",
+        [&] { timesEnteredWaitLoop++; },
+        /*nss=*/{},
+        extraPred);
+    ASSERT_EQ(timesEnteredWaitLoop, 0);
+
+    failPoint.setMode(FailPoint::off);
+    failPoint.setMode(FailPoint::alwaysOn, 0, BSON("shouldWait" << true << "sleepFor" << 1));
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &failPoint,
+        opCtx.get(),
+        "testFailpointMsg",
+        [&] { timesEnteredWaitLoop++; },
+        /*nss=*/{},
+        extraPred);
+    ASSERT_EQ(timesEnteredWaitLoop, 1);
+}
+
 }  // namespace
 }  // namespace mongo
