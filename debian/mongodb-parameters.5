@@ -1,14 +1,13 @@
 .TH mongodb-parameters 5
 .SH MONGODB SERVER PARAMETERS FOR A SELF-MANAGED DEPLOYMENT
-Starting in MongoDB 8.0, LDAP authentication and authorization is
-deprecated. LDAP is available and will continue to operate without
-changes throughout the lifetime of MongoDB 8. LDAP will be removed in a
-future major release.
+Starting in MongoDB 8.0 and continued in 9.0, LDAP authentication and
+authorization is deprecated. LDAP will be removed in a future release.
 .PP
-For details, see \fBLDAP Deprecation\f1\&.
+To learn about alternative authentication methods, see
+\fBLDAP Authentication Alternatives\f1\&.
 .SH SYNOPSIS
 .PP
-MongoDB provides a number of configuration options that you can set
+MongoDB provides several configuration options that you can set
 using:
 .RS
 .IP \(bu 2
@@ -48,8 +47,8 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIDefault\f1: true
 .PP
-A boolean flag that allows or disallows the retrieval of
-authorization roles from client X.509 certificates.
+Allows or disallows the retrieval of authorization roles from
+client X.509 certificates.
 .PP
 This parameter is only available at startup. To set the
 parameter, use the \fBsetParameter\f1\f1 setting.
@@ -59,6 +58,12 @@ parameter, use the \fBsetParameter\f1\f1 setting.
 .RS
 .PP
 Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIDefault\f1: \fBMONGODB\-X509,SCRAM\-SHA\-1,SCRAM\-SHA\-256\f1
+.PP
+Starting in MongoDB 8.3, if \fBmongod \-\-tlsFIPSMode\f1\f1 or
+\fBmongos \-\-tlsFIPSMode\f1\f1 is enabled, \fBSCRAM\-SHA\-1\f1 is
+excluded from the effective default.
 .PP
 Specifies the list of authentication mechanisms the server accepts. Set
 this to one or more of the following values. If you specify multiple
@@ -211,7 +216,7 @@ membership authentication\f1
 to minimize downtime.
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 This parameter is only available at runtime. To set the
@@ -410,8 +415,8 @@ You must use \fBldapForceMultiThreadMode\f1\f1 to use LDAP connection
 pool. To enable LDAP connection pool, set \fBldapForceMultiThreadMode\f1\f1
 and \fBldapUseConnectionPool\f1\f1 to \fBtrue\f1\&.
 .PP
-If you have any concerns regarding your MongoDB version, OS version or
-libldap version, please contact MongoDB Support.
+If you have any concerns regarding your MongoDB version, OS version,
+or libldap version, contact MongoDB Support.
 .RE
 .PP
 \fBldapQueryPassword\f1
@@ -743,7 +748,7 @@ stapled OCSP responses.
 \fBoidcIdentityProviders\f1
 .RS
 .PP
-Available for \fBmongod\f1\f1 only.
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 Use this parameter to specify IdP (Identity Provider) configurations when
 using \fBOpenID Connect Authentication\f1\&.
@@ -1178,10 +1183,10 @@ following:
 .RS
 .IP \(bu 2
 Linux:
-\fBConfigure Self\-Managed MongoDB with Kerberos Authentication on Linux\f1
+\fBConfigure MongoDB with Kerberos Authentication on Linux\f1
 .IP \(bu 2
 Windows:
-\fBConfigure Self\-Managed MongoDB with Kerberos Authentication on Windows\f1
+\fBConfigure MongoDB with Kerberos Authentication on Windows\f1
 .RE
 .RE
 .PP
@@ -1313,7 +1318,7 @@ Set the \fBnet.ssl.mode\f1 to either \fBpreferSSL\f1 or
 \fBrequireSSL\f1\&. Useful during \fBrolling upgrade to TLS/SSL\f1 to minimize downtime.
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 This parameter is only available at runtime. To set the
@@ -1372,7 +1377,7 @@ Set to either:
 \fBrequireTLS\f1
 .RE
 .PP
-The \fBtlsMode\f1\f1 parameter is useful during \fBrolling
+Use the \fBtlsMode\f1\f1 parameter during \fBrolling
 upgrade to TLS/SSL\f1 to minimize
 downtime.
 .PP
@@ -1384,7 +1389,7 @@ parameter, use the \fBsetParameter\f1\f1 command.
 .EE
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 \fBsslMode\f1\f1
@@ -1489,7 +1494,7 @@ For example, to set \fBtlsUseSystemCA\f1 to \fBtrue\f1:
 .EE
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1563,7 +1568,7 @@ To set the parameter at startup, use the
 .PP
 You can use this parameter for a rolling update of certificates to
 new certificates that contain a new \fBDN\f1 value. See
-\fBRotate Certificates on Self\-Managed Clusters without clusterAuthX509\f1\&.
+\fBRotate Certificates on Clusters without clusterAuthX509\f1\&.
 .PP
 For more information about membership certificate requirements, see
 \fBMember Certificate Requirements\f1 for details.
@@ -1599,6 +1604,36 @@ parameter, use the \fBsetParameter\f1\f1 setting.
 .PP
 For more information on X.509 certificate validity, see RFC 5280
 4.1.2.5 (https://tools.ietf.org/html/rfc5280#section\-4.1.2.5)\&.
+.RE
+.PP
+\fBuseInternalAuthzForX509\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIDefault\f1: \fBfalse\f1
+.PP
+When set to \fBtrue\f1, clients that authenticate using X.509
+certificates always use internal authorization, even when
+LDAP authorization is configured.
+.PP
+When set to \fBfalse\f1, MongoDB uses LDAP
+authorization for X.509\-authenticated users if LDAP is
+enabled. If LDAP is not enabled, internal authorization is
+used regardless of this setting.
+.PP
+This parameter only affects X.509 authentication. It has no
+impact on other authentication mechanisms.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
 .RE
 .PP
 \fBuserCacheInvalidationIntervalSecs\f1
@@ -2217,6 +2252,84 @@ Internal Client" during run time:
 .EE
 .RE
 .PP
+\fBinternalOperationResponseMaxMS\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: integer
+.PP
+\fIDefault\f1: 0
+.PP
+Sets an approximate time limit, in milliseconds, that a
+\fBchange stream\f1 \fBaggregate\f1\f1 or
+\fBgetMore\f1\f1 command can spend scanning the oplog before it
+returns the results accumulated so far, along with an updated
+\fBresume token\f1\&.
+.PP
+By default, \fBinternalOperationResponseMaxMS\f1 is \fB0\f1, which means
+that change stream oplog scans are not time\-limited and do not return
+an updated resume token until the command fills a batch or the change
+stream reaches the end of the oplog. This setting preserves the
+behavior of MongoDB versions earlier than 9.0. The feature is
+strictly opt\-in.
+.PP
+When you set \fBinternalOperationResponseMaxMS\f1 to a value greater
+than \fB0\f1, change stream oplog scans periodically check whether the
+time limit is exceeded. If the limit is exceeded, the command returns
+the accumulated results with an updated resume token, even if the
+scan has not reached the end of the oplog or filled a batch. An
+updated resume token lets change stream consumers observe progress
+during a long scan. If an error occurs, consumers can resume from a
+later point instead of restarting the scan from the beginning.
+.PP
+Setting \fBinternalOperationResponseMaxMS\f1 requires
+\fBfeature compatibility version\f1 (fCV) \fB9.0\f1 or
+later.
+.PP
+Although the name of the \fBinternalOperationResponseMaxMS\f1
+parameter suggests broad applicability, the parameter currently
+affects only change stream queries. Setting the parameter has no
+effect on other query types.
+.PP
+Consider the following behavior when you set this parameter:
+.RS
+.IP \(bu 2
+The time limit is checked only when the query yields, so treat the
+value as approximate. The limit is not enforced after the change
+stream reaches the end of the oplog and is waiting for new writes.
+.IP \(bu 2
+Set the value substantially higher than the change stream\(aqs
+\fBmaxTimeMS\f1 or \fBmaxAwaitTimeMS\f1 value, but lower than the
+network timeout value. A value that is too low causes oplog scans
+to bail out too frequently, which limits the progress that each
+command makes and can cause the change stream to fall behind the
+write workload.
+.RE
+.PP
+To override the parameter for an individual change stream, pass the
+\fBoperationResponseMaxMS\f1 query knob in the change stream\(aqs initial
+\fBaggregate\f1\f1 command:
+.PP
+.EX
+  { querySettings: { queryKnobs: { operationResponseMaxMS: <value> } } }
+.EE
+.PP
+The following command sets \fBinternalOperationResponseMaxMS\f1 to
+\fB5000\f1 milliseconds:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, internalOperationResponseMaxMS: 5000 } )
+.EE
+.PP
+The following startup command sets
+\fBinternalOperationResponseMaxMS\f1 to \fB5000\f1 milliseconds:
+.PP
+.EX
+  mongod \-\-setParameter internalOperationResponseMaxMS=5000
+.EE
+.RE
+.PP
 \fBoverloadAwareServerSelectionEnabled\f1
 .RS
 .PP
@@ -2441,9 +2554,9 @@ or true:
   db.adminCommand( { setParameter: 1, notablescan: true } )
 .EE
 .PP
-Setting \fBnotablescan\f1\f1 to \fBtrue\f1 can be useful for testing
-application queries, for example, to identify queries that scan an
-entire collection and cannot use an index.
+Set \fBnotablescan\f1\f1 to \fBtrue\f1 to test application queries
+and identify queries that scan an entire collection and cannot use
+an index.
 .PP
 To detect unindexed queries without \fBnotablescan\f1, consider reading
 the \fBAnalyze Query Performance\f1 section and using
@@ -3062,7 +3175,7 @@ The verbosity level can range from \fB0\f1 to \fB5\f1:
 \fBInformational\f1 messages.
 .IP \(bu 2
 \fB1\f1 to \fB5\f1 increases the verbosity level to include
-\fBDebug\f1 messages.
+Debug messages.
 .RE
 .PP
 For a component, you can also specify \fB\-1\f1 to inherit the parent\(aqs
@@ -3495,9 +3608,9 @@ set the \fBdiagnosticDataCollectionDirectoryPath\f1\f1 parameter.
 The following parameters support diagnostic data capture (FTDC):
 .PP
 The default values for the diagnostic data capture interval and the
-maximum sizes are chosen to provide useful data to MongoDB engineers
+maximum sizes are configured to provide data to MongoDB engineers
 with minimal impact on performance and storage size. Typically, these
-values will only need modifications as requested by MongoDB engineers
+values need modification only when requested by MongoDB engineers
 for specific diagnostic purposes.
 .PP
 \fBdiagnosticDataCollectionDirectoryPath\f1
@@ -3682,6 +3795,28 @@ The minimum value for
 \fBdiagnosticDataCollectionPeriodMillis\f1\f1 is \fB100\f1
 milliseconds.
 .RE
+.PP
+\fBprocFileSizeLimit\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: integer
+.PP
+\fIDefault\f1: 1048576
+.PP
+If the size of a \fBprocfs\f1 file (tabular text files under \fB/proc\f1) exceeds
+this limit, Full\-Time Diagnostic Data Capture skips reading the file.
+.PP
+This parameter is only available at startup. To set the
+parameter, use the \fBsetParameter\f1\f1 setting.
+.PP
+The following example sets \fBprocFileSizeLimit\f1 to \fB1000000\f1 at startup:
+.PP
+.EX
+  mongod \-\-setParameter procFileSizeLimit=1000000
+.EE
+.RE
 .SS REPLICATION AND CONSISTENCY
 .PP
 \fBallowMultipleArbiters\f1
@@ -3794,7 +3929,7 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIDefault\f1: false
 .PP
-To configure cluster nodes for split horizon DNS (https://en.wikipedia.org/wiki/Split\-horizon_DNS), use host names
+To configure cluster nodes for split horizon DNS, use host names
 instead of IP addresses.
 .PP
 Starting in MongoDB v5.0, \fBreplSetInitiate\f1\f1 and
@@ -3806,8 +3941,8 @@ cannot be updated to use host names. The parameter only applies to the
 configuration commands.
 .PP
 \fBmongod\f1\f1 and \fBmongos\f1\f1 do not rely on
-\fBdisableSplitHorizonIPCheck\f1\f1 for validation at startup.
-Legacy \fBmongod\f1\f1 and \fBmongos\f1\f1 instances that use IP
+\fBdisableSplitHorizonIPCheck\f1 for validation at startup.
+Legacy \fBmongod\f1 and \fBmongos\f1 instances that use IP
 addresses instead of host names can start after an upgrade.
 .PP
 Instances that are configured with IP addresses log a warning to use
@@ -4713,9 +4848,7 @@ Available for \fBmongod\f1\f1 only.
 \fIDefault\f1: 0
 .PP
 Minimum number of threads to use to apply replicated operations in
-parallel. Values can range from 0 to 256 inclusive. You can only set
-\fBreplWriterMinThreadCount\f1\f1 at startup and cannot change
-this setting with the \fBsetParameter\f1\f1 command.
+parallel. Values can range from 0 to 256 inclusive.
 .PP
 Parallel application of replication operations uses up to
 \fBreplWriterThreadCount\f1\f1 threads. If
@@ -4724,11 +4857,20 @@ less than \fBreplWriterThreadCount\f1\f1, the thread pool will
 timeout idle threads until the total count of threads in the thread
 pool is equal to \fBreplWriterMinThreadCount\f1\f1\&.
 .PP
-\fBreplWriterMinThreadCount\f1\f1 must be configured with a value
-that is less than or equal to \fBreplWriterThreadCount\f1\f1\&.
+\fBreplWriterMinThreadCount\f1\f1 must be less than or equal to
+\fBreplWriterThreadCount\f1\f1\&. MongoDB rejects the update if
+you set \fBreplWriterMinThreadCount\f1\f1 to a value greater
+than \fBreplWriterThreadCount\f1\f1\&.
 .PP
-This parameter is only available at startup. To set the
-parameter, use the \fBsetParameter\f1\f1 setting.
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
 .RE
 .PP
 \fBreplWriterThreadCount\f1
@@ -4742,11 +4884,23 @@ Available for \fBmongod\f1\f1 only.
 .PP
 Maximum number of threads to use to apply replicated operations in
 parallel. Values can range from 1 to 256 inclusive. However, the
-maximum number of threads used is capped at twice the number of
+maximum number of threads used is capped at four times the number of
 available cores.
 .PP
-This parameter is only available at startup. To set the
-parameter, use the \fBsetParameter\f1\f1 setting.
+\fBreplWriterThreadCount\f1\f1 must be greater than or equal
+to \fBreplWriterMinThreadCount\f1\f1\&. MongoDB rejects the
+update if you set \fBreplWriterThreadCount\f1\f1 to a value
+less than \fBreplWriterMinThreadCount\f1\f1\&.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
 .PP
 \fBreplWriterMinThreadCount\f1\f1
 .RE
@@ -5201,7 +5355,7 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIType\f1: integer
 .PP
-\fIDefault\f1: 0
+\fIDefault\f1: 1000
 .PP
 Specifies the minimum time period (in milliseconds) between
 consecutive split and merge commands run by the \fBbalancer\f1 when
@@ -6320,7 +6474,25 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 Type: integer
 .PP
-Default: 2 64 \- 1
+Default:
+.RS
+.IP \(bu 2
+On\-prem deployments: \fB32767\f1 for both \fBmongos\f1\f1 and
+\fBmongod\f1\f1
+.IP \(bu 2
+MongoDB Atlas:
+.RS
+.IP \(bu 4
+\fB250\f1 for \fBmongos\f1\f1 routers
+.IP \(bu 4
+\fB32767\f1 for \fBmongod\f1\f1 instances
+.RE
+.RE
+.PP
+While the maximum configurable value is 2 64 \- 1, the
+defaults for both on\-premises and MongoDB Atlas deployments
+are significantly lower to optimize performance and resource
+usage.
 .PP
 Maximum number of outbound connections each TaskExecutor connection
 pool can open to any given \fBmongod\f1\f1 instance. The maximum
@@ -6801,6 +6973,90 @@ During run time, you can also set the parameter with the
 .PP
 .EX
   db.adminCommand( { setParameter: 1,  ShardingTaskExecutorPoolReplicaSetMatching: "automatic" } )
+.EE
+.RE
+.PP
+\fBshardRetryTokenBucketCapacity\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: Integer
+.PP
+\fIDefault\f1: 1000
+.PP
+Maximum number of overload retry tokens allocated for each
+shard. Each retry attempt in response to an overload error
+uses a token and each attempt that succeeds frees a token. If
+there are no tokens available, the operation fails.
+.PP
+For example, if \fBmongos\f1 retries an operation that was
+previously load shed by the shard, it uses a token in the
+retry. If the attempt succeeds, it returns the token to the
+shard plus the \fBshardRetryTokenReturnRate\f1\f1\&. If the
+attempt fails, it tries again with a new token. If it finds
+the bucket empty, it doesn\(aqt retry the operation.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following example sets the
+\fBshardRetryTokenBucketCapacity\f1 to 5000 during startup:
+.PP
+.EX
+  mongod \-\-setParameter shardRetryTokenBucketCapacity=5000
+.EE
+.PP
+During run time, you can also set the parameter with the
+\fBsetParameter\f1\f1 command:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, shardRetryTokenBucketCapacity: 5000 } )
+.EE
+.RE
+.PP
+\fBshardRetryTokenReturnRate\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: Double
+.PP
+\fIDefault\f1: 0.1
+.PP
+Return rate for shard retry tokens on successful requests.
+MongoDB allows the number of available retry tokens to
+increase over time as it processes requests.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following example sets the
+\fBshardRetryTokenBucketReturnRate\f1 to 0.25 during startup:
+.PP
+.EX
+  mongod \-\-setParameter shardRetryTokenReturnRate=0.25
+.EE
+.PP
+During run time, you can also set the parameter with the
+\fBsetParameter\f1\f1 command:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, shardRetryTokenReturnRate: 0.25 } )
 .EE
 .RE
 .PP
@@ -7418,6 +7674,57 @@ in your \fBmongos config file\f1 using the
 .RE
 .SS STORAGE PARAMETERS
 .PP
+\fBchangeStreamPreImagesSamplePointsPerUUID\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: integer
+.PP
+\fIDefault\f1: 10
+.PP
+Controls the number of samples that MongoDB draws from each user
+collection that has change stream pre\-images enabled. The minimum
+value is \fB1\f1\&.
+.PP
+MongoDB uses these samples to build the initial truncation
+information that governs pre\-image removal. Sampling documents in
+the pre\-images collection can be I/O\-intensive if the pre\-image
+data is not cached. The total number of document lookups
+depends on the number of user collections with pre\-images enabled:
+for each collection with pre\-images enabled, MongoDB draws up to
+\fBchangeStreamPreImagesSamplePointsPerUUID\f1\f1 samples from
+the pre\-images collection.
+.PP
+Lower this value to reduce I/O usage if pre\-image sampling
+consumes too many I/O resources. Lowering the value also reduces
+the accuracy of the initial truncation information, which means
+that already\-expired pre\-images may be removed later than
+expected. This applies only to pre\-images that already exist at
+the time of sampling. Pre\-images inserted after sampling always
+have accurate expiration information.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following example sets
+\fBchangeStreamPreImagesSamplePointsPerUUID\f1\f1 to \fB5\f1:
+.PP
+.EX
+  db.adminCommand( {
+     setParameter: 1,
+     changeStreamPreImagesSamplePointsPerUUID: 5
+  } )
+.EE
+.RE
+.PP
 \fBenableAutoCompaction\f1
 .RS
 .PP
@@ -7709,6 +8016,9 @@ Adjust the write retry properties by modifying the
 \fBtemporarilyUnavailableBackoffBaseMs\f1\f1 and
 \fBtemporarilyUnavailableMaxRetries\f1\f1 parameters.
 .PP
+\fBContact support\f1 if you experience any cache pressure
+issues.
+.PP
 The parameter accepts:
 .RS
 .IP \(bu 2
@@ -7773,6 +8083,9 @@ Adjust the write retry properties by modifying the
 \fBtemporarilyUnavailableBackoffBaseMs\f1\f1 and
 \fBtemporarilyUnavailableMaxRetries\f1\f1 parameters.
 .PP
+\fBContact support\f1 if you experience any cache pressure
+issues.
+.PP
 The parameter accepts:
 .RS
 .IP \(bu 2
@@ -7810,6 +8123,76 @@ To set a new value, use \fBdb.adminCommand()\f1\f1:
 .EX
   db.adminCommand( { setParameter: 1, temporarilyUnavailableMaxRetries: 5 } )
 .EE
+.RE
+.PP
+\fBthroughputProbingStallEscalationThreshold\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: integer
+.PP
+\fIDefault\f1: 3
+.PP
+Specifies the number of consecutive throughput probing intervals
+with zero throughput and at least one operation waiting for a ticket
+that must elapse before MongoDB forcibly increases concurrency to
+break the stall. This threshold guards against reacting to transient
+measurement noise.
+.PP
+The parameter accepts:
+.RS
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Value
+.IP \(bu 4
+Description
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBinteger >= 1\f1
+.IP \(bu 4
+The number of consecutive stalled intervals that must elapse
+before concurrency is increased. A value of \fB1\f1 reacts on
+the first detected interval.
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fB0\f1
+.IP \(bu 4
+Disables stall breaking entirely.
+.RE
+.RE
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+To set a new value, use \fBdb.adminCommand()\f1\f1:
+.PP
+.EX
+  db.adminCommand( {
+     setParameter: 1,
+     throughputProbingStallEscalationThreshold: 3
+  } )
+.EE
+.RS
+.IP \(bu 2
+\fBstorageEngineConcurrentReadTransactions\f1\f1
+.IP \(bu 2
+\fBstorageEngineConcurrentWriteTransactions\f1\f1
+.IP \(bu 2
+\fBqueues.execution\f1\f1
+.RE
 .RE
 .PP
 \fBupsertMaxRetryAttemptsOnDuplicateKeyError\f1
@@ -8182,6 +8565,9 @@ To set the parameter at startup, use the
 \fBsetParameter\f1\f1 setting.
 .RE
 .PP
+\fBContact support\f1 if you experience any cache pressure
+issues.
+.PP
 The following example sets
 \fBcachePressureQueryPeriodMilliseconds\f1 to \fB3000\f1 milliseconds at runtime:
 .PP
@@ -8310,6 +8696,57 @@ startup. For example:
 .EE
 .RE
 .PP
+\fBmaxConcurrentMultiDocumentTransactions\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: integer
+.PP
+\fIDefault\f1: 10000
+.PP
+The maximum number of concurrently open \fBmulti\-document
+transactions\f1 that the server allows for
+external clients at one time. When this limit is reached, the
+server rejects new multi\-document transactions from external
+clients and returns a \fBTooManyOpenTransactions\f1 error.
+.PP
+The count of open transactions is server\-wide. Process\-internal
+transactions are exempt from rejection, but still contribute to the
+total count when the server enforces the limit for external
+clients.
+.PP
+Limiting the number of concurrent multi\-document transactions can
+help prevent high numbers of idle transactions from degrading
+system performance.
+.PP
+Set this parameter to \fB0\f1 to disable the limit. The minimum value
+is \fB0\f1\&.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following example sets
+\fBmaxConcurrentMultiDocumentTransactions\f1 to \fB5000\f1 at runtime:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, maxConcurrentMultiDocumentTransactions: 5000 } )
+.EE
+.PP
+You can also set this parameter at startup. For example:
+.PP
+.EX
+  mongod \-\-setParameter maxConcurrentMultiDocumentTransactions=5000
+.EE
+.RE
+.PP
 \fBtransactionLifetimeLimitSeconds\f1
 .RS
 .PP
@@ -8407,6 +8844,9 @@ To set the parameter at runtime, use the
 To set the parameter at startup, use the
 \fBsetParameter\f1\f1 setting.
 .RE
+.PP
+\fBContact support\f1 if you experience any cache pressure
+issues.
 .PP
 For more information on WiredTiger storage, see:
 \fBstorage.wiredTiger\f1 Options\f1\&.
