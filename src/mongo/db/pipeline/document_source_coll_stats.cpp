@@ -5,7 +5,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/serialization_context.h"
 
@@ -66,6 +68,33 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
                 "$collStats supports targetAllNodes parameter only for sharded clusters",
                 pExpCtx->getInRouter() || pExpCtx->getFromRouter());
     }
+
+    // When running on a router:
+    // - If filtering is required by the metrics policy, set 'forceFiltered' to true to indicate to
+    //   shards that metrics should be filtered. This is required for filtering to work for external
+    //   clients since a router is an internal client so requests from it are not subject to metrics
+    //   filtering.
+    // - Otherwise, make sure that 'forceFiltered' is not set.
+    if (pExpCtx->getInRouter()) {
+        auto& metricsPolicyManager = MetricsPolicyManager::get(pExpCtx->getOperationContext());
+        if (metricsPolicyManager.requiresFiltering(pExpCtx->getOperationContext(),
+                                                   MetricsCategoryEnum::kCollStats,
+                                                   spec.getForceFiltered().value_or(false))) {
+            spec.setForceFiltered(true);
+        } else {
+            spec.setForceFiltered({});
+        }
+    }
+
+    // If 'forceFiltered' is set to true and this is a request from a router, assert that this node
+    // supports filtering. This is to prevent this node from silently returning unfiltered metrics.
+    if (spec.getForceFiltered().value_or(false) && pExpCtx->getFromRouter()) {
+        uassert(
+            ErrorCodes::IllegalOperation,
+            "'forceFiltered' is set by a router but this node does not support metrics filtering",
+            gFeatureFlagCollStatsMetricsFiltering.isEnabled());
+    }
+
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
 

@@ -72,3 +72,8 @@ structs:
                 description: When true, $collStats targets all nodes on each shard. When false, $collStats targets only nodes defined by read preference.
                 type: optionalBool
                 query_shape: parameter
+            forceFiltered:
+                description: When set to true, forces $collStats metrics to be filtered if the feature flag is enabled.
+                cpp_name: forceFiltered
+                type: optionalBool
+                query_shape: parameter

@@ -124,11 +124,13 @@ BSONObj CollStatsStage::makeStatsForNs(const boost::intrusive_ptr<ExpressionCont
                                    "Unable to retrieve queryExecStats in $collStats stage");
     }
 
-    // If filtering is required by the metrics policy, extract and append only the
-    // metrics matching the allowlist to a separate builder and return the resulting object.
+    // If filtering is required by the metrics policy, extract and append only the metrics matching
+    // the allowlist to a separate builder and return the result.
     auto& metricsPolicyManager = MetricsPolicyManager::get(expCtx->getOperationContext());
-    bool shouldFilter = metricsPolicyManager.requiresFiltering(
-        expCtx->getOperationContext(), MetricsCategoryEnum::kCollStats, /*forceFiltered=*/false);
+    bool shouldFilter =
+        metricsPolicyManager.requiresFiltering(expCtx->getOperationContext(),
+                                               MetricsCategoryEnum::kCollStats,
+                                               spec.getForceFiltered().value_or(false));
 
     if (shouldFilter) {
         const auto& matcher =
