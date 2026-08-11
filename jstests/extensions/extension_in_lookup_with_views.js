@@ -13,7 +13,7 @@
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {before, describe, it} from "jstests/libs/mochalite.js";
+import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 const localCollName = jsTestName() + "_local";
 const foreignCollName = jsTestName() + "_foreign";
@@ -368,10 +368,7 @@ describe("extension stages in $lookup with views", function () {
         }
     });
 
-    // TODO SERVER-133203: skipped to keep the waterfall green. $lookup against a view with a
-    // desugaring stage returns incorrect results on any topology with a mongos (it passes on a
-    // standalone mongod). Re-enable when that fix lands.
-    it.skip("$lookup with localField/foreignField against a view with a desugaring extension", function () {
+    it("$lookup with localField/foreignField against a view with a desugaring extension", function () {
         // $matchTopN desugars inside the view; the join must see the post-desugar output.
         // Join on a field that actually overlaps so a wrong result is visible.
         const viewName = jsTestName() + "_lff_desugar_view";
@@ -463,12 +460,80 @@ describe("extension stages in $lookup with views", function () {
         }
     });
 
-    // TODO SERVER-133203: skipped to keep the waterfall green. Same bug as above, reproduced with a
-    // server-side desugarer ($sortByCount) rather than an extension one. Re-enable when the fix
-    // lands.
-    it.skip("$lookup with localField/foreignField against a view with a $sortByCount desugaring stage", function () {
-        // Mirrors SERVER-133203: the view yields only the top seller ("widget"), so a local doc
-        // with product "gizmo" must not match anything.
+    it("localField/foreignField $lookup runs the join $match after a desugar extension in the view", function () {
+        // The join $match must be placed after *all* of the stages the view's $matchTopN expands
+        // into ($match, $sort, $limit), not in the middle of them. The position is carried to the
+        // shard as $_internalFieldMatchPipelineIdx, and that index counts stages of the serialized
+        // (already expanded) subpipeline -- so an index computed over the unexpanded view
+        // definition would land the join $match between the expanded $match and $limit.
+        //
+        // The view reduces its input to the single highest-ranked product, "widget". A join on
+        // "gizmo" must therefore match nothing: if the join $match ran ahead of $sort/$limit it
+        // would filter to the gizmo document first, making it the top-ranked one and joining it.
+        const salesCollName = jsTestName() + "_sales";
+        const reportsCollName = jsTestName() + "_reports";
+        const viewName = jsTestName() + "_topRanked_view";
+        const salesColl = db[salesCollName];
+        const reportsColl = db[reportsCollName];
+        salesColl.drop();
+        reportsColl.drop();
+
+        assert.commandWorked(
+            salesColl.insertMany([
+                {_id: "widget", rank: 2},
+                {_id: "gizmo", rank: 1},
+            ]),
+        );
+        assert.commandWorked(
+            reportsColl.insertMany([
+                {_id: 1, product: "gizmo"},
+                {_id: 2, product: "widget"},
+            ]),
+        );
+        assert.commandWorked(
+            db.createView(viewName, salesCollName, [
+                {$matchTopN: {filter: {}, sort: {rank: -1}, limit: 1}},
+            ]),
+        );
+
+        try {
+            const results = reportsColl
+                .aggregate([
+                    {
+                        $lookup: {
+                            from: viewName,
+                            localField: "product",
+                            foreignField: "_id",
+                            as: "t",
+                        },
+                    },
+                    {$sort: {_id: 1}},
+                ])
+                .toArray();
+
+            assert.eq(2, results.length, {results});
+            assert.eq(
+                0,
+                results[0].t.length,
+                "gizmo is not the top-ranked product and must not join",
+                {results},
+            );
+            // Positive control: the product the view does keep still joins, so the assertion above
+            // is not passing merely because the join is broken outright.
+            assert.eq(1, results[1].t.length, "widget is the top-ranked product and must join", {
+                results,
+            });
+            assert.eq("widget", results[1].t[0]._id, {results});
+        } finally {
+            assertDropCollection(db, viewName);
+            salesColl.drop();
+            reportsColl.drop();
+        }
+    });
+
+    it("$lookup with localField/foreignField against a view with a $sortByCount desugaring stage", function () {
+        // The view yields only the top seller ("widget"), so a local doc with product "gizmo" must
+        // not match anything.
         const salesCollName = jsTestName() + "_sales";
         const reportsCollName = jsTestName() + "_reports";
         const viewName = jsTestName() + "_top_seller_view";
@@ -513,6 +578,168 @@ describe("extension stages in $lookup with views", function () {
             salesColl.drop();
             reportsColl.drop();
         }
+    });
+
+    // The cases below add a user 'pipeline:' field alongside localField/foreignField. That
+    // combination is what selects the stitch-derived view prefix length rather than the
+    // whole-subpipeline one, so it exercises a different derivation of the join $match's position
+    // than the localField/foreignField-only cases above.
+    describe("desugaring view with both localField/foreignField and a user pipeline", function () {
+        let salesColl, reportsColl;
+
+        // $matchTopN expands into [$match, $sort, $limit], so the view is one written stage but
+        // three parsed sources. The view keeps only the top-ranked product, "widget".
+        const kTopRankedView = [{$matchTopN: {filter: {}, sort: {rank: -1}, limit: 1}}];
+
+        before(function () {
+            salesColl = db[jsTestName() + "_userpipe_sales"];
+            reportsColl = db[jsTestName() + "_userpipe_reports"];
+            salesColl.drop();
+            reportsColl.drop();
+            assert.commandWorked(
+                salesColl.insertMany([
+                    {_id: "widget", rank: 2},
+                    {_id: "gizmo", rank: 1},
+                ]),
+            );
+            assert.commandWorked(
+                reportsColl.insertMany([
+                    {_id: 1, product: "gizmo"},
+                    {_id: 2, product: "widget"},
+                ]),
+            );
+        });
+
+        after(function () {
+            salesColl.drop();
+            reportsColl.drop();
+        });
+
+        it("runs the join $match after the view's expansion", function () {
+            const viewName = jsTestName() + "_userpipe_view";
+            assert.commandWorked(db.createView(viewName, salesColl.getName(), kTopRankedView));
+            try {
+                const results = reportsColl
+                    .aggregate([
+                        {
+                            $lookup: {
+                                from: viewName,
+                                localField: "product",
+                                foreignField: "_id",
+                                pipeline: [{$addFields: {tag: 1}}],
+                                as: "t",
+                            },
+                        },
+                        {$sort: {_id: 1}},
+                    ])
+                    .toArray();
+                assert.eq(2, results.length, {results});
+                assert.eq(0, results[0].t.length, "gizmo is not top-ranked and must not join", {
+                    results,
+                });
+                assert.eq(1, results[1].t.length, "widget is top-ranked and must join", {results});
+                assert.eq(1, results[1].t[0].tag, "the user pipeline must still run", {results});
+            } finally {
+                assertDropCollection(db, viewName);
+            }
+        });
+
+        it("runs the join $match before a user pipeline that drops the joined-on field", function () {
+            // The join $match must land between the view's expansion and the user's $unset: after
+            // the view so 'rank' has been applied, before the $unset removes the field joined on.
+            const viewName = jsTestName() + "_userpipe_unset_view";
+            assert.commandWorked(db.createView(viewName, salesColl.getName(), kTopRankedView));
+            try {
+                const results = reportsColl
+                    .aggregate([
+                        {
+                            $lookup: {
+                                from: viewName,
+                                localField: "product",
+                                foreignField: "_id",
+                                pipeline: [{$unset: "_id"}],
+                                as: "t",
+                            },
+                        },
+                        {$sort: {_id: 1}},
+                    ])
+                    .toArray();
+                assert.eq(2, results.length, {results});
+                assert.eq(0, results[0].t.length, "gizmo must not join", {results});
+                assert.eq(1, results[1].t.length, "widget must join before $unset removes _id", {
+                    results,
+                });
+            } finally {
+                assertDropCollection(db, viewName);
+            }
+        });
+
+        it("resolves a chain of two desugaring views", function () {
+            // Both views expand, so the prefix the join $match must follow spans both expansions.
+            const baseViewName = jsTestName() + "_userpipe_base_view";
+            const topViewName = jsTestName() + "_userpipe_top_view";
+            assert.commandWorked(
+                db.createView(baseViewName, salesColl.getName(), [
+                    {$matchTopN: {filter: {}, sort: {rank: -1}, limit: 2}},
+                ]),
+            );
+            assert.commandWorked(db.createView(topViewName, baseViewName, kTopRankedView));
+            try {
+                const results = reportsColl
+                    .aggregate([
+                        {
+                            $lookup: {
+                                from: topViewName,
+                                localField: "product",
+                                foreignField: "_id",
+                                pipeline: [{$addFields: {tag: 1}}],
+                                as: "t",
+                            },
+                        },
+                        {$sort: {_id: 1}},
+                    ])
+                    .toArray();
+                assert.eq(2, results.length, {results});
+                assert.eq(0, results[0].t.length, "gizmo must not join through the view chain", {
+                    results,
+                });
+                assert.eq(1, results[1].t.length, "widget must join through the view chain", {
+                    results,
+                });
+            } finally {
+                assertDropCollection(db, topViewName);
+                assertDropCollection(db, baseViewName);
+            }
+        });
+
+        it("joins like the base collection when the view pipeline is empty", function () {
+            // An empty view definition means there is no prefix for the join $match to follow, so
+            // the placeholder must stay at the front of the subpipeline.
+            const viewName = jsTestName() + "_userpipe_empty_view";
+            assert.commandWorked(db.createView(viewName, salesColl.getName(), []));
+            try {
+                const results = reportsColl
+                    .aggregate([
+                        {
+                            $lookup: {
+                                from: viewName,
+                                localField: "product",
+                                foreignField: "_id",
+                                as: "t",
+                            },
+                        },
+                        {$sort: {_id: 1}},
+                    ])
+                    .toArray();
+                assert.eq(2, results.length, {results});
+                assert.eq(1, results[0].t.length, "an empty view joins every matching doc", {
+                    results,
+                });
+                assert.eq(1, results[1].t.length, {results});
+            } finally {
+                assertDropCollection(db, viewName);
+            }
+        });
     });
 
     it("$desugarFoo (desugar-only, expands into $testFoo with allowedInLookup=false) is rejected in $lookup subpipeline", function () {

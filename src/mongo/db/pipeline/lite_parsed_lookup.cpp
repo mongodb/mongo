@@ -214,11 +214,16 @@ bool LiteParsedLookUp::hasExtensionSearchStage() const {
 std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
     boost::optional<StageParamsPipeline> subParams;
     auto subpipelineViewPolicy = FirstStageViewApplicationPolicy::kDefaultPrepend;
+    size_t subpipelineViewPrefixLen = 0;
     if (!_pipelines.empty()) {
         subParams = _pipelines[0]->getStageParams();
         // handleView() may already have prepended the foreign view's definition here, so ask for
         // the user's first stage rather than the front stage.
         subpipelineViewPolicy = _pipelines[0]->getUserFirstStageViewApplicationPolicy();
+        // With no user `pipeline:` field the subpipeline *is* the materialized view definition, so
+        // every stage is a view stage; otherwise the view was prepended ahead of the user's stages.
+        subpipelineViewPrefixLen = _noUserPipeline ? _pipelines[0]->getStages().size()
+                                                   : _pipelines[0]->getNumPrependedViewStages();
     }
     return std::make_unique<LookUpStageParams>(*_foreignNss,
                                                _as,
@@ -234,7 +239,8 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
                                                _internalFieldMatchPipelineIdx,
                                                _internalFromIsAView,
                                                _noUserPipeline,
-                                               subpipelineViewPolicy);
+                                               subpipelineViewPolicy,
+                                               subpipelineViewPrefixLen);
 }
 
 void LiteParsedLookUp::validate(const OperationContext* opCtx) const {

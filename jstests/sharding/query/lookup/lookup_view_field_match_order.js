@@ -24,8 +24,11 @@ const kViewPipeline = [{$addFields: {b: 0}}];
 function setUpFixture(testDB, {shardForeign = false} = {}) {
     testDB.v.drop();
     testDB.vMultiStage.drop();
+    testDB.topSeller.drop();
     testDB.foreign.drop();
     testDB.local.drop();
+    testDB.sales.drop();
+    testDB.reports.drop();
 
     assert.commandWorked(testDB.foreign.insert({}));
     if (shardForeign) {
@@ -41,6 +44,48 @@ function setUpFixture(testDB, {shardForeign = false} = {}) {
         testDB.createView("vMultiStage", "foreign", [{$addFields: {t: 1}}, {$addFields: {b: 0}}]),
     );
     assert.commandWorked(testDB.local.insert({a: 0}));
+
+    // A view whose stages select which documents exist at all, so running the join $match ahead of
+    // them changes the result set rather than just the field being matched on.
+    assert.commandWorked(
+        testDB.sales.insertMany([{product: "widget"}, {product: "widget"}, {product: "gizmo"}]),
+    );
+    assert.commandWorked(
+        testDB.createView("topSeller", "sales", [{$sortByCount: "$product"}, {$limit: 1}]),
+    );
+    assert.commandWorked(testDB.reports.insert({product: "gizmo"}));
+}
+
+// The view reduces its input to the single top-selling product, "widget". "gizmo" must not join: a
+// join $match placed ahead of the view's stages would filter to the "gizmo" sales first and make it
+// the top seller.
+function assertFilteringViewJoinsNothing(testDB) {
+    const res = testDB.reports
+        .aggregate([
+            {$lookup: {from: "topSeller", localField: "product", foreignField: "_id", as: "t"}},
+        ])
+        .toArray();
+    assert.eq(0, res[0].t.length, "gizmo is not the top seller and must not join", {res});
+}
+
+// The same filtering view, but with a user pipeline alongside localField/foreignField. This takes
+// the general StageParams construction path rather than the pre-resolved-view one, so it covers a
+// different derivation of the join $match's position than the case above.
+function assertFilteringViewWithUserPipelineJoinsNothing(testDB) {
+    const res = testDB.reports
+        .aggregate([
+            {
+                $lookup: {
+                    from: "topSeller",
+                    localField: "product",
+                    foreignField: "_id",
+                    pipeline: [{$addFields: {tag: 1}}],
+                    as: "t",
+                },
+            },
+        ])
+        .toArray();
+    assert.eq(0, res[0].t.length, "gizmo is not the top seller and must not join", {res});
 }
 
 // localField/foreignField-only syntax. The view's stages are the entire subpipeline, so if the
@@ -175,6 +220,14 @@ describe("$lookup against a view runs the join $match after the view's stages", 
             assertMultiStageViewPipelineJoins(testDB);
         });
 
+        it("does not join a document the view's stages filter out", function () {
+            assertFilteringViewJoinsNothing(testDB);
+        });
+
+        it("does not join a filtered-out document when a user pipeline is present", function () {
+            assertFilteringViewWithUserPipelineJoinsNothing(testDB);
+        });
+
         it("honors the router's view-resolved spec", function () {
             assertViewResolvedSpecFromRouterJoins(internalTestDB);
         });
@@ -230,6 +283,14 @@ describe("$lookup against a view runs the join $match after the view's stages", 
 
                 it("joins across a multi-stage view pipeline", function () {
                     assertMultiStageViewPipelineJoins(testDB);
+                });
+
+                it("does not join a document the view's stages filter out", function () {
+                    assertFilteringViewJoinsNothing(testDB);
+                });
+
+                it("does not join a filtered-out document when a user pipeline is present", function () {
+                    assertFilteringViewWithUserPipelineJoinsNothing(testDB);
                 });
             });
         }

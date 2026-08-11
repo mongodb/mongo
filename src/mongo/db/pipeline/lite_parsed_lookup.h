@@ -44,7 +44,8 @@ public:
                       bool internalFromIsAView = false,
                       bool noUserPipeline = false,
                       FirstStageViewApplicationPolicy subpipelineViewPolicy =
-                          FirstStageViewApplicationPolicy::kDefaultPrepend)
+                          FirstStageViewApplicationPolicy::kDefaultPrepend,
+                      size_t subpipelineViewPrefixLen = 0)
         : DefaultStageParams(ownedBsonObj.firstElement()),
           fromNss(std::move(fromNss)),
           as(std::move(as)),
@@ -60,6 +61,7 @@ public:
           internalFromIsAView(internalFromIsAView),
           noUserPipeline(noUserPipeline),
           subpipelineViewPolicy(subpipelineViewPolicy),
+          subpipelineViewPrefixLen(subpipelineViewPrefixLen),
           _ownedOriginalBson(std::move(ownedBsonObj)) {}
 
     static const Id& id;
@@ -105,6 +107,11 @@ public:
     // prepended to the resolved pipeline.
     FirstStageViewApplicationPolicy subpipelineViewPolicy =
         FirstStageViewApplicationPolicy::kDefaultPrepend;
+
+    // How many of the leading stages in 'subpipelineStageParams' came from the resolved view
+    // definition rather than from the user's subpipeline, used by DocumentSourceLookUp as the split
+    // point when parsing the subpipeline. 0 when 'fromNss' is not a view.
+    size_t subpipelineViewPrefixLen = 0;
 
 private:
     // Owns the BSON buffer that DefaultStageParams::_originalSpec points into.

@@ -469,6 +469,18 @@ public:
     }
 
     /**
+     * The number of stages at the front of this pipeline that came from a prepended view definition
+     * rather than from the user's request. See '_numPrependedViewStages'.
+     *
+     * Since getStageParams() emits exactly one StageParams per lite-parsed stage, this is a valid
+     * index into the pipeline it returns. It is NOT a valid index into a serialized DocumentSource
+     * pipeline, because alias stages ($sortByCount, $bucket, ...) expand only at parse time.
+     */
+    size_t getNumPrependedViewStages() const {
+        return _numPrependedViewStages;
+    }
+
+    /**
      * Returns the StageParams for each stage in this pipeline.
      */
     StageParamsPipeline getStageParams() const {
@@ -585,7 +597,7 @@ private:
     // Number of stages at the front of '_stageSpecs' that came from a view definition prepended by
     // handleView(), rather than from the pipeline the user wrote. Maintained by _stitchFront() and
     // adjusted by replaceStageWith() when one of those prepended stages is desugared in place. Used
-    // by getUserFirstStageViewApplicationPolicy().
+    // by getUserFirstStageViewApplicationPolicy() and getNumPrependedViewStages().
     // TODO SERVER-120477 Remove this when legacy mongot is removed.
     size_t _numPrependedViewStages = 0;
 

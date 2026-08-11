@@ -174,7 +174,8 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          bool containsUserSpecifiedPipeline = true,
                          FirstStageViewApplicationPolicy subpipelineViewPolicy =
-                             FirstStageViewApplicationPolicy::kDefaultPrepend);
+                             FirstStageViewApplicationPolicy::kDefaultPrepend,
+                         size_t subpipelineViewPrefixLen = 0);
 
     static std::unique_ptr<Pipeline> parsePipelineFromStageParamsWithMaybeViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
@@ -419,6 +420,61 @@ private:
     void insertFieldMatchPlaceholder();
 
     /**
+     * Returns the index, in the subpipeline we serialize for a remote receiver, at which the join
+     * $match belongs.
+     *
+     * '_fieldMatchPipelineIdx' cannot be sent as-is: it indexes the unexpanded BSON of
+     * '_sharedState->resolvedPipeline', while serialization sends the parsed pipeline, in which
+     * alias stages have become their components (a view of [$sortByCount, $limit] is two stages of
+     * BSON but three parsed) and extension stages have been desugared.
+     *
+     * '_fieldMatchIntrospectionIdx' records the boundary in parsed DocumentSources, so this method
+     * only has to sum how many stages each source ahead of it serializes to.
+     */
+    size_t _serializedFieldMatchPipelineIdx(const query_shape::SerializationOptions& opts) const;
+
+    /**
+     * Whether the subpipeline should be parsed in two halves split at 'splitPoint' so that
+     * _spliceIntrospectionPipelineAtFieldMatch() can record the seam. 'numStages' is the length of
+     * the pre-parse pipeline being split, in the same units as 'splitPoint'.
+     *
+     * A 'splitPoint' of 0 needs no split: nothing precedes the join $match, so its position needs
+     * no translation either way.
+     */
+    bool _shouldSpliceAtFieldMatch(size_t splitPoint, size_t numStages) const {
+        return _canSplitAtFieldMatch && splitPoint > 0 && splitPoint <= numStages;
+    }
+
+    /**
+     * Splits 'stages' at 'splitPoint', builds a Pipeline from each half with the matching builder,
+     * and sets '_sharedState->resolvedIntrospectionPipeline' to the prefix followed by the suffix,
+     * recording the join $match's position at the seam in '_fieldMatchIntrospectionIdx'.
+     *
+     * Note that parsing the subpipeline in halves runs validateTopLevelPipeline() once per half
+     * rather than once overall, so the suffix's first stage is checked as though it led a pipeline;
+     * Pipeline::appendPipeline() then re-runs only validateCommon() on the joined result.
+     */
+    template <typename StageContainer, typename PrefixBuilder, typename SuffixBuilder>
+    void _spliceIntrospectionPipelineAtFieldMatch(StageContainer stages,
+                                                  size_t splitPoint,
+                                                  PrefixBuilder&& buildPrefix,
+                                                  SuffixBuilder&& buildSuffix) {
+        const auto seam = stages.begin() + splitPoint;
+        StageContainer prefix(std::make_move_iterator(stages.begin()),
+                              std::make_move_iterator(seam));
+        StageContainer suffix(std::make_move_iterator(seam), std::make_move_iterator(stages.end()));
+
+        auto prefixPipe = buildPrefix(std::move(prefix));
+        auto suffixPipe = suffix.empty() ? nullptr : buildSuffix(std::move(suffix));
+
+        _fieldMatchIntrospectionIdx = prefixPipe->getSources().size();
+        if (suffixPipe) {
+            prefixPipe->appendPipeline(std::move(suffixPipe));
+        }
+        _sharedState->resolvedIntrospectionPipeline = std::move(prefixPipe);
+    }
+
+    /**
      * Given a mutable document, appends execution stats such as 'totalDocsExamined',
      * 'totalKeysExamined', 'collectionScans', 'indexesUsed', etc. to it.
      */
@@ -444,6 +500,14 @@ private:
     // Indicates the index in '_sharedState->resolvedPipeline' where the local/foreignField $match
     // resides.
     boost::optional<size_t> _fieldMatchPipelineIdx;
+    // Where the join $match belongs among the parsed sources of
+    // '_sharedState->resolvedIntrospectionPipeline'; unset means '_fieldMatchPipelineIdx' is
+    // already in the units we serialize and needs no translation.
+    boost::optional<size_t> _fieldMatchIntrospectionIdx;
+    // True when '_fieldMatchPipelineIdx' splits a view prefix from the user's stages and so can be
+    // translated into '_fieldMatchIntrospectionIdx'; false for a mongot subpipeline and when a
+    // $documents/$queue source stage sits ahead of the join $match.
+    bool _canSplitAtFieldMatch = false;
 
     // Holds 'let' defined variables defined both in this stage and in parent pipelines.
     // These are copied to the '_fromExpCtx' ExpressionContext's 'variables' and
