@@ -37,10 +37,8 @@ Value evaluate(const ExpressionFunction& expr,
     if (expr.getAssignFirstArgToThis()) {
         // For defense-in-depth, The $where case will pass a field path expr carrying $$CURRENT as
         // the only element of the array.
-        auto args = argValue.getArray();
-        uassert(31422,
-                "field path $$CURRENT must be the only element in args",
-                argValue.getArrayLength() == 1);
+        const auto& args = argValue.getArray();
+        uassert(31422, "field path $$CURRENT must be the only element in args", args.size() == 1);
 
         BSONObj thisBSON = args[0].getDocument().toBson();
         scope->setObject("obj", thisBSON);

@@ -1022,7 +1022,7 @@ private:
         uassert(ErrorCodes::ConversionFailure,
                 "Converting array to BinData requires array",
                 inputValue.isArray());
-        auto arr = inputValue.getArray();
+        const auto& arr = inputValue.getArray();
         // Scan the array to pick a dtype value.
         // PackedBit can be used if all values are 0 or 1.
         dType currentType = dType::PACKED_BIT;

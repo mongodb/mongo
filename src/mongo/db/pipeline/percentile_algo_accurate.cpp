@@ -123,7 +123,7 @@ void AccuratePercentile::combine(const Value& partial) {
             str::stream() << "'partial' is expected to be an array; found " << partial.getType(),
             partial.isArray());
 
-    auto partialArray = partial.getArray();
+    const auto& partialArray = partial.getArray();
 
     _accumulatedValues.reserve(_accumulatedValues.size() + partialArray.size());
 

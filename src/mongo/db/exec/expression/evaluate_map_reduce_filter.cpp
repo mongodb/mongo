@@ -118,7 +118,7 @@ Value evaluate(const ExpressionReduce& expr,
 
     int32_t prevDepth = -1;
     size_t interval = expr.getAccumulatedValueDepthCheckInterval();
-    auto input = inputVal.getArray();
+    const auto& input = inputVal.getArray();
     for (size_t i = 0; i < input.size(); ++i) {
         checkForInterrupt();
 
