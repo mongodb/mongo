@@ -685,8 +685,12 @@ __schema_open_layered(WT_SESSION_IMPL *session)
 int
 __wt_schema_open_layered(WT_SESSION_IMPL *session)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_LAYERED_TABLE *layered;
+    char *stable_value;
+
+    stable_value = NULL;
 
     if (!__wt_conn_is_disagg(session)) {
         __wt_err(session, EINVAL, "layered table is only supported for disaggregated storage");
@@ -710,6 +714,20 @@ __wt_schema_open_layered(WT_SESSION_IMPL *session)
     WT_RET(ret);
 
     WT_RET(__wt_layered_table_manager_add_table(session, layered->ingest_btree_id));
+
+    /*
+     * A create after the step-down timestamp skips the stable constituent, so mark the handle and
+     * cursors route to ingest rather than attempting an open that cannot succeed. The schema lock
+     * held here serializes the timestamp, making the relaxed load safe.
+     */
+    conn = S2C(session);
+    if (__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) &&
+      __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE) {
+        WT_RET_NOTFOUND_OK(ret = __wt_metadata_search(session, layered->stable_uri, &stable_value));
+        if (ret == WT_NOTFOUND)
+            F_SET(layered, WT_LAYERED_TABLE_STEP_DOWN_CREATED);
+        __wt_free(session, stable_value);
+    }
 
     F_SET(layered, WT_LAYERED_TABLE_OPEN);
 

@@ -287,7 +287,7 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
     WT_SESSION *session;
     STEPDOWN_ARGS stepdown_args;
     wt_thread_t alter_tid, background_compact_tid, backup_tid, checkpoint_tid, compact_tid,
-      follower_tid, hs_tid, import_tid, random_tid;
+      follower_tid, follower_read_no_ts_tid[2], hs_tid, import_tid, random_tid;
     wt_thread_t key_rotation_tid, stepdown_tid, timestamp_tid;
     int64_t fourths, quit_fourths, thread_ops;
     uint32_t i;
@@ -309,6 +309,7 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
     memset(&checkpoint_tid, 0, sizeof(checkpoint_tid));
     memset(&compact_tid, 0, sizeof(compact_tid));
     memset(&follower_tid, 0, sizeof(follower_tid));
+    memset(follower_read_no_ts_tid, 0, sizeof(follower_read_no_ts_tid));
     memset(&hs_tid, 0, sizeof(hs_tid));
     memset(&import_tid, 0, sizeof(import_tid));
     memset(&key_rotation_tid, 0, sizeof(key_rotation_tid));
@@ -388,8 +389,17 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
         testutil_check(__wt_thread_create(NULL, &backup_tid, backup, NULL));
     if (GV(OPS_COMPACTION))
         testutil_check(__wt_thread_create(NULL, &compact_tid, compact, NULL));
-    if (disagg_is_multi_node() && !g.disagg_leader)
+    if (disagg_is_multi_node() && !g.disagg_leader) {
         testutil_check(__wt_thread_create(NULL, &follower_tid, follower, NULL));
+        /*
+         * The snapshot readers fail a run when a transaction's reads change under it, so they are
+         * configured rather than implied by a multi-node run.
+         */
+        if (GV(DISAGG_SNAPSHOT_READ))
+            for (i = 0; i < WT_ELEMENTS(follower_read_no_ts_tid); ++i)
+                testutil_check(
+                  __wt_thread_create(NULL, &follower_read_no_ts_tid[i], follower_read_no_ts, NULL));
+    }
     if (GV(OPS_HS_CURSOR))
         testutil_check(__wt_thread_create(NULL, &hs_tid, hs_cursor, NULL));
     if (GV(IMPORT))
@@ -531,8 +541,12 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
         testutil_check(__wt_thread_join(NULL, &compact_tid));
     if (GV(DISAGG_STEPDOWN_ASYNC) && stepdown_triggered)
         testutil_check(__wt_thread_join(NULL, &stepdown_tid));
-    if (disagg_is_multi_node() && !g.disagg_leader)
+    if (disagg_is_multi_node() && !g.disagg_leader) {
         testutil_check(__wt_thread_join(NULL, &follower_tid));
+        if (GV(DISAGG_SNAPSHOT_READ))
+            for (i = 0; i < WT_ELEMENTS(follower_read_no_ts_tid); ++i)
+                testutil_check(__wt_thread_join(NULL, &follower_read_no_ts_tid[i]));
+    }
     if (GV(OPS_HS_CURSOR))
         testutil_check(__wt_thread_join(NULL, &hs_tid));
     if (GV(IMPORT))

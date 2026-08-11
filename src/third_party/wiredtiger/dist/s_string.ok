@@ -1309,6 +1309,7 @@ lldb
 llll
 llu
 llvm
+ln
 loadshed
 loadtext
 loc
@@ -1906,6 +1907,7 @@ unbuffered
 uncached
 uncheckpointed
 unconfigured
+uncontended
 uncustomized
 undef
 undeferred
@@ -1950,6 +1952,7 @@ unsized
 unspawned
 unsynchronised
 unterminated
+untimestamped
 untyped
 unvalued
 unvisited

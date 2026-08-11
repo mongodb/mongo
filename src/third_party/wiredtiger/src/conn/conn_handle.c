@@ -26,6 +26,7 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     TAILQ_INIT(&conn->fhqh);                                       /* File list */
     TAILQ_INIT(&conn->disaggregated_storage.shared_metadata_qh);   /* Shared metadata list */
     TAILQ_INIT(&conn->disaggregated_storage.pending_crypt_key_qh); /* Pending pushed crypt keys */
+    TAILQ_INIT(&conn->disaggregated_storage.deferred_ckpt_qh);     /* Deferred checkpoints */
 
     /* Prefetch. */
     WT_RET(__wti_conn_prefetch_init(session));
@@ -51,6 +52,8 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     /* Spinlocks. */
     WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
     WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
+    WT_RET(__wt_spin_init(session, &conn->disaggregated_storage.deferred_ckpt_lock,
+      "disagg deferred checkpoint queue"));
     WT_RET(__wt_spin_init(session, &conn->background_compact.lock, "background compact"));
     WT_RET(__wt_spin_init(
       session, &conn->disaggregated_storage.shared_metadata_queue_lock, "update shared metadata"));
@@ -115,6 +118,7 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_spin_destroy(session, &conn->background_compact.lock);
     __wt_spin_destroy(session, &conn->block_lock);
     __wt_spin_destroy(session, &conn->checkpoint_lock);
+    __wt_spin_destroy(session, &conn->disaggregated_storage.deferred_ckpt_lock);
     __wt_spin_destroy(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
     __wti_disagg_pending_crypt_key_clear(session);
     __wt_spin_destroy(session, &conn->disaggregated_storage.pending_crypt_key_lock);

@@ -517,10 +517,25 @@ int
 snap_repeat_txn(TINFO *tinfo)
 {
     SNAP_OPS *current;
+    WT_CURSOR *cursor;
+    u_int i;
 
     /* If we wrapped the buffer, we can't repeat operations. */
     if (tinfo->repeatable_wrap)
         return (0);
+
+    /*
+     * With disaggregated storage, close the operation cursors so the repeated reads go through
+     * freshly opened ones. A checkpoint pickup may have completed while this transaction was
+     * running, and a cursor opened after the pickup must still read the transaction's snapshot;
+     * only a cursor's first use exercises that path.
+     */
+    if (g.disagg_storage_config)
+        for (i = 0; i < WT_MAX(ntables, 1); ++i)
+            if ((cursor = tinfo->cursors[i]) != NULL) {
+                testutil_check(cursor->close(cursor));
+                tinfo->cursors[i] = NULL;
+            }
 
     /* Check from the first operation we saved to the last. */
     for (current = tinfo->snap_first;; ++current) {

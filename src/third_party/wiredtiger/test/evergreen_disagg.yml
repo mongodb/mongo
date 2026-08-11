@@ -78,7 +78,7 @@ functions:
               export MSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
               export TESTUTIL_MSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ TSan ]]; then
-              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3:history_size=7:print_suppressions=0:suppressions=$WT_TOPDIR/test/evergreen/tsan_warnings.supp"
               export TESTUTIL_TSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
               export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"
@@ -582,6 +582,78 @@ variables:
           format_args: disagg.mode=switch debug.disagg_slow_truncate_follower=off runs.timer=10:15 ops.prepare=0 ops.verify=1 runs.mirror=1
           times: 5
 
+  - &format-stress-test-disagg-multi
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # FIXME-WT-17278 Enable removes in disagg multi mode once the related issues have been resolved.
+          format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000 ops.pct.delete=0
+          times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
+
+  - &format-stress-test-disagg-multi-data-validation
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # Validate data with a non-layered table.
+          # FIXME-WT-17278 Enable removes in disagg multi mode once the related issues have been resolved.
+          format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 disagg.preserve=1 runs.ops=500000:2000000 ops.pct.delete=0
+          times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
+
+  # FIXME-WT-17278 We can get rid of this task once the issues related to removes in disagg multi mode have been resolved.
+  - &format-stress-test-disagg-multi-delete-enabled
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000
+          times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
+
+  # FIXME-WT-17278 We can get rid of this task once the issues related to removes in disagg multi mode have been resolved.
+  - &format-stress-test-disagg-multi-delete-enabled-data-validation
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # Validate data with a non-layered table.
+          format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 disagg.preserve=1 runs.ops=500000:2000000
+          times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
+
+  # Long-running randomized stress for snapshot transactions without a read timestamp racing
+  # checkpoint pickups on a follower: multi-node runs verify pre-commit re-reads through freshly
+  # opened cursors, exercising the stable bind checks and the deferral queue. The operation mix is
+  # left to format: the reader threads do their own reads, so what matters from the workers is
+  # churn, and a randomized mix covers more shapes across the iterations than a pinned one.
+  - &format-stress-test-disagg-snapshot
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # The row and operation counts are load-bearing, not decoration: the reproduction needs
+          # enough rows for a scan window to contain a changed key, and enough operations for a
+          # pickup to land inside a reader's transaction. Trimming them to the defaults stops the
+          # stress reproducing the violation at all.
+          format_args: >-
+            disagg.multi=1 disagg.multi_validation=1 disagg.snapshot_read=1
+            runs.predictable_replay=1 runs.rows=50000:200000 runs.ops=500000:2000000
+          times: 10
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
+
   - &timestamp-abort-test-disagg
     depends_on:
         - name: compile
@@ -818,6 +890,36 @@ tasks:
   - <<: *format-stress-test-disagg-switch-fast-truncate
     name: format-stress-test-disagg-switch-fast-truncate-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+  - <<: *format-stress-test-disagg-multi
+    name: format-stress-test-disagg-multi-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+  - <<: *format-stress-test-disagg-multi
+    name: format-stress-test-disagg-multi-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-data-validation
+    name: format-stress-test-disagg-multi-validation-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-data-validation
+    name: format-stress-test-disagg-multi-validation-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-delete-enabled
+    name: format-stress-test-disagg-multi-delete-enabled-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+  - <<: *format-stress-test-disagg-multi-delete-enabled
+    name: format-stress-test-disagg-multi-delete-enabled-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-delete-enabled-data-validation
+    name: format-stress-test-disagg-multi-delete-enabled-validation-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-delete-enabled-data-validation
+    name: format-stress-test-disagg-multi-delete-enabled-validation-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-snapshot
+    name: format-stress-test-disagg-snapshot-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-snapshot
+    name: format-stress-test-disagg-snapshot-2
+    tags: ["stress-test-disagg-fail"]
 
   - <<: *timestamp-abort-test-disagg
     name: timestamp-abort-test-disagg-1

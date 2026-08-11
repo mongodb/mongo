@@ -867,7 +867,24 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
      * Do the bookkeeping. We cannot fail this function past this point, so that our bookkeeping is
      * correct and self-consistent.
      */
+    /*
+     * A leader's own checkpoint is never delivered to itself, so nothing else advances the
+     * checkpoint generation for it. Without this, a node that steps down would answer reads from
+     * this checkpoint while the generation still named an older one, and the first snapshot
+     * established before any checkpoint arrives would pin less than the node has adopted: the
+     * stable bind check then fails. Waiting for the next delivery to advance it is not enough,
+     * because the node serves reads in the meantime.
+     *
+     * No snapshot can observe the two stores out of step: only a follower's snapshots pin a
+     * checkpoint, and a role change cannot interleave here because a step-down takes the checkpoint
+     * lock this path already holds. The order still matters if that ever changes, so advance the
+     * generation first, matching a delivery, which advances it before the adoption publishes the
+     * LSN: a pin is then never older than the LSN a stable bind compares it against.
+     */
+    __wt_gen_advance(session, WT_GEN_DISAGG_CKPT, WT_DISAGG_CKPT_GEN(lsn));
     __wt_atomic_store_uint64_release(&disagg->last_checkpoint_meta_lsn, lsn);
+    /* A leader's own checkpoint is implicitly adopted; keep the statistic in step. */
+    WT_STAT_CONN_SET(session, disagg_checkpoint_meta_lsn, (int64_t)lsn);
     __wt_atomic_store_uint64_release(&disagg->last_checkpoint_timestamp, checkpoint_timestamp);
     __wt_atomic_store_uint64_release(&disagg->last_checkpoint_oldest_timestamp, oldest_timestamp);
     __wt_atomic_store_uint64_release(&disagg->last_checkpoint_schema_epoch, schema_epoch);

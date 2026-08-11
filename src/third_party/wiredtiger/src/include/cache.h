@@ -86,12 +86,13 @@ typedef enum {
 #define WT_DSK_CACHE_READABLE(state) \
     ((state) == WT_DSK_CACHE_ACTIVE || (state) == WT_DSK_CACHE_READONLY)
 
-#define WT_DSK_CACHE_CAN_READ(state, btree) \
-    (WT_DSK_CACHE_READABLE(state) && F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+#define WT_DSK_CACHE_CAN_READ(state, btree)                                    \
+    (WT_DSK_CACHE_READABLE(state) && F_ISSET(btree, WT_BTREE_DISAGGREGATED) && \
+      !WT_DHANDLE_IS_CHECKPOINT((btree)->dhandle))
 
-#define WT_DSK_CACHE_CAN_WRITE(state, btree) \
-    ((state) == WT_DSK_CACHE_ACTIVE && F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-
+#define WT_DSK_CACHE_CAN_WRITE(state, btree)                                     \
+    ((state) == WT_DSK_CACHE_ACTIVE && F_ISSET(btree, WT_BTREE_DISAGGREGATED) && \
+      !WT_DHANDLE_IS_CHECKPOINT((btree)->dhandle))
 struct __wt_shared_dsk_cache {
     wt_shared uint8_t state;
     wt_shared uint64_t readonly_since; /* Seconds when the cache went read-only on step-up. */

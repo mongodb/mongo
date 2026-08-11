@@ -1306,6 +1306,14 @@ err:
     WT_TRET(__wt_session_array_walk(
       conn->default_session, __conn_rollback_transaction_callback, true, NULL));
 
+    /*
+     * Stop the deferred checkpoint pickup server before transactional activity shuts down: an
+     * adoption runs metadata transactions, so any in-flight adoption must complete while snapshot
+     * visibility checks still operate. Stop it before the session-closing walk below as well: it
+     * opens a session per adoption, which must not race a walk that closes sessions.
+     */
+    WT_TRET(__wti_disagg_deferred_pickup_server_destroy(session));
+
     __wt_verbose_info(session, WT_VERB_RECOVERY_PROGRESS, "%s", "closing all running sessions.");
     /* Close open, external sessions. */
     WT_TRET(

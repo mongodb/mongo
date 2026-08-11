@@ -221,6 +221,18 @@ struct __wt_disagg_pending_crypt_key {
 #define WT_DISAGG_LSN_NONE 0 /* The LSN is not set. */
 
 /*
+ * The checkpoint generation encoding of an LSN: the LSN plus one. The generation manager starts
+ * connection generations at one and reserves zero in a session slot for "not entered", so the
+ * initial generation is exactly the encoding of "no checkpoint" and a published pin of an
+ * un-delivered node covers nothing. A pin covers an LSN when its generation exceeds it, and a
+ * generation-active query at an LSN finds exactly the pins that do not cover it.
+ */
+#define WT_DISAGG_CKPT_GEN(lsn) ((lsn) + 1)
+
+/* The backoff between retries of a blocked checkpoint adoption. */
+#define WT_DISAGG_RETRY_SLEEP_USECS (100 * WT_THOUSAND)
+
+/*
  * WT_DISAGGREGATED_CHECKPOINT_TRACK --
  *      A relationship between the checkpoint order number and the history timestamp.
  */
@@ -281,6 +293,17 @@ struct __wt_repair {
 };
 
 /*
+ * WT_DISAGG_DEFERRED_CKPT --
+ *      A checkpoint whose adoption is deferred while transactional snapshots that predate it are
+ *      active.
+ */
+struct __wt_disagg_deferred_ckpt {
+    uint64_t lsn; /* Checkpoint metadata LSN */
+    char *meta;   /* Checkpoint metadata configuration */
+    TAILQ_ENTRY(__wt_disagg_deferred_ckpt) q;
+};
+
+/*
  * WT_DISAGGREGATED_STORAGE --
  *      Configuration and the current state for disaggregated storage, which tells the Block Manager
  *      how to find remote object storage. This is a separate configuration from layered tables.
@@ -294,6 +317,31 @@ struct __wt_disaggregated_storage {
 
     wt_shared uint64_t last_checkpoint_meta_lsn; /* The LSN of the last checkpoint metadata. */
     wt_shared uint64_t last_materialized_lsn;    /* The LSN of the last materialized page. */
+
+    /*
+     * The LSN of the newest checkpoint received, published before its adoption begins. A snapshot
+     * established after a checkpoint's arrival may pin it even though the adoption has not
+     * completed: arrival implies the checkpoint's content is already replayed into the ingest
+     * tables, so such a snapshot covers it. Only ever moves forward.
+     */
+    wt_shared uint64_t pending_checkpoint_meta_lsn;
+
+    /*
+     * Checkpoints whose adoption is deferred while transactional snapshots that predate them are
+     * active, oldest first. Keeping every checkpoint not yet adopted lets the node adopt
+     * incrementally up to the newest one no active snapshot predates, so a reader only ever blocks
+     * the checkpoints newer than its own snapshot.
+     */
+    WT_SPINLOCK deferred_ckpt_lock; /* Protects the deferred checkpoint queue */
+    TAILQ_HEAD(__wt_disagg_deferred_ckpt_qh, __wt_disagg_deferred_ckpt) deferred_ckpt_qh;
+
+    /*
+     * Server adopting a deferred checkpoint once the transactions blocking it end; it sleeps until
+     * a pinning transaction finishes or a checkpoint is deferred.
+     */
+    WT_CONDVAR *deferred_pickup_cond;
+    WT_SESSION_IMPL *deferred_pickup_session;
+    wt_thread_t deferred_pickup_tid;
 
     wt_timestamp_t cur_checkpoint_timestamp; /* The timestamp of the in-progress checkpoint. */
     wt_timestamp_t cur_schema_epoch;         /* The schema epoch of the in-progress checkpoint. */
@@ -383,6 +431,9 @@ struct __wt_disaggregated_storage {
      * (really, per block-manager) so it's easy to accidentally miss a file when doing it that way,
      * e.g. if the config parsing does anything even slightly off the beaten track.
      */
+    /* Set while the deferred pickup server thread exists; placed here to pack with the flags. */
+    bool deferred_pickup_tid_set;
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_DISAGG_NO_LOCAL_DURABILITY 0x1u
 #define WT_DISAGG_STABLE_TOMBSTONE_ENCODING 0x2u
@@ -1289,14 +1340,15 @@ struct __wt_connection_impl {
 #define WT_CONN_SERVER_CHECKPOINT_CLEANUP 0x0004u
 #define WT_CONN_SERVER_CHECKPOINT_RECONCILE_THREADS 0x0008u
 #define WT_CONN_SERVER_COMPACT 0x0010u
-#define WT_CONN_SERVER_EVICTION 0x0020u
-#define WT_CONN_SERVER_LAYERED 0x0040u
-#define WT_CONN_SERVER_LOG 0x0080u
-#define WT_CONN_SERVER_PREFETCH 0x0100u
-#define WT_CONN_SERVER_RTS 0x0200u
-#define WT_CONN_SERVER_STATISTICS 0x0400u
-#define WT_CONN_SERVER_SWEEP 0x0800u
-#define WT_CONN_SERVER_TIERED 0x1000u
+#define WT_CONN_SERVER_DISAGG_PICKUP 0x0020u
+#define WT_CONN_SERVER_EVICTION 0x0040u
+#define WT_CONN_SERVER_LAYERED 0x0080u
+#define WT_CONN_SERVER_LOG 0x0100u
+#define WT_CONN_SERVER_PREFETCH 0x0200u
+#define WT_CONN_SERVER_RTS 0x0400u
+#define WT_CONN_SERVER_STATISTICS 0x0800u
+#define WT_CONN_SERVER_SWEEP 0x1000u
+#define WT_CONN_SERVER_TIERED 0x2000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 

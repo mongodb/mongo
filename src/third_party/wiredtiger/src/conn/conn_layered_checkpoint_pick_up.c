@@ -8,6 +8,8 @@
 
 #include "wt_internal.h"
 
+static int __disagg_adopt_deferred_checkpoint_meta(WT_SESSION_IMPL *, const char *, size_t);
+
 /*
  * __layered_create_missing_ingest_table --
  *     Create a missing ingest table from an existing layered table configuration.
@@ -972,6 +974,334 @@ __raise_next_file_id(WT_SESSION_IMPL *session, const WT_DISAGG_METADATA *metadat
 }
 
 /*
+ * __disagg_defer_checkpoint --
+ *     Remember a checkpoint whose adoption is deferred while transactional snapshots that predate
+ *     it are active, taking ownership of the metadata copy. The queue has its own lock, so
+ *     deliveries never wait behind an adoption.
+ */
+static int
+__disagg_defer_checkpoint(WT_SESSION_IMPL *session, char **meta_strp, uint64_t lsn)
+{
+    WT_DECL_RET;
+    WT_DISAGG_DEFERRED_CKPT *entry, *newest;
+    WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
+
+    __wt_spin_lock(session, &disagg->deferred_ckpt_lock);
+
+    /* A checkpoint at or behind the newest deferred one carries nothing new. */
+    newest = TAILQ_LAST(&disagg->deferred_ckpt_qh, __wt_disagg_deferred_ckpt_qh);
+    if (newest != NULL && lsn <= newest->lsn)
+        goto err;
+
+    /*
+     * Remember every checkpoint not yet adopted, oldest first: a reader only blocks the checkpoints
+     * newer than its snapshot, so keeping the intermediate ones lets the node adopt up to the
+     * newest checkpoint its readers permit instead of waiting for all of them to finish. Adopting
+     * an entry discards all older ones, which bounds the queue.
+     */
+    WT_ERR(__wt_calloc_one(session, &entry));
+    entry->lsn = lsn;
+    entry->meta = *meta_strp;
+    *meta_strp = NULL;
+    TAILQ_INSERT_TAIL(&disagg->deferred_ckpt_qh, entry, q);
+    WT_STAT_CONN_INCR(session, disagg_checkpoint_defer);
+
+err:
+    __wt_spin_unlock(session, &disagg->deferred_ckpt_lock);
+    return (ret);
+}
+
+/*
+ * __disagg_clear_deferred_checkpoint --
+ *     Discard the deferred checkpoints covered by the given LSN.
+ */
+static void
+__disagg_clear_deferred_checkpoint(WT_SESSION_IMPL *session, uint64_t adopted_lsn)
+{
+    WT_DISAGG_DEFERRED_CKPT *entry;
+    WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
+
+    __wt_spin_lock(session, &disagg->deferred_ckpt_lock);
+    while ((entry = TAILQ_FIRST(&disagg->deferred_ckpt_qh)) != NULL && entry->lsn <= adopted_lsn) {
+        TAILQ_REMOVE(&disagg->deferred_ckpt_qh, entry, q);
+        __wt_free(session, entry->meta);
+        __wt_free(session, entry);
+    }
+    __wt_spin_unlock(session, &disagg->deferred_ckpt_lock);
+}
+
+/*
+ * __wti_disagg_clear_deferred_checkpoint_all --
+ *     Discard every deferred checkpoint unconditionally, e.g. on a role change: the new role makes
+ *     none of them adoptable, regardless of LSN.
+ */
+void
+__wti_disagg_clear_deferred_checkpoint_all(WT_SESSION_IMPL *session)
+{
+    __disagg_clear_deferred_checkpoint(session, UINT64_MAX);
+}
+
+/*
+ * __disagg_deferred_ckpt_queued --
+ *     Check whether any checkpoint is waiting to be adopted. This is an unsafe check to avoid
+ *     claiming the queue lock: only the pickup server asks, to choose how long to sleep, and an
+ *     answer stale in either direction only delays a look at the queue. This is in its own function
+ *     to suppress the TSan warning.
+ */
+static WT_INLINE bool
+__disagg_deferred_ckpt_queued(WT_SESSION_IMPL *session)
+{
+    WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
+
+    return (!TAILQ_EMPTY(&disagg->deferred_ckpt_qh));
+}
+
+/*
+ * __disagg_deferred_pickup_run_chk --
+ *     Check to decide if the deferred pickup server should continue running.
+ */
+static WT_INLINE bool
+__disagg_deferred_pickup_run_chk(WT_SESSION_IMPL *session)
+{
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_DISAGG_PICKUP));
+}
+
+/*
+ * __disagg_deferred_pickup_server --
+ *     Background server adopting deferred checkpoints once the transactions blocking them end. It
+ *     sleeps until a pinning transaction finishes or a checkpoint is deferred.
+ */
+static WT_THREAD_RET
+__disagg_deferred_pickup_server(void *arg)
+{
+    WT_DECL_RET;
+    WT_DISAGGREGATED_STORAGE *disagg;
+    WT_SESSION_IMPL *session;
+    int last_error;
+
+    session = arg;
+    disagg = &S2C(session)->disaggregated_storage;
+    last_error = 0;
+
+    for (;;) {
+        /*
+         * Sleep until signalled: a deferral arms the server and a pin release may unblock an
+         * adoption. While anything is queued, wake periodically as a backstop against a wakeup lost
+         * to a release racing a delivery; this is not an adoption deadline.
+         */
+        __wt_cond_wait(session, disagg->deferred_pickup_cond,
+          __disagg_deferred_ckpt_queued(session) ? 10 * WT_MILLION : 0,
+          __disagg_deferred_pickup_run_chk);
+
+        /*
+         * A conflict with a concurrent pickup (EBUSY) clears on its own, and the blockers that
+         * would produce the next signal may already be gone, so spin here rather than returning to
+         * an indefinite wait that could strand the queue. Back off so the conflict is not hot.
+         *
+         * Any other failure may well be permanent, so report it once and go back to waiting: the
+         * queue stays armed and the backstop retries it, without a warning per retry.
+         */
+        while (__disagg_deferred_pickup_run_chk(session)) {
+            ret = __wti_disagg_deferred_pickup_retry(session, false);
+            if (ret != EBUSY)
+                break;
+
+            __wt_sleep(0, WT_DISAGG_RETRY_SLEEP_USECS);
+        }
+        if (ret != last_error) {
+            last_error = ret;
+            if (ret != 0)
+                __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE,
+                  "deferred checkpoint pickup failed: %s", __wt_strerror(session, ret, NULL, 0));
+        }
+
+        if (!__disagg_deferred_pickup_run_chk(session))
+            break;
+    }
+
+    return (WT_THREAD_RET_VALUE);
+}
+
+/*
+ * __wt_disagg_deferred_pickup_signal --
+ *     Wake the deferred pickup server: called when a pinning transaction finishes and when a
+ *     checkpoint is deferred. A released pin generation is passed so releases that cannot unblock
+ *     any deferred checkpoint skip the wakeup; zero signals unconditionally.
+ */
+void
+__wt_disagg_deferred_pickup_signal(WT_SESSION_IMPL *session, uint64_t released_gen)
+{
+    WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
+
+    /*
+     * Every deferred checkpoint was delivered, so a pin taken at or after the newest delivered
+     * checkpoint was blocking none of them. This needs no state of its own and skips the wakeup for
+     * the common case: a reader that began after the last delivery, which is every reader once
+     * nothing is deferred.
+     */
+    if (released_gen != 0 && released_gen >= __wt_gen(session, WT_GEN_DISAGG_CKPT))
+        return;
+    if (disagg->deferred_pickup_cond != NULL)
+        __wt_cond_signal(session, disagg->deferred_pickup_cond);
+}
+
+/*
+ * __wti_disagg_deferred_pickup_server_create --
+ *     Start the deferred checkpoint pickup server.
+ */
+int
+__wti_disagg_deferred_pickup_server_create(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn = S2C(session);
+    WT_DECL_RET;
+    WT_DISAGGREGATED_STORAGE *disagg = &conn->disaggregated_storage;
+
+    if (disagg->deferred_pickup_session != NULL)
+        return (0);
+
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_DISAGG_PICKUP);
+
+    WT_ERR(__wt_open_internal_session(
+      conn, "disagg-pickup-server", false, 0, 0, &disagg->deferred_pickup_session));
+    /* The condition variable survives a server stop: see the comment in the destroy function. */
+    if (disagg->deferred_pickup_cond == NULL)
+        WT_ERR(__wt_cond_alloc(disagg->deferred_pickup_session, "disagg deferred pickup",
+          &disagg->deferred_pickup_cond));
+    WT_ERR(__wt_thread_create(disagg->deferred_pickup_session, &disagg->deferred_pickup_tid,
+      __disagg_deferred_pickup_server, disagg->deferred_pickup_session));
+    disagg->deferred_pickup_tid_set = true;
+    return (0);
+
+err:
+    WT_TRET(__wti_disagg_deferred_pickup_server_destroy(session));
+    return (ret);
+}
+
+/*
+ * __wti_disagg_deferred_pickup_server_destroy --
+ *     Stop the deferred checkpoint pickup server.
+ */
+int
+__wti_disagg_deferred_pickup_server_destroy(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn = S2C(session);
+    WT_DECL_RET;
+    WT_DISAGGREGATED_STORAGE *disagg = &conn->disaggregated_storage;
+
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_DISAGG_PICKUP);
+    if (disagg->deferred_pickup_tid_set) {
+        __wt_cond_signal(session, disagg->deferred_pickup_cond);
+        WT_TRET(__wt_thread_join(session, &disagg->deferred_pickup_tid));
+        disagg->deferred_pickup_tid_set = false;
+    }
+    /*
+     * Do not destroy the condition variable: a step-up stops the server on a live system, and any
+     * session releasing a pinned snapshot may be signaling it concurrently. Signaling with no
+     * waiter is harmless, so the condition variable lives until the connection tears down
+     * disaggregated storage single-threaded.
+     */
+    if (disagg->deferred_pickup_session != NULL) {
+        WT_TRET(__wt_session_close_internal(disagg->deferred_pickup_session));
+        disagg->deferred_pickup_session = NULL;
+    }
+    return (ret);
+}
+
+/*
+ * __disagg_deferred_copy --
+ *     Copy out the deferred checkpoint to adopt: the newest one outright when forced (a step-up
+ *     must continue from the newest checkpoint), otherwise the newest one no active snapshot
+ *     predates. The walk relies on ordering along the oldest-first queue: a snapshot predating a
+ *     checkpoint predates every newer one, so it stops at the first blocked entry, having
+ *     remembered the newest one that passed. The queue has its own lock, so the copy never waits
+ *     behind an adoption. Returns WT_NOTFOUND when no entry may be adopted.
+ */
+static int
+__disagg_deferred_copy(WT_SESSION_IMPL *session, bool force, char **metap, uint64_t *lsnp)
+{
+    WT_DECL_RET;
+    WT_DISAGG_DEFERRED_CKPT *entry, *selected;
+    WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
+    uint64_t oldest_gen;
+
+    *metap = NULL;
+    *lsnp = WT_DISAGG_LSN_NONE;
+
+    /*
+     * The oldest pin decides the whole queue, so scan the sessions once, before taking the queue
+     * lock. A snapshot established after the scan pins a generation newer than every delivered
+     * checkpoint, so it cannot be one this selection needed to see.
+     */
+    oldest_gen = force ? 0 : __wt_gen_oldest(session, WT_GEN_DISAGG_CKPT);
+
+    __wt_spin_lock(session, &disagg->deferred_ckpt_lock);
+    selected = NULL;
+    TAILQ_FOREACH (entry, &disagg->deferred_ckpt_qh, q) {
+        /* A pin that does not cover the LSN means a snapshot predates it. */
+        if (!force && oldest_gen <= entry->lsn)
+            break;
+        selected = entry;
+    }
+    if (selected == NULL)
+        ret = WT_NOTFOUND;
+    else {
+        *lsnp = selected->lsn;
+        /*
+         * Copy the metadata: the adoption runs without this lock, and a concurrent adoption's
+         * pruning may free the entry meanwhile.
+         */
+        ret = __wt_strdup(session, selected->meta, metap);
+    }
+    __wt_spin_unlock(session, &disagg->deferred_ckpt_lock);
+    return (ret);
+}
+
+/*
+ * __wti_disagg_deferred_pickup_retry --
+ *     Retry adopting a checkpoint whose pickup was deferred for active snapshots. Called
+ *     periodically so a deferred checkpoint is adopted once the snapshots that blocked it end.
+ */
+int
+__wti_disagg_deferred_pickup_retry(WT_SESSION_IMPL *session, bool force)
+{
+    WT_DECL_RET;
+    WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
+    uint64_t deferred_lsn;
+    char *meta_copy = NULL;
+
+    deferred_lsn = WT_DISAGG_LSN_NONE;
+
+    /* Having nothing to adopt is the common case, not a failure. */
+    ret = __disagg_deferred_copy(session, force, &meta_copy, &deferred_lsn);
+    if (ret == WT_NOTFOUND)
+        return (0);
+    WT_RET(ret);
+
+    ret = __disagg_adopt_deferred_checkpoint_meta(session, meta_copy, strlen(meta_copy));
+
+    /*
+     * A concurrent pickup may have adopted this checkpoint, or a newer one, between the copy above
+     * and the adoption, which leaves the deferred pickup satisfied. That race has two outcomes: the
+     * adoption rejects the now-older checkpoint (EINVAL), or its metadata merge conflicts with the
+     * winner and unrolls (EBUSY). Anything else is a real failure, and a panic in particular must
+     * not be swallowed here just because the winner published its LSN first.
+     */
+    if ((ret == EINVAL || ret == EBUSY) &&
+      __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_meta_lsn) >= deferred_lsn) {
+        /*
+         * Prune the superseded entries: the copy above is not atomic with adoptions, so an entry
+         * covered by a concurrent adoption may linger and would otherwise be selected again.
+         */
+        __disagg_clear_deferred_checkpoint(
+          session, __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_meta_lsn));
+        ret = 0;
+    }
+
+    __wt_free(session, meta_copy);
+    return (ret);
+}
+
+/*
  * __disagg_finalize_checkpoint_meta --
  *     Finalize checkpoint bookkeeping after processing shared metadata entries.
  */
@@ -988,6 +1318,11 @@ __disagg_finalize_checkpoint_meta(WT_SESSION_IMPL *session,
      */
     __wt_atomic_store_uint64_release(
       &conn->disaggregated_storage.last_checkpoint_meta_lsn, ckpt_meta->metadata_lsn);
+    /* Publish the adopted LSN as a statistic: adoption is asynchronous when deferred. */
+    WT_STAT_CONN_SET(session, disagg_checkpoint_meta_lsn, (int64_t)ckpt_meta->metadata_lsn);
+
+    /* The adoption satisfies any pending deferred pickup this checkpoint covers. */
+    __disagg_clear_deferred_checkpoint(session, ckpt_meta->metadata_lsn);
 
     /* Update the timestamps. */
     __wt_atomic_store_uint64_release(
@@ -1049,10 +1384,12 @@ err:
 
 /*
  * __disagg_pick_up_checkpoint --
- *     Pick up a new checkpoint.
+ *     Pick up a new checkpoint. A caller that raced another adoption expects to find the checkpoint
+ *     superseded and says so, which reports that outcome quietly rather than as an error.
  */
 static int
-__disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta)
+__disagg_pick_up_checkpoint(
+  WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta, bool superseded_ok)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -1080,11 +1417,19 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     /* We should not pick up a checkpoint with an earlier LSN. */
     current_meta_lsn =
       __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_meta_lsn);
-    if (ckpt_meta->metadata_lsn < current_meta_lsn)
+    if (ckpt_meta->metadata_lsn < current_meta_lsn) {
+        if (superseded_ok) {
+            __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
+              "Skipping a superseded checkpoint: current metadata LSN = %" PRIu64
+              ", new metadata LSN = %" PRIu64,
+              current_meta_lsn, ckpt_meta->metadata_lsn);
+            return (EINVAL);
+        }
         WT_RET_MSG(session, EINVAL,
           "Attempting to pick up an older checkpoint: current metadata LSN = %" PRIu64
           ", new metadata LSN = %" PRIu64,
           current_meta_lsn, ckpt_meta->metadata_lsn);
+    }
     is_startup = current_meta_lsn == WT_DISAGG_LSN_NONE;
 
     /*
@@ -1179,14 +1524,6 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     WT_ERR(ret);
 
     /*
-     * Part 3: Do the bookkeeping.
-     *
-     * The merge is complete: from here a failure would leave the local metadata resolving to the
-     * new checkpoint while the published LSN still admits only the old one, and there is no
-     * compensation short of completing the adoption, so it is fatal.
-     */
-
-    /*
      * A no-epoch checkpoint clears the whole queue. An epoch-world node never picks up a no-epoch
      * checkpoint, so its live stable epoch is unset here and the queue holds no published entries
      * to lose.
@@ -1194,7 +1531,17 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     WT_ASSERT(session,
       metadata.schema_epoch != WT_SCHEMA_EPOCH_NONE ||
         __wt_get_stable_disaggregated_schema_epoch(session) == WT_SCHEMA_EPOCH_NONE);
+
+    /*
+     * Part 3: Do the bookkeeping.
+     */
     __wti_disagg_shared_metadata_queue_prune(session, metadata.schema_epoch);
+
+    /*
+     * The merge is complete: a failure from here leaves the local metadata resolving to the new
+     * checkpoint while the published LSN still admits only the old one, and there is no
+     * compensation short of completing the adoption, so it is fatal.
+     */
     if ((ret = __disagg_finalize_checkpoint_meta(session, ckpt_meta, &metadata)) != 0)
         WT_ERR_PANIC(
           session, ret, "failed to adopt a checkpoint after completing its metadata merge");
@@ -1280,19 +1627,19 @@ err:
 }
 
 /*
- * __wti_disagg_pick_up_checkpoint_meta --
- *     Pick up a new checkpoint from metadata config.
+ * __disagg_pick_up_checkpoint_meta --
+ *     Pick up a new checkpoint from metadata config, shared by the loud and the racing callers.
  */
-int
-__wti_disagg_pick_up_checkpoint_meta(
-  WT_SESSION_IMPL *session, const char *meta_data, size_t meta_data_size)
+static int
+__disagg_pick_up_checkpoint_meta(WT_SESSION_IMPL *session, const char *meta_data,
+  size_t meta_data_size, bool force, bool superseded_ok)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     WT_DISAGGREGATED_STORAGE *disagg;
     WT_DISAGG_CHECKPOINT_META ckpt_meta;
     WT_SESSION_IMPL *internal_session;
-    uint64_t metadata_checksum;
+    uint64_t metadata_checksum, pending_lsn;
     char *meta_str;
     bool encoding, prev_adopted, prev_encoding;
 
@@ -1348,11 +1695,46 @@ __wti_disagg_pick_up_checkpoint_meta(
       encoding ? "a checkpoint compatible version predating the unescaped format" :
                  "the checkpoint compatible version"));
 
+    /*
+     * Publish the incoming checkpoint before doing anything else: a snapshot established from here
+     * on may pin it even though the adoption has not completed, because the arrival of checkpoint
+     * metadata implies the content is already replayed into the ingest tables. This keeps such
+     * snapshots from being refused at their first stable open once the adoption completes, and from
+     * blocking a deferred adoption. Only ever move it forward.
+     */
+    disagg = &S2C(session)->disaggregated_storage;
+    for (;;) {
+        pending_lsn = __wt_atomic_load_uint64_acquire(&disagg->pending_checkpoint_meta_lsn);
+        if (ckpt_meta.metadata_lsn <= pending_lsn ||
+          __wt_atomic_cas_uint64(
+            &disagg->pending_checkpoint_meta_lsn, pending_lsn, ckpt_meta.metadata_lsn))
+            break;
+    }
+    /* Advance the checkpoint generation snapshots pin. */
+    __wt_gen_advance(session, WT_GEN_DISAGG_CKPT, WT_DISAGG_CKPT_GEN(ckpt_meta.metadata_lsn));
+    /* Publish the delivered LSN as a statistic; the adopted LSN is published separately. */
+    WT_STAT_CONN_SET(session, disagg_checkpoint_delivered_lsn,
+      (int64_t)__wt_atomic_load_uint64_relaxed(&disagg->pending_checkpoint_meta_lsn));
+
+    /*
+     * Defer adopting a newer checkpoint while transactional snapshots that predate it are active,
+     * so those readers keep opening stable cursors instead of being refused. Forced pickups
+     * (startup, step-up) are never deferred.
+     */
+    if (!force &&
+      ckpt_meta.metadata_lsn > __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_meta_lsn) &&
+      __wt_gen_active(session, WT_GEN_DISAGG_CKPT, ckpt_meta.metadata_lsn)) {
+        WT_ERR(__disagg_defer_checkpoint(session, &meta_str, ckpt_meta.metadata_lsn));
+        /* Wake the pickup server: the delivery may already be adoptable. */
+        __wt_disagg_deferred_pickup_signal(session, 0);
+        goto err;
+    }
+
     WT_ERR(__wt_open_internal_session(
       S2C(session), "checkpoint-pick-up", false, 0, 0, &internal_session));
     /* Now actually pick up the checkpoint. */
-    WT_WITH_CHECKPOINT_LOCK(
-      internal_session, ret = __disagg_pick_up_checkpoint(internal_session, &ckpt_meta));
+    WT_WITH_CHECKPOINT_LOCK(internal_session,
+      ret = __disagg_pick_up_checkpoint(internal_session, &ckpt_meta, superseded_ok));
     WT_ERR(ret);
 
     /* Record the picked-up checkpoint's version fields; a failed pickup leaves them unchanged. */
@@ -1377,6 +1759,32 @@ err:
         WT_TRET(__wt_session_close_internal(internal_session));
     __wt_free(session, meta_str);
     return (ret);
+}
+
+/*
+ * __wti_disagg_pick_up_checkpoint_meta --
+ *     Pick up a new checkpoint from metadata config. A checkpoint older than the adopted one is an
+ *     error here: nothing races this caller, so going backwards means the checkpoint is wrong.
+ */
+int
+__wti_disagg_pick_up_checkpoint_meta(
+  WT_SESSION_IMPL *session, const char *meta_data, size_t meta_data_size, bool force)
+{
+    return (__disagg_pick_up_checkpoint_meta(session, meta_data, meta_data_size, force, false));
+}
+
+/*
+ * __disagg_adopt_deferred_checkpoint_meta --
+ *     Adopt a checkpoint whose pickup was deferred. Finding it superseded is the expected outcome
+ *     of losing a race with a concurrent adoption, so it is reported without an error message; the
+ *     caller decides whether the race left the deferred pickup satisfied. The deferral check is
+ *     skipped: the selection already decided this checkpoint may be adopted.
+ */
+static int
+__disagg_adopt_deferred_checkpoint_meta(
+  WT_SESSION_IMPL *session, const char *meta_data, size_t meta_data_size)
+{
+    return (__disagg_pick_up_checkpoint_meta(session, meta_data, meta_data_size, true, true));
 }
 
 #ifdef HAVE_UNITTEST

@@ -233,6 +233,8 @@ struct __wt_dhandle_clear_event;
 typedef struct __wt_dhandle_clear_event WT_DHANDLE_CLEAR_EVENT;
 struct __wt_dhandle_clear_log;
 typedef struct __wt_dhandle_clear_log WT_DHANDLE_CLEAR_LOG;
+struct __wt_disagg_deferred_ckpt;
+typedef struct __wt_disagg_deferred_ckpt WT_DISAGG_DEFERRED_CKPT;
 struct __wt_disagg_metadata_op;
 typedef struct __wt_disagg_metadata_op WT_DISAGG_METADATA_OP;
 struct __wt_disagg_pending_crypt_key;

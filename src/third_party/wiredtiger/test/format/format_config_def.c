@@ -203,6 +203,9 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"disagg.stepdown_async", "use async step-down instead of synchronous", C_IGNORE | C_BOOL, 0, 0,
     0, V_GLOBAL_DISAGG_STEPDOWN_ASYNC},
 
+  {"disagg.snapshot_read", "run background transactions checking snapshot isolation on a follower",
+    C_IGNORE | C_BOOL, 0, 0, 0, V_GLOBAL_DISAGG_SNAPSHOT_READ},
+
   {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_DISK_CHECKSUM},
 

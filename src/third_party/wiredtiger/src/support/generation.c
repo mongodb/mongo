@@ -40,6 +40,10 @@ __gen_name(int which)
         return ("commit");
     case WT_GEN_HAS_CKPT_SNAPSHOT:
         return ("checkpoint-snapshot");
+    case WT_GEN_DISAGG_CKPT:
+        return ("disagg-checkpoint");
+    case WT_GEN_DISAGG_ROLE:
+        return ("disagg-role");
     default:
         break;
     }
@@ -240,11 +244,12 @@ __gen_oldest_callback(
 }
 
 /*
- * __gen_oldest --
- *     Return the oldest generation in use for the resource.
+ * __wt_gen_oldest --
+ *     Return the oldest generation in use for the resource, the connection's current generation
+ *     when no session is using it.
  */
-static uint64_t
-__gen_oldest(WT_SESSION_IMPL *session, int which)
+uint64_t
+__wt_gen_oldest(WT_SESSION_IMPL *session, int which)
 {
     WT_CONNECTION_IMPL *conn;
     WT_GENERATION_COOKIE cookie;
@@ -377,7 +382,7 @@ __stash_discard(WT_SESSION_IMPL *session, int which)
     session_stash = &session->stash[which];
 
     /* Get the resource's oldest generation. */
-    oldest = __gen_oldest(session, which);
+    oldest = __wt_gen_oldest(session, which);
 
     for (i = 0, stash = session_stash->list; i < session_stash->cnt; ++i, ++stash) {
         if (stash->p == NULL)

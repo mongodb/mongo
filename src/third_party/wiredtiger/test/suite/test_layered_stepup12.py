@@ -79,7 +79,7 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     scenarios = make_scenarios(disagg_storages, transitions, ops)
 
-    conn_config = 'disaggregated=(role="leader",drain_threads=1)'
+    conn_config = 'disaggregated=(role="leader",drain_threads=1,lose_all_my_data=true)'
 
     def _race_scenario(self):
         # Create and populate the table as leader so the drop scenarios have something to drop.

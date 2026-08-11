@@ -152,9 +152,9 @@ from packing import pack, unpack
         PyObject_SetAttrString($result, "is_version_cursor",
             PyBool_FromLong(version_cursor != 0));
         PyObject_SetAttrString($result, "key_format",
-            PyString_InternFromString((*$1)->key_format));
+            PyUnicode_InternFromString((*$1)->key_format));
         PyObject_SetAttrString($result, "value_format",
-            PyString_InternFromString((*$1)->value_format));
+            PyUnicode_InternFromString((*$1)->value_format));
 
         Py_XINCREF($result);
         (*$1)->lang_private = $result;
@@ -178,9 +178,9 @@ from packing import pack, unpack
         PyObject_SetAttrString(o, "data", PyBytes_FromStringAndSize(
             $1[i].data.data, $1[i].data.size));
         PyObject_SetAttrString(o, "offset",
-            PyInt_FromLong($1[i].offset));
+            PyLong_FromSize_t($1[i].offset));
         PyObject_SetAttrString(o, "size",
-            PyInt_FromLong($1[i].size));
+            PyLong_FromSize_t($1[i].size));
         PyList_SetItem($result, i, o);
     }
 }
@@ -198,9 +198,9 @@ from packing import pack, unpack
         PyObject_SetAttrString(o, "data", PyUnicode_FromStringAndSize(
             $1[i].data.data, $1[i].data.size));
         PyObject_SetAttrString(o, "offset",
-            PyInt_FromLong($1[i].offset));
+            PyLong_FromSize_t($1[i].offset));
         PyObject_SetAttrString(o, "size",
-            PyInt_FromLong($1[i].size));
+            PyLong_FromSize_t($1[i].size));
         PyList_SetItem($result, i, o);
     }
 }
@@ -302,7 +302,7 @@ from packing import pack, unpack
      * but that's awkward, since we don't have the file system and session.
      */
     for (i = 0; i < *$2; i++) {
-        PyObject *o = PyString_InternFromString(list[i]);
+        PyObject *o = PyUnicode_InternFromString(list[i]);
         PyList_SetItem($result, i, o);
         free(list[i]);
     }
@@ -338,7 +338,7 @@ from packing import pack, unpack
 }
 
 %typemap(argout) wt_off_t * {
-    $result = PyInt_FromLong(*$1);
+    $result = PyLong_FromLongLong(*$1);
 }
 
 %typemap(freearg) (WT_MODIFY *, int *nentriesp) {
@@ -388,7 +388,7 @@ from packing import pack, unpack
         Py_DECREF(dataobj);
 
         WT_GETATTR(offsetobj, modobj, "offset");
-        if ((offset = PyInt_AsLong(offsetobj)) < 0) {
+        if ((offset = PyLong_AsLong(offsetobj)) < 0) {
             Py_DECREF(offsetobj);
             Py_DECREF(modobj);
             freeModifyArray(modarray);
@@ -399,7 +399,7 @@ from packing import pack, unpack
         Py_DECREF(offsetobj);
 
         WT_GETATTR(sizeobj, modobj, "size");
-        if ((size = PyInt_AsLong(sizeobj)) < 0) {
+        if ((size = PyLong_AsLong(sizeobj)) < 0) {
             Py_DECREF(sizeobj);
             Py_DECREF(modobj);
             freeModifyArray(modarray);

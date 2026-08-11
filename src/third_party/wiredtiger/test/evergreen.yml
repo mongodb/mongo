@@ -66,7 +66,7 @@ functions:
               export MSAN_OPTIONS="$COMMON_SAN_OPTIONS"
               export TESTUTIL_MSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ TSan ]]; then
-              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS"
+              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$WT_TOPDIR/test/evergreen/tsan_warnings.supp"
               export TESTUTIL_TSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
               export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"

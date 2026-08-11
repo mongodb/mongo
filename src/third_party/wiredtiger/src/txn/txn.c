@@ -110,6 +110,25 @@ __wt_txn_import_snapshot(WT_SESSION_IMPL *session, const WT_TXN_SNAPSHOT *snapsh
 }
 
 /*
+ * __txn_snapshot_leave_disagg --
+ *     Leave the disaggregated generations a snapshot entered, at the end of its era: its release, a
+ *     refresh, or a failed post-build validation. Releasing a pinned checkpoint generation may
+ *     unblock a deferred pickup, so wake the pickup server after the pin is cleared.
+ */
+static WT_INLINE void
+__txn_snapshot_leave_disagg(WT_SESSION_IMPL *session)
+{
+    uint64_t released_gen;
+
+    if ((released_gen = __wt_session_gen(session, WT_GEN_DISAGG_CKPT)) != 0) {
+        __wt_session_gen_leave(session, WT_GEN_DISAGG_CKPT);
+        __wt_disagg_deferred_pickup_signal(session, released_gen);
+    }
+    if (__wt_session_gen(session, WT_GEN_DISAGG_ROLE) != 0)
+        __wt_session_gen_leave(session, WT_GEN_DISAGG_ROLE);
+}
+
+/*
  * __wt_txn_release_snapshot --
  *     Release the snapshot in the current transaction.
  */
@@ -133,6 +152,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 
     __wt_atomic_store_uint64_v_relaxed(&txn_shared->metadata_pinned, WT_TXN_NONE);
     __wt_atomic_store_uint64_v_relaxed(&txn_shared->pinned_id, WT_TXN_NONE);
+    __txn_snapshot_leave_disagg(session);
     F_CLR(txn, WT_TXN_REFRESH_SNAPSHOT);
     F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
 
@@ -200,6 +220,71 @@ done:
 }
 
 /*
+ * __txn_snapshot_record_disagg --
+ *     Record the disaggregated state a snapshot about to be built is consistent with: the role, the
+ *     role-change generation, and (on a follower) the pinned checkpoint generation.
+ */
+static WT_INLINE void
+__txn_snapshot_record_disagg(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn = S2C(session);
+
+    /*
+     * Enter the role-change generation: the published generation is the snapshot's recorded role
+     * era, compared at every stable bind. Both generations entered here are left wherever the
+     * snapshot's era ends: a failed validation, a snapshot refresh, or the snapshot's release.
+     */
+    __wt_session_gen_enter(session, WT_GEN_DISAGG_ROLE);
+    /*
+     * Acquire-read the role: it is published with a release store after the role-change generation
+     * is bumped, so a snapshot that records the new role also observes the new generation and
+     * cannot validate against the era it just left.
+     */
+    session->txn->disagg_role_leader =
+      __wt_atomic_load_bool_acquire(&conn->layered_table_manager.leader);
+
+    /*
+     * Only a follower pins a checkpoint: its stable binds compare against the pin. A leader's
+     * stable table is written with local transaction ids and needs no pin, and its own checkpoints
+     * advance the checkpoint generation, so pinning would rebuild every snapshot that overlaps a
+     * checkpoint completion. A snapshot from before a step-down is left unpinned and refused if it
+     * binds checkpoint content afterwards.
+     *
+     * The checkpoint generation is the newest checkpoint delivered plus one, advanced when the
+     * metadata arrives, even before its adoption completes: arrival implies its content is already
+     * replayed into the ingest tables, so this snapshot covers it. Until the adoption completes,
+     * the pin is simply newer than anything the stable can bind, which is always safe.
+     *
+     * Entering the generation publishes the pin with the manager's full-barrier recheck, pairing
+     * with a delivery's generation advance: a delivery either observes the pin published here, or
+     * the validation after the build observes the delivery and retries.
+     */
+    if (!session->txn->disagg_role_leader)
+        __wt_session_gen_enter(session, WT_GEN_DISAGG_CKPT);
+}
+
+/*
+ * __txn_snapshot_validate_disagg --
+ *     Return whether the disaggregated state recorded before the snapshot was built is still
+ *     current, so the snapshot and the pin describe the same world. A pickup or role change that
+ *     landed during the build fails this and the caller retries: rebuilding is equivalent to
+ *     releasing the snapshot and acquiring a new one before anything was read under it, and it
+ *     cannot repeat indefinitely because each retry requires another adoption during the
+ *     microseconds of a build, while adoptions are seconds apart.
+ */
+static WT_INLINE bool
+__txn_snapshot_validate_disagg(WT_SESSION_IMPL *session)
+{
+    if (__wt_gen(session, WT_GEN_DISAGG_ROLE) != __wt_session_gen(session, WT_GEN_DISAGG_ROLE) ||
+      __wt_atomic_load_bool_acquire(&S2C(session)->layered_table_manager.leader) !=
+        session->txn->disagg_role_leader)
+        return (false);
+    if (session->txn->disagg_role_leader)
+        return (true);
+    return (__wt_gen(session, WT_GEN_DISAGG_CKPT) == __wt_session_gen(session, WT_GEN_DISAGG_CKPT));
+}
+
+/*
  * __txn_get_snapshot_int --
  *     Allocate a snapshot, optionally update our shared txn ids.
  */
@@ -212,12 +297,23 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
     WT_TXN_SHARED *s, *txn_shared;
     uint64_t current_id, id, pinned_id, prev_oldest_id, snapshot_gen;
     uint32_t i, n, session_cnt;
+    bool record_disagg;
 
     conn = S2C(session);
     txn = session->txn;
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
-    n = 0;
+
+    /*
+     * Record the disaggregated state the snapshot is consistent with before building it, and
+     * validate it afterwards, retrying the build on a change: the retried snapshot postdates the
+     * change, so the transaction reads consistently instead of being refused at its first stable
+     * open. Loading before and validating after brackets the snapshot, so it can never pin state
+     * that changed after it was built. Timestamped readers are excluded: they stay consistent
+     * through the history store regardless of which checkpoint they read.
+     */
+    record_disagg = update_shared_state && __wt_conn_is_disagg(session) &&
+      txn_shared->read_timestamp == WT_TS_NONE;
 
     /* Fast path if we already have the current snapshot. */
     if ((snapshot_gen = __wt_session_gen(session, WT_GEN_HAS_SNAPSHOT)) != 0) {
@@ -227,10 +323,25 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
           snapshot_gen == __wt_gen(session, WT_GEN_HAS_SNAPSHOT))
             return;
 
-        /* Leave the generation here and enter again later to acquire a new snapshot. */
+        /*
+         * Leave the generations here and enter again later to acquire a new snapshot. The
+         * disaggregated generations are left only when this build re-records them: a temporary
+         * snapshot taken to be released or restored (an eviction refresh) keeps the transaction's
+         * pins, which are older than the temporary snapshot and thus conservatively cover it.
+         */
         __wt_session_gen_leave(session, WT_GEN_HAS_SNAPSHOT);
+        if (record_disagg)
+            __txn_snapshot_leave_disagg(session);
     }
     __wt_session_gen_enter(session, WT_GEN_HAS_SNAPSHOT);
+
+retry:
+    n = 0;
+    if (record_disagg) {
+        __txn_snapshot_record_disagg(session);
+        /* Widen the window between recording the pin and building the snapshot. */
+        WT_DIAGNOSTIC_YIELD;
+    }
 
     /* We're going to scan the table: wait for the lock. */
     __wt_readlock(session, &txn_global->rwlock);
@@ -318,6 +429,21 @@ done:
         __wt_atomic_store_uint64_v_relaxed(&txn_shared->pinned_id, pinned_id);
     __wt_readunlock(session, &txn_global->rwlock);
     __txn_sort_snapshot(session, n, current_id);
+
+    if (record_disagg) {
+        /* Widen the window a delivery during the build must be caught in. */
+        WT_DIAGNOSTIC_YIELD;
+        if (!__txn_snapshot_validate_disagg(session)) {
+            WT_STAT_CONN_INCR(session, disagg_snapshot_rebuild);
+            __txn_snapshot_leave_disagg(session);
+            goto retry;
+        }
+        /*
+         * Widen the window between the validation passing and the snapshot's first use: a delivery
+         * landing here must observe the published pin and defer its adoption.
+         */
+        WT_DIAGNOSTIC_YIELD;
+    }
 }
 
 /*

@@ -796,22 +796,25 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
         if (__wti_rec_need_split(r, key->len + val->len))
             WT_ERR(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
 
-        /*
-         * Copy the key and value onto the page. val->buf.data may point directly into ref's WT_ADDR
-         * block_cookie; hold the hazard pointer until after both copies.
-         */
+        /* Copy the key and value onto the page. */
         __wti_rec_image_copy(session, r, key);
         __wti_rec_image_copy(session, r, val);
+
+        /*
+         * The value may point directly into the child's address cookie, which a concurrent split
+         * rewrite is free to discard once the child is unpinned, so keep the hazard pointer until
+         * the delta has taken its own copy.
+         */
+        if (build_delta && prev_dirty && !retain_onpage)
+            WT_ERR(__rec_pack_delta_row_int(session, r, key, val, &ta));
         WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+
         if (page_del != NULL)
             WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
         WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
 
         /* Update compression state. */
         __rec_key_state_update(r, false);
-
-        if (build_delta && prev_dirty && !retain_onpage)
-            WT_ERR(__rec_pack_delta_row_int(session, r, key, val, &ta));
 
         /*
          * Set the ref dirty state to clean if there were no concurrent changes while reconciling

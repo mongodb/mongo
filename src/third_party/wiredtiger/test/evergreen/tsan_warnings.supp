@@ -22,6 +22,16 @@ race:__conn_open_session
 # __tiered_queue_peek_empty is intentionally unsafe to avoid taking the tiered lock when it's not needed.
 race:__tiered_queue_peek_empty
 
+# __disagg_deferred_ckpt_queued is intentionally unsafe to avoid taking the deferred checkpoint queue
+# lock: a stale answer only delays the pickup server's next look at the queue.
+race:__disagg_deferred_ckpt_queued
+
+# SQLite reads the WAL-index header without synchronization on purpose: it keeps two redundant copies
+# plus a checksum and retries when they disagree, which TSan cannot see. The palite page log runs SQLite
+# in WAL mode, so any concurrent reader and writer of the page log reaches this.
+race:walIndexTryHdr
+race:walIndexWriteHdr
+
 # The ref track code is diagnostic only and allows for races
 race:__ref_track_state
 

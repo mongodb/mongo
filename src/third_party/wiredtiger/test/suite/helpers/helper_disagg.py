@@ -29,7 +29,7 @@
 
 import re
 import wiredtiger
-import functools, json, os, shutil, subprocess, wttest
+import functools, json, os, shutil, subprocess, time, wttest
 from run import wt_builddir
 
 # These routines help run the various page log sources used by disaggregated storage.
@@ -225,10 +225,34 @@ class DisaggConfigMixin:
         (_, _, _, m) = self.disagg_get_complete_checkpoint_ext(conn)
         return m
 
-    # Let the follower pick up the latest checkpoint
+    # Deliver the newest checkpoint to the follower. Adopting it is asynchronous while transaction
+    # snapshots that predate it are active, so a caller that needs the adoption observed must end
+    # those snapshots and deliver again.
     def disagg_advance_checkpoint(self, conn_follower, conn_leader=None):
         m = self.disagg_get_complete_checkpoint_meta(conn_leader)
         conn_follower.reconfigure(f'disaggregated=(checkpoint_meta="{m}")')
+
+    # Wait until every checkpoint delivered to the follower has been adopted. A caller that asserts
+    # on state the adoption produces needs this: a delivery that raced a snapshot's release is
+    # adopted by the pickup server rather than inline. Snapshots that predate a delivery block it
+    # indefinitely, so end them before waiting.
+    def disagg_wait_for_adoption(self, conn_follower, timeout=60):
+        session = conn_follower.open_session('')
+        try:
+            deadline = time.time() + timeout
+            while True:
+                cursor = session.open_cursor('statistics:')
+                delivered = cursor[wiredtiger.stat.conn.disagg_checkpoint_delivered_lsn][2]
+                adopted = cursor[wiredtiger.stat.conn.disagg_checkpoint_meta_lsn][2]
+                cursor.close()
+                if adopted >= delivered:
+                    return
+                if time.time() > deadline:
+                    raise Exception(f'checkpoint {delivered} not adopted within {timeout}s, ' +
+                                    f'newest adopted is {adopted}')
+                time.sleep(0.01)
+        finally:
+            session.close()
 
     # Switch the leader and the follower
     def disagg_switch_follower_and_leader(self, conn_follower, conn_leader=None):
@@ -808,6 +832,33 @@ class DisaggSchemaEpochMixin:
         tablename = uri[len('layered:'):]
         return 'file:' + tablename + '.wt_stable'
 
+    def stable_in_local_metadata(self, conn, uri):
+        """
+        Return True if uri's stable constituent has a row in conn's local metadata.
+
+        This reads the metadata table directly, so unlike opening a cursor on the constituent the
+        answer cannot be confused with a transactional failure.
+        """
+        session = conn.open_session('')
+        cursor = session.open_cursor('metadata:')
+        cursor.set_key(self.stable_uri(uri))
+        found = cursor.search() != wiredtiger.WT_NOTFOUND
+        cursor.close()
+        session.close()
+        return found
+
+    def step_down(self, conn=None):
+        """Reconfigure the given (or main) connection to the follower role."""
+        if conn is None:
+            conn = self.conn
+        conn.reconfigure('disaggregated=(role="follower")')
+
+    def step_up(self, conn=None):
+        """Reconfigure the given (or main) connection to the leader role."""
+        if conn is None:
+            conn = self.conn
+        conn.reconfigure('disaggregated=(role="leader")')
+
     def uri_in_shared_metadata(self, conn, uri):
         """Return True if uri's stable constituent is present in the shared metadata table."""
         session = conn.open_session('')
@@ -862,6 +913,12 @@ class DisaggSchemaEpochMixin:
         self.disagg_advance_checkpoint(conn)
         session = conn.open_session('')
         return conn, session
+
+    def close_follower(self, conn, session=None):
+        """Close a follower opened by open_follower without taking a final checkpoint."""
+        if session is not None:
+            session.close()
+        conn.close('debug=(skip_checkpoint=true)')
 
     def open_follower_epoch(self, epoch=1):
         """Open a follower already in epoch world (stable schema epoch set), ready to publish."""

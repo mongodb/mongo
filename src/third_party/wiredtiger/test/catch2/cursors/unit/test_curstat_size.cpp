@@ -188,6 +188,18 @@ TEST_CASE_METHOD(curstat_size_fixture, "local size", "[curstat_size]")
 
 TEST_CASE_METHOD(curstat_size_fixture, "shared size", "[curstat_size]")
 {
+    SECTION("propagates a checkpoint error")
+    {
+        constexpr auto expected_error = WT_ERROR;
+        constexpr auto config =
+          "checkpoint=(WiredTigerCheckpoint.1=(addr=\"\",order=,time=1,size=0,write_gen=1))";
+
+        int64_t size = 0;
+        const auto result = __ut_curstat_size_shared(session(), config, &size);
+
+        REQUIRE(result == expected_error);
+    }
+
     SECTION("reports zero when there is no checkpoint entry")
     {
         constexpr auto config = "checkpoint=()";
@@ -254,6 +266,22 @@ TEST_CASE_METHOD(curstat_size_fixture, "file size", "[curstat_size][curstat_file
         const auto result = __ut_curstat_file_size(session(), file_uri, &was_fast, &size);
 
         REQUIRE(result == expected_error);
+    }
+
+    SECTION("propagates an error from shared sizing")
+    {
+        enable_disaggregated_storage();
+
+        constexpr auto file_config =
+          "block_manager=disagg,"
+          "checkpoint=(WiredTigerCheckpoint.1=(addr=\"\",order=))";
+        metadata_cursor().insert_metadata(file_uri, file_config);
+
+        bool was_fast = false;
+        int64_t size = 0;
+        const auto result = __ut_curstat_file_size(session(), file_uri, &was_fast, &size);
+
+        REQUIRE(result == WT_ERROR);
     }
 
     SECTION("retrieves the shared checkpoint size")
@@ -414,6 +442,22 @@ TEST_CASE_METHOD(curstat_size_fixture, "table size", "[curstat_size][curstat_tab
         const auto result = __ut_curstat_table_size(session(), table_uri, &was_fast, &size);
 
         REQUIRE(result == expected_error);
+    }
+
+    SECTION("propagates an error from shared sizing")
+    {
+        enable_disaggregated_storage();
+
+        metadata_cursor().insert_metadata(table_uri, "columns=()");
+
+        constexpr auto stable_config = "checkpoint=(WiredTigerCheckpoint.1=(addr=\"\",order=))";
+        metadata_cursor().insert_metadata(stable_uri, stable_config);
+
+        bool was_fast = false;
+        int64_t size = 0;
+        const auto result = __ut_curstat_table_size(session(), table_uri, &was_fast, &size);
+
+        REQUIRE(result == WT_ERROR);
     }
 
     SECTION("retrieves the shared checkpoint size")

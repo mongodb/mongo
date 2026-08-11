@@ -12,12 +12,14 @@
 
 /*
  * __wt_gen --
- *     Return the resource's generation.
+ *     Return the resource's generation. The acquire ordering is for readers that must observe the
+ *     generation no older than another variable they loaded before it; the protocol's own ordering
+ *     comes from the full barriers at its publish points.
  */
 static WT_INLINE uint64_t
 __wt_gen(WT_SESSION_IMPL *session, int which)
 {
-    return (__wt_atomic_load_uint64_v_relaxed(&S2C(session)->generations[which]));
+    return (__wt_atomic_load_uint64_v_acquire(&S2C(session)->generations[which]));
 }
 
 /*
@@ -32,6 +34,22 @@ __wt_gen_next(WT_SESSION_IMPL *session, int which, uint64_t *genp)
     gen = __wt_atomic_add_uint64_v(&S2C(session)->generations[which], 1);
     if (genp != NULL)
         *genp = gen;
+}
+
+/*
+ * __wt_gen_advance --
+ *     Advance the resource's generation to a caller-supplied value, for resources whose generation
+ *     is an externally assigned sequence rather than a counter. Only ever moves forward; racing
+ *     advances resolve to the maximum.
+ */
+static WT_INLINE void
+__wt_gen_advance(WT_SESSION_IMPL *session, int which, uint64_t gen)
+{
+    uint64_t old;
+
+    do {
+        old = __wt_gen(session, which);
+    } while (old < gen && !__wt_atomic_cas_uint64_v(&S2C(session)->generations[which], old, gen));
 }
 
 /*

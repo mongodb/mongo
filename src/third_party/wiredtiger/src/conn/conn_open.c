@@ -99,6 +99,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wt_live_restore_server_destroy(session));
     WT_TRET(__wti_background_compact_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
+    WT_TRET(__wti_disagg_deferred_pickup_server_destroy(session));
     WT_TRET(__wti_statlog_destroy(session, true));
     WT_TRET(__wti_tiered_storage_destroy(session, false));
     WT_TRET(__wti_sweep_destroy(session));

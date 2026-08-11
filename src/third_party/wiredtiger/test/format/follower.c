@@ -90,7 +90,7 @@ follower_try_pickup_checkpoint(WT_SESSION *session, WT_CONNECTION *conn, WT_PAGE
 {
     WT_DISAGG_METADATA metadata;
     WT_ITEM full_metadata;
-    wt_timestamp_t pinned_ts;
+    wt_timestamp_t pinned_ts, replayed_ts;
     char config[1024];
     bool picked_up;
 
@@ -112,6 +112,22 @@ follower_try_pickup_checkpoint(WT_SESSION *session, WT_CONNECTION *conn, WT_PAGE
       follower_fetch_full_metadata(session, page_log, checkpoint_metadata, &full_metadata));
     testutil_check(__wt_disagg_parse_meta((WT_SESSION_IMPL *)session, &full_metadata, &metadata));
     testutil_assert(metadata.oldest_timestamp != WT_TS_NONE);
+    /*
+     * Checkpoint metadata may only be delivered once its content has been replayed, so wait for
+     * replay to reach the checkpoint's timestamp; the stable timestamp is no substitute, advancing
+     * on the replay schedule rather than with application. The watermark only exists under
+     * predictable replay.
+     */
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        replayed_ts = replay_maximum_committed();
+        if (replayed_ts < checkpoint_ts) {
+            printf("--- [Follower] Skipping checkpoint pickup: checkpoint_timestamp(hex)=%" PRIx64
+                   " > replayed_timestamp(hex)=%" PRIx64 " ---\n",
+              checkpoint_ts, replayed_ts);
+            goto done;
+        }
+    }
+
     testutil_check(timestamp_query("get=pinned", &pinned_ts));
     if (pinned_ts != WT_TS_NONE && metadata.oldest_timestamp > pinned_ts) {
         printf("--- [Follower] Skipping checkpoint pickup: oldest_timestamp(hex)=%" PRIx64
@@ -166,6 +182,202 @@ follower_read_latest_checkpoint(void)
     free(args.checkpoint_metadata.mem);
     wt_wrap_close_session(session);
     testutil_check(page_log->terminate(page_log, NULL));
+}
+
+/*
+ * follower_read_no_ts --
+ *     Repeatedly run transactional snapshot reads with no read timestamp on the follower, racing
+ *     checkpoint pickups: scan a table's first rows twice within one transaction, through freshly
+ *     opened cursors, and fail on any difference. The snapshot must observe exactly one state for
+ *     its lifetime; a refused read (rollback) is an acceptable outcome and retried.
+ */
+WT_THREAD_RET
+follower_read_no_ts(void *arg)
+{
+    SAP sap;
+    WT_CONNECTION *conn;
+    WT_DECL_RET;
+    WT_ITEM keys[FOLLOWER_READ_ROWS], values[FOLLOWER_READ_ROWS];
+    WT_SESSION *session;
+    uint64_t iterations;
+    u_int i;
+
+    (void)(arg); /* Unused parameter */
+    conn = g.wts_conn;
+    memset(keys, 0, sizeof(keys));
+    memset(values, 0, sizeof(values));
+
+    /* Restrict to row-store, like the random cursor reader. */
+    for (i = 0; i <= ntables; ++i)
+        if (tables[i] != NULL && tables[i]->type == ROW)
+            break;
+    if (i > ntables)
+        return (WT_THREAD_RET_VALUE);
+
+    WT_CLEAR(sap);
+    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
+
+    printf("--- [Follower] snapshot read stress running ---\n");
+    for (iterations = 0; !g.workers_finished; ++iterations) {
+        TABLE *table = table_select_type(ROW, false);
+        WT_ITEM start_key;
+        u_int count = 0;
+        bool failed = false;
+
+        if (table == NULL)
+            break;
+        testutil_check(session->begin_transaction(session, "isolation=snapshot"));
+
+        /* Scan from a random position, so updates anywhere in the table are candidates. */
+        key_gen_init(&start_key);
+        key_gen(table, &start_key, mmrand(&g.extra_rnd, 1, table->rows_current));
+
+        for (u_int pass = 0; pass < FOLLOWER_READ_PASSES && !failed && !g.workers_finished;
+          ++pass) {
+            WT_CURSOR *cursor;
+            int exact;
+
+            /*
+             * Hold the snapshot across pickups: the first pass records the baseline and the later
+             * passes re-read it every few hundred milliseconds, so most transactions span an
+             * adoption and every scanned row is a candidate to catch a leaked change.
+             */
+            if (pass > 0)
+                __wt_sleep(0, mmrand(&g.extra_rnd, 200, 400) * WT_THOUSAND);
+            wt_wrap_open_cursor(session, table->uri, NULL, &cursor);
+            cursor->set_key(cursor, &start_key);
+            if ((ret = cursor->search_near(cursor, &exact)) != 0) {
+                testutil_assertfmt(ret == WT_NOTFOUND || ret == WT_ROLLBACK ||
+                    ret == WT_PREPARE_CONFLICT || ret == WT_CACHE_FULL,
+                  "follower_read_no_ts: search_near: %d", ret);
+                failed = true;
+                testutil_check(cursor->close(cursor));
+                break;
+            }
+            /*
+             * A near search may legally position on either neighbor of the search key, and the side
+             * it picks can change when the underlying trees are reshaped without any visible
+             * change, such as by a checkpoint pickup. Anchor every pass on the first visible key at
+             * or after the start position so the passes are comparable.
+             */
+            if (exact < 0 && (ret = cursor->next(cursor)) != 0) {
+                testutil_assertfmt(ret == WT_NOTFOUND || ret == WT_ROLLBACK ||
+                    ret == WT_PREPARE_CONFLICT || ret == WT_CACHE_FULL,
+                  "follower_read_no_ts: next: %d", ret);
+                if (ret == WT_NOTFOUND) {
+                    /* No rows at or after the start position: every pass must agree on that. */
+                    testutil_assertfmt(pass == 0 || count == 0,
+                      "follower_read_no_ts: snapshot row count changed within a transaction "
+                      "(0 != %u)",
+                      count);
+                } else
+                    failed = true;
+                testutil_check(cursor->close(cursor));
+                continue;
+            }
+            for (i = 0; i < FOLLOWER_READ_ROWS; ++i) {
+                if (i > 0 && (ret = cursor->next(cursor)) != 0) {
+                    testutil_assertfmt(ret == WT_NOTFOUND || ret == WT_ROLLBACK ||
+                        ret == WT_PREPARE_CONFLICT || ret == WT_CACHE_FULL,
+                      "follower_read_no_ts: next: %d", ret);
+                    /* A refusal or conflict abandons the transaction; it is not a failure. */
+                    failed = ret != WT_NOTFOUND;
+                    if (ret == WT_NOTFOUND && pass > 0)
+                        testutil_assertfmt(i == count,
+                          "follower_read_no_ts: snapshot row count changed within a transaction "
+                          "(%u != %u)",
+                          i, count);
+                    break;
+                }
+                WT_ITEM key, value;
+
+                testutil_check(cursor->get_key(cursor, &key));
+                testutil_check(cursor->get_value(cursor, &value));
+                if (pass == 0) {
+                    testutil_check(
+                      __wt_buf_set((WT_SESSION_IMPL *)session, &keys[i], key.data, key.size));
+                    testutil_check(
+                      __wt_buf_set((WT_SESSION_IMPL *)session, &values[i], value.data, value.size));
+                    count = i + 1;
+                } else {
+                    /* The second pass must observe exactly the first pass's rows. */
+                    testutil_assertfmt(i < count,
+                      "follower_read_no_ts: snapshot row count changed within a transaction (more "
+                      "than %u rows)",
+                      count);
+                    testutil_assertfmt(
+                      key.size == keys[i].size && memcmp(key.data, keys[i].data, key.size) == 0,
+                      "follower_read_no_ts: snapshot key changed within a transaction (row %u)", i);
+                    testutil_assertfmt(value.size == values[i].size &&
+                        memcmp(value.data, values[i].data, value.size) == 0,
+                      "follower_read_no_ts: snapshot value changed within a transaction (row %u)",
+                      i);
+                }
+            }
+            testutil_check(cursor->close(cursor));
+        }
+
+        /*
+         * Repeat the reads as point lookups: within the same snapshot, searching each key seen by
+         * the scan must return the identical value. Point reads and scans position differently, so
+         * both paths are verified.
+         */
+        if (!failed && count > 0 && !g.workers_finished) {
+            WT_CURSOR *cursor;
+            WT_ITEM value;
+
+            wt_wrap_open_cursor(session, table->uri, NULL, &cursor);
+            for (i = 0; i < count; ++i) {
+                cursor->set_key(cursor, &keys[i]);
+                if ((ret = cursor->search(cursor)) != 0) {
+                    testutil_assertfmt(
+                      ret == WT_ROLLBACK || ret == WT_PREPARE_CONFLICT || ret == WT_CACHE_FULL,
+                      "follower_read_no_ts: a key seen by the snapshot disappeared on search (row "
+                      "%u): "
+                      "%d",
+                      i, ret);
+                    break;
+                }
+                testutil_check(cursor->get_value(cursor, &value));
+                testutil_assertfmt(value.size == values[i].size &&
+                    memcmp(value.data, values[i].data, value.size) == 0,
+                  "follower_read_no_ts: snapshot value changed between a scan and a search (row "
+                  "%u)",
+                  i);
+            }
+            testutil_check(cursor->close(cursor));
+        }
+        key_gen_teardown(&start_key);
+        testutil_check(session->rollback_transaction(session, NULL));
+    }
+    /*
+     * Report whether the intended race ran: how many pick-ups the readers deferred and how many
+     * were adopted. Configurations with long checkpoint intervals or short timers may legitimately
+     * record zero, so this is diagnostic rather than asserted.
+     */
+    {
+        WT_CURSOR *stat_cursor;
+        int64_t adopted, deferred;
+
+        wt_wrap_open_cursor(session, "statistics:", NULL, &stat_cursor);
+        stat_cursor->set_key(stat_cursor, WT_STAT_CONN_DISAGG_CHECKPOINT_DEFER);
+        testutil_check(stat_cursor->search(stat_cursor));
+        testutil_check(stat_cursor->get_value(stat_cursor, NULL, NULL, &deferred));
+        stat_cursor->set_key(stat_cursor, WT_STAT_CONN_DISAGG_CHECKPOINT_META_LSN);
+        testutil_check(stat_cursor->search(stat_cursor));
+        testutil_check(stat_cursor->get_value(stat_cursor, NULL, NULL, &adopted));
+        testutil_check(stat_cursor->close(stat_cursor));
+        printf("--- [Follower] snapshot read stress: %" PRIu64 " transactions, %" PRId64
+               " pick-ups deferred, adopted LSN %" PRId64 " ---\n",
+          iterations, deferred, adopted);
+    }
+
+    for (i = 0; i < FOLLOWER_READ_ROWS; ++i) {
+        __wt_buf_free((WT_SESSION_IMPL *)session, &keys[i]);
+        __wt_buf_free((WT_SESSION_IMPL *)session, &values[i]);
+    }
+    wt_wrap_close_session(session);
+    return (WT_THREAD_RET_VALUE);
 }
 
 /*

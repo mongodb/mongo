@@ -294,10 +294,9 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.run_panic_subprocess('strict_at_open_panics', self.panic_message)
 
     #
-    # Step-down tests: stepping down clears the metadata queue, so a table created
-    # but never published before the step-down becomes an unexplained local-only
-    # difference. The application must drop such tables (or disable strict mode)
-    # before the stepped-down node installs checkpoints.
+    # Step-down tests: stepping down preserves the metadata queue, so a table created
+    # but never published before the step-down stays an explained local-only
+    # difference and the stepped-down node can install checkpoints under strict mode.
     #
 
     def step_down_with_unpublished_table(self):
@@ -314,8 +313,8 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         # behind, waiting for a drop.
         self.session.create(self.uri2, self.table_config)
 
-        # Step down; the metadata queue is cleared, so uri2's CREATE no longer
-        # explains its presence in the local metadata.
+        # Step down; uri2's CREATE survives in the metadata queue and keeps explaining
+        # its presence in the local metadata.
         self.conn.reconfigure('disaggregated=(role="follower")')
         conn_follow.reconfigure('disaggregated=(role="leader")')
 
@@ -325,23 +324,24 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         session_lead.close()
         return conn_follow
 
-    def subprocess_step_down_pending_create_panics(self):
-        """Subprocess body for the step-down panic test; expected to panic/abort."""
+    def test_strict_step_down_pending_create(self):
+        """
+        A node that steps down with a created-but-unpublished table passes strict
+        validation: the queued CREATE survives the step-down at the unpublished
+        sentinel epoch, which exceeds any checkpoint epoch, so the local-only table
+        is explained and picking up the new leader's checkpoint succeeds.
+        """
         conn_lead = self.step_down_with_unpublished_table()
 
         self.conn.reconfigure('disaggregated=(strict_checkpoint_metadata=true)')
-        self.disagg_advance_checkpoint(self.conn, conn_lead)  # Expected to panic.
+        self.disagg_advance_checkpoint(self.conn, conn_lead)
 
-    def test_strict_step_down_pending_create_panics(self):
-        """
-        A node that steps down with a created-but-unpublished table cannot pass
-        strict validation: the queue was cleared on step-down, so the local-only
-        table is unexplained and picking up the new leader's checkpoint panics.
-        """
-        # Initialize self.conn so the test fixture can close it cleanly; the real test runs
-        # in a subprocess so that the panic/abort does not kill the test runner.
-        self.setup_leader_empty()
-        self.run_panic_subprocess('step_down_pending_create_panics', self.panic_message)
+        # The unpublished table survives locally and stays out of shared metadata
+        # until a checkpoint covers its CREATE.
+        self.assertTrue(self.uri_in_local_metadata(self.conn, self.uri2, leader=True))
+        self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri2))
+
+        conn_lead.close('debug=(skip_checkpoint=true)')
 
     def test_strict_step_down_drop_then_pickup(self):
         """

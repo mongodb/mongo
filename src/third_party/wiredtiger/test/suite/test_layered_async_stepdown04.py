@@ -61,8 +61,8 @@ class test_layered_async_stepdown04(LayeredStepdownMixin, wttest.WiredTigerTestC
             'the layered cursor must be served from the session cursor cache')
         return cursor
 
-    # A table created while the timestamp is set routes its writes to ingest, leaves stable empty,
-    # and survives the demotion.
+    # A table created while the timestamp is set routes its writes to ingest, builds no stable
+    # constituent, and survives the demotion.
     def test_create_while_step_down_ts_set(self):
         self.set_global_ts(1, 1)
         self.set_step_down_ts(20)
@@ -72,7 +72,9 @@ class test_layered_async_stepdown04(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.write_at(uri, {'k1': 'v', 'k2': 'v'}, 30)
 
         self.assertEqual(self.read_keys_at(self.ingest_uri(uri), 40), {'k1', 'k2'})
-        self.assertEqual(self.read_keys_at(self.stable_uri(uri), 40), set())
+        # No transaction can write the stable constituent, so the create skips building it.
+        self.assertRaisesException(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(self.stable_uri(uri), None, None))
         self.assertEqual(self.read_keys_at(uri, 40), {'k1', 'k2'})
 
         # The table has no stable content at all, so the demotion is its first checkpoint.

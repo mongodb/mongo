@@ -129,6 +129,7 @@ struct __wt_layered_table {
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LAYERED_TABLE_OPEN 0x1u
+#define WT_LAYERED_TABLE_STEP_DOWN_CREATED 0x2u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
