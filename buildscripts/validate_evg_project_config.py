@@ -1,3 +1,4 @@
+import logging
 import os.path
 import re
 import subprocess
@@ -6,6 +7,7 @@ from collections import defaultdict
 
 import structlog
 import typer
+import yaml
 from typing_extensions import Annotated
 
 if __name__ == "__main__" and __package__ is None:
@@ -75,13 +77,40 @@ def default_evg_config():
     sys.exit(1)
 
 
+def ensure_authenticated(evergreen_bin, evg_auth_config):
+    """Log in before running any command whose output we capture.
+
+    A missing or expired OAuth token otherwise turns `validate` into a silent five minute hang:
+    it starts a device auth flow whose verification URI is swallowed by our output capture.
+
+    Configs without an `oauth` section authenticate  with a static api key, so there is nothing to do here.
+    """
+    with open(evg_auth_config, encoding="utf-8") as auth_config_file:
+        if not yaml.safe_load(auth_config_file).get("oauth"):
+            return
+
+    cmd = [evergreen_bin, "--config", evg_auth_config, "login"]
+    LOGGER.info(f"Logging in to evergreen: {' '.join(cmd)}")
+    if subprocess.run(cmd).returncode:
+        sys.exit(1)
+    LOGGER.info("Logged in to evergreen.")
+
+
 def main(
     evg_project_name: Annotated[
         str, typer.Option(help="Evergreen project name")
     ] = DEFAULT_EVG_PROJECT_NAME,
     evg_auth_config: Annotated[str, typer.Option(help="Evergreen auth config file")] = None,
+    quiet: Annotated[
+        bool, typer.Option(help="Only report errors and anything needing user interaction")
+    ] = False,
 ):
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
+    if quiet:
+        structlog.configure(
+            wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING),
+        )
 
     if not evg_auth_config:
         evg_auth_config = default_evg_config()
@@ -93,6 +122,8 @@ def main(
         }
 
     evergreen_bin = find_evergreen_binary("evergreen")
+
+    ensure_authenticated(evergreen_bin, evg_auth_config)
 
     if RELEASE_BRANCH:
         for _, project_config in evg_project_config_map.items():

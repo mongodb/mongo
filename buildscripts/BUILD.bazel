@@ -473,6 +473,10 @@ py_binary(
             "structlog",
             group = "evergreen",
         ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
     ],
 )
 

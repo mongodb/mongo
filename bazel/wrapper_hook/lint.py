@@ -14,6 +14,7 @@ from typing import Optional
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
+from bazel.wrapper_hook.wrapper_util import get_terminal_stream
 from buildscripts.bazel_custom_formatter import validate_tcmalloc_cc_test_coverage
 
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MiB
@@ -317,9 +318,17 @@ class LintRunner:
         else:
             print(f"All {type_name} files have BUILD.bazel targets!")
 
-    def run_bazel(self, target: str, args: list | None = None) -> bool:
+    def run_bazel(self, target: str, args: list | None = None, interactive: bool = False) -> bool:
         args = args or []
-        p = subprocess.run([self.bazel_bin, "run", target] + (["--"] + args if args else []))
+
+        # When the bazel target requires interaction from a user, ensure its output is sent to
+        # the configured terminal stream.
+        terminal = get_terminal_stream("MONGO_WRAPPER_STDERR_FD") if interactive else None
+        p = subprocess.run(
+            [self.bazel_bin, "run", target] + (["--"] + args if args else []),
+            stdout=terminal,
+            stderr=terminal,
+        )
         if p.returncode != 0:
             self.fail = True
             if not self.keep_going:
@@ -901,7 +910,10 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
             "buildscripts:validate_evg_project_config",
             [
                 f"--evg-project-name={parsed_args.lint_yaml_project}",
+                "--quiet",
             ],
+            # This runs `evergreen login`, which may need the user to complete a device auth flow.
+            interactive=True,
         )
         lr.run_bazel("//buildscripts:yamllinters")
         print("No errors found in evergreen yaml")
