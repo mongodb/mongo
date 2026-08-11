@@ -328,6 +328,11 @@ main() {
     set -o errexit
 
     if [[ -n "$result_task" ]]; then
+        if [[ "${resmoke_disable_rbe}" != "true" ]]; then
+            # Reaching here means this result task ran bazel test itself rather than fetching the
+            # runner's results. Attach the binaries from this test with debug info to this task's artifacts.
+            gather_failed_tests
+        fi
         # Explicitly shutdown the bazel server in case the Evergreen agent is tracking it for completion of this process.
         eval ${BAZEL_BINARY} shutdown
         exit_for_result_task "$RET"

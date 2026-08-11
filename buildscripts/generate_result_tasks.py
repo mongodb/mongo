@@ -45,6 +45,11 @@ MASTER_PROJECT_NAME = "mongodb-mongo-master"
 MASTER_PROJECT_CONFIG = "etc/evergreen.yml"
 NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 
+# Result tasks in a task group share a host. Remove the test logs and outputs between tasks, as
+# leaving them can cause a task to report test logs from another bazel target, and remove the
+# relinked binaries staged by gather_failed_tests so one task never uploads another's.
+_RESULT_TASK_CLEANUP = "rm -rf build/ results/ report.json src/dist-tests/ mongo-tests.tgz"
+
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
@@ -247,9 +252,7 @@ def make_task_group(
         max_hosts=len(targets),
         setup_group_can_fail_task=True,
         setup_group=_make_setup_group(resmoke_task, resmoke_disable_rbe),
-        # Between tasks, remove the test logs and outputs. The tasks share hosts and leaving them
-        # can cause the task to include test logs from other bazel targets.
-        setup_task=[BuiltInCommand("shell.exec", {"script": "rm -rf build/ results/ report.json"})],
+        setup_task=[BuiltInCommand("shell.exec", {"script": _RESULT_TASK_CLEANUP})],
         teardown_task=[
             BuiltInCommand("attach.results", {"file_location": "report.json"}),
             BuiltInCommand(
@@ -268,11 +271,12 @@ def make_task_group(
         ]
         + _result_artifact_uploads()
         + [
+            FunctionCall("save failed tests"),
             FunctionCall("generate result task hang analyzer"),
         ],
         teardown_group=[
             FunctionCall("kill processes"),
-            BuiltInCommand("shell.exec", {"script": "rm -rf build/ results/ report.json"}),
+            BuiltInCommand("shell.exec", {"script": _RESULT_TASK_CLEANUP}),
         ],
     )
 
