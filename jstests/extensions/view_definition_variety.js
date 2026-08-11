@@ -51,11 +51,6 @@ const OPERATORS = [
     {
         label: "$lookup (localField/foreignField syntax)",
         isLookup: true,
-        // TODO SERVER-133203: on a standalone or replica set this hits the lookupGap and throws,
-        // but on a sharded cluster the equality-match rewrite silently returns no documents
-        // instead of erroring. Skip that combination until the fix lands;
-        // extension_in_lookup_with_views.js has two it.skip'd cases for the same bug.
-        lookupGapBrokenWhenSharded: true,
         run: (localColl, viewName) =>
             localColl
                 .aggregate([
@@ -160,9 +155,8 @@ describe("view definition variety across join operators", function () {
 
                     // Definitions marked 'lookupFailsWithCode' are unusable under $lookup on a
                     // standalone or replica set: the prepended foreign source displaces the view's
-                    // source stage. On a sharded cluster the view resolves correctly for pipeline
-                    // syntax; only the localField/foreignField rewrite misbehaves (see
-                    // 'lookupGapBrokenWhenSharded').
+                    // source stage. On a sharded cluster the view resolves correctly for both
+                    // $lookup syntaxes.
                     if (def.lookupFailsWithCode && operator.isLookup) {
                         if (!FixtureHelpers.isMongos(db)) {
                             const err = assert.throws(
@@ -173,13 +167,6 @@ describe("view definition variety across join operators", function () {
                             jsTest.log.info(`${context}: lookupGap error`, {
                                 code: err.code,
                                 message: String(err.message),
-                            });
-                            return;
-                        }
-                        if (operator.lookupGapBrokenWhenSharded) {
-                            jsTest.log.info(`SKIPPING ${context}`, {
-                                skipReason:
-                                    "TODO SERVER-133203: silently returns no documents when sharded",
                             });
                             return;
                         }

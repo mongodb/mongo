@@ -84,9 +84,8 @@ export function getViewDefs(sideCollName) {
             //
             // Known 'lookupGap': $lookup-on-a-view prepends a foreign source that displaces
             // $produceIds from position 0, failing with 40602 for both $lookup syntaxes on a
-            // standalone or replica set. On a sharded cluster, pipeline syntax resolves the view
-            // correctly but localField/foreignField silently yields no documents (TODO
-            // SERVER-133203). $unionWith and $graphLookup always succeed.
+            // standalone or replica set. On a sharded cluster both syntaxes resolve the view
+            // correctly. $unionWith and $graphLookup always succeed.
             lookupFailsWithCode: 40602,
             pipeline: [{$readNDocuments: {numDocs: 3}}],
             expectedNames: ["a", "b"],
@@ -98,8 +97,8 @@ export function getViewDefs(sideCollName) {
         },
         {
             label: "server-side (non-extension) desugarer",
-            // $setWindowFields desugars server-side and is result-preserving. This is the shape
-            // implicated in SERVER-133203.
+            // $setWindowFields desugars server-side and is result-preserving, so it exercises the
+            // case where the join $match must be placed after every stage the view expands into.
             pipeline: [
                 {
                     $setWindowFields: {
