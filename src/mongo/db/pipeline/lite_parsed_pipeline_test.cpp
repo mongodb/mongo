@@ -421,6 +421,119 @@ protected:
     std::string _doNothingStageName;
 };
 
+/**
+ * Builds one lite-parsed stage of 'stageName' for use with replaceStageWith().
+ */
+std::vector<std::unique_ptr<LiteParsedDocumentSource>> makeStages(
+    const std::vector<BSONObj>& specs) {
+    std::vector<std::unique_ptr<LiteParsedDocumentSource>> out;
+    for (const auto& spec : specs) {
+        out.push_back(LiteParsedDocumentSource::parse(kTestNss, spec, LiteParserOptions{}));
+    }
+    return out;
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, UserFirstStagePolicySkipsPrependedViewStages) {
+    // handleView() prepends the view definition, so getStages().front() is a view stage. The user
+    // policy accessor must look past it and report the user's own first stage.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({doNothingStageSpec()}), {});
+
+    ASSERT_EQ(pipeline.getStages().front()->getParseTimeName(), _doNothingStageName);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, UserFirstStagePolicyDefaultsWhenOnlyViewStages) {
+    // A pipeline consisting entirely of prepended view stages has no user stage to consult.
+    std::vector<BSONObj> userStages = {};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({doNothingStageSpec()}), {});
+
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, ReplaceStageWithGrowsViewPrefixWhenExpandingViewStage) {
+    // Desugaring a prepended VIEW stage into 3 stages must move the view/user boundary by +2, so
+    // the user's own stage is still identified correctly.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({doNothingStageSpec()}), {});
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+
+    pipeline.replaceStageWith(0,
+                              makeStages({BSON("$match" << BSON("a" << 1)),
+                                          BSON("$match" << BSON("b" << 1)),
+                                          BSON("$match" << BSON("c" << 1))}));
+
+    ASSERT_EQ(pipeline.getStages().size(), 4U);
+    ASSERT_EQ(pipeline.getStages()[3]->getParseTimeName(), _defaultStageName);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, ReplaceStageWithLeavesViewPrefixWhenExpandingUserStage) {
+    // Desugaring a USER stage must NOT move the view/user boundary (index >= prefix length). The
+    // user pipeline must start with kDefaultPrepend, or handleView() would not prepend at all and
+    // there would be no prefix to test.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({BSON("$match" << BSON("x" << 1))}), {});
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+
+    // Expand the user stage (index 1) into [kDoNothing, $match]. If the boundary wrongly advanced,
+    // the accessor would read the trailing $match (kDefaultPrepend) instead of the kDoNothing
+    // stage.
+    pipeline.replaceStageWith(1,
+                              makeStages({doNothingStageSpec(), BSON("$match" << BSON("y" << 1))}));
+
+    ASSERT_EQ(pipeline.getStages().size(), 3U);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, ReplaceStageWithHandlesOneForOneViewStageExpansion) {
+    // numInserted == 1 must leave the boundary unchanged (+1 - 1 == 0).
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({BSON("$match" << BSON("x" << 1))}), {});
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+
+    // Replace the single VIEW stage with exactly one stage. If the boundary wrongly moved to 0, the
+    // accessor would read that replacement (kDoNothing) rather than the user's stage.
+    pipeline.replaceStageWith(0, makeStages({doNothingStageSpec()}));
+
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, CopyAndAssignmentPreserveViewPrefixBoundary) {
+    // The view/user boundary is part of the class invariant, so copying or assigning a stitched
+    // pipeline must carry it along. If it resets to 0, the accessor reads the prepended view stage
+    // and the view gets dropped from the join.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({BSON("$match" << BSON("x" << 1))}), {});
+    // Make the user's own first stage kDoNothing, so it is distinguishable from the prepended
+    // $match's kDefaultPrepend.
+    pipeline.replaceStageWith(1, makeStages({doNothingStageSpec()}));
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+
+    auto cloned = pipeline.clone();
+    ASSERT_EQ(std::string{cloned.getStages().front()->getParseTimeName()}, "$match");
+    ASSERT_EQ(cloned.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+
+    LiteParsedPipeline assigned(kTestNss, std::vector<BSONObj>{});
+    assigned = pipeline.clone();
+    ASSERT_EQ(assigned.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+}
+
 TEST_F(LiteParsedPipelineViewPolicyTest, FirstDoNothingSuppressesPrepend) {
     std::vector<BSONObj> userStages = {doNothingStageSpec(), defaultStageSpec()};
     LiteParsedPipeline pipeline(kTestNss, userStages);
