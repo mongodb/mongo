@@ -335,7 +335,7 @@ def maybe_override_num_jobs_on_required(task_name, variant, jobs):
         all_factors |= {
             "search_no_pinned_connections_auth": 0.5,
         }
-    elif variant in ("linux-64-debug-required", "linux-64-debug-required-toolchain-v5"):
+    elif variant in ("linux-arm64-debug-required", "linux-64-debug-required-toolchain-v5"):
         all_factors |= {
             "^noPassthrough$": 0.5,
             "read_concern_linearizable_passthrough": 1,

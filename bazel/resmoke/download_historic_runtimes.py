@@ -12,7 +12,7 @@ S3_BASE = "https://mongo-test-stats.s3.amazonaws.com"
 
 # If run outside of CI, use the following defaults as they should provide reasonably close runtimes.
 DEFAULT_PROJECT = "mongodb-mongo-master"
-DEFAULT_BUILD_VARIANT = "linux-64-debug-required"
+DEFAULT_BUILD_VARIANT = "linux-arm64-debug-required"
 
 
 def parse_volatile_status(path):
