@@ -368,6 +368,21 @@ feature_flags:
         cpp_varname: gFeatureFlagBatchedContainerWrites
         default: false
         fcv_gated: true
+    featureFlagServerStatusMetricsFiltering:
+        description: "Enable metrics filtering for the serverStatus command."
+        cpp_varname: gFeatureFlagServerStatusMetricsFiltering
+        default: false
+        fcv_gated: false
+    featureFlagReplSetGetStatusMetricsFiltering:
+        description: "Enable metrics filtering for the replSetGetStatus command."
+        cpp_varname: gFeatureFlagReplSetGetStatusMetricsFiltering
+        default: false
+        fcv_gated: false
+    featureFlagCollStatsMetricsFiltering:
+        description: "Enable metrics filtering for the collStats command and the $collStats aggregation stage."
+        cpp_varname: gFeatureFlagCollStatsMetricsFiltering
+        default: false
+        fcv_gated: false
 
 server_parameters:
     allowDirectSystemBucketsAccess:
