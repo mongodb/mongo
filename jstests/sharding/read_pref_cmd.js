@@ -3,7 +3,8 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [
  *    resource_intensive,
- *    requires_scripting
+ *    requires_scripting,
+ *    requires_profiling
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -40,6 +41,9 @@ let setUp = function (rst) {
     if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
     }
+
+    // Wait for the secondaries to catch up before enabling profiling on them.
+    rst.awaitReplication();
 
     // Each time we drop the database we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.
