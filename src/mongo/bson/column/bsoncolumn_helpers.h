@@ -74,6 +74,20 @@ concept Appendable [[MONGO_MOD_PUBLIC]] = requires(T& t,
 };
 
 /**
+ * A Container for Collector that materializes elements as usual but retains none of them.
+ *
+ * This is for callers that decompress purely for the side effects of decoding and materializing,
+ * such as validation establishing that a column can be unpacked without throwing. Elements are
+ * still materialized into the BSONElementStorage passed to decompress(), so this saves only the
+ * cost of accumulating them, not the cost of materializing them.
+ */
+template <class Element>
+class [[MONGO_MOD_PUBLIC]] DiscardingContainer {
+public:
+    void push_back(const Element&) {}
+};
+
+/**
  * Interface to accept elements decoded from BSONColumn and materialize them
  * as Elements of user-defined type.
  *

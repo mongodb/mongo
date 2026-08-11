@@ -107,9 +107,14 @@ public:
                 const auto binData = bsonElemVal.BinData();
                 switch (binData.type) {
                     case BinDataType::Column: {
-                        // Check for exceptions when decompressing.
-                        // Calling size() decompresses the entire column.
-                        BSONColumn(BSONElement(ptr)).size();
+                        // Check for exceptions when decompressing. The block-based decoder is used
+                        // over BSONColumn's iterator API, and the materialized elements are
+                        // discarded, as we only care about whether decoding throws.
+                        bsoncolumn::DiscardingContainer<BSONElement> elements;
+                        bsoncolumn::BSONColumnBlockBased(static_cast<const char*>(binData.data),
+                                                         binData.length)
+                            .decompress<bsoncolumn::BSONElementMaterializer>(
+                                elements, new BSONElementStorage());
                         break;
                     }
                     case BinDataType::Encrypt:

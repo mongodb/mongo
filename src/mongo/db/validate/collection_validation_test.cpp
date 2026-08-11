@@ -1465,8 +1465,7 @@ TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
         V1_Original);
 
     ASSERT_EQ(results.size(), 1U);
-    ASSERT_THAT(*results.front().getErrors().begin(),
-                ::testing::HasSubstr("Invalid BSONColumn encoding"));
+    ASSERT_THAT(*results.front().getErrors().begin(), ::testing::HasSubstr("InvalidBSONColumn"));
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationFixedBucketingInconsistency) {
