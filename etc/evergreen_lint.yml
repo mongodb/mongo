@@ -196,6 +196,7 @@ rules:
             "streams_kafka_9",
             "streams_kafka_10",
             "streams_kafka_11",
+            "streams_kafka_12",
             "streams_kafka_gwproxy",
             "streams_kafka_benchmark",
             "streams_https",
