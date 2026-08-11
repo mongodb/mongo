@@ -23,6 +23,8 @@ last-patch:
   all:
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
@@ -70,6 +72,8 @@ last-continuous:
       ticket: SERVER-129103
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_reopening_stale_config.js
       ticket: SERVER-131302
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
@@ -301,6 +305,8 @@ last-lts:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
       ticket: SERVER-107819
+    - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
+      ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/query/remove/update_and_batched_delete.js
       ticket: SERVER-95570
     - test_file: jstests/concurrency/fsm_workloads/query/update/upsert_unique_index_collation.js
