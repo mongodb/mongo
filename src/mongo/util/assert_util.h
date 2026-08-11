@@ -695,6 +695,29 @@ namespace error_details {
 #define tasserted(...) MONGO_BASE_ASSERT_FAILED(::mongo::error_details::tassertFailed, __VA_ARGS__)
 
 /**
+ * Log assertion failure, like tassert, but then continues execution without
+ * throwing or aborting. Used in cases where a failed check indicates
+ * a bug that we want to intentionally **ignore** semantically in production.
+ *
+ * `bugLog()` and `bugLogOn()` use the same trigger semantics as standard asserts; a false condition
+ * triggers it. True condition is a no-op.
+ */
+#define bugLogOn(...)                  \
+    do {                               \
+        try {                          \
+            tassert(__VA_ARGS__);      \
+        } catch (const DBException&) { \
+        }                              \
+    } while (false)
+#define bugLog(...)                    \
+    do {                               \
+        try {                          \
+            tasserted(__VA_ARGS__);    \
+        } catch (const DBException&) { \
+        }                              \
+    } while (false)
+
+/**
  * Return true if tripwire conditions have occurred.
  */
 bool haveTripwireAssertionsOccurred();

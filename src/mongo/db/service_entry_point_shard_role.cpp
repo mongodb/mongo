@@ -2521,13 +2521,9 @@ void HandleRequest::completeOperation(DbResponse& response) {
             // but swallow it and fire once per process to avoid any negative impact on the cluster.
             static std::once_flag once;
             std::call_once(once, [&] {
-                try {
-                    tasserted(13192400,
-                              str::stream()
-                                  << "Failed to collect query stats for an errored operation: "
-                                  << redact(ex));
-                } catch (const DBException&) {
-                }
+                bugLog(13192400,
+                       str::stream() << "Failed to collect query stats for an errored operation: "
+                                     << redact(ex));
             });
         }
     }
