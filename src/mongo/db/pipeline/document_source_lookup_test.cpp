@@ -1362,6 +1362,104 @@ TEST_F(DocumentSourceLookUpTest, SubpipelineViewPolicyDoNothingSuppressesViewPre
     }
 }
 
+/**
+ * Builds a $lookup against a view with subpipelineViewPolicy forced to kDoNothing, with the given
+ * user subpipeline and optional localField/foreignField.
+ */
+namespace {
+DocumentSourceLookUp* makeKDoNothingLookupOnView(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext>& expCtxOut,
+    std::list<boost::intrusive_ptr<DocumentSource>>& sourcesOut,
+    BSONArray userPipeline,
+    bool withLocalForeignFields) {
+    auto mainNss = NamespaceString::createNamespaceString_forTest("test", "main");
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test", "foreign");
+    auto backingNss = NamespaceString::createNamespaceString_forTest("test", "backing");
+
+    expCtxOut = ExpressionContextBuilder{}.opCtx(opCtx).ns(mainNss).build();
+    expCtxOut->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    BSONObj viewStage = BSON("$addFields" << BSON("viewField" << 1));
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(
+        viewNss,
+        ResolvedNamespace(viewNss, backingNss, std::vector<BSONObj>{viewStage}, BSONObj{}, opts));
+    expCtxOut->setResolvedNamespaces(std::move(nsMap));
+
+    BSONObjBuilder specBuilder;
+    specBuilder.append("from", viewNss.coll());
+    specBuilder.append("as", "r");
+    specBuilder.append("pipeline", userPipeline);
+    if (withLocalForeignFields) {
+        specBuilder.append("localField", "x");
+        specBuilder.append("foreignField", "y");
+    }
+    auto lookupBson = BSON("$lookup" << specBuilder.obj());
+
+    auto liteParsed =
+        LiteParsedLookUp::parse(mainNss, lookupBson.firstElement(), LiteParserOptions{});
+    liteParsed->makeOwned();
+    auto stageParams = liteParsed->getStageParams();
+    auto* params = dynamic_cast<LookUpStageParams*>(stageParams.get());
+    invariant(params);
+    params->subpipelineViewPolicy = FirstStageViewApplicationPolicy::kDoNothing;
+
+    sourcesOut = DocumentSourceLookUp::createFromStageParams(*params, expCtxOut);
+    invariant(sourcesOut.size() == 1U);
+    return dynamic_cast<DocumentSourceLookUp*>(sourcesOut.front().get());
+}
+}  // namespace
+
+TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithEmptySubpipelineDoesNotInsertOutOfRange) {
+    // Regression test for an out-of-range insert (SIGBUS) on an empty subpipeline.
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::list<boost::intrusive_ptr<DocumentSource>> sources;
+    auto* lookup = makeKDoNothingLookupOnView(
+        getOpCtx(), expCtx, sources, BSONArray{}, false /* withLocalForeignFields */);
+    ASSERT_TRUE(lookup != nullptr);
+
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 1U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$addFields" << BSON("viewField" << 1)));
+}
+
+TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithEmptySubpipelineAndFieldJoinRetainsView) {
+    // Same shape with localField/foreignField: the view prefix is retained and the join $match goes
+    // after it.
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::list<boost::intrusive_ptr<DocumentSource>> sources;
+    auto* lookup = makeKDoNothingLookupOnView(
+        getOpCtx(), expCtx, sources, BSONArray{}, true /* withLocalForeignFields */);
+    ASSERT_TRUE(lookup != nullptr);
+
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 2U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$addFields" << BSON("viewField" << 1)));
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[1], BSON("$match" << BSONObj()));
+}
+
+TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithNonEmptySubpipelineAndFieldJoinPlacesMatch) {
+    // Control: with a non-empty subpipeline the branch is entered as before, so the placeholder
+    // lands after the first stage.
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::list<boost::intrusive_ptr<DocumentSource>> sources;
+    auto* lookup = makeKDoNothingLookupOnView(getOpCtx(),
+                                              expCtx,
+                                              sources,
+                                              BSON_ARRAY(BSON("$match" << BSON("x" << 1))),
+                                              true /* withLocalForeignFields */);
+    ASSERT_TRUE(lookup != nullptr);
+
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 2U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$match" << BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[1], BSON("$match" << BSONObj()));
+}
+
 TEST_F(DocumentSourceLookUpTest,
        ExplainSerializesSubpipelineWithoutFieldMatchPlaceholderForFieldsAndPipeline) {
     auto expCtx = getExpCtx();

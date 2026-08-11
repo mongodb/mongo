@@ -216,10 +216,9 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
     auto subpipelineViewPolicy = FirstStageViewApplicationPolicy::kDefaultPrepend;
     if (!_pipelines.empty()) {
         subParams = _pipelines[0]->getStageParams();
-        const auto& subStages = _pipelines[0]->getStages();
-        if (!subStages.empty()) {
-            subpipelineViewPolicy = subStages.front()->getFirstStageViewApplicationPolicy();
-        }
+        // handleView() may already have prepended the foreign view's definition here, so ask for
+        // the user's first stage rather than the front stage.
+        subpipelineViewPolicy = _pipelines[0]->getUserFirstStageViewApplicationPolicy();
     }
     return std::make_unique<LookUpStageParams>(*_foreignNss,
                                                _as,

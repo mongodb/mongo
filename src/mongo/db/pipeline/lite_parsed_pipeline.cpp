@@ -246,12 +246,19 @@ size_t LiteParsedPipeline::replaceStageWith(
                   std::make_move_iterator(newSources.begin()),
                   std::make_move_iterator(newSources.end()));
 
+    // If we just expanded one of the view-definition stages prepended by handleView(), the boundary
+    // between view stages and user stages moves by the number of stages we added (or removed).
+    if (index < _numPrependedViewStages) {
+        _numPrependedViewStages = _numPrependedViewStages + numInserted - 1;
+    }
+
     return index + numInserted;
 }
 
 void LiteParsedPipeline::_stitchFront(LiteParsedPipeline&& prefix) {
+    const size_t numPrefixStages = prefix._stageSpecs.size();
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> newStages;
-    newStages.reserve(prefix._stageSpecs.size() + _stageSpecs.size());
+    newStages.reserve(numPrefixStages + _stageSpecs.size());
 
     // Move prefix stages first.
     for (auto& stage : prefix._stageSpecs) {
@@ -263,8 +270,29 @@ void LiteParsedPipeline::_stitchFront(LiteParsedPipeline&& prefix) {
         newStages.push_back(std::move(stage));
     }
 
+    _numPrependedViewStages += numPrefixStages;
     _stageSpecs = std::move(newStages);
     resetDeferredCaches();
+}
+
+FirstStageViewApplicationPolicy LiteParsedPipeline::getUserFirstStageViewApplicationPolicy() const {
+    if (!_hasUserStages()) {
+        // Either the pipeline is empty or it consists entirely of prepended view stages: there is
+        // no user stage that could apply the view on its own.
+        return FirstStageViewApplicationPolicy::kDefaultPrepend;
+    }
+    return _getFirstUserStage()->getFirstStageViewApplicationPolicy();
+}
+
+bool LiteParsedPipeline::_hasUserStages() const {
+    return _numPrependedViewStages < _stageSpecs.size();
+}
+
+const LiteParsedDocumentSource* LiteParsedPipeline::_getFirstUserStage() const {
+    tassert(13296301,
+            "Cannot get the first user stage of a pipeline that has no user stages",
+            _hasUserStages());
+    return _stageSpecs[_numPrependedViewStages].get();
 }
 
 void LiteParsedPipeline::handleView(const ResolvedNamespace& view,
