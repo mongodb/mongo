@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <s2.h>
@@ -550,5 +551,38 @@ TEST(BigSimplePolygon, ShareEdgeContained) {
     checkConsistency(bigPoly, expandedBigPoly, collinearPoly);
     checkConsistency(bigPoly, expandedBigPoly, line);
     checkConsistency(bigPoly, expandedBigPoly, collinearLine);
+}
+
+TEST(BigSimplePolygon, ConcurrentBorderCacheInitIsThreadSafe) {
+    // Fresh BigSimplePolygon with uninitialized cache (not yet accessed from any thread).
+    BigSimplePolygon bigPoly(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
+                                           << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+
+    // Shapes used for concurrent queries.
+    S2Polygon innerPoly(loopVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0)
+                                         << LatLng(-5.0, -5.0) << LatLng(-5.0, 5.0)));
+    S2Polyline innerLine(pointVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0)
+                                           << LatLng(-5.0, -5.0) << LatLng(-5.0, 5.0)));
+
+    constexpr int kThreads = 16;
+    constexpr int kIters = 100;
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kIters; ++i) {
+                // Exercises the polygon border cache (Contains/Intersects S2Polygon path)
+                // and the line border cache (Intersects S2Polyline path) concurrently.
+                ASSERT_TRUE(bigPoly.Contains(innerPoly));
+                ASSERT_TRUE(bigPoly.Intersects(innerPoly));
+                ASSERT_TRUE(bigPoly.Intersects(innerLine));
+                ASSERT_TRUE(bigPoly.Contains(innerLine));
+            }
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
 }
 }  // namespace
