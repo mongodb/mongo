@@ -115,9 +115,7 @@ def _zip_scalar(items, obj):
 def _item_and_type(dic):
     # type: (Dict[Any, List[Any]]) -> Iterator[Tuple[Any, Any]]
     """Return an Iterator of (key, value) pairs from a dictionary."""
-    return itertools.chain.from_iterable(
-        (_zip_scalar(value, key) for (key, value) in dic.items())
-    )
+    return itertools.chain.from_iterable((_zip_scalar(value, key) for (key, value) in dic.items()))
 
 
 class SymbolTable(object):
@@ -150,9 +148,7 @@ class SymbolTable(object):
             }
         ):
             if item.name == name:
-                ctxt.add_duplicate_symbol_error(
-                    location, name, duplicate_class_name, entity_type
-                )
+                ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name, entity_type)
                 return True
             if entity_type == "command":
                 if name in [
@@ -263,22 +259,16 @@ class SymbolTable(object):
         """Find the type or struct a field refers to or log an error."""
 
         if isinstance(field_type, FieldTypeVariant):
-            variant = VariantType(
-                field_type.file_name, field_type.line, field_type.column
-            )
+            variant = VariantType(field_type.file_name, field_type.line, field_type.column)
             variant.bson_serialization_type = []
             for alternative in field_type.variant:
-                alternative_type = self.resolve_field_type(
-                    ctxt, location, field_name, alternative
-                )
+                alternative_type = self.resolve_field_type(ctxt, location, field_name, alternative)
                 if not alternative_type:
                     # There was an error.
                     return None
 
                 if isinstance(alternative_type, Enum):
-                    ctxt.add_variant_enum_error(
-                        location, field_name, alternative_type.name
-                    )
+                    ctxt.add_variant_enum_error(location, field_name, alternative_type.name)
                     return None
 
                 if isinstance(alternative_type, Struct):
@@ -303,9 +293,7 @@ class SymbolTable(object):
                     bson_serialization_type = []
                     # If alternative_type is an array, element type could be Struct or Type.
                     if isinstance(base_type, Type):
-                        bson_serialization_type = cast(
-                            Type, base_type
-                        ).bson_serialization_type
+                        bson_serialization_type = cast(Type, base_type).bson_serialization_type
 
                 variant.bson_serialization_type.extend(bson_serialization_type)
 
@@ -745,9 +733,7 @@ class EnumValue(common.SourceLocation):
 
     def __eq__(self, other):
         return (
-            isinstance(other, EnumValue)
-            and self.name == other.name
-            and self.value == other.value
+            isinstance(other, EnumValue) and self.name == other.name and self.value == other.value
         )
 
     def __ne__(self, other):

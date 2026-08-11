@@ -24,9 +24,7 @@ def _upload(local_source_directory: str, s3_destination_directory: str) -> None:
     files_to_upload = []
     for file in pathlib.Path(local_source_directory).iterdir():
         files_to_upload.append(file)
-    print(
-        "Please authenticate with an account that can upload to the s3 bucket mdb-build-public"
-    )
+    print("Please authenticate with an account that can upload to the s3 bucket mdb-build-public")
     subprocess.check_call(["aws", "configure", "sso", "--profile", "devprod-build"])
 
     s3_destination_directory = s3_destination_directory.rstrip("/") + "/"
@@ -63,10 +61,7 @@ def _upload(local_source_directory: str, s3_destination_directory: str) -> None:
 
     with open("buildscripts/s3_binary/hashes.py", "w", encoding="utf-8") as hash_file:
         hash_dict = (
-            pformat(S3_SHA256_HASHES, indent=4)
-            .replace("'", '"')
-            .replace("}", "")
-            .replace("{", "")
+            pformat(S3_SHA256_HASHES, indent=4).replace("'", '"').replace("}", "").replace("{", "")
         )
         hash_file.write(f"S3_SHA256_HASHES = {{\n {hash_dict}\n}}\n")
 

@@ -7,12 +7,8 @@ import jsonschema
 from license_expression import get_spdx_licensing
 from referencing import Registry, Resource
 
-BOM_SCHEMA_LOCATION = os.path.join(
-    "buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json"
-)
-SPDX_SCHEMA_LOCATION = os.path.join(
-    "buildscripts", "tests", "sbom_linter", "spdx.schema.json"
-)
+BOM_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
+SPDX_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "spdx.schema.json")
 SPDX_SCHEMA_REF = "spdx.schema.json"
 
 # directory to scan for third party libraries
@@ -37,9 +33,7 @@ SCHEMA_MATCH_FAILURE = "File did not match the CycloneDX schema"
 MISSING_VERSION_IN_SBOM_COMPONENT_ERROR = "Component must include a version."
 MISSING_VERSION_IN_IMPORT_FILE_ERROR = "Missing version in the import file: "
 MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR = "Component must include a license."
-COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR = (
-    "Could not find or read the import script file"
-)
+COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR = "Could not find or read the import script file"
 
 
 # A class for managing error messages for components
@@ -102,9 +96,7 @@ def get_script_version(
     try:
         file = open(script_path, "r")
     except OSError:
-        error_manager.append_full_error_message(
-            COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR
-        )
+        error_manager.append_full_error_message(COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR)
         return result
 
     with file:
@@ -136,28 +128,20 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
                 valid_license = True
 
         if not valid_license:
-            licensing_validate = get_spdx_licensing().validate(
-                expression, validate=True
-            )
+            licensing_validate = get_spdx_licensing().validate(expression, validate=True)
             # ExpressionInfo(
             #   original_expression='',
             #   normalized_expression='',
             #   errors=[],
             #   invalid_symbols=[]
             # )
-            valid_license = (
-                not licensing_validate.errors or not licensing_validate.invalid_symbols
-            )
+            valid_license = not licensing_validate.errors or not licensing_validate.invalid_symbols
             if not valid_license:
-                error_manager.append_full_error_message(
-                    f"Invalid license expression: {expression}"
-                )
+                error_manager.append_full_error_message(f"Invalid license expression: {expression}")
                 return
 
 
-def validate_evidence(
-    component: dict, third_party_libs: set, error_manager: ErrorManager
-) -> None:
+def validate_evidence(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
     if component["scope"] == "required":
         if "evidence" not in component or "occurrences" not in component["evidence"]:
             error_manager.append_full_error_message(MISSING_EVIDENCE_ERROR)
@@ -197,14 +181,10 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
 
     script_version = get_script_version(script_path, script_version_key, error_manager)
     if script_version == "":
-        error_manager.append_full_error_message(
-            MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path
-        )
+        error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path)
 
 
-def validate_component(
-    component: dict, third_party_libs: set, error_manager: ErrorManager
-) -> None:
+def validate_component(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
     error_manager.update_component_attribute(component["name"])
     if "scope" not in component:
         error_manager.append_full_error_message("component must include a scope.")
@@ -218,9 +198,7 @@ def validate_component(
     error_manager.update_component_attribute("")
 
 
-def validate_location(
-    component: dict, third_party_libs: set, error_manager: ErrorManager
-) -> None:
+def validate_location(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
     if "evidence" in component:
         if "occurrences" not in component["evidence"]:
             error_manager.append_full_error_message(
@@ -233,9 +211,7 @@ def validate_location(
                 location = occurrence["location"]
 
                 if not os.path.exists(location) and not SKIP_FILE_CHECKING:
-                    error_manager.append_full_error_message(
-                        "location does not exist in repo."
-                    )
+                    error_manager.append_full_error_message("location does not exist in repo.")
 
                 if location.startswith(THIRD_PARTY_LOCATION_PREFIX):
                     lib = location.removeprefix(THIRD_PARTY_LOCATION_PREFIX)

@@ -204,9 +204,7 @@ class IDLCompatibilityErrorCollection(object):
     ) -> None:
         """Add an error message with directory information."""
         self._errors.append(
-            IDLCompatibilityError(
-                error_id, command_name, msg, old_idl_dir, new_idl_dir, file
-            )
+            IDLCompatibilityError(error_id, command_name, msg, old_idl_dir, new_idl_dir, file)
         )
 
     def has_errors(self) -> bool:
@@ -241,9 +239,7 @@ class IDLCompatibilityErrorCollection(object):
         assert error is not None
         return error
 
-    def get_all_errors_by_command_name(
-        self, command_name: str
-    ) -> List[IDLCompatibilityError]:
+    def get_all_errors_by_command_name(self, command_name: str) -> List[IDLCompatibilityError]:
         """Get all the errors in the error collection with the command command_name."""
         return [a for a in self._errors if a.command_name == command_name]
 
@@ -254,10 +250,7 @@ class IDLCompatibilityErrorCollection(object):
     def dump_errors(self) -> None:
         """Print the list of errors."""
         error_list = self.to_list()
-        print(
-            "Errors found while checking IDL compatibility: %s errors:"
-            % (len(error_list))
-        )
+        print("Errors found while checking IDL compatibility: %s errors:" % (len(error_list)))
         for error_msg in error_list:
             print("%s\n\n" % error_msg)
         print("------------------------------------------------")
@@ -293,9 +286,7 @@ class IDLCompatibilityContext(object):
 
     def _add_error(self, error_id: str, command_name: str, msg: str, file: str) -> None:
         """Add an error with an error id and error message."""
-        self.errors.add(
-            error_id, command_name, msg, self.old_idl_dir, self.new_idl_dir, file
-        )
+        self.errors.add(error_id, command_name, msg, self.old_idl_dir, self.new_idl_dir, file)
 
     def add_command_invalid_api_version_error(
         self, command_name: str, api_version: str, file: str
@@ -313,8 +304,7 @@ class IDLCompatibilityContext(object):
         self._add_error(
             ERROR_ID_REMOVED_COMMAND,
             command_name,
-            "The command '%s' was present in the stable API but was removed."
-            % (command_name),
+            "The command '%s' was present in the stable API but was removed." % (command_name),
             file,
         )
 
@@ -328,9 +318,7 @@ class IDLCompatibilityContext(object):
             file,
         )
 
-    def add_duplicate_command_name_error(
-        self, command_name: str, dir_name: str, file: str
-    ) -> None:
+    def add_duplicate_command_name_error(self, command_name: str, dir_name: str, file: str) -> None:
         """Add an error about a duplicate command name within a directory."""
         self._add_error(
             ERROR_ID_DUPLICATE_COMMAND_NAME,
@@ -454,8 +442,7 @@ class IDLCompatibilityContext(object):
                 ERROR_ID_COMMAND_PARAMETER_VALIDATORS_NOT_EQUAL,
                 command_name,
                 "Validator for field or sub-field '%s' in old definition of command '%s' is not equal "
-                "to the validator in the new definition of the field"
-                % (field_name, command_name),
+                "to the validator in the new definition of the field" % (field_name, command_name),
                 file,
             )
         else:
@@ -535,8 +522,7 @@ class IDLCompatibilityContext(object):
                 command_name,
                 "The command '%s' has field or sub-field '%s' of type '%s' that is an enum or "
                 "struct while the old definition of the field type is a non-enum or "
-                "non-struct of type '%s'."
-                % (command_name, field_name, new_type, old_type),
+                "non-struct of type '%s'." % (command_name, field_name, new_type, old_type),
                 file,
             )
         else:
@@ -545,8 +531,7 @@ class IDLCompatibilityContext(object):
                 command_name,
                 "The command '%s' or its sub-struct has type '%s' that is an enum "
                 "or struct while the old definition of the"
-                "type was a non-enum or struct of type '%s'."
-                % (command_name, new_type, old_type),
+                "type was a non-enum or struct of type '%s'." % (command_name, new_type, old_type),
                 file,
             )
 
@@ -910,8 +895,7 @@ class IDLCompatibilityContext(object):
             ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE,
             command_name,
             "The new definition of '%s' has namespace '%s' that is incompatible with the old definition "
-            " of the command with namespace '%s'."
-            % (command_name, new_namespace, old_namespace),
+            " of the command with namespace '%s'." % (command_name, new_namespace, old_namespace),
             file,
         )
 
@@ -1129,8 +1113,7 @@ class IDLCompatibilityContext(object):
             ERROR_ID_NEW_REPLY_FIELD_UNSTABLE,
             command_name,
             "'%s' has an unstable reply field or sub-field '%s' "
-            "that was stable in the old definition of the command."
-            % (command_name, field_name),
+            "that was stable in the old definition of the command." % (command_name, field_name),
             file,
         )
 
@@ -1509,9 +1492,7 @@ class IDLCompatibilityContext(object):
             file,
         )
 
-    def add_new_action_types_not_subset_error(
-        self, command_name: str, file: str
-    ) -> None:
+    def add_new_action_types_not_subset_error(self, command_name: str, file: str) -> None:
         """Add an error about the new access_check action types not being a subset of the old ones."""
         self._add_error(
             ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET,
@@ -1562,9 +1543,7 @@ class IDLCompatibilityContext(object):
             file,
         )
 
-    def add_new_complex_checks_not_subset_error(
-        self, command_name: str, file: str
-    ) -> None:
+    def add_new_complex_checks_not_subset_error(self, command_name: str, file: str) -> None:
         """Add an error about the complex access_check checks not being a subset of the old ones."""
         self._add_error(
             ERROR_ID_NEW_COMPLEX_CHECKS_NOT_SUBSET,
@@ -1578,9 +1557,7 @@ class IDLCompatibilityContext(object):
             file,
         )
 
-    def add_new_complex_privileges_not_subset_error(
-        self, command_name: str, file: str
-    ) -> None:
+    def add_new_complex_privileges_not_subset_error(self, command_name: str, file: str) -> None:
         """Add an error about the complex access_check privileges not being a subset of the old ones."""
         self._add_error(
             ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET,
@@ -1593,9 +1570,7 @@ class IDLCompatibilityContext(object):
             file,
         )
 
-    def add_new_additional_complex_access_check_error(
-        self, command_name: str, file: str
-    ) -> None:
+    def add_new_additional_complex_access_check_error(self, command_name: str, file: str) -> None:
         """Add an error about an additional complex access_check being added."""
         self._add_error(
             ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK,
@@ -1608,9 +1583,7 @@ class IDLCompatibilityContext(object):
             file,
         )
 
-    def add_removed_access_check_field_error(
-        self, command_name: str, file: str
-    ) -> None:
+    def add_removed_access_check_field_error(self, command_name: str, file: str) -> None:
         """Add an error the new command removing the access_check field."""
         self._add_error(
             ERROR_ID_REMOVED_ACCESS_CHECK_FIELD,
@@ -1649,9 +1622,7 @@ class IDLCompatibilityContext(object):
             file,
         )
 
-    def add_generic_argument_removed_reply_field(
-        self, field_name: str, file: str
-    ) -> None:
+    def add_generic_argument_removed_reply_field(self, field_name: str, file: str) -> None:
         """Add an error about a generic reply field that was removed."""
         self._add_error(
             ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD,

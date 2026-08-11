@@ -30,11 +30,7 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         :return: None
         """
 
-        if (
-            _config.REPEAT_SUITES > 1
-            or _config.REPEAT_TESTS > 1
-            or _config.REPEAT_TESTS_SECS
-        ):
+        if _config.REPEAT_SUITES > 1 or _config.REPEAT_TESTS > 1 or _config.REPEAT_TESTS_SECS:
             raise ValueError(
                 "--repeatSuites/--repeatTests cannot be used with benchmark tests. "
                 "Please use --benchmarkMinTimeSecs to increase the runtime of a single benchmark "
@@ -89,6 +85,4 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         return self.bm_executable + ".json"
 
     def _make_process(self):
-        return core.programs.generic_program(
-            self.logger, [self.bm_executable], **self.bm_options
-        )
+        return core.programs.generic_program(self.logger, [self.bm_executable], **self.bm_options)

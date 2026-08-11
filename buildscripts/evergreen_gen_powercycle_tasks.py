@@ -117,9 +117,7 @@ def main(
 
         commands.extend(
             [
-                FunctionCall(
-                    "set up remote credentials", config.remote_credentials_vars
-                ),
+                FunctionCall("set up remote credentials", config.remote_credentials_vars),
                 BuiltInCommand("timeout.update", config.timeout_params),
                 FunctionCall("set up EC2 instance", config.set_up_ec2_instance_vars),
                 FunctionCall("run powercycle test", config.run_powercycle_vars),
@@ -129,9 +127,7 @@ def main(
         sub_tasks.update(
             {
                 Task(
-                    name_generated_task(
-                        task_name, index, config.num_tasks, config.build_variant
-                    ),
+                    name_generated_task(task_name, index, config.num_tasks, config.build_variant),
                     commands,
                     task_dependency,
                 )

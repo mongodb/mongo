@@ -221,9 +221,7 @@ class GenerateAndCheckPerfResultsFixture(unittest.TestCase):
 
 class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
     def test_generate_cedar_report(self):
-        report = self.cbr_hook._generate_cedar_report(
-            self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        )
+        report = self.cbr_hook._generate_cedar_report(self.cbr_hook._parse_report(_BM_FULL_REPORT))
 
         self.assertEqual(len(report), 2)
         self.assertEqual(report[0].thread_level, 1)
@@ -242,9 +240,7 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
 
 class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
     def test_thread_from_name(self):
-        name_obj = self.bm_threads_report.parse_bm_name(
-            {"name": "BM_Name/arg name:100/threads:10"}
-        )
+        name_obj = self.bm_threads_report.parse_bm_name({"name": "BM_Name/arg name:100/threads:10"})
         self.assertEqual(name_obj.thread_count, "10")
         self.assertEqual(name_obj.statistic_type, None)
         self.assertEqual(name_obj.base_name, "BM_Name/arg name:100")
@@ -256,9 +252,7 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(name_obj.statistic_type, "mean")
         self.assertEqual(name_obj.base_name, "BM_Name/arg name:100")
 
-        name_obj = self.bm_threads_report.parse_bm_name(
-            {"name": "BM_Name/threads:abcd"}
-        )
+        name_obj = self.bm_threads_report.parse_bm_name({"name": "BM_Name/threads:abcd"})
         self.assertEqual(name_obj.thread_count, "abcd")
         self.assertEqual(name_obj.statistic_type, None)
         self.assertEqual(name_obj.base_name, "BM_Name")
@@ -275,16 +269,12 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(name_obj.statistic_type, "mean")
         self.assertEqual(name_obj.base_name, "BM_Name/1/eeee")
 
-        name_obj = self.bm_threads_report.parse_bm_name(
-            {"name": "BM_Name/arg name:100"}
-        )
+        name_obj = self.bm_threads_report.parse_bm_name({"name": "BM_Name/arg name:100"})
         self.assertEqual(name_obj.thread_count, "1")
         self.assertEqual(name_obj.statistic_type, None)
         self.assertEqual(name_obj.base_name, "BM_Name/arg name:100")
 
-        name_obj = self.bm_threads_report.parse_bm_name(
-            {"name": "BM_baseline_match_simple/0"}
-        )
+        name_obj = self.bm_threads_report.parse_bm_name({"name": "BM_baseline_match_simple/0"})
         self.assertEqual(name_obj.thread_count, "1")
         self.assertEqual(name_obj.statistic_type, None)
         self.assertEqual(name_obj.base_name, "BM_baseline_match_simple/0")

@@ -182,12 +182,8 @@ dbl_distributions.append(
         children=[
             dbl_distributions[0],
             dbl_distributions[4],
-            RandomDistribution.normal(
-                RangeGenerator(DataType.DOUBLE, 500.0, 600.0, 0.1)
-            ),
-            RandomDistribution.normal(
-                RangeGenerator(DataType.DOUBLE, 3000200.0, 5000100.0, 3030)
-            ),
+            RandomDistribution.normal(RangeGenerator(DataType.DOUBLE, 500.0, 600.0, 0.1)),
+            RandomDistribution.normal(RangeGenerator(DataType.DOUBLE, 3000200.0, 5000100.0, 3030)),
         ],
         weight=[1, 1, 1, 1],
     )
@@ -201,27 +197,13 @@ HOUR = MINUTE * 60
 DAY = HOUR * 24
 MONTH = DAY * 30
 
-range_dtt_1y = RangeGenerator(
-    DataType.DATE, datetime(2007, 1, 1), datetime(2008, 1, 1), HOUR
-)
-range_dtt_1m_1 = RangeGenerator(
-    DataType.DATE, datetime(2007, 2, 1), datetime(2008, 3, 1), HOUR
-)
-range_dtt_1m_2 = RangeGenerator(
-    DataType.DATE, datetime(2007, 6, 1), datetime(2008, 7, 1), HOUR
-)
-range_dtt_1m_3 = RangeGenerator(
-    DataType.DATE, datetime(2007, 10, 1), datetime(2008, 11, 1), HOUR
-)
-range_dtt_10y_1 = RangeGenerator(
-    DataType.DATE, datetime(2006, 1, 1), datetime(2016, 1, 1), DAY
-)
-range_dtt_10y_2 = RangeGenerator(
-    DataType.DATE, datetime(1995, 1, 1), datetime(2005, 1, 1), DAY
-)
-range_dtt_20y = RangeGenerator(
-    DataType.DATE, datetime(1997, 10, 1), datetime(2017, 11, 1), MONTH
-)
+range_dtt_1y = RangeGenerator(DataType.DATE, datetime(2007, 1, 1), datetime(2008, 1, 1), HOUR)
+range_dtt_1m_1 = RangeGenerator(DataType.DATE, datetime(2007, 2, 1), datetime(2008, 3, 1), HOUR)
+range_dtt_1m_2 = RangeGenerator(DataType.DATE, datetime(2007, 6, 1), datetime(2008, 7, 1), HOUR)
+range_dtt_1m_3 = RangeGenerator(DataType.DATE, datetime(2007, 10, 1), datetime(2008, 11, 1), HOUR)
+range_dtt_10y_1 = RangeGenerator(DataType.DATE, datetime(2006, 1, 1), datetime(2016, 1, 1), DAY)
+range_dtt_10y_2 = RangeGenerator(DataType.DATE, datetime(1995, 1, 1), datetime(2005, 1, 1), DAY)
+range_dtt_20y = RangeGenerator(DataType.DATE, datetime(1997, 10, 1), datetime(2017, 11, 1), MONTH)
 
 dt_distributions = []
 
@@ -268,9 +250,7 @@ def next_char(char: str, distance: int, min_char_code: int, max_char_code: int):
         min_char_code <= char_code <= max_char_code
     ), f'char_code "{char_code}" is out of range ({min_char_code}, {max_char_code})'
     number_of_chars = max_char_code - min_char_code + 1
-    new_char_code = (
-        (char_code - min_char_code + distance) % number_of_chars
-    ) + min_char_code
+    new_char_code = ((char_code - min_char_code + distance) % number_of_chars) + min_char_code
     assert (
         min_char_code <= new_char_code <= max_char_code
     ), f'new char code "{new_char_code}" is out of range'
@@ -375,9 +355,7 @@ def add_choice_distr(
     v_name: str,
     w_name: str,
 ):
-    distr = RandomDistribution.choice(
-        str_set, weight_distr.generate(len(str_set)), v_name, w_name
-    )
+    distr = RandomDistribution.choice(str_set, weight_distr.generate(len(str_set)), v_name, w_name)
     distr_set.append(distr)
 
 
@@ -394,12 +372,8 @@ for set_name, cur_set in string_sets.items():
 
 # array lenght distributions - they are all uniform
 arr_len_dist_s = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 6, 1))
-arr_len_dist_m = RandomDistribution.uniform(
-    RangeGenerator(DataType.INTEGER, 90, 110, 3)
-)
-arr_len_dist_l = RandomDistribution.uniform(
-    RangeGenerator(DataType.INTEGER, 900, 1100, 10)
-)
+arr_len_dist_m = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 90, 110, 3))
+arr_len_dist_l = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 900, 1100, 10))
 
 
 def add_array_distr(
@@ -464,25 +438,13 @@ mix_distributions = []
 int_str_mix_1 = [int_distributions[0], str_distributions[0]]
 int_str_mix_2 = [int_distributions_offset[7], str_distributions[-1]]
 
-mix_distributions.append(
-    RandomDistribution.mixed(children=int_str_mix_1, weight=[0.5, 0.5])
-)
-mix_distributions.append(
-    RandomDistribution.mixed(children=int_str_mix_2, weight=[0.5, 0.5])
-)
+mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_1, weight=[0.5, 0.5]))
+mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_2, weight=[0.5, 0.5]))
 
-mix_distributions.append(
-    RandomDistribution.mixed(children=int_str_mix_1, weight=[0.1, 0.9])
-)
-mix_distributions.append(
-    RandomDistribution.mixed(children=int_str_mix_1, weight=[0.9, 0.1])
-)
-mix_distributions.append(
-    RandomDistribution.mixed(children=int_str_mix_2, weight=[0.1, 0.9])
-)
-mix_distributions.append(
-    RandomDistribution.mixed(children=int_str_mix_2, weight=[0.9, 0.1])
-)
+mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_1, weight=[0.1, 0.9]))
+mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_1, weight=[0.9, 0.1]))
+mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_2, weight=[0.1, 0.9]))
+mix_distributions.append(RandomDistribution.mixed(children=int_str_mix_2, weight=[0.9, 0.1]))
 
 # Doubles and strings
 dbl_ascii_range = RangeGenerator(
@@ -491,25 +453,15 @@ dbl_ascii_range = RangeGenerator(
 ascii_double_range_distr = RandomDistribution.normal(dbl_ascii_range)
 
 dbl_str_mix_1 = [ascii_double_range_distr, str_distributions[1]]
-mix_distributions.append(
-    RandomDistribution.mixed(children=dbl_str_mix_1, weight=[0.5, 0.5])
-)
-mix_distributions.append(
-    RandomDistribution.mixed(children=dbl_str_mix_1, weight=[0.1, 0.9])
-)
-mix_distributions.append(
-    RandomDistribution.mixed(children=dbl_str_mix_1, weight=[0.9, 0.1])
-)
+mix_distributions.append(RandomDistribution.mixed(children=dbl_str_mix_1, weight=[0.5, 0.5]))
+mix_distributions.append(RandomDistribution.mixed(children=dbl_str_mix_1, weight=[0.1, 0.9]))
+mix_distributions.append(RandomDistribution.mixed(children=dbl_str_mix_1, weight=[0.9, 0.1]))
 
 dbl_str_mix_2 = [dbl_distributions[5], str_distributions[0]]
-mix_distributions.append(
-    RandomDistribution.mixed(children=dbl_str_mix_2, weight=[0.5, 0.5])
-)
+mix_distributions.append(RandomDistribution.mixed(children=dbl_str_mix_2, weight=[0.5, 0.5]))
 
 dbl_str_mix_3 = [dbl_distributions[5], str_distributions[5]]
-mix_distributions.append(
-    RandomDistribution.mixed(children=dbl_str_mix_3, weight=[0.5, 0.5])
-)
+mix_distributions.append(RandomDistribution.mixed(children=dbl_str_mix_3, weight=[0.5, 0.5]))
 
 # Doubles and/or strings and dates
 
@@ -519,13 +471,9 @@ mix_distributions.append(
 )
 
 str_dt_mix_1 = [str_distributions[0], dt_distributions[-1]]
-mix_distributions.append(
-    RandomDistribution.mixed(children=str_dt_mix_1, weight=[0.5, 0.5])
-)
+mix_distributions.append(RandomDistribution.mixed(children=str_dt_mix_1, weight=[0.5, 0.5]))
 str_dt_mix_2 = [str_distributions[-1], dt_distributions[0]]
-mix_distributions.append(
-    RandomDistribution.mixed(children=str_dt_mix_2, weight=[0.5, 0.5])
-)
+mix_distributions.append(RandomDistribution.mixed(children=str_dt_mix_2, weight=[0.5, 0.5]))
 
 ################################################################################
 # Collection templates

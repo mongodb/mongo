@@ -72,9 +72,7 @@ class CompilerImportResolver(parser.ImportResolverBase):
         # type: (str, str) -> str
         """Return the complete path to an imported file name."""
 
-        logging.debug(
-            "Resolving imported file '%s' for file '%s'", imported_file_name, base_file
-        )
+        logging.debug("Resolving imported file '%s' for file '%s'", imported_file_name, base_file)
 
         # Check for fully-qualified paths
         logging.debug(
@@ -94,9 +92,7 @@ class CompilerImportResolver(parser.ImportResolverBase):
 
         for candidate_dir in self._import_directories or []:
             base_dir = os.path.abspath(candidate_dir)
-            resolved_file_name = os.path.normpath(
-                os.path.join(base_dir, imported_file_name)
-            )
+            resolved_file_name = os.path.normpath(os.path.join(base_dir, imported_file_name))
 
             logging.debug(
                 "Checking for imported file '%s' for file '%s' at '%s'",
@@ -172,15 +168,11 @@ def _update_import_includes(args, spec, header_file_name):
 
     for resolved_file_name in spec.imports.resolved_imports:
         # Guess: the file naming rules are consistent across IDL invocations
-        include_h_file_name = (
-            os.path.splitext(resolved_file_name)[0] + args.output_suffix + ".h"
-        )
+        include_h_file_name = os.path.splitext(resolved_file_name)[0] + args.output_suffix + ".h"
 
         if args.output_base_dir:
             base_dir = os.path.normpath(args.output_base_dir)
-            include_h_file_name = os.path.relpath(
-                os.path.normpath(include_h_file_name), base_dir
-            )
+            include_h_file_name = os.path.relpath(os.path.normpath(include_h_file_name), base_dir)
 
             if os.path.isabs(base_dir):
                 include_h_file_name = os.path.join(
@@ -188,9 +180,7 @@ def _update_import_includes(args, spec, header_file_name):
                     include_h_file_name[include_h_file_name.rfind(first_dir) :],
                 )
             else:
-                include_h_file_name = include_h_file_name[
-                    include_h_file_name.find(first_dir) :
-                ]
+                include_h_file_name = include_h_file_name[include_h_file_name.find(first_dir) :]
         else:
             include_h_file_name = os.path.abspath(include_h_file_name)
 

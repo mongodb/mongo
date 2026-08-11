@@ -70,9 +70,7 @@ def run_rules_lint(
             print("Running rules_lint formatter")
         if files_to_format != "all":
             command += files_to_format
-        repo_path = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
+        repo_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         subprocess.run(command, check=True, env=os.environ, cwd=repo_path)
     except subprocess.CalledProcessError:
         return False
@@ -87,9 +85,7 @@ def run_shellscripts_linters(shellscripts_linters: pathlib.Path, check: bool) ->
             command.append("fix")
         else:
             print("Running shellscripts linter")
-        repo_path = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
+        repo_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         subprocess.run(command, check=True, env=os.environ, cwd=repo_path)
     except subprocess.CalledProcessError:
         return False
@@ -151,9 +147,7 @@ def main() -> int:
     # If we are running in bazel, default the directory to the workspace
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
     if not default_dir:
-        print(
-            "This script must be run though bazel. Please run 'bazel run //:format' instead"
-        )
+        print("This script must be run though bazel. Please run 'bazel run //:format' instead")
         print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
         return 1
@@ -162,9 +156,7 @@ def main() -> int:
         prog="Format", description="This script formats code in mongodb"
     )
 
-    parser.add_argument(
-        "--check", help="Run in check mode", default=False, action="store_true"
-    )
+    parser.add_argument("--check", help="Run in check mode", default=False, action="store_true")
     parser.add_argument(
         "--prettier", help="Set the path to prettier", required=True, type=pathlib.Path
     )
@@ -210,9 +202,7 @@ def main() -> int:
             print(
                 f"The number of commits between current branch and origin branch ({args.origin_branch}) is too large: {distance} commits"
             )
-            print(
-                "WARNING!!! Defaulting to formatting all files, this may take a while."
-            )
+            print("WARNING!!! Defaulting to formatting all files, this may take a while.")
             print(
                 "Please update your local branch with the latest changes from origin, or use `bazel run format -- --origin-branch other_branch` to select a different origin branch"
             )
@@ -229,9 +219,7 @@ def main() -> int:
         validate_bazel_groups(generate_report=True, fix=not args.check)
 
     if files_to_format != "all":
-        files_to_format = [
-            str(file) for file in files_to_format if os.path.isfile(file)
-        ]
+        files_to_format = [str(file) for file in files_to_format if os.path.isfile(file)]
 
     return (
         0

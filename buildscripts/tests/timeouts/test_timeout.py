@@ -9,9 +9,7 @@ from buildscripts.timeouts import timeout as under_test
 
 class CalculateTimeoutTest(unittest.TestCase):
     def test_min_timeout(self):
-        self.assertEqual(
-            under_test.MIN_TIMEOUT_SECONDS, under_test.calculate_timeout(15, 1)
-        )
+        self.assertEqual(under_test.MIN_TIMEOUT_SECONDS, under_test.calculate_timeout(15, 1))
 
     def test_over_timeout_by_one_minute(self):
         self.assertEqual(360, under_test.calculate_timeout(301, 1))
@@ -38,23 +36,17 @@ class TimeoutEstimateTest(unittest.TestCase):
             timeout_est.generate_timeout_cmd(is_patch=True, repeat_factor=1)
 
     def test_is_specified_should_return_true_when_a_test_runtime_is_specified(self):
-        timeout_est = under_test.TimeoutEstimate(
-            max_test_runtime=3.14, expected_task_runtime=None
-        )
+        timeout_est = under_test.TimeoutEstimate(max_test_runtime=3.14, expected_task_runtime=None)
 
         self.assertTrue(timeout_est.is_specified())
 
     def test_is_specified_should_return_true_when_a_task_runtime_is_specified(self):
-        timeout_est = under_test.TimeoutEstimate(
-            max_test_runtime=None, expected_task_runtime=3.14
-        )
+        timeout_est = under_test.TimeoutEstimate(max_test_runtime=None, expected_task_runtime=3.14)
 
         self.assertTrue(timeout_est.is_specified())
 
     def test_is_specified_should_return_false_when_no_data_is_specified(self):
-        timeout_est = under_test.TimeoutEstimate(
-            max_test_runtime=None, expected_task_runtime=None
-        )
+        timeout_est = under_test.TimeoutEstimate(max_test_runtime=None, expected_task_runtime=None)
 
         self.assertFalse(timeout_est.is_specified())
 
@@ -110,9 +102,7 @@ class TestTimeoutInfo(unittest.TestCase):
     def test_both_timeouts_set(self):
         timeout = 3
         exec_timeout = 5
-        timeout_info = under_test.TimeoutInfo.overridden(
-            exec_timeout=exec_timeout, timeout=timeout
-        )
+        timeout_info = under_test.TimeoutInfo.overridden(exec_timeout=exec_timeout, timeout=timeout)
 
         cmd = timeout_info.cmd.as_dict()
 

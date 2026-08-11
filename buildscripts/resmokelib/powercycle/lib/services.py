@@ -63,9 +63,7 @@ class WindowsService(object):
     def create(self):
         """Create service, if not installed. Return (code, output) tuple."""
         if self.status() in list(self._states.values()):
-            return 1, "Service '{}' already installed, status: {}".format(
-                self.name, self.status()
-            )
+            return 1, "Service '{}' already installed, status: {}".format(self.name, self.status())
         try:
             win32serviceutil.InstallService(
                 pythonClassString="Service.{}".format(self.name),
@@ -162,9 +160,7 @@ class WindowsService(object):
                 # (winerror=109) when stopping the "mongod-powercycle-test" service on
                 # Windows Server 2016 and the underlying mongod process has already exited.
                 ret = 0
-                output = (
-                    f"Assuming service '{self.name}' stopped despite error: {output}"
-                )
+                output = f"Assuming service '{self.name}' stopped despite error: {output}"
 
         return ret, output
 

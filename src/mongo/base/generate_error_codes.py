@@ -55,12 +55,8 @@ def init_parser():
         description=__doc__,
         epilog=help_epilog,
     )
-    parser.add_argument(
-        "--verbose", action="store_true", help="extra debug logging to stderr"
-    )
-    parser.add_argument(
-        "error_codes_spec", help="YAML file describing error codes and categories"
-    )
+    parser.add_argument("--verbose", action="store_true", help="extra debug logging to stderr")
+    parser.add_argument("error_codes_spec", help="YAML file describing error codes and categories")
     parser.add_argument("template_file", help="Cheetah template file")
     parser.add_argument("output_file")
 
@@ -210,8 +206,7 @@ def has_duplicate_error_codes(error_codes):
     for curr in sorted_by_name[1:]:
         if curr.name == prev.name:
             sys.stdout.write(
-                "Duplicate name %s with codes %s and %s\n"
-                % (curr.name, curr.code, prev.code)
+                "Duplicate name %s with codes %s and %s\n" % (curr.name, curr.code, prev.code)
             )
             failed = True
         prev = curr
@@ -220,8 +215,7 @@ def has_duplicate_error_codes(error_codes):
     for curr in sorted_by_code[1:]:
         if curr.code == prev.code:
             sys.stdout.write(
-                "Duplicate code %s with names %s and %s\n"
-                % (curr.code, curr.name, prev.name)
+                "Duplicate code %s with names %s and %s\n" % (curr.code, curr.name, prev.name)
             )
             failed = True
         prev = curr
@@ -250,9 +244,7 @@ def has_missing_error_codes(error_codes, error_classes):
             try:
                 code_names[name].categories.append(category.name)
             except KeyError:
-                sys.stdout.write(
-                    "Undeclared error code %s in class %s\n" % (name, category.name)
-                )
+                sys.stdout.write("Undeclared error code %s in class %s\n" % (name, category.name))
                 failed = True
 
     return failed

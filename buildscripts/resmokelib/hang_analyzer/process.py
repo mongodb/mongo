@@ -81,14 +81,10 @@ def signal_python(logger, pname, pid):
     # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
     # a signal handler to wait for the signal since it supports POSIX signals.
     if _IS_WINDOWS:
-        logger.info(
-            "Calling SetEvent to signal python process %s with PID %d", pname, pid
-        )
+        logger.info("Calling SetEvent to signal python process %s with PID %d", pname, pid)
         signal_event_object(logger, pid)
     else:
-        logger.info(
-            "Sending signal SIGUSR1 to python process %s with PID %d", pname, pid
-        )
+        logger.info("Sending signal SIGUSR1 to python process %s with PID %d", pname, pid)
         signal_process(logger, pid, signal.SIGUSR1)
 
     logger.info("Waiting for process to report")
@@ -104,9 +100,7 @@ def signal_event_object(logger, pid):
     try:
         desired_access = win32event.EVENT_MODIFY_STATE
         inherit_handle = False
-        task_timeout_handle = win32event.OpenEvent(
-            desired_access, inherit_handle, event_name
-        )
+        task_timeout_handle = win32event.OpenEvent(desired_access, inherit_handle, event_name)
     except win32event.error as err:
         logger.info("Exception from win32event.OpenEvent with error: %s", err)
         return
@@ -152,9 +146,7 @@ def resume_process(logger, pname, pid):
 
 def teardown_processes(logger, processes, dump_pids):
     """Kill processes with SIGKILL or SIGABRT."""
-    logger.info(
-        "Starting to kill or abort processes. Logs should be ignored from this point."
-    )
+    logger.info("Starting to kill or abort processes. Logs should be ignored from this point.")
     for pinfo in processes:
         for pid in pinfo.pidv:
             try:

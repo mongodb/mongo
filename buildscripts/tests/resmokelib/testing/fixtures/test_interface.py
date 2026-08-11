@@ -21,9 +21,7 @@ class TestFixture(unittest.TestCase):
 
 class TestFixtureTeardownHandler(unittest.TestCase):
     def test_teardown_ok(self):
-        handler = interface.FixtureTeardownHandler(
-            logging.getLogger("handler_unittests")
-        )
+        handler = interface.FixtureTeardownHandler(logging.getLogger("handler_unittests"))
         # Before any teardown.
         self.assertTrue(handler.was_successful())
         self.assertIsNone(handler.get_error_message())
@@ -35,9 +33,7 @@ class TestFixtureTeardownHandler(unittest.TestCase):
         self.assertIsNone(handler.get_error_message())
 
     def test_teardown_error(self):
-        handler = interface.FixtureTeardownHandler(
-            logging.getLogger("handler_unittests")
-        )
+        handler = interface.FixtureTeardownHandler(logging.getLogger("handler_unittests"))
         # Failing teardown.
         ko_fixture = UnitTestFixture(should_raise=True)
         handler.teardown(ko_fixture, "ko")

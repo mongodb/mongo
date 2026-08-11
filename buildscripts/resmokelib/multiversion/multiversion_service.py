@@ -156,9 +156,7 @@ class MongoReleases(BaseModel):
       LTS.
     """
 
-    feature_compatibility_versions: List[str] = Field(
-        alias="featureCompatibilityVersions"
-    )
+    feature_compatibility_versions: List[str] = Field(alias="featureCompatibilityVersions")
     long_term_support_releases: List[str] = Field(alias="longTermSupportReleases")
     eol_versions: List[str] = Field(alias="eolVersions")
     generate_fcv_lower_bound_override: Optional[str] = Field(
@@ -204,9 +202,7 @@ class MongoReleases(BaseModel):
 class MultiversionService:
     """A service for working with multiversion information."""
 
-    def __init__(
-        self, mongo_version: MongoVersion, mongo_releases: MongoReleases
-    ) -> None:
+    def __init__(self, mongo_version: MongoVersion, mongo_releases: MongoReleases) -> None:
         """
         Initialize the service.
 
@@ -230,9 +226,7 @@ class MultiversionService:
         last_lts = lts[bisect_left(lts, latest) - 1]
 
         # All FCVs greater than last LTS, up to latest.
-        requires_fcv_tag_list = fcvs[
-            bisect_right(fcvs, last_lts) : bisect_right(fcvs, latest)
-        ]
+        requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts) : bisect_right(fcvs, latest)]
         requires_fcv_tag_list_continuous = [latest]
 
         # All FCVs less than latest.

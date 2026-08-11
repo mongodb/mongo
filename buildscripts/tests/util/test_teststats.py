@@ -16,9 +16,7 @@ _DATE = datetime.datetime(2018, 7, 15)
 
 class NormalizeTestNameTest(unittest.TestCase):
     def test_unix_names(self):
-        self.assertEqual(
-            "/home/user/test.js", under_test.normalize_test_name("/home/user/test.js")
-        )
+        self.assertEqual("/home/user/test.js", under_test.normalize_test_name("/home/user/test.js"))
 
     def test_windows_names(self):
         self.assertEqual(
@@ -171,9 +169,7 @@ class TestHistoricTaskData(unittest.TestCase):
         ]
         mock_get.return_value = mock_response
 
-        result = under_test.HistoricTaskData.get_stats_from_s3(
-            "project", "task", "variant"
-        )
+        result = under_test.HistoricTaskData.get_stats_from_s3("project", "task", "variant")
 
         self.assertEqual(
             result,
@@ -201,8 +197,6 @@ class TestHistoricTaskData(unittest.TestCase):
         mock_response.json.side_effect = JSONDecodeError("msg", "doc", 0)
         mock_get.return_value = mock_response
 
-        result = under_test.HistoricTaskData.get_stats_from_s3(
-            "project", "task", "variant"
-        )
+        result = under_test.HistoricTaskData.get_stats_from_s3("project", "task", "variant")
 
         self.assertEqual(result, [])

@@ -33,15 +33,11 @@ class TestShardedClusterFixtureUDSEnvironmentVariables(unittest.TestCase):
 
         # Should be comma-separated list
         paths_list = uds_paths.split(",")
-        self.assertGreater(
-            len(paths_list), 0, f"Should have at least one UDS path: {uds_paths}"
-        )
+        self.assertGreater(len(paths_list), 0, f"Should have at least one UDS path: {uds_paths}")
 
         # Verify each path
         for uds_path in paths_list:
-            self.assertIn(
-                "/", uds_path, f"UDS path should be an absolute path: {uds_path}"
-            )
+            self.assertIn("/", uds_path, f"UDS path should be an absolute path: {uds_path}")
             self.assertIn(
                 "mongodb-",
                 uds_path,
@@ -78,9 +74,7 @@ class TestShardedClusterFixtureUDSEnvironmentVariables(unittest.TestCase):
         # Verify each path
         for uds_path in paths_list:
             # Verify it's a path
-            self.assertIn(
-                "/", uds_path, f"UDS path should be an absolute path: {uds_path}"
-            )
+            self.assertIn("/", uds_path, f"UDS path should be an absolute path: {uds_path}")
 
             # Verify it contains mongodb in the filename
             self.assertIn(
@@ -111,9 +105,7 @@ class TestShardedClusterFixtureUDSEnvironmentVariables(unittest.TestCase):
     def test_mongodb_connection_string_is_still_set(self):
         """Test that MONGODB_CONNECTION_STRING is still set even with UDS."""
         conn_str = os.environ.get("MONGODB_CONNECTION_STRING")
-        self.assertIsNotNone(
-            conn_str, "MONGODB_CONNECTION_STRING should still be set with UDS"
-        )
+        self.assertIsNotNone(conn_str, "MONGODB_CONNECTION_STRING should still be set with UDS")
         # For sharded clusters, connection string points to mongos
         self.assertIn(
             "localhost",

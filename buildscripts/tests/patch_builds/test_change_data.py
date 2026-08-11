@@ -57,12 +57,8 @@ class TestGenerateRevisionMap(unittest.TestCase):
 
         revision_map = under_test.generate_revision_map(mock_repo_list, revision_data)
 
-        self.assertEqual(
-            revision_map[mock_repo_list[0].git_dir], revision_data["mongo"]
-        )
-        self.assertEqual(
-            revision_map[mock_repo_list[1].git_dir], revision_data["enterprise"]
-        )
+        self.assertEqual(revision_map[mock_repo_list[0].git_dir], revision_data["mongo"])
+        self.assertEqual(revision_map[mock_repo_list[1].git_dir], revision_data["enterprise"])
 
     def test_missing_revisions_are_not_returned(self):
         mock_repo_list = [
@@ -73,9 +69,7 @@ class TestGenerateRevisionMap(unittest.TestCase):
 
         revision_map = under_test.generate_revision_map(mock_repo_list, revision_data)
 
-        self.assertEqual(
-            revision_map[mock_repo_list[0].git_dir], revision_data["mongo"]
-        )
+        self.assertEqual(revision_map[mock_repo_list[0].git_dir], revision_data["mongo"])
         self.assertEqual(len(revision_map), 1)
 
     def test_missing_repos_are_not_returned(self):
@@ -84,7 +78,5 @@ class TestGenerateRevisionMap(unittest.TestCase):
 
         revision_map = under_test.generate_revision_map(mock_repo_list, revision_data)
 
-        self.assertEqual(
-            revision_map[mock_repo_list[0].git_dir], revision_data["mongo"]
-        )
+        self.assertEqual(revision_map[mock_repo_list[0].git_dir], revision_data["mongo"])
         self.assertEqual(len(revision_map), 1)

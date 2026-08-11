@@ -33,42 +33,26 @@ def __lldb_init_module(debugger, *_args):
         "type summary add -s 'A${*var.__ptr_.__value_}' -x '^std::__1::unique_ptr<.+>$'"
     )
 
-    debugger.HandleCommand(
-        "type summary add -s '${var._value}' -x '^mongo::AtomicWord<.+>$'"
-    )
-    debugger.HandleCommand(
-        "type summary add -s '${var._M_base._M_i}' 'std::atomic<bool>'"
-    )
+    debugger.HandleCommand("type summary add -s '${var._value}' -x '^mongo::AtomicWord<.+>$'")
+    debugger.HandleCommand("type summary add -s '${var._M_base._M_i}' 'std::atomic<bool>'")
     debugger.HandleCommand("type summary add -s '${var._M_i}' -x '^std::atomic<.+>$'")
 
-    debugger.HandleCommand(
-        "type summary add mongo::BSONObj -F lldb_printers.BSONObjPrinter"
-    )
+    debugger.HandleCommand("type summary add mongo::BSONObj -F lldb_printers.BSONObjPrinter")
     debugger.HandleCommand(
         "type summary add mongo::BSONElement -F lldb_printers.BSONElementPrinter"
     )
 
-    debugger.HandleCommand(
-        "type summary add mongo::Status -F lldb_printers.StatusPrinter"
-    )
+    debugger.HandleCommand("type summary add mongo::Status -F lldb_printers.StatusPrinter")
     debugger.HandleCommand(
         "type summary add -x '^mongo::StatusWith<.+>$' -F lldb_printers.StatusWithPrinter"
     )
 
-    debugger.HandleCommand(
-        "type summary add mongo::StringData -F lldb_printers.StringDataPrinter"
-    )
-    debugger.HandleCommand(
-        "type summary add mongo::NamespaceString --summary-string '${var._ns}'"
-    )
+    debugger.HandleCommand("type summary add mongo::StringData -F lldb_printers.StringDataPrinter")
+    debugger.HandleCommand("type summary add mongo::NamespaceString --summary-string '${var._ns}'")
 
     debugger.HandleCommand("type summary add mongo::UUID -F lldb_printers.UUIDPrinter")
-    debugger.HandleCommand(
-        "type summary add mongo::Decimal128 -F lldb_printers.Decimal128Printer"
-    )
-    debugger.HandleCommand(
-        "type summary add mongo::Date_t -F lldb_printers.Date_tPrinter"
-    )
+    debugger.HandleCommand("type summary add mongo::Decimal128 -F lldb_printers.Decimal128Printer")
+    debugger.HandleCommand("type summary add mongo::Date_t -F lldb_printers.Date_tPrinter")
 
     debugger.HandleCommand(
         "type summary add --summary-string '${var.m_pathname}' 'boost::filesystem::path'"
@@ -122,9 +106,7 @@ def StatusWithPrinter(valobj, *_args):  # pylint: disable=invalid-name
         .GetValueAsUnsigned()
     )
     if code == 0:
-        return "StatusWith(OK, {})".format(
-            valobj.GetChildMemberWithName("_t").children[0]
-        )
+        return "StatusWith(OK, {})".format(valobj.GetChildMemberWithName("_t").children[0])
     rep = StatusPrinter(status)
     return rep.replace("Status", "StatusWith", 1)
 
@@ -136,9 +118,7 @@ def StringDataPrinter(valobj, *_args):  # pylint: disable=invalid-name
         return "nullptr"
 
     size1 = valobj.GetChildMemberWithName("_size").GetValueAsUnsigned(0)
-    return '"{}"'.format(
-        valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).decode("utf-8")
-    )
+    return '"{}"'.format(valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).decode("utf-8"))
 
 
 def read_memory_as_hex(process, address, size):
@@ -207,9 +187,7 @@ def BSONElementPrinter(valobj, *_args):  # pylint: disable=invalid-name
     mem = bytes(memoryview(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
 
     # Call an internal bson method to directly convert an BSON element to a string
-    el_tuple = bson._element_to_dict(
-        mem, memoryview(mem), 0, len(mem), DEFAULT_CODEC_OPTIONS
-    )  # pylint: disable=protected-access
+    el_tuple = bson._element_to_dict(mem, memoryview(mem), 0, len(mem), DEFAULT_CODEC_OPTIONS)  # pylint: disable=protected-access
 
     return '"%s": %s' % (el_tuple[0], el_tuple[1])
 
@@ -319,10 +297,7 @@ class OptionalPrinter:
 
     def update(self):
         """Check if the optional has changed."""
-        self.is_init = (
-            self.valobj.GetChildMemberWithName("m_initialized").GetValueAsUnsigned()
-            != 0
-        )
+        self.is_init = self.valobj.GetChildMemberWithName("m_initialized").GetValueAsUnsigned() != 0
         self.value = None
         if self.is_init:
             temp_type = self.valobj.GetType().GetTemplateArgumentType(0)
@@ -403,9 +378,7 @@ class AbslHashSetPrinter:
         return True
 
     def update(self):
-        self.capacity = self.valobj.GetChildMemberWithName(
-            "capacity_"
-        ).GetValueAsUnsigned()
+        self.capacity = self.valobj.GetChildMemberWithName("capacity_").GetValueAsUnsigned()
 
         self.data_type = self.valobj.GetChildMemberWithName("slots_").GetType()
 
@@ -463,9 +436,7 @@ class AbslHashMapPrinter:
         return True
 
     def update(self):
-        self.capacity = self.valobj.GetChildMemberWithName(
-            "capacity_"
-        ).GetValueAsUnsigned()
+        self.capacity = self.valobj.GetChildMemberWithName("capacity_").GetValueAsUnsigned()
         self.data_type = self.valobj.GetChildMemberWithName("slots_").GetType()
         self.data_size = self.data_type.GetByteSize()
 
@@ -490,16 +461,9 @@ def print_type_base(data_type):
     print("IsPolymorphicClass: %s " % (data_type.IsPolymorphicClass()))
     print("GetNumberOfFields: %s " % (data_type.GetNumberOfFields()))
     print("GetNumberOfMemberFunctions: %s " % (data_type.GetNumberOfMemberFunctions()))
-    print(
-        "GetNumberOfTemplateArguments: %s " % (data_type.GetNumberOfTemplateArguments())
-    )
-    print(
-        "GetNumberOfVirtualBaseClasses: %s "
-        % (data_type.GetNumberOfVirtualBaseClasses())
-    )
-    print(
-        "GetNumberOfDirectBaseClasses: %s " % (data_type.GetNumberOfDirectBaseClasses())
-    )
+    print("GetNumberOfTemplateArguments: %s " % (data_type.GetNumberOfTemplateArguments()))
+    print("GetNumberOfVirtualBaseClasses: %s " % (data_type.GetNumberOfVirtualBaseClasses()))
+    print("GetNumberOfDirectBaseClasses: %s " % (data_type.GetNumberOfDirectBaseClasses()))
 
 
 def print_type(data_type):

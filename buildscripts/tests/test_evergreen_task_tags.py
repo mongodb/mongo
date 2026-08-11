@@ -27,9 +27,7 @@ class TestGetAllTaskTags(unittest.TestCase):
     def test_with_some_tags(self):
         task_prefixes = ["b", "a", "q", "v"]
         n_tags = 3
-        task_list_mock = [
-            MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes
-        ]
+        task_list_mock = [MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes]
         evg_config_mock = MagicMock(tasks=task_list_mock)
 
         tag_list = ett.get_all_task_tags(evg_config_mock)
@@ -51,9 +49,7 @@ class TestGetTasksWithTag(unittest.TestCase):
     def test_with_one_tag_each(self):
         task_prefixes = ["b", "a", "b", "v"]
         n_tags = 3
-        task_list_mock = [
-            MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes
-        ]
+        task_list_mock = [MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes]
         for index, task in enumerate(task_list_mock):
             task.name = "task " + str(index)
         evg_config_mock = MagicMock(tasks=task_list_mock)
@@ -67,9 +63,7 @@ class TestGetTasksWithTag(unittest.TestCase):
     def test_with_two_tags(self):
         task_prefixes = ["b", "a", "b", "v"]
         n_tags = 3
-        task_list_mock = [
-            MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes
-        ]
+        task_list_mock = [MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes]
         for index, task in enumerate(task_list_mock):
             task.name = "task " + str(index)
         evg_config_mock = MagicMock(tasks=task_list_mock)
@@ -83,9 +77,7 @@ class TestGetTasksWithTag(unittest.TestCase):
     def test_with_two_tags_no_results(self):
         task_prefixes = ["b", "a", "b", "v"]
         n_tags = 3
-        task_list_mock = [
-            MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes
-        ]
+        task_list_mock = [MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes]
         for index, task in enumerate(task_list_mock):
             task.name = "task " + str(index)
         evg_config_mock = MagicMock(tasks=task_list_mock)
@@ -96,9 +88,7 @@ class TestGetTasksWithTag(unittest.TestCase):
     def test_with_one_filter(self):
         task_prefixes = ["b", "a", "b", "v"]
         n_tags = 3
-        task_list_mock = [
-            MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes
-        ]
+        task_list_mock = [MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes]
         for index, task in enumerate(task_list_mock):
             task.name = "task " + str(index)
         task_list_mock[0].tags = ["b 0"]
@@ -111,9 +101,7 @@ class TestGetTasksWithTag(unittest.TestCase):
     def test_with_two_filter(self):
         task_prefixes = ["b", "a", "b", "v"]
         n_tags = 3
-        task_list_mock = [
-            MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes
-        ]
+        task_list_mock = [MagicMock(tags=gen_tag_set(prefix, n_tags)) for prefix in task_prefixes]
         for index, task in enumerate(task_list_mock):
             task.name = "task " + str(index)
         task_list_mock[0].tags = ["b 0"]

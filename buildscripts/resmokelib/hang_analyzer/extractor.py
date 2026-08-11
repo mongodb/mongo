@@ -64,9 +64,7 @@ def run_with_retries(
             )
             return False
 
-        root_logger.error(
-            f"Failed to run {func.__name__}, retrying in {retry_secs} seconds..."
-        )
+        root_logger.error(f"Failed to run {func.__name__}, retrying in {retry_secs} seconds...")
         time.sleep(retry_secs)
 
 
@@ -143,9 +141,7 @@ def download_core_dumps(
                     extracted_name,
                 )
                 root_logger.error(ex)
-                core_dump_span.set_status(
-                    StatusCode.ERROR, "Failed to download core dump."
-                )
+                core_dump_span.set_status(StatusCode.ERROR, "Failed to download core dump.")
                 core_dump_span.set_attributes(
                     {
                         "core_dump_download_attempts": attempts,
@@ -153,9 +149,7 @@ def download_core_dumps(
                     }
                 )
 
-    core_dump_directory_size = sum(
-        f.stat().st_size for f in Path("./").glob("**/*") if f.is_file()
-    )
+    core_dump_directory_size = sum(f.stat().st_size for f in Path("./").glob("**/*") if f.is_file())
     current_span.set_attributes(
         {
             "core_dumps_dir": core_dumps_dir,
@@ -199,13 +193,9 @@ def download_multiversion_artifact(
             ignore_failed_push=True,
             link_dir=os.path.abspath(download_dir),
         )
-        urlinfo = multiversion_setup.get_urls(
-            version=version_id, buildvariant_name=variant
-        )
+        urlinfo = multiversion_setup.get_urls(version=version_id, buildvariant_name=variant)
         if bin_version:
-            install_dir = os.path.abspath(
-                os.path.join(download_dir, bin_version, "install")
-            )
+            install_dir = os.path.abspath(os.path.join(download_dir, bin_version, "install"))
             os.makedirs(install_dir, exist_ok=True)
             multiversion_setup.download_and_extract_from_urls(
                 urlinfo.urls,
@@ -234,9 +224,7 @@ def download_multiversion_artifact(
 
 @TRACER.start_as_current_span("core_analyzer.post_install_gdb_optimization")
 def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
-    @TRACER.start_as_current_span(
-        "core_analyzer.post_install_gdb_optimization.add_index"
-    )
+    @TRACER.start_as_current_span("core_analyzer.post_install_gdb_optimization.add_index")
     def add_index(file_path: str):
         """Generate and add gdb-index to ELF binary."""
         current_span = get_default_current_span(
@@ -262,9 +250,7 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
         # find dwarf version from output, it should always be present
         regex = re.search("version = 0x([0-9]{4}),", process.stdout)
         if not regex:
-            current_span.set_status(
-                StatusCode.ERROR, "Could not find dwarf version in file."
-            )
+            current_span.set_status(StatusCode.ERROR, "Could not find dwarf version in file.")
             current_span.set_attributes(
                 {
                     "add_index_status": "failed",
@@ -348,9 +334,7 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
                 )
                 os.remove(f"{file_path}.gdb-index")
             else:
-                current_span.set_status(
-                    StatusCode.ERROR, f"Unsupported dwarf version: {version}"
-                )
+                current_span.set_status(StatusCode.ERROR, f"Unsupported dwarf version: {version}")
                 current_span.set_attributes(
                     {
                         "add_index_status": "failed",
@@ -369,9 +353,7 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             )
             return
 
-        current_span.set_attribute(
-            "add_index_changed_file_size", os.path.getsize(file_path)
-        )
+        current_span.set_attribute("add_index_changed_file_size", os.path.getsize(file_path))
 
         root_looger.debug(
             "Finished creating gdb-index for %s in %s",
@@ -379,9 +361,7 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             (time.time() - start_time),
         )
 
-    @TRACER.start_as_current_span(
-        "core_analyzer.post_install_gdb_optimization.recalc_debuglink"
-    )
+    @TRACER.start_as_current_span("core_analyzer.post_install_gdb_optimization.recalc_debuglink")
     def recalc_debuglink(file_path: str):
         """
         Recalcuate the debuglink for ELF binaries.
@@ -498,9 +478,7 @@ def download_task_artifacts(
     else:
         task_info = evg_api.task_by_id(task_id)
     binary_download_options = _DownloadOptions(db=True, ds=False, da=False, dv=False)
-    debugsymbols_download_options = _DownloadOptions(
-        db=False, ds=True, da=False, dv=False
-    )
+    debugsymbols_download_options = _DownloadOptions(db=False, ds=True, da=False, dv=False)
 
     @retry(tries=3, delay=5)
     def get_multiversion_download_links(task: Task) -> Optional[dict]:
@@ -576,9 +554,7 @@ def download_task_artifacts(
 
         for future in concurrent.futures.as_completed(futures):
             if not future.result():
-                current_span.set_status(
-                    StatusCode.ERROR, "Errors occured while fetching artifacts"
-                )
+                current_span.set_status(StatusCode.ERROR, "Errors occured while fetching artifacts")
                 current_span.set_attribute(
                     "download_task_artifacts_error",
                     "Errors occured while fetching artifacts",
@@ -589,17 +565,14 @@ def download_task_artifacts(
 
     if multiversion_versions:
         if not multiversion_downloads:
-            raise RuntimeError(
-                "Multiversion core dumps were found without download links."
-            )
+            raise RuntimeError("Multiversion core dumps were found without download links.")
 
         with OtelThreadPoolExecutor() as executor:
             futures = []
             for version in multiversion_versions:
                 version_downloads = next(
                     filter(
-                        lambda actual, desired=version: actual.get("bin_suffix")
-                        == desired,
+                        lambda actual, desired=version: actual.get("bin_suffix") == desired,
                         multiversion_downloads,
                     )
                 )
@@ -646,9 +619,7 @@ def download_task_artifacts(
                         "download_task_artifacts_error",
                         "Errors occured while fetching old version artifacts",
                     )
-                    root_logger.error(
-                        "Errors occured while fetching old version artifacts"
-                    )
+                    root_logger.error("Errors occured while fetching old version artifacts")
                     all_downloaded = False
                     break
 
@@ -656,9 +627,7 @@ def download_task_artifacts(
         post_install_gdb_optimization(download_dir, root_logger)
 
         for version in multiversion_versions:
-            post_install_gdb_optimization(
-                os.path.join(multiversion_dir, version), root_logger
-            )
+            post_install_gdb_optimization(os.path.join(multiversion_dir, version), root_logger)
 
     return all_downloaded
 
@@ -715,11 +684,7 @@ def _get_symbol_files():
     out = []
     for ext in ["debug", "dSYM", "pdb"]:
         for file in _DEBUG_FILE_BASE_NAMES:
-            haystack = build_hygienic_bin_path(
-                child="{file}.{ext}".format(file=file, ext=ext)
-            )
+            haystack = build_hygienic_bin_path(child="{file}.{ext}".format(file=file, ext=ext))
             for needle in glob.glob(haystack):
-                out.append(
-                    (needle, os.path.join(os.getcwd(), os.path.basename(needle)))
-                )
+                out.append((needle, os.path.join(os.getcwd(), os.path.basename(needle))))
     return out

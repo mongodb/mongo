@@ -39,8 +39,7 @@ class FeatureFlagIncompatibleTagRule(JstestTagRule):
             failure_message="The following tags are not allowed for feature flags that default to true"
         )
         self.disallowed_tags = {
-            f"{flag}_incompatible"
-            for flag in get_all_feature_flags_turned_on_by_default()
+            f"{flag}_incompatible" for flag in get_all_feature_flags_turned_on_by_default()
         }
 
     def _tag_failed(self, file: str, tag: str) -> bool:

@@ -36,9 +36,7 @@ class TestFixtureEnvironmentVariables(unittest.TestCase):
         for key in ["MONGODB_CONNECTION_STRING"]:
             value = os.environ.get(key)
             if value is not None:
-                self.assertIsInstance(
-                    value, str, f"{key} should be a string, got {type(value)}"
-                )
+                self.assertIsInstance(value, str, f"{key} should be a string, got {type(value)}")
 
 
 if __name__ == "__main__":

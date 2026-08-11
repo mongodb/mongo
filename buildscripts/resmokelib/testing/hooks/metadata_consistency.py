@@ -36,16 +36,14 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
     ]
 
     if _IS_WINDOWS:
-        SKIP_TESTS = [
-            testname_utils.denormalize_test_file(path)[1] for path in SKIP_TESTS
-        ]
+        SKIP_TESTS = [testname_utils.denormalize_test_file(path)[1] for path in SKIP_TESTS]
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckMetadataConsistencyInBackground."""
 
-        if not isinstance(
-            fixture, shardedcluster.ShardedClusterFixture
-        ) and not isinstance(fixture, multi_sharded_cluster.MultiShardedClusterFixture):
+        if not isinstance(fixture, shardedcluster.ShardedClusterFixture) and not isinstance(
+            fixture, multi_sharded_cluster.MultiShardedClusterFixture
+        ):
             raise ValueError(
                 f"'fixture' must be an instance of ShardedClusterFixture or MultiShardedClusterFixture, but got"
                 f" {fixture.__class__.__name__}"
@@ -55,9 +53,7 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
             "Perform consistency checks between the config database and metadata "
             "stored/cached in the shards"
         )
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_check_metadata_consistency.js"
-        )
+        js_filename = os.path.join("jstests", "hooks", "run_check_metadata_consistency.js")
         super().__init__(
             hook_logger, fixture, js_filename, description, shell_options=shell_options
         )
@@ -89,16 +85,14 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
             return
 
         # TODO SERVER-75675 do not skip index consistency check
-        shell_options = (
-            self._shell_options.copy() if self._shell_options is not None else {}
-        )
+        shell_options = self._shell_options.copy() if self._shell_options is not None else {}
         if "global_vars" not in shell_options:
             shell_options["global_vars"] = {}
         if "TestData" not in shell_options["global_vars"]:
             shell_options["global_vars"]["TestData"] = {}
-        shell_options["global_vars"]["TestData"][
-            "skipCheckingIndexesConsistentAcrossCluster"
-        ] = True
+        shell_options["global_vars"]["TestData"]["skipCheckingIndexesConsistentAcrossCluster"] = (
+            True
+        )
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
             test.logger, test, self, self._js_filename, shell_options

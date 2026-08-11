@@ -178,10 +178,7 @@ class BufferedHandler(logging.Handler):
                 # be None after this point.
                 self.__flush_event = flush.flush_after(self, delay=self.interval_secs)
 
-            if (
-                not self.__flush_scheduled_by_emit
-                and len(self.__emit_buffer) >= self.capacity
-            ):
+            if not self.__flush_scheduled_by_emit and len(self.__emit_buffer) >= self.capacity:
                 # Attempt to flush the buffer early if we haven't already done so. We don't bother
                 # calling flush.cancel() and flush.flush_after() when 'self.__flush_event' is
                 # already scheduled to happen as soon as possible to avoid introducing unnecessary
@@ -220,8 +217,7 @@ class BufferedHandler(logging.Handler):
         """Ensure all logging output has been flushed."""
 
         raise NotImplementedError(
-            "_flush_buffer_with_lock must be implemented by BufferedHandler"
-            " subclasses"
+            "_flush_buffer_with_lock must be implemented by BufferedHandler" " subclasses"
         )
 
     def close(self):
@@ -306,9 +302,7 @@ class HTTPHandler(object):
         with warnings.catch_warnings():
             if urllib3_exceptions is not None:
                 try:
-                    warnings.simplefilter(
-                        "ignore", urllib3_exceptions.InsecurePlatformWarning
-                    )
+                    warnings.simplefilter("ignore", urllib3_exceptions.InsecurePlatformWarning)
                 except AttributeError:
                     # Versions of urllib3 prior to 1.10.3 didn't define InsecurePlatformWarning.
                     # Versions of requests prior to 2.6.0 didn't have a vendored copy of urllib3
@@ -316,9 +310,7 @@ class HTTPHandler(object):
                     pass
 
                 try:
-                    warnings.simplefilter(
-                        "ignore", urllib3_exceptions.InsecureRequestWarning
-                    )
+                    warnings.simplefilter("ignore", urllib3_exceptions.InsecureRequestWarning)
                 except AttributeError:
                     # Versions of urllib3 prior to 1.9 didn't define InsecureRequestWarning.
                     # Versions of requests prior to 2.4.0 didn't have a vendored copy of urllib3

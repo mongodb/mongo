@@ -8,9 +8,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--depfile", action="append")
 parser.add_argument("--install-dir")
-parser.add_argument(
-    "--install-mode", choices=["copy", "symlink", "hardlink"], default="hardlink"
-)
+parser.add_argument("--install-mode", choices=["copy", "symlink", "hardlink"], default="hardlink")
 
 args = parser.parse_args()
 if os.path.exists(args.install_dir):
@@ -77,9 +75,9 @@ def install(src, install_type):
                     if os.path.isdir(src):
                         for root, _, files in os.walk(src):
                             for name in files:
-                                dest_dir = os.path.dirname(
-                                    os.path.join(root, name)
-                                ).replace(src, dst)
+                                dest_dir = os.path.dirname(os.path.join(root, name)).replace(
+                                    src, dst
+                                )
                                 if not os.path.exists(dest_dir):
                                     os.makedirs(dest_dir)
                                 try:
@@ -89,9 +87,7 @@ def install(src, install_type):
                                     )
                                 except OSError as exc:
                                     if exc.strerror == "Invalid argument":
-                                        print(
-                                            "Encountered OSError: Invalid argument. Retrying..."
-                                        )
+                                        print("Encountered OSError: Invalid argument. Retrying...")
                                         time.sleep(1)
                                         os.link(
                                             os.path.join(root, name),

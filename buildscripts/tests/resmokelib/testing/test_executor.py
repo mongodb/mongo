@@ -54,9 +54,7 @@ class TestCreateJobs(unittest.TestCase):
 class TestCreateQueueElemForTestName(unittest.TestCase):
     @mock.patch(ns("testcases.make_test_case"))
     @mock.patch(ns("queue_elem_factory"))
-    def test_queue_elem_created_for_test_name(
-        self, queue_elem_mock, make_test_case_mock
-    ):
+    def test_queue_elem_created_for_test_name(self, queue_elem_mock, make_test_case_mock):
         num_tests = 1
         test_config = {}
         suite = mock_suite(num_tests)

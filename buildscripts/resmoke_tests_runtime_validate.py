@@ -31,11 +31,7 @@ def parse_resmoke_report(report_file: str) -> List[TestInfo]:
     with open(report_file, "r") as fh:
         report_data = json.load(fh)
     test_report = TestReport.from_dict(report_data)
-    return [
-        test_info
-        for test_info in test_report.test_infos
-        if "jstests" in test_info.test_file
-    ]
+    return [test_info for test_info in test_report.test_infos if "jstests" in test_info.test_file]
 
 
 def get_historic_stats(
@@ -69,13 +65,9 @@ def make_stats_map(stats: List[_TestData]) -> Dict[str, List[float]]:
     help="Location of resmoke's report JSON file.",
 )
 @click.option("--project-id", type=str, required=True, help="Evergreen project id.")
-@click.option(
-    "--build-variant", type=str, required=True, help="Evergreen build variant name."
-)
+@click.option("--build-variant", type=str, required=True, help="Evergreen build variant name.")
 @click.option("--task-name", type=str, required=True, help="Evergreen task name.")
-def main(
-    resmoke_report_file: str, project_id: str, build_variant: str, task_name: str
-) -> None:
+def main(resmoke_report_file: str, project_id: str, build_variant: str, task_name: str) -> None:
     """Compare resmoke tests runtime with historic stats."""
     enable_logging(verbose=False)
 
@@ -132,9 +124,7 @@ def main(
             "If you believe the test has inherently large variability, please consider writing"
             " a new test instead of modifying this one."
         )
-        LOGGER.error(
-            "For any other questions or concerns, please reach out to #server-testing."
-        )
+        LOGGER.error("For any other questions or concerns, please reach out to #server-testing.")
         sys.exit(1)
 
 

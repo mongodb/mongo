@@ -40,9 +40,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
             EC.presence_of_element_located((By.XPATH, "//input[@name='otc']"))
         )
         next_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//input[@type='submit'][@value='Next']")
-            )
+            EC.presence_of_element_located((By.XPATH, "//input[@type='submit'][@value='Next']"))
         )
 
         # Enter usercode.
@@ -54,9 +52,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
             EC.presence_of_element_located((By.XPATH, "//input[@name='loginfmt']"))
         )
         next_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//input[@type='submit'][@value='Next']")
-            )
+            EC.presence_of_element_located((By.XPATH, "//input[@type='submit'][@value='Next']"))
         )
 
         # Enter username.
@@ -89,9 +85,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
 
         try:
             verify_button = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//button[@data-testid='primaryButton']")
-                )
+                EC.presence_of_element_located((By.XPATH, "//button[@data-testid='primaryButton']"))
             )
         except:
             verify_button = WebDriverWait(driver, 30).until(
@@ -104,9 +98,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
 
         # Assert 'Are you trying to sign in to OIDC_EVG_TESTING?' message.
         continue_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//input[@type='submit'][@value='Continue']")
-            )
+            EC.presence_of_element_located((By.XPATH, "//input[@type='submit'][@value='Continue']"))
         )
         continue_button.click()
 
@@ -117,9 +109,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
             )
         )
 
-        assert (
-            landing_header is not None and "You have signed in" in landing_header.text
-        )
+        assert landing_header is not None and "You have signed in" in landing_header.text
 
     except Exception as e:
         print("Error: ", e)
@@ -133,9 +123,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Azure Automated Authentication Simulator"
-    )
+    parser = argparse.ArgumentParser(description="Azure Automated Authentication Simulator")
 
     parser.add_argument(
         "-e", "--activationEndpoint", type=str, help="Endpoint to start activation at"
@@ -146,9 +134,7 @@ def main():
         type=str,
         help="Code to be added in the endpoint to authenticate",
     )
-    parser.add_argument(
-        "-u", "--username", type=str, help="Username to authenticate as"
-    )
+    parser.add_argument("-u", "--username", type=str, help="Username to authenticate as")
     parser.add_argument(
         "-s",
         "--setupFile",
@@ -186,9 +172,7 @@ def main():
         else:
             print(f"Authentication with Azure failed after {num_retries} attempts")
 
-        authenticate_azure(
-            args.activationEndpoint, args.userCode, args.username, setup_information
-        )
+        authenticate_azure(args.activationEndpoint, args.userCode, args.username, setup_information)
 
 
 if __name__ == "__main__":

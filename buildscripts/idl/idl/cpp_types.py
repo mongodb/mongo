@@ -147,9 +147,7 @@ class CppTypeBase(metaclass=ABCMeta):
         return common.template_args(
             "${optionally_call_validator} ${member_name} = std::move(value);",
             member_name=member_name,
-            optionally_call_validator=_optionally_make_call(
-                validator_method_name, "value"
-            ),
+            optionally_call_validator=_optionally_make_call(validator_method_name, "value"),
         )
 
     @abstractmethod
@@ -182,9 +180,7 @@ class _CppTypeBasic(CppTypeBase):
 
     def return_by_reference(self):
         # type: () -> bool
-        return (
-            not is_primitive_type(self.get_type_name()) and not self._field.type.is_enum
-        )
+        return not is_primitive_type(self.get_type_name()) and not self._field.type.is_enum
 
     def is_view_type(self):
         # type: () -> bool
@@ -202,9 +198,7 @@ class _CppTypeBasic(CppTypeBase):
         # type: (str, str) -> str
         return common.template_args(
             "${optionally_call_validator} ${member_name} = std::move(value);",
-            optionally_call_validator=_optionally_make_call(
-                validator_method_name, "value"
-            ),
+            optionally_call_validator=_optionally_make_call(validator_method_name, "value"),
             member_name=member_name,
         )
 
@@ -259,9 +253,7 @@ class _CppTypeView(CppTypeBase):
         return common.template_args(
             "auto _tmpValue = ${value}; ${optionally_call_validator} ${member_name} = std::move(_tmpValue);",
             member_name=member_name,
-            optionally_call_validator=_optionally_make_call(
-                validator_method_name, "_tmpValue"
-            ),
+            optionally_call_validator=_optionally_make_call(validator_method_name, "_tmpValue"),
             value=self.get_transform_to_storage_type("value"),
         )
 
@@ -319,17 +311,13 @@ class _CppTypeVector(CppTypeBase):
         return common.template_args(
             "auto _tmpValue = ${value}; ${optionally_call_validator} ${member_name} = std::move(_tmpValue);",
             member_name=member_name,
-            optionally_call_validator=_optionally_make_call(
-                validator_method_name, "_tmpValue"
-            ),
+            optionally_call_validator=_optionally_make_call(validator_method_name, "_tmpValue"),
             value=self.get_transform_to_storage_type("value"),
         )
 
     def get_transform_to_getter_type(self, expression):
         # type: (str) -> Optional[str]
-        return common.template_args(
-            "ConstDataRange(${expression});", expression=expression
-        )
+        return common.template_args("ConstDataRange(${expression});", expression=expression)
 
     def get_transform_to_storage_type(self, expression):
         # type: (str) -> Optional[str]
@@ -382,9 +370,7 @@ class _CppTypeDelegating(CppTypeBase):
 
     def get_storage_type_setter_body(self, member_name, validator_method_name):
         # type: (str, str) -> Optional[str]
-        return self._base.get_storage_type_setter_body(
-            member_name, validator_method_name
-        )
+        return self._base.get_storage_type_setter_body(member_name, validator_method_name)
 
     def get_transform_to_getter_type(self, expression):
         # type: (str) -> Optional[str]
@@ -426,9 +412,7 @@ class _CppTypeArray(_CppTypeDelegating):
             return common.template_args(
                 "auto _tmpValue = ${convert}; ${optionally_call_validator} ${member_name} = std::move(_tmpValue);",
                 member_name=member_name,
-                optionally_call_validator=_optionally_make_call(
-                    validator_method_name, "_tmpValue"
-                ),
+                optionally_call_validator=_optionally_make_call(validator_method_name, "_tmpValue"),
                 convert=convert,
             )
         return self._base.get_setter_body(member_name, validator_method_name)
@@ -471,9 +455,7 @@ class _CppTypeOptional(_CppTypeDelegating):
 
     def get_getter_body(self, member_name):
         # type: (str) -> str
-        base_expression = common.template_args(
-            "*${member_name}", member_name=member_name
-        )
+        base_expression = common.template_args("*${member_name}", member_name=member_name)
 
         convert = self._base.get_transform_to_getter_type(base_expression)
         if convert:
@@ -517,9 +499,7 @@ class _CppTypeOptional(_CppTypeDelegating):
                             """),
                 member_name=member_name,
                 convert=convert,
-                optionally_call_validator=_optionally_make_call(
-                    validator_method_name, "_tmpValue"
-                ),
+                optionally_call_validator=_optionally_make_call(validator_method_name, "_tmpValue"),
             )
         return self._base.get_setter_body(member_name, validator_method_name)
 
@@ -554,9 +534,7 @@ def get_cpp_type_from_cpp_type_name(field, cpp_type_name, array):
 def get_cpp_type_without_optional(field):
     # type: (ast.Field) -> CppTypeBase
     """Get the C++ Type information for the given field but ignore optional."""
-    return get_cpp_type_from_cpp_type_name(
-        field, field.type.cpp_type, field.type.is_array
-    )
+    return get_cpp_type_from_cpp_type_name(field, field.type.cpp_type, field.type.is_array)
 
 
 def get_cpp_type(field):
@@ -612,9 +590,7 @@ def _call_method_or_global_function(
     enum deserializers/serializers which are not methods.
     """
     method_name = ast_type.serializer
-    serialization_context = (
-        "getSerializationContext()" if ast_type.deserialize_with_tenant else ""
-    )
+    serialization_context = "getSerializationContext()" if ast_type.deserialize_with_tenant else ""
     shape_options = ""
     if should_shapify:
         shape_options = "options"
@@ -693,9 +669,7 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
             return "localObject"
 
         # Just pass the BSONObj through without trying to parse it.
-        return common.template_args(
-            "${object_instance}.Obj()", object_instance=object_instance
-        )
+        return common.template_args("${object_instance}.Obj()", object_instance=object_instance)
 
     def has_serializer(self):
         # type: () -> bool
@@ -803,9 +777,7 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
 
         return common.template_args(
             "BSONBinData(tempCDR.data(), tempCDR.length(), ${bindata_subtype})",
-            bindata_subtype=bson.cpp_bindata_subtype_type_name(
-                self._ast_type.bindata_subtype
-            ),
+            bindata_subtype=bson.cpp_bindata_subtype_type_name(self._ast_type.bindata_subtype),
         )
 
 

@@ -46,8 +46,7 @@ class TestWatchTasks(unittest.TestCase):
         evg_api = EvergreenApi()
         task_ids = ["1", "2"]
         exec_timeout_seconds_ago = (
-            datetime.now(timezone.utc)
-            - timedelta(hours=POWERCYCLE_TASK_EXEC_TIMEOUT_SECS)
+            datetime.now(timezone.utc) - timedelta(hours=POWERCYCLE_TASK_EXEC_TIMEOUT_SECS)
         ).isoformat()
         now = datetime.now(timezone.utc).isoformat()
         task_1 = make_task_mock(evg_api, task_ids[0], exec_timeout_seconds_ago, now)

@@ -78,9 +78,7 @@ class TestGenerator(testcase.IDLTestcase):
         """Cleanup resources created by tests."""
         for idl_file in self.idl_files_to_test:
             for ext in ["h", "cpp"]:
-                file_path = os.path.join(
-                    self._idl_dir, f"{idl_file}{self.output_suffix}.{ext}"
-                )
+                file_path = os.path.join(self._idl_dir, f"{idl_file}{self.output_suffix}.{ext}")
                 if os.path.exists(file_path):
                     os.remove(file_path)
 
@@ -91,13 +89,10 @@ class TestGenerator(testcase.IDLTestcase):
         args.output_suffix = self.output_suffix
         args.import_directories = [self._src_dir]
 
-        unittest_idl_file = os.path.join(
-            self._idl_dir, f"{self.idl_files_to_test[0]}.idl"
-        )
+        unittest_idl_file = os.path.join(self._idl_dir, f"{self.idl_files_to_test[0]}.idl")
         if not os.path.exists(unittest_idl_file):
             unittest.skip(
-                "Skipping IDL Generator testing since %s could not be found."
-                % (unittest_idl_file)
+                "Skipping IDL Generator testing since %s could not be found." % (unittest_idl_file)
             )
             return
 

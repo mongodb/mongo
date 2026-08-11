@@ -55,13 +55,9 @@ def main():
         help="Directory to search for IDL import files",
     )
 
-    parser.add_argument(
-        "-v", "--verbose", action="count", help="Enable verbose tracing"
-    )
+    parser.add_argument("-v", "--verbose", action="count", help="Enable verbose tracing")
 
-    parser.add_argument(
-        "--base_dir", type=str, help="IDL output relative base directory"
-    )
+    parser.add_argument("--base_dir", type=str, help="IDL output relative base directory")
 
     parser.add_argument(
         "--write-dependencies",

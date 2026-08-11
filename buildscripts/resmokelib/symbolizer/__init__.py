@@ -50,9 +50,7 @@ class Symbolizer(Subcommand):
 
         self.logger = logger or self.setup_logger()
 
-        self.evg_api: evergreen_conn.RetryingEvergreenApi = (
-            evergreen_conn.get_evergreen_api()
-        )
+        self.evg_api: evergreen_conn.RetryingEvergreenApi = evergreen_conn.get_evergreen_api()
         self.multiversion_setup = self._get_multiversion_setup()
         self.task_info = self.evg_api.task_by_id(task_id)
 
@@ -84,9 +82,7 @@ class Symbolizer(Subcommand):
         logger = logging.Logger("symbolizer", level=log_level)
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(
-            logging.Formatter(
-                fmt="[%(asctime)s - %(name)s - %(levelname)s] %(message)s"
-            )
+            logging.Formatter(fmt="[%(asctime)s - %(name)s - %(levelname)s] %(message)s")
         )
         logger.addHandler(handler)
         return logger
@@ -153,13 +149,9 @@ class Symbolizer(Subcommand):
         for module_name, diff in module_diffs.items():
             # TODO: enterprise.
             if "mongodb-mongo-" in module_name:
-                with open(
-                    os.path.join(self.dest_dir, "patch.diff"), "w"
-                ) as git_diff_file:
+                with open(os.path.join(self.dest_dir, "patch.diff"), "w") as git_diff_file:
                     git_diff_file.write(diff)
-                    subprocess.run(
-                        ["git", "apply", "patch.diff"], cwd=self.dest_dir, check=True
-                    )
+                    subprocess.run(["git", "apply", "patch.diff"], cwd=self.dest_dir, check=True)
 
     def _get_source(self):
         revision = self.task_info.revision
@@ -219,8 +211,7 @@ class Symbolizer(Subcommand):
         symbolizer_path = self.mongosym_args.symbolizer_path
         if symbolizer_path:
             raise ValueError(
-                "Must use the default symbolizer from the toolchain,"
-                f"not {symbolizer_path}"
+                "Must use the default symbolizer from the toolchain," f"not {symbolizer_path}"
             )
         self.mongosym_args.symbolizer_path = DEFAULT_SYMBOLIZER_LOCATION
 

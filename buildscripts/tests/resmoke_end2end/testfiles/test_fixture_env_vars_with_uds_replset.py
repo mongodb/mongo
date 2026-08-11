@@ -21,9 +21,7 @@ class TestReplicaSetFixtureUDSEnvironmentVariables(unittest.TestCase):
         """Test that MONGODB_UDS_PATH (singular) is set for the primary."""
         uds_path = os.environ.get("MONGODB_UDS_PATH")
         self.assertIsNotNone(uds_path, "MONGODB_UDS_PATH should be set")
-        self.assertTrue(
-            os.path.exists(uds_path), f"Primary UDS path should exist: {uds_path}"
-        )
+        self.assertTrue(os.path.exists(uds_path), f"Primary UDS path should exist: {uds_path}")
 
     def test_mongodb_uds_paths_are_set(self):
         """Test that MONGODB_UDS_PATHS environment variable is set when UDS is configured."""
@@ -35,16 +33,12 @@ class TestReplicaSetFixtureUDSEnvironmentVariables(unittest.TestCase):
 
         # Should be comma-separated list
         paths_list = uds_paths.split(",")
-        self.assertGreater(
-            len(paths_list), 0, f"Should have at least one UDS path: {uds_paths}"
-        )
+        self.assertGreater(len(paths_list), 0, f"Should have at least one UDS path: {uds_paths}")
 
         # Verify each path
         for uds_path in paths_list:
             # Verify it's a path
-            self.assertIn(
-                "/", uds_path, f"UDS path should be an absolute path: {uds_path}"
-            )
+            self.assertIn("/", uds_path, f"UDS path should be an absolute path: {uds_path}")
 
             # Verify it contains mongodb in the filename
             self.assertIn(
@@ -87,9 +81,7 @@ class TestReplicaSetFixtureUDSEnvironmentVariables(unittest.TestCase):
     def test_mongodb_connection_string_is_still_set(self):
         """Test that MONGODB_CONNECTION_STRING is still set even with UDS."""
         conn_str = os.environ.get("MONGODB_CONNECTION_STRING")
-        self.assertIsNotNone(
-            conn_str, "MONGODB_CONNECTION_STRING should still be set with UDS"
-        )
+        self.assertIsNotNone(conn_str, "MONGODB_CONNECTION_STRING should still be set with UDS")
         # For replica sets, connection string should have multiple hosts
         self.assertIn(
             "localhost",

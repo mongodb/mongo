@@ -52,9 +52,7 @@ def test_dbname_nss():
 
 
 def test_string_map():
-    search(
-        r"absl::flat_hash_map.*0 elems", gdb.execute("print emptyMap", to_string=True)
-    )
+    search(r"absl::flat_hash_map.*0 elems", gdb.execute("print emptyMap", to_string=True))
     int_map_results = gdb.execute("print intMap", to_string=True)
     search(r"absl::flat_hash_map.*2 elems", int_map_results)
     search(r'\["a"\] = 1', int_map_results)

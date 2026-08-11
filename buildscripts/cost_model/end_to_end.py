@@ -89,8 +89,7 @@ class CostEstimator:
     def physical_scan(self, cardinality: int) -> float:
         """Estinamate PhysicalScan ABT node."""
         return (
-            self.cost_model.scan_startup_cost
-            + cardinality * self.cost_model.scan_incremental_cost
+            self.cost_model.scan_startup_cost + cardinality * self.cost_model.scan_incremental_cost
         )
 
     def index_scan(self, cardinality: int) -> float:
@@ -102,9 +101,7 @@ class CostEstimator:
 
     def seek(self, cardinality: int) -> float:
         """Estinamate Seek ABT node."""
-        return (
-            self.cost_model.seek_startup_cost + cardinality * self.cost_model.seek_cost
-        )
+        return self.cost_model.seek_startup_cost + cardinality * self.cost_model.seek_cost
 
     def filter(self, cardinality: int) -> float:
         """Estinamate Filter ABT node."""
@@ -116,8 +113,7 @@ class CostEstimator:
     def evaluation(self, cardinality: int) -> float:
         """Estinamate Evaluation ABT node."""
         return (
-            self.cost_model.eval_startup_cost
-            + cardinality * self.cost_model.eval_incremental_cost
+            self.cost_model.eval_startup_cost + cardinality * self.cost_model.eval_incremental_cost
         )
 
     def group_by(self, cardinality: int) -> float:
@@ -202,10 +198,7 @@ class AbtCostEstimator:
         local_cost = self.estimate_node(abt.node_type, stats.n_processed)
         estimations.append((abt.node_type, stats, local_cost))
         child_cost = sum(
-            (
-                self.estimate(child, sbe, estimations, level + 1)
-                for child in abt.children
-            ),
+            (self.estimate(child, sbe, estimations, level + 1) for child in abt.children),
             start=0.0,
         )
         return local_cost + child_cost
@@ -234,9 +227,7 @@ class EndToEndStatisticsRow:
             self.estimation_error / n_documents if n_documents != 0 else 0
         )
         self.relative_error = (
-            self.estimation_error / self.execution_time
-            if self.execution_time != 0
-            else 0
+            self.estimation_error / self.execution_time if self.execution_time != 0 else 0
         )
 
     pipeline: str
@@ -501,9 +492,7 @@ async def execute_index_intersect_queries(
         )
 
     async with (
-        get_database_parameter(
-            database, "internalCostModelCoefficients"
-        ) as cost_model_param,
+        get_database_parameter(database, "internalCostModelCoefficients") as cost_model_param,
         get_database_parameter(
             database, "internalCascadesOptimizerDisableMergeJoinRIDIntersect"
         ) as merge_join_param,
@@ -548,23 +537,17 @@ def extract_abt_nodes(df: pd.DataFrame, estimate_cost) -> pd.DataFrame:
     return pd.DataFrame(list(df.apply(extract, axis=1).explode()))
 
 
-def build_abt_nodes_report(
-    df: pd.DataFrame, processor_config: config.End2EndProcessorConfig
-):
+def build_abt_nodes_report(df: pd.DataFrame, processor_config: config.End2EndProcessorConfig):
     return extract_abt_nodes(df, processor_config.estimator)
 
 
-def build_queries_report(
-    df: pd.DataFrame, processor_config: config.End2EndProcessorConfig
-):
+def build_queries_report(df: pd.DataFrame, processor_config: config.End2EndProcessorConfig):
     abt_estimator = AbtCostEstimator(processor_config.estimator)
 
     def calculate_cost(row):
         rows = []
         estimations = []
-        total_estimated_cost = abt_estimator.estimate(
-            row["abt"], row["sbe"], estimations
-        )
+        total_estimated_cost = abt_estimator.estimate(row["abt"], row["sbe"], estimations)
         local_id = 0
         rows.append(
             EndToEndStatisticsRow(
@@ -597,9 +580,7 @@ async def conduct_end2end(
     if not processor_config.enabled:
         return {}
 
-    df = await exp.load_calibration_data(
-        database, processor_config.input_collection_name
-    )
+    df = await exp.load_calibration_data(database, processor_config.input_collection_name)
     noout_df = exp.remove_outliers(df, 0.0, 0.90)
 
     abt_report = build_abt_nodes_report(noout_df, processor_config)
@@ -646,9 +627,7 @@ async def end2end(e2e_config: config.EntToEndTestingConfig):
         # It runs the pipelines and stores explains to the database.
         execution_query_functions = [execute_queries, execute_index_intersect_queries]
         for execute_query in execution_query_functions:
-            await execute_query(
-                database, e2e_config.workload_execution, generator.collection_infos
-            )
+            await execute_query(database, e2e_config.workload_execution, generator.collection_infos)
             e2e_config.workload_execution.write_mode = config.WriteMode.APPEND
 
         # 4. Process end to end testing. Compare the estimated and actual costs and return results.

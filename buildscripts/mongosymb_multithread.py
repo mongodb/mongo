@@ -16,9 +16,7 @@ def main():
     """Execute Main program."""
 
     parent_parser = mongosymb.make_argument_parser(add_help=False)
-    parser = argparse.ArgumentParser(
-        parents=[parent_parser], description=__doc__, add_help=True
-    )
+    parser = argparse.ArgumentParser(parents=[parent_parser], description=__doc__, add_help=True)
     options = parser.parse_args()
 
     # Remember the prologue between lines,

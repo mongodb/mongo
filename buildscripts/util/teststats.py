@@ -99,9 +99,7 @@ class HistoricHookInfo(NamedTuple):
     avg_duration: float
 
     @classmethod
-    def from_test_stats(
-        cls, test_stats: HistoricalTestInformation
-    ) -> "HistoricHookInfo":
+    def from_test_stats(cls, test_stats: HistoricalTestInformation) -> "HistoricHookInfo":
         """Create an instance from a test_stats object."""
         return cls(
             hook_id=test_stats.test_name,
@@ -158,8 +156,7 @@ class HistoricTestInfo(NamedTuple):
             predicate = default_predicate
         return sum(
             [
-                hook.avg_duration
-                * (hook.num_pass // self.num_pass if self.num_pass else 1)
+                hook.avg_duration * (hook.num_pass // self.num_pass if self.num_pass else 1)
                 for hook in self.hooks
                 if predicate(hook)
             ]
@@ -168,9 +165,7 @@ class HistoricTestInfo(NamedTuple):
     def total_test_runtime(self) -> float:
         """Get the average runtime of this test and it's non-task level hooks."""
         if self.num_pass > 0:
-            return self.avg_duration + self.total_hook_runtime(
-                lambda h: not h.is_task_level_hook()
-            )
+            return self.avg_duration + self.total_hook_runtime(lambda h: not h.is_task_level_hook())
         return 0.0
 
     def get_hook_overhead(self) -> float:
@@ -186,9 +181,7 @@ class HistoricTaskData(object):
         self.historic_test_results = historic_test_results
 
     @staticmethod
-    def get_stats_from_s3(
-        project: str, task: str, variant: str
-    ) -> List[HistoricalTestInformation]:
+    def get_stats_from_s3(project: str, task: str, variant: str) -> List[HistoricalTestInformation]:
         """
         Retrieve test stats from s3 for a given task.
 
@@ -233,9 +226,7 @@ class HistoricTaskData(object):
         :return: Historic task data from the list of stats.
         """
         hooks = defaultdict(list)
-        for hook in [
-            stat for stat in historical_test_data if is_resmoke_hook(stat.test_name)
-        ]:
+        for hook in [stat for stat in historical_test_data if is_resmoke_hook(stat.test_name)]:
             historical_hook = HistoricHookInfo.from_test_stats(hook)
             hooks[historical_hook.test_name()].append(historical_hook)
 

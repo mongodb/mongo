@@ -41,9 +41,7 @@ class ContinuousAddRemoveShard(interface.Hook):
         add_remove_random_shards=False,
         move_primary_comment=None,
     ):
-        interface.Hook.__init__(
-            self, hook_logger, fixture, ContinuousAddRemoveShard.DESCRIPTION
-        )
+        interface.Hook.__init__(self, hook_logger, fixture, ContinuousAddRemoveShard.DESCRIPTION)
         self._fixture = fixture
         self._add_remove_thread = None
         self._auth_options = auth_options
@@ -172,8 +170,7 @@ class _AddRemoveShardThread(threading.Thread):
         # including the config shard. Otherwise, pick any shard that is not the config shard.
         shard_to_remove_and_add = (
             self._get_other_shard_info(None)
-            if self._transition_configsvr
-            and self._current_config_mode is self.CONFIG_SHARD
+            if self._transition_configsvr and self._current_config_mode is self.CONFIG_SHARD
             else self._get_other_shard_info("config")
         )
         return shard_to_remove_and_add["_id"], shard_to_remove_and_add["host"]
@@ -368,35 +365,19 @@ class _AddRemoveShardThread(threading.Thread):
                 self.logger.error(msg)
                 raise errors.ServerFailure(msg)
 
-            direct_shard_conn = pymongo.MongoClient(
-                shard_obj.get_driver_connection_url()
-            )
+            direct_shard_conn = pymongo.MongoClient(shard_obj.get_driver_connection_url())
 
             # Wait until any DDL, resharding, transactions, and migration ops are cleaned up.
             # TODO SERVER-90782 Change these to be assertions, rather than waiting for the collections
             # to be empty
-            if (
-                len(
-                    list(
-                        direct_shard_conn.config.system.sharding_ddl_coordinators.find()
-                    )
-                )
-                != 0
-            ):
+            if len(list(direct_shard_conn.config.system.sharding_ddl_coordinators.find())) != 0:
                 self.logger.info(
                     "Waiting for config.system.sharding_ddl_coordinators to be empty before decomissioning."
                 )
                 time.sleep(1)
                 continue
 
-            if (
-                len(
-                    list(
-                        direct_shard_conn.config.localReshardingOperations.recipient.find()
-                    )
-                )
-                != 0
-            ):
+            if len(list(direct_shard_conn.config.localReshardingOperations.recipient.find())) != 0:
                 self.logger.info(
                     "Waiting for config.localReshardingOperations.recipient to be empty before decomissioning."
                 )
@@ -422,27 +403,14 @@ class _AddRemoveShardThread(threading.Thread):
 
             all_dbs = direct_shard_conn.admin.command({"listDatabases": 1})
             for db in all_dbs["databases"]:
-                if (
-                    db["name"] not in ["admin", "config", "local"]
-                    and db["empty"] is False
-                ):
+                if db["name"] not in ["admin", "config", "local"] and db["empty"] is False:
                     db_name = db["name"]
                     all_collections = direct_shard_conn.get_database(db_name).command(
                         {"listCollections": 1}
                     )
                     for coll in all_collections:
-                        if (
-                            len(
-                                list(
-                                    direct_shard_conn.get_database(db_name).coll.find()
-                                )
-                            )
-                            != 0
-                        ):
-                            msg = (
-                                "Found non-empty collection after removing shard: "
-                                + coll
-                            )
+                        if len(list(direct_shard_conn.get_database(db_name).coll.find())) != 0:
+                            msg = "Found non-empty collection after removing shard: " + coll
                             self.logger.error(msg)
                             raise errors.ServerFailure(msg)
 
@@ -491,9 +459,7 @@ class _AddRemoveShardThread(threading.Thread):
             )
         )
         for database in databases:
-            for collection in self._client.get_database(
-                database["_id"]
-            ).list_collections():
+            for collection in self._client.get_database(database["_id"]).list_collections():
                 namespace = database["_id"] + "." + collection["name"]
                 coll_doc = self._client.config.collections.find_one({"_id": namespace})
                 if not coll_doc:
@@ -505,21 +471,14 @@ class _AddRemoveShardThread(threading.Thread):
         for collection in collections:
             namespace = collection["_id"]
             destination = self._get_other_shard_id(source)
-            self.logger.info(
-                "Running moveCollection for " + namespace + " to " + destination
-            )
+            self.logger.info("Running moveCollection for " + namespace + " to " + destination)
             try:
-                self._client.admin.command(
-                    {"moveCollection": namespace, "toShard": destination}
-                )
+                self._client.admin.command({"moveCollection": namespace, "toShard": destination})
             except pymongo.errors.OperationFailure as err:
                 if not self._is_expected_move_collection_error(err, namespace):
                     raise err
                 self.logger.info(
-                    "Ignoring error when moving the collection '"
-                    + namespace
-                    + "': "
-                    + str(err)
+                    "Ignoring error when moving the collection '" + namespace + "': " + str(err)
                 )
                 if err.code == self._RESHARD_COLLECTION_IN_PROGRESS:
                     self.logger.info(
@@ -532,9 +491,7 @@ class _AddRemoveShardThread(threading.Thread):
         for database in databases:
             destination = self._get_other_shard_id(source)
             try:
-                self.logger.info(
-                    "Running movePrimary for " + database + " to " + destination
-                )
+                self.logger.info("Running movePrimary for " + database + " to " + destination)
                 cmd_obj = {"movePrimary": database, "to": destination}
                 if self._move_primary_comment:
                     cmd_obj["comment"] = self._move_primary_comment
@@ -543,15 +500,10 @@ class _AddRemoveShardThread(threading.Thread):
                 if not self._is_expected_move_primary_error_code(err.code):
                     raise err
                 self.logger.info(
-                    "Ignoring error when moving the database '"
-                    + database
-                    + "': "
-                    + str(err)
+                    "Ignoring error when moving the database '" + database + "': " + str(err)
                 )
 
-    def _drain_shard_for_ongoing_transition(
-        self, num_rounds, transition_result, source
-    ):
+    def _drain_shard_for_ongoing_transition(self, num_rounds, transition_result, source):
         tracked_colls = self._get_tracked_collections_on_shard(source)
         sharded_colls = []
         tracked_unsharded_colls = []
@@ -563,9 +515,7 @@ class _AddRemoveShardThread(threading.Thread):
         untracked_unsharded_colls = self._get_untracked_collections_on_shard(source)
 
         if num_rounds % 10 == 0:
-            self.logger.info(
-                "Draining shard " + source + ": " + str({"num_rounds": num_rounds})
-            )
+            self.logger.info("Draining shard " + source + ": " + str({"num_rounds": num_rounds}))
             self.logger.info(
                 "Sharded collections on "
                 + source
@@ -659,9 +609,7 @@ class _AddRemoveShardThread(threading.Thread):
         while True:
             try:
                 if last_balancer_status is None:
-                    last_balancer_status = self._client.admin.command(
-                        {"balancerStatus": 1}
-                    )
+                    last_balancer_status = self._client.admin.command({"balancerStatus": 1})
 
                 if self._should_wait_for_balancer_round:
                     # TODO SERVER-90291: Remove.
@@ -700,9 +648,7 @@ class _AddRemoveShardThread(threading.Thread):
                     self._should_wait_for_balancer_round = False
 
                 if shard_id == "config":
-                    res = self._client.admin.command(
-                        {"transitionToDedicatedConfigServer": 1}
-                    )
+                    res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
                 else:
                     res = self._client.admin.command({"removeShard": shard_id})
 
@@ -713,16 +659,11 @@ class _AddRemoveShardThread(threading.Thread):
                     )
                     return True
                 elif res["state"] == "started":
-                    if (
-                        self._client.config.chunks.count_documents({"shard": shard_id})
-                        == 0
-                    ):
+                    if self._client.config.chunks.count_documents({"shard": shard_id}) == 0:
                         self._should_wait_for_balancer_round = True
                 elif res["state"] == "ongoing":
                     num_draining_rounds += 1
-                    self._drain_shard_for_ongoing_transition(
-                        num_draining_rounds, res, shard_id
-                    )
+                    self._drain_shard_for_ongoing_transition(num_draining_rounds, res, shard_id)
 
                 prev_round_interrupted = False
                 time.sleep(1)
@@ -733,9 +674,9 @@ class _AddRemoveShardThread(threading.Thread):
                     raise errors.ServerFailure(msg)
             except pymongo.errors.OperationFailure as err:
                 # Some workloads add and remove shards so removing the config shard may fail transiently.
-                if err.code in [
-                    self._ILLEGAL_OPERATION
-                ] and "would remove the last shard" in str(err):
+                if err.code in [self._ILLEGAL_OPERATION] and "would remove the last shard" in str(
+                    err
+                ):
                     # Abort the transition attempt and make the hook try again later.
                     return False
 
@@ -753,10 +694,7 @@ class _AddRemoveShardThread(threading.Thread):
                 # FailedToSatisfyReadPreference
                 if err.code in [self._FAILED_TO_SATISFY_READ_PREFERENCE]:
                     self.logger.info(
-                        "Primary not found when "
-                        + msg
-                        + ", will retry. err: "
-                        + str(err)
+                        "Primary not found when " + msg + ", will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     continue
@@ -767,9 +705,7 @@ class _AddRemoveShardThread(threading.Thread):
                 # the transition to dedicated is retried, it will fail because the shard will no longer exist.
                 if err.code in [self._SHARD_NOT_FOUND]:
                     latest_status, prev_round_interrupted = (
-                        self._get_balancer_status_on_shard_not_found(
-                            prev_round_interrupted, msg
-                        )
+                        self._get_balancer_status_on_shard_not_found(prev_round_interrupted, msg)
                     )
                     if latest_status is None:
                         # The balancerStatus request was interrupted, so we retry the transition
@@ -812,20 +748,14 @@ class _AddRemoveShardThread(threading.Thread):
         while True:
             try:
                 if shard_id == "config":
-                    self._client.admin.command(
-                        {"transitionFromDedicatedConfigServer": 1}
-                    )
+                    self._client.admin.command({"transitionFromDedicatedConfigServer": 1})
                 else:
                     original_shard_id = (
-                        shard_id
-                        if self._shard_name_suffix == 0
-                        else shard_id.split("_")[0]
+                        shard_id if self._shard_name_suffix == 0 else shard_id.split("_")[0]
                     )
                     shard_name = original_shard_id + "_" + str(self._shard_name_suffix)
                     self.logger.info("Adding shard with new shardId: " + shard_name)
-                    self._client.admin.command(
-                        {"addShard": shard_host, "name": shard_name}
-                    )
+                    self._client.admin.command({"addShard": shard_host, "name": shard_name})
                     self._shard_name_suffix = self._shard_name_suffix + 1
                 return
             except pymongo.errors.OperationFailure as err:
@@ -833,10 +763,7 @@ class _AddRemoveShardThread(threading.Thread):
                 # network error, we should retry.
                 if err.code in set(retryable_network_errs):
                     self.logger.info(
-                        "Network error when "
-                        + msg
-                        + " server, will retry. err: "
-                        + str(err)
+                        "Network error when " + msg + " server, will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     continue
@@ -848,15 +775,10 @@ class _AddRemoveShardThread(threading.Thread):
                 if (
                     err.code in [self._OPERATION_FAILED]
                     and "Connection refused" in str(err)
-                    or any(
-                        err_name in str(err) for err_name in retryable_network_err_names
-                    )
+                    or any(err_name in str(err) for err_name in retryable_network_err_names)
                 ):
                     self.logger.info(
-                        "Network error adding shard when "
-                        + msg
-                        + ", will retry. err: "
-                        + str(err)
+                        "Network error adding shard when " + msg + ", will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     continue
@@ -865,10 +787,7 @@ class _AddRemoveShardThread(threading.Thread):
                 # FailedToSatisfyReadPreference
                 if err.code in [self._FAILED_TO_SATISFY_READ_PREFERENCE]:
                     self.logger.info(
-                        "Primary not found when "
-                        + msg
-                        + ", will retry. err: "
-                        + str(err)
+                        "Primary not found when " + msg + ", will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     continue
@@ -889,9 +808,7 @@ class _AddRemoveShardThread(threading.Thread):
         possible_choices = []
         if shard_id is not None:
             possible_choices = [
-                shard_info
-                for shard_info in res["shards"]
-                if shard_info["_id"] != shard_id
+                shard_info for shard_info in res["shards"] if shard_info["_id"] != shard_id
             ]
         else:
             possible_choices = [shard_info for shard_info in res["shards"]]
@@ -925,9 +842,7 @@ class _AddRemoveShardThread(threading.Thread):
                 # Configsvr metadata checks:
                 ## Check that the removed shard no longer exists on config.shards.
                 assert (
-                    self._client["config"]["shards"].count_documents(
-                        {"_id": removed_shard_name}
-                    )
+                    self._client["config"]["shards"].count_documents({"_id": removed_shard_name})
                     == 0
                 ), f"Removed shard still exists on config.shards: {removed_shard_name}"
 
@@ -943,11 +858,11 @@ class _AddRemoveShardThread(threading.Thread):
                 ## Check that no chunk has the removed shard as its owner.
                 chunksPointingToRemovedShard = [
                     doc
-                    for doc in self._client["config"]["chunks"].find(
-                        {"shard": removed_shard_name}
-                    )
+                    for doc in self._client["config"]["chunks"].find({"shard": removed_shard_name})
                 ]
-                assert not chunksPointingToRemovedShard, f"Found chunks whose owner is a removed shard: {chunksPointingToRemovedShard}"
+                assert (
+                    not chunksPointingToRemovedShard
+                ), f"Found chunks whose owner is a removed shard: {chunksPointingToRemovedShard}"
 
                 ## Check that all tag in config.tags refer to at least one existing shard.
                 tagsWithoutShardPipeline = [
@@ -961,9 +876,9 @@ class _AddRemoveShardThread(threading.Thread):
                     },
                     {"$match": {"shards": []}},
                 ]
-                tagsWithoutShardPipelineResultCursor = self._client["config"][
-                    "tags"
-                ].aggregate(tagsWithoutShardPipeline)
+                tagsWithoutShardPipelineResultCursor = self._client["config"]["tags"].aggregate(
+                    tagsWithoutShardPipeline
+                )
                 tagsWithoutShardPipelineResult = [
                     doc for doc in tagsWithoutShardPipelineResultCursor
                 ]
@@ -974,9 +889,7 @@ class _AddRemoveShardThread(threading.Thread):
 
                 # Check that there is no user data left on the removed shard. (Note: This can only be
                 # checked on transitionToDedicatedConfigServer)
-                removed_shard_primary_client = (
-                    removed_shard_fixture.get_primary().mongo_client()
-                )
+                removed_shard_primary_client = removed_shard_fixture.get_primary().mongo_client()
                 dbs = removed_shard_primary_client.list_database_names()
                 assert all(
                     databaseName in {"local", "admin", "config"} for databaseName in dbs
@@ -991,20 +904,15 @@ class _AddRemoveShardThread(threading.Thread):
                 for removed_shard_node in [
                     removed_shard_fixture.get_primary()
                 ] + removed_shard_fixture.get_secondaries():
-                    sharding_state_response = (
-                        removed_shard_node.mongo_client().admin.command(
-                            {"shardingState": 1}
-                        )
+                    sharding_state_response = removed_shard_node.mongo_client().admin.command(
+                        {"shardingState": 1}
                     )
                     for nss, metadata in sharding_state_response["versions"].items():
                         # placementVersion == Timestamp(0, 0) means that this shard owns no chunk for the
                         # collection.
 
                         # TODO (SERVER-90810): Re-enable this check for resharding temporary collections.
-                        if (
-                            "system.resharding" in nss
-                            or "system.buckets.resharding" in nss
-                        ):
+                        if "system.resharding" in nss or "system.buckets.resharding" in nss:
                             continue
 
                         assert (

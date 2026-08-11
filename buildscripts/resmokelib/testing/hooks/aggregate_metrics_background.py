@@ -17,9 +17,7 @@ class AggregateResourceConsumptionMetricsInBackground(BGHook):
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize AggregateResourceConsumptionMetricsInBackground."""
 
-        description = (
-            "Run background $operationMetrics on all mongods while a test is running"
-        )
+        description = "Run background $operationMetrics on all mongods while a test is running"
         super().__init__(
             hook_logger, fixture, description, tests_per_cycle=None, loop_delay_ms=1000
         )

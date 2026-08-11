@@ -14,9 +14,7 @@ from bazelisk import get_bazel_path, make_bazel_cmd
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(
-        os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
-    )
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 SUPPORTED_VERSIONS = "v5"
 
@@ -211,9 +209,7 @@ if __name__ == "__main__":
     def main(
         tool: Annotated[Optional[str], typer.Argument()] = None,
         version: Annotated[Optional[str], typer.Option("--version")] = None,
-        from_bazel: Annotated[
-            Optional[bool], typer.Option("--bazel/--no-bazel")
-        ] = None,
+        from_bazel: Annotated[Optional[bool], typer.Option("--bazel/--no-bazel")] = None,
     ):
         """
         Prints the path to tools in the mongo toolchain or the toolchain's root directory (which

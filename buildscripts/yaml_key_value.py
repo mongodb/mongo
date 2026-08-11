@@ -17,9 +17,7 @@ def main():
     """Execute Main program."""
 
     parser = optparse.OptionParser(description=__doc__)
-    parser.add_option(
-        "--yamlFile", dest="yaml_file", default=None, help="YAML file to read"
-    )
+    parser.add_option("--yamlFile", dest="yaml_file", default=None, help="YAML file to read")
     parser.add_option(
         "--yamlKey",
         dest="yaml_key",

@@ -19,8 +19,7 @@ class ContinuousStepdown(interface.Hook):
     """Regularly connect to replica sets and send a replSetStepDown command."""
 
     DESCRIPTION = (
-        "Continuous stepdown (steps down the primary of replica sets at regular"
-        " intervals)"
+        "Continuous stepdown (steps down the primary of replica sets at regular" " intervals)"
     )
 
     IS_BACKGROUND = True
@@ -63,16 +62,10 @@ class ContinuousStepdown(interface.Hook):
         "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,
         so we use a different means to achieve the same result as sending SIGTERM or SIGKILL.
         """
-        interface.Hook.__init__(
-            self, hook_logger, fixture, ContinuousStepdown.DESCRIPTION
-        )
+        interface.Hook.__init__(self, hook_logger, fixture, ContinuousStepdown.DESCRIPTION)
 
         self._fixture = fixture
-        if (
-            hasattr(fixture, "config_shard")
-            and fixture.config_shard is not None
-            and shard_stepdown
-        ):
+        if hasattr(fixture, "config_shard") and fixture.config_shard is not None and shard_stepdown:
             # If the config server is a shard, shard_stepdown implies config_stepdown.
             config_stepdown = shard_stepdown
 
@@ -115,9 +108,7 @@ class ContinuousStepdown(interface.Hook):
             self._add_fixture(self._fixture)
 
         if self.__action_files is not None:
-            lifecycle = lifecycle_interface.FileBasedThreadLifecycle(
-                self.__action_files
-            )
+            lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.__action_files)
         else:
             lifecycle = lifecycle_interface.FlagBasedThreadLifecycle()
 
@@ -257,9 +248,7 @@ class _StepdownThread(threading.Thread):
                 # The 'wait_secs' is used to wait 'self._stepdown_interval_secs' from the moment
                 # the last stepdown command was sent.
                 now = time.time()
-                wait_secs = max(
-                    0, self._stepdown_interval_secs - (now - self._last_exec)
-                )
+                wait_secs = max(0, self._stepdown_interval_secs - (now - self._last_exec))
                 self.__lifecycle.wait_for_action_interval(wait_secs)
         except Exception:  # pylint: disable=W0703
             # Proactively log the exception when it happens so it will be
@@ -333,9 +322,7 @@ class _StepdownThread(threading.Thread):
 
     def _step_down(self, rs_fixture):
         try:
-            old_primary = rs_fixture.get_primary(
-                timeout_secs=self._stepdown_interval_secs
-            )
+            old_primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
         except errors.ServerFailure:
             # We ignore the ServerFailure exception because it means a primary wasn't available.
             # We'll try again after self._stepdown_interval_secs seconds.
@@ -349,9 +336,7 @@ class _StepdownThread(threading.Thread):
             rs_fixture.replset_name,
         )
         if self._terminate:
-            if not rs_fixture.stop_primary(
-                old_primary, self._background_reconfig, self._kill
-            ):
+            if not rs_fixture.stop_primary(old_primary, self._background_reconfig, self._kill):
                 return
 
         if self._should_downgrade:
@@ -406,9 +391,7 @@ class _StepdownThread(threading.Thread):
                 if time.time() - retry_start_time > retry_time_secs:
                     raise errors.ServerFailure(
                         "The old primary on port {} of replica set {} did not step down in"
-                        " {} seconds.".format(
-                            client.port, rs_fixture.replset_name, retry_time_secs
-                        )
+                        " {} seconds.".format(client.port, rs_fixture.replset_name, retry_time_secs)
                     )
                 self.logger.info(
                     "Waiting for primary on port %d of replica set '%s' to step down.",
@@ -448,9 +431,7 @@ class _StepdownThread(threading.Thread):
                 if time.time() - retry_start_time > retry_time_secs:
                     raise errors.ServerFailure(
                         "The old primary on port {} of replica set {} did not step up in"
-                        " {} seconds.".format(
-                            client.port, rs_fixture.replset_name, retry_time_secs
-                        )
+                        " {} seconds.".format(client.port, rs_fixture.replset_name, retry_time_secs)
                     )
 
         # Bump the counter for the chosen secondary to indicate that the replSetStepUp command

@@ -189,14 +189,10 @@ class Archival(object):
                 message = "No input_files specified"
             elif self.limit_size_mb and self.size_mb >= self.limit_size_mb:
                 status = 1
-                message = "Files not archived, {}MB size limit reached".format(
-                    self.limit_size_mb
-                )
+                message = "Files not archived, {}MB size limit reached".format(self.limit_size_mb)
             elif self.limit_files and self.num_files >= self.limit_files:
                 status = 1
-                message = "Files not archived, {} file limit reached".format(
-                    self.limit_files
-                )
+                message = "Files not archived, {} file limit reached".format(self.limit_files)
             else:
                 status, message, file_size_mb = self._archive_files(
                     display_name, input_files, s3_bucket, s3_path
@@ -279,9 +275,7 @@ class Archival(object):
             )
             if upload_completed:
                 archive_file_work_queue.put(
-                    ArchiveArgs(
-                        upload_args.archival_file, upload_args.display_name, remote_file
-                    )
+                    ArchiveArgs(upload_args.archival_file, upload_args.display_name, remote_file)
                 )
 
             work_queue.task_done()
@@ -305,19 +299,13 @@ class Archival(object):
 
         if "test_archival" in config.INTERNAL_PARAMS:
             message = "'test_archival' specified. Skipping tar/gzip."
-            with open(
-                os.path.join(config.DBPATH_PREFIX, "test_archival.txt"), "a"
-            ) as test_file:
+            with open(os.path.join(config.DBPATH_PREFIX, "test_archival.txt"), "a") as test_file:
                 for input_file in input_files:
                     # If a resmoke fixture is used, the input_file will be the source of the data
                     # files. If mongorunner is used, input_file/mongorunner will be the source
                     # of the data files.
-                    if os.path.isdir(
-                        os.path.join(input_file, config.MONGO_RUNNER_SUBDIR)
-                    ):
-                        input_file = os.path.join(
-                            input_file, config.MONGO_RUNNER_SUBDIR
-                        )
+                    if os.path.isdir(os.path.join(input_file, config.MONGO_RUNNER_SUBDIR)):
+                        input_file = os.path.join(input_file, config.MONGO_RUNNER_SUBDIR)
 
                     # Each node contains one directory for its data files. Here we write out
                     # the names of those directories. In the unit test for archival, we will
@@ -334,9 +322,7 @@ class Archival(object):
         if file_list_size(input_files) > free_space(temp_file):
             status, message = remove_file(temp_file)
             if status:
-                self.logger.warning(
-                    "Removing tarfile due to insufficient space - %s", message
-                )
+                self.logger.warning("Removing tarfile due to insufficient space - %s", message)
             return 1, "Insufficient space for {}".format(message), 0
 
         try:
@@ -351,9 +337,7 @@ class Archival(object):
         except (IOError, OSError, tarfile.TarError) as err:
             status, message = remove_file(temp_file)
             if status:
-                self.logger.warning(
-                    "Removing tarfile due to creation failure - %s", message
-                )
+                self.logger.warning("Removing tarfile due to creation failure - %s", message)
             return 1, str(err), 0
 
         # Round up the size of the archive.

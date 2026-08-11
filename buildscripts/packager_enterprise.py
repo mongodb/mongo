@@ -55,17 +55,9 @@ class EnterpriseSpec(packager.Spec):
     def suffix(self):
         """Suffix."""
         if int(self.ver.split(".")[0]) >= 5:
-            return (
-                "-enterprise"
-                if int(self.ver.split(".")[1]) == 0
-                else "-enterprise-unstable"
-            )
+            return "-enterprise" if int(self.ver.split(".")[1]) == 0 else "-enterprise-unstable"
         else:
-            return (
-                "-enterprise"
-                if int(self.ver.split(".")[1]) % 2 == 0
-                else "-enterprise-unstable"
-            )
+            return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
 
 
 class EnterpriseDistro(packager.Distro):
@@ -192,9 +184,7 @@ def main():
 
     args = packager.get_args(distros, ARCH_CHOICES)
 
-    spec = EnterpriseSpec(
-        args.server_version, args.metadata_gitspec, args.release_number
-    )
+    spec = EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
 
     oldcwd = os.getcwd()
     srcdir = oldcwd + "/../"
@@ -268,9 +258,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
     # thing and chdir into where and run tar there.
     os.chdir(where)
     try:
-        packager.sysassert(
-            ["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)]
-        )
+        packager.sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
         release_dir = glob("mongodb-linux-*")[0]
         for releasefile in (
             "bin",
@@ -300,9 +288,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # directory, so the debian directory is needed in all cases (and
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
-        print(
-            "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
-        )
+        print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
         git_repo = git.Repo(srcdir)
         # get the original HEAD position of repo
         head_commit_sha = git_repo.head.object.hexsha
@@ -321,9 +307,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
         # original command to preserve functionality
         # FIXME: make consistent with the rest of the code when we have more packaging testing
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
-        print(
-            "Copying packaging files from specified gitspec:", spec.metadata_gitspec()
-        )
+        print("Copying packaging files from specified gitspec:", spec.metadata_gitspec())
         packager.sysassert(
             [
                 "sh",
@@ -364,9 +348,7 @@ def make_deb_repo(repo, distro, build_os):
     try:
         dirs = {
             os.path.dirname(deb)[2:]
-            for deb in packager.backtick(["find", ".", "-name", "*.deb"])
-            .decode("utf-8")
-            .split()
+            for deb in packager.backtick(["find", ".", "-name", "*.deb"]).decode("utf-8").split()
         }
         for directory in dirs:
             st = packager.backtick(["dpkg-scanpackages", directory, "/dev/null"])

@@ -31,9 +31,7 @@ class TestEndorctl(unittest.TestCase):
         logger = logging.getLogger("generate_sbom")
         logger.setLevel(logging.INFO)
 
-        e = EndorCtl(
-            namespace="mongodb.10gen", endorctl_path="this_path_does_not_exist"
-        )
+        e = EndorCtl(namespace="mongodb.10gen", endorctl_path="this_path_does_not_exist")
         result = e.get_sbom("https://github.com/10gen/mongo.git")
         self.assertRaises(FileNotFoundError)
         self.assertIsNone(result, None)
@@ -185,9 +183,7 @@ class TestConfigRegex(unittest.TestCase):
         print("\nTesting Invalid PURLs:")
         for purl in invalid_purls:
             with self.subTest(purl=purl):
-                self.assertFalse(
-                    is_valid_purl(purl), f"Expected '{purl}' to be invalid"
-                )
+                self.assertFalse(is_valid_purl(purl), f"Expected '{purl}' to be invalid")
 
 
 class TestMetadataFile(unittest.TestCase):

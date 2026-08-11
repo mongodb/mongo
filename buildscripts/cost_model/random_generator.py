@@ -324,9 +324,7 @@ class RandomDistribution:
             probs = None
 
         if probs is not None and len(probs) != len(values):
-            raise ValueError(
-                f"values and probs must be the same size: {probs} !! {values}"
-            )
+            raise ValueError(f"values and probs must be the same size: {probs} !! {values}")
 
         if len(values) == 0:
             raise ValueError(f"Values cannot be empty: {self.values}")
@@ -402,9 +400,7 @@ class RandomDistribution:
                 index = len(values) - 1
             return values[index]
 
-        return [
-            get_value(n) for n in _rng.noncentral_chisquare(df=df, nonc=nonc, size=size)
-        ]
+        return [get_value(n) for n in _rng.noncentral_chisquare(df=df, nonc=nonc, size=size)]
 
     @staticmethod
     def _uniform(size: int, values: Sequence[TVar], _: Sequence[float]):
@@ -415,13 +411,9 @@ class RandomDistribution:
         return [get_value(n) for n in _rng.uniform(low=0, high=len(values), size=size)]
 
     @staticmethod
-    def _mixed(
-        size: int, children: Sequence[RandomDistribution], probs: Sequence[float]
-    ):
+    def _mixed(size: int, children: Sequence[RandomDistribution], probs: Sequence[float]):
         if probs is None:
-            raise ValueError(
-                f"probs must be specified for mixed distributions: {str(children)}"
-            )
+            raise ValueError(f"probs must be specified for mixed distributions: {str(children)}")
 
         result = []
         for child_distr, prob in zip(children, probs):
@@ -445,9 +437,7 @@ class ArrayRandomDistribution(RandomDistribution):
     lengths_distr: RandomDistribution = _NO_DEFAULT
     value_distr: RandomDistribution = _NO_DEFAULT
 
-    def __init__(
-        self, lengths_distr: RandomDistribution, value_distr: RandomDistribution
-    ):
+    def __init__(self, lengths_distr: RandomDistribution, value_distr: RandomDistribution):
         self.lengths_distr = lengths_distr
         self.value_distr = value_distr
         self.distribution_type = value_distr.distribution_type
@@ -511,9 +501,7 @@ class DocumentRandomDistribution(RandomDistribution):
         for idx, num in enumerate(nums):
             doc = {}
             if not isinstance(num, int):
-                raise ValueError(
-                    "the number of fields must be an int for document generation"
-                )
+                raise ValueError("the number of fields must be an int for document generation")
 
             field_names = self.fields_distr.generate(num)
             for field in field_names:
@@ -561,19 +549,13 @@ if __name__ == "__main__":
     str_normal = RandomDistribution.normal(string_generator)
     print_distr("Normal for strings", str_normal)
 
-    int_noncentral_chisquare = RandomDistribution.noncentral_chisquare(
-        list(range(1, 30))
-    )
+    int_noncentral_chisquare = RandomDistribution.noncentral_chisquare(list(range(1, 30)))
     print_distr("Noncentral Chisquare for integers", int_noncentral_chisquare)
 
-    float_uniform = RandomDistribution.uniform(
-        RangeGenerator(DataType.DOUBLE, 0.1, 10.0, 0.37)
-    )
+    float_uniform = RandomDistribution.uniform(RangeGenerator(DataType.DOUBLE, 0.1, 10.0, 0.37))
     print_distr("Uniform for floats", float_uniform)
 
-    float_normal = RandomDistribution.normal(
-        RangeGenerator(DataType.DOUBLE, 0.1, 10.0, 0.37)
-    )
+    float_normal = RandomDistribution.normal(RangeGenerator(DataType.DOUBLE, 0.1, 10.0, 0.37))
     print_distr("Normal for floats", float_normal)
 
     FOUR_DAYS_IN_SECONDS = 60 * 20 * 24 * 12
@@ -598,9 +580,7 @@ if __name__ == "__main__":
     )
     print_distr("Normal for dates", date_normal, size=1000)
 
-    str_chisquare2 = RandomDistribution.normal(
-        RangeGenerator(DataType.STRING, "aa", "ba")
-    )
+    str_chisquare2 = RandomDistribution.normal(RangeGenerator(DataType.STRING, "aa", "ba"))
     str_normal2 = RandomDistribution.normal(RangeGenerator(DataType.STRING, "ap", "bp"))
     mixed = RandomDistribution.mixed(
         children=[float_uniform, str_chisquare2, str_normal2], weight=[0.3, 0.5, 0.2]

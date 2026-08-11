@@ -55,9 +55,7 @@ def main(expansions_file: str, output_file: str) -> int:
     is_patch = expansions.get("is_patch", False)
 
     today = datetime.datetime.utcnow().date()
-    start_of_today = datetime.datetime(
-        today.year, today.month, today.day, tzinfo=tz.UTC
-    )
+    start_of_today = datetime.datetime(today.year, today.month, today.day, tzinfo=tz.UTC)
 
     # STM daily cron runs everyday at 4 AM
     # We scan the day before yesterday so we do not have to worry about in progress tasks assuming
@@ -103,25 +101,15 @@ def main(expansions_file: str, output_file: str) -> int:
         concurrent.futures.wait(futures)
     errors = []
     if timeouts_without_dumps:
-        errors.append(
-            "ERROR: The following tasks timed out without core dumps uploaded:"
-        )
+        errors.append("ERROR: The following tasks timed out without core dumps uploaded:")
         errors.extend(
-            [
-                f"https://spruce.mongodb.com/task/{task_id}"
-                for task_id in timeouts_without_dumps
-            ]
+            [f"https://spruce.mongodb.com/task/{task_id}" for task_id in timeouts_without_dumps]
         )
 
     if passed_with_dumps:
-        errors.append(
-            "ERROR: The following tasks had core dumps uploaded while being successful:"
-        )
+        errors.append("ERROR: The following tasks had core dumps uploaded while being successful:")
         errors.extend(
-            [
-                f"https://spruce.mongodb.com/task/{task_id}"
-                for task_id in passed_with_dumps
-            ]
+            [f"https://spruce.mongodb.com/task/{task_id}" for task_id in passed_with_dumps]
         )
 
     if not errors:

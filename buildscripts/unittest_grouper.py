@@ -67,9 +67,7 @@ def download_buildozer(download_location: str = "./"):
     operating_system = determine_platform()
     architechture = determine_architecture()
     if operating_system == "windows" and architechture == "arm64":
-        raise RuntimeError(
-            "There are no published arm windows releases for buildifier."
-        )
+        raise RuntimeError("There are no published arm windows releases for buildifier.")
 
     extension = ".exe" if operating_system == "windows" else ""
     binary_name = f"buildozer-{operating_system}-{architechture}{extension}"
@@ -236,9 +234,7 @@ def validate_bazel_groups(generate_report, fix):
                     )
                     print(failures[-1][1])
                     if fix:
-                        buildozer_update_cmds += [
-                            [f"add tags mongo_unittest_{group}_group", test]
-                        ]
+                        buildozer_update_cmds += [[f"add tags mongo_unittest_{group}_group", test]]
 
             for test in group_tests:
                 if test not in groups[group]:

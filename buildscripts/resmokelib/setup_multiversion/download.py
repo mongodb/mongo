@@ -120,9 +120,7 @@ def _rsync_move_dir(source_dir, dest_dir):
 def extract_archive(archive_file, install_dir):
     """Uncompress file and return root of extracted directory."""
 
-    LOGGER.info(
-        "Extracting archive data.", archive=archive_file, install_dir=install_dir
-    )
+    LOGGER.info("Extracting archive data.", archive=archive_file, install_dir=install_dir)
     temp_dir = mkdtemp_in_build_dir()
     archive_name = os.path.basename(archive_file)
     _, file_suffix = os.path.splitext(archive_name)
@@ -229,7 +227,5 @@ def symlink_version(suffix, installed_dir, link_dir=None):
             else:
                 raise
 
-    LOGGER.info(
-        "Symlinks for all executables are created in the directory.", link_dir=link_dir
-    )
+    LOGGER.info("Symlinks for all executables are created in the directory.", link_dir=link_dir)
     return link_dir

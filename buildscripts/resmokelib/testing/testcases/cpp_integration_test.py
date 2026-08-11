@@ -25,9 +25,7 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         """Configure the test case."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
-        self.program_options["connectionString"] = (
-            self.fixture.get_internal_connection_string()
-        )
+        self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
 
         process_kwargs = copy.deepcopy(self.program_options.get("process_kwargs", {}))
         # Merge test and fixture environment variables into process_kwargs

@@ -12,9 +12,7 @@ def generate_eviction_configs(rng, mode):
     eviction_trigger = rng.randint(eviction_target + 1, 99)
 
     # Fuzz eviction_dirty_target and trigger both as relative and absolute values
-    target_bytes_min = (
-        50 * 1024 * 1024
-    )  # 50MB # 5% of 1GB default cache size on Evergreen
+    target_bytes_min = 50 * 1024 * 1024  # 50MB # 5% of 1GB default cache size on Evergreen
     target_bytes_max = 256 * 1024 * 1024  # 256MB # 1GB default cache size on Evergreen
     eviction_dirty_target = rng.choice(
         [rng.randint(5, 50), rng.randint(target_bytes_min, target_bytes_max)]
@@ -29,13 +27,9 @@ def generate_eviction_configs(rng, mode):
     # values of the corresponding eviction dirty target and trigger. They need to stay less than the
     # dirty equivalents. The default updates target is 2.5% of the cache, so let's start fuzzing
     # from 2%.
-    updates_target_min = (
-        2 if eviction_dirty_target <= 100 else 20 * 1024 * 1024
-    )  # 2% of 1GB cache
+    updates_target_min = 2 if eviction_dirty_target <= 100 else 20 * 1024 * 1024  # 2% of 1GB cache
     eviction_updates_target = rng.randint(updates_target_min, eviction_dirty_target - 1)
-    eviction_updates_trigger = rng.randint(
-        eviction_updates_target + 1, eviction_dirty_trigger - 1
-    )
+    eviction_updates_trigger = rng.randint(eviction_updates_target + 1, eviction_dirty_trigger - 1)
 
     # Fuzz File manager settings
     close_idle_time_secs = rng.randint(1, 100)
@@ -93,9 +87,7 @@ def generate_table_configs(rng):
     memory_page_max_upper_bound = round(
         (rng.randint(256, 1024) * 1024 * 1024) / 10
     )  # cache_size / 10
-    memory_page_max = rng.randint(
-        memory_page_max_lower_bound, memory_page_max_upper_bound
-    )
+    memory_page_max = rng.randint(memory_page_max_lower_bound, memory_page_max_upper_bound)
 
     split_pct = rng.choice([50, 60, 75, 100])
     prefix_compression = rng.choice(["true", "false"])
@@ -144,9 +136,9 @@ def generate_mongod_parameters(rng, mode):
     # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
     if not ret["disableLogicalSessionCacheRefresh"]:
         ret["logicalSessionRefreshMillis"] = rng.choice([100, 1000, 10000, 100000])
-    ret["maxNumberOfTransactionOperationsInSingleOplogEntry"] = rng.randint(
-        1, 10
-    ) * rng.choice([1, 10, 100])
+    ret["maxNumberOfTransactionOperationsInSingleOplogEntry"] = rng.randint(1, 10) * rng.choice(
+        [1, 10, 100]
+    )
     ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(30, 600)])
     ret["mirrorReads"] = {"samplingRate": rng.random()}
     ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(1, 100) * 1024 * 1024
@@ -170,9 +162,7 @@ def generate_mongod_parameters(rng, mode):
 
     ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
-    ret["wiredTigerStressConfig"] = (
-        False if mode != "stress" else rng.choice([True, False])
-    )
+    ret["wiredTigerStressConfig"] = False if mode != "stress" else rng.choice([True, False])
     ret["wiredTigerSizeStorerPeriodicSyncHits"] = rng.randint(1, 100000)
     ret["wiredTigerSizeStorerPeriodicSyncPeriodMillis"] = rng.randint(1, 60000)
 

@@ -101,9 +101,7 @@ class WorkloadExecution:
         if self.config.write_mode == WriteMode.REPLACE:
             await self.database.drop_collection(self.config.output_collection_name)
 
-    async def collect(
-        self, collection_infos: Sequence[CollectionInfo], queries: Sequence[Query]
-    ):
+    async def collect(self, collection_infos: Sequence[CollectionInfo], queries: Sequence[Query]):
         """Run the given piplelines on the given collection to generate and collect execution statistics."""
         measurements = []
 
@@ -113,13 +111,9 @@ class WorkloadExecution:
                 print(f">>>>>>> running query {query.pipeline}")
                 await self._run_query(coll_info, query, measurements)
 
-        await self.database.insert_many(
-            self.config.output_collection_name, measurements
-        )
+        await self.database.insert_many(self.config.output_collection_name, measurements)
 
-    async def _run_query(
-        self, coll_info: CollectionInfo, query: Query, result: Sequence
-    ):
+    async def _run_query(self, coll_info: CollectionInfo, query: Query, result: Sequence):
         # warm up
         for _ in range(self.config.warmup_runs):
             await self.database.explain(coll_info.name, query.pipeline)

@@ -29,11 +29,11 @@ if os.environ["project"] in ["mongodb-mongo-master-nightly", "mongo-release"]:
 else:
     signing_type = "sign"
 
-macnotary_url = f"https://macos-notary-1628249594.s3.amazonaws.com/releases/client/latest/{macnotary_name}.zip"
-print(f"Fetching macnotary tool from: {macnotary_url}")
-local_filename, headers = urllib.request.urlretrieve(
-    macnotary_url, f"{macnotary_name}.zip"
+macnotary_url = (
+    f"https://macos-notary-1628249594.s3.amazonaws.com/releases/client/latest/{macnotary_name}.zip"
 )
+print(f"Fetching macnotary tool from: {macnotary_url}")
+local_filename, headers = urllib.request.urlretrieve(macnotary_url, f"{macnotary_name}.zip")
 with zipfile.ZipFile(f"{macnotary_name}.zip") as zipf:
     zipf.extractall()
 

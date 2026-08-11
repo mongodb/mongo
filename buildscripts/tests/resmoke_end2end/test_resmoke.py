@@ -51,9 +51,7 @@ class _ResmokeSelftest(unittest.TestCase):
     def execute_resmoke(self, resmoke_args, **kwargs):  # pylint: disable=unused-argument
         resmoke_process = core.programs.make_process(
             self.logger,
-            [sys.executable, "buildscripts/resmoke.py"]
-            + self.resmoke_const_args
-            + resmoke_args,
+            [sys.executable, "buildscripts/resmoke.py"] + self.resmoke_const_args + resmoke_args,
         )
         resmoke_process.start()
         self.resmoke_process = resmoke_process
@@ -91,9 +89,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
 
         # test archival
         archival_dirs_to_expect = 4  # 2 tests * 2 nodes
-        self.assert_dir_file_count(
-            self.test_dir, self.archival_file, archival_dirs_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
     def test_archival_on_task_failure_no_passthrough(self):
         # The --originSuite argument is to trick the resmoke local invocation into passing
@@ -113,9 +109,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
 
         # test archival
         archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
-        self.assert_dir_file_count(
-            self.test_dir, self.archival_file, archival_dirs_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
     def test_no_archival_locally(self):
         # archival should not happen if --taskId is not set.
@@ -181,9 +175,7 @@ class TestTimeout(_ResmokeSelftest):
         started_polling_datetime = datetime.datetime.now()
         while not os.path.isfile(sentinel_path):
             time.sleep(0.1)
-            if datetime.datetime.now() - started_polling_datetime > datetime.timedelta(
-                minutes=5
-            ):
+            if datetime.datetime.now() - started_polling_datetime > datetime.timedelta(minutes=5):
                 self.fail("SUT is not available within 99 seconds; aborting test")
 
         # Kill resmoke:
@@ -206,14 +198,10 @@ class TestTimeout(_ResmokeSelftest):
         self.execute_resmoke(resmoke_args, sentinel_file="timeout0")
 
         archival_dirs_to_expect = 4  # 2 tests * 2 mongod
-        self.assert_dir_file_count(
-            self.test_dir, self.archival_file, archival_dirs_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
-        self.assert_dir_file_count(
-            self.test_dir, self.analysis_file, analysis_pids_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
 
     def test_task_timeout_no_passthrough(self):
         # The --originSuite argument is to trick the resmoke local invocation into passing
@@ -232,14 +220,10 @@ class TestTimeout(_ResmokeSelftest):
         self.execute_resmoke(resmoke_args, sentinel_file="timeout1")
 
         archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
-        self.assert_dir_file_count(
-            self.test_dir, self.archival_file, archival_dirs_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
-        self.assert_dir_file_count(
-            self.test_dir, self.analysis_file, analysis_pids_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
 
     # Test scenarios where an resmoke-launched process launches resmoke.
     def test_nested_timeout(self):
@@ -261,17 +245,11 @@ class TestTimeout(_ResmokeSelftest):
         archival_dirs_to_expect = (
             4  # ((2 tests + 2 stacktrace files) * 2 nodes) / 2 data_file directories
         )
-        self.assert_dir_file_count(
-            self.test_dir, self.archival_file, archival_dirs_to_expect
-        )
-        self.assert_dir_file_count(
-            self.test_dir_inner, self.archival_file, archival_dirs_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
+        self.assert_dir_file_count(self.test_dir_inner, self.archival_file, archival_dirs_to_expect)
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
-        self.assert_dir_file_count(
-            self.test_dir, self.analysis_file, analysis_pids_to_expect
-        )
+        self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
 
 
 class TestTestSelection(_ResmokeSelftest):
@@ -481,9 +459,7 @@ class TestSetParameters(_ResmokeSelftest):
     def test_cli_set_parameters(self):
         self.generate_suite_and_execute_resmoke(
             f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
-            [
-                """--mongodSetParameter={"enableFlowControl": false, "flowControlMaxSamples": 500}"""
-            ],
+            ["""--mongodSetParameter={"enableFlowControl": false, "flowControlMaxSamples": 500}"""],
         ).wait()
 
         set_params = self.parse_output_json()
@@ -539,9 +515,7 @@ class TestSetParameters(_ResmokeSelftest):
 
         set_params = self.parse_output_json()
         self.assertEqual("100", set_params["maxTimeMSForHedgedReads"])
-        self.assertEqual(
-            "1000", set_params["mongosShutdownTimeoutMillisForSignaledShutdown"]
-        )
+        self.assertEqual("1000", set_params["mongosShutdownTimeoutMillisForSignaledShutdown"])
 
     def test_merge_error_cli_mongos_set_parameter(self):
         self.assertEqual(
@@ -635,7 +609,9 @@ class TestForceExcludedTest(unittest.TestCase):
 
         result = execute_resmoke(resmoke_args)
 
-        expected = "Cannot run excluded test in suite config. Use '--force-excluded-tests' to override:"
+        expected = (
+            "Cannot run excluded test in suite config. Use '--force-excluded-tests' to override:"
+        )
         assert expected in result.stdout
         assert result.returncode == 1
 
@@ -778,9 +754,7 @@ class TestEvergreenYML(unittest.TestCase):
 
             self.validate_jstestfuzz_selector(task.get_suite_names())
 
-        self.assertNotEqual(
-            0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks"
-        )
+        self.assertNotEqual(0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks")
 
 
 class TestMultiversionConfig(unittest.TestCase):
@@ -802,9 +776,7 @@ class TestMultiversionConfig(unittest.TestCase):
         try:
             yaml.safe_load(file_contents)
         except Exception:
-            self.fail(
-                msg="`resmoke.py multiversion-config` does not output valid yaml."
-            )
+            self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")
 
         os.remove(file_name)
 
@@ -814,12 +786,8 @@ class TestCoreAnalyzerFunctions(unittest.TestCase):
         task_name = "test_tast_name"
         execution = "0"
         generated_task_name = get_generated_task_name(task_name, execution)
-        self.assertEquals(
-            matches_generated_task_pattern(task_name, generated_task_name), execution
-        )
-        self.assertIsNone(
-            matches_generated_task_pattern("not_same_task", generated_task_name)
-        )
+        self.assertEquals(matches_generated_task_pattern(task_name, generated_task_name), execution)
+        self.assertIsNone(matches_generated_task_pattern("not_same_task", generated_task_name))
 
 
 class TestModuleLoading(unittest.TestCase):

@@ -81,9 +81,7 @@ def copytree_dirs_exist_ok_compatibility(src, dest):
             os.makedirs(dest)
         files = os.listdir(src)
         for file in files:
-            copytree_dirs_exist_ok_compatibility(
-                os.path.join(src, file), os.path.join(dest, file)
-            )
+            copytree_dirs_exist_ok_compatibility(os.path.join(src, file), os.path.join(dest, file))
     else:
         shutil.copyfile(src, dest)
 
@@ -155,9 +153,7 @@ class GoldenTestApp(object):
     def get_git_root(self):
         """Return the root for git repo."""
         self.vprint("Querying git repo root")
-        repo_root = check_output(
-            "git rev-parse --show-toplevel", shell=True, text=True
-        ).strip()
+        repo_root = check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
         self.vprint(f"Found git repo root: '{repo_root}'")
         return repo_root
 
@@ -176,9 +172,7 @@ class GoldenTestApp(object):
         config = GoldenTestConfig.from_yaml_file(config_path)
 
         if config.outputRootPattern is None:
-            raise AppError(
-                "Invalid config. outputRootPattern config parameter is not set"
-            )
+            raise AppError("Invalid config. outputRootPattern config parameter is not set")
 
         return config
 
@@ -225,8 +219,7 @@ class GoldenTestApp(object):
             raise AppError("No outputs found")
 
         self.vprint(
-            f"Found output with latest creation time: {latest_name} "
-            + f"created at {latest_ctime}"
+            f"Found output with latest creation time: {latest_name} " + f"created at {latest_ctime}"
         )
 
         return latest_name
@@ -281,9 +274,7 @@ class GoldenTestApp(object):
 
     def setup_windows(self):
         # Create config file
-        config_path = os.path.join(
-            os.path.expandvars("%LocalAppData%"), ".golden_test_config.yml"
-        )
+        config_path = os.path.join(os.path.expandvars("%LocalAppData%"), ".golden_test_config.yml")
         if not os.path.isfile(config_path):
             print(f"Creating {config_path}")
             config_contents = (
@@ -407,9 +398,7 @@ class GoldenTestApp(object):
         elif platform.platform().startswith("Windows"):
             self.setup_windows()
         else:
-            raise AppError(
-                f"Platform not supported by this setup utility: {platform.platform()}"
-            )
+            raise AppError(f"Platform not supported by this setup utility: {platform.platform()}")
 
 
 def main():

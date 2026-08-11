@@ -19,9 +19,7 @@ class TestGetConfigValue(unittest.TestCase):
         self.assertEqual("default", value)
 
     def test_exception_throw_for_missing_required(self):
-        self.assertRaises(
-            KeyError, read_config.get_config_value, "missing", {}, {}, required=True
-        )
+        self.assertRaises(KeyError, read_config.get_config_value, "missing", {}, {}, required=True)
 
     def test_config_file_value_is_used(self):
         value = read_config.get_config_value(

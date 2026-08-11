@@ -62,9 +62,7 @@ def main():
                     res_json = response.json()
                 except ValueError:
                     print(
-                        "Invalid JSON object returned with response: {}".format(
-                            response.text
-                        ),
+                        "Invalid JSON object returned with response: {}".format(response.text),
                         file=sys.stderr,
                     )
                     time.sleep(options.interval)

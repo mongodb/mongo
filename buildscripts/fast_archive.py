@@ -36,16 +36,14 @@ def process_file(
 
     print(f"{file} finished compressing at {time.time() - start_time}")
 
-    s3_client = boto3.client(
-        "s3", aws_access_key_id=aws_key, aws_secret_access_key=aws_secret
-    )
+    s3_client = boto3.client("s3", aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
     basename = os.path.basename(compressed_file)
-    object_path = f"{project}/{variant}/{version_id}/{task_name}-{revision}-{file_number}/{basename}"
+    object_path = (
+        f"{project}/{variant}/{version_id}/{task_name}-{revision}-{file_number}/{basename}"
+    )
     extra_args = {"ContentType": "application/gzip", "ACL": "public-read"}
     try:
-        s3_client.upload_file(
-            compressed_file, "mciuploads", object_path, ExtraArgs=extra_args
-        )
+        s3_client.upload_file(compressed_file, "mciuploads", object_path, ExtraArgs=extra_args)
     except Exception as ex:
         print(f"ERROR: failed to upload file to s3 {file}", file=sys.stderr)
         print(ex, file=sys.stderr)
@@ -75,9 +73,7 @@ def process_file(
     return task_artifact
 
 
-def main(
-    output_file: str, patterns: List[str], display_name: str, expansions_file: str
-) -> int:
+def main(output_file: str, patterns: List[str], display_name: str, expansions_file: str) -> int:
     if not output_file.endswith(".json"):
         print("WARN: filename input should end with `.json`", file=sys.stderr)
 

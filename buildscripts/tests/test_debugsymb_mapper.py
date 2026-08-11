@@ -35,9 +35,7 @@ class TestGetBuildId(TestCmdOutputExtractor):
         self.cmd_client_mock.run.return_value = readelf_output
 
         build_id_output = self.cmd_output_extractor.get_build_id("path/to/bin")
-        self.assertEqual(
-            build_id_output.build_id, "74c2322104428836f3d94af6cd7471ee7cb5c4ee"
-        )
+        self.assertEqual(build_id_output.build_id, "74c2322104428836f3d94af6cd7471ee7cb5c4ee")
         self.assertEqual(build_id_output.cmd_output, readelf_output)
 
     def test_get_build_id_raises_error(self):
@@ -55,9 +53,7 @@ class TestGetBuildId(TestCmdOutputExtractor):
         )
         self.cmd_client_mock.run.return_value = readelf_output
 
-        self.assertRaises(
-            ValueError, self.cmd_output_extractor.get_build_id, "path/to/bin"
-        )
+        self.assertRaises(ValueError, self.cmd_output_extractor.get_build_id, "path/to/bin")
 
     def test_get_build_id_returns_none(self):
         readelf_output = (

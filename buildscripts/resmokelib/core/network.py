@@ -89,9 +89,7 @@ class PortAllocator(object):
         Raises a PortAllocationError if that port is higher than the
         maximum port.
         """
-        return (
-            config.BASE_PORT + (job_num * cls._PORTS_PER_JOB) + cls._PORTS_PER_FIXTURE
-        )
+        return config.BASE_PORT + (job_num * cls._PORTS_PER_JOB) + cls._PORTS_PER_FIXTURE
 
     @classmethod
     @_check_port

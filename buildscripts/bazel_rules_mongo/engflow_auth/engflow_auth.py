@@ -73,9 +73,7 @@ def install(verbose: bool) -> str:
         binary_path += ".exe"
     if os.path.exists(binary_path):
         if verbose:
-            print(
-                f"{binary_filename} already exists at {binary_path}, skipping download"
-            )
+            print(f"{binary_filename} already exists at {binary_path}, skipping download")
     else:
         url = GH_URL_PREFIX + tag
         print(f"Downloading {url}...")
@@ -111,9 +109,7 @@ def update_bazelrc(binary_path: str, verbose: bool):
 
 def authenticate(binary_path: str, verbose: bool) -> bool:
     need_login = False
-    p = subprocess.run(
-        f"{binary_path} export {CLUSTER}", shell=True, capture_output=True
-    )
+    p = subprocess.run(f"{binary_path} export {CLUSTER}", shell=True, capture_output=True)
     if p.returncode != 0:
         need_login = True
     else:

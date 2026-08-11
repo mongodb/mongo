@@ -45,9 +45,7 @@ _FIXTURE_LOGGER_REGISTRY: dict = {}
 # URL of parsley logs.
 RAW_TEST_LOGS_URL = "https://evergreen.mongodb.com/rest/v2/tasks/{task_id}/build/TestLogs/job{job_num}%2F{test_id}.log?execution={execution}&print_time=true"
 RAW_JOBS_LOGS_URL = "https://evergreen.mongodb.com/rest/v2/tasks/{task_id}/build/TestLogs/job{job_num}?execution={execution}&print_time=true"
-PARSLEY_JOBS_LOGS_URL = (
-    "https://parsley.mongodb.com/test/{task_id}/{execution}/job{job_num}/all"
-)
+PARSLEY_JOBS_LOGS_URL = "https://parsley.mongodb.com/test/{task_id}/{execution}/job{job_num}/all"
 
 
 def _build_logger_server():
@@ -246,9 +244,7 @@ def configure_exception_capture(test_logger):
     return [js_exception, py_exception]
 
 
-def new_test_logger(
-    test_shortname, test_basename, command, parent, job_num, test_id, job_logger
-):
+def new_test_logger(test_shortname, test_basename, command, parent, job_num, test_id, job_logger):
     """Create a new test logger that will be a child of the given parent."""
     name = "%s:%s" % (parent.name, test_shortname)
     logger = logging.Logger(name)
@@ -333,9 +329,7 @@ def _add_build_logger_handler(logger, job_num, test_id=None):
     handler_info = _get_buildlogger_handler_info(logger_info)
     if handler_info is not None:
         if test_id is not None:
-            handler = BUILDLOGGER_SERVER.get_test_handler(
-                build_id, test_id, handler_info
-            )
+            handler = BUILDLOGGER_SERVER.get_test_handler(build_id, test_id, handler_info)
         else:
             handler = BUILDLOGGER_SERVER.get_global_handler(build_id, handler_info)
         handler.setFormatter(_get_formatter(logger_info))
@@ -426,16 +420,12 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
             break
 
     if evergreen_handler_info:
-        fp = (
-            f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
-        )
+        fp = f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
         os.makedirs(os.path.dirname(fp), exist_ok=True)
 
         handler = BufferedFileHandler(fp)
         handler.setFormatter(
-            formatters.EvergreenLogFormatter(
-                fmt=logger_info.get("format", _DEFAULT_FORMAT)
-            )
+            formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT))
         )
         logger.addHandler(handler)
 
@@ -447,9 +437,7 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
                 execution=config.EVERGREEN_EXECUTION,
             )
             ROOT_EXECUTOR_LOGGER.info("Writing output of %s to %s.", test_id, fp)
-            ROOT_EXECUTOR_LOGGER.info(
-                "Raw logs for %s can be viewed at %s", test_name, raw_url
-            )
+            ROOT_EXECUTOR_LOGGER.info("Raw logs for %s can be viewed at %s", test_name, raw_url)
         else:
             parsley_url = PARSLEY_JOBS_LOGS_URL.format(
                 task_id=config.EVERGREEN_TASK_ID,
@@ -465,9 +453,7 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
             ROOT_EXECUTOR_LOGGER.info(
                 "Parsley logs for job #%s can be viewed at %s", job_num, parsley_url
             )
-            ROOT_EXECUTOR_LOGGER.info(
-                "Raw logs for job #%s can be viewed at %s", job_num, raw_url
-            )
+            ROOT_EXECUTOR_LOGGER.info("Raw logs for job #%s can be viewed at %s", job_num, raw_url)
 
 
 def _get_evergreen_log_dirname():

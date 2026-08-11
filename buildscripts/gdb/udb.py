@@ -43,9 +43,7 @@ class LoadDebugFile(gdb.Command):
 
     def __init__(self):
         """GDB Command API init."""
-        super(LoadDebugFile, self).__init__(
-            "load-debug-symbols", gdb.COMPLETE_EXPRESSION
-        )
+        super(LoadDebugFile, self).__init__("load-debug-symbols", gdb.COMPLETE_EXPRESSION)
 
     def invoke(self, args, from_tty):
         """GDB Command API invoke."""
@@ -136,9 +134,7 @@ def extend_solib_search_path(new_path: str):
     gdb.execute(f"set solib-search-path {solib_search_path}", to_string=True)
 
 
-DEBUG_FILE_DIRECTORY_PREFIX = (
-    'The directory where separate debug symbols are searched for is "'
-)
+DEBUG_FILE_DIRECTORY_PREFIX = 'The directory where separate debug symbols are searched for is "'
 
 
 def extend_debug_file_directory(new_path: str):

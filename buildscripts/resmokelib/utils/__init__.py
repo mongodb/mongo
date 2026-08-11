@@ -80,9 +80,7 @@ def load_yaml(value):
     try:
         return yaml.safe_load(value)
     except yaml.YAMLError as err:
-        raise ValueError(
-            "Attempted to parse invalid YAML value '%s': %s" % (value, err)
-        )
+        raise ValueError("Attempted to parse invalid YAML value '%s': %s" % (value, err))
 
 
 def get_task_name_without_suffix(task_name, variant_name):

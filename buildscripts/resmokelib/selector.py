@@ -121,9 +121,7 @@ class TestFileExplorer(object):
         """
         command = [binary]
         command.extend(args)
-        program = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        program = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = program.communicate()
         return program.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
 
@@ -157,9 +155,7 @@ class TestFileExplorer(object):
                 # TODO SERVER-77265 always validate tag file input when mongo-task-generator
                 # no longer passes in invalid tag files
                 if not config.EVERGREEN_TASK_ID:
-                    raise errors.TagFileDoesNotExistError(
-                        f"A tag file was not found at {tag_file}"
-                    )
+                    raise errors.TagFileDoesNotExistError(f"A tag file was not found at {tag_file}")
 
         return tagged_tests
 
@@ -360,9 +356,7 @@ class _TestList(object):
             get_tags: a callable object that takes a test and returns the corresponding list of
                 tags.
         """
-        self._filtered = {
-            test for test in self._filtered if tag_expression(get_tags(test))
-        }
+        self._filtered = {test for test in self._filtered if tag_expression(get_tags(test))}
 
     def include_any_pattern(self, patterns):
         """Filter the test list to only include tests that match any provided glob patterns."""
@@ -508,9 +502,7 @@ class _SelectorConfig(object):
         if root and roots:
             raise ValueError("root and roots cannot be specified at the same time")
         if include_tags and exclude_tags:
-            raise ValueError(
-                "include_tags and exclude_tags cannot be specified at the same time"
-            )
+            raise ValueError("include_tags and exclude_tags cannot be specified at the same time")
         self.root = root
         self.roots = roots
         self.tag_file = tag_file
@@ -557,9 +549,7 @@ class _SelectorConfig(object):
         if include_tags:
             expressions.append(make_expression(include_tags))
         if include_with_all_tags:
-            include_with_all_tags_expr = make_expression(
-                {"$allOf": include_with_all_tags}
-            )
+            include_with_all_tags_expr = make_expression({"$allOf": include_with_all_tags})
             expressions.append(include_with_all_tags_expr)
         elif exclude_tags:
             expressions.append(_NotExpression(make_expression(exclude_tags)))
@@ -567,9 +557,7 @@ class _SelectorConfig(object):
             include_with_any_expr = make_expression({"$anyOf": include_with_any_tags})
             expressions.append(include_with_any_expr)
         if exclude_with_any_tags:
-            exclude_with_any_expr = make_expression(
-                {"$not": {"$anyOf": exclude_with_any_tags}}
-            )
+            exclude_with_any_expr = make_expression({"$not": {"$anyOf": exclude_with_any_tags}})
             expressions.append(exclude_with_any_expr)
 
         if expressions:
@@ -609,17 +597,13 @@ class _Selector(object):
             roots = []
 
         # 2. Create a _TestList.
-        test_list = _TestList(
-            self._test_file_explorer, roots, self._tests_are_files, suite_root
-        )
+        test_list = _TestList(self._test_file_explorer, roots, self._tests_are_files, suite_root)
         # 3. Apply the exclude_files.
         if self._tests_are_files and selector_config.exclude_files:
             test_list.exclude_files(selector_config.exclude_files)
         # 4. Apply the tag filters.
         if selector_config.tags_expression:
-            test_list.match_tag_expression(
-                selector_config.tags_expression, self.get_tags
-            )
+            test_list.match_tag_expression(selector_config.tags_expression, self.get_tags)
         # 5. Apply the include files last with force=True to take precedence over the tags.
         if self._tests_are_files and selector_config.include_files:
             test_list.include_files(selector_config.include_files)
@@ -679,9 +663,7 @@ class _JSTestSelector(_Selector):
 
     def __init__(self, test_file_explorer):
         _Selector.__init__(self, test_file_explorer)
-        self._tags = self._test_file_explorer.parse_tag_files(
-            "js_test", config.TAG_FILES
-        )
+        self._tags = self._test_file_explorer.parse_tag_files("js_test", config.TAG_FILES)
 
     def select(self, selector_config, suite_root=None):
         self._tags = self._test_file_explorer.parse_tag_files(
@@ -729,9 +711,7 @@ class _MultiJSTestSelector(_JSTestSelector):
            until we exceed "total_tests" number of tests.
         2. Slice the corpus into "group_size" lists, put these lists in "grouped_tests".
         """
-        tests, excluded = _JSTestSelector.select(
-            self, selector_config, suite_root=suite_root
-        )
+        tests, excluded = _JSTestSelector.select(self, selector_config, suite_root=suite_root)
 
         group_size = selector_config.group_size
         multi = selector_config.group_count_multiplier

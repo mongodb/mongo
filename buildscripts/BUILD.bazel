@@ -273,3 +273,40 @@ py_binary(
         ),
     ],
 )
+
+py_library(
+    name = "generate_version_expansions",
+    srcs = ["generate_version_expansions.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "generate_bazel_spawn_pb2",
+    srcs = ["generate_bazel_spawn_pb2.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "package_test_provenance",
+    srcs = [
+        "bazel_spawn_pb2.py",
+        "package_test_provenance.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "protobuf",
+            group = "testing",
+        ),
+        dependency(
+            "requests",
+            group = "core",
+        ),
+    ],
+)

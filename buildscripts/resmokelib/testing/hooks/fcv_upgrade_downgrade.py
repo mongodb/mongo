@@ -23,9 +23,7 @@ class FCVUpgradeDowngradeInBackground(jsfile.JSHook):
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize FCVUpgradeDowngradeInBackground."""
         description = "Run background FCV upgrade/downgrade while a test is running"
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_fcv_upgrade_downgrade_background.js"
-        )
+        js_filename = os.path.join("jstests", "hooks", "run_fcv_upgrade_downgrade_background.js")
         jsfile.JSHook.__init__(
             self,
             hook_logger,

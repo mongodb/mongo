@@ -20,17 +20,13 @@ from buildscripts.resmokelib.testing.fixtures import interface
 class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a mongot to run alongside a mongod."""
 
-    def __init__(
-        self, logger, job_num, fixturelib, dbpath_prefix=None, mongot_options=None
-    ):
+    def __init__(self, logger, job_num, fixturelib, dbpath_prefix=None, mongot_options=None):
         interface.Fixture.__init__(self, logger, job_num, fixturelib)
         self.mongot_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongot_options, {})
         )
         # Default to command line options if the YAML configuration is not passed in.
-        self.mongot_executable = self.fixturelib.default_if_none(
-            self.config.MONGOT_EXECUTABLE
-        )
+        self.mongot_executable = self.fixturelib.default_if_none(self.config.MONGOT_EXECUTABLE)
         self.port = self.mongot_options["port"]
         # Each mongot requires its own unique config journal to persist index definitions, replication status, etc to disk.
         # If dir passed to --data-dir option doesn't exist, mongot will create it
@@ -109,13 +105,12 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
 
         # Java applications return exit code of 143 when they shut down upon receiving and obeying a SIGTERM signal, which is the desired/default mode.
         if exit_code == 143 or (mode is not None and exit_code == -(mode.value)):
-            self.logger.info(
-                "Successfully stopped the mongot on port {:d}.".format(self.port)
-            )
+            self.logger.info("Successfully stopped the mongot on port {:d}.".format(self.port))
         else:
             self.logger.warning(
-                "Stopped the mongot on port {:d}. "
-                "Process exited with code {:d}.".format(self.port, exit_code)
+                "Stopped the mongot on port {:d}. " "Process exited with code {:d}.".format(
+                    self.port, exit_code
+                )
             )
             raise self.fixturelib.ServerFailure(
                 "mongot on port {:d} with pid {:d} exited with code {:d}".format(
@@ -129,9 +124,7 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         try:
             shutil.rmtree(self.data_dir)
         except OSError as error:
-            self.logger.error(
-                "Hit OS error trying to delete mongot config journal: %s", error
-            )
+            self.logger.error("Hit OS error trying to delete mongot config journal: %s", error)
             pass
         self.logger.info("Finished deleting mongot data files in fixture teardown")
 
@@ -164,11 +157,7 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
-        return (
-            "mongodb://"
-            + self.get_internal_connection_string()
-            + "/?directConnection=true"
-        )
+        return "mongodb://" + self.get_internal_connection_string() + "/?directConnection=true"
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""

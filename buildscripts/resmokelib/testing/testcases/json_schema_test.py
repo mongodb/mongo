@@ -8,9 +8,7 @@ class JSONSchemaTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = "json_schema_test"
 
-    def __init__(
-        self, logger, json_filename, shell_executable=None, shell_options=None
-    ):
+    def __init__(self, logger, json_filename, shell_executable=None, shell_options=None):
         """Initialize the JSONSchemaTestCase with the JSON test file."""
 
         jsrunnerfile.JSRunnerFileTestCase.__init__(

@@ -23,9 +23,7 @@ def make_test_case(test_kind, *args, **kwargs) -> "TestCase":
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
-class TestCase(
-    unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)
-):  # pylint: disable=invalid-metaclass
+class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)):  # pylint: disable=invalid-metaclass
     """A test case to execute."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
@@ -187,14 +185,10 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
 
     def _execute(self, process):
         """Run the specified process."""
-        self.logger.info(
-            "Starting %s...\n%s", self.short_description(), process.as_command()
-        )
+        self.logger.info("Starting %s...\n%s", self.short_description(), process.as_command())
 
         process.start()
-        self.logger.info(
-            "%s started with pid %s.", self.short_description(), process.pid
-        )
+        self.logger.info("%s started with pid %s.", self.short_description(), process.pid)
 
         self.return_code = process.wait()
         if self.return_code != 0:
@@ -204,9 +198,7 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
 
     def _make_process(self):
         """Return a new Process instance that could be used to run the test or log the command."""
-        raise NotImplementedError(
-            "_make_process must be implemented by TestCase subclasses"
-        )
+        raise NotImplementedError("_make_process must be implemented by TestCase subclasses")
 
     def _get_fixture_environment_variables(self):
         """
@@ -290,23 +282,17 @@ class TestCaseFactory:
     ) -> TestCase:
         """Create and configure a TestCase to be run in a separate thread."""
 
-        shell_options = self._get_shell_options_for_thread(
-            num_clients, thread_id, tenant_id
-        )
+        shell_options = self._get_shell_options_for_thread(num_clients, thread_id, tenant_id)
         test_case = self.create_test_case(logger, shell_options)
         return test_case
 
     def configure(self, fixture, *args, **kwargs):
         """Configure the test case factory."""
-        raise NotImplementedError(
-            "configure must be implemented by TestCaseFactory subclasses"
-        )
+        raise NotImplementedError("configure must be implemented by TestCaseFactory subclasses")
 
     def make_process(self):
         """Make a process for a TestCase."""
-        raise NotImplementedError(
-            "make_process must be implemented by TestCaseFactory subclasses"
-        )
+        raise NotImplementedError("make_process must be implemented by TestCaseFactory subclasses")
 
     def _get_shell_options_for_thread(self, num_clients, thread_id, tenant_id):
         """Get shell_options with an initialized TestData object for given thread."""

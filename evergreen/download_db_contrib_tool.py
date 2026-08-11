@@ -14,7 +14,9 @@ sys.path.append(str(mongo_path))
 from buildscripts.util.expansions import get_expansion
 
 DB_CONTRIB_TOOL_VERSION = "v2.2.11"
-RELEASE_URL = f"https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/{DB_CONTRIB_TOOL_VERSION}/"
+RELEASE_URL = (
+    f"https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/{DB_CONTRIB_TOOL_VERSION}/"
+)
 
 
 def get_binary_name() -> str:
@@ -41,9 +43,7 @@ def get_binary_name() -> str:
 
         operating_system = f"rhel{major_version}"
 
-    binary_name = (
-        f"db-contrib-tool_{DB_CONTRIB_TOOL_VERSION}_{operating_system}_{machine}"
-    )
+    binary_name = f"db-contrib-tool_{DB_CONTRIB_TOOL_VERSION}_{operating_system}_{machine}"
     if operating_system == "windows":
         binary_name = f"{binary_name}.exe"
 

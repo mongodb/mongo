@@ -152,14 +152,10 @@ def register_signal_handler(handler):
                 # Wait for task time out to dump stacks.
                 ret = win32event.WaitForSingleObject(event_handle, win32event.INFINITE)
                 if ret != win32event.WAIT_OBJECT_0:
-                    LOGGER.error(
-                        "_handle_set_event WaitForSingleObject failed: %d", ret
-                    )
+                    LOGGER.error("_handle_set_event WaitForSingleObject failed: %d", ret)
                     return
             except win32event.error as err:
-                LOGGER.error(
-                    "Exception from win32event.WaitForSingleObject with error: %s", err
-                )
+                LOGGER.error("Exception from win32event.WaitForSingleObject with error: %s", err)
             else:
                 handler(None, None)
 
@@ -239,9 +235,7 @@ def kill_process(parent, kill_children=True):
             LOGGER.debug("Killing process '%s' pid %d", proc.name(), proc.pid)
             proc.kill()
         except psutil.NoSuchProcess:
-            LOGGER.warning(
-                "Could not kill process %d, as it no longer exists", proc.pid
-            )
+            LOGGER.warning("Could not kill process %d, as it no longer exists", proc.pid)
 
     _, alive = psutil.wait_procs(procs, timeout=30, callback=None)
     if alive:
@@ -256,9 +250,7 @@ def kill_processes(procs, kill_children=True):
         LOGGER.debug("Starting kill of parent process %d", proc.pid)
         kill_process(proc, kill_children=kill_children)
         ret = proc.wait()
-        LOGGER.debug(
-            "Finished kill of parent process %d has return code of %d", proc.pid, ret
-        )
+        LOGGER.debug("Finished kill of parent process %d has return code of %d", proc.pid, ret)
 
 
 def get_extension(filename):
@@ -281,9 +273,7 @@ def abs_path(path):
         ret, output = execute_cmd(cmd, use_file=True)
         if ret:
             raise Exception(
-                'Command "{}" failed with code {} and output message: {}'.format(
-                    cmd, ret, output
-                )
+                'Command "{}" failed with code {} and output message: {}'.format(cmd, ret, output)
             )
         return output.rstrip().replace("\\", "/")
     return os.path.abspath(os.path.normpath(path))
@@ -389,9 +379,7 @@ def download_file(url, file_name, download_retries=5):
                 except requests.exceptions.ChunkedEncodingError as err:
                     download_retries -= 1
                     if download_retries == 0:
-                        raise Exception(
-                            "Incomplete download for URL {}: {}".format(url, err)
-                        )
+                        raise Exception("Incomplete download for URL {}: {}".format(url, err))
                     continue
 
         # Check if file download was completed.
@@ -404,9 +392,7 @@ def download_file(url, file_name, download_retries=5):
                 if download_retries == 0:
                     raise Exception(
                         "Downloaded file size ({} bytes) doesn't match content length"
-                        "({} bytes) for URL {}".format(
-                            file_size, url_content_length, url
-                        )
+                        "({} bytes) for URL {}".format(file_size, url_content_length, url)
                     )
                 continue
 
@@ -425,16 +411,12 @@ def install_tarball(tarball, root_dir):
     if ext == ".tgz":
         with tarfile.open(tarball, "r:gz") as tar_handle:
             tar_handle.extractall(path=root_dir)
-            output = "Unzipped {} to {}: {}".format(
-                tarball, root_dir, tar_handle.getnames()
-            )
+            output = "Unzipped {} to {}: {}".format(tarball, root_dir, tar_handle.getnames())
         ret = 0
     elif ext == ".zip":
         with zipfile.ZipFile(tarball, "r") as zip_handle:
             zip_handle.extractall(root_dir)
-            output = "Unzipped {} to {}: {}".format(
-                tarball, root_dir, zip_handle.namelist()
-            )
+            output = "Unzipped {} to {}: {}".format(tarball, root_dir, zip_handle.namelist())
         ret = 0
     elif ext == ".msi":
         if not _IS_WINDOWS:
@@ -469,8 +451,9 @@ def install_tarball(tarball, root_dir):
         shutil.rmtree(tmp_dir)
     else:
         raise Exception(
-            "Unsupported file extension to unzip {},"
-            " supported extensions are {}".format(tarball, extensions)
+            "Unsupported file extension to unzip {}," " supported extensions are {}".format(
+                tarball, extensions
+            )
         )
 
     LOGGER.debug(output)
@@ -499,30 +482,20 @@ def chmod_w_file(chmod_file):
         #       questions/12168110/setting-folder-permissions-in-windows-using-python
         # pylint: disable=undefined-variable,unused-variable
         user, domain, sec_type = win32security.LookupAccountName("", "Everyone")
-        file_sd = win32security.GetFileSecurity(
-            chmod_file, win32security.DACL_SECURITY_INFORMATION
-        )
+        file_sd = win32security.GetFileSecurity(chmod_file, win32security.DACL_SECURITY_INFORMATION)
         dacl = file_sd.GetSecurityDescriptorDacl()
-        dacl.AddAccessAllowedAce(
-            win32security.ACL_REVISION, ntsecuritycon.FILE_GENERIC_WRITE, user
-        )
+        dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_GENERIC_WRITE, user)
         file_sd.SetSecurityDescriptorDacl(1, dacl, 0)
-        win32security.SetFileSecurity(
-            chmod_file, win32security.DACL_SECURITY_INFORMATION, file_sd
-        )
+        win32security.SetFileSecurity(chmod_file, win32security.DACL_SECURITY_INFORMATION, file_sd)
         # pylint: enable=undefined-variable,unused-variable
     else:
-        os.chmod(
-            chmod_file, os.stat(chmod_file) | stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
-        )
+        os.chmod(chmod_file, os.stat(chmod_file) | stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
 
 
 def set_windows_bootstatuspolicy():
     """For Windows hosts that are physical, this prevents boot to prompt after failure."""
 
-    LOGGER.info(
-        "Setting bootstatuspolicy to ignoreallfailures & boot timeout to 5 seconds"
-    )
+    LOGGER.info("Setting bootstatuspolicy to ignoreallfailures & boot timeout to 5 seconds")
     cmds = """
         echo 'Setting bootstatuspolicy to ignoreallfailures & boot timeout to 5 seconds' ;
         bcdedit /set {default} bootstatuspolicy ignoreallfailures ;
@@ -559,11 +532,11 @@ def _do_install_mongod(bin_dir=None, tarball_url="latest", root_dir=None):
         if _IS_WINDOWS:
             # MSI default:
             # https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-ssl-latest-signed.msi
-            tarball_url = "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-ssl-latest.zip"
-        elif _IS_LINUX:
             tarball_url = (
-                "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-latest.tgz"
+                "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-ssl-latest.zip"
             )
+        elif _IS_LINUX:
+            tarball_url = "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-latest.tgz"
 
     tarball = os.path.split(urllib.parse.urlsplit(tarball_url).path)[-1]
     download_file(tarball_url, tarball)
@@ -593,16 +566,12 @@ def get_boot_datetime(uptime_string):
 def print_uptime():
     """Print the last time the system was booted, and the uptime (in seconds)."""
     boot_time_epoch = psutil.boot_time()
-    boot_time = datetime.datetime.fromtimestamp(boot_time_epoch).strftime(
-        "%Y-%m-%d %H:%M:%S.%f"
-    )
+    boot_time = datetime.datetime.fromtimestamp(boot_time_epoch).strftime("%Y-%m-%d %H:%M:%S.%f")
     uptime = int(time.time() - boot_time_epoch)
     LOGGER.info("System was last booted %s, up %d seconds", boot_time, uptime)
 
 
-def call_remote_operation(
-    local_ops, remote_python, script_name, client_args, operation
-):
+def call_remote_operation(local_ops, remote_python, script_name, client_args, operation):
     """Call the remote operation and return tuple (ret, ouput)."""
     client_call = f"{remote_python} {script_name} {client_args} {operation}"
     ret, output = local_ops.shell(client_call)
@@ -700,9 +669,7 @@ class MongodControl(object):
         if os.path.isdir(root_dir):
             LOGGER.warning("Root dir %s already exists", root_dir)
         else:
-            _do_install_mongod(
-                bin_dir=self.bin_dir, tarball_url=tarball_url, root_dir=root_dir
-            )
+            _do_install_mongod(bin_dir=self.bin_dir, tarball_url=tarball_url, root_dir=root_dir)
         self.bin_dir = get_bin_dir(root_dir)
         if not self.bin_dir:
             ret, output = execute_cmd("ls -lR '{}'".format(root_dir), use_file=True)
@@ -848,9 +815,7 @@ def remote_handler(options, task_config, root_dir):
         options=mongod_options,
     )
 
-    mongo_client_opts = get_mongo_client_args(
-        host=host, port=options.port, task_config=task_config
-    )
+    mongo_client_opts = get_mongo_client_args(host=host, port=options.port, task_config=task_config)
 
     # Perform the sequence of operations specified. If any operation fails then return immediately.
     for operation in options.remote_operations:
@@ -921,9 +886,7 @@ def remote_handler(options, task_config, root_dir):
             ret, output = mongod.start()
             LOGGER.info(output)
             if ret:
-                LOGGER.error(
-                    "Failed to start mongod on port %d: %s", options.port, output
-                )
+                LOGGER.error("Failed to start mongod on port %d: %s", options.port, output)
                 return ret
             LOGGER.info(
                 "Started mongod running on port %d pid %s",
@@ -1146,34 +1109,24 @@ def internal_crash():
     return 1, "Crash did not occur"
 
 
-def crash_server_or_kill_mongod(
-    task_config, crash_canary, local_ops, script_name, client_args
-):
+def crash_server_or_kill_mongod(task_config, crash_canary, local_ops, script_name, client_args):
     """Crash server or kill mongod and optionally write canary doc. Return tuple (ret, output)."""
 
     crash_wait_time = powercycle_constants.CRASH_WAIT_TIME + random.randint(
         0, powercycle_constants.CRASH_WAIT_TIME_JITTER
     )
-    message_prefix = (
-        "Killing mongod" if task_config.crash_method == "kill" else "Crashing server"
-    )
+    message_prefix = "Killing mongod" if task_config.crash_method == "kill" else "Crashing server"
     LOGGER.info("%s in %d seconds", message_prefix, crash_wait_time)
     time.sleep(crash_wait_time)
 
     if task_config.crash_method in ["internal", "kill"]:
-        crash_cmd = (
-            "crash_server" if task_config.crash_method == "internal" else "kill_mongod"
-        )
+        crash_cmd = "crash_server" if task_config.crash_method == "internal" else "kill_mongod"
         crash_func = local_ops.shell
         remote_python = get_remote_python()
-        crash_args = [
-            f"{remote_python} {script_name} {client_args} --remoteOperation {crash_cmd}"
-        ]
+        crash_args = [f"{remote_python} {script_name} {client_args} --remoteOperation {crash_cmd}"]
 
     else:
-        message = "Unsupported crash method '{}' provided".format(
-            task_config.crash_method
-        )
+        message = "Unsupported crash method '{}' provided".format(task_config.crash_method)
         LOGGER.error(message)
         return 1, message
 
@@ -1191,9 +1144,7 @@ def wait_for_mongod_shutdown(mongod_control, timeout=2 * ONE_HOUR_SECS):
     status = mongod_control.status()
     while status != "stopped":
         if time.time() - start >= timeout:
-            LOGGER.error(
-                "The mongod process has not stopped, current status is %s", status
-            )
+            LOGGER.error("The mongod process has not stopped, current status is %s", status)
             return 1
         LOGGER.info("Waiting for mongod process to stop, current status is %s ", status)
         time.sleep(3)
@@ -1330,8 +1281,7 @@ def mongo_seed_docs(mongo, db_name, coll_name, num_docs):
     def rand_string(max_length=1024):
         """Return random string of random length."""
         return "".join(
-            random.choice(string.ascii_letters)
-            for _ in range(random.randint(1, max_length))
+            random.choice(string.ascii_letters) for _ in range(random.randint(1, max_length))
         )
 
     LOGGER.info(
@@ -1350,10 +1300,7 @@ def mongo_seed_docs(mongo, db_name, coll_name, num_docs):
         if num_coll_docs >= num_docs:
             break
         mongo[db_name][coll_name].insert_many(
-            [
-                {"x": random.randint(0, base_num), "doc": rand_string(1024)}
-                for _ in range(bulk_num)
-            ]
+            [{"x": random.randint(0, base_num), "doc": rand_string(1024)} for _ in range(bulk_num)]
         )
     LOGGER.info(
         "After seeding there are %d documents in the collection",
@@ -1366,17 +1313,13 @@ def mongo_validate_canary(mongo, db_name, coll_name, doc):
     """Validate a canary document, return 0 if the document exists."""
     if not doc:
         return 0
-    LOGGER.info(
-        "Validating canary document using %s.%s.find_one(%s)", db_name, coll_name, doc
-    )
+    LOGGER.info("Validating canary document using %s.%s.find_one(%s)", db_name, coll_name, doc)
     return 0 if mongo[db_name][coll_name].find_one(doc) else 1
 
 
 def mongo_insert_canary(mongo, db_name, coll_name, doc):
     """Insert a canary document with 'j' True, return 0 if successful."""
-    LOGGER.info(
-        "Inserting canary document using %s.%s.insert_one(%s)", db_name, coll_name, doc
-    )
+    LOGGER.info("Inserting canary document using %s.%s.insert_one(%s)", db_name, coll_name, doc)
     coll = mongo[db_name][coll_name].with_options(
         write_concern=pymongo.write_concern.WriteConcern(j=True)
     )
@@ -1439,9 +1382,7 @@ def get_remote_python():
     """Return remote python."""
 
     python_bin_dir = "Scripts" if _IS_WINDOWS else "bin"
-    remote_python = (
-        f". {powercycle_constants.VIRTUALENV_DIR}/{python_bin_dir}/activate; python -u"
-    )
+    remote_python = f". {powercycle_constants.VIRTUALENV_DIR}/{python_bin_dir}/activate; python -u"
 
     return remote_python
 
@@ -1477,9 +1418,7 @@ def main(parser_actions, options):
 
     # Initialize the mongod options
     # Note - We use posixpath for Windows client to Linux server scenarios.
-    root_dir = (
-        f"{powercycle_constants.REMOTE_DIR}/mongodb-powercycle-test-{int(time.time())}"
-    )
+    root_dir = f"{powercycle_constants.REMOTE_DIR}/mongodb-powercycle-test-{int(time.time())}"
     set_fcv_cmd = "set_fcv" if task_config.fcv is not None else ""
 
     # Error out earlier if these options are not properly specified
@@ -1622,9 +1561,7 @@ def main(parser_actions, options):
                 option_value = " ".join(map(str, option_value))
             client_args = f"{client_args} {action.option_strings[-1]} {option_value}"
 
-    script_name = (
-        f"{powercycle_constants.REMOTE_DIR}/{powercycle_constants.RESMOKE_PATH}"
-    )
+    script_name = f"{powercycle_constants.REMOTE_DIR}/{powercycle_constants.RESMOKE_PATH}"
     script_name = abs_path(script_name)
     LOGGER.info("%s %s", script_name, client_args)
 
@@ -1663,9 +1600,7 @@ def main(parser_actions, options):
     # =========
     while True:
         loop_num += 1
-        LOGGER.info(
-            "****Starting test loop %d test time %d seconds****", loop_num, test_time
-        )
+        LOGGER.info("****Starting test loop %d test time %d seconds****", loop_num, test_time)
 
         temp_client_files = []
 
@@ -1738,7 +1673,9 @@ def main(parser_actions, options):
         )
         LOGGER.info("Local collection validation: %d %s", ret, output)
         if ret:
-            network_error = f"network error while attempting to run command 'isMaster' on host '{host_port}'"
+            network_error = (
+                f"network error while attempting to run command 'isMaster' on host '{host_port}'"
+            )
             # Mark this error as ssh failure, since it happens during the first test loop before
             # the first server crash and likely related to port forwarding not working, which
             # uses ssh tunnel command.
@@ -1785,12 +1722,8 @@ def main(parser_actions, options):
         host_port = f"{mongod_host}:{standard_port}"
         for i in range(num_crud_clients):
             crud_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
-            crud_test_data["collectionName"] = (
-                f"{powercycle_constants.COLLECTION_NAME}-{i}"
-            )
-            new_resmoke_config(
-                with_external_server, crud_config_file, crud_test_data, eval_str
-            )
+            crud_test_data["collectionName"] = f"{powercycle_constants.COLLECTION_NAME}-{i}"
+            new_resmoke_config(with_external_server, crud_config_file, crud_test_data, eval_str)
             _, _ = resmoke_client(
                 work_dir=mongo_repo_root_dir,
                 mongo_path=mongo_path,
@@ -1810,9 +1743,7 @@ def main(parser_actions, options):
             fsm_test_data["dbNamePrefix"] = f"fsm-{i}"
             # Do collection validation only for the first FSM client.
             fsm_test_data["validateCollections"] = bool(i == 0)
-            new_resmoke_config(
-                with_external_server, fsm_config_file, fsm_test_data, eval_str
-            )
+            new_resmoke_config(with_external_server, fsm_config_file, fsm_test_data, eval_str)
             _, _ = resmoke_client(
                 work_dir=mongo_repo_root_dir,
                 mongo_path=mongo_path,
@@ -1889,8 +1820,7 @@ def main(parser_actions, options):
                 boot_time_after_crash,
             )
         elif (
-            task_config.crash_method != "kill"
-            and boot_time_after_crash <= boot_time_after_recovery
+            task_config.crash_method != "kill" and boot_time_after_crash <= boot_time_after_recovery
         ):
             raise Exception(
                 f"System boot time after crash ({boot_time_after_crash}) is not newer"
@@ -1900,9 +1830,7 @@ def main(parser_actions, options):
         canary_doc = copy.deepcopy(orig_canary_doc)
 
         test_time = int(time.time()) - start_time
-        LOGGER.info(
-            "****Completed test loop %d test time %d seconds****", loop_num, test_time
-        )
+        LOGGER.info("****Completed test loop %d test time %d seconds****", loop_num, test_time)
         if loop_num == test_loops:
             break
 

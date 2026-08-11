@@ -159,8 +159,7 @@ def default_buildinfo_environment_data(compiler_path, extra_definitions, env_var
         ),
     )
     return {
-        k: {"key": k, "value": v, "inBuildInfo": ibi, "inVersion": iv}
-        for k, v, ibi, iv in data
+        k: {"key": k, "value": v, "inBuildInfo": ibi, "inVersion": iv} for k, v, ibi, iv in data
     }
 
 
@@ -248,9 +247,7 @@ def generate_config_header(
         version_parts[3] = 0
     version_parts = [int(x) for x in version_parts[:4]]
 
-    modules = (
-        ["enterprise"] if "build_enterprise_enabled" in extra_definitions_dict else []
-    )
+    modules = ["enterprise"] if "build_enterprise_enabled" in extra_definitions_dict else []
     module_list = ",\n".join(['"{0}"_sd'.format(x) for x in modules])
 
     replacements = {

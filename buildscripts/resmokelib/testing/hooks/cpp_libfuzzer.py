@@ -52,9 +52,7 @@ class LibfuzzerHook(interface.Hook):
             test.merged_corpus_directory,
             test.corpus_directory,
         ]
-        process = core.programs.make_process(
-            self.logger, default_args, **test.program_options
-        )
+        process = core.programs.make_process(self.logger, default_args, **test.program_options)
         process.start()
         process.wait()
         self.logger.info(f"Merge for {test.short_name()} libfuzzer test finished.")

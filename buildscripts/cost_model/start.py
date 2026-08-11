@@ -46,9 +46,7 @@ from workload_execution import Query, QueryParameters
 __all__ = []
 
 
-def save_to_csv(
-    parameters: Mapping[str, Sequence[CostModelParameters]], filepath: str
-) -> None:
+def save_to_csv(parameters: Mapping[str, Sequence[CostModelParameters]], filepath: str) -> None:
     """Save model input parameters to a csv file."""
     abt_type_name = "abt_type"
     fieldnames = [
@@ -61,9 +59,9 @@ def save_to_csv(
         writer.writeheader()
         for abt_type, type_params_list in parameters.items():
             for type_params in type_params_list:
-                fields = dataclasses.asdict(
-                    type_params.execution_stats
-                ) | dataclasses.asdict(type_params.query_params)
+                fields = dataclasses.asdict(type_params.execution_stats) | dataclasses.asdict(
+                    type_params.query_params
+                )
                 fields[abt_type_name] = abt_type
                 writer.writerow(fields)
 
@@ -127,23 +125,15 @@ async def execute_index_intersections_with_requests(
         await database.set_parameter(
             "internalCostModelCoefficients", '{"filterIncrementalCost": 10000.0}'
         )
-        await database.set_parameter(
-            "internalCascadesOptimizerDisableMergeJoinRIDIntersect", False
-        )
-        await database.set_parameter(
-            "internalCascadesOptimizerDisableHashJoinRIDIntersect", False
-        )
+        await database.set_parameter("internalCascadesOptimizerDisableMergeJoinRIDIntersect", False)
+        await database.set_parameter("internalCascadesOptimizerDisableHashJoinRIDIntersect", False)
 
         await workload_execution.execute(
             database, main_config.workload_execution, collections, requests
         )
 
-        await database.set_parameter(
-            "internalCascadesOptimizerDisableMergeJoinRIDIntersect", True
-        )
-        await database.set_parameter(
-            "internalCascadesOptimizerDisableHashJoinRIDIntersect", True
-        )
+        await database.set_parameter("internalCascadesOptimizerDisableMergeJoinRIDIntersect", True)
+        await database.set_parameter("internalCascadesOptimizerDisableHashJoinRIDIntersect", True)
 
         main_config.workload_execution.write_mode = WriteMode.APPEND
         await workload_execution.execute(
@@ -151,12 +141,8 @@ async def execute_index_intersections_with_requests(
         )
 
     finally:
-        await database.set_parameter(
-            "internalCascadesOptimizerDisableMergeJoinRIDIntersect", False
-        )
-        await database.set_parameter(
-            "internalCascadesOptimizerDisableHashJoinRIDIntersect", False
-        )
+        await database.set_parameter("internalCascadesOptimizerDisableMergeJoinRIDIntersect", False)
+        await database.set_parameter("internalCascadesOptimizerDisableHashJoinRIDIntersect", False)
         await database.set_parameter("internalCostModelCoefficients", "")
 
 
@@ -168,9 +154,7 @@ async def execute_index_intersections(
     requests = []
 
     for i in range(0, 1000, 100):
-        requests.append(
-            Query(pipeline=[{"$match": {"in1": i, "in2": i}}], keys_length_in_bytes=1)
-        )
+        requests.append(Query(pipeline=[{"$match": {"in1": i, "in2": i}}], keys_length_in_bytes=1))
 
         requests.append(
             Query(
@@ -196,9 +180,7 @@ async def execute_index_intersections(
     await execute_index_intersections_with_requests(database, collections, requests)
 
 
-async def execute_evaluation(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo]
-):
+async def execute_evaluation(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collections = [ci for ci in collections if ci.name.startswith("c_int_05")]
     requests = []
 
@@ -217,9 +199,7 @@ async def execute_evaluation(
     )
 
 
-async def execute_unwind(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo]
-):
+async def execute_unwind(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collections = [ci for ci in collections if ci.name.startswith("c_arr_01")]
     requests = []
     # average size of arrays in the collection
@@ -227,9 +207,7 @@ async def execute_unwind(
 
     for _ in range(500, 1000, 100):
         requests.append(
-            Query(
-                pipeline=[{"$unwind": "$as"}], number_of_fields=average_size_of_arrays
-            )
+            Query(pipeline=[{"$unwind": "$as"}], number_of_fields=average_size_of_arrays)
         )
 
     await workload_execution.execute(
@@ -237,9 +215,7 @@ async def execute_unwind(
     )
 
 
-async def execute_unique(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo]
-):
+async def execute_unique(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collections = [ci for ci in collections if ci.name.startswith("c_arr_01")]
     requests = []
 
@@ -251,9 +227,7 @@ async def execute_unique(
     )
 
 
-async def execute_limitskip(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo]
-):
+async def execute_limitskip(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [ci for ci in collections if ci.name.startswith("index_scan")][0]
     limits = [5, 10, 15, 20]
     skips = [5, 10, 15, 20]
@@ -261,9 +235,7 @@ async def execute_limitskip(
 
     for limit in limits:
         for skip in skips:
-            requests.append(
-                Query(pipeline=[{"$skip": skip}, {"$limit": limit}], note="LimitSkip")
-            )
+            requests.append(Query(pipeline=[{"$skip": skip}, {"$limit": limit}], note="LimitSkip"))
 
     await workload_execution.execute(
         database, main_config.workload_execution, [collection], requests

@@ -33,16 +33,12 @@ file_handler.setFormatter(formatter)
 root.addHandler(stdout_handler)
 root.addHandler(file_handler)
 
-DOCKER_SYSTEMCTL_REPO = (
-    "https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement"
-)
+DOCKER_SYSTEMCTL_REPO = "https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement"
 SYSTEMCTL_URL = (
-    DOCKER_SYSTEMCTL_REPO
-    + "/eb2a963a7d8413119b432bcb6151af6076b65f84/files/docker/systemctl3.py"
+    DOCKER_SYSTEMCTL_REPO + "/eb2a963a7d8413119b432bcb6151af6076b65f84/files/docker/systemctl3.py"
 )
 JOURNALCTL_URL = (
-    DOCKER_SYSTEMCTL_REPO
-    + "/eb2a963a7d8413119b432bcb6151af6076b65f84/files/docker/journalctl3.py"
+    DOCKER_SYSTEMCTL_REPO + "/eb2a963a7d8413119b432bcb6151af6076b65f84/files/docker/journalctl3.py"
 )
 
 TestArgs = Dict[str, Union[str, int, List[str]]]
@@ -50,9 +46,7 @@ TestArgs = Dict[str, Union[str, int, List[str]]]
 
 def run_and_log(cmd: str, end_on_error: bool = True):
     # type: (str, bool) -> 'subprocess.CompletedProcess[bytes]'
-    proc = subprocess.run(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
+    proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     logging.debug(cmd)
     logging.debug(proc.stdout.decode("UTF-8").strip())
     if end_on_error and proc.returncode != 0:
@@ -69,9 +63,7 @@ def download_extract_package(package: str) -> List[str]:
         logging.info("Using local file: %s", local_path)
         downloaded_file = os.path.basename(local_path)
         # Copy the file to the current directory if it's not already here
-        if local_path != downloaded_file and local_path != os.path.join(
-            ".", downloaded_file
-        ):
+        if local_path != downloaded_file and local_path != os.path.join(".", downloaded_file):
             shutil.copy(local_path, downloaded_file)
     else:
         # Use wget here because using urllib we get errors like the following
@@ -103,11 +95,7 @@ def download_extract_all_packages(package_urls: List[str]) -> List[str]:
 
 def run_apt_test(packages: List[str]):
     logging.info("Detected apt running test.")
-    run_and_log(
-        "DEBIAN_FRONTEND=noninteractive apt-get install -y {}".format(
-            " ".join(packages)
-        )
-    )
+    run_and_log("DEBIAN_FRONTEND=noninteractive apt-get install -y {}".format(" ".join(packages)))
 
 
 def run_yum_test(packages: List[str]):
@@ -184,9 +172,7 @@ def get_os_release() -> Tuple[str, int, int]:
     os_version = release_info["VERSION_ID"]
 
     try:
-        os_version_major, os_version_minor = (
-            int(text) for text in os_version.split(".")
-        )
+        os_version_major, os_version_minor = (int(text) for text in os_version.split("."))
     except ValueError:
         os_version_major = int(os_version)
         os_version_minor = 0
@@ -276,9 +262,7 @@ def get_test_args(package_manager: str, package_files: List[str]) -> TestArgs:
     def get_package_name(package_file: str) -> str:
         if package_manager in ("yum", "zypper"):
             result = run_and_log(
-                "rpm --nosignature -qp --queryformat '%{{NAME}}' {0}".format(
-                    package_file
-                )
+                "rpm --nosignature -qp --queryformat '%{{NAME}}' {0}".format(package_file)
             )
             return result.stdout.decode("utf-8").strip()
         else:
@@ -313,9 +297,7 @@ def setup(test_args: TestArgs):
     # it in our tests
     run_and_log("mkdir -p /run/systemd/system")
     run_and_log("mkdir -p {}".format(test_args["systemd_presets_dir"]))
-    run_and_log(
-        "echo 'disable *' > {}/00-test.preset".format(test_args["systemd_presets_dir"])
-    )
+    run_and_log("echo 'disable *' > {}/00-test.preset".format(test_args["systemd_presets_dir"]))
 
 
 def install_fake_systemd(test_args: TestArgs):
@@ -387,16 +369,12 @@ def test_install_is_complete(test_args: TestArgs):
     try:
         user_info = pwd.getpwnam(test_args["mongo_username"])
     except KeyError:
-        raise RuntimeError(
-            "Required user missing: {}".format(test_args["mongo_username"])
-        )
+        raise RuntimeError("Required user missing: {}".format(test_args["mongo_username"]))
 
     try:
         grp.getgrnam(test_args["mongo_groupname"])
     except KeyError:
-        raise RuntimeError(
-            "Required group missing: {}".format(test_args["mongo_username"])
-        )
+        raise RuntimeError("Required group missing: {}".format(test_args["mongo_username"]))
 
     # All of the supplemental groups (the .deb pattern)
     mongo_user_groups = [
@@ -440,25 +418,19 @@ def test_ulimits_correct():
     ulimits = parse_ulimits(mongod_pid)
 
     if ulimits["Max file size"][0] != -1:
-        raise RuntimeError(
-            "RLMIT_FSIZE != unlimited: {}".format(ulimits["Max file size"])
-        )
+        raise RuntimeError("RLMIT_FSIZE != unlimited: {}".format(ulimits["Max file size"]))
 
     if ulimits["Max cpu time"][0] != -1:
         raise RuntimeError("RLMIT_CPU != unlimited: {}".format(ulimits["Max cpu time"]))
 
     if ulimits["Max address space"][0] != -1:
-        raise RuntimeError(
-            "RLMIT_AS != unlimited: {}".format(ulimits["Max address space"])
-        )
+        raise RuntimeError("RLMIT_AS != unlimited: {}".format(ulimits["Max address space"]))
 
     if ulimits["Max open files"][0] != -1 and ulimits["Max open files"][0] < 64000:
         raise RuntimeError("RLMIT_NOFILE < 64000: {}".format(ulimits["Max open files"]))
 
     if ulimits["Max resident set"][0] != -1:
-        raise RuntimeError(
-            "RLMIT_RSS != unlimited: {}".format(ulimits["Max resident set"])
-        )
+        raise RuntimeError("RLMIT_RSS != unlimited: {}".format(ulimits["Max resident set"]))
 
     if ulimits["Max processes"][0] != -1 and ulimits["Max processes"][0] < 64000:
         raise RuntimeError("RLMIT_NPROC < 64000: {}".format(ulimits["Max processes"]))
@@ -481,9 +453,7 @@ def test_stop():
     run_and_log("systemctl stop mongod.service")
 
     logging.debug("Waiting up to 60 seconds for mongod to finish shutting down...")
-    run_mongo_query(
-        test_args["mongo_shell"], "db.smoke.insertOne({answer: 42})", should_fail=True
-    )
+    run_mongo_query(test_args["mongo_shell"], "db.smoke.insertOne({answer: 42})", should_fail=True)
 
     run_and_log("systemctl is-active mongod.service", end_on_error=False)
 
@@ -509,9 +479,7 @@ def test_install_compass(test_args: TestArgs):
 
 
 def test_uninstall(test_args: TestArgs):
-    logging.info(
-        "Uninstalling packages:\n\t%s", "\n\t".join(test_args["package_names"])
-    )
+    logging.info("Uninstalling packages:\n\t%s", "\n\t".join(test_args["package_names"]))
 
     command = ""  # type: str
     if test_args["package_manager"] == "apt":

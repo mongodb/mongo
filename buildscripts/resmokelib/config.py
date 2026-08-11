@@ -18,9 +18,7 @@ RESMOKE_ROOT = str(Path(__file__).parent.parent.parent)
 EXTERNAL_MODULE_ROOT = os.getcwd()
 
 # Whether or not resmoke is being run from an external module
-IN_EXTERNAL_MODULE = os.path.normpath(EXTERNAL_MODULE_ROOT) != os.path.normpath(
-    RESMOKE_ROOT
-)
+IN_EXTERNAL_MODULE = os.path.normpath(EXTERNAL_MODULE_ROOT) != os.path.normpath(RESMOKE_ROOT)
 
 # Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
 # by resmoke.py.
@@ -127,9 +125,7 @@ DEFAULTS = {
     "stagger_jobs": None,
     "majority_read_concern": "on",
     "enable_enterprise_tests": "on",
-    "resmoke_modules_path": os.path.join(
-        "buildscripts", "resmokeconfig", "resmoke_modules.yml"
-    ),
+    "resmoke_modules_path": os.path.join("buildscripts", "resmokeconfig", "resmoke_modules.yml"),
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
@@ -255,9 +251,7 @@ class SuiteOptions(_SuiteOptions):
 
                 combined_value = combined_options[field]
                 if combined_value is not cls.INHERIT and combined_value != value:
-                    raise ValueError(
-                        "Attempted to set '{}' option multiple times".format(field)
-                    )
+                    raise ValueError("Attempted to set '{}' option multiple times".format(field))
                 combined_options[field] = value
 
         if include_tags_list:
@@ -702,19 +696,11 @@ BENCHMARK_OUT_FORMAT = "json"
 ORDER_TESTS_BY_NAME = True
 
 # Default file names for externally generated lists of tests created during the build.
-DEFAULT_BENCHMARK_TEST_LIST = (
-    "bazel-bin/install/install-mongo_benchmark-stripped_test_list.txt"
-)
+DEFAULT_BENCHMARK_TEST_LIST = "bazel-bin/install/install-mongo_benchmark-stripped_test_list.txt"
 DEFAULT_UNIT_TEST_LIST = "bazel-bin/install/install-mongo_unittest_test_list.txt"
-DEFAULT_INTEGRATION_TEST_LIST = (
-    "bazel-bin/install/install-mongo_integration_test_test_list.txt"
-)
-DEFAULT_LIBFUZZER_TEST_LIST = (
-    "bazel-bin/install/install-mongo_fuzzer_test_test_list.txt"
-)
-DEFAULT_PRETTY_PRINTER_TEST_LIST = (
-    "bazel-bin/install/install-dist-test-stripped_test_list.txt"
-)
+DEFAULT_INTEGRATION_TEST_LIST = "bazel-bin/install/install-mongo_integration_test_test_list.txt"
+DEFAULT_LIBFUZZER_TEST_LIST = "bazel-bin/install/install-mongo_fuzzer_test_test_list.txt"
+DEFAULT_PRETTY_PRINTER_TEST_LIST = "bazel-bin/install/install-dist-test-stripped_test_list.txt"
 SPLIT_UNITTESTS_LISTS = [
     f"bazel-bin/install/install-mongo_unittest_{test_group}_group_test_list.txt"
     for test_group in [

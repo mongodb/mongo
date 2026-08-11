@@ -34,9 +34,7 @@ class TestGetProcesses(unittest.TestCase):
         process_match = "exact"
         logger = Mock()
 
-        processes = get_processes(
-            process_ids, interesting_processes, process_match, logger
-        )
+        processes = get_processes(process_ids, interesting_processes, process_match, logger)
 
         self.assertCountEqual(
             processes,
@@ -64,9 +62,7 @@ class TestGetProcesses(unittest.TestCase):
         process_match = "exact"
         logger = Mock()
 
-        processes = get_processes(
-            process_ids, interesting_processes, process_match, logger
-        )
+        processes = get_processes(process_ids, interesting_processes, process_match, logger)
 
         self.assertCountEqual(
             processes,
@@ -95,9 +91,7 @@ class TestGetProcesses(unittest.TestCase):
         process_match = "contains"
         logger = Mock()
 
-        processes = get_processes(
-            process_ids, interesting_processes, process_match, logger
-        )
+        processes = get_processes(process_ids, interesting_processes, process_match, logger)
 
         self.assertCountEqual(
             processes,
@@ -131,9 +125,7 @@ class TestGetProcesses(unittest.TestCase):
         process_match = "exact"
         logger = Mock()
 
-        processes = get_processes(
-            process_ids, interesting_processes, process_match, logger
-        )
+        processes = get_processes(process_ids, interesting_processes, process_match, logger)
 
         self.assertCountEqual(
             processes,

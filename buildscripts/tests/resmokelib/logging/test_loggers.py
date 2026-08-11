@@ -71,9 +71,7 @@ class TestLoggers(unittest.TestCase):
         self.assertEqual(url, "dummy_url")
 
     def test_test_thread_logger(self):
-        logger = loggers.new_test_thread_logger(
-            "dummy_parent", "dummy_kind", "dummy_id"
-        )
+        logger = loggers.new_test_thread_logger("dummy_parent", "dummy_kind", "dummy_id")
         self.assertEqual(logger.parent, "dummy_parent")
 
     def test_hook_logger(self):

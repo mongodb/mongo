@@ -98,9 +98,7 @@ class ParametersBuilder:
 
     def _process(self, qsn_node: qsn.Node, sbe_tree: sbe.Node, params: QueryParameters):
         processor = self._get_processor(qsn_node.node_type)
-        self.rows.append(
-            processor(qsn_node.node_type, qsn_node.plan_node_id, sbe_tree, params)
-        )
+        self.rows.append(processor(qsn_node.node_type, qsn_node.plan_node_id, sbe_tree, params))
         for child in qsn_node.children:
             self._process(child, sbe_tree, params)
 
@@ -110,9 +108,7 @@ class ParametersBuilder:
     def _process_generic(
         self, stage: str, node_id: int, sbe_tree: sbe.Node, params: QueryParameters
     ):
-        nodes: list[sbe.Node] = find_nodes(
-            sbe_tree, lambda node: node.plan_node_id == node_id
-        )
+        nodes: list[sbe.Node] = find_nodes(sbe_tree, lambda node: node.plan_node_id == node_id)
         if len(nodes) == 0:
             raise ValueError(f"Cannot find sbe nodes of {stage}")
         return ParametersBuilder._build_row(

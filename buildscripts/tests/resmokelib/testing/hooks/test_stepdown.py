@@ -14,9 +14,7 @@ from buildscripts.resmokelib.testing.hooks import stepdown as _stepdown
 
 class TestStepdownThread(unittest.TestCase):
     @mock.patch("buildscripts.resmokelib.testing.fixtures.replicaset.ReplicaSetFixture")
-    @mock.patch(
-        "buildscripts.resmokelib.testing.fixtures.shardedcluster.ShardedClusterFixture"
-    )
+    @mock.patch("buildscripts.resmokelib.testing.fixtures.shardedcluster.ShardedClusterFixture")
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.stepdown._StepdownThread.is_alive",
         mock.Mock(return_value=True),

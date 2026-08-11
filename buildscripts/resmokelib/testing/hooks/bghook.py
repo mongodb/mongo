@@ -35,9 +35,7 @@ class BGJob(threading.Thread):
                     # The configured loop delay asked us to wait before running the action again. Do
                     # that wait, but listen to see if we finish running the test or are killed in
                     # the meantime.
-                    interrupted = self._interrupt_event.wait(
-                        self._loop_delay_ms / 1000.0
-                    )
+                    interrupted = self._interrupt_event.wait(self._loop_delay_ms / 1000.0)
                     if interrupted:
                         self._hook.logger.info("interrupted")
                         break
@@ -59,9 +57,7 @@ class BGHook(interface.Hook):
     # By default, we continuously run the background hook for the duration of the suite.
     DEFAULT_TESTS_PER_CYCLE = math.inf
 
-    def __init__(
-        self, hook_logger, fixture, desc, tests_per_cycle=None, loop_delay_ms=None
-    ):
+    def __init__(self, hook_logger, fixture, desc, tests_per_cycle=None, loop_delay_ms=None):
         """
         Initialize the background hook.
 
@@ -104,9 +100,7 @@ class BGHook(interface.Hook):
         self._background_job.join()
 
         if self._background_job.err is not None:
-            self.logger.error(
-                "Encountered an error inside the hook: %s.", self._background_job.err
-            )
+            self.logger.error("Encountered an error inside the hook: %s.", self._background_job.err)
             raise self._background_job.err
 
     def before_test(self, test, test_report):
@@ -122,21 +116,14 @@ class BGHook(interface.Hook):
     def after_test(self, test, test_report):
         """Each test will call this after it executes. Check if the hook found an error."""
         self._test_num += 1
-        if (
-            self._test_num % self._tests_per_cycle != 0
-            and self._background_job.err is None
-        ):
+        if self._test_num % self._tests_per_cycle != 0 and self._background_job.err is None:
             return
 
         self._background_job.kill()
         self._background_job.join()
 
         if self._background_job.err is not None:
-            self.logger.error(
-                "Encountered an error inside the hook: %s.", self._background_job.err
-            )
+            self.logger.error("Encountered an error inside the hook: %s.", self._background_job.err)
             raise self._background_job.err
         else:
-            self.logger.info(
-                "Reached end of cycle in the hook, killing background thread."
-            )
+            self.logger.info("Reached end of cycle in the hook, killing background thread.")

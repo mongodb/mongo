@@ -50,9 +50,7 @@ class TestBuildShardedCluster(unittest.TestCase):
         self.assertEqual(len(sharded_cluster.mongos), 1)
         from buildscripts.resmokelib import multiversionconstants
 
-        self.assertEqual(
-            sharded_cluster.shards[0].fcv, multiversionconstants.LATEST_FCV
-        )
+        self.assertEqual(sharded_cluster.shards[0].fcv, multiversionconstants.LATEST_FCV)
 
     def test_build_sharded_cluster_with_feature_flags(self):
         ff_name = "featureFlagDummy"
@@ -68,22 +66,12 @@ class TestBuildShardedCluster(unittest.TestCase):
         self.assertEqual(len(sharded_cluster.mongos), 1)
         from buildscripts.resmokelib import multiversionconstants
 
-        self.assertEqual(
-            sharded_cluster.shards[0].fcv, multiversionconstants.LATEST_FCV
-        )
+        self.assertEqual(sharded_cluster.shards[0].fcv, multiversionconstants.LATEST_FCV)
         # feature flags are set
-        self.assertIn(
-            ff_name, sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS]
-        )
-        self.assertTrue(
-            sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS][ff_name]
-        )
-        self.assertIn(
-            ff_name, sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS]
-        )
-        self.assertTrue(
-            sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS][ff_name]
-        )
+        self.assertIn(ff_name, sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS])
+        self.assertTrue(sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS][ff_name])
+        self.assertIn(ff_name, sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS])
+        self.assertTrue(sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS][ff_name])
         self.assertIn(ff_name, sharded_cluster.mongos[0].mongos_options[SET_PARAMS])
         self.assertTrue(sharded_cluster.mongos[0].mongos_options[SET_PARAMS][ff_name])
 
@@ -127,9 +115,7 @@ class TestBuildShardedCluster(unittest.TestCase):
             sharded_cluster.shards[0].nodes[1].mongod_executable,
             multiversionconstants.LAST_LTS_MONGOD_BINARY,
         )
-        self.assertEqual(
-            sharded_cluster.shards[0].fcv, multiversionconstants.LAST_LTS_FCV
-        )
+        self.assertEqual(sharded_cluster.shards[0].fcv, multiversionconstants.LAST_LTS_FCV)
         # 2st repl set nodes are last-lts and latest (old_new)
         self.assertEqual(
             sharded_cluster.shards[1].nodes[0].mongod_executable,
@@ -139,9 +125,7 @@ class TestBuildShardedCluster(unittest.TestCase):
             sharded_cluster.shards[1].nodes[1].mongod_executable,
             config.DEFAULT_MONGOD_EXECUTABLE,
         )
-        self.assertEqual(
-            sharded_cluster.shards[0].fcv, multiversionconstants.LAST_LTS_FCV
-        )
+        self.assertEqual(sharded_cluster.shards[0].fcv, multiversionconstants.LAST_LTS_FCV)
         # mongos is last-lts
         self.assertEqual(
             sharded_cluster.mongos[0].mongos_executable,
@@ -169,35 +153,15 @@ class TestBuildShardedCluster(unittest.TestCase):
         self.assertEqual(len(sharded_cluster.shards[1].nodes), 2)
         self.assertEqual(len(sharded_cluster.mongos), 1)
         # feature flags are set on new versions
-        self.assertIn(
-            ff_name, sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS]
-        )
-        self.assertTrue(
-            sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS][ff_name]
-        )
-        self.assertIn(
-            ff_name, sharded_cluster.configsvr.nodes[1].mongod_options[SET_PARAMS]
-        )
-        self.assertTrue(
-            sharded_cluster.configsvr.nodes[1].mongod_options[SET_PARAMS][ff_name]
-        )
-        self.assertIn(
-            ff_name, sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS]
-        )
-        self.assertTrue(
-            sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS][ff_name]
-        )
-        self.assertIn(
-            ff_name, sharded_cluster.shards[1].nodes[1].mongod_options[SET_PARAMS]
-        )
-        self.assertTrue(
-            sharded_cluster.shards[1].nodes[1].mongod_options[SET_PARAMS][ff_name]
-        )
+        self.assertIn(ff_name, sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS])
+        self.assertTrue(sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS][ff_name])
+        self.assertIn(ff_name, sharded_cluster.configsvr.nodes[1].mongod_options[SET_PARAMS])
+        self.assertTrue(sharded_cluster.configsvr.nodes[1].mongod_options[SET_PARAMS][ff_name])
+        self.assertIn(ff_name, sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS])
+        self.assertTrue(sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS][ff_name])
+        self.assertIn(ff_name, sharded_cluster.shards[1].nodes[1].mongod_options[SET_PARAMS])
+        self.assertTrue(sharded_cluster.shards[1].nodes[1].mongod_options[SET_PARAMS][ff_name])
         # feature flags are NOT set on old versions
-        self.assertNotIn(
-            ff_name, sharded_cluster.shards[0].nodes[1].mongod_options[SET_PARAMS]
-        )
-        self.assertNotIn(
-            ff_name, sharded_cluster.shards[1].nodes[0].mongod_options[SET_PARAMS]
-        )
+        self.assertNotIn(ff_name, sharded_cluster.shards[0].nodes[1].mongod_options[SET_PARAMS])
+        self.assertNotIn(ff_name, sharded_cluster.shards[1].nodes[0].mongod_options[SET_PARAMS])
         self.assertNotIn(ff_name, sharded_cluster.mongos[0].mongos_options[SET_PARAMS])

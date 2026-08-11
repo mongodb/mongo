@@ -154,9 +154,7 @@ async def generate_histograms(coll_template, coll, dump_path):
         field_data = []
         if re.match("^mixeddata_.*", field.name):
             continue
-        async for doc in coll.find(
-            {field.name: {"$exists": True}}, {"_id": 0, field.name: 1}
-        ):
+        async for doc in coll.find({field.name: {"$exists": True}}, {"_id": 0, field.name: 1}):
             field_val = doc[field.name]
             if isinstance(field_val, str):
                 field_val = re.escape(field_val)
@@ -227,9 +225,7 @@ async def main():
                     )
                     # Uncomment this to generate histograms in PNG format
                     # await generate_histograms(coll_template, database_instance.database[name], database_config.dump_path)
-            json_metadata = json.dumps(
-                collections, indent=4, cls=CollectionTemplateEncoder
-            )
+            json_metadata = json.dumps(collections, indent=4, cls=CollectionTemplateEncoder)
             metadata_file.write("// This is a generated file.\nconst dbMetadata = ")
             metadata_file.write(json_metadata)
             metadata_file.write(";")

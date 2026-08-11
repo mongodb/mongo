@@ -69,9 +69,7 @@ def main():
         metavar=f"[1-{_MAX_RUNS}]",
         help="Number of times to run each patch build",
     )
-    parser.add_argument(
-        "--evergreen-args", type=str, help="Arguments to pass to evergreen patch"
-    )
+    parser.add_argument("--evergreen-args", type=str, help="Arguments to pass to evergreen patch")
 
     args = parser.parse_args()
     deflakinator(args.runs, args.evergreen_args)

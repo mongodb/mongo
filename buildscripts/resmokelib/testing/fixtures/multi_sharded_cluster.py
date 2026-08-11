@@ -32,20 +32,14 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
     ):
         """Initialize MultiShardedClusterFixture with different options for the sharded cluster processes."""
 
-        interface.MultiClusterFixture.__init__(
-            self, logger, job_num, fixturelib, dbpath_prefix
-        )
+        interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix)
 
         if num_sharded_clusters < 2:
             raise ValueError("num_sharded_clusters must be greater or equal to 2")
         self.num_sharded_clusters = num_sharded_clusters
 
-        self.common_mongod_options = self.fixturelib.default_if_none(
-            common_mongod_options, {}
-        )
-        self.per_mongod_options = self.fixturelib.default_if_none(
-            per_mongod_options, []
-        )
+        self.common_mongod_options = self.fixturelib.default_if_none(common_mongod_options, {})
+        self.per_mongod_options = self.fixturelib.default_if_none(per_mongod_options, [])
         self.common_sharded_cluster_options = common_sharded_cluster_options
         self.per_sharded_cluster_options = self.fixturelib.default_if_none(
             per_sharded_cluster_options, []
@@ -105,12 +99,8 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
                 }
                 for (i, sharded_cluster) in enumerate(self.sharded_clusters)
             ]
-            client = pymongo.MongoClient(
-                self.sharded_clusters[0].get_driver_connection_url()
-            )
-            coll = client[self.CONNECTION_STRING_DB_NAME][
-                self.CONNECTION_STRING_COLL_NAME
-            ]
+            client = pymongo.MongoClient(self.sharded_clusters[0].get_driver_connection_url())
+            coll = client[self.CONNECTION_STRING_DB_NAME][self.CONNECTION_STRING_COLL_NAME]
             coll.insert_many(docs)
 
     def feature_flag_present_and_enabled(self, feature_flag_name):
@@ -126,9 +116,7 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
 
         running_at_start = self.is_running()
         if not running_at_start:
-            self.logger.warning(
-                "All sharded clusters were expected to be running, but weren't."
-            )
+            self.logger.warning("All sharded clusters were expected to be running, but weren't.")
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
@@ -143,9 +131,7 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
 
     def is_running(self):
         """Return true if all sharded clusters are still operating."""
-        return all(
-            sharded_cluster.is_running() for sharded_cluster in self.sharded_clusters
-        )
+        return all(sharded_cluster.is_running() for sharded_cluster in self.sharded_clusters)
 
     def get_num_sharded_clusters(self):
         """Return the number of sharded clusters."""
@@ -166,17 +152,13 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
     def get_internal_connection_string(self):
         """Return the internal connection string to the sharded cluster that tests should connect to."""
         if not self.sharded_clusters:
-            raise ValueError(
-                "Must call setup() before calling get_internal_connection_string()"
-            )
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
         return self.sharded_clusters[0].get_internal_connection_string()
 
     def get_driver_connection_url(self):
         """Return the driver connection URL to the sharded cluster that tests should connect to."""
         if not self.sharded_clusters:
-            raise ValueError(
-                "Must call setup() before calling get_driver_connection_url"
-            )
+            raise ValueError("Must call setup() before calling get_driver_connection_url")
         return self.sharded_clusters[0].get_driver_connection_url()
 
     def get_node_info(self):

@@ -62,9 +62,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 and all routing requests are directed to the routing ports of those nodes.
             TODO SERVER-86554: Support a mix of shard servers with the routerPort opened and not.
         """
-        interface.Fixture.__init__(
-            self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix
-        )
+        interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
 
         if "dbpath" in mongod_options:
             raise ValueError("Cannot specify mongod_options.dbpath")
@@ -85,15 +83,13 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             mongod_options.get("set_parameters", {})
         ).copy()
         self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = (
-            self.mongod_options[
-                "set_parameters"
-            ].get("migrationLockAcquisitionMaxWaitMS", 30000)
+            self.mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
         )
         # Extend time for transactions by default to account for slow machines during testing.
-        self.mongod_options["set_parameters"][
-            "maxTransactionLockRequestTimeoutMillis"
-        ] = self.mongod_options["set_parameters"].get(
-            "maxTransactionLockRequestTimeoutMillis", 10 * 1000
+        self.mongod_options["set_parameters"]["maxTransactionLockRequestTimeoutMillis"] = (
+            self.mongod_options[
+                "set_parameters"
+            ].get("maxTransactionLockRequestTimeoutMillis", 10 * 1000)
         )
 
         # Misc other options for the fixture.
@@ -160,9 +156,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
             # Reduce migration throttling to increase frequency of random migrations
             self.mongod_options["set_parameters"]["balancerMigrationsThrottlingMs"] = (
-                self.mongod_options[
-                    "set_parameters"
-                ].get("balancerMigrationsThrottlingMs", 250)
+                self.mongod_options["set_parameters"].get("balancerMigrationsThrottlingMs", 250)
             )  # millis
 
         self._dbpath_prefix = os.path.join(
@@ -260,9 +254,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # Need to get the new config shard connection string generated from the auto-bootstrap procedure
         if self.use_auto_bootstrap_procedure and not self.embedded_router_mode:
             for mongos in self.mongos:
-                mongos.mongos_options["configdb"] = (
-                    self.configsvr.get_internal_connection_string()
-                )
+                mongos.mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
         # We call mongos.setup() in self.await_ready() function instead of self.setup()
         # because mongos routers have to connect to a running cluster.
@@ -320,9 +312,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         client = interface.build_client(self, self.auth_options)
         command_request = {
             "setClusterParameter": {
-                self.set_cluster_parameter["parameter"]: self.set_cluster_parameter[
-                    "value"
-                ]
+                self.set_cluster_parameter["parameter"]: self.set_cluster_parameter["value"]
             },
         }
         client.admin.command(command_request)
@@ -342,9 +332,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
         if join_migrations:
             for shard in self.shards:
-                shard_client = interface.build_client(
-                    shard.get_primary(), self.auth_options
-                )
+                shard_client = interface.build_client(shard.get_primary(), self.auth_options)
                 shard_client.admin.command({"_shardsvrJoinMigrations": 1})
         self.logger.info("Stopped the balancer")
 
@@ -386,8 +374,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         running_at_start = self.is_running()
         if not running_at_start:
             self.logger.warning(
-                "All members of the sharded cluster were expected to be running, "
-                "but weren't."
+                "All members of the sharded cluster were expected to be running, " "but weren't."
             )
 
         # If we're killing or aborting to archive data files, stopping the balancer will execute
@@ -425,9 +412,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.configsvr is not None
             and self.configsvr.is_running()
             and all(
-                shard.is_running()
-                for shard in self.shards
-                if not shard.removeshard_teardown_marker
+                shard.is_running() for shard in self.shards if not shard.removeshard_teardown_marker
             )
             and all(mongos.is_running() for mongos in self.mongos)
         )
@@ -435,13 +420,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def get_internal_connection_string(self):
         """Return the internal connection string."""
         if self.mongos is None:
-            raise ValueError(
-                "Must call setup() before calling get_internal_connection_string()"
-            )
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
-        return ",".join(
-            [mongos.get_internal_connection_string() for mongos in self.mongos]
-        )
+        return ",".join([mongos.get_internal_connection_string() for mongos in self.mongos])
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
@@ -455,9 +436,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                     "Must call install_rs_shard() before calling get_internal_connection_string()"
                 )
             if len(self.shards) > 1:
-                raise ValueError(
-                    "Cannot use replica set endpoint on a multi-shard cluster"
-                )
+                raise ValueError("Cannot use replica set endpoint on a multi-shard cluster")
             return self.shards[0].get_driver_connection_url()
 
         if self.embedded_router_mode:
@@ -488,9 +467,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Return dict of all UDS paths in the cluster."""
         paths = {
             "configsvr": (
-                self.configsvr.get_uds_paths()
-                if hasattr(self.configsvr, "get_uds_paths")
-                else []
+                self.configsvr.get_uds_paths() if hasattr(self.configsvr, "get_uds_paths") else []
             ),
             "shards": [],
             "mongos": [],
@@ -517,9 +494,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         env_vars["MONGODB_FIXTURE_TYPE"] = "ShardedClusterFixture"
 
         # Provide mongos connection strings (comma-separated)
-        mongos_conn_strs = [
-            mongos.get_internal_connection_string() for mongos in self.mongos
-        ]
+        mongos_conn_strs = [mongos.get_internal_connection_string() for mongos in self.mongos]
         if mongos_conn_strs:
             env_vars["MONGODB_MONGOS_HOSTS"] = ",".join(mongos_conn_strs)
             # Provide primary mongos connection
@@ -556,18 +531,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         # Set environment variables if we have any UDS paths
         if all_uds_paths:
-            env_vars["MONGODB_UDS_PATHS"] = ",".join(
-                all_uds_paths
-            )  # All paths from all components
+            env_vars["MONGODB_UDS_PATHS"] = ",".join(all_uds_paths)  # All paths from all components
 
         # Provide number of shards
         env_vars["MONGODB_NUM_SHARDS"] = str(len(self.shards))
 
         # Provide config server connection string
         if self.configsvr:
-            env_vars["MONGODB_CONFIG_SERVER"] = (
-                self.configsvr.get_internal_connection_string()
-            )
+            env_vars["MONGODB_CONFIG_SERVER"] = self.configsvr.get_internal_connection_string()
 
         return env_vars
 
@@ -644,9 +615,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.fixturelib.make_historic(shard_options.pop("mongod_options", {})),
         )
         mongod_options["shardsvr"] = ""
-        mongod_options["dbpath"] = os.path.join(
-            self._dbpath_prefix, "shard{}".format(index)
-        )
+        mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
         mongod_options["replSet"] = self._SHARD_REPLSET_NAME_PREFIX + str(index)
 
         if self.config_shard == index:
@@ -704,9 +673,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def get_mongos_logger(self, index, total):
         """Return a new logging.Logger instance used for a mongos."""
         logger_name = (
-            self.mongos_logging_prefix
-            if total == 1
-            else f"{self.mongos_logging_prefix}{index}"
+            self.mongos_logging_prefix if total == 1 else f"{self.mongos_logging_prefix}{index}"
         )
         return self.fixturelib.new_fixture_node_logger(
             self.__class__.__name__, self.job_num, logger_name
@@ -772,12 +739,8 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
             [f"mongos{i}:27017" for i in range(self.dummy_fixture.num_mongos)]
         )
 
-        external.ExternalFixture.__init__(
-            self, logger, job_num, fixturelib, self.shell_conn_string
-        )
-        ShardedClusterFixture.__init__(
-            self, logger, job_num, fixturelib, mongod_options={}
-        )
+        external.ExternalFixture.__init__(self, logger, job_num, fixturelib, self.shell_conn_string)
+        ShardedClusterFixture.__init__(self, logger, job_num, fixturelib, mongod_options={})
 
     def setup(self):
         """Execute some setup before offically starting testing against this external cluster."""
@@ -877,14 +840,10 @@ class _RouterView(interface.Fixture):
                         )
                     )
 
-                self.logger.info(
-                    "Waiting to connect to embedded router on port %d.", self.port
-                )
+                self.logger.info("Waiting to connect to embedded router on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.
 
-        self.logger.info(
-            "Successfully contacted the embedded router on port %d.", self.port
-        )
+        self.logger.info("Successfully contacted the embedded router on port %d.", self.port)
 
     def is_running(self):
         """Return true if the cluster is still operating."""
@@ -942,9 +901,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         self.uds_path = None
         if self.uds_path_prefix:
             # MongoDB creates socket at {unixSocketPrefix}/mongodb-{port}.sock
-            self.uds_path = os.path.join(
-                self.uds_path_prefix, f"mongodb-{self.port}.sock"
-            )
+            self.uds_path = os.path.join(self.uds_path_prefix, f"mongodb-{self.port}.sock")
             self.mongos_options["unixSocketPrefix"] = self.uds_path_prefix
 
         self._dbpath_prefix = dbpath_prefix
@@ -970,13 +927,9 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         )
         self.mongos_options["port"] = self.port
         try:
-            self.logger.info(
-                "Starting mongos on port %d...\n%s", self.port, mongos.as_command()
-            )
+            self.logger.info("Starting mongos on port %d...\n%s", self.port, mongos.as_command())
             mongos.start()
-            self.logger.info(
-                "mongos started on port %d with pid %d.", self.port, mongos.pid
-            )
+            self.logger.info("mongos started on port %d with pid %d.", self.port, mongos.pid)
         except Exception as err:
             msg = "Failed to start mongos on port {:d}: {}".format(self.port, err)
             self.logger.exception(msg)
@@ -1070,13 +1023,12 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
 
         # Python's subprocess module returns negative versions of system calls.
         if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
-            self.logger.info(
-                "Successfully stopped the mongos on port {:d}".format(self.port)
-            )
+            self.logger.info("Successfully stopped the mongos on port {:d}".format(self.port))
         else:
             self.logger.warning(
-                "Stopped the mongos on port {:d}. "
-                "Process exited with code {:d}.".format(self.port, exit_code)
+                "Stopped the mongos on port {:d}. " "Process exited with code {:d}.".format(
+                    self.port, exit_code
+                )
             )
             raise self.fixturelib.ServerFailure(
                 "mongos on port {:d} with pid {:d} exited with code {:d}".format(
@@ -1184,14 +1136,12 @@ class MongosLauncher(object):
         suite_set_parameters = mongos_options.setdefault("set_parameters", {})
 
         if self.config.MONGOS_SET_PARAMETERS is not None:
-            suite_set_parameters.update(
-                yaml.safe_load(self.config.MONGOS_SET_PARAMETERS)
-            )
+            suite_set_parameters.update(yaml.safe_load(self.config.MONGOS_SET_PARAMETERS))
 
         if "mongotHost" in mongos_options:
             suite_set_parameters["mongotHost"] = mongos_options.pop("mongotHost")
-            suite_set_parameters["searchIndexManagementHostAndPort"] = (
-                mongos_options.pop("searchIndexManagementHostAndPort")
+            suite_set_parameters["searchIndexManagementHostAndPort"] = mongos_options.pop(
+                "searchIndexManagementHostAndPort"
             )
 
         # Set default log verbosity levels if none were specified.
@@ -1221,6 +1171,4 @@ def _add_testing_set_parameters(suite_set_parameters):
     """
     suite_set_parameters.setdefault("testingDiagnosticsEnabled", True)
     suite_set_parameters.setdefault("enableTestCommands", True)
-    suite_set_parameters.setdefault(
-        "disableTransitionFromLatestToLastContinuous", False
-    )
+    suite_set_parameters.setdefault("disableTransitionFromLatestToLastContinuous", False)

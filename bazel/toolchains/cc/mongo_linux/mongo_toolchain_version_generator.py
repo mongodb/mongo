@@ -54,9 +54,7 @@ PLATFORM_NAME_MAP = {
 REQUESTS_SESSION = requests.Session()
 REQUESTS_SESSION.mount(
     "https://",
-    HTTPAdapter(
-        max_retries=Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
-    ),
+    HTTPAdapter(max_retries=Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])),
 )
 
 
@@ -65,9 +63,7 @@ def download_toolchain(toolchain_url: str, local_path: str) -> bool:
 
     response = REQUESTS_SESSION.get(toolchain_url)
     if response.status_code != requests.codes.ok:
-        print(
-            f"WARNING: HTTP {response.status_code} status downloading {toolchain_url}"
-        )
+        print(f"WARNING: HTTP {response.status_code} status downloading {toolchain_url}")
         return False
 
     with open(local_path, "wb") as f:
@@ -172,13 +168,9 @@ def main():
                     )
                     print(f'TOOLCHAIN_ID = "{args.build_id}"', file=f)
                     print(f"TOOLCHAIN_MAP_{version_str.upper()} = {{", file=f)
-                    for key, value in sorted(
-                        mongo_toolchain_version.items(), key=lambda x: x[0]
-                    ):
+                    for key, value in sorted(mongo_toolchain_version.items(), key=lambda x: x[0]):
                         print(f'    "{key}": {{', file=f)
-                        for subkey, subvalue in sorted(
-                            value.items(), key=lambda x: x[0]
-                        ):
+                        for subkey, subvalue in sorted(value.items(), key=lambda x: x[0]):
                             print(f'        "{subkey}": "{subvalue}",', file=f)
                         print("    },", file=f)
                     print("}", file=f)

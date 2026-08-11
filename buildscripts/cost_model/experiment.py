@@ -109,9 +109,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 
 
-async def load_calibration_data(
-    database: DatabaseInstance, collection_name: str
-) -> pd.DataFrame:
+async def load_calibration_data(database: DatabaseInstance, collection_name: str) -> pd.DataFrame:
     """Load workflow data containing explain output from database and parse it. Retuned calibration DataFrame with parsed SBE and ABT."""
 
     data = await database.get_all_documents(collection_name)
@@ -210,9 +208,7 @@ def print_trees(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: i
     row.abt.print()
 
 
-def print_explain(
-    calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: int = 0
-):
+def print_explain(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: int = 0):
     """Print explain."""
     row = calibration_df.loc[abt_df.iloc[row_index].source]
     explain = json.loads(row.explain)

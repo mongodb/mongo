@@ -19,9 +19,7 @@ class ValidateDirectSecondaryReads(jsfile.PerClusterDataConsistencyHook):
     ):
         """Initialize ValidateDirectSecondaryReads."""
         description = "Validate direct secondary reads"
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_validate_direct_secondary_reads.js"
-        )
+        js_filename = os.path.join("jstests", "hooks", "run_validate_direct_secondary_reads.js")
         jsfile.JSHook.__init__(  # pylint: disable=non-parent-init-called
             self,
             hook_logger,

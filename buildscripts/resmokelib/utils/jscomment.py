@@ -35,12 +35,8 @@ def get_tags(pathname):
                 # TODO: it might be worth supporting the block (indented) style of YAML lists in
                 #       addition to the flow (bracketed) style
                 tags = yaml.safe_load(_strip_jscomments(match.group(1)))
-                if not isinstance(tags, list) and all(
-                    isinstance(tag, str) for tag in tags
-                ):
-                    raise TypeError(
-                        "Expected a list of string tags, but got '%s'" % (tags)
-                    )
+                if not isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
+                    raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
 
                 for tag in tags:
                     if "//" in tag:
@@ -64,8 +60,7 @@ def get_tags(pathname):
                 return tags
             except yaml.YAMLError as err:
                 raise ValueError(
-                    "File '%s' contained invalid tags (expected YAML): %s"
-                    % (pathname, err)
+                    "File '%s' contained invalid tags (expected YAML): %s" % (pathname, err)
                 )
 
     return []

@@ -13,9 +13,7 @@ class PyTestCase(interface.ProcessTestCase):
 
     def __init__(self, logger, py_filename, **kwargs):
         """Initialize PyTestCase."""
-        interface.ProcessTestCase.__init__(
-            self, logger, "PyTest", py_filename, **kwargs
-        )
+        interface.ProcessTestCase.__init__(self, logger, "PyTest", py_filename, **kwargs)
 
     def _make_process(self):
         program_options = {}

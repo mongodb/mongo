@@ -65,9 +65,7 @@ def synchronized(method):
 class Suite(object):
     """A suite of tests of a particular kind (e.g. C++ unit tests, dbtests, jstests)."""
 
-    def __init__(
-        self, suite_name, suite_config, suite_options=_config.SuiteOptions.ALL_INHERITED
-    ):
+    def __init__(self, suite_name, suite_config, suite_options=_config.SuiteOptions.ALL_INHERITED):
         """Initialize the suite with the specified name and configuration."""
         self._lock = threading.RLock()
 
@@ -321,9 +319,7 @@ class Suite(object):
         active_report = _report.TestReport.combine(*self._partial_reports)
         # Use the current time as the time that this suite finished running.
         end_time = time.time()
-        return self._summarize_report(
-            active_report, self._test_start_times[-1], end_time, sb
-        )
+        return self._summarize_report(active_report, self._test_start_times[-1], end_time, sb)
 
     def _summarize_repeated(self, sb):
         """Return the summary information of all executions.
@@ -337,14 +333,10 @@ class Suite(object):
         start_times = self._test_start_times[:]
         end_times = self._test_end_times[:]
         if self._partial_reports:
-            end_times.append(
-                time.time()
-            )  # Add an end time in this copy for the partial reports.
+            end_times.append(time.time())  # Add an end time in this copy for the partial reports.
 
         total_time_taken = end_times[-1] - start_times[0]
-        sb.append(
-            "Executed %d times in %0.2f seconds:" % (num_iterations, total_time_taken)
-        )
+        sb.append("Executed %d times in %0.2f seconds:" % (num_iterations, total_time_taken))
 
         combined_summary = _summary.Summary(0, 0.0, 0, 0, 0, 0)
         for iteration in range(num_iterations):
@@ -422,9 +414,7 @@ class Suite(object):
 
         if num_failed > 0:
             sb.append("The following tests failed (with exit code):")
-            for test_info in itertools.chain(
-                report.get_failed(), report.get_interrupted()
-            ):
+            for test_info in itertools.chain(report.get_failed(), report.get_interrupted()):
                 test_names.append(test_info.test_file)
                 sb.append(
                     "    %s (%d %s)"
@@ -465,15 +455,12 @@ class Suite(object):
         """Log summary of all suites."""
         sb = []
         sb.append(
-            "Summary of all suites: %d suites ran in %0.2f seconds"
-            % (len(suites), time_taken)
+            "Summary of all suites: %d suites ran in %0.2f seconds" % (len(suites), time_taken)
         )
         for suite in suites:
             suite_sb = []
             suite.summarize(suite_sb)
-            sb.append(
-                "    %s: %s" % (suite.get_display_name(), "\n    ".join(suite_sb))
-            )
+            sb.append("    %s: %s" % (suite.get_display_name(), "\n    ".join(suite_sb)))
 
         logger.info("=" * 80)
         logger.info("\n".join(sb))

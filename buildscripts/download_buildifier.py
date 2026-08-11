@@ -5,7 +5,9 @@ import stat
 import urllib.request
 
 BUILDIFIER_VERSION = "v6.4.0"
-RELEASE_URL = f"https://mdb-build-public.s3.amazonaws.com/bazel-buildifier-binaries/{BUILDIFIER_VERSION}/"
+RELEASE_URL = (
+    f"https://mdb-build-public.s3.amazonaws.com/bazel-buildifier-binaries/{BUILDIFIER_VERSION}/"
+)
 
 
 def determine_platform():
@@ -39,9 +41,7 @@ def main():
     operating_system = determine_platform()
     architechture = determine_architecture()
     if operating_system == "windows" and architechture == "arm64":
-        raise RuntimeError(
-            "There are no published arm windows releases for buildifier."
-        )
+        raise RuntimeError("There are no published arm windows releases for buildifier.")
 
     parser = argparse.ArgumentParser(
         prog="DownloadBuildifier",

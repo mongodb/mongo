@@ -14,9 +14,7 @@ class _SingleFSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(
-        self, logger, test_name, test_id, shell_executable=None, shell_options=None
-    ):
+    def __init__(self, logger, test_name, test_id, shell_executable=None, shell_options=None):
         """Initialize the _SingleFSMWorkloadTestCase with the FSM workload file."""
 
         jsrunnerfile.JSRunnerFileTestCase.__init__(
@@ -54,9 +52,7 @@ class _FSMWorkloadTestCaseBuilder(interface.TestCaseFactory):
         db_name_prefix=None,
     ):
         """Initialize the _FSMWorkloadTestCaseBuilder."""
-        interface.TestCaseFactory.__init__(
-            self, _SingleFSMWorkloadTestCase, shell_options
-        )
+        interface.TestCaseFactory.__init__(self, _SingleFSMWorkloadTestCase, shell_options)
         self.logger = logger
         self.fsm_workload_group = fsm_workload_group
         self.test_name = test_name

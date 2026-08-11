@@ -172,9 +172,7 @@ Everything looks good! ヽ(‘ー`)ノ
             if _try_find_log_file.counter == 0:
                 _try_find_log_file.counter += 1
                 with open(
-                    os.path.join(
-                        os.path.dirname(__file__), "test_jepsen_report_corpus.log.txt"
-                    )
+                    os.path.join(os.path.dirname(__file__), "test_jepsen_report_corpus.log.txt")
                 ) as fh:
                     return fh.read()
             return ""

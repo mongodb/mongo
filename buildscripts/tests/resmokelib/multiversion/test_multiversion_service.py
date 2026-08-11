@@ -18,9 +18,7 @@ class TestTagStr(TestCase):
 
 class TestGetVersion(TestCase):
     def test_version_should_be_extracted(self):
-        mongo_version = under_test.MongoVersion(
-            mongo_version="6.0.0-rc5-18-gbcdfaa9035b"
-        )
+        mongo_version = under_test.MongoVersion(mongo_version="6.0.0-rc5-18-gbcdfaa9035b")
 
         self.assertEqual(mongo_version.get_version(), Version("6.0"))
 
@@ -81,9 +79,7 @@ class TestCalculateFcvConstants(TestCase):
             version_constants.requires_fcv_tag_list,
             [Version(v) for v in ["5.1", "5.2", "5.3", "6.0"]],
         )
-        self.assertEqual(
-            version_constants.requires_fcv_tag_list_continuous, [Version("6.0")]
-        )
+        self.assertEqual(version_constants.requires_fcv_tag_list_continuous, [Version("6.0")])
         self.assertEqual(
             version_constants.fcvs_less_than_latest,
             [
@@ -153,9 +149,7 @@ class TestCalculateFcvConstants(TestCase):
             version_constants.requires_fcv_tag_list,
             [Version(v) for v in ["6.1", "100.0"]],
         )
-        self.assertEqual(
-            version_constants.requires_fcv_tag_list_continuous, [Version("100.0")]
-        )
+        self.assertEqual(version_constants.requires_fcv_tag_list_continuous, [Version("100.0")])
         self.assertEqual(
             version_constants.fcvs_less_than_latest,
             [

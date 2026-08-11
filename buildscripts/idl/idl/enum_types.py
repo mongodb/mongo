@@ -52,9 +52,7 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
     def get_qualified_cpp_type_name(self):
         # type: () -> str
         """Get the fully qualified C++ type name for an enum."""
-        return common.qualify_cpp_name(
-            self._enum.cpp_namespace, self.get_cpp_type_name()
-        )
+        return common.qualify_cpp_name(self._enum.cpp_namespace, self.get_cpp_type_name())
 
     @abstractmethod
     def get_cpp_type_name(self):
@@ -173,9 +171,7 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
                 indented_writer.write_line(
                     common.template_args(
                         'const BSONObj ${const_name}("${bson_value}");',
-                        const_name=_get_constant_enum_extra_data_name(
-                            self._enum, enum_value
-                        ),
+                        const_name=_get_constant_enum_extra_data_name(self._enum, enum_value),
                         bson_value=bson_value,
                     )
                 )
@@ -191,17 +187,13 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
 
         with writer.TemplateContext(indented_writer, template_params):
             with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
-                with writer.IndentedScopedBlock(
-                    indented_writer, "switch (value) {", "}"
-                ):
+                with writer.IndentedScopedBlock(indented_writer, "switch (value) {", "}"):
                     for enum_value in extra_values:
                         indented_writer.write_template(
                             "case ${enum_name}::%s: return %s;"
                             % (
                                 enum_value.name,
-                                _get_constant_enum_extra_data_name(
-                                    self._enum, enum_value
-                                ),
+                                _get_constant_enum_extra_data_name(self._enum, enum_value),
                             )
                         )
                     if len(extra_values) != len(self._enum.values):
@@ -238,9 +230,7 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        enum_values = sorted(
-            cast(ast.Enum, self._enum).values, key=lambda ev: int(ev.value)
-        )
+        enum_values = sorted(cast(ast.Enum, self._enum).values, key=lambda ev: int(ev.value))
 
         template_params = {
             "enum_name": self.get_cpp_type_name(),
@@ -283,9 +273,7 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
 
         with writer.TemplateContext(indented_writer, template_params):
             with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
-                indented_writer.write_template(
-                    "return static_cast<std::int32_t>(value);"
-                )
+                indented_writer.write_template("return static_cast<std::int32_t>(value);")
 
 
 def _get_constant_enum_extra_data_name(idl_enum, enum_value):

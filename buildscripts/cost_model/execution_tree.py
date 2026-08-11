@@ -51,9 +51,7 @@ class Node:
 
     def get_execution_time(self):
         """Execution time of the SBE node without execuion time of its children."""
-        return self.total_execution_time - sum(
-            n.total_execution_time for n in self.children
-        )
+        return self.total_execution_time - sum(n.total_execution_time for n in self.children)
 
     def print(self, level=0):
         """Pretty print of the SBE tree."""
@@ -170,9 +168,7 @@ def process_seek(stage: dict[str, any]) -> Node:
 def process_union_node(stage: dict[str, any]) -> Node:
     """Process union stage."""
     children = [process_stage(child) for child in stage["inputStages"]]
-    return Node(
-        **get_common_fields(stage), n_processed=stage["nReturned"], children=children
-    )
+    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=children)
 
 
 def process_unwind_node(stage: dict[str, any]) -> Node:
@@ -189,9 +185,7 @@ def process_unique_node(stage: dict[str, any]) -> Node:
     """Process unique stage."""
     input_stage = process_stage(stage["inputStage"])
     n_processed = stage["dupsTested"]
-    return Node(
-        **get_common_fields(stage), n_processed=n_processed, children=[input_stage]
-    )
+    return Node(**get_common_fields(stage), n_processed=n_processed, children=[input_stage])
 
 
 def process_branch_node(stage: dict[str, any]) -> Node:

@@ -46,9 +46,7 @@ if __name__ == "__main__":
         default="ciphers.json",
         help="file to write the output to",
     )
-    parser.add_argument(
-        "--host", type=str, default="localhost", help="host to connect to"
-    )
+    parser.add_argument("--host", type=str, default="localhost", help="host to connect to")
     parser.add_argument("--cafile", type=str, help="Path to CA certificate")
     parser.add_argument("--cert", type=str, help="Path to client certificate")
     args = parser.parse_args()

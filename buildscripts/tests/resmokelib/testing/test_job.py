@@ -76,19 +76,13 @@ class TestJob(unittest.TestCase):
         time_repeat_tests_secs = 10
         expected_tests_run = self.expected_run_num(time_repeat_tests_secs, increment)
         queue = _queue.Queue()
-        suite_options = self.get_suite_options(
-            time_repeat_tests_secs=time_repeat_tests_secs
-        )
+        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs)
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
-        self.queue_tests(
-            self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options
-        )
+        self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
         job_object._get_time = mock_time.time
         job_object._run(queue, self.mock_interrupt_flag())
-        self.assertEqual(
-            job_object.total_test_num, expected_tests_run * len(self.TESTS)
-        )
+        self.assertEqual(job_object.total_test_num, expected_tests_run * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], expected_tests_run)
 
@@ -104,14 +98,10 @@ class TestJob(unittest.TestCase):
         )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
-        self.queue_tests(
-            self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options
-        )
+        self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
         job_object._get_time = mock_time.time
         job_object._run(queue, self.mock_interrupt_flag())
-        self.assertLess(
-            job_object.total_test_num, num_repeat_tests_max * len(self.TESTS)
-        )
+        self.assertLess(job_object.total_test_num, num_repeat_tests_max * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], expected_tests_run)
 
@@ -127,14 +117,10 @@ class TestJob(unittest.TestCase):
         )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
-        self.queue_tests(
-            self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options
-        )
+        self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
         job_object._get_time = mock_time.time
         job_object._run(queue, self.mock_interrupt_flag())
-        self.assertGreater(
-            job_object.total_test_num, num_repeat_tests_min * len(self.TESTS)
-        )
+        self.assertGreater(job_object.total_test_num, num_repeat_tests_min * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], expected_tests_run)
 
@@ -152,17 +138,11 @@ class TestJob(unittest.TestCase):
         )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
-        self.queue_tests(
-            self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options
-        )
+        self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
         job_object._get_time = mock_time.time
         job_object._run(queue, self.mock_interrupt_flag())
-        self.assertGreater(
-            job_object.total_test_num, num_repeat_tests_min * len(self.TESTS)
-        )
-        self.assertLess(
-            job_object.total_test_num, num_repeat_tests_max * len(self.TESTS)
-        )
+        self.assertGreater(job_object.total_test_num, num_repeat_tests_min * len(self.TESTS))
+        self.assertLess(job_object.total_test_num, num_repeat_tests_max * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], expected_tests_run)
 
@@ -179,14 +159,10 @@ class TestJob(unittest.TestCase):
         )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
-        self.queue_tests(
-            self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options
-        )
+        self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
         job_object._get_time = mock_time.time
         job_object._run(queue, self.mock_interrupt_flag())
-        self.assertEqual(
-            job_object.total_test_num, num_repeat_tests_min * len(self.TESTS)
-        )
+        self.assertEqual(job_object.total_test_num, num_repeat_tests_min * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], num_repeat_tests_min)
 
@@ -195,9 +171,7 @@ class TestJob(unittest.TestCase):
         time_repeat_tests_secs = 30
         num_repeat_tests_min = 1
         num_repeat_tests_max = 10
-        expected_time_repeat_tests = self.expected_run_num(
-            time_repeat_tests_secs, increment
-        )
+        expected_time_repeat_tests = self.expected_run_num(time_repeat_tests_secs, increment)
         queue = _queue.Queue()
         suite_options = self.get_suite_options(
             time_repeat_tests_secs=time_repeat_tests_secs,
@@ -206,14 +180,10 @@ class TestJob(unittest.TestCase):
         )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
-        self.queue_tests(
-            self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options
-        )
+        self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
         job_object._get_time = mock_time.time
         job_object._run(queue, self.mock_interrupt_flag())
-        self.assertEqual(
-            job_object.total_test_num, num_repeat_tests_max * len(self.TESTS)
-        )
+        self.assertEqual(job_object.total_test_num, num_repeat_tests_max * len(self.TESTS))
         for test in self.TESTS:
             self.assertEqual(job_object.tests[test], num_repeat_tests_max)
             self.assertLess(job_object.tests[test], expected_time_repeat_tests)
@@ -285,9 +255,7 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         setup_flag = threading.Event()
         teardown_flag = threading.Event()
 
-        self.__job_object(
-            queue, interrupt_flag, self.__context, setup_flag, teardown_flag
-        )
+        self.__job_object(queue, interrupt_flag, self.__context, setup_flag, teardown_flag)
 
         self.assertEqual(setup_succeeded, not interrupt_flag.is_set())
         self.assertEqual(setup_succeeded, not setup_flag.is_set())
@@ -305,10 +273,8 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         self.__assert_when_run_tests(setup_succeeded=False)
 
     def test_setup_raises_logging_config_exception(self):
-        self.__job_object.manager.setup_fixture.side_effect = (
-            errors.LoggerRuntimeConfigError(
-                "Logging configuration error intentionally raised in unit test"
-            )
+        self.__job_object.manager.setup_fixture.side_effect = errors.LoggerRuntimeConfigError(
+            "Logging configuration error intentionally raised in unit test"
         )
         self.__assert_when_run_tests(setup_succeeded=False)
 
@@ -323,10 +289,8 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         self.__assert_when_run_tests(teardown_succeeded=False)
 
     def test_teardown_raises_logging_config_exception(self):
-        self.__job_object.manager.teardown_fixture.side_effect = (
-            errors.LoggerRuntimeConfigError(
-                "Logging configuration error intentionally raised in unit test"
-            )
+        self.__job_object.manager.teardown_fixture.side_effect = errors.LoggerRuntimeConfigError(
+            "Logging configuration error intentionally raised in unit test"
         )
         self.__assert_when_run_tests(teardown_succeeded=False)
 

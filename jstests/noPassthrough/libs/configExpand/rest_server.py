@@ -89,17 +89,11 @@ def run(port):
 def main():
     """Main Method."""
 
-    parser = argparse.ArgumentParser(
-        description="MongoDB Mock Config Expandsion REST Endpoint."
-    )
+    parser = argparse.ArgumentParser(description="MongoDB Mock Config Expandsion REST Endpoint.")
 
-    parser.add_argument(
-        "-p", "--port", type=int, default=8000, help="Port to listen on"
-    )
+    parser.add_argument("-p", "--port", type=int, default=8000, help="Port to listen on")
 
-    parser.add_argument(
-        "-v", "--verbose", action="count", help="Enable verbose tracing"
-    )
+    parser.add_argument("-v", "--verbose", action="count", help="Enable verbose tracing")
 
     args = parser.parse_args()
     if args.verbose:

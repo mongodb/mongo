@@ -31,9 +31,7 @@ class FixtureLib:
 
     def new_fixture_node_logger(self, fixture_class, job_num, node_name):
         """Create a logger for a particular element in a multi-process fixture."""
-        return logging.loggers.new_fixture_node_logger(
-            fixture_class, job_num, node_name
-        )
+        return logging.loggers.new_fixture_node_logger(fixture_class, job_num, node_name)
 
     ############
     # Programs #
@@ -43,9 +41,7 @@ class FixtureLib:
         """Build fixtures by calling builder API."""
         return _builder.make_fixture(class_name, logger, job_num, *args, **kwargs)
 
-    def mongod_program(
-        self, logger, job_num, executable, process_kwargs, mongod_options
-    ):
+    def mongod_program(self, logger, job_num, executable, process_kwargs, mongod_options):
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -116,9 +112,7 @@ class FixtureLib:
         original_set_parameters = original.get(self.SET_PARAMETERS_KEY, {})
         override_set_parameters = override.get(self.SET_PARAMETERS_KEY, {})
 
-        merged_set_parameters = merge_dicts(
-            original_set_parameters, override_set_parameters
-        )
+        merged_set_parameters = merge_dicts(original_set_parameters, override_set_parameters)
         original.update(override)
         original[self.SET_PARAMETERS_KEY] = merged_set_parameters
 

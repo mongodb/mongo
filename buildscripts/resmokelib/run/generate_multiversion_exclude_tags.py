@@ -32,9 +32,7 @@ def get_backports_required_hash(mongod_path: str | None = None):
     if is_windows():
         mongod = mongod_path + ".exe"
 
-    version = check_output(f"{mongod} --version", shell=True, env=env_vars).decode(
-        "utf-8"
-    )
+    version = check_output(f"{mongod} --version", shell=True, env=env_vars).decode("utf-8")
     for line in version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(":")[1]
@@ -50,9 +48,7 @@ def get_backports_required_hash(mongod_path: str | None = None):
                 return commit_hash
             else:
                 break
-    raise ValueError(
-        f"Could not find a valid commit hash from the {mongod_path} mongo binary."
-    )
+    raise ValueError(f"Could not find a valid commit hash from the {mongod_path} mongo binary.")
 
 
 def get_git_file_content(commit_hash: str) -> str:
@@ -68,12 +64,8 @@ def get_git_file_content(commit_hash: str) -> str:
         try:
             # If the git show command failed once, we attempt to shallow fetch the commit
             # to ensure we have the commit's contents then try again.
-            _ = subprocess.run(
-                git_fetch_command, capture_output=True, text=True, check=True
-            )
-            result = subprocess.run(
-                git_command, capture_output=True, text=True, check=True
-            )
+            _ = subprocess.run(git_fetch_command, capture_output=True, text=True, check=True)
+            result = subprocess.run(git_command, capture_output=True, text=True, check=True)
         except subprocess.CalledProcessError as err:
             raise RuntimeError(
                 f"Failed to retrieve file content using command: {' '.join(git_command)}. Error: {err.stderr}"
@@ -96,9 +88,7 @@ def get_old_yaml(commit_hash: str):
     return backports_required_old
 
 
-def generate_exclude_yaml(
-    old_bin_version: str, output: str, logger: logging.Logger
-) -> None:
+def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Logger) -> None:
     """
     Create a tag file associating multiversion tests to tags for exclusion.
 
@@ -111,9 +101,7 @@ def generate_exclude_yaml(
     if not os.path.isdir(location):
         os.makedirs(location)
 
-    backports_required_latest = read_yaml_file(
-        os.path.join(ETC_DIR, BACKPORTS_REQUIRED_FILE)
-    )
+    backports_required_latest = read_yaml_file(os.path.join(ETC_DIR, BACKPORTS_REQUIRED_FILE))
 
     # Get the state of the backports_required_for_multiversion_tests.yml file for the old
     # binary we are running tests against. We do this by using the commit hash from the old
@@ -128,9 +116,7 @@ def generate_exclude_yaml(
     old_version_commit_hash = get_backports_required_hash(old_mongod)
 
     # Get the yaml contents from the old commit.
-    logger.info(
-        f"Downloading file from commit hash of old branch {old_version_commit_hash}"
-    )
+    logger.info(f"Downloading file from commit hash of old branch {old_version_commit_hash}")
     backports_required_old = get_old_yaml(old_version_commit_hash)
 
     def diff(list1, list2):
@@ -155,9 +141,7 @@ def generate_exclude_yaml(
                 backports_required_latest[version_key]["all"],
                 backports_required_old["all"],
             )
-            _suites_old: defaultdict = defaultdict(
-                list, backports_required_old["suites"] or {}
-            )
+            _suites_old: defaultdict = defaultdict(list, backports_required_old["suites"] or {})
 
         return _suites_latest, _suites_old, _always_exclude
 

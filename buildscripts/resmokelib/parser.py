@@ -79,9 +79,7 @@ def parse_command_line(sys_args, usage=None, **kwargs):
         if subcommand_obj is not None:
             return subcommand_obj
 
-    raise RuntimeError(
-        f"Resmoke configuration has invalid subcommand: {subcommand}. Try '--help'"
-    )
+    raise RuntimeError(f"Resmoke configuration has invalid subcommand: {subcommand}. Try '--help'")
 
 
 def set_run_options(argstr=""):

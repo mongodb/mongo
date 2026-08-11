@@ -103,8 +103,7 @@ def main():
     expected_variants = read_variable_from_yml(args.file, MONGOCRYPTD_VARIANTS)
     if not expected_variants:
         print(
-            "ERROR: Could not find node %s in file '%s'"
-            % (MONGOCRYPTD_VARIANTS, args.file),
+            "ERROR: Could not find node %s in file '%s'" % (MONGOCRYPTD_VARIANTS, args.file),
             file=sys.stderr,
         )
         sys.exit(1)
@@ -116,8 +115,7 @@ def main():
 
     if args.variant not in expected_variants:
         print(
-            "ERROR: Expected to find variant %s in list %s"
-            % (args.variant, expected_variants),
+            "ERROR: Expected to find variant %s in list %s" % (args.variant, expected_variants),
             file=sys.stderr,
         )
         print(

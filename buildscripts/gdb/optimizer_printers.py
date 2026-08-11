@@ -145,9 +145,7 @@ class FixedArityNodePrinter(object):
         global operator_indent_level
 
         prior_indent = operator_indent_level
-        current_indent = (
-            operator_indent_level + self.arity + len(self.custom_children) - 1
-        )
+        current_indent = operator_indent_level + self.arity + len(self.custom_children) - 1
         for child in self.custom_children:
             lhs = "\n"
             for _ in range(current_indent):
@@ -197,9 +195,7 @@ class Vector(object):
     def get(self, index):
         if index > self.count() - 1:
             raise gdb.GdbError(
-                "Invalid Vector access at index {} with size {}".format(
-                    index, self.count()
-                )
+                "Invalid Vector access at index {} with size {}".format(index, self.count())
             )
         item = self.start + index
         return item.dereference()
@@ -289,9 +285,7 @@ class ScanNodePrinter(object):
         return str(bound_projections.get(0))
 
     def to_string(self):
-        return "Scan[{}, {}]".format(
-            self.val["_scanDefName"], self.get_bound_projection()
-        )
+        return "Scan[{}, {}]".format(self.val["_scanDefName"], self.get_bound_projection())
 
 
 class FilterNodePrinter(FixedArityNodePrinter):
@@ -327,9 +321,7 @@ class ConstantPrinter(object):
         value_print_fn = "mongo::sbe::value::print"
         (print_fn_symbol, _) = gdb.lookup_symbol(value_print_fn)
         if print_fn_symbol is None:
-            raise gdb.GdbError(
-                "Could not find pretty print function: " + value_print_fn
-            )
+            raise gdb.GdbError("Could not find pretty print function: " + value_print_fn)
         print_fn = print_fn_symbol.value()
         return print_fn(tag, value)
 
@@ -620,10 +612,7 @@ class FieldProjectionMapPrinter(object):
 
         # Python reformats the string with embedded "=" characters, avoid that by replacing here.
         res += (
-            str(self.val["_fieldProjections"])
-            .replace("=", ":")
-            .replace("{", "(")
-            .replace("}", ")")
+            str(self.val["_fieldProjections"]).replace("=", ":").replace("{", "(").replace("}", ")")
         )
         res += "}"
         return res
@@ -732,18 +721,10 @@ class ResidualRequirementPrinter(object):
         if get_boost_optional(key["_projectionName"]) is not None:
             res += "refProj: " + str(get_boost_optional(key["_projectionName"])) + ", "
 
-        res += (
-            "path: '"
-            + str(key["_path"]).replace("|   ", "").replace("\n", " -> ")
-            + "'"
-        )
+        res += "path: '" + str(key["_path"]).replace("|   ", "").replace("\n", " -> ") + "'"
 
         if get_boost_optional(req["_boundProjectionName"]) is not None:
-            res += (
-                "boundProj: "
-                + str(get_boost_optional(req["_boundProjectionName"]))
-                + ", "
-            )
+            res += "boundProj: " + str(get_boost_optional(req["_boundProjectionName"])) + ", "
 
         res += ">"
         return res
@@ -835,9 +816,7 @@ class BinaryJoinNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 3, "BinaryJoin")
 
     def to_string(self):
-        correlated = print_correlated_projections(
-            self.val["_correlatedProjectionNames"]
-        )
+        correlated = print_correlated_projections(self.val["_correlatedProjectionNames"])
         return (
             "BinaryJoin[type="
             + str(strip_namespace(self.val["_joinType"]))
@@ -908,9 +887,7 @@ class SortedMergeNodePrinter(DynamicArityNodePrinter):
         """Initialize SortedMergeNodePrinter."""
         super().__init__(val, 2, "MergeJoin")
 
-        self.add_child(
-            "collation[" + print_collation_req(self.val["_collationReq"]) + "]"
-        )
+        self.add_child("collation[" + print_collation_req(self.val["_collationReq"]) + "]")
 
     def to_string(self):
         return "SortedMerge"
@@ -924,9 +901,7 @@ class NestedLoopJoinNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 3, "NestedLoopJoin")
 
     def to_string(self):
-        correlated = print_correlated_projections(
-            self.val["_correlatedProjectionNames"]
-        )
+        correlated = print_correlated_projections(self.val["_correlatedProjectionNames"])
         return (
             "NestedLoopJoin[type="
             + strip_namespace(self.val["_joinType"])
@@ -1028,11 +1003,7 @@ class ExchangeNodePrinter(FixedArityNodePrinter):
             "Exchange[type: "
             + str(self.val["_distribution"]["_distributionAndProjections"]["_type"])
             + ", projections: "
-            + str(
-                self.val["_distribution"]["_distributionAndProjections"][
-                    "_projectionNames"
-                ]
-            )
+            + str(self.val["_distribution"]["_distributionAndProjections"]["_projectionNames"])
             + "]"
         )
 
@@ -1061,9 +1032,7 @@ class PolyValuePrinter(object):
         self.type_set = str(self.poly_type).split("<", 1)[1]
 
         if self.tag < 0:
-            raise gdb.GdbError(
-                "Invalid PolyValue tag: {}, must be at least 0".format(self.tag)
-            )
+            raise gdb.GdbError("Invalid PolyValue tag: {}, must be at least 0".format(self.tag))
 
         # Check if the tag is out of range for the set of types that we know about.
         if self.tag > len(self.type_set.split(",")):
@@ -1080,9 +1049,7 @@ class PolyValuePrinter(object):
 
     def cast_control_block(self, target_type):
         return (
-            self.control_block.dereference()
-            .address.cast(target_type.pointer())
-            .dereference()["_t"]
+            self.control_block.dereference().address.cast(target_type.pointer()).dereference()["_t"]
         )
 
     def get_dynamic_type(self):

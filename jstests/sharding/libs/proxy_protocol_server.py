@@ -127,10 +127,7 @@ async def _patched_run(args):
     # --- BEGIN: Code copied from library's run() function ---
     loop = asyncio.get_running_loop()
 
-    services = [
-        (Address(source, server=True), Address(dest))
-        for (source, dest) in args.services
-    ]
+    services = [(Address(source, server=True), Address(dest)) for (source, dest) in args.services]
     buf_len = args.buf_len
     dnsbl = Dnsbl.load(args.dnsbl, timeout=args.dnsbl_timeout)
 
@@ -163,32 +160,22 @@ async def _patched_run(args):
                         if raw:
                             # Only read the last line
                             continue
-                        _tlv_structs, _ssl_tlv_structs = _parse_pp2_tlv_structs_json(
-                            line
-                        )
+                        _tlv_structs, _ssl_tlv_structs = _parse_pp2_tlv_structs_json(line)
                 else:
                     _tlv_structs, _ssl_tlv_structs = {}, {}
         except FileNotFoundError:
             pass
         except Exception as e:
             _tlv_structs, _ssl_tlv_structs = {}, {}
-            print(
-                f"Failed to reload TLV file {path!r}: {e}", file=sys.stderr, flush=True
-            )
+            print(f"Failed to reload TLV file {path!r}: {e}", file=sys.stderr, flush=True)
 
     def _with_tlv(result: ProxyResult, tlv: ProxyProtocolTLV) -> ProxyResult:
         if is_ipv4(result):
-            return ProxyResultIPv4(
-                result.source, result.dest, protocol=result.protocol, tlv=tlv
-            )
+            return ProxyResultIPv4(result.source, result.dest, protocol=result.protocol, tlv=tlv)
         if is_ipv6(result):
-            return ProxyResultIPv6(
-                result.source, result.dest, protocol=result.protocol, tlv=tlv
-            )
+            return ProxyResultIPv6(result.source, result.dest, protocol=result.protocol, tlv=tlv)
         if is_unix(result):
-            return ProxyResultUnix(
-                result.source, result.dest, protocol=result.protocol, tlv=tlv
-            )
+            return ProxyResultUnix(result.source, result.dest, protocol=result.protocol, tlv=tlv)
         return result
 
     class UpstreamProtocolWithTLV(UpstreamProtocol):
@@ -232,9 +219,7 @@ async def _patched_run(args):
             return self.pp.pack(
                 _with_tlv(
                     result,
-                    ProxyProtocolTLV(
-                        init=cur_tlv, ssl=ProxyProtocolSSLTLV(init=cur_ssl_tlv)
-                    ),
+                    ProxyProtocolTLV(init=cur_tlv, ssl=ProxyProtocolSSLTLV(init=cur_ssl_tlv)),
                 )
             )
 
@@ -258,18 +243,12 @@ async def _patched_run(args):
                     super(DownstreamProtocol, self).connection_made(transport)
 
                     loop = self.loop
-                    self._dnsbl_task = loop.create_task(
-                        self.dnsbl.lookup(self.sock_info)
-                    )
+                    self._dnsbl_task = loop.create_task(self.dnsbl.lookup(self.sock_info))
                     self._connect_task = connect_task = loop.create_task(
-                        loop.create_unix_connection(
-                            self._upstream_factory, _unix_egress_path
-                        )
+                        loop.create_unix_connection(self._upstream_factory, _unix_egress_path)
                     )
                     result = build_transport_result(transport, unique_id=self.id)
-                    connect_task.add_done_callback(
-                        partial(self._unix_set_client, result)
-                    )
+                    connect_task.add_done_callback(partial(self._unix_set_client, result))
                 except Exception as e:
                     print(
                         f"[proxy-uds] Error in connection_made: {e!r}",
@@ -367,9 +346,7 @@ def _parse_wrapper_flags_from_argv(
 if __name__ == "__main__":
     # Parse and strip wrapper-specific flags before invoking the library's CLI.
     try:
-        filtered_argv, tlv_file, unix_egress = _parse_wrapper_flags_from_argv(
-            sys.argv[1:]
-        )
+        filtered_argv, tlv_file, unix_egress = _parse_wrapper_flags_from_argv(sys.argv[1:])
         sys.argv = [sys.argv[0], *filtered_argv]
         if tlv_file:
             _tlv_file_path = tlv_file

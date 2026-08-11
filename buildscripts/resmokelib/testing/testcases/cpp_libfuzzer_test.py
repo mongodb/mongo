@@ -34,9 +34,7 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         self.runs = runs
 
         self.corpus_directory = f"{corpus_directory_stem}/corpus-{self.short_name()}"
-        self.merged_corpus_directory = (
-            f"{corpus_directory_stem}-merged/corpus-{self.short_name()}"
-        )
+        self.merged_corpus_directory = f"{corpus_directory_stem}-merged/corpus-{self.short_name()}"
 
         os.makedirs(self.corpus_directory, exist_ok=True)
 

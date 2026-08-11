@@ -24,16 +24,12 @@ class TestErrorcodes(unittest.TestCase):
         def accumulate_files(code):
             captured_error_codes.append(code)
 
-        errorcodes.parse_source_files(
-            accumulate_files, TESTDATA_DIR + "regex_matching/"
-        )
+        errorcodes.parse_source_files(accumulate_files, TESTDATA_DIR + "regex_matching/")
         self.assertEqual(32, len(captured_error_codes))
 
     def test_dup_checking(self):
         """Test dup checking."""
-        assertions, errors, _ = errorcodes.read_error_codes(
-            TESTDATA_DIR + "dup_checking/"
-        )
+        assertions, errors, _ = errorcodes.read_error_codes(TESTDATA_DIR + "dup_checking/")
         # `assertions` is every use of an error code. Duplicates are included.
         self.assertEqual(4, len(assertions))
         self.assertEqual([1, 2, 3, 2], list(map(lambda x: int(x.code), assertions)))
@@ -58,9 +54,7 @@ class TestErrorcodes(unittest.TestCase):
         `server_ticket` is passed in. But it maybe makes sense for the test to do so in case a
         future patch changes that relationship.
         """
-        _, _, seen = errorcodes.read_error_codes(
-            TESTDATA_DIR + "generate_next_server_code/"
-        )
+        _, _, seen = errorcodes.read_error_codes(TESTDATA_DIR + "generate_next_server_code/")
         print("Seen: " + str(seen))
         generator = errorcodes.get_next_code(seen, server_ticket=12301)
         self.assertEqual(1230101, next(generator))

@@ -381,9 +381,7 @@ def _gen_trie(prefix, words, writer, callback):
     empty_words = [lw for lw in words if len(lw) == 0]
     if empty_words:
         word_to_check = prefix
-        with IndentedScopedBlock(
-            writer, f"if (fieldName.size() == {len(word_to_check)}) {{", "}"
-        ):
+        with IndentedScopedBlock(writer, f"if (fieldName.size() == {len(word_to_check)}) {{", "}"):
             callback(word_to_check)
 
     # Filter out empty words
@@ -435,7 +433,5 @@ def gen_string_table_find_function_block(out, in_str, on_match, on_fail, words):
     """Wrap a gen_trie generated block as a function."""
     index = {word: i for i, word in enumerate(words)}
     out.write_line(f"StringData fieldName{{{in_str}}};")
-    gen_trie(
-        words, out, lambda w: out.write_line(f"return {on_match.format(index[w])};")
-    )
+    gen_trie(words, out, lambda w: out.write_line(f"return {on_match.format(index[w])};"))
     out.write_line(f"return {on_fail};")

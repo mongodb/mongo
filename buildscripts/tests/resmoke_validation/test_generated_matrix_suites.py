@@ -47,9 +47,7 @@ class ValidateGeneratedSuites(unittest.TestCase):
                     ".yml",
                     msg=f"{filename} has the wrong file extension, expected `.yml`",
                 )
-                expected_mapping_file = os.path.join(
-                    suites_dir, f"mappings/{suite_name}.yml"
-                )
+                expected_mapping_file = os.path.join(suites_dir, f"mappings/{suite_name}.yml")
                 self.assertIn(
                     suite_name,
                     suite_names,

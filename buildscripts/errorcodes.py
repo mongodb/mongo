@@ -28,9 +28,7 @@ MAXIMUM_CODE = 99999999  # JIRA Ticket + XX
 codes = []  # type: ignore
 
 # Each AssertLocation identifies the C++ source location of an assertion
-AssertLocation = namedtuple(
-    "AssertLocation", ["sourceFile", "byteOffset", "lines", "code"]
-)
+AssertLocation = namedtuple("AssertLocation", ["sourceFile", "byteOffset", "lines", "code"])
 
 list_files = False  # pylint: disable=invalid-name
 
@@ -256,9 +254,7 @@ def replace_bad_codes(errors, next_code_generator):
 
     for loc in skip_errors:
         line, col = get_line_and_column_for_position(loc)
-        print(
-            "SKIPPING NONZERO code=%s: %s:%d:%d" % (loc.code, loc.sourceFile, line, col)
-        )
+        print("SKIPPING NONZERO code=%s: %s:%d:%d" % (loc.code, loc.sourceFile, line, col))
 
     # Dedupe, sort, and reverse so we don't have to update offsets as we go.
     for assert_loc in reversed(sorted(set(zero_errors))):

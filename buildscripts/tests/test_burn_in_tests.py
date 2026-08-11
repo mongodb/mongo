@@ -81,9 +81,7 @@ class TestRepeatConfig(unittest.TestCase):
         self.assertEqual(repeat_config, repeat_config.validate())
 
     def test_validate_with_both_repeat_options_specified(self):
-        repeat_config = under_test.RepeatConfig(
-            repeat_tests_secs=10, repeat_tests_num=5
-        )
+        repeat_config = under_test.RepeatConfig(repeat_tests_secs=10, repeat_tests_num=5)
 
         with self.assertRaises(ValueError):
             repeat_config.validate()
@@ -192,9 +190,7 @@ class TestSetResmokeCmd(unittest.TestCase):
 
         resmoke_cmd = under_test._set_resmoke_cmd(repeat_config, resmoke_args)
         expected_resmoke_cmd = (
-            [sys.executable, "buildscripts/resmoke.py", "run"]
-            + resmoke_args
-            + ["--repeatSuites=2"]
+            [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args + ["--repeatSuites=2"]
         )
 
         self.assertListEqual(expected_resmoke_cmd, resmoke_cmd)
@@ -205,9 +201,7 @@ class TestSetResmokeCmd(unittest.TestCase):
 
         resmoke_cmd = under_test._set_resmoke_cmd(repeat_config, resmoke_args)
         expected_resmoke_cmd = (
-            [sys.executable, "buildscripts/resmoke.py", "run"]
-            + resmoke_args
-            + ["--repeatSuites=3"]
+            [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args + ["--repeatSuites=3"]
         )
 
         self.assertListEqual(expected_resmoke_cmd, resmoke_cmd)
@@ -309,9 +303,7 @@ class CreateExecutorList(unittest.TestCase):
 
     @patch(RESMOKELIB + ".testing.suite.Suite")
     @patch(RESMOKELIB + ".suitesconfig.get_named_suites")
-    def test_create_executor_list_runs_core_suite(
-        self, mock_get_named_suites, mock_suite_class
-    ):
+    def test_create_executor_list_runs_core_suite(self, mock_get_named_suites, mock_suite_class):
         mock_get_named_suites.return_value = ["core"]
 
         under_test.create_executor_list([], [])
@@ -333,9 +325,7 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     variant_task.name = task_name
     variant_task.generated_task_name = task_name
     variant_task.get_suite_names.return_value = [suite_name]
-    variant_task.combined_suite_to_resmoke_args_map = {
-        suite_name: f"--suites={suite_name}"
-    }
+    variant_task.combined_suite_to_resmoke_args_map = {suite_name: f"--suites={suite_name}"}
     variant_task.run_on = [distro]
     return variant_task
 
@@ -457,9 +447,7 @@ class TestCreateTestsByTask(unittest.TestCase):
         evg_conf_mock.get_variant.return_value = None
 
         with self.assertRaises(ValueError):
-            under_test.create_tests_by_task(
-                variant, evg_conf_mock, set(), "install-dir/bin"
-            )
+            under_test.create_tests_by_task(variant, evg_conf_mock, set(), "install-dir/bin")
 
 
 class TestLocalFileChangeDetector(unittest.TestCase):
@@ -533,6 +521,4 @@ class TestYamlBurnInExecutor(unittest.TestCase):
         yaml_raw = stdout.getvalue()
         results = yaml.safe_load(yaml_raw)
         self.assertEqual(n_tasks, len(results["discovered_tasks"]))
-        self.assertEqual(
-            n_tests, len(results["discovered_tasks"][0]["suites"][0]["test_list"])
-        )
+        self.assertEqual(n_tests, len(results["discovered_tasks"][0]["suites"][0]["test_list"]))

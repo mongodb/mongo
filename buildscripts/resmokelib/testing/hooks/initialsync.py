@@ -61,15 +61,11 @@ class BackgroundInitialSync(interface.Hook):
 class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
     """BackgroundInitialSyncTestCase class."""
 
-    JS_FILENAME = os.path.join(
-        "jstests", "hooks", "run_initial_sync_node_validation.js"
-    )
+    JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
     INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
     INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
 
-    def __init__(
-        self, logger, test_name, description, base_test_name, hook, shell_options=None
-    ):
+    def __init__(self, logger, test_name, description, base_test_name, hook, shell_options=None):
         """Initialize BackgroundInitialSyncTestCase."""
         jsfile.DynamicJSTestCase.__init__(
             self,
@@ -102,9 +98,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                     ("waitForMemberState", 2),
                     (
                         "timeoutMillis",
-                        fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS
-                        * 60
-                        * 1000,
+                        fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000,
                     ),
                 ]
             )
@@ -132,9 +126,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
             if state != 2:
                 if self._hook.tests_run == 0:
                     msg = "Initial sync node did not catch up after waiting 24 hours"
-                    self.logger.exception(
-                        "{0} failed: {1}".format(self._hook.description, msg)
-                    )
+                    self.logger.exception("{0} failed: {1}".format(self._hook.description, msg))
                     raise errors.TestFailure(msg)
 
                 self.logger.info(
@@ -223,9 +215,7 @@ class IntermediateInitialSync(interface.Hook):
         if not self._should_run_after_test():
             return
 
-        hook_test_case = IntermediateInitialSyncTestCase.create_after_test(
-            test.logger, test, self
-        )
+        hook_test_case = IntermediateInitialSyncTestCase.create_after_test(test.logger, test, self)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
@@ -233,9 +223,7 @@ class IntermediateInitialSync(interface.Hook):
 class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
     """IntermediateInitialSyncTestCase class."""
 
-    JS_FILENAME = os.path.join(
-        "jstests", "hooks", "run_initial_sync_node_validation.js"
-    )
+    JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
 
     def __init__(self, logger, test_name, description, base_test_name, hook):
         """Initialize IntermediateInitialSyncTestCase."""
@@ -262,9 +250,7 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
                 ("waitForMemberState", 2),
                 (
                     "timeoutMillis",
-                    fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS
-                    * 60
-                    * 1000,
+                    fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000,
                 ),
             ]
         )

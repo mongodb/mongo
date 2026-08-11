@@ -35,16 +35,14 @@ def build_mock_evg_api(variant_data_list):
 
     mock_version = MagicMock(spec_set=VersionPatchedSpec)
     mock_version.build_variants_map = {
-        variant_data.variant_name: variant_data.build_id
-        for variant_data in variant_data_list
+        variant_data.variant_name: variant_data.build_id for variant_data in variant_data_list
     }
 
     mock_evg_api = MagicMock(spec_set=EvergreenApi)
     mock_evg_api.version_by_id.return_value = mock_version
 
     build_id_mapping = {
-        variant_data.build_id: variant_data.task_list
-        for variant_data in variant_data_list
+        variant_data.build_id: variant_data.task_list for variant_data in variant_data_list
     }
 
     def tasks_by_build_side_effect(build_id):
@@ -103,12 +101,8 @@ class TestActivateTask(unittest.TestCase):
         mock_task_list_3.append(build_mock_task("burn_in_tests", "burn_in_tests_id_3"))
         mock_evg_api = build_mock_evg_api(
             [
-                MockVariantData(
-                    "1", "variant1-generated-by-burn-in-tags", mock_task_list_2
-                ),
-                MockVariantData(
-                    "2", "variant2-generated-by-burn-in-tags", mock_task_list_3
-                ),
+                MockVariantData("1", "variant1-generated-by-burn-in-tags", mock_task_list_2),
+                MockVariantData("2", "variant2-generated-by-burn-in-tags", mock_task_list_3),
             ]
         )
 
@@ -130,22 +124,16 @@ class TestActivateTask(unittest.TestCase):
             }
         )
         mock_task_list_1 = build_mock_task_list(5)
-        mock_task_list_1.append(
-            build_mock_task("burn_in_tags_gen", "burn_in_tags_gen_id_1")
-        )
+        mock_task_list_1.append(build_mock_task("burn_in_tags_gen", "burn_in_tags_gen_id_1"))
         mock_task_list_2 = build_mock_task_list(5)
         mock_task_list_2.append(build_mock_task("burn_in_tests", "burn_in_tests_id_2"))
         mock_evg_api = build_mock_evg_api(
             [
                 MockVariantData("1", "variant1-non-burn-in", mock_task_list_1),
-                MockVariantData(
-                    "2", "variant2-generated-by-burn-in-tags", mock_task_list_2
-                ),
+                MockVariantData("2", "variant2-generated-by-burn-in-tags", mock_task_list_2),
             ]
         )
 
         under_test.activate_task(expansions, mock_evg_api)
 
-        mock_evg_api.configure_task.assert_called_once_with(
-            "burn_in_tests_id_2", activated=True
-        )
+        mock_evg_api.configure_task.assert_called_once_with("burn_in_tests_id_2", activated=True)

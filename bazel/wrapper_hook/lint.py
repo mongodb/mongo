@@ -83,9 +83,7 @@ def list_files_without_targets(
         "src/mongo/util/processinfo_solaris.cpp",
     }
 
-    typed_files_in_targets = [
-        line for line in files_with_targets if line.endswith(f".{ext}")
-    ]
+    typed_files_in_targets = [line for line in files_with_targets if line.endswith(f".{ext}")]
 
     print(f"Checking that all {type_name} files have BUILD.bazel targets...")
 
@@ -186,9 +184,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     # so that the naive thing of pasting that flag to lint.sh will do what the user expects.
     if "--fix" in args:
         fix = "patch"
-        args.extend(
-            ["--@aspect_rules_lint//lint:fix", "--output_groups=rules_lint_patch"]
-        )
+        args.extend(["--@aspect_rules_lint//lint:fix", "--output_groups=rules_lint_patch"])
         args.remove("--fix")
 
     # the --dry-run flag must immediately follow the --fix flag
@@ -232,11 +228,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     failing_reports = 0
     for report in valid_reports:
         # Exclude coverage reports, and check if the output is empty.
-        if (
-            "coverage.dat" in report
-            or not os.path.exists(report)
-            or not os.path.getsize(report)
-        ):
+        if "coverage.dat" in report or not os.path.exists(report) or not os.path.getsize(report):
             # Report is empty. No linting errors.
             continue
         with open(report, "r", encoding="utf-8") as f:
@@ -273,11 +265,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
 
         for patch in valid_patches:
             # Exclude coverage, and check if the patch is empty.
-            if (
-                "coverage.dat" in patch
-                or not os.path.exists(patch)
-                or not os.path.getsize(patch)
-            ):
+            if "coverage.dat" in patch or not os.path.exists(patch) or not os.path.getsize(patch):
                 # Patch is empty. No linting errors.
                 continue
 

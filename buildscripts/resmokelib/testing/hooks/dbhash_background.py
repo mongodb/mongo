@@ -21,12 +21,8 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckReplDBHashInBackground."""
-        description = (
-            "Check dbhashes of all replica set members while a test is running"
-        )
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_check_repl_dbhash_background.js"
-        )
+        description = "Check dbhashes of all replica set members while a test is running"
+        js_filename = os.path.join("jstests", "hooks", "run_check_repl_dbhash_background.js")
         jsfile.JSHook.__init__(
             self,
             hook_logger,
@@ -46,9 +42,7 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
         # replica set shards supports snapshot reads.
         if not client.is_mongos:
             server_status = client.admin.command("serverStatus")
-            if not server_status["storageEngine"].get(
-                "supportsSnapshotReadConcern", False
-            ):
+            if not server_status["storageEngine"].get("supportsSnapshotReadConcern", False):
                 self.logger.info(
                     "Not enabling the background check repl dbhash thread because '%s' storage"
                     " engine doesn't support snapshot reads.",

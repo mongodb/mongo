@@ -51,9 +51,7 @@ def get_unique_ptr_bytes(obj):
     mongo::Decorable<> types which store the decorations as a slab of memory with
     std::unique_ptr<unsigned char[]>. In all other cases get_unique_ptr() can be preferred.
     """
-    return obj.cast(gdb.lookup_type("std::_Head_base<0, unsigned char*, false>"))[
-        "_M_head_impl"
-    ]
+    return obj.cast(gdb.lookup_type("std::_Head_base<0, unsigned char*, false>"))["_M_head_impl"]
 
 
 def get_unique_ptr(obj):
@@ -172,9 +170,7 @@ class BSONObjPrinter(object):
             self.raw_memory = None
         else:
             self.size = struct.unpack("<I", inferior.read_memory(self.ptr, 4))[0]
-            self.raw_memory = bytes(
-                memoryview(inferior.read_memory(self.ptr, self.size))
-            )
+            self.raw_memory = bytes(memoryview(inferior.read_memory(self.ptr, self.size)))
             if bson:
                 self.is_valid = bson.is_valid(self.raw_memory)
 
@@ -187,12 +183,7 @@ class BSONObjPrinter(object):
         """Children."""
         # Do not decode a BSONObj with an invalid size, or that is considered
         # invalid by pymongo.
-        if (
-            not bson
-            or not self.is_valid
-            or self.size < 5
-            or self.size > 17 * 1024 * 1024
-        ):
+        if not bson or not self.is_valid or self.size < 5 or self.size > 17 * 1024 * 1024:
             return
 
         options = CodecOptions(document_class=collections.OrderedDict)
@@ -208,11 +199,7 @@ class BSONObjPrinter(object):
         if self.size == -1:
             return "BSONObj @ %s - optimized out" % (self.ptr)
 
-        ownership = (
-            "owned"
-            if self.val["_ownedBuffer"]["_buffer"]["_holder"]["px"]
-            else "unowned"
-        )
+        ownership = "owned" if self.val["_ownedBuffer"]["_buffer"]["_holder"]["px"] else "unowned"
 
         size = self.size
         # Print an invalid BSONObj size in hex.
@@ -320,9 +307,7 @@ class RecordIdPrinter(object):
         if rid_format == 0:
             return "null RecordId"
         elif rid_format == 1:
-            koffset = (
-                8 - 1
-            )  ##  std::alignment_of_v<int64_t> - sizeof(Format); (see record_id.h)
+            koffset = 8 - 1  ##  std::alignment_of_v<int64_t> - sizeof(Format); (see record_id.h)
             rid_address = self.__get_data_address("int64_t", koffset)
             return "RecordId long: %d" % int(rid_address.dereference())
         elif rid_format == 2:
@@ -338,9 +323,7 @@ class RecordIdPrinter(object):
             koffset = (
                 8 - 1
             )  ## std::alignment_of_v<ConstSharedBuffer> - sizeof(Format); (see record_id.h)
-            buffer = self.__get_data_address(
-                "mongo::ConstSharedBuffer", koffset
-            ).dereference()
+            buffer = self.__get_data_address("mongo::ConstSharedBuffer", koffset).dereference()
             holder_ptr = holder = buffer["_buffer"]["_holder"]["px"]
             holder = holder.dereference()
             str_len = int(holder["_capacity"])
@@ -431,26 +414,17 @@ class DecorablePrinter(object):
 
     def to_string(self):
         """Return Decorable for printing."""
-        return "Decorable<{}> with {} elems ".format(
-            self.val.type.template_argument(0), self.count
-        )
+        return "Decorable<{}> with {} elems ".format(self.val.type.template_argument(0), self.count)
 
     def children(self):
         """Children."""
         for index in range(self.count):
             try:
-                deco_type_name, obj, obj_addr = get_object_decoration(
-                    self.val, self.start, index
-                )
+                deco_type_name, obj, obj_addr = get_object_decoration(self.val, self.start, index)
                 yield ("key", "{}:{}:{}".format(index, obj_addr, deco_type_name))
                 yield ("value", obj)
             except Exception as err:
-                print(
-                    "Failed to look up decoration type: "
-                    + deco_type_name
-                    + ": "
-                    + str(err)
-                )
+                print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
 
 
 def _get_flags(flag_val, flags):
@@ -483,9 +457,7 @@ class WtCursorPrinter(object):
     """
 
     try:
-        with open(
-            "./src/third_party/wiredtiger/src/include/wiredtiger.in"
-        ) as wiredtiger_header:
+        with open("./src/third_party/wiredtiger/src/include/wiredtiger.in") as wiredtiger_header:
             file_contents = wiredtiger_header.read()
             cursor_flags_re = re.compile(r"#define\s+WT_CURSTD_(\w+)\s+0x(\d+)u")
             cursor_flags = cursor_flags_re.findall(file_contents)[::-1]
@@ -507,9 +479,7 @@ class WtCursorPrinter(object):
             if field.name == "flags":
                 yield (
                     "flags",
-                    "{} ({})".format(
-                        field_val, str(_get_flags(field_val, self.cursor_flags))
-                    ),
+                    "{} ({})".format(field_val, str(_get_flags(field_val, self.cursor_flags))),
                 )
             else:
                 yield (field.name, field_val)
@@ -523,9 +493,7 @@ class WtSessionImplPrinter(object):
     """
 
     try:
-        with open(
-            "./src/third_party/wiredtiger/src/include/session.h"
-        ) as session_header:
+        with open("./src/third_party/wiredtiger/src/include/session.h") as session_header:
             file_contents = session_header.read()
             session_flags_re = re.compile(r"#define\s+WT_SESSION_(\w+)\s+0x(\d+)u")
             session_flags = session_flags_re.findall(file_contents)[::-1]
@@ -547,9 +515,7 @@ class WtSessionImplPrinter(object):
             if field.name == "flags":
                 yield (
                     "flags",
-                    "{} ({})".format(
-                        field_val, str(_get_flags(field_val, self.session_flags))
-                    ),
+                    "{} ({})".format(field_val, str(_get_flags(field_val, self.session_flags))),
                 )
             else:
                 yield (field.name, field_val)
@@ -585,9 +551,7 @@ class WtTxnPrinter(object):
             if field.name == "flags":
                 yield (
                     "flags",
-                    "{} ({})".format(
-                        field_val, str(_get_flags(field_val, self.txn_flags))
-                    ),
+                    "{} ({})".format(field_val, str(_get_flags(field_val, self.txn_flags))),
                 )
             else:
                 yield (field.name, field_val)
@@ -607,10 +571,7 @@ def absl_insert_version_after_absl(cpp_name):
     absl_ns_end = absl_ns_start + len(absl_ns_str)
 
     return (
-        cpp_name[:absl_ns_end]
-        + ABSL_OPTION_INLINE_NAMESPACE_NAME
-        + "::"
-        + cpp_name[absl_ns_end:]
+        cpp_name[:absl_ns_end] + ABSL_OPTION_INLINE_NAMESPACE_NAME + "::" + cpp_name[absl_ns_end:]
     )
 
 
@@ -621,9 +582,7 @@ def absl_get_settings(val):
             absl_insert_version_after_absl(
                 "absl::container_internal::internal_compressed_tuple::Storage"
             )
-            + absl_insert_version_after_absl(
-                "<absl::container_internal::CommonFields, 0, false>"
-            )
+            + absl_insert_version_after_absl("<absl::container_internal::CommonFields, 0, false>")
         )
     except gdb.error as err:
         if not err.args[0].startswith("No type named "):
@@ -661,9 +620,7 @@ def absl_get_nodes(val):
     ctrl = settings["control_"]
 
     # Derive the underlying type stored in the container.
-    slot_type = lookup_type(
-        str(val.type.strip_typedefs()) + "::slot_type"
-    ).strip_typedefs()
+    slot_type = lookup_type(str(val.type.strip_typedefs()) + "::slot_type").strip_typedefs()
 
     # Using the array of ctrl bytes, search for in-use slots and return them
     # https://github.com/abseil/abseil-cpp/blob/8a3caf7dea955b513a6c1b572a2423c6b4213402/absl/container/internal/raw_hash_set.h#L2108-L2113
@@ -892,9 +849,7 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
 
     def add(self, name, prefix, is_template, printer):
         """Add a subprinter."""
-        self.subprinters.append(
-            MongoSubPrettyPrinter(name, prefix, is_template, printer)
-        )
+        self.subprinters.append(MongoSubPrettyPrinter(name, prefix, is_template, printer))
 
     def __call__(self, val):
         """Return matched printer type."""
@@ -914,10 +869,7 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
             # Ignore subtypes of templated classes.
             # We do not want HashTable<T>::iterator as an example, just HashTable<T>
             if printer.is_template:
-                if (
-                    index + 1 == len(lookup_tag)
-                    and lookup_tag.find(printer.prefix) == 0
-                ):
+                if index + 1 == len(lookup_tag) and lookup_tag.find(printer.prefix) == 0:
                     return printer.printer(val)
             elif lookup_tag == printer.prefix:
                 return printer.printer(val)
@@ -1026,9 +978,7 @@ class SbeCodeFragmentPrinter(object):
         self.is_inlined = meta % 2 == 0
         self.size = meta >> 1
         self.pdata = (
-            storage["data_"]["inlined"]["inlined_data"].cast(
-                lookup_type("uint8_t").pointer()
-            )
+            storage["data_"]["inlined"]["inlined_data"].cast(lookup_type("uint8_t").pointer())
             if self.is_inlined
             else storage["data_"]["allocated"]["allocated_data"]
         )
@@ -1128,14 +1078,10 @@ class SbeCodeFragmentPrinter(object):
                 )
                 builtin_id = read_as_integer(cur_op, builtin_size)
                 args = "builtin: " + self.builtins_lookup.get(builtin_id, "unknown")
-                args += " arity: " + str(
-                    read_as_integer(cur_op + builtin_size, arity_size)
-                )
+                args += " arity: " + str(read_as_integer(cur_op + builtin_size, arity_size))
                 cur_op += builtin_size + arity_size
             elif op_name in ["fillEmptyImm"]:
-                args = "Instruction::Constants: " + str(
-                    read_as_integer(cur_op, uint8_size)
-                )
+                args = "Instruction::Constants: " + str(read_as_integer(cur_op, uint8_size))
                 cur_op += uint8_size
             elif op_name in ["traverseFImm", "traversePImm"]:
                 const_enum = read_as_integer(cur_op, uint8_size)
@@ -1169,9 +1115,7 @@ class SbeCodeFragmentPrinter(object):
 
         yield (
             "instructions count",
-            instr_count
-            if not error
-            else "? (successfully parsed {})".format(instr_count),
+            instr_count if not error else "? (successfully parsed {})".format(instr_count),
         )
 
 
@@ -1217,9 +1161,7 @@ def build_pretty_printer():
     pp.add("__wt_session_impl", "__wt_session_impl", False, WtSessionImplPrinter)
     pp.add("__wt_txn", "__wt_txn", False, WtTxnPrinter)
     pp.add("__wt_update", "__wt_update", False, WtUpdateToBsonPrinter)
-    pp.add(
-        "CodeFragment", "mongo::sbe::vm::CodeFragment", False, SbeCodeFragmentPrinter
-    )
+    pp.add("CodeFragment", "mongo::sbe::vm::CodeFragment", False, SbeCodeFragmentPrinter)
     pp.add("boost::optional", "boost::optional", True, BoostOptionalPrinter)
     pp.add("immutable::map", "mongo::immutable::map", True, ImmutableMapPrinter)
     pp.add("immutable::set", "mongo::immutable::set", True, ImmutableSetPrinter)
@@ -1237,8 +1179,6 @@ def build_pretty_printer():
 ###################################################################################################
 
 # Register pretty-printers, replace existing mongo printers
-gdb.printing.register_pretty_printer(
-    gdb.current_objfile(), build_pretty_printer(), True
-)
+gdb.printing.register_pretty_printer(gdb.current_objfile(), build_pretty_printer(), True)
 
 print("MongoDB GDB pretty-printers loaded")

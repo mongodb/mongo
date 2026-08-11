@@ -19,9 +19,7 @@ def sha256_file(filename: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "patch_build_id", help="Patch build id from toolchain-builder project."
-    )
+    parser.add_argument("patch_build_id", help="Patch build id from toolchain-builder project.")
     parser.add_argument(
         "patch_build_date_string",
         help="Patch build date string from toolchain-builder project, get this at the task URL, ex the date is 24_01_09_16_10_07 for https://spruce.mongodb.com/task/toolchain_builder_amazon2023_compile_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07/",

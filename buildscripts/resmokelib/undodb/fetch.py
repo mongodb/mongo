@@ -36,9 +36,7 @@ class Fetch(Subcommand):
         :return: None
         """
         if self._ticket:
-            raise NotImplementedError(
-                "Fetching recordings from JIRA tickets not yet implemented"
-            )
+            raise NotImplementedError("Fetching recordings from JIRA tickets not yet implemented")
 
         assert self._task_id
 

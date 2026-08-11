@@ -21,9 +21,7 @@ def _check_version(linter, cmd_path, args):
     try:
         cmd = cmd_path + args
         logging.info(str(cmd))
-        process_handle = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        process_handle = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, stderr = process_handle.communicate()
         decoded_output = output.decode("utf-8")
 
@@ -236,18 +234,14 @@ class LintRunner(object):
                             count += 1
 
                         if count == 0:
-                            print(
-                                "ERROR: The files only differ in trailing whitespace? LF vs CRLF"
-                            )
+                            print("ERROR: The files only differ in trailing whitespace? LF vs CRLF")
 
                     no_lint_errors = False
             else:
                 subprocess.check_output(cmd).decode("utf-8")
 
         except subprocess.CalledProcessError as cpe:
-            self._safe_print(
-                "CMD [%s] failed:\n%s" % (" ".join(cmd), cpe.output.decode("utf-8"))
-            )
+            self._safe_print("CMD [%s] failed:\n%s" % (" ".join(cmd), cpe.output.decode("utf-8")))
             no_lint_errors = False
 
         return no_lint_errors

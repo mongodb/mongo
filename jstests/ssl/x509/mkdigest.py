@@ -38,12 +38,8 @@ def main():
         choices={"cert", "crl"},
         help="Type of X509 object to generate digest for",
     )
-    parser.add_argument(
-        "digest", choices={"sha1", "sha256"}, help="Algorithm for digest"
-    )
-    parser.add_argument(
-        "filename", nargs="+", help="Path of X509 file to generate digest for"
-    )
+    parser.add_argument("digest", choices={"sha1", "sha256"}, help="Algorithm for digest")
+    parser.add_argument("filename", nargs="+", help="Path of X509 file to generate digest for")
     args = parser.parse_args()
 
     for fname in args.filename:

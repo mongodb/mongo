@@ -233,9 +233,7 @@ def _gen_field_element_name(field):
 
 def _gen_mark_present(field_name):
     # type: (str) -> str
-    return (
-        f"_hasMembers.markPresent(static_cast<size_t>(RequiredFields::{field_name}));"
-    )
+    return f"_hasMembers.markPresent(static_cast<size_t>(RequiredFields::{field_name}));"
 
 
 def _is_parse(field):
@@ -307,24 +305,18 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
 
         with writer.IndentedScopedBlock(
             self._writer,
-            "if (MONGO_unlikely(usedFields[%s])) {"
-            % (_gen_field_usage_constant(field)),
+            "if (MONGO_unlikely(usedFields[%s])) {" % (_gen_field_usage_constant(field)),
             "}",
         ):
-            self._writer.write_line(
-                "ctxt.throwDuplicateField(%s);" % (bson_element_variable)
-            )
+            self._writer.write_line("ctxt.throwDuplicateField(%s);" % (bson_element_variable))
         self._writer.write_empty_line()
 
-        self._writer.write_line(
-            "usedFields.set(%s);" % (_gen_field_usage_constant(field))
-        )
+        self._writer.write_line("usedFields.set(%s);" % (_gen_field_usage_constant(field)))
         self._writer.write_empty_line()
 
         if field.stability == "unstable":
             self._writer.write_line(
-                "ctxt.checkAndthrowAPIStrictErrorIfApplicable(%s);"
-                % (bson_element_variable)
+                "ctxt.checkAndthrowAPIStrictErrorIfApplicable(%s);" % (bson_element_variable)
             )
             self._writer.write_empty_line()
 
@@ -350,9 +342,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
             ["(1ULL << %s)" % (_gen_field_usage_constant(rf)) for rf in required_fields]
         )
 
-        self._writer.write_line(
-            f"constexpr std::uint64_t requiredFieldBitMask = {bitmask};"
-        )
+        self._writer.write_line(f"constexpr std::uint64_t requiredFieldBitMask = {bitmask};")
 
         self._writer.write_line(
             "std::bitset<%d> requiredFields(requiredFieldBitMask);" % (self.field_count)
@@ -362,9 +352,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
             "bool hasMissingRequiredFields = (requiredFields & usedFields) != requiredFields;"
         )
 
-        with writer.IndentedScopedBlock(
-            self._writer, "if (hasMissingRequiredFields) {", "}"
-        ):
+        with writer.IndentedScopedBlock(self._writer, "if (hasMissingRequiredFields) {", "}"):
             for field in required_fields:
                 # If 'field.default' is true, the fields(members) gets initialized with the default
                 # value in the class definition. So, it's ok to skip setting the field to
@@ -375,8 +363,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
                     "}",
                 ):
                     self._writer.write_line(
-                        "ctxt.throwMissingField(%s);"
-                        % (_get_field_constant_name(field))
+                        "ctxt.throwMissingField(%s);" % (_get_field_constant_name(field))
                     )
 
 
@@ -546,9 +533,7 @@ class _CppFileWriterBase(object):
         if constexpr:
             conditional = conditional + " constexpr"
 
-        return writer.IndentedScopedBlock(
-            self._writer, "%s (%s) {" % (conditional, check_str), "}"
-        )
+        return writer.IndentedScopedBlock(self._writer, "%s (%s) {" % (conditional, check_str), "}")
 
     def _else(self, check_bool):
         # type: (bool) -> Union[writer.IndentedScopedBlock,writer.EmptyBlock]
@@ -568,9 +553,7 @@ class _CppFileWriterBase(object):
         blocks = []  # type: List[writer.WriterBlock]
         if condition.preprocessor:
             blocks.append(
-                writer.UnindentedBlock(
-                    self._writer, "#if " + condition.preprocessor, "#endif"
-                )
+                writer.UnindentedBlock(self._writer, "#if " + condition.preprocessor, "#endif")
             )
 
         if not preprocessor_only:
@@ -606,9 +589,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         constructor = struct_type_info.get_constructor_method(gen_header=True)
         self._writer.write_line(constructor.get_declaration())
 
-        required_constructor = struct_type_info.get_required_constructor_method(
-            gen_header=True
-        )
+        required_constructor = struct_type_info.get_required_constructor_method(gen_header=True)
         if len(required_constructor.args) != len(constructor.args):
             self._writer.write_line(required_constructor.get_declaration())
 
@@ -623,13 +604,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         """Generate serializer method declarations."""
         struct_type_info = struct_types.get_struct_info(struct)
-        self._writer.write_line(
-            struct_type_info.get_serializer_method().get_declaration()
-        )
+        self._writer.write_line(struct_type_info.get_serializer_method().get_declaration())
 
-        maybe_op_msg_serializer = (
-            struct_type_info.get_op_msg_request_serializer_method()
-        )
+        maybe_op_msg_serializer = struct_type_info.get_op_msg_request_serializer_method()
         if maybe_op_msg_serializer:
             self._writer.write_line(maybe_op_msg_serializer.get_declaration())
 
@@ -672,9 +649,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             struct members that are pointers-into-BSON (i.e. BSONElement and BSONObject) are valid for
             the lifetime of the struct itself.""")
             )
-            self._writer.write_line(
-                "bool isOwned() const { return _anchorObj.isOwned(); }"
-            )
+            self._writer.write_line("bool isOwned() const { return _anchorObj.isOwned(); }")
         else:
             self.gen_description_comment(
                 textwrap.dedent("""\
@@ -757,18 +732,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 )
 
                 if not struct.immutable:
-                    self._writer.write_template(
-                        "${param_type} ${method_name}() { ${body} }"
-                    )
+                    self._writer.write_template("${param_type} ${method_name}() { ${body} }")
             else:
                 self._writer.write_template(
                     "${const_type}${param_type} ${method_name}() const { ${body} }"
                 )
 
                 if field.non_const_getter:
-                    self._writer.write_template(
-                        "${param_type} ${method_name}() { ${body} }"
-                    )
+                    self._writer.write_template("${param_type} ${method_name}() { ${body} }")
 
     def gen_validators(self, field):
         # type: (ast.Field) -> None
@@ -803,11 +774,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         storage_type = cpp_type_info.get_storage_type()
         is_serial = _is_required_serializer_field(field)
         memfn = _get_field_member_setter_name(field)
-        validator = (
-            _get_field_member_validator_name(field)
-            if field.validator is not None
-            else ""
-        )
+        validator = _get_field_member_validator_name(field) if field.validator is not None else ""
 
         # Generate the setter for instances of the "getter/setter type", which may not be the same
         # as the storage type.
@@ -816,9 +783,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 _get_field_member_name(field.chained_struct_field), memfn
             )
         else:
-            body = cpp_type_info.get_setter_body(
-                _get_field_member_name(field), validator
-            )
+            body = cpp_type_info.get_setter_body(_get_field_member_name(field), validator)
         set_has = _gen_mark_present(field.cpp_name) if is_serial else ""
 
         with self._block(f"void {memfn}({setter_type} value) {{", "}"):
@@ -882,9 +847,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             elif field.type.is_struct:
                 self._writer.write_line("%s %s;" % (member_type, member_name))
             else:
-                self._writer.write_line(
-                    "%s %s{%s};" % (member_type, member_name, field.default)
-                )
+                self._writer.write_line("%s %s{%s};" % (member_type, member_name, field.default))
         else:
             self._writer.write_line("%s %s;" % (member_type, member_name))
 
@@ -892,9 +855,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         """Generate the C++ class member definition for constexpr data."""
         cpp_string_val = "true" if struct.is_command_reply else "false"
-        self._writer.write_line(
-            f"static constexpr bool _isCommandReply{{{cpp_string_val}}};"
-        )
+        self._writer.write_line(f"static constexpr bool _isCommandReply{{{cpp_string_val}}};")
 
     def gen_serializer_member(self, field):
         # type: (ast.Field) -> None
@@ -1041,20 +1002,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 should_forward_name=field_list_info.get_should_forward_name(),
             )
         )
-        self._writer.write_line(
-            "static const StaticImmortal<StringMap<bool>> _genericFields;"
-        )
+        self._writer.write_line("static const StaticImmortal<StringMap<bool>> _genericFields;")
         self.write_empty_line()
 
     def gen_known_fields_declaration(self):
         # type: () -> None
         """Generate all the known fields vectors for a command."""
-        self._writer.write_line(
-            "static const std::vector<StringData> _knownBSONFields;"
-        )
-        self._writer.write_line(
-            "static const std::vector<StringData> _knownOP_MSGFields;"
-        )
+        self._writer.write_line("static const std::vector<StringData> _knownBSONFields;")
+        self._writer.write_line("static const std::vector<StringData> _knownOP_MSGFields;")
         self.write_empty_line()
 
     def gen_comparison_operators_declarations(self, struct):
@@ -1066,10 +1021,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 [
                     field
                     for field in struct.fields
-                    if (
-                        not field.ignore
-                        and not (field.type and field.type.internal_only)
-                    )
+                    if (not field.ignore and not (field.type and field.type.internal_only))
                     and field.comparison_order != -1
                 ],
                 key=lambda f: f.comparison_order,
@@ -1097,9 +1049,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 "}",
             ):
                 self._writer.write_line(
-                    common.template_args(
-                        "return a._relopTuple() ${op} b._relopTuple();", op=op
-                    )
+                    common.template_args("return a._relopTuple() ${op} b._relopTuple();", op=op)
                 )
 
         self.write_empty_line()
@@ -1151,8 +1101,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             )
         if initializer.store:
             self._writer.write_line(
-                "Status %s(const optionenvironment::Environment&);"
-                % (initializer.store)
+                "Status %s(const optionenvironment::Environment&);" % (initializer.store)
             )
 
         if initializer.register or initializer.store:
@@ -1175,9 +1124,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
             if cls.override_ctor:
                 # Explicit custom constructor.
-                self._writer.write_line(
-                    cls.name + "(StringData name, ServerParameterType spt);"
-                )
+                self._writer.write_line(cls.name + "(StringData name, ServerParameterType spt);")
             else:
                 # Inherit base constructor.
                 self._writer.write_line("using ServerParameter::ServerParameter;")
@@ -1204,9 +1151,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             # The reset() and getClusterParameterTime() methods must be custom implemented for
             # specialized cluster server parameters. Provide the declarations here.
             if scp.set_at == "ServerParameterType::kClusterWide":
-                self._writer.write_line(
-                    "Status reset(const boost::optional<TenantId>&) final;"
-                )
+                self._writer.write_line("Status reset(const boost::optional<TenantId>&) final;")
                 self._writer.write_line(
                     "LogicalTime getClusterParameterTime(const boost::optional<TenantId>&) const final;"
                 )
@@ -1244,9 +1189,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     ):
         # type: (str, str, str, *str) -> None
         """Generate a derived class constructor."""
-        class_name = (
-            common.title_case(command_name) + "CmdVersion" + api_version + "Gen"
-        )
+        class_name = common.title_case(command_name) + "CmdVersion" + api_version + "Gen"
         args = ", ".join(base_class_args)
         self._writer.write_line("%s(): %s(%s) {}" % (class_name, base_class, args))
 
@@ -1262,9 +1205,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def gen_invocation_base_class_declaration(self, command):
         # type: (ast.Command) -> None
         """Generate the InvocationBaseGen class for a command's base class."""
-        class_declaration = (
-            "class InvocationBaseGen : public _TypedCommandInvocationBase {"
-        )
+        class_declaration = "class InvocationBaseGen : public _TypedCommandInvocationBase {"
         with writer.IndentedScopedBlock(self._writer, class_declaration, "};"):
             # public requires special indentation that aligns with the class definition.
             self._writer.unindent()
@@ -1276,9 +1217,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 "using _TypedCommandInvocationBase::_TypedCommandInvocationBase;"
             )
 
-            self._writer.write_line(
-                "virtual Reply typedRun(OperationContext* opCtx) = 0;"
-            )
+            self._writer.write_line("virtual Reply typedRun(OperationContext* opCtx) = 0;")
 
             if command.access_checks == []:
                 self._writer.write_line(
@@ -1388,8 +1327,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             if [
                 param
                 for param in spec.server_parameters
-                if param.feature_flag
-                or (param.condition and param.condition.feature_flag)
+                if param.feature_flag or (param.condition and param.condition.feature_flag)
             ]:
                 header_list.append("mongo/db/feature_flag.h")
             if [
@@ -1476,9 +1414,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             if field.description:
                                 self.gen_description_comment(field.description)
                             self.gen_getter(struct, field)
-                            if not struct.immutable or (
-                                field.type and field.type.internal_only
-                            ):
+                            if not struct.immutable or (field.type and field.type.internal_only):
                                 self.gen_setters(field)
 
                     # Generate getters for any constexpr/compile-time struct data
@@ -1501,11 +1437,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     if [field for field in struct.fields if field.validator]:
                         self.write_unindented_line("private:")
                         for field in struct.fields:
-                            if (
-                                not field.ignore
-                                and not struct.immutable
-                                and field.validator
-                            ):
+                            if not field.ignore and not struct.immutable and field.validator:
                                 self.gen_validators(field)
 
                     self.write_unindented_line("private:")
@@ -1549,22 +1481,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
             for scp in spec.server_parameters:
                 if scp.cpp_class is None:
-                    self._gen_exported_constexpr(
-                        scp.name, "Default", scp.default, scp.condition
-                    )
-                self._gen_extern_declaration(
-                    scp.cpp_vartype, scp.cpp_varname, scp.condition
-                )
+                    self._gen_exported_constexpr(scp.name, "Default", scp.default, scp.condition)
+                self._gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
                 self.gen_server_parameter_class(scp)
 
             if spec.configs:
                 for opt in spec.configs:
-                    self._gen_exported_constexpr(
-                        opt.name, "Default", opt.default, opt.condition
-                    )
-                    self._gen_extern_declaration(
-                        opt.cpp_vartype, opt.cpp_varname, opt.condition
-                    )
+                    self._gen_exported_constexpr(opt.name, "Default", opt.default, opt.condition)
+                    self._gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
                 self._gen_config_function_declaration(spec)
 
             # Write a base class for each command in API Version 1.
@@ -1619,9 +1543,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     if len(selected_fields) == 0:
                         self._writer.write_line("return onFail();")
                     else:
-                        with self._block(
-                            "static constexpr auto adaptMatch = [](int i) {", "};"
-                        ):
+                        with self._block("static constexpr auto adaptMatch = [](int i) {", "};"):
                             with self._block(
                                 "static constexpr auto arr = std::to_array<Field>({",
                                 "});",
@@ -1661,9 +1583,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     tenant,
                 )
             )
-            self._writer.write_line(
-                "const auto localObject = %s.Obj();" % (element_name)
-            )
+            self._writer.write_line("const auto localObject = %s.Obj();" % (element_name))
             return "%s::parse(tempContext, localObject)" % (ast_type.cpp_type,)
         elif ast_type.deserializer and "BSONElement::" in ast_type.deserializer:
             method_name = writer.get_method_name(ast_type.deserializer)
@@ -1679,9 +1599,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # Class Class::method(StringData value)
             # or
             # Class::method(const BSONObj& value)
-            expression = bson_cpp_type.gen_deserializer_expression(
-                self._writer, element_name
-            )
+            expression = bson_cpp_type.gen_deserializer_expression(self._writer, element_name)
             if ast_type.deserializer:
                 method_name = writer.get_method_name_from_qualified_method_name(
                     ast_type.deserializer
@@ -1709,13 +1627,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 if ast_type.deserialize_with_tenant:
                     arguments = "${method_name}(${tenant}, ${expression}, ${context})"
-                    if (
-                        is_catalog_ctxt
-                    ):  # serializeForCatalog doesn't need a serializationContext
+                    if is_catalog_ctxt:  # serializeForCatalog doesn't need a serializationContext
                         arguments = "${method_name}(${tenant}, ${expression})"
-                        method_name = method_name.replace(
-                            "serialize", "serializeForCatalog"
-                        )
+                        method_name = method_name.replace("serialize", "serializeForCatalog")
                     return common.template_args(
                         arguments,
                         method_name=method_name,
@@ -1736,9 +1650,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Call a static class method with the signature:
         # Class Class::method(const BSONElement& value)
-        method_name = writer.get_method_name_from_qualified_method_name(
-            ast_type.deserializer
-        )
+        method_name = writer.get_method_name_from_qualified_method_name(ast_type.deserializer)
 
         if ast_type.deserialize_with_tenant:
             return "%s(%s, %s, %s)" % (
@@ -1750,15 +1662,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             return "%s(%s)" % (method_name, element_name)
 
-    def _gen_array_deserializer(
-        self, field, bson_element, ast_type, tenant, is_catalog_ctxt
-    ):
+    def _gen_array_deserializer(self, field, bson_element, ast_type, tenant, is_catalog_ctxt):
         # type: (ast.Field, str, ast.Type, str, bool) -> None
         """Generate the C++ deserializer piece for an array field."""
         assert ast_type.is_array
-        cpp_type_info = cpp_types.get_cpp_type_from_cpp_type_name(
-            field, ast_type.cpp_type, True
-        )
+        cpp_type_info = cpp_types.get_cpp_type_from_cpp_type_name(field, ast_type.cpp_type, True)
         cpp_type = cpp_type_info.get_type_name()
 
         self._writer.write_line("DecimalCounter<std::uint32_t> expectedFieldNumber{0};")
@@ -1777,9 +1685,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self._writer.write_line("std::vector<%s> values;" % (cpp_type))
         self._writer.write_empty_line()
 
-        self._writer.write_line(
-            "const BSONObj arrayObject = %s.Obj();" % (bson_element)
-        )
+        self._writer.write_line("const BSONObj arrayObject = %s.Obj();" % (bson_element))
 
         with self._block("for (const auto& arrayElement : arrayObject) {", "}"):
             self._writer.write_line(
@@ -1812,9 +1718,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line("++expectedFieldNumber;")
 
         if field.validator:
-            self._writer.write_line(
-                "%s(values);" % (_get_field_member_validator_name(field))
-            )
+            self._writer.write_line("%s(values);" % (_get_field_member_validator_name(field)))
 
         if field.chained_struct_field:
             if field.type.is_variant:
@@ -1835,19 +1739,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     )
                 )
         else:
-            self._writer.write_line(
-                "%s = std::move(values);" % (_get_field_member_name(field))
-            )
+            self._writer.write_line("%s = std::move(values);" % (_get_field_member_name(field)))
 
-    def _gen_variant_deserializer(
-        self, field, field_name, bson_element, tenant, is_catalog_ctxt
-    ):
+    def _gen_variant_deserializer(self, field, field_name, bson_element, tenant, is_catalog_ctxt):
         # type: (ast.Field, str, str, str, bool) -> None
         """Generate the C++ deserializer piece for a variant field."""
         self._writer.write_empty_line()
-        self._writer.write_line(
-            "const BSONType variantType = %s.type();" % (bson_element,)
-        )
+        self._writer.write_line("const BSONType variantType = %s.type();" % (bson_element,))
 
         array_types = [v for v in field.type.variant_types if v.is_array]
         scalar_types = [v for v in field.type.variant_types if not v.is_array]
@@ -1870,9 +1768,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line("switch (elemType) {")
                 for array_type in array_types:
                     for bson_type in array_type.bson_serialization_type:
-                        self._writer.write_line(
-                            "case %s:" % (bson.cpp_bson_type_name(bson_type),)
-                        )
+                        self._writer.write_line("case %s:" % (bson.cpp_bson_type_name(bson_type),))
                     # Each copy of the array deserialization code gets an anonymous block.
                     with self._block("{", "}"):
                         self._gen_array_deserializer(
@@ -1883,8 +1779,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line("default:")
                 self._writer.indent()
                 expected_types = [
-                    bson.cpp_bson_type_name(t.bson_serialization_type[0])
-                    for t in array_types
+                    bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in array_types
                 ]
                 self._writer.write_line(
                     f'ctxt.throwBadType({bson_element},  {_std_array_expr("BSONType", expected_types)});'
@@ -1899,9 +1794,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         for scalar_type in scalar_types:
             for bson_type in scalar_type.bson_serialization_type:
-                self._writer.write_line(
-                    "case %s:" % (bson.cpp_bson_type_name(bson_type),)
-                )
+                self._writer.write_line("case %s:" % (bson.cpp_bson_type_name(bson_type),))
                 with self._block("{", "}"):
                     self.gen_field_deserializer(
                         field,
@@ -1932,8 +1825,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in array_types
         ]
         self._writer.write_line(
-            f'ctxt.throwBadType({bson_element}, '
-            f'{_std_array_expr("BSONType", expected_types)});'
+            f'ctxt.throwBadType({bson_element}, ' f'{_std_array_expr("BSONType", expected_types)});'
         )
         self._writer.write_line("break;")
         self._writer.unindent()
@@ -1959,13 +1851,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 )
             )
             if from_doc_seq:
-                value_expr = (
-                    f"{variant_type.cpp_type}::parse(tempContext, {bson_element})"
-                )
+                value_expr = f"{variant_type.cpp_type}::parse(tempContext, {bson_element})"
             else:
-                self._writer.write_line(
-                    "const auto localObject = %s.Obj();" % (bson_element)
-                )
+                self._writer.write_line("const auto localObject = %s.Obj();" % (bson_element))
                 value_expr = f"{variant_type.cpp_type}::parse(tempContext, localObject)"
             if field.optional:
                 cpp_type_info = cpp_types.get_cpp_type(field)
@@ -2034,9 +1922,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             return
 
         if field_type.is_array:
-            predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (
-                bson_element
-            )
+            predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (bson_element)
             with self._predicate(predicate):
                 self._gen_usage_check(field, bson_element, field_usage_check)
                 self._gen_array_deserializer(
@@ -2065,9 +1951,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             with self._block("{", "}"):
                 self._writer.write_line("auto value = %s;" % (expression))
-                self._writer.write_line(
-                    "%s(value);" % (_get_field_member_validator_name(field))
-                )
+                self._writer.write_line("%s(value);" % (_get_field_member_validator_name(field)))
                 self._writer.write_line("%s = std::move(value);" % (field_name))
 
         if field.chained:
@@ -2122,8 +2006,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if is_command_field and predicate:
                 with self._block("else {", "}"):
                     self._writer.write_line(
-                        "ctxt.throwMissingField(%s);"
-                        % (_get_field_constant_name(field))
+                        "ctxt.throwMissingField(%s);" % (_get_field_constant_name(field))
                     )
 
     def gen_doc_sequence_deserializer(self, field, tenant):
@@ -2134,9 +2017,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # If field (cpp_type) is the same type as sequence.objs, just copy and skip loop
         if cpp_type == "mongo::BSONObj" and not field.type.deserializer:
-            self._writer.write_line(
-                "%s = sequence.objs;" % (_get_field_member_name(field))
-            )
+            self._writer.write_line("%s = sequence.objs;" % (_get_field_member_name(field)))
             return
 
         self._writer.write_line("std::vector<%s> values;" % (cpp_type))
@@ -2162,9 +2043,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         tenant,
                     )
                 )
-                array_value = "%s::parse(tempContext, sequenceObject)" % (
-                    field.type.cpp_type,
-                )
+                array_value = "%s::parse(tempContext, sequenceObject)" % (field.type.cpp_type,)
             elif field.type.is_variant:
                 self._writer.write_line("%s _tmp;" % field.type.cpp_type)
                 self._gen_variant_deserializer_from_obj(
@@ -2185,9 +2064,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line("values.emplace_back(%s);" % (array_value))
 
-        self._writer.write_line(
-            "%s = std::move(values);" % (_get_field_member_name(field))
-        )
+        self._writer.write_line("%s = std::move(values);" % (_get_field_member_name(field)))
 
     def gen_op_msg_request_namespace_check(self, struct):
         # type: (ast.Struct) -> None
@@ -2276,9 +2153,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     # If the current field is a nested struct, we need to pass the initialized
                     # _serializationContext into the nested struct.
                     serialization_ctx_arg = (
-                        "_serializationContext"
-                        if field.type and field.type.is_struct
-                        else ""
+                        "_serializationContext" if field.type and field.type.is_struct else ""
                     )
 
                     initializers.append(
@@ -2296,15 +2171,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # in the list via _gen_initializer_vars above.
         initializes_db_name = False
         if [arg for arg in constructor.args if arg.name == "nss"]:
-            if [
-                field for field in struct.fields if field.serialize_op_msg_request_only
-            ]:
+            if [field for field in struct.fields if field.serialize_op_msg_request_only]:
                 initializers.append("_dbName(_nss.dbName())")
                 initializes_db_name = True
         elif [arg for arg in constructor.args if arg.name == "nssOrUUID"]:
-            if [
-                field for field in struct.fields if field.serialize_op_msg_request_only
-            ]:
+            if [field for field in struct.fields if field.serialize_op_msg_request_only]:
                 initializers.append("_dbName(_nssOrUUID.dbName())")
                 initializes_db_name = True
 
@@ -2312,14 +2183,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if initializers:
             initializers_str = ": " + ", ".join(initializers)
 
-        with self._block(
-            "%s %s {" % (constructor.get_definition(), initializers_str), "}"
-        ):
+        with self._block("%s %s {" % (constructor.get_definition(), initializers_str), "}"):
             for field in _get_required_fields(struct):
-                if (
-                    not (field.name == "$db" and initializes_db_name)
-                    and not default_init
-                ):
+                if not (field.name == "$db" and initializes_db_name) and not default_init:
                     self._writer.write_line(_gen_mark_present(field.cpp_name))
             if initializes_db_name:
                 self._writer.write_line(_gen_mark_present("dbName"))
@@ -2380,9 +2246,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             struct_type_info = struct_types.get_struct_info(struct)
 
             # Generate namespace check now that "$db" has been read or defaulted
-            struct_type_info.gen_namespace_check(
-                self._writer, "_dbName", "commandElement"
-            )
+            struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement")
 
     def _gen_fields_deserializer_common(self, struct, bson_object, tenant):
         # type: (ast.Struct, str, str) -> _FieldUsageCheckerBase
@@ -2405,9 +2269,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     "if (request.validatedTenancyScope != boost::none && request.validatedTenancyScope->isFromAtlasProxy()) {",
                     "}",
                 ):
-                    self._writer.write_line(
-                        "_serializationContext.setPrefixState(true);"
-                    )
+                    self._writer.write_line("_serializationContext.setPrefixState(true);")
             else:
                 # if a non-default serialization context was passed in via the IDLParserContext,
                 # use that to set the local serialization context, otherwise set it to a command
@@ -2454,9 +2316,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line("return true;")
 
         with self._block("for (const auto& element :%s) {" % (bson_object), "}"):
-            self._writer.write_line(
-                "const auto fieldName = element.fieldNameStringData();"
-            )
+            self._writer.write_line("const auto fieldName = element.fieldNameStringData();")
             self._writer.write_empty_line()
 
             if isinstance(struct, ast.Command):
@@ -2474,9 +2334,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._block("auto onMatch = [&](Field f) {", "};"):
                     with self._block("switch (f) {", "}"):
                         for f in parsed_fields:
-                            with self._block(
-                                f"case {_get_field_enum(f)}: {{", "} break;"
-                            ):
+                            with self._block(f"case {_get_field_enum(f)}: {{", "} break;"):
                                 map_field(f.name)
                         self._writer.write_line("default: return false;")
                     self._writer.write_line("return false;")
@@ -2502,9 +2360,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._predicate(command_predicate):
                     self._writer.write_line("ctxt.throwUnknownField(fieldName);")
             elif not struct.unsafe_dangerous_disable_extra_field_duplicate_checks:
-                self._writer.write_line(
-                    "auto push_result = usedFieldSet.insert(fieldName);"
-                )
+                self._writer.write_line("auto push_result = usedFieldSet.insert(fieldName);")
                 with writer.IndentedScopedBlock(
                     self._writer,
                     "if (MONGO_unlikely(push_result.second == false)) {",
@@ -2553,11 +2409,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 if struct.namespace == common.COMMAND_NAMESPACE_TYPE:
                     cpp_type_info = cpp_types.get_cpp_type(struct.command_field)
 
-                    if (
+                    if struct.command_field.type.cpp_type and cpp_types.is_primitive_scalar_type(
                         struct.command_field.type.cpp_type
-                        and cpp_types.is_primitive_scalar_type(
-                            struct.command_field.type.cpp_type
-                        )
                     ):
                         self._writer.write_line(
                             "auto localCmdType = mongo::idl::preparsedValue<%s>();"
@@ -2569,8 +2422,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             % (cpp_type_info.get_storage_type())
                         )
                     self._writer.write_line(
-                        "%s object(localCmdType);"
-                        % (common.title_case(struct.cpp_name))
+                        "%s object(localCmdType);" % (common.title_case(struct.cpp_name))
                     )
                 elif struct.namespace in (
                     common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB,
@@ -2608,9 +2460,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         param_type = cpp_type_info.get_storage_type()
 
         with self._block("{", "}"):
-            self._writer.write_line(
-                f"static const {param_type} rhs{{{_get_expression(limit)}}};"
-            )
+            self._writer.write_line(f"static const {param_type} rhs{{{_get_expression(limit)}}};")
             with self._block("if (!(value %s rhs)) {" % (op), "}"):
                 self._writer.write_line(
                     'throwComparisonError<%s>(%s"%s", "%s"_sd, value, rhs);'
@@ -2641,26 +2491,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             )
             with self._block("{", "}"):
                 if validator.gt is not None:
-                    self._compare_and_return_status(
-                        ">", validator.gt, field, optional_params[1]
-                    )
+                    self._compare_and_return_status(">", validator.gt, field, optional_params[1])
                 if validator.gte is not None:
-                    self._compare_and_return_status(
-                        ">=", validator.gte, field, optional_params[1]
-                    )
+                    self._compare_and_return_status(">=", validator.gte, field, optional_params[1])
                 if validator.lt is not None:
-                    self._compare_and_return_status(
-                        "<", validator.lt, field, optional_params[1]
-                    )
+                    self._compare_and_return_status("<", validator.lt, field, optional_params[1])
                 if validator.lte is not None:
-                    self._compare_and_return_status(
-                        "<=", validator.lte, field, optional_params[1]
-                    )
+                    self._compare_and_return_status("<=", validator.lte, field, optional_params[1])
 
                 if validator.callback is not None:
-                    self._writer.write_line(
-                        "uassertStatusOK(%s(value));" % (validator.callback)
-                    )
+                    self._writer.write_line("uassertStatusOK(%s(value));" % (validator.callback))
 
         self._writer.write_empty_line()
 
@@ -2710,9 +2550,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if not struct.fields:
                 return
             # if the only field is an internal only field, there's also nothing to deserialize
-            if len(struct.fields) == 1 and any(
-                field.type.internal_only for field in struct.fields
-            ):
+            if len(struct.fields) == 1 and any(field.type.internal_only for field in struct.fields):
                 return
 
             # Deserialize all the fields
@@ -2746,9 +2584,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             _StructDataOwnership.VIEW,
         )
 
-        func_def = (
-            struct_type_info.get_op_msg_request_deserializer_method().get_definition()
-        )
+        func_def = struct_type_info.get_op_msg_request_deserializer_method().get_definition()
         with self._block("%s {" % (func_def), "}"):
             # Deserialize all the fields
             field_usage_check = self._gen_fields_deserializer_common(
@@ -2770,17 +2606,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         if not field.supports_doc_sequence:
                             continue
 
-                        field_predicate = "sequence.name == %s" % (
-                            _get_field_constant_name(field)
-                        )
+                        field_predicate = "sequence.name == %s" % (_get_field_constant_name(field))
 
                         with self._predicate(field_predicate, not first_field):
                             field_usage_check.add(field, "sequence.name")
 
                             if _is_required_serializer_field(field):
-                                self._writer.write_line(
-                                    _gen_mark_present(field.cpp_name)
-                                )
+                                self._writer.write_line(_gen_mark_present(field.cpp_name))
 
                             self.gen_doc_sequence_deserializer(
                                 field, "request.getValidatedTenantId()"
@@ -2793,9 +2625,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     # Generate strict check for extranous fields
                     with self._block("else {", "}"):
                         if struct.strict:
-                            self._writer.write_line(
-                                "ctxt.throwUnknownField(sequence.name);"
-                            )
+                            self._writer.write_line("ctxt.throwUnknownField(sequence.name);")
                         else:
                             self._writer.write_line(
                                 "auto push_result = usedFieldSet.insert(sequence.name);"
@@ -2805,9 +2635,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                 "if (MONGO_unlikely(push_result.second == false)) {",
                                 "}",
                             ):
-                                self._writer.write_line(
-                                    "ctxt.throwDuplicateField(sequence.name);"
-                                )
+                                self._writer.write_line("ctxt.throwDuplicateField(sequence.name);")
 
                 self._writer.write_empty_line()
 
@@ -2815,9 +2643,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add_final_checks()
             self._writer.write_empty_line()
 
-            self._gen_command_deserializer(
-                struct, "request.body", "request.getValidatedTenantId()"
-            )
+            self._gen_command_deserializer(struct, "request.body", "request.getValidatedTenantId()")
 
     def _gen_serializer_method_custom(self, field, is_catalog_ctxt):
         # type: (ast.Field, bool) -> None
@@ -2841,9 +2667,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_template(
                         "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
                     )
-                    with self._block(
-                        "for (const auto& item : ${access_member}) {", "}"
-                    ):
+                    with self._block("for (const auto& item : ${access_member}) {", "}"):
                         expression = bson_cpp_type.gen_serializer_expression(
                             self._writer,
                             "item",
@@ -2851,9 +2675,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             is_catalog_ctxt,
                         )
                         template_params["expression"] = expression
-                        self._writer.write_template(
-                            "arrayBuilder.append(${expression});"
-                        )
+                        self._writer.write_template("arrayBuilder.append(${expression});")
                 else:
                     expression = bson_cpp_type.gen_serializer_expression(
                         self._writer,
@@ -2901,9 +2723,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     args = maybe_add_serialization_options(*args)
                     if writer.is_function(serializer):
                         # It should be invoked as 'function(subject, ...args);'
-                        return (
-                            f"{serializer}({generate_args_template(subject, *args)});"
-                        )
+                        return f"{serializer}({generate_args_template(subject, *args)});"
                     else:
                         # It should be invoked as 'subject.method(...args);'
                         truncated_serializer = writer.get_method_name(serializer)
@@ -2914,9 +2734,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_template(
                         "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
                     )
-                    with self._block(
-                        "for (const auto& item : ${access_member}) {", "}"
-                    ):
+                    with self._block("for (const auto& item : ${access_member}) {", "}"):
                         template = generate_call_site(
                             field.type.serializer,
                             "item",
@@ -2940,22 +2758,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 if field.chained:
                     # Just directly call the serializer for chained structs without opening up a
                     # nested document.
-                    self._writer.write_template(
-                        "${access_member}.${method_name}(builder);"
-                    )
+                    self._writer.write_template("${access_member}.${method_name}(builder);")
                 elif field.type.is_array:
                     self._writer.write_template(
                         "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
                     )
-                    with self._block(
-                        "for (const auto& item : ${access_member}) {", "}"
-                    ):
+                    with self._block("for (const auto& item : ${access_member}) {", "}"):
                         self._writer.write_line(
                             "BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());"
                         )
-                        self._writer.write_template(
-                            "item.${method_name}(&subObjBuilder);"
-                        )
+                        self._writer.write_template("item.${method_name}(&subObjBuilder);")
                 else:
                     self._writer.write_template(
                         "${access_member}.${method_name}(${field_name}, builder);"
@@ -2977,9 +2789,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 if not field.should_serialize_with_options:
                     self._writer.write_template("${access_member}.serialize(builder);")
                 else:
-                    self._writer.write_template(
-                        "${access_member}.serialize(builder, options);"
-                    )
+                    self._writer.write_template("${access_member}.serialize(builder, options);")
 
             elif field.type.is_array:
                 self._writer.write_template(
@@ -2992,17 +2802,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     if not field.should_serialize_with_options:
                         self._writer.write_line("item.serialize(&subObjBuilder);")
                     else:
-                        self._writer.write_line(
-                            "item.serialize(&subObjBuilder, options);"
-                        )
+                        self._writer.write_line("item.serialize(&subObjBuilder, options);")
             else:
                 self._writer.write_template(
                     "BSONObjBuilder subObjBuilder(builder->subobjStart(${field_name}));"
                 )
                 if not field.should_serialize_with_options:
-                    self._writer.write_template(
-                        "${access_member}.serialize(&subObjBuilder);"
-                    )
+                    self._writer.write_template("${access_member}.serialize(&subObjBuilder);")
                 else:
                     self._writer.write_template(
                         "${access_member}.serialize(&subObjBuilder, options);"
@@ -3018,12 +2824,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_template(
                 "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
             )
-            with self._block(
-                "for (const auto& item : %s) {" % _access_member(field), "}"
-            ):
-                self._writer.write_line(
-                    "BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());"
-                )
+            with self._block("for (const auto& item : %s) {" % _access_member(field), "}"):
+                self._writer.write_line("BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());")
                 self._gen_serializer_method_variant_helper(
                     field, template_params, builder="&subObjBuilder"
                 )
@@ -3039,17 +2841,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._with_template(template_params):
             self._gen_serializer_method_variant_helper(field, template_params)
 
-    def _gen_serializer_method_variant_helper(
-        self, field, template_params, builder="builder"
-    ):
+    def _gen_serializer_method_variant_helper(self, field, template_params, builder="builder"):
         # type: (ast.Field, Dict[str, str], str) -> None
 
         with self._block("visit(OverloadedVisitor{", "}, ${access_member});"):
             for variant_type in itertools.chain(
                 field.type.variant_types,
-                field.type.variant_struct_types
-                if field.type.variant_struct_types
-                else [],
+                field.type.variant_struct_types if field.type.variant_struct_types else [],
             ):
                 template_params["cpp_type"] = (
                     "std::vector<" + variant_type.cpp_type + ">"
@@ -3060,9 +2858,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 template_params["param_opt"] = ""
                 if field.should_serialize_with_options:
                     template_params["param_opt"] = ", options"
-                with self._block(
-                    "[%s${param_opt}](const ${cpp_type}& value) {" % builder, "},"
-                ):
+                with self._block("[%s${param_opt}](const ${cpp_type}& value) {" % builder, "},"):
                     bson_cpp_type = cpp_types.get_bson_cpp_type(variant_type)
                     if field.type.is_variant and field.type.is_array:
                         self._writer.write_template("value.serialize(%s);" % builder)
@@ -3195,13 +2991,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if isinstance(struct, ast.Command):
             if struct.command_field:
                 # Internal-only types aren't serialized or deserialized.
-                if not (
-                    struct.command_field.type
-                    and struct.command_field.type.internal_only
-                ):
-                    self._gen_serializer_method_common(
-                        struct.command_field, struct.is_catalog_ctxt
-                    )
+                if not (struct.command_field.type and struct.command_field.type.internal_only):
+                    self._gen_serializer_method_common(struct.command_field, struct.is_catalog_ctxt)
             else:
                 struct_type_info = struct_types.get_struct_info(struct)
                 struct_type_info.gen_serializer(self._writer)
@@ -3236,9 +3027,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Append passthrough elements
         if isinstance(struct, ast.Command):
-            known_name = (
-                "_knownOP_MSGFields" if is_op_msg_request else "_knownBSONFields"
-            )
+            known_name = "_knownOP_MSGFields" if is_op_msg_request else "_knownBSONFields"
             self._writer.write_line(
                 "::mongo::appendGenericCommandArguments(commandPassthroughFields, %s, builder);"
                 % (known_name)
@@ -3251,9 +3040,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         struct_type_info = struct_types.get_struct_info(struct)
 
-        with self._block(
-            "%s {" % (struct_type_info.get_serializer_method().get_definition()), "}"
-        ):
+        with self._block("%s {" % (struct_type_info.get_serializer_method().get_definition()), "}"):
             self._gen_serializer_methods_common(struct, False)
 
     def gen_to_bson_serializer_method(self, struct):
@@ -3261,9 +3048,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the toBSON method definition."""
         struct_type_info = struct_types.get_struct_info(struct)
 
-        with self._block(
-            "%s {" % (struct_type_info.get_to_bson_method().get_definition()), "}"
-        ):
+        with self._block("%s {" % (struct_type_info.get_to_bson_method().get_definition()), "}"):
             self._writer.write_line("BSONObjBuilder builder;")
             self._writer.write_line(
                 struct_type_info.get_serializer_method()
@@ -3289,20 +3074,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._block(optional_block_start, "}"):
                 self._writer.write_line("OpMsg::DocumentSequence documentSequence;")
                 self._writer.write_template(
-                    "documentSequence.name = %s.toString();"
-                    % (_get_field_constant_name(field))
+                    "documentSequence.name = %s.toString();" % (_get_field_constant_name(field))
                 )
 
-                with self._block(
-                    "for (const auto& item : %s) {" % (_access_member(field)), "}"
-                ):
+                with self._block("for (const auto& item : %s) {" % (_access_member(field)), "}"):
                     if not field.type.is_struct:
                         if field.type.is_variant:
                             # _gen_serializer_method_variant expects builder to be a pointer.
                             self._writer.write_line("BSONObjBuilder objBuilder;")
-                            self._writer.write_line(
-                                "BSONObjBuilder* builder = &objBuilder;"
-                            )
+                            self._writer.write_line("BSONObjBuilder* builder = &objBuilder;")
 
                             template_params = {
                                 "field_name": _get_field_constant_name(field),
@@ -3310,9 +3090,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             }
 
                             with self._with_template(template_params):
-                                self._gen_serializer_method_variant_helper(
-                                    field, template_params
-                                )
+                                self._gen_serializer_method_variant_helper(field, template_params)
 
                             self._writer.write_line(
                                 "documentSequence.objs.push_back(builder->obj());"
@@ -3323,19 +3101,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                 % (writer.get_method_name(field.type.serializer))
                             )
                         else:
-                            self._writer.write_line(
-                                "documentSequence.objs.push_back(item);"
-                            )
+                            self._writer.write_line("documentSequence.objs.push_back(item);")
                     else:
                         self._writer.write_line("BSONObjBuilder builder;")
                         self._writer.write_line("item.serialize(&builder);")
-                        self._writer.write_line(
-                            "documentSequence.objs.push_back(builder.obj());"
-                        )
+                        self._writer.write_line("documentSequence.objs.push_back(builder.obj());")
 
-                self._writer.write_template(
-                    "request.sequences.emplace_back(documentSequence);"
-                )
+                self._writer.write_template("request.sequences.emplace_back(documentSequence);")
 
             # Add a blank line after each block
             self._writer.write_empty_line()
@@ -3349,10 +3121,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         struct_type_info = struct_types.get_struct_info(struct)
 
         with self._block(
-            "%s {"
-            % (
-                struct_type_info.get_op_msg_request_serializer_method().get_definition()
-            ),
+            "%s {" % (struct_type_info.get_op_msg_request_serializer_method().get_definition()),
             "}",
         ):
             self._writer.write_line("BSONObjBuilder localBuilder;")
@@ -3428,10 +3197,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 [
                     field
                     for field in struct.fields
-                    if (
-                        not field.serialize_op_msg_request_only
-                        or include_op_msg_implicit
-                    )
+                    if (not field.serialize_op_msg_request_only or include_op_msg_implicit)
                 ],
                 key=lambda f: f.cpp_name,
             )
@@ -3519,8 +3285,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if param.default:
             self._writer.write_line(
-                "constexpr decltype(%s::kDataDefault) %s::kDataDefault;"
-                % (cls.name, cls.name)
+                "constexpr decltype(%s::kDataDefault) %s::kDataDefault;" % (cls.name, cls.name)
             )
             self.write_empty_line()
 
@@ -3570,9 +3335,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line("ret->setOnUpdate(%s);" % (param.on_update))
         if param.validator is not None:
             if param.validator.callback is not None:
-                self._writer.write_line(
-                    "ret->addValidator(%s);" % (param.validator.callback)
-                )
+                self._writer.write_line("ret->addValidator(%s);" % (param.validator.callback))
 
             for pred in ["lt", "gt", "lte", "gte"]:
                 bound = getattr(param.validator, pred)
@@ -3591,8 +3354,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.default and not (param.cpp_vartype and param.cpp_varname):
             # Only need to call setDefault() if we haven't in-place initialized the declared var.
             self._writer.write_line(
-                "uassertStatusOK(ret->setDefault(%s));"
-                % (_get_expression(param.default))
+                "uassertStatusOK(ret->setDefault(%s));" % (_get_expression(param.default))
             )
 
         self._writer.write_line("return ret;")
@@ -3710,9 +3472,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 for requires in opt.requires:
                     self._writer.write_line(".requiresOption(%s)" % (_encaps(requires)))
                 for conflicts in opt.conflicts:
-                    self._writer.write_line(
-                        ".incompatibleWith(%s)" % (_encaps(conflicts))
-                    )
+                    self._writer.write_line(".incompatibleWith(%s)" % (_encaps(conflicts)))
                 if opt.default:
                     self._writer.write_line(
                         ".setDefault(moe::Value(%s))" % (_get_expression(opt.default))
@@ -3723,12 +3483,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     )
                 if opt.duplicates_append:
                     self._writer.write_line(".composing()")
-                if (opt.positional_start is not None) and (
-                    opt.positional_end is not None
-                ):
+                if (opt.positional_start is not None) and (opt.positional_end is not None):
                     self._writer.write_line(
-                        ".positional(%d, %d)"
-                        % (opt.positional_start, opt.positional_end)
+                        ".positional(%d, %d)" % (opt.positional_start, opt.positional_end)
                     )
                 if opt.canonicalize:
                     self._writer.write_line(".canonicalize(%s)" % opt.canonicalize)
@@ -3781,9 +3538,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         for section_name, section_opts in sections.items():
             with self._block("{", "}"):
-                self._writer.write_line(
-                    "moe::OptionSection section(%s);" % (_encaps(section_name))
-                )
+                self._writer.write_line("moe::OptionSection section(%s);" % (_encaps(section_name)))
                 self.write_empty_line()
 
                 for opt in section_opts:
@@ -3818,8 +3573,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._condition(opt.condition):
                 with self._block("if (params.count(%s)) {" % (_encaps(opt.name)), "}"):
                     self._writer.write_line(
-                        "%s = params[%s].as<%s>();"
-                        % (opt.cpp_varname, _encaps(opt.name), vartype)
+                        "%s = params[%s].as<%s>();" % (opt.cpp_varname, _encaps(opt.name), vartype)
                     )
             self.write_empty_line()
 
@@ -3862,8 +3616,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if initializer and initializer.register:
             with self._block(
-                "Status %s(optionenvironment::OptionSection* options_ptr) {"
-                % initializer.register,
+                "Status %s(optionenvironment::OptionSection* options_ptr) {" % initializer.register,
                 "}",
             ):
                 self._writer.write_line("auto& options = *options_ptr;")
@@ -3875,9 +3628,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     % (blockname),
                     "}",
                 ):
-                    self._writer.write_line(
-                        "auto& options = optionenvironment::startupOptions;"
-                    )
+                    self._writer.write_line("auto& options = optionenvironment::startupOptions;")
                     self._gen_config_options_register(root_opts, sections, False)
 
         self.write_empty_line()
@@ -3885,16 +3636,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if has_storage_targets:
             if initializer and initializer.store:
                 with self._block(
-                    "Status %s(const optionenvironment::Environment& params) {"
-                    % initializer.store,
+                    "Status %s(const optionenvironment::Environment& params) {" % initializer.store,
                     "}",
                 ):
                     self._gen_config_options_store(spec.configs, True)
             else:
                 with self.gen_namespace_block(""):
                     with self._block(
-                        "MONGO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {"
-                        % (blockname),
+                        "MONGO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {" % (blockname),
                         "}",
                     ):
                         # If all options are guarded by non-passing #ifdefs, then params will be unused.
@@ -4062,9 +3811,7 @@ def _generate_source(spec, target_arch, file_name, header_file_name):
         file_handle.write(str_value.encode())
 
 
-def generate_code(
-    spec, target_arch, output_base_dir, header_file_name, source_file_name
-):
+def generate_code(spec, target_arch, output_base_dir, header_file_name, source_file_name):
     # type: (ast.IDLAST, str, str, str, str) -> None
     """Generate a C++ header and source file from an idl.ast tree."""
 

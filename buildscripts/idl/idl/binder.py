@@ -60,9 +60,7 @@ def _validate_single_bson_type(ctxt, idl_type, syntax_type):
                 idl_type, syntax_type, idl_type.name, subtype
             )
     elif idl_type.bindata_subtype is not None:
-        ctxt.add_bad_bson_bindata_subtype_error(
-            idl_type, syntax_type, idl_type.name, bson_type
-        )
+        ctxt.add_bad_bson_bindata_subtype_error(idl_type, syntax_type, idl_type.name, bson_type)
 
     return True
 
@@ -77,29 +75,21 @@ def _validate_bson_types_list(ctxt, idl_type, syntax_type):
 
     for bson_type in bson_types:
         if bson_type in ["any", "chain"]:
-            ctxt.add_bad_any_type_use_error(
-                idl_type, bson_type, syntax_type, idl_type.name
-            )
+            ctxt.add_bad_any_type_use_error(idl_type, bson_type, syntax_type, idl_type.name)
             return False
 
         if not bson.is_valid_bson_type(bson_type):
-            ctxt.add_bad_bson_type_error(
-                idl_type, syntax_type, idl_type.name, bson_type
-            )
+            ctxt.add_bad_bson_type_error(idl_type, syntax_type, idl_type.name, bson_type)
             return False
 
         if not isinstance(idl_type, syntax.VariantType):
             if bson_type == "bindata":
-                ctxt.add_bad_bson_type_error(
-                    idl_type, syntax_type, idl_type.name, bson_type
-                )
+                ctxt.add_bad_bson_type_error(idl_type, syntax_type, idl_type.name, bson_type)
                 return False
 
             # Cannot mix non-scalar types into the list of types
             if not bson.is_scalar_bson_type(bson_type):
-                ctxt.add_bad_bson_scalar_type_error(
-                    idl_type, syntax_type, idl_type.name, bson_type
-                )
+                ctxt.add_bad_bson_scalar_type_error(idl_type, syntax_type, idl_type.name, bson_type)
                 return False
 
     return True
@@ -233,10 +223,7 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
                     idl_type, syntax_type, idl_type.name, "deserializer"
                 )
 
-            if (
-                idl_type.deserializer is not None
-                and "BSONElement" not in idl_type.deserializer
-            ):
+            if idl_type.deserializer is not None and "BSONElement" not in idl_type.deserializer:
                 ctxt.add_not_custom_scalar_serialization_not_supported_error(
                     idl_type, syntax_type, idl_type.name, bson_type
                 )
@@ -246,11 +233,7 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
                     idl_type, syntax_type, idl_type.name, bson_type
                 )
 
-        if (
-            bson_type == "bindata"
-            and isinstance(idl_type, syntax.Type)
-            and idl_type.default
-        ):
+        if bson_type == "bindata" and isinstance(idl_type, syntax.Type) and idl_type.default:
             ctxt.add_bindata_no_default(idl_type, syntax_type, idl_type.name)
 
     else:
@@ -281,9 +264,7 @@ def _is_duplicate_field(ctxt, field_container, fields, ast_field):
             if field.name == ast_field.name:
                 duplicate_field = field
 
-        ctxt.add_duplicate_field_error(
-            ast_field, field_container, ast_field.name, duplicate_field
-        )
+        ctxt.add_duplicate_field_error(ast_field, field_container, ast_field.name, duplicate_field)
         return True
 
     return False
@@ -348,13 +329,9 @@ def _compute_command_type_is_view(struct, ctxt, symbols, field_type):
             if _compute_command_type_is_view(struct, ctxt, symbols, variant_type):
                 return True
     elif isinstance(field_type, syntax.FieldTypeArray):
-        return _compute_command_type_is_view(
-            struct, ctxt, symbols, field_type.element_type
-        )
+        return _compute_command_type_is_view(struct, ctxt, symbols, field_type.element_type)
     elif isinstance(field_type, syntax.FieldTypeSingle):
-        resolved_type = symbols.resolve_field_type(
-            ctxt, struct, field_type.type_name, field_type
-        )
+        resolved_type = symbols.resolve_field_type(ctxt, struct, field_type.type_name, field_type)
         # If symbols.resolve_field_type returns None, we can assume an error occured during the function.
         # We can rely on symbols.resolve_field_type to add errors.
         if resolved_type is None:
@@ -485,9 +462,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
         ast_field = _bind_field(ctxt, parsed_spec, field)
         if ast_field:
             if ast_struct.generic_list_type:
-                gen_field_info = ast.GenericFieldInfo(
-                    struct.file_name, struct.line, struct.column
-                )
+                gen_field_info = ast.GenericFieldInfo(struct.file_name, struct.line, struct.column)
                 if ast_struct.generic_list_type == ast.GenericListType.ARG:
                     gen_field_info.forward_to_shards = field.forward_to_shards
                 elif ast_struct.generic_list_type == ast.GenericListType.REPLY:
@@ -496,9 +471,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
                 else:
                     assert False
                 ast_field.generic_field_info = gen_field_info
-            if ast_field.supports_doc_sequence and not isinstance(
-                ast_struct, ast.Command
-            ):
+            if ast_field.supports_doc_sequence and not isinstance(ast_struct, ast.Command):
                 # Doc sequences are only supported in commands at the moment
                 ctxt.add_bad_struct_field_as_doc_sequence_error(
                     ast_struct, ast_struct.name, ast_field.name
@@ -509,26 +482,16 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
                     ast_struct, ast_struct.name, ast_field.name
                 )
 
-            if not _is_duplicate_field(
-                ctxt, ast_struct.name, ast_struct.fields, ast_field
-            ):
+            if not _is_duplicate_field(ctxt, ast_struct.name, ast_struct.fields, ast_field):
                 ast_struct.fields.append(ast_field)
 
             # Verify that each field on the struct defines a query shape type on the field if and only if
             # query_shape_component is defined on the struct.
-            if (
-                not field.hidden
-                and struct.query_shape_component
-                and ast_field.query_shape is None
-            ):
-                ctxt.add_must_declare_shape_type(
-                    ast_field, ast_struct.name, ast_field.name
-                )
+            if not field.hidden and struct.query_shape_component and ast_field.query_shape is None:
+                ctxt.add_must_declare_shape_type(ast_field, ast_struct.name, ast_field.name)
 
             if not struct.query_shape_component and ast_field.query_shape is not None:
-                ctxt.add_must_be_query_shape_component(
-                    ast_field, ast_struct.name, ast_field.name
-                )
+                ctxt.add_must_be_query_shape_component(ast_field, ast_struct.name, ast_field.name)
 
             if ast_field.query_shape == ast.QueryShapeFieldType.ANONYMIZE and not (
                 ast_field.type.cpp_type in ["std::string", "std::vector<std::string>"]
@@ -570,12 +533,8 @@ def _inject_hidden_fields(struct):
     if struct.fields is None:
         struct.fields = []
 
-    serialization_context_field = syntax.Field(
-        struct.file_name, struct.line, struct.column
-    )
-    serialization_context_field.name = (
-        "serialization_context"  # This comes from basic_types.idl
-    )
+    serialization_context_field = syntax.Field(struct.file_name, struct.line, struct.column)
+    serialization_context_field.name = "serialization_context"  # This comes from basic_types.idl
     serialization_context_field.type = syntax.FieldTypeSingle(
         struct.file_name, struct.line, struct.column
     )
@@ -611,9 +570,7 @@ def _inject_hidden_command_fields(command):
     # Inject a "$db" which we can decode during command parsing
     db_field = syntax.Field(command.file_name, command.line, command.column)
     db_field.name = "$db"
-    db_field.type = syntax.FieldTypeSingle(
-        command.file_name, command.line, command.column
-    )
+    db_field.type = syntax.FieldTypeSingle(command.file_name, command.line, command.column)
     db_field.type.type_name = "database_name"  # This comes from basic_types.idl
     db_field.cpp_name = "dbName"
     db_field.serialize_op_msg_request_only = True
@@ -730,9 +687,7 @@ def _bind_command_type(ctxt, parsed_spec, command):
     assert not isinstance(syntax_symbol, syntax.Enum)
 
     base_type = (
-        syntax_symbol.element_type
-        if isinstance(syntax_symbol, syntax.ArrayType)
-        else syntax_symbol
+        syntax_symbol.element_type if isinstance(syntax_symbol, syntax.ArrayType) else syntax_symbol
     )
 
     # Copy over only the needed information if this is a struct or a type.
@@ -837,9 +792,7 @@ def _bind_single_check(ctxt, parsed_spec, access_check):
             return None
     else:
         privilege = access_check.privilege
-        ast_privilege = ast.Privilege(
-            privilege.file_name, privilege.line, privilege.column
-        )
+        ast_privilege = ast.Privilege(privilege.file_name, privilege.line, privilege.column)
 
         ast_privilege.resource_pattern = _bind_enum_value(
             ctxt, parsed_spec, privilege, "MatchType", privilege.resource_pattern
@@ -1026,9 +979,7 @@ def _validate_variant_type(ctxt, syntax_symbol, field):
 
     for type_name, count in array_type_count.items():
         if count > 1:
-            ctxt.add_variant_duplicate_types_error(
-                syntax_symbol, field.name, f"array<{type_name}>"
-            )
+            ctxt.add_variant_duplicate_types_error(syntax_symbol, field.name, f"array<{type_name}>")
 
     types = len(syntax_symbol.variant_types) + len(syntax_symbol.variant_struct_types)
     if types < 2:
@@ -1213,9 +1164,7 @@ def _bind_type(idltype):
     ast_type.bson_serialization_type = idltype.bson_serialization_type
     ast_type.bindata_subtype = idltype.bindata_subtype
     ast_type.serializer = _normalize_method_name(idltype.cpp_type, idltype.serializer)
-    ast_type.deserializer = _normalize_method_name(
-        idltype.cpp_type, idltype.deserializer
-    )
+    ast_type.deserializer = _normalize_method_name(idltype.cpp_type, idltype.deserializer)
     ast_type.deserialize_with_tenant = idltype.deserialize_with_tenant
     ast_type.internal_only = idltype.internal_only
     ast_type.is_query_shape_component = True
@@ -1262,9 +1211,7 @@ def _bind_field(ctxt, parsed_spec, field):
         _validate_ignored_field(ctxt, field)
         return ast_field
 
-    syntax_symbol = parsed_spec.symbols.resolve_field_type(
-        ctxt, field, field.name, field.type
-    )
+    syntax_symbol = parsed_spec.symbols.resolve_field_type(ctxt, field, field.name, field.type)
     if syntax_symbol is None:
         return None
 
@@ -1287,9 +1234,7 @@ def _bind_field(ctxt, parsed_spec, field):
         return None
 
     base_type = (
-        syntax_symbol.element_type
-        if isinstance(syntax_symbol, syntax.ArrayType)
-        else syntax_symbol
+        syntax_symbol.element_type if isinstance(syntax_symbol, syntax.ArrayType) else syntax_symbol
     )
 
     # Copy over only the needed information if this is a struct or a type.
@@ -1336,9 +1281,7 @@ def _bind_field(ctxt, parsed_spec, field):
             return None
 
     if ast_field.should_shapify and not ast_field.type.is_query_shape_component:
-        ctxt.add_must_be_query_shape_component(
-            ast_field, ast_field.type.name, ast_field.name
-        )
+        ctxt.add_must_be_query_shape_component(ast_field, ast_field.type.name, ast_field.name)
     return ast_field
 
 
@@ -1357,10 +1300,7 @@ def _bind_chained_type(ctxt, parsed_spec, location, chained_type):
 
     idltype = cast(syntax.Type, syntax_symbol)
 
-    if (
-        len(idltype.bson_serialization_type) != 1
-        or idltype.bson_serialization_type[0] != "chain"
-    ):
+    if len(idltype.bson_serialization_type) != 1 or idltype.bson_serialization_type[0] != "chain":
         ctxt.add_chained_type_wrong_type_error(
             location, chained_type.name, idltype.bson_serialization_type[0]
         )
@@ -1386,9 +1326,7 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
     if not syntax_symbol:
         return
 
-    if not isinstance(syntax_symbol, syntax.Struct) or isinstance(
-        syntax_symbol, syntax.Command
-    ):
+    if not isinstance(syntax_symbol, syntax.Struct) or isinstance(syntax_symbol, syntax.Command):
         ctxt.add_chained_struct_not_found_error(ast_struct, chained_struct.name)
         return
 
@@ -1406,18 +1344,14 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
         )
 
     # Configure a field for the chained struct.
-    ast_chained_field = ast.Field(
-        ast_struct.file_name, ast_struct.line, ast_struct.column
-    )
+    ast_chained_field = ast.Field(ast_struct.file_name, ast_struct.line, ast_struct.column)
     ast_chained_field.name = struct.name
     ast_chained_field.type = _bind_struct_type(struct)
     ast_chained_field.cpp_name = chained_struct.cpp_name
     ast_chained_field.description = struct.description
     ast_chained_field.chained = True
 
-    if not _is_duplicate_field(
-        ctxt, chained_struct.name, ast_struct.fields, ast_chained_field
-    ):
+    if not _is_duplicate_field(ctxt, chained_struct.name, ast_struct.fields, ast_chained_field):
         ast_struct.fields.append(ast_chained_field)
     else:
         return
@@ -1457,9 +1391,7 @@ def _bind_globals(ctxt, parsed_spec):
 
         configs = parsed_spec.globals.configs
         if configs:
-            ast_global.configs = ast.ConfigGlobal(
-                configs.file_name, configs.line, configs.column
-            )
+            ast_global.configs = ast.ConfigGlobal(configs.file_name, configs.line, configs.column)
 
             if configs.initializer:
                 init = configs.initializer
@@ -1519,9 +1451,7 @@ def _bind_enum(ctxt, idl_enum):
         return None
 
     for enum_value in idl_enum.values:
-        ast_enum_value = ast.EnumValue(
-            enum_value.file_name, enum_value.line, enum_value.column
-        )
+        ast_enum_value = ast.EnumValue(enum_value.file_name, enum_value.line, enum_value.column)
         ast_enum_value.name = enum_value.name
         ast_enum_value.description = enum_value.description
         ast_enum_value.value = enum_value.value
@@ -1573,9 +1503,7 @@ def _bind_server_parameter_class(ctxt, ast_param, param):
     ast_param.cpp_class.override_validate = cls.override_validate
 
     # If set_at is cluster, then set must be overridden. Otherwise, use the parsed value.
-    ast_param.cpp_class.override_set = (
-        True if param.set_at == ["cluster"] else cls.override_set
-    )
+    ast_param.cpp_class.override_set = True if param.set_at == ["cluster"] else cls.override_set
 
     return ast_param
 
@@ -1653,18 +1581,14 @@ def _bind_server_parameter(ctxt, param):
     ast_param = ast.ServerParameter(param.file_name, param.line, param.column)
     ast_param.name = param.name
     ast_param.description = param.description
-    ast_param.condition = _bind_condition(
-        param.condition, condition_for="server_parameter"
-    )
+    ast_param.condition = _bind_condition(param.condition, condition_for="server_parameter")
     ast_param.redact = param.redact
     ast_param.test_only = param.test_only
     ast_param.deprecated_name = param.deprecated_name
 
     # The omit_in_ftdc flag can only be enabled for cluster parameters.
     if param.omit_in_ftdc is not None and param.set_at != ["cluster"]:
-        ctxt.add_server_parameter_invalid_attr(
-            param, "omit_in_ftdc=True", "".join(param.set_at)
-        )
+        ctxt.add_server_parameter_invalid_attr(param, "omit_in_ftdc=True", "".join(param.set_at))
         return None
 
     # If omit_in_ftdc is None (it has not been set) for a cluster parameter, then emit an error.
@@ -1682,9 +1606,7 @@ def _bind_server_parameter(ctxt, param):
     elif param.cpp_varname:
         return _bind_server_parameter_with_storage(ctxt, ast_param, param)
     else:
-        ctxt.add_server_parameter_required_attr(
-            param, "cpp_varname", "server_parameter"
-        )
+        ctxt.add_server_parameter_required_attr(param, "cpp_varname", "server_parameter")
         return None
 
 
@@ -1718,14 +1640,10 @@ def _bind_feature_flags(ctxt, param):
         ctxt.add_feature_flag_fcv_gated_false_has_version(param)
         return None
 
-    expr = syntax.Expression(
-        param.default.file_name, param.default.line, param.default.column
-    )
+    expr = syntax.Expression(param.default.file_name, param.default.line, param.default.column)
     expr.expr = '%s, "%s"_sd, %s' % (
         param.default.literal,
-        param.version
-        if (param.shouldBeFCVGated.literal == "true" and param.version)
-        else "",
+        param.version if (param.shouldBeFCVGated.literal == "true" and param.version) else "",
         param.shouldBeFCVGated.literal,
     )
 
@@ -1903,14 +1821,10 @@ def bind(parsed_spec):
         bound_spec.server_parameters.append(_bind_feature_flags(ctxt, feature_flag))
 
     for server_parameter in parsed_spec.server_parameters:
-        bound_spec.server_parameters.append(
-            _bind_server_parameter(ctxt, server_parameter)
-        )
+        bound_spec.server_parameters.append(_bind_server_parameter(ctxt, server_parameter))
 
     for option in parsed_spec.configs:
-        bound_spec.configs.append(
-            _bind_config_option(ctxt, parsed_spec.globals, option)
-        )
+        bound_spec.configs.append(_bind_config_option(ctxt, parsed_spec.globals, option))
 
     if ctxt.errors.has_errors():
         return ast.IDLBoundSpec(None, ctxt.errors)

@@ -18,12 +18,8 @@ class HelloDelays(interface.Hook):
         """Initialize HelloDelays."""
         description = "Sets Hello fault injections"
         interface.Hook.__init__(self, hook_logger, fixture, description)
-        self.js_filename = os.path.join(
-            "jstests", "hooks", "run_inject_hello_failures.js"
-        )
-        self.cleanup_js_filename = os.path.join(
-            "jstests", "hooks", "run_cleanup_hello_failures.js"
-        )
+        self.js_filename = os.path.join("jstests", "hooks", "run_inject_hello_failures.js")
+        self.cleanup_js_filename = os.path.join("jstests", "hooks", "run_cleanup_hello_failures.js")
         self.shell_options = None
 
     def before_test(self, test, test_report):

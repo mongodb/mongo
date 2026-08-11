@@ -11,9 +11,7 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
     """Server Selection JSON test case."""
 
     REGISTERED_NAME = "server_selection_json_test"
-    TEST_DIR = os.path.normpath(
-        "src/mongo/client/sdam/json_tests/server_selection_tests"
-    )
+    TEST_DIR = os.path.normpath("src/mongo/client/sdam/json_tests/server_selection_tests")
 
     def __init__(self, logger, json_test_file, program_options=None, **kwargs):
         """Initialize the TestCase with the executable to run."""

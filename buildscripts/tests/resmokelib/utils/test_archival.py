@@ -103,9 +103,7 @@ class ArchivalFileTests(ArchivalTestCase):
         # No files
         display_name = "Unittest no files"
         s3_path = self.s3_path("unittest/no_files.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, [], self.bucket, s3_path
-        )
+        status, message = self.archive.archive_files_to_s3(display_name, [], self.bucket, s3_path)
         self.assertEqual(1, status, message)
 
     def test_files(self):

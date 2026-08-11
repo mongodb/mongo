@@ -27,9 +27,7 @@ class ExternalFixture(interface.Fixture):
         # Reconfiguring the external fixture isn't supported so there's no reason to attempt to
         # parse the mongodb:// connection string the user specified via the command line into the
         # internal format used by the server.
-        raise NotImplementedError(
-            "ExternalFixture can only be used with a MongoDB connection URI"
-        )
+        raise NotImplementedError("ExternalFixture can only be used with a MongoDB connection URI")
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

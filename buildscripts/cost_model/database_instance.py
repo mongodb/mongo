@@ -154,9 +154,7 @@ class DatabaseInstance:
         """Drop collection."""
         await self.database[collection_name].drop()
 
-    async def insert_many(
-        self, collection_name: str, docs: Sequence[Mapping[str, any]]
-    ) -> None:
+    async def insert_many(self, collection_name: str, docs: Sequence[Mapping[str, any]]) -> None:
         """Insert documents into the collection with the given name."""
         if len(docs) > 0:
             await self.database[collection_name].insert_many(docs, ordered=False)
@@ -198,9 +196,7 @@ class DatabaseParameter:
         if self.original_value is not None:
             await self.set(self.original_value)
         else:
-            raise ValueError(
-                f'The parameter "{self.parameter_name}" has not been remembered.'
-            )
+            raise ValueError(f'The parameter "{self.parameter_name}" has not been remembered.')
 
 
 @asynccontextmanager

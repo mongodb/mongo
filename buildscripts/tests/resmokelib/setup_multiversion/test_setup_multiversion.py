@@ -315,9 +315,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
 class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
     @patch("evergreen.version.Version")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
-    @patch(
-        "buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit"
-    )
+    @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_urls_by_binary_version_found(
         self,
@@ -357,16 +355,12 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
         mock_get_evergreen_version.return_value = mock_version
         mock_get_compile_artifact_urls.return_value = expected_urls
 
-        urlinfo = self.setup_multiversion.get_urls(
-            "90f767adbb1901d007ee4dd8714f53402d893669"
-        )
+        urlinfo = self.setup_multiversion.get_urls("90f767adbb1901d007ee4dd8714f53402d893669")
         self.assertEqual(urlinfo.urls, expected_urls)
 
     @patch("evergreen.version.Version")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
-    @patch(
-        "buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit"
-    )
+    @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_urls_not_found(
         self,
@@ -390,12 +384,8 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
         self.assertEqual(urlinfo.evg_version_id, mock_version.version_id)
 
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
-    @patch(
-        "buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit"
-    )
-    def test_evg_version_not_found(
-        self, mock_get_git_tag_and_commit, mock_get_evergreen_version
-    ):
+    @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
+    def test_evg_version_not_found(self, mock_get_git_tag_and_commit, mock_get_evergreen_version):
         mock_get_git_tag_and_commit.return_value = (
             "r4.4.1",
             "90f767adbb1901d007ee4dd8714f53402d893669",

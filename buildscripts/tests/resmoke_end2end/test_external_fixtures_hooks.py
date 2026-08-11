@@ -35,9 +35,7 @@ class TestExternalFixturesHooks(unittest.TestCase):
         ) != os.path.normpath(_config.RESMOKE_ROOT)
 
         # Set CONFIG_DIR to avoid errors
-        _config.CONFIG_DIR = os.path.join(
-            _config.RESMOKE_ROOT, "buildscripts", "resmokeconfig"
-        )
+        _config.CONFIG_DIR = os.path.join(_config.RESMOKE_ROOT, "buildscripts", "resmokeconfig")
 
         # Load the external module config once for all tests
         config_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, "external_module.yml")

@@ -250,9 +250,7 @@ class TestLocalCommandLine(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(
-            cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"]
-        )
+        self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_evergreen_options(self):
         cmdline = to_local_args(
@@ -274,9 +272,7 @@ class TestLocalCommandLine(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(
-            cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"]
-        )
+        self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_log_option(self):
         cmdline = to_local_args(
@@ -289,9 +285,7 @@ class TestLocalCommandLine(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(
-            cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"]
-        )
+        self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_report_file_options(self):
         cmdline = to_local_args(
@@ -303,9 +297,7 @@ class TestLocalCommandLine(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(
-            cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"]
-        )
+        self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_stagger_jobs_option(self):
         cmdline = to_local_args(
@@ -317,9 +309,7 @@ class TestLocalCommandLine(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(
-            cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"]
-        )
+        self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_tag_file_option(self):
         cmdline = to_local_args(
@@ -331,9 +321,7 @@ class TestLocalCommandLine(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(
-            cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"]
-        )
+        self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_accepts_space_delimited_args(self):
         cmdline = to_local_args(

@@ -6,9 +6,7 @@ import threading
 
 import buildscripts.resmokelib.utils.filesystem as fs
 
-ActionFiles = collections.namedtuple(
-    "ActionFiles", ["permitted", "idle_request", "idle_ack"]
-)
+ActionFiles = collections.namedtuple("ActionFiles", ["permitted", "idle_request", "idle_ack"])
 
 
 class FlagBasedThreadLifecycle(object):

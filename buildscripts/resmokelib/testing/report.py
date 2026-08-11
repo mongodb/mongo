@@ -147,9 +147,7 @@ class TestReport(unittest.TestResult):
         test_info.add_logger(test_logger)
         test_info.add_logger(self.job_logger)
         # Set up logging handlers to capture exceptions.
-        test_info.exception_extractors = logging.loggers.configure_exception_capture(
-            test_logger
-        )
+        test_info.exception_extractors = logging.loggers.configure_exception_capture(test_logger)
 
         test_info.log_info = {
             "log_name": logging.loggers.get_evergreen_log_name(self.job_num, test.id()),
@@ -180,9 +178,7 @@ class TestReport(unittest.TestResult):
             with self._lock:
                 test_info = self.find_test_info(test)
                 test_info.end_time = time.time()
-                test_status = (
-                    "no failures detected" if test_info.status == "pass" else "failed"
-                )
+                test_status = "no failures detected" if test_info.status == "pass" else "failed"
 
             time_taken = test_info.end_time - test_info.start_time
             self.job_logger.info(
@@ -300,37 +296,25 @@ class TestReport(unittest.TestResult):
         """Return the status and timing information of the tests that executed successfully."""
 
         with self._lock:
-            return [
-                test_info for test_info in self.test_infos if test_info.status == "pass"
-            ]
+            return [test_info for test_info in self.test_infos if test_info.status == "pass"]
 
     def get_failed(self):
         """Return the status and timing information of tests that raised a failureException."""
 
         with self._lock:
-            return [
-                test_info for test_info in self.test_infos if test_info.status == "fail"
-            ]
+            return [test_info for test_info in self.test_infos if test_info.status == "fail"]
 
     def get_errored(self):
         """Return the status and timing information of tests that raised a non-failureException."""
 
         with self._lock:
-            return [
-                test_info
-                for test_info in self.test_infos
-                if test_info.status == "error"
-            ]
+            return [test_info for test_info in self.test_infos if test_info.status == "error"]
 
     def get_interrupted(self):
         """Return the status and timing information of tests that were execution interrupted."""
 
         with self._lock:
-            return [
-                test_info
-                for test_info in self.test_infos
-                if test_info.status == "timeout"
-            ]
+            return [test_info for test_info in self.test_infos if test_info.status == "timeout"]
 
     def as_dict(self):
         """Return the test result information as a dictionary.
@@ -379,9 +363,7 @@ class TestReport(unittest.TestResult):
         )
         for result in report_dict["results"]:
             # By convention, dynamic tests are named "<basename>:<hook name>".
-            is_dynamic = ":" in result["test_file"] or ":" in result.get(
-                "display_test_name", ""
-            )
+            is_dynamic = ":" in result["test_file"] or ":" in result.get("display_test_name", "")
             test_file = result["test_file"]
             # Using test_file as the test id is ok here since the test id only needs to be unique
             # during suite execution.

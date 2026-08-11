@@ -57,9 +57,7 @@ class CoreAnalyzer(Subcommand):
                         "core_analyzer_execute_error": "Artifacts were not found.",
                     }
                 )
-                current_span.set_status(
-                    StatusCode.ERROR, description="Artifacts were not found."
-                )
+                current_span.set_status(StatusCode.ERROR, description="Artifacts were not found.")
                 raise RuntimeError(
                     "Artifacts were not found for specified task. Could not analyze cores."
                 )

@@ -267,9 +267,7 @@ class TestSuiteExecutor(object):
 
         fixture_logger = logging.loggers.new_fixture_logger(fixture_class, job_num)
 
-        return fixtures.make_fixture(
-            fixture_class, fixture_logger, job_num, **fixture_config
-        )
+        return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
     def _make_hooks(self, fixture, job_num) -> List[Hook]:
         """Create the hooks for the job's fixture."""
@@ -371,18 +369,13 @@ class TestQueue(_queue.Queue, Generic[T]):
     def __init__(self):
         """Initialize test queue."""
         self.num_tests = 0
-        self.max_test_queue_size = utils.default_if_none(
-            _config.MAX_TEST_QUEUE_SIZE, -1
-        )
+        self.max_test_queue_size = utils.default_if_none(_config.MAX_TEST_QUEUE_SIZE, -1)
         super().__init__()
 
     def add_test_cases(self, test_cases: List[QueueElem]) -> None:
         """Add test cases to the queue."""
         for test_case in test_cases:
-            if (
-                self.max_test_queue_size < 0
-                or self.num_tests < self.max_test_queue_size
-            ):
+            if self.max_test_queue_size < 0 or self.num_tests < self.max_test_queue_size:
                 self.put(test_case)
                 self.num_tests += 1
             else:

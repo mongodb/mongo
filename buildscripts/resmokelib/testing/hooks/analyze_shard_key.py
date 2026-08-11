@@ -21,9 +21,7 @@ class AnalyzeShardKeysInBackground(jsfile.JSHook):
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize AnalyzeShardKeysInBackground."""
         description = "Runs running analyzeShardKey commands while a test is running"
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_analyze_shard_key_background.js"
-        )
+        js_filename = os.path.join("jstests", "hooks", "run_analyze_shard_key_background.js")
         jsfile.JSHook.__init__(
             self,
             hook_logger,

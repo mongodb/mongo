@@ -165,9 +165,9 @@ class Linter:
             if not re.fullmatch(lic_re, src_line):
                 self._license_error(
                     linenum,
-                    "Incorrect license header.\n"
-                    '  Expected: "{}"\n'
-                    '  Received: "{}"\n'.format(lic_line, src_line),
+                    "Incorrect license header.\n" '  Expected: "{}"\n' '  Received: "{}"\n'.format(
+                        lic_line, src_line
+                    ),
                 )
                 return linenum
 
@@ -199,12 +199,8 @@ class Linter:
         line = self.clean_lines[linenum]
         if _RE_FEATURE_FLAG_IGNORE_FCV_CHECK_REF.search(line):
             # Find the first ignore FCV check comment preceding the current line.
-            i = bisect.bisect_right(
-                self.feature_flag_ignore_fcv_check_comments, linenum
-            )
-            if not i or self.feature_flag_ignore_fcv_check_comments[i - 1] < (
-                linenum - 10
-            ):
+            i = bisect.bisect_right(self.feature_flag_ignore_fcv_check_comments, linenum)
+            if not i or self.feature_flag_ignore_fcv_check_comments[i - 1] < (linenum - 10):
                 self._error(
                     linenum,
                     "mongodb/fcv",
@@ -251,9 +247,7 @@ class Linter:
                     return
 
         # We count internally from 0 but users count from 1 for line numbers
-        print(
-            "Error: %s:%d - %s - %s" % (self.file_name, linenum + 1, category, message)
-        )
+        print("Error: %s:%d - %s - %s" % (self.file_name, linenum + 1, category, message))
         self._error_count += 1
 
 
@@ -273,9 +267,7 @@ def main():
 
     parser.add_argument("file", type=str, help="C++ input file")
 
-    parser.add_argument(
-        "-v", "--verbose", action="count", help="Enable verbose tracing"
-    )
+    parser.add_argument("-v", "--verbose", action="count", help="Enable verbose tracing")
 
     args = parser.parse_args()
 

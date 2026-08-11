@@ -172,9 +172,7 @@ MongoDB Powercycle Tests. To run a powercycle test locally, use the following st
             "--sshConnection",
             dest="ssh_connection_options",
             help="Remote server ssh additional connection options, i.e., '-i ident.pem'"
-            " which are added to '{}'".format(
-                powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS
-            ),
+            " which are added to '{}'".format(powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS),
             default=None,
         )
 
@@ -222,8 +220,9 @@ MongoDB Powercycle Tests. To run a powercycle test locally, use the following st
             "--logLevel",
             dest="log_level",
             choices=log_levels,
-            help="The log level. Accepted values are: {}."
-            " [default: '%(default)s'].".format(log_levels),
+            help="The log level. Accepted values are: {}." " [default: '%(default)s'].".format(
+                log_levels
+            ),
             default="info",
         )
 

@@ -55,9 +55,7 @@ class Job(object):
         self.report = report
         self.archival = archival
         self.suite_options = suite_options
-        self.manager = FixtureTestCaseManager(
-            test_queue_logger, self.fixture, job_num, self.report
-        )
+        self.manager = FixtureTestCaseManager(test_queue_logger, self.fixture, job_num, self.report)
 
         # Don't check fixture.is_running() when using hooks that kill and restart fixtures, such
         # as ContinuousStepdown or KillReplicator. Even if the fixture is still running as
@@ -120,9 +118,7 @@ class Job(object):
             except:  # pylint: disable=bare-except
                 # Something unexpected happened when setting up the fixture. We don't attempt to run
                 # any tests.
-                self.logger.exception(
-                    "Encountered an error when setting up the fixture."
-                )
+                self.logger.exception("Encountered an error when setting up the fixture.")
                 setup_succeeded = False
 
             if not setup_succeeded:
@@ -158,9 +154,7 @@ class Job(object):
                 # Something unexpected happened when tearing down the fixture. We indicate back to
                 # the executor thread that teardown has failed. This may mean resmoke.py is exiting
                 # without having terminated all of the child processes it spawned.
-                self.logger.exception(
-                    "Encountered an error when tearing down the fixture."
-                )
+                self.logger.exception("Encountered an error when tearing down the fixture.")
                 teardown_succeeded = False
 
             if not teardown_succeeded:
@@ -240,9 +234,7 @@ class Job(object):
             queue.put(queue_elem)
 
     @TRACER.start_as_current_span("job._execute_test")
-    def _execute_test(
-        self, test: TestCase, hook_failure_flag: Optional[threading.Event]
-    ):
+    def _execute_test(self, test: TestCase, hook_failure_flag: Optional[threading.Event]):
         """Call the before/after test hooks and execute 'test'."""
 
         common_test_attributes = test.get_test_otel_attributes()
@@ -250,17 +242,13 @@ class Job(object):
         execute_test_span.set_attributes(attributes=common_test_attributes)
         execute_test_span.set_status(StatusCode.ERROR, "fail_early")
 
-        test.configure(
-            self.fixture, config.NUM_CLIENTS_PER_FIXTURE, config.USE_TENANT_CLIENT
-        )
+        test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE, config.USE_TENANT_CLIENT)
 
         self._run_hooks_before_tests(test, hook_failure_flag)
 
         self.report.logging_prefix = create_fixture_table(self.fixture)
 
-        with TRACER.start_as_current_span(
-            "run_test", attributes=common_test_attributes
-        ):
+        with TRACER.start_as_current_span("run_test", attributes=common_test_attributes):
             test(self.report)
         try:
             if test.propagate_error is not None:
@@ -271,13 +259,8 @@ class Job(object):
             # part of a hook has added a failed test case to 'self.report'. Checking the individual
             # 'test' status ensures self._run_hooks_after_tests() is called if it is a hook's test
             # case that has failed and not 'test' that has failed.
-            if (
-                self.suite_options.fail_fast
-                and self.report.find_test_info(test).status != "pass"
-            ):
-                self.logger.info(
-                    "%s failed, so stopping..." % (test.short_description())
-                )
+            if self.suite_options.fail_fast and self.report.find_test_info(test).status != "pass":
+                self.logger.info("%s failed, so stopping..." % (test.short_description()))
                 raise errors.StopExecution("%s failed" % (test.short_description()))
 
             if self._check_if_fixture_running and not self.fixture.is_running():
@@ -365,9 +348,7 @@ class Job(object):
                 StatusCode.ERROR if hooks_failed else StatusCode.OK
             )
 
-    def _run_hooks_before_tests(
-        self, test: TestCase, hook_failure_flag: Optional[threading.Event]
-    ):
+    def _run_hooks_before_tests(self, test: TestCase, hook_failure_flag: Optional[threading.Event]):
         """Run the before_test method on each of the hooks.
 
         Swallows any TestFailure exceptions if set to continue on
@@ -442,9 +423,7 @@ class Job(object):
                 if self.archival:
                     result = TestResult(test=test, hook=None, success=False)
                     self.archival.archive(self.logger, result, self.manager)
-                raise errors.StopExecution(
-                    "stop_balancer failed before running after test hooks"
-                )
+                raise errors.StopExecution("stop_balancer failed before running after test hooks")
 
         try:
             for hook in self.hooks:
@@ -496,9 +475,7 @@ class Job(object):
                 if self.archival:
                     result = TestResult(test=test, hook=None, success=False)
                     self.archival.archive(self.logger, result, self.manager)
-                raise errors.StopExecution(
-                    "start_balancer failed after running after test hooks"
-                )
+                raise errors.StopExecution("start_balancer failed after running after test hooks")
 
     def _fail_test(self, test: TestCase, exc_info, return_code=1):
         """Provide helper to record a test as a failure with the provided return code.
@@ -582,9 +559,7 @@ class FixtureTestCaseManager:
         Return True if the teardown was successful, False otherwise.
         """
         try:
-            test_case: Union[
-                _fixture.FixtureAbortTestCase, _fixture.FixtureTeardownTestCase
-            ] = None
+            test_case: Union[_fixture.FixtureAbortTestCase, _fixture.FixtureTeardownTestCase] = None
 
             if abort:
                 test_case = _fixture.FixtureAbortTestCase(

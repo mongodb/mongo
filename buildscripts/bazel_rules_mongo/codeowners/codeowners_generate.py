@@ -66,9 +66,7 @@ def process_owners_file(output_lines: list[str], node: FileNode) -> None:
     with open(owners_file_path, "r") as file:
         contents = yaml.safe_load(file)
         assert "version" in contents, f"Version not found in {owners_file_path}"
-        assert (
-            contents["version"] in parsers
-        ), f"Unsupported version in {owners_file_path}"
+        assert contents["version"] in parsers, f"Unsupported version in {owners_file_path}"
         parser = parsers[contents["version"]]
         owners_lines = parser.parse(directory, owners_file_path, contents)
         output_lines.extend(owners_lines)
@@ -94,9 +92,7 @@ def print_diff_and_instructions(old_codeowners_contents, new_codeowners_contents
     )
     sys.stdout.writelines(diff)
 
-    print(
-        "If you are seeing this message in CI you likely need to run `bazel run codeowners`"
-    )
+    print("If you are seeing this message in CI you likely need to run `bazel run codeowners`")
 
 
 def validate_generated_codeowners(validator_path: str) -> int:
@@ -119,9 +115,7 @@ def validate_generated_codeowners(validator_path: str) -> int:
 
 
 @cache
-def get_unowned_files(
-    codeowners_binary_path: str, codeowners_file: str = None
-) -> Set[str]:
+def get_unowned_files(codeowners_binary_path: str, codeowners_file: str = None) -> Set[str]:
     temp_output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
     temp_output_file.close()
     codeowners_file_arg = ""
@@ -147,9 +141,7 @@ def get_unowned_files(
     return unowned_files
 
 
-def check_new_files(
-    codeowners_binary_path: str, expansions_file: str, branch: str
-) -> int:
+def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: str) -> int:
     new_files = evergreen_git.get_new_files(expansions_file, branch)
     if not new_files:
         print("No new files were detected.")
@@ -189,23 +181,17 @@ def check_orphaned_files(
     )
     if previous_codeowners_file_contents is None:
         return 0
-    temp_codeowners_file = tempfile.NamedTemporaryFile(
-        mode="w", delete=False, suffix=".txt"
-    )
+    temp_codeowners_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt")
     temp_codeowners_file.write(previous_codeowners_file_contents)
     temp_codeowners_file.close()
-    old_unowned_files = get_unowned_files(
-        codeowners_binary_path, temp_codeowners_file.name
-    )
+    old_unowned_files = get_unowned_files(codeowners_binary_path, temp_codeowners_file.name)
 
     unowned_files_difference = current_unowned_files - old_unowned_files
     if not unowned_files_difference:
         print("No files have lost ownership with these changes.")
         return 0
 
-    print(
-        "The following files lost ownership with CODEOWNERS changes:", file=sys.stderr
-    )
+    print("The following files lost ownership with CODEOWNERS changes:", file=sys.stderr)
     for file in sorted(unowned_files_difference):
         print(f"- {file}", file=sys.stderr)
 
@@ -379,9 +365,7 @@ def main():
 
     with open(output_file, "w") as file:
         file.write(new_contents)
-        print(
-            f"Successfully wrote to the CODEOWNERS file at: {os.path.abspath(output_file)}"
-        )
+        print(f"Successfully wrote to the CODEOWNERS file at: {os.path.abspath(output_file)}")
 
     # Add validation after generating CODEOWNERS file
     return post_generation_checks(

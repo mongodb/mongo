@@ -60,9 +60,7 @@ def _get_required_parameters(struct):
     # type: (ast.Struct) -> List[str]
     """Get a list of arguments for required parameters."""
     params = [
-        _get_arg_for_field(field)
-        for field in struct.fields
-        if _is_required_constructor_arg(field)
+        _get_arg_for_field(field) for field in struct.fields if _is_required_constructor_arg(field)
     ]
     # Since this contains defaults, we need to push this to the end of the list.
     params.append(_get_serialization_ctx_arg())
@@ -309,9 +307,7 @@ class _StructTypeInfo(StructTypeInfoBase):
     def get_required_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(
-            class_name, class_name, _get_required_parameters(self._struct)
-        )
+        return MethodInfo(class_name, class_name, _get_required_parameters(self._struct))
 
     def get_sharing_deserializer_static_method(self):
         # type: () -> MethodInfo
@@ -499,9 +495,7 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line(
-            'builder->append("%s"_sd, 1);' % (self._command.name)
-        )
+        indented_writer.write_line('builder->append("%s"_sd, 1);' % (self._command.name))
 
     def gen_namespace_check(self, indented_writer, db_name, element):
         # type: (writer.IndentedTextWriter, str, str) -> None
@@ -665,13 +659,9 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line(
-            "const NamespaceString& getNamespace() const { return _nss; }"
-        )
+        indented_writer.write_line("const NamespaceString& getNamespace() const { return _nss; }")
         if self._struct.non_const_getter:
-            indented_writer.write_line(
-                "NamespaceString& getNamespace() { return _nss; }"
-            )
+            indented_writer.write_line("NamespaceString& getNamespace() { return _nss; }")
 
     def gen_member(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -790,9 +780,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line(
-            '_nssOrUUID.serialize(builder, "%s"_sd);' % (self._command.name)
-        )
+        indented_writer.write_line('_nssOrUUID.serialize(builder, "%s"_sd);' % (self._command.name))
         indented_writer.write_empty_line()
 
     def gen_namespace_check(self, indented_writer, db_name, element):

@@ -68,9 +68,7 @@ async def extract_parameters(
 Node = TypeVar("Node")
 
 
-def find_abt_node_by_type(
-    root: physical_tree.Node, abt_type: str
-) -> Sequence[physical_tree.Node]:
+def find_abt_node_by_type(root: physical_tree.Node, abt_type: str) -> Sequence[physical_tree.Node]:
     """Find ABT node by its type."""
     return find_nodes(root, lambda node: node.node_type == abt_type)
 

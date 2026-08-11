@@ -21,9 +21,7 @@ class CheckClusterIndexConsistency(jsfile.DataConsistencyHook):
             )
 
         description = "Check index consistency across cluster"
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_cluster_index_consistency.js"
-        )
+        js_filename = os.path.join("jstests", "hooks", "run_cluster_index_consistency.js")
         super().__init__(
             hook_logger, fixture, js_filename, description, shell_options=shell_options
         )

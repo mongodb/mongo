@@ -193,9 +193,7 @@ def lookup_type(gdb_type_str: str) -> gdb.Type:
     except Exception as exc:
         exceptions.append(exc)
 
-    raise gdb.error(
-        "Failed to get type, tried:\n%s" % "\n".join([str(exc) for exc in exceptions])
-    )
+    raise gdb.error("Failed to get type, tried:\n%s" % "\n".join([str(exc) for exc in exceptions]))
 
 
 def get_current_thread_name():
@@ -213,9 +211,7 @@ def get_current_thread_name():
 
 def get_global_service_context():
     """Return the global ServiceContext object."""
-    return gdb.parse_and_eval(
-        "'mongo::(anonymous namespace)::globalServiceContext'"
-    ).dereference()
+    return gdb.parse_and_eval("'mongo::(anonymous namespace)::globalServiceContext'").dereference()
 
 
 def get_session_catalog():
@@ -224,9 +220,7 @@ def get_session_catalog():
     Returns None if no SessionCatalog could be found.
     """
     # The SessionCatalog is a decoration on the ServiceContext.
-    session_catalog_dec = get_decoration(
-        get_global_service_context(), "mongo::SessionCatalog"
-    )
+    session_catalog_dec = get_decoration(get_global_service_context(), "mongo::SessionCatalog")
     if session_catalog_dec is None:
         return None
     return session_catalog_dec[1]
@@ -259,9 +253,9 @@ def get_wt_session(recovery_unit, recovery_unit_impl_type):
     wt_session_handle = get_unique_ptr(recovery_unit["_session"])
     if not wt_session_handle.dereference().address:
         return None
-    wt_session = wt_session_handle.dereference().cast(
-        lookup_type("mongo::WiredTigerSession")
-    )["_session"]
+    wt_session = wt_session_handle.dereference().cast(lookup_type("mongo::WiredTigerSession"))[
+        "_session"
+    ]
     return wt_session
 
 
@@ -279,9 +273,7 @@ def get_decorations(obj):
         try:
             yield (deco_type_name, obj)
         except Exception as err:
-            print(
-                "Failed to look up decoration type: " + deco_type_name + ": " + str(err)
-            )
+            print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
 
 
 def get_object_decoration(decorable, start, index):
@@ -298,9 +290,7 @@ def get_object_decoration(decorable, start, index):
 
 def get_decorable_info(decorable):
     decorable_t = decorable.type.template_argument(0)
-    reg_sym, _ = gdb.lookup_symbol(
-        "mongo::decorable_detail::gdbRegistry<{}>".format(decorable_t)
-    )
+    reg_sym, _ = gdb.lookup_symbol("mongo::decorable_detail::gdbRegistry<{}>".format(decorable_t))
     decl_vector = reg_sym.value()["_entries"]
     start = decl_vector["_M_impl"]["_M_start"]
     finish = decl_vector["_M_impl"]["_M_finish"]
@@ -423,11 +413,7 @@ class GetMongoDecoration(gdb.Command):
             (type_name, obj) = dec
             print(type_name, obj)
         else:
-            print(
-                "No decoration found whose type name contains '"
-                + type_name_substr
-                + "'."
-            )
+            print("No decoration found whose type name contains '" + type_name_substr + "'.")
 
 
 # Register command
@@ -466,15 +452,11 @@ class DumpMongoDSessionCatalog(gdb.Command):
             )
             return
         session_kv_pairs = get_session_kv_pairs()
-        print(
-            "Dumping %d Session objects from the SessionCatalog" % len(session_kv_pairs)
-        )
+        print("Dumping %d Session objects from the SessionCatalog" % len(session_kv_pairs))
 
         # Optionally search for a specified session, based on its id.
         if lsid_to_find:
-            print(
-                "Only printing information for session " + lsid_to_find + ", if found."
-            )
+            print("Only printing information for session " + lsid_to_find + ", if found.")
             lsids_to_print = [lsid_to_find]
         else:
             lsids_to_print = [str(s["first"]["_id"]) for s in session_kv_pairs]
@@ -523,10 +505,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             if field in get_field_names(session_runtime_info):
                 print(field, "=", session_runtime_info[field])
             else:
-                print(
-                    "Could not find field '%s' on the SessionRuntimeInfo object."
-                    % field
-                )
+                print("Could not find field '%s' on the SessionRuntimeInfo object." % field)
         print("")
 
     @staticmethod
@@ -540,10 +519,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             if field in get_field_names(session):
                 print(field, "=", session[field])
             else:
-                print(
-                    "Could not find field '%s' on the SessionRuntimeInfo object."
-                    % field
-                )
+                print("Could not find field '%s' on the SessionRuntimeInfo object." % field)
 
         # Print the information from a TransactionParticipant if a session has one.
         txn_part_dec = get_decoration(session, "TransactionParticipant")
@@ -564,10 +540,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
                 if field in get_field_names(txn_part_observable_state):
                     print(field, "=", txn_part_observable_state[field])
                 else:
-                    print(
-                        "Could not find field '%s' on the TransactionParticipant"
-                        % field
-                    )
+                    print("Could not find field '%s' on the TransactionParticipant" % field)
 
             # The 'txnResourceStash' field is a boost::optional so we unpack it manually if it
             # is non-empty. We are only interested in its Locker object for now. TODO: Load the
@@ -576,9 +549,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             val = get_boost_optional(txn_part_observable_state["txnResourceStash"])
             if val:
                 locker_addr = get_unique_ptr(val["_locker"])
-                locker_obj = locker_addr.dereference().cast(
-                    lookup_type("mongo::Locker")
-                )
+                locker_obj = locker_addr.dereference().cast(lookup_type("mongo::Locker"))
                 print("txnResourceStash._locker", "@", locker_addr)
                 print("txnResourceStash._locker._id", "=", locker_obj["_id"])
             else:
@@ -629,9 +600,7 @@ class DumpMongoDBMutexes(gdb.Command):
                 output_doc["mutex"] = str(diagnostic_info["_captureName"])[1:-1]
 
                 millis = int(diagnostic_info["_timestamp"]["millis"])
-                dt = datetime.datetime.fromtimestamp(
-                    millis / 1000, tz=datetime.timezone.utc
-                )
+                dt = datetime.datetime.fromtimestamp(millis / 1000, tz=datetime.timezone.utc)
                 output_doc["since"] = dt.isoformat()
             print(json.dumps(output_doc))
 
@@ -664,9 +633,7 @@ class MongoDBDumpLocks(gdb.Command):
         try:
             # Call into mongod, and dump the state of lock manager
             # Note that output will go to mongod's standard output, not the debugger output window
-            gdb.execute(
-                "call mongo::dumpLockManager()", from_tty=False, to_string=False
-            )
+            gdb.execute("call mongo::dumpLockManager()", from_tty=False, to_string=False)
         except gdb.error as gdberr:
             print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
 
@@ -680,9 +647,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
 
     def __init__(self):
         """Initialize MongoDBDumpRecoveryUnits."""
-        RegisterMongoCommand.register(
-            self, "mongodb-dump-recovery-units", gdb.COMMAND_DATA
-        )
+        RegisterMongoCommand.register(self, "mongodb-dump-recovery-units", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
         """Invoke MongoDBDumpRecoveryUnits."""
@@ -724,17 +689,13 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             recovery_unit = None
             if operation_context_handle:
                 operation_context = operation_context_handle.dereference()
-                recovery_unit_handle = get_unique_ptr(
-                    operation_context["_recoveryUnit"]
-                )
+                recovery_unit_handle = get_unique_ptr(operation_context["_recoveryUnit"])
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
                     lookup_type(recovery_unit_impl_type)
                 )
 
-            output_doc["recoveryUnit"] = (
-                hex(recovery_unit_handle) if recovery_unit else "0x0"
-            )
+            output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
             wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
             if wt_session:
                 output_doc["WT_SESSION"] = hex(wt_session)
@@ -749,14 +710,10 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             parent_session = session_runtime_info["parentSession"]
             child_sessions = absl_get_nodes(session_runtime_info["childSessions"])
 
-            MongoDBDumpRecoveryUnits.dump_session(
-                parent_session, recovery_unit_impl_type
-            )
+            MongoDBDumpRecoveryUnits.dump_session(parent_session, recovery_unit_impl_type)
             for child_session_kv in child_sessions:
                 child_session = child_session_kv["second"]
-                MongoDBDumpRecoveryUnits.dump_session(
-                    child_session, recovery_unit_impl_type
-                )
+                MongoDBDumpRecoveryUnits.dump_session(child_session, recovery_unit_impl_type)
 
         if enabled_at_start:
             gdb.execute("set print static-members on")
@@ -779,17 +736,13 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             )
             if txn_resource_stash:
                 output_doc["txnResourceStash"] = str(txn_resource_stash.address)
-                recovery_unit_handle = get_unique_ptr(
-                    txn_resource_stash["_recoveryUnit"]
-                )
+                recovery_unit_handle = get_unique_ptr(txn_resource_stash["_recoveryUnit"])
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
                     lookup_type(recovery_unit_impl_type)
                 )
 
-        output_doc["recoveryUnit"] = (
-            hex(recovery_unit_handle) if recovery_unit else "0x0"
-        )
+        output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
         wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
         if wt_session:
             output_doc["WT_SESSION"] = hex(wt_session)
@@ -809,9 +762,7 @@ class MongoDBDumpStorageEngineInfo(gdb.Command):
 
     def __init__(self):
         """Initialize MongoDBDumpStorageEngineInfo."""
-        RegisterMongoCommand.register(
-            self, "mongodb-dump-storage-engine-info", gdb.COMMAND_DATA
-        )
+        RegisterMongoCommand.register(self, "mongodb-dump-storage-engine-info", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke MongoDBDumpStorageEngineInfo."""
@@ -821,10 +772,7 @@ class MongoDBDumpStorageEngineInfo(gdb.Command):
         if main_binary_name == "mongod":
             self.dump_mongod_storage_engine_info()
         else:
-            print(
-                "Not invoking mongod storage engine info dump for: %s"
-                % (main_binary_name)
-            )
+            print("Not invoking mongod storage engine info dump for: %s" % (main_binary_name))
 
     @staticmethod
     def dump_mongod_storage_engine_info():
@@ -839,9 +787,7 @@ class MongoDBDumpStorageEngineInfo(gdb.Command):
                 to_string=False,
             )
         except gdb.error as gdberr:
-            print(
-                "Ignoring error '%s' in dump_mongod_storage_engine_info" % str(gdberr)
-            )
+            print("Ignoring error '%s' in dump_mongod_storage_engine_info" % str(gdberr))
 
 
 # Register command
@@ -858,9 +804,7 @@ class BtIfActive(gdb.Command):
     def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke GDB to print stack trace."""
         try:
-            idle_location = gdb.parse_and_eval(
-                "mongo::for_debuggers::idleThreadLocation"
-            )
+            idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
         except gdb.error:
             idle_location = None  # If unsure, print a stack trace.
 
@@ -911,15 +855,11 @@ class MongoDBUniqueStack(gdb.Command):
         thread_info["name"] = get_current_thread_name()
 
         if sys.platform.startswith("linux"):
-            header_format = (
-                "Thread {gdb_thread_num}: {name} (Thread 0x{pthread:x} (LWP {lwpid}))"
-            )
+            header_format = "Thread {gdb_thread_num}: {name} (Thread 0x{pthread:x} (LWP {lwpid}))"
         elif sys.platform.startswith("sunos"):
             (_, _, thread_tid) = thread.ptid
             if thread_tid != 0 and thread_info["lwpid"] != 0:
-                header_format = (
-                    "Thread {gdb_thread_num}: {name} (Thread {pthread} (LWP {lwpid}))"
-                )
+                header_format = "Thread {gdb_thread_num}: {name} (Thread {pthread} (LWP {lwpid}))"
             elif thread_info["lwpid"] != 0:
                 header_format = "Thread {gdb_thread_num}: {name} (LWP {lwpid})"
             else:
@@ -980,9 +920,7 @@ class MongoDBJavaScriptStack(gdb.Command):
 
     def __init__(self):
         """Initialize MongoDBJavaScriptStack."""
-        RegisterMongoCommand.register(
-            self, "mongodb-javascript-stack", gdb.COMMAND_STATUS
-        )
+        RegisterMongoCommand.register(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke GDB to dump JS stacks."""

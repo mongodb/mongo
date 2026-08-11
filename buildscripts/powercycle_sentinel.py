@@ -38,23 +38,17 @@ def get_evergreen_api() -> EvergreenApi:
             evg_api = RetryingEvergreenApi.get_api(config_file=file)
             return evg_api
 
-    LOGGER.error(
-        "Evergreen config not found in locations.", locations=EVERGREEN_CONFIG_LOCATIONS
-    )
+    LOGGER.error("Evergreen config not found in locations.", locations=EVERGREEN_CONFIG_LOCATIONS)
     sys.exit(1)
 
 
-def watch_tasks(
-    task_ids: List[str], evg_api: EvergreenApi, watch_interval_secs: int
-) -> List[str]:
+def watch_tasks(task_ids: List[str], evg_api: EvergreenApi, watch_interval_secs: int) -> List[str]:
     """Watch tasks if they run longer than exec timeout."""
     watch_task_ids = task_ids[:]
     long_running_task_ids = []
 
     while watch_task_ids:
-        LOGGER.info(
-            "Looking if powercycle tasks are still running on the current buildvariant."
-        )
+        LOGGER.info("Looking if powercycle tasks are still running on the current buildvariant.")
         powercycle_tasks = [evg_api.task_by_id(task_id) for task_id in watch_task_ids]
         for task in powercycle_tasks:
             if task.finish_time:
@@ -97,9 +91,7 @@ def main(expansions_file: str = "expansions.yml") -> None:
     evg_api = get_evergreen_api()
 
     build_tasks = evg_api.tasks_by_build(build_id)
-    gen_task_id = [
-        task.task_id for task in build_tasks if gen_task_name in task.task_id
-    ][0]
+    gen_task_id = [task.task_id for task in build_tasks if gen_task_name in task.task_id][0]
     gen_task_url = f"{EVERGREEN_HOST}/task/{gen_task_id}"
 
     while evg_api.task_by_id(gen_task_id).is_active():
@@ -119,9 +111,7 @@ def main(expansions_file: str = "expansions.yml") -> None:
     ]
     LOGGER.info(f"Watching powercycle tasks:\n{get_links(powercycle_task_ids)}")
 
-    long_running_task_ids = watch_tasks(
-        powercycle_task_ids, evg_api, WATCH_INTERVAL_SECS
-    )
+    long_running_task_ids = watch_tasks(powercycle_task_ids, evg_api, WATCH_INTERVAL_SECS)
     if long_running_task_ids:
         LOGGER.error(
             f"Found powercycle tasks that are running for more than {POWERCYCLE_TASK_EXEC_TIMEOUT_SECS} "

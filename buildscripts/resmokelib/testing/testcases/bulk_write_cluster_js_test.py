@@ -27,9 +27,5 @@ class BulkWriteClusterTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     def _populate_test_data(self, test_data):
         test_data["jsTestFile"] = self.js_filename
-        test_data["bulkWriteCluster"] = self.fixture.clusters[
-            0
-        ].get_driver_connection_url()
-        test_data["normalCluster"] = self.fixture.clusters[
-            1
-        ].get_driver_connection_url()
+        test_data["bulkWriteCluster"] = self.fixture.clusters[0].get_driver_connection_url()
+        test_data["normalCluster"] = self.fixture.clusters[1].get_driver_connection_url()

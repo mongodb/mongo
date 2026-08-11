@@ -74,9 +74,7 @@ class TagsConfig(object):
         with open(filename, "w") as fstream:
             if preamble:
                 print(
-                    textwrap.fill(
-                        preamble, width=100, initial_indent="# ", subsequent_indent="# "
-                    ),
+                    textwrap.fill(preamble, width=100, initial_indent="# ", subsequent_indent="# "),
                     file=fstream,
                 )
 

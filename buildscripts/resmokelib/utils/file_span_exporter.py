@@ -25,8 +25,7 @@ class FileSpanExporter(SpanExporter):
         directory: str,
         pretty_print=False,
         service_name: Optional[str] = None,
-        formatter: Callable[[ReadableSpan], str] = lambda span: span.to_json()
-        + linesep,
+        formatter: Callable[[ReadableSpan], str] = lambda span: span.to_json() + linesep,
     ):
         self.formatter = formatter
         self.service_name = service_name

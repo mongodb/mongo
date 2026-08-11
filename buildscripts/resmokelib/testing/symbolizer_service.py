@@ -95,14 +95,10 @@ class ResmokeSymbolizer:
         """Initialize instance."""
 
         self.config = (
-            config
-            if config is not None
-            else ResmokeSymbolizerConfig.from_resmoke_config()
+            config if config is not None else ResmokeSymbolizerConfig.from_resmoke_config()
         )
         self.symbolizer_service = (
-            symbolizer_service
-            if symbolizer_service is not None
-            else SymbolizerService()
+            symbolizer_service if symbolizer_service is not None else SymbolizerService()
         )
         self.file_service = (
             file_service
@@ -147,9 +143,7 @@ class ResmokeSymbolizer:
         data = self.get_unsymbolized_stacktrace_data(test, files)
         self.make_symbolization_instructions_or_symbolize(test, data, files)
 
-    def get_unsymbolized_stacktrace_data(
-        self, test: TestCase, files: list[str]
-    ) -> dict:
+    def get_unsymbolized_stacktrace_data(self, test: TestCase, files: list[str]) -> dict:
         """
         Reads each file containing unsymbolized stacktraces and stores its content.
         In each entry, the original name of the file and the test associated with the stacktrace is also stored.
@@ -167,20 +161,14 @@ class ResmokeSymbolizer:
                     with open(UNSYMBOLIZED_STACKTRACE_JSON, "r") as file:
                         data = json.load(file)
                 except Exception as ex:
-                    test.logger.info(
-                        f"unable to read existing unsymbolized_stacktraces file: {ex}"
-                    )
+                    test.logger.info(f"unable to read existing unsymbolized_stacktraces file: {ex}")
 
             for f in files:
                 unsymbolized_content_dict = {}
                 try:
                     with open(f, "r") as file:
-                        unsymbolized_content = ",".join(
-                            [line.rstrip("\n") for line in file]
-                        )
-                        unsymbolized_content_dict = ast.literal_eval(
-                            unsymbolized_content
-                        )
+                        unsymbolized_content = ",".join([line.rstrip("\n") for line in file])
+                        unsymbolized_content_dict = ast.literal_eval(unsymbolized_content)
                 except Exception as e:
                     test.logger.error(e)
 
@@ -292,9 +280,7 @@ class ResmokeSymbolizer:
         missing_keys = []
         for entry in unsymbolized_stacktraces_info:
             unsymbolized_stacktrace = entry["unsymbolized_stacktrace"]
-            found_backtrace = self.get_value_recursively(
-                unsymbolized_stacktrace, BACKTRACE_KEY
-            )
+            found_backtrace = self.get_value_recursively(unsymbolized_stacktrace, BACKTRACE_KEY)
             found_process_info = self.get_value_recursively(
                 unsymbolized_stacktrace, PROCESS_INFO_KEY
             )
@@ -371,8 +357,7 @@ If no symbolized stacktrace is created, then most likely either:
 
         if self.config.client_id is None or self.config.client_secret is None:
             test.logger.info(
-                "Symbolizer client secret and/or client ID are absent,"
-                " skipping symbolization"
+                "Symbolizer client secret and/or client ID are absent," " skipping symbolization"
             )
             return False
 

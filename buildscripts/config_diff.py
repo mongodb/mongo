@@ -132,9 +132,7 @@ def load_yaml(dirs: list, exclusions: list, idl_yaml_handlers: list) -> None:
                 if not name.endswith(".idl"):
                     continue
 
-                with io.open(
-                    os.path.join(dirpath, name), "r", encoding="utf-8"
-                ) as idl_yaml_stream:
+                with io.open(os.path.join(dirpath, name), "r", encoding="utf-8") as idl_yaml_stream:
                     idl_yaml = yaml.safe_load(idl_yaml_stream)
                     for handler in idl_yaml_handlers:
                         handler.handle(idl_yaml, name)
@@ -233,9 +231,7 @@ def main():
     exclude = set(args.exclude_dirs.split(":")) if args.exclude_dirs else set()
     mode = ComparisonType(args.mode)
 
-    diffs = get_properties_diffs(
-        mode, base_version_dirs, incremented_version_dirs, exclude
-    )
+    diffs = get_properties_diffs(mode, base_version_dirs, incremented_version_dirs, exclude)
     output_diffs(mode, diffs)
 
 
@@ -273,15 +269,11 @@ class TestBuildBasePropertiesForComparisonHandler(unittest.TestCase):
         """
         yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
-        fixture = BuildBasePropertiesForComparisonHandler(
-            ComparisonType.SERVER_PARAMETERS
-        )
+        fixture = BuildBasePropertiesForComparisonHandler(ComparisonType.SERVER_PARAMETERS)
         fixture.handle(yaml_obj, filename)
 
         # should filter out configs, but parse server parameters
-        self.assertIsNone(
-            fixture.properties.get(("net.compression.compressors", filename))
-        )
+        self.assertIsNone(fixture.properties.get(("net.compression.compressors", filename)))
         self.assertIsNotNone(fixture.properties[("changeStreamOptions", filename)])
 
         fixture = BuildBasePropertiesForComparisonHandler(ComparisonType.CONFIGS)
@@ -289,9 +281,7 @@ class TestBuildBasePropertiesForComparisonHandler(unittest.TestCase):
 
         # should filter out server parameters, but parse configs
         self.assertIsNone(fixture.properties.get(("changeStreamOptions", filename)))
-        self.assertIsNotNone(
-            fixture.properties.get(("net.compression.compressors", filename))
-        )
+        self.assertIsNotNone(fixture.properties.get(("net.compression.compressors", filename)))
 
     def test_empty_yaml_obj_does_nothing(self):
         filename = "test.yml"
@@ -302,9 +292,7 @@ class TestBuildBasePropertiesForComparisonHandler(unittest.TestCase):
 
         yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
-        fixture = BuildBasePropertiesForComparisonHandler(
-            ComparisonType.SERVER_PARAMETERS
-        )
+        fixture = BuildBasePropertiesForComparisonHandler(ComparisonType.SERVER_PARAMETERS)
         fixture.handle(yaml_obj, filename)
         self.assertTrue(len(fixture.properties) == 0)
 

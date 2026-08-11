@@ -47,10 +47,7 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
 
     try:
         extras = []
-        if (
-            platform.machine() in set(["s390x", "ppc64le"])
-            and ".el9" not in platform.release()
-        ):
+        if platform.machine() in set(["s390x", "ppc64le"]) and ".el9" not in platform.release():
             extras = ["--extras", "oldcrypt"]
         poetry_dry_run_proc = subprocess.run(
             [

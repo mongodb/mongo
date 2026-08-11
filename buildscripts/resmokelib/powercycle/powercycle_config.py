@@ -14,15 +14,9 @@ class PowercycleTaskConfig:
         """Initialize."""
 
         self.name = task_yaml.get("name", "")
-        self.crash_method = task_yaml.get(
-            "crash_method", powercycle_constants.DEFAULT_CRASH_METHOD
-        )
-        self.test_loops = task_yaml.get(
-            "test_loops", powercycle_constants.DEFAULT_TEST_LOOPS
-        )
-        self.seed_doc_num = task_yaml.get(
-            "seed_doc_num", powercycle_constants.DEFAULT_SEED_DOC_NUM
-        )
+        self.crash_method = task_yaml.get("crash_method", powercycle_constants.DEFAULT_CRASH_METHOD)
+        self.test_loops = task_yaml.get("test_loops", powercycle_constants.DEFAULT_TEST_LOOPS)
+        self.seed_doc_num = task_yaml.get("seed_doc_num", powercycle_constants.DEFAULT_SEED_DOC_NUM)
 
         self.write_concern = task_yaml.get("write_concern", "{}")
         self.read_concern_level = task_yaml.get("read_concern_level", None)

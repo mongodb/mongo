@@ -72,9 +72,7 @@ def get_children(explain_node: dict[str, any]) -> list[Node]:
     if "inputStage" in explain_node:
         children = [parse_optimizer_node(explain_node["inputStage"])]
     elif "inputStages" in explain_node:
-        children = [
-            parse_optimizer_node(child) for child in explain_node["inputStages"]
-        ]
+        children = [parse_optimizer_node(child) for child in explain_node["inputStages"]]
     else:
         children = []
     return children

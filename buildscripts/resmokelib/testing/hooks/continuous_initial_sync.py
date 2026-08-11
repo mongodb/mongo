@@ -42,9 +42,7 @@ class ContinuousInitialSync(interface.Hook):
             use_action_permitted_file: use a file to control if the syncer thread should do a failover or initial sync
             sync_interval_secs: how often to trigger a new cycle
         """
-        interface.Hook.__init__(
-            self, hook_logger, fixture, ContinuousInitialSync.DESCRIPTION
-        )
+        interface.Hook.__init__(self, hook_logger, fixture, ContinuousInitialSync.DESCRIPTION)
 
         self.hook_logger = hook_logger
 
@@ -76,9 +74,7 @@ class ContinuousInitialSync(interface.Hook):
             self._add_fixture(self._fixture)
 
         if self.__action_files is not None:
-            lifecycle = lifecycle_interface.FileBasedThreadLifecycle(
-                self.__action_files
-            )
+            lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.__action_files)
         else:
             lifecycle_interface.FlagBasedThreadLifecycle()
 
@@ -217,9 +213,7 @@ class _InitialSyncThread(threading.Thread):
                 elif stage == SyncerStage.INITSYNC_PRIMARY:
                     self.logger.info("Stepping up new secondaries...")
                     for fixture in self._rs_fixtures:
-                        self._fail_over_to_node(
-                            fixture.get_initial_sync_node(), fixture
-                        )
+                        self._fail_over_to_node(fixture.get_initial_sync_node(), fixture)
 
                     stage = SyncerStage.ORIGINAL_PRIMARY
                     wait_secs = self._sync_interval_secs
@@ -578,10 +572,6 @@ class _InitialSyncThread(threading.Thread):
         shell_proc.start()
         return_code = shell_proc.wait()
         if return_code:
-            raise errors.ServerFailure(
-                "Awaiting replication failed for {}".format(client_conn)
-            )
+            raise errors.ServerFailure("Awaiting replication failed for {}".format(client_conn))
 
-        self.logger.info(
-            "Finished WaitForReplication, no nodes should be in ROLLBACK state."
-        )
+        self.logger.info("Finished WaitForReplication, no nodes should be in ROLLBACK state.")

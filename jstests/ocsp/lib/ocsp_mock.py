@@ -26,21 +26,13 @@ def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description="MongoDB Mock OCSP Responder.")
 
-    parser.add_argument(
-        "-p", "--port", type=int, default=8080, help="Port to listen on"
-    )
+    parser.add_argument("-p", "--port", type=int, default=8080, help="Port to listen on")
 
-    parser.add_argument(
-        "-b", "--bind_ip", type=str, default=None, help="IP to listen on"
-    )
+    parser.add_argument("-b", "--bind_ip", type=str, default=None, help="IP to listen on")
 
-    parser.add_argument(
-        "--ca_file", type=str, required=True, help="CA file for OCSP responder"
-    )
+    parser.add_argument("--ca_file", type=str, required=True, help="CA file for OCSP responder")
 
-    parser.add_argument(
-        "-v", "--verbose", action="count", help="Enable verbose tracing"
-    )
+    parser.add_argument("-v", "--verbose", action="count", help="Enable verbose tracing")
 
     parser.add_argument(
         "--ocsp_responder_cert",
@@ -95,9 +87,7 @@ def main():
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=level, format="%(asctime)s %(levelname)s %(module)s: %(message)s"
-    )
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(module)s: %(message)s")
     logging.Formatter.converter = time.gmtime
 
     logger.info("Initializing OCSP Responder")

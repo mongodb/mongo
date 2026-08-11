@@ -15,6 +15,7 @@ package(
 )
 
 exports_files([
+    ".bazelversion",
     ".prettierrc",
     "pyproject.toml",
     "poetry.lock",

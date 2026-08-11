@@ -22,10 +22,10 @@ class ValidateCollectionsInBackground(jsfile.JSHook):
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize ValidateCollectionsInBackground."""
-        description = "Run background collection validation against all mongods while a test is running"
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_validate_collections_background.js"
+        description = (
+            "Run background collection validation against all mongods while a test is running"
         )
+        js_filename = os.path.join("jstests", "hooks", "run_validate_collections_background.js")
         jsfile.JSHook.__init__(
             self,
             hook_logger,

@@ -15,9 +15,7 @@ class MongoTidyTests(unittest.TestCase):
             "--@bazel_clang_tidy//:clang_tidy_config=//src/mongo/tools/mongo_tidy_checks/tests:"
             + self._testMethodName
             + "_tidy_config",
-            "//src/mongo/tools/mongo_tidy_checks/tests:"
-            + self._testMethodName
-            + "_with_debug",
+            "//src/mongo/tools/mongo_tidy_checks/tests:" + self._testMethodName + "_with_debug",
         ]
         p = subprocess.run(
             cmd,
@@ -27,17 +25,10 @@ class MongoTidyTests(unittest.TestCase):
         )
 
         if isinstance(self.expected_output, list):
-            passed = all(
-                [
-                    expected_output in p.stdout
-                    for expected_output in self.expected_output
-                ]
-            )
+            passed = all([expected_output in p.stdout for expected_output in self.expected_output])
             print_expected_output = "\n".join(self.expected_output)
         else:
-            passed = (
-                self.expected_output is not None and self.expected_output in p.stdout
-            )
+            passed = self.expected_output is not None and self.expected_output in p.stdout
             print_expected_output = self.expected_output
 
         msg = "\n".join(
@@ -131,8 +122,7 @@ class MongoTidyTests(unittest.TestCase):
             "day",
         ]
         self.expected_output = [
-            f"Illegal use of prohibited type 'std::chrono::{t}'."
-            for t in prohibited_types
+            f"Illegal use of prohibited type 'std::chrono::{t}'." for t in prohibited_types
         ]
         self.run_clang_tidy()
 

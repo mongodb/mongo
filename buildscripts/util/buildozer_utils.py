@@ -35,9 +35,7 @@ def bd_new(package: str, rule_kind: str, rule_name: str) -> None:
     _bd_command(f"new {rule_kind} {rule_name}", [package])
 
 
-def bd_comment(
-    labels: List[str], comment: str, attr: str = "", value: str = ""
-) -> None:
+def bd_comment(labels: List[str], comment: str, attr: str = "", value: str = "") -> None:
     _bd_command(f"comment {attr} {value} {comment}", labels)
 
 

@@ -86,9 +86,9 @@ def _set_up_modules():
         # Only load module if all its paths exist
         if all_paths_present:
             # Load fixtures and hooks so they get registered
-            for resource_dir in module_config.get(
-                "fixture_dirs", []
-            ) + module_config.get("hook_dirs", []):
+            for resource_dir in module_config.get("fixture_dirs", []) + module_config.get(
+                "hook_dirs", []
+            ):
                 norm_path = os.path.normpath(resource_dir)
                 package = resource_dir.replace("/", ".")
                 autoloader.load_all_modules(package, [norm_path])
@@ -224,18 +224,12 @@ def _validate_options(parser, args):
         return errors
 
     config = vars(args)
-    mongod_set_param_errors = get_set_param_errors(
-        config.get("mongod_set_parameters") or []
-    )
-    mongos_set_param_errors = get_set_param_errors(
-        config.get("mongos_set_parameters") or []
-    )
+    mongod_set_param_errors = get_set_param_errors(config.get("mongod_set_parameters") or [])
+    mongos_set_param_errors = get_set_param_errors(config.get("mongos_set_parameters") or [])
     mongocryptd_set_param_errors = get_set_param_errors(
         config.get("mongocryptd_set_parameters") or []
     )
-    mongo_set_param_errors = get_set_param_errors(
-        config.get("mongo_set_parameters") or []
-    )
+    mongo_set_param_errors = get_set_param_errors(config.get("mongo_set_parameters") or [])
     error_msgs = {}
     if mongod_set_param_errors:
         error_msgs["mongodSetParameters"] = mongod_set_param_errors
@@ -279,9 +273,7 @@ def _validate_config(parser):
             "i686",
             "x86_64",
         ]:
-            parser.error(
-                "--recordWith is only supported on x86 and x86_64 Linux distributions"
-            )
+            parser.error("--recordWith is only supported on x86 and x86_64 Linux distributions")
             return
 
         resolved_path = shutil.which(_config.UNDO_RECORDER_PATH)
@@ -300,13 +292,9 @@ def _validate_config(parser):
         if _config.TLS_CA_FILE:
             parser.error("--tlsCAFile requires server TLS to be enabled")
         if _config.MONGOD_TLS_CERTIFICATE_KEY_FILE:
-            parser.error(
-                "--mongodTlsCertificateKeyFile requires server TLS to be enabled"
-            )
+            parser.error("--mongodTlsCertificateKeyFile requires server TLS to be enabled")
         if _config.MONGOS_TLS_CERTIFICATE_KEY_FILE:
-            parser.error(
-                "--mongosTlsCertificateKeyFile requires server TLS to be enabled"
-            )
+            parser.error("--mongosTlsCertificateKeyFile requires server TLS to be enabled")
 
     if not _config.SHELL_TLS_ENABLED:
         if _config.SHELL_TLS_CERTIFICATE_KEY_FILE:
@@ -326,9 +314,7 @@ def _find_resmoke_wrappers():
     search_pattern = os.path.join(_config.RESMOKE_ROOT, "**/bin/resmoke.py")
     candidate_installs = glob.glob(search_pattern, recursive=True)
     candidate_installs = [
-        wrapper
-        for wrapper in candidate_installs
-        if not wrapper.startswith("bazel-mongo/")
+        wrapper for wrapper in candidate_installs if not wrapper.startswith("bazel-mongo/")
     ]
     return list(candidate_installs)
 
@@ -432,17 +418,13 @@ be invoked as either:
     def setup_feature_flags():
         _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
         _config.RUN_NO_FEATURE_FLAG_TESTS = config.pop("run_no_feature_flag_tests")
-        _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop(
-            "additional_feature_flags_file"
-        )
+        _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop("additional_feature_flags_file")
 
         if values.command == "run":
             # These logging messages start with # becuase the output of this file must produce
             # valid yaml. This comments out these print statements when the output is parsed.
             print("# Fetching feature flags...")
-            all_ff = (
-                gen_all_feature_flag_list.get_all_feature_flags_turned_off_by_default()
-            )
+            all_ff = gen_all_feature_flag_list.get_all_feature_flags_turned_off_by_default()
             print("# Fetched feature flags...")
         else:
             all_ff = []
@@ -458,18 +440,14 @@ be invoked as either:
 
         # Specify additional feature flags from the command line.
         # Set running all feature flag tests to True if this options is specified.
-        additional_feature_flags = _tags_from_list(
-            config.pop("additional_feature_flags")
-        )
+        additional_feature_flags = _tags_from_list(config.pop("additional_feature_flags"))
         if additional_feature_flags is not None:
             enabled_feature_flags.extend(additional_feature_flags)
 
         return enabled_feature_flags, all_ff
 
     _config.ENABLED_FEATURE_FLAGS, all_feature_flags = setup_feature_flags()
-    not_enabled_feature_flags = list(
-        set(all_feature_flags) - set(_config.ENABLED_FEATURE_FLAGS)
-    )
+    not_enabled_feature_flags = list(set(all_feature_flags) - set(_config.ENABLED_FEATURE_FLAGS))
 
     _config.AUTO_KILL = config.pop("auto_kill")
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
@@ -501,17 +479,12 @@ be invoked as either:
         # Don't run tests with feature flags that are not enabled.
         _config.EXCLUDE_WITH_ANY_TAGS.extend(not_enabled_feature_flags)
         _config.EXCLUDE_WITH_ANY_TAGS.extend(
-            [
-                f"{feature_flag}_incompatible"
-                for feature_flag in _config.ENABLED_FEATURE_FLAGS
-            ]
+            [f"{feature_flag}_incompatible" for feature_flag in _config.ENABLED_FEATURE_FLAGS]
         )
 
     _config.DOCKER_COMPOSE_BUILD_IMAGES = config.pop("docker_compose_build_images")
     if _config.DOCKER_COMPOSE_BUILD_IMAGES is not None:
-        _config.DOCKER_COMPOSE_BUILD_IMAGES = _config.DOCKER_COMPOSE_BUILD_IMAGES.split(
-            ","
-        )
+        _config.DOCKER_COMPOSE_BUILD_IMAGES = _config.DOCKER_COMPOSE_BUILD_IMAGES.split(",")
     _config.DOCKER_COMPOSE_BUILD_ENV = config.pop("docker_compose_build_env")
     _config.DOCKER_COMPOSE_TAG = config.pop("docker_compose_tag")
     _config.EXTERNAL_SUT = config.pop("external_sut")
@@ -573,9 +546,7 @@ be invoked as either:
         # Normalize the path so that on Windows dist-test/bin
         # translates to .\dist-test\bin then absolutify it since the
         # Windows PATH variable requires absolute paths.
-        _config.INSTALL_DIR = os.path.abspath(
-            _expand_user(os.path.normpath(_config.INSTALL_DIR))
-        )
+        _config.INSTALL_DIR = os.path.abspath(_expand_user(os.path.normpath(_config.INSTALL_DIR)))
 
         for binary in ["mongo", "mongod", "mongos", "mongot-localdev/mongot", "dbtest"]:
             keyname = binary + "_executable"
@@ -634,14 +605,10 @@ be invoked as either:
             _config.MONGOS_SET_PARAMETERS,
         )
 
-    _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(
-        config.pop("mongocryptd_set_parameters")
-    )
+    _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))
     _config.MONGO_SET_PARAMETERS = _merge_set_params(config.pop("mongo_set_parameters"))
 
-    _config.MONGOT_EXECUTABLE = _expand_user(
-        config.pop("mongot-localdev/mongot_executable")
-    )
+    _config.MONGOT_EXECUTABLE = _expand_user(config.pop("mongot-localdev/mongot_executable"))
     mongot_set_parameters = config.pop("mongot_set_parameters")
     _config.MONGOT_SET_PARAMETERS = _merge_set_params(mongot_set_parameters)
 
@@ -653,15 +620,9 @@ be invoked as either:
     _config.TLS_MODE = config.pop("tls_mode")
     _config.TLS_CA_FILE = config.pop("tls_ca_file")
     _config.SHELL_TLS_ENABLED = config.pop("shell_tls_enabled")
-    _config.SHELL_TLS_CERTIFICATE_KEY_FILE = config.pop(
-        "shell_tls_certificate_key_file"
-    )
-    _config.MONGOD_TLS_CERTIFICATE_KEY_FILE = config.pop(
-        "mongod_tls_certificate_key_file"
-    )
-    _config.MONGOS_TLS_CERTIFICATE_KEY_FILE = config.pop(
-        "mongos_tls_certificate_key_file"
-    )
+    _config.SHELL_TLS_CERTIFICATE_KEY_FILE = config.pop("shell_tls_certificate_key_file")
+    _config.MONGOD_TLS_CERTIFICATE_KEY_FILE = config.pop("mongod_tls_certificate_key_file")
+    _config.MONGOS_TLS_CERTIFICATE_KEY_FILE = config.pop("mongos_tls_certificate_key_file")
     _config.NUM_SHARDS = config.pop("num_shards")
     _config.CONFIG_SHARD = utils.pick_catalog_shard_node(
         config.pop("config_shard"), _config.NUM_SHARDS
@@ -768,10 +729,7 @@ be invoked as either:
         _config.ARCHIVE_FILE = None
     else:
         # Enable archival globally for all mainline variants.
-        if (
-            _config.EVERGREEN_VARIANT_NAME is not None
-            and not _config.EVERGREEN_PATCH_BUILD
-        ):
+        if _config.EVERGREEN_VARIANT_NAME is not None and not _config.EVERGREEN_PATCH_BUILD:
             _config.FORCE_ARCHIVE_ALL_DATA_FILES = True
 
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
@@ -798,15 +756,11 @@ be invoked as either:
 
     # Config Dir options.
     config_dir = config.pop("config_dir")
-    _config.CONFIG_DIR = (
-        os.path.join(_config.RESMOKE_ROOT, config_dir) if config_dir else None
-    )
+    _config.CONFIG_DIR = os.path.join(_config.RESMOKE_ROOT, config_dir) if config_dir else None
 
     # Directory with jstests option
     jstests_dir = config.pop("jstests_dir")
-    _config.JSTESTS_DIR = (
-        os.path.join(_config.RESMOKE_ROOT, jstests_dir) if jstests_dir else None
-    )
+    _config.JSTESTS_DIR = os.path.join(_config.RESMOKE_ROOT, jstests_dir) if jstests_dir else None
 
     # External module configuration
     external_module_config = config.pop("external_module_config")
@@ -819,9 +773,7 @@ be invoked as either:
         task_name = utils.get_task_name_without_suffix(
             _config.EVERGREEN_TASK_NAME, _config.EVERGREEN_VARIANT_NAME
         )
-        evg_task_doc_file = os.path.join(
-            _config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml"
-        )
+        evg_task_doc_file = os.path.join(_config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml")
         if os.path.exists(evg_task_doc_file):
             evg_task_doc = utils.load_yaml_file(evg_task_doc_file)
             if task_name in evg_task_doc:
@@ -840,9 +792,7 @@ be invoked as either:
         # Treat `resmoke run @to_replay` as `resmoke run --replayFile to_replay`
         if len(test_files) == 1 and test_files[0].startswith("@"):
             to_replay = test_files[0][1:]
-        elif len(test_files) > 1 and any(
-            test_file.startswith("@") for test_file in test_files
-        ):
+        elif len(test_files) > 1 and any(test_file.startswith("@") for test_file in test_files):
             parser.error(
                 "Cannot use @replay with additional test files listed on the command line invocation."
             )
@@ -898,9 +848,7 @@ def _set_logging_config():
         if os.path.exists(pathname):
             logger_config = utils.load_yaml_file(pathname)
             _config.LOGGING_CONFIG = logger_config.pop("logging")
-            _config.SHORTEN_LOGGER_NAME_CONFIG = logger_config.pop(
-                "shorten_logger_name"
-            )
+            _config.SHORTEN_LOGGER_NAME_CONFIG = logger_config.pop("shorten_logger_name")
             return
 
         root = os.path.abspath(_config.LOGGER_DIR)
@@ -910,14 +858,10 @@ def _set_logging_config():
             if ext in (".yml", ".yaml") and short_name == pathname:
                 config_file = os.path.join(root, filename)
                 if not os.path.isfile(config_file):
-                    raise ValueError(
-                        "Expected a logger YAML config, but got '%s'" % pathname
-                    )
+                    raise ValueError("Expected a logger YAML config, but got '%s'" % pathname)
                 logger_config = utils.load_yaml_file(config_file)
                 _config.LOGGING_CONFIG = logger_config.pop("logging")
-                _config.SHORTEN_LOGGER_NAME_CONFIG = logger_config.pop(
-                    "shorten_logger_name"
-                )
+                _config.SHORTEN_LOGGER_NAME_CONFIG = logger_config.pop("shorten_logger_name")
                 return
 
         raise ValueError("Unknown logger '%s'" % pathname)
@@ -1001,6 +945,4 @@ def detect_evergreen_config(
     parsed_args.variant_name = expansions.get("build_variant", None)
     parsed_args.version_id = expansions.get("version_id", None)
     parsed_args.work_dir = expansions.get("workdir", None)
-    parsed_args.evg_project_config_path = expansions.get(
-        "evergreen_config_file_path", None
-    )
+    parsed_args.evg_project_config_path = expansions.get("evergreen_config_file_path", None)

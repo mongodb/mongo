@@ -77,9 +77,7 @@ def init_parser():
         description=__doc__,
         epilog=help_epilog,
     )
-    parser.add_argument(
-        "--verbose", action="store_true", help="extra debug logging to stderr"
-    )
+    parser.add_argument("--verbose", action="store_true", help="extra debug logging to stderr")
     parser.add_argument("builtin_roles_spec", help="YAML file describing builtin roles")
     parser.add_argument("template_file", help="Cheetah template file")
     parser.add_argument("output_file")
@@ -116,16 +114,14 @@ def check_required_fields(mapping, required):
 def assert_str_field(name, value):
     if type(value) is not str:
         raise Exception(
-            "Invalid type for string field '%s', got '%s' ': %r"
-            % (name, type(value), value)
+            "Invalid type for string field '%s', got '%s' ': %r" % (name, type(value), value)
         )
 
 
 def assert_list_field(name, value):
     if type(value) is not list:
         raise Exception(
-            "Invalid type for list field '%s', got '%s' ': %r"
-            % (name, type(value), value)
+            "Invalid type for list field '%s', got '%s' ': %r" % (name, type(value), value)
         )
 
 
@@ -180,18 +176,14 @@ class Privilege:
             if self.matchType in db_valid_types:
                 self.db = get_nonempty_str_field(spec, "db")
             else:
-                raise Exception(
-                    "db field is not valid for matchType: %s" % (self.matchType)
-                )
+                raise Exception("db field is not valid for matchType: %s" % (self.matchType))
 
         coll_valid_types = ["collection", "exact_namespace"]
         if self.matchType in coll_valid_types:
             check_required_fields(spec, ["collection"])
             self.collection = get_nonempty_str_field(spec, "collection")
         elif "collection" in spec:
-            raise Exception(
-                "collection field is not valid for matchType: %s" % (self.matchType)
-            )
+            raise Exception("collection field is not valid for matchType: %s" % (self.matchType))
 
         buckets_valid_types = ["system_buckets", "system_buckets_in_any_db"]
         if self.matchType in buckets_valid_types:
@@ -234,9 +226,7 @@ class BuiltinRole:
 
         if "adminOnly" in spec:
             if type(spec["adminOnly"]) is not bool:
-                raise Exception(
-                    "adminOnly must be a bool, got: %r" % (spec["adminOnly"])
-                )
+                raise Exception("adminOnly must be a bool, got: %r" % (spec["adminOnly"]))
             self.adminOnly = spec["adminOnly"]
 
         if "roles" in spec:
@@ -271,9 +261,7 @@ def main():
     output_file = parsed.output_file
 
     # Parse and validate builtin_roles.yml
-    builtin_roles = parse_builtin_role_definitions_from_file(
-        parsed.builtin_roles_spec, verbose
-    )
+    builtin_roles = parse_builtin_role_definitions_from_file(parsed.builtin_roles_spec, verbose)
 
     # Render the templates to the output files.
     if verbose:

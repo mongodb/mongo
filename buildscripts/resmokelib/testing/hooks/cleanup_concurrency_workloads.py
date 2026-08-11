@@ -33,9 +33,7 @@ class CleanupConcurrencyWorkloads(interface.Hook):
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
         protected_dbs = ["admin", "config", "local", "$external"]
-        self.exclude_dbs = list(
-            set().union(protected_dbs, utils.default_if_none(exclude_dbs, []))
-        )
+        self.exclude_dbs = list(set().union(protected_dbs, utils.default_if_none(exclude_dbs, [])))
         self.same_collection_name = None
         self.same_db_name = None
         if same_db or same_collection:
@@ -82,9 +80,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
             try:
                 with_naive_retry(lambda: client.drop_database(db_name))
             except:
-                self.logger.exception(
-                    "Encountered an error while dropping database %s.", db_name
-                )
+                self.logger.exception("Encountered an error while dropping database %s.", db_name)
                 raise
 
         if self._hook.same_collection_name and same_db_name:
@@ -94,9 +90,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
                 self._hook.same_collection_name,
             )
             colls = with_naive_retry(client[same_db_name].list_collection_names)
-            for coll in [
-                coll for coll in colls if coll != self._hook.same_collection_name
-            ]:
+            for coll in [coll for coll in colls if coll != self._hook.same_collection_name]:
                 self.logger.info("Dropping db %s collection %s", same_db_name, coll)
                 try:
                     with_naive_retry(lambda: client[same_db_name].drop_collection(coll))

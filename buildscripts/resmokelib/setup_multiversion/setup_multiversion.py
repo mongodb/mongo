@@ -43,11 +43,7 @@ def infer_platform(edition=None, version=None):
         id_name = distro.id()
         if id_name in ("ubuntu", "rhel"):
             major_version = distro.major_version()
-            if (
-                id_name == "rhel"
-                and major_version.isdigit()
-                and int(major_version) >= 10
-            ):
+            if id_name == "rhel" and major_version.isdigit() and int(major_version) >= 10:
                 pltf = id_name + major_version
             else:
                 pltf = id_name + major_version + distro.minor_version()
@@ -63,9 +59,7 @@ def infer_platform(edition=None, version=None):
 def get_merge_base_commit(version: str, logger: logging.Logger) -> Optional[str]:
     """Get merge-base commit hash between origin/master and version."""
     cmd = ["git", "merge-base", "origin/master", f"origin/v{version}"]
-    result = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
-    )
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if result.returncode:
         logger.warning(
             "Git merge-base command failed. Falling back to latest master",
@@ -162,9 +156,7 @@ class SetupMultiversion(Subcommand):
         logger = logging.Logger("SetupMultiversion", level=log_level)
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(
-            logging.Formatter(
-                fmt="[%(asctime)s - %(name)s - %(levelname)s] %(message)s"
-            )
+            logging.Formatter(fmt="[%(asctime)s - %(name)s - %(levelname)s] %(message)s")
         )
         logger.addHandler(handler)
         return logger
@@ -189,13 +181,9 @@ class SetupMultiversion(Subcommand):
         """Return last-LTS and/or last-continuous versions."""
         out = []
         if not os.path.isfile(
-            os.path.join(
-                os.getcwd(), "buildscripts", "resmokelib", "multiversionconstants.py"
-            )
+            os.path.join(os.getcwd(), "buildscripts", "resmokelib", "multiversionconstants.py")
         ):
-            self.logger.error(
-                "This command should be run from the root of the mongo repo."
-            )
+            self.logger.error("This command should be run from the root of the mongo repo.")
             self.logger.error(
                 "If you're running it from the root of the mongo repo and still seeing"
                 " this error, please reach out in #server-testing slack channel."
@@ -204,9 +192,7 @@ class SetupMultiversion(Subcommand):
         try:
             from buildscripts.resmokelib import multiversionconstants
         except ImportError:
-            self.logger.error(
-                "Could not import `buildscripts.resmokelib.multiversionconstants`."
-            )
+            self.logger.error("Could not import `buildscripts.resmokelib.multiversionconstants`.")
             self.logger.error(
                 "If you're passing `--installLastLTS` and/or `--installLastContinuous`"
                 " flags, this module is required to automatically calculate last-LTS"
@@ -267,9 +253,7 @@ class SetupMultiversion(Subcommand):
                     )
                     urls_info = self.get_urls(version, self.variant)
                 if not urls_info:
-                    self.logger.error(
-                        "URL is not available for the version. version=%s", version
-                    )
+                    self.logger.error("URL is not available for the version. version=%s", version)
                     exit(1)
 
                 urls = urls_info.urls
@@ -297,13 +281,9 @@ class SetupMultiversion(Subcommand):
             self._write_windows_install_paths(self, self._windows_bin_install_dirs)
 
         if self.evg_versions_file:
-            self._write_evg_versions_file(
-                self, self.evg_versions_file, downloaded_versions
-            )
+            self._write_evg_versions_file(self, self.evg_versions_file, downloaded_versions)
 
-    def download_and_extract_from_urls(
-        self, urls, bin_suffix, install_dir, skip_symlinks=False
-    ):
+    def download_and_extract_from_urls(self, urls, bin_suffix, install_dir, skip_symlinks=False):
         """Download and extract values indicated in `urls`."""
         artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
         binaries_url = urls.get("Binaries", "") if self.download_binaries else None
@@ -327,9 +307,7 @@ class SetupMultiversion(Subcommand):
                     break
 
         if self.download_symbols and not download_symbols_url:
-            raise download.DownloadError(
-                "Symbols download requested but not URL available"
-            )
+            raise download.DownloadError("Symbols download requested but not URL available")
 
         if self.download_artifacts and not artifacts_url:
             raise download.DownloadError(
@@ -337,14 +315,10 @@ class SetupMultiversion(Subcommand):
             )
 
         if self.download_binaries and not binaries_url:
-            raise download.DownloadError(
-                "Binaries download requested but not URL available"
-            )
+            raise download.DownloadError("Binaries download requested but not URL available")
 
         if self.download_python_venv and not python_venv_url:
-            raise download.DownloadError(
-                "Python venv download requested but not URL available"
-            )
+            raise download.DownloadError("Python venv download requested but not URL available")
 
         self.setup_mongodb(
             artifacts_url,
@@ -407,13 +381,8 @@ class SetupMultiversion(Subcommand):
 
         for evg_version in chain(iter([evg_version]), evg_versions):
             # Skip all versions until we get the revision we should start looking from
-            if (
-                found_start_revision is False
-                and evg_version.revision != start_from_revision
-            ):
-                self.logger.warning(
-                    "Skipping evergreen version. evg_version=%s", evg_version
-                )
+            if found_start_revision is False and evg_version.revision != start_from_revision:
+                self.logger.warning("Skipping evergreen version. evg_version=%s", evg_version)
                 continue
             else:
                 found_start_revision = True
@@ -435,9 +404,7 @@ class SetupMultiversion(Subcommand):
 
         return EvgURLInfo(urls=urls, evg_version_id=actual_version_id)
 
-    def get_urls(
-        self, version: str, buildvariant_name: Optional[str] = None
-    ) -> EvgURLInfo:
+    def get_urls(self, version: str, buildvariant_name: Optional[str] = None) -> EvgURLInfo:
         """Return multiversion urls for a given version (as binary version or commit hash or evergreen_version_id)."""
 
         evg_version = evergreen_conn.get_evergreen_version(self.evg_api, version)
@@ -448,17 +415,13 @@ class SetupMultiversion(Subcommand):
             self.logger.info(
                 "Found git attributes. git_tag=%s, commit_hash=%s", git_tag, commit_hash
             )
-            evg_version = evergreen_conn.get_evergreen_version(
-                self.evg_api, commit_hash
-            )
+            evg_version = evergreen_conn.get_evergreen_version(self.evg_api, commit_hash)
         if evg_version is None:
             return EvgURLInfo()
 
         if not buildvariant_name:
             evg_project = evg_version.project_identifier
-            self.logger.debug(
-                "Found evergreen project. evergreen_project=%s", evg_project
-            )
+            self.logger.debug("Found evergreen project. evergreen_project=%s", evg_project)
 
             try:
                 major_minor_version = re.findall(r"\d+\.\d+", evg_project)[-1]
@@ -466,9 +429,7 @@ class SetupMultiversion(Subcommand):
                 major_minor_version = "master"
 
             buildvariant_name = self.get_buildvariant_name(major_minor_version)
-            self.logger.debug(
-                "Found buildvariant. buildvariant_name=%s", buildvariant_name
-            )
+            self.logger.debug("Found buildvariant. buildvariant_name=%s", buildvariant_name)
 
         if buildvariant_name not in evg_version.build_variants_map:
             raise ValueError(
@@ -505,9 +466,7 @@ class SetupMultiversion(Subcommand):
                 def try_download(download_url):
                     self.logger.info("Downloading '%s'", download_url)
                     tarball = download.download_from_s3(download_url)
-                    self.logger.info(
-                        "Extracting '%s' in '%s' folder", tarball, install_dir
-                    )
+                    self.logger.info("Extracting '%s' in '%s' folder", tarball, install_dir)
                     download.extract_archive(tarball, install_dir)
                     self.logger.info("Removing tarball '%s'", tarball)
                     os.remove(tarball)

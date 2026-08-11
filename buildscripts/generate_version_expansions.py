@@ -58,9 +58,7 @@ def generate_version_expansions():
         version_line = version_line.lstrip("r")
         version_parts = match_verstr(version_line)
         if not version_parts:
-            raise ValueError(
-                "Unable to parse version from stdin and no version.json provided"
-            )
+            raise ValueError("Unable to parse version from stdin and no version.json provided")
 
     if version_parts[0]:
         expansions["suffix"] = "v8.0-latest"
@@ -70,6 +68,11 @@ def generate_version_expansions():
         expansions["suffix"] = version_line
         expansions["src_suffix"] = "r{0}".format(version_line)
         expansions["is_release"] = "true"
+    explicit_is_release = os.getenv("IS_RELEASE", "").lower()
+    if explicit_is_release in {"true", "false"}:
+        expansions["is_release"] = explicit_is_release
+    elif explicit_is_release:
+        raise ValueError(f"IS_RELEASE must be 'true' or 'false', got {explicit_is_release!r}")
     expansions["version"] = version_line
 
     return expansions

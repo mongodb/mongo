@@ -27,9 +27,7 @@ class TestResmokeSymbolizer(unittest.TestCase):
         self.symbolizer_service_mock: under_test.SymbolizerService = MagicMock(
             spec_set=under_test.SymbolizerService
         )
-        self.file_service_mock: under_test.FileService = MagicMock(
-            spec_set=under_test.FileService
-        )
+        self.file_service_mock: under_test.FileService = MagicMock(spec_set=under_test.FileService)
         self.resmoke_symbolizer = under_test.ResmokeSymbolizer(
             self.config_mock, self.symbolizer_service_mock, self.file_service_mock
         )
@@ -79,9 +77,7 @@ class TestResmokeSymbolizer(unittest.TestCase):
 
     def test_get_stacktrace_dir_returns_dir(self):
         dbpath = "dbpath"
-        test = MagicMock(
-            fixture=MagicMock(get_dbpath_prefix=MagicMock(return_value=dbpath))
-        )
+        test = MagicMock(fixture=MagicMock(get_dbpath_prefix=MagicMock(return_value=dbpath)))
         self.file_service_mock.check_path_exists.return_value = True
 
         ret = self.resmoke_symbolizer.get_stacktrace_dir(test)
@@ -191,9 +187,7 @@ class TestFileService(unittest.TestCase):
     def test_do_not_panic_when_file_does_not_exist(self):
         non_existing_files = ["this-does-not-exist.file", "my.cat"]
         # non-existing files should be filtered out, instead of causing errors
-        self.assertListEqual(
-            self.file_service.filter_out_empty_files(non_existing_files), []
-        )
+        self.assertListEqual(self.file_service.filter_out_empty_files(non_existing_files), [])
 
     def test_filter_out_empty_files_if_partly_empty(self):
         with TemporaryDirectory() as tmpdir:

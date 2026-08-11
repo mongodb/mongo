@@ -161,9 +161,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     return make_process(logger, args, **process_kwargs), final_mongod_options
 
 
-def mongos_program(
-    logger, job_num, executable=None, process_kwargs=None, mongos_options=None
-):
+def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos_options=None):
     """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
     bin_version = get_binary_version(executable)
     args = [executable]
@@ -173,9 +171,7 @@ def mongos_program(
     if config.NOOP_MONGO_D_S_PROCESSES:
         args[0] = os.path.basename(args[0])
         mongos_options["set_parameters"]["fassertOnLockTimeoutForStepUpDown"] = 0
-        mongos_options.update(
-            {"logpath": "/var/log/mongodb/mongodb.log", "bind_ip": "0.0.0.0"}
-        )
+        mongos_options.update({"logpath": "/var/log/mongodb/mongodb.log", "bind_ip": "0.0.0.0"})
 
     if config.TLS_MODE:
         mongos_options["tlsMode"] = config.TLS_MODE
@@ -226,9 +222,7 @@ def mongos_program(
     return make_process(logger, args, **process_kwargs), final_mongos_options
 
 
-def mongot_program(
-    logger, job_num, executable=None, process_kwargs=None, mongot_options=None
-):
+def mongot_program(logger, job_num, executable=None, process_kwargs=None, mongot_options=None):
     """Return a Process instance that starts a mongot."""
     args = [executable]
     mongot_options = mongot_options.copy()
@@ -307,9 +301,7 @@ def mongo_shell_program(
         test_data["shellTlsEnabled"] = True
 
         if config.SHELL_TLS_CERTIFICATE_KEY_FILE:
-            test_data["shellTlsCertificateKeyFile"] = (
-                config.SHELL_TLS_CERTIFICATE_KEY_FILE
-            )
+            test_data["shellTlsCertificateKeyFile"] = config.SHELL_TLS_CERTIFICATE_KEY_FILE
 
     if config.TLS_CA_FILE:
         test_data["tlsCAFile"] = config.TLS_CA_FILE
@@ -318,14 +310,10 @@ def mongo_shell_program(
         test_data["tlsMode"] = config.TLS_MODE
 
     if config.MONGOD_TLS_CERTIFICATE_KEY_FILE:
-        test_data["mongodTlsCertificateKeyFile"] = (
-            config.MONGOD_TLS_CERTIFICATE_KEY_FILE
-        )
+        test_data["mongodTlsCertificateKeyFile"] = config.MONGOD_TLS_CERTIFICATE_KEY_FILE
 
     if config.MONGOS_TLS_CERTIFICATE_KEY_FILE:
-        test_data["mongosTlsCertificateKeyFile"] = (
-            config.MONGOS_TLS_CERTIFICATE_KEY_FILE
-        )
+        test_data["mongosTlsCertificateKeyFile"] = config.MONGOS_TLS_CERTIFICATE_KEY_FILE
 
     global_vars["TestData"] = test_data
 
@@ -364,9 +352,7 @@ def mongo_shell_program(
     # Propagate additional setParameters to mongocryptd processes spawned by the mongo shell.
     # Command line options to resmoke.py override the YAML configuration.
     if config.MONGOCRYPTD_SET_PARAMETERS is not None:
-        mongocryptd_set_parameters.update(
-            utils.load_yaml(config.MONGOCRYPTD_SET_PARAMETERS)
-        )
+        mongocryptd_set_parameters.update(utils.load_yaml(config.MONGOCRYPTD_SET_PARAMETERS))
         mongocryptd_set_parameters.update(feature_flag_dict)
 
     if config.MONGO_SET_PARAMETERS is not None:
@@ -385,9 +371,7 @@ def mongo_shell_program(
     # If the 'enableFlowControl' setParameter for mongod was not already specified, we set its value
     # to a default.
     if config.FLOW_CONTROL is not None:
-        mongod_set_parameters.setdefault(
-            "enableFlowControl", config.FLOW_CONTROL == "on"
-        )
+        mongod_set_parameters.setdefault("enableFlowControl", config.FLOW_CONTROL == "on")
 
     mongos_launcher = shardedcluster.MongosLauncher(fixturelib)
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
@@ -427,10 +411,7 @@ def mongo_shell_program(
         test_data["connectionString"] = connection_string
         connection_string = None
 
-    if (
-        config.FUZZ_MONGOD_CONFIGS is not None
-        and config.FUZZ_MONGOD_CONFIGS is not False
-    ):
+    if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
         test_data["fuzzMongodConfigs"] = True
 
     for var_name in global_vars:
@@ -440,9 +421,7 @@ def mongo_shell_program(
         eval_sb.append(str(kwargs.pop("eval")))
 
     # Load a callback to check that the cluster-wide metadata is consistent.
-    eval_sb.append(
-        'await import("jstests/libs/override_methods/check_metadata_consistency.js")'
-    )
+    eval_sb.append('await import("jstests/libs/override_methods/check_metadata_consistency.js")')
 
     # Load this file to allow a callback to validate collections before shutting down mongod.
     eval_sb.append(
@@ -460,9 +439,7 @@ def mongo_shell_program(
     )
 
     # Load a callback to check that all orphans are deleted before shutting down a ShardingTest.
-    eval_sb.append(
-        'await import("jstests/libs/override_methods/check_orphans_are_deleted.js")'
-    )
+    eval_sb.append('await import("jstests/libs/override_methods/check_orphans_are_deleted.js")')
 
     # Load a callback to check that the info stored in config.collections and config.chunks is
     # semantically correct before shutting down a ShardingTest.
@@ -476,10 +453,7 @@ def mongo_shell_program(
         'await import("jstests/libs/override_methods/check_shard_filtering_metadata.js")'
     )
 
-    if (
-        config.FUZZ_MONGOD_CONFIGS is not None
-        and config.FUZZ_MONGOD_CONFIGS is not False
-    ):
+    if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
         # Prevent commands from running with the config fuzzer.
         eval_sb.append(
             'await import("jstests/libs/override_methods/config_fuzzer_incompatible_commands.js")'

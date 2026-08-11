@@ -144,9 +144,7 @@ class TestDetermineExecTimeout(unittest.TestCase):
             timeout_overrides=mock_timeout_overrides,
             evg_project_config=MagicMock(
                 spec_set=EvergreenProjectConfig,
-                get_variant=MagicMock(
-                    return_value=MagicMock(display_name=display_name)
-                ),
+                get_variant=MagicMock(return_value=MagicMock(display_name=display_name)),
             ),
         )
 
@@ -304,8 +302,7 @@ class TestDetermineExecTimeout(unittest.TestCase):
         self._validate_exec_timeout(
             idle_timeout=None,
             exec_timeout=None,
-            historic_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT
-            + timedelta(minutes=30),
+            historic_timeout=under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT + timedelta(minutes=30),
             evg_alias=None,
             build_variant="variant-required",
             display_name="! required",
@@ -326,9 +323,7 @@ class TestDetermineIdleTimeout(unittest.TestCase):
         task_name = "task_name"
         overrides = {}
         if timeout_override is not None:
-            overrides[build_variant] = [
-                {"task": task_name, "idle_timeout": timeout_override}
-            ]
+            overrides[build_variant] = [{"task": task_name, "idle_timeout": timeout_override}]
 
         mock_timeout_overrides = under_test.TimeoutOverrides(overrides=overrides)
 

@@ -35,18 +35,13 @@ class RunQueryStats(Hook):
     def verify_query_stats(self, querystats_spec):
         """Verify a $queryStats call has all the right properties."""
         try:
-            with self.client.admin.aggregate(
-                [{"$queryStats": querystats_spec}]
-            ) as cursor:
+            with self.client.admin.aggregate([{"$queryStats": querystats_spec}]) as cursor:
                 for operation in cursor:
                     assert "key" in operation
                     assert "metrics" in operation
                     assert "asOf" in operation
         except pymongo.errors.OperationFailure as err:
-            if (
-                self.allow_feature_not_supported
-                and err.code in QUERY_STATS_NOT_ENABLED_CODES
-            ):
+            if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
                 self.logger.info(
                     "Encountered an error while running $queryStats. "
                     "$queryStats will not be run for this test."
@@ -68,17 +63,10 @@ class RunQueryStats(Hook):
     def before_test(self, test, test_report):
         try:
             # Clear out all existing entries, then reset the size cap.
-            self.client.admin.command(
-                "setParameter", 1, internalQueryStatsCacheSize="0%"
-            )
-            self.client.admin.command(
-                "setParameter", 1, internalQueryStatsCacheSize="1%"
-            )
+            self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="0%")
+            self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="1%")
         except pymongo.errors.OperationFailure as err:
-            if (
-                self.allow_feature_not_supported
-                and err.code in QUERY_STATS_NOT_ENABLED_CODES
-            ):
+            if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
                 self.logger.info(
                     "Encountered an error while configuring the query stats store. "
                     "Query stats will not be collected for this test."

@@ -106,9 +106,7 @@ class HangAnalyzer(Subcommand):
 
         # Suspending all processes, except python, to prevent them from getting unstuck when
         # the hang analyzer attaches to them.
-        for pinfo in [
-            pinfo for pinfo in processes if not is_python_process(pinfo.name)
-        ]:
+        for pinfo in [pinfo for pinfo in processes if not is_python_process(pinfo.name)]:
             for pid in pinfo.pidv:
                 process.pause_process(self.root_logger, pinfo.name, pid)
 
@@ -124,9 +122,7 @@ class HangAnalyzer(Subcommand):
         # Dump core files of all processes, except python & java.
         if self.options.dump_core:
             take_core_processes = [
-                pinfo
-                for pinfo in processes
-                if not re.match("^(java|python)", pinfo.name)
+                pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
             ]
             if os.getenv("ASAN_OPTIONS") or os.getenv("TSAN_OPTIONS"):
                 quit_processes: list[psutil.Process] = []
@@ -202,15 +198,11 @@ class HangAnalyzer(Subcommand):
             download_debug_symbols(self.root_logger, my_symbolizer)
 
         # Dump info of all processes, except python & java.
-        for pinfo in [
-            pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
-        ]:
+        for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
             try:
                 dumpers.dbg.dump_info(pinfo, take_dump=False)
             except Exception as err:  # pylint: disable=broad-except
-                self.root_logger.info(
-                    "Error encountered when invoking debugger %s", err
-                )
+                self.root_logger.info("Error encountered when invoking debugger %s", err)
                 trapped_exceptions.append(traceback.format_exc())
 
         # Dump java processes using jstack.
@@ -221,9 +213,7 @@ class HangAnalyzer(Subcommand):
                         self.root_logger, self.options.debugger_output, pinfo.name, pid
                     )
                 except Exception as err:  # pylint: disable=broad-except
-                    self.root_logger.info(
-                        "Error encountered when invoking debugger %s", err
-                    )
+                    self.root_logger.info("Error encountered when invoking debugger %s", err)
                     trapped_exceptions.append(traceback.format_exc())
 
         # Signal go processes to ensure they print out stack traces, and die on POSIX OSes.
@@ -246,9 +236,7 @@ class HangAnalyzer(Subcommand):
             process.teardown_processes(self.root_logger, processes, dump_pids)
         else:
             # Resuming all suspended processes.
-            for pinfo in [
-                pinfo for pinfo in processes if not pinfo.name.startswith("python")
-            ]:
+            for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
                 for pid in pinfo.pidv:
                     process.resume_process(self.root_logger, pinfo.name, pid)
 
@@ -292,14 +280,10 @@ class HangAnalyzer(Subcommand):
             if sys.platform in ["win32", "cygwin"]:
                 self.root_logger.info("Windows Distribution: %s", platform.win32_ver())
             else:
-                self.root_logger.info(
-                    "Linux Distribution: %s", distro.linux_distribution()
-                )
+                self.root_logger.info("Linux Distribution: %s", distro.linux_distribution())
 
         except AttributeError:
-            self.root_logger.warning(
-                "Cannot determine Linux distro since Python is too old"
-            )
+            self.root_logger.warning("Cannot determine Linux distro since Python is too old")
 
         try:
             current_login = getpass.getuser()
@@ -358,8 +342,7 @@ class HangAnalyzerPlugin(PluginInterface):
             "--process-ids",
             dest="process_ids",
             default=None,
-            help="Comma separated list of process ids (PID) to analyze, overrides -p &"
-            " -g",
+            help="Comma separated list of process ids (PID) to analyze, overrides -p &" " -g",
         )
         parser.add_argument(
             "-c",

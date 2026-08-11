@@ -89,9 +89,7 @@ class TestChangedFiles(unittest.TestCase):
         # make a new file that has not been commited yet
         write_file(self.repo, new_file_name)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as tmp:
             tmp.write("fake_expansion: true\n")
             self.expansions_file = tmp.name
 
@@ -148,9 +146,7 @@ class TestChangedFiles(unittest.TestCase):
             msg="New file list did not contain the new file.",
         )
 
-        changed_files = evergreen_git.get_changed_files(
-            expansions_file=self.expansions_file
-        )
+        changed_files = evergreen_git.get_changed_files(expansions_file=self.expansions_file)
         self.assertEqual(
             changed_files,
             [changed_file_name, new_file_name],
@@ -168,9 +164,7 @@ class TestChangedFiles(unittest.TestCase):
             msg="New file list did not contain the new file.",
         )
 
-        changed_files = evergreen_git.get_changed_files(
-            expansions_file=self.expansions_file
-        )
+        changed_files = evergreen_git.get_changed_files(expansions_file=self.expansions_file)
         self.assertEqual(
             changed_files,
             [changed_file_name, new_file_name],

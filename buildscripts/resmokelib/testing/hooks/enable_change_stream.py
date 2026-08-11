@@ -24,9 +24,7 @@ class EnableChangeStream(interface.Hook):
     def __init__(self, hook_logger, fixture, tenant_id=None):
         """Initialize the EnableChangeCollection."""
         description = "Enables the change stream in the multi-tenant environment."
-        self._js_filename = os.path.join(
-            "jstests", "hooks", "run_enable_change_stream.js"
-        )
+        self._js_filename = os.path.join("jstests", "hooks", "run_enable_change_stream.js")
         interface.Hook.__init__(self, hook_logger, fixture, description)
         self._fixture = fixture
         self._tenant_id = ObjectId(tenant_id) if tenant_id else None
@@ -50,9 +48,7 @@ class EnableChangeStream(interface.Hook):
         sleep(5)
 
     def _call_js_hook(self, fixture, test, test_report):
-        shell_options = {
-            "global_vars": {"TestData": {"tenantId": str(self._tenant_id)}}
-        }
+        shell_options = {"global_vars": {"TestData": {"tenantId": str(self._tenant_id)}}}
         hook_test_case = jsfile.DynamicJSTestCase.create_before_test(
             test.logger, test, self, self._js_filename, shell_options
         )

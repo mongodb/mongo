@@ -120,9 +120,7 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
 
         username = build_config["username"]
         password = build_config["password"]
-        self.http_handler = handlers.HTTPHandler(
-            _config.BUILDLOGGER_URL, username, password
-        )
+        self.http_handler = handlers.HTTPHandler(_config.BUILDLOGGER_URL, username, password)
 
         self.endpoint = endpoint
         self.retry_buffer = []
@@ -242,9 +240,7 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
             "build_id": build_id,
             "test_id": test_id,
         }
-        _BaseBuildloggerHandler.__init__(
-            self, build_config, endpoint, capacity, interval_secs
-        )
+        _BaseBuildloggerHandler.__init__(self, build_config, endpoint, capacity, interval_secs)
 
     @_log_on_error
     def _finish_test(self, failed=False):
@@ -278,9 +274,7 @@ class BuildloggerGlobalHandler(_BaseBuildloggerHandler):
     ):
         """Initialize the buildlogger handler with the credentials and build id."""
         endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
-        _BaseBuildloggerHandler.__init__(
-            self, build_config, endpoint, capacity, interval_secs
-        )
+        _BaseBuildloggerHandler.__init__(self, build_config, endpoint, capacity, interval_secs)
 
 
 class BuildloggerServer(object):
@@ -296,9 +290,7 @@ class BuildloggerServer(object):
         tmp_globals = {}
         self.config = {}
         exec(
-            compile(
-                open(_BUILDLOGGER_CONFIG, "rb").read(), _BUILDLOGGER_CONFIG, "exec"
-            ),
+            compile(open(_BUILDLOGGER_CONFIG, "rb").read(), _BUILDLOGGER_CONFIG, "exec"),
             tmp_globals,
             self.config,
         )

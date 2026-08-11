@@ -95,9 +95,7 @@ if args.move_output:
                 result_dst = shutil.move(file, dst)
                 print(f"Moved {file} to {result_dst}")
         except ValueError as exc:
-            print(
-                f"Bad format, needs to be glob like paths in the from 'src:dst', got: {arg}"
-            )
+            print(f"Bad format, needs to be glob like paths in the from 'src:dst', got: {arg}")
             raise exc
 
 sys.exit(proc.returncode)

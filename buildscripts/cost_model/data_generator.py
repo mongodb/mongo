@@ -96,18 +96,12 @@ class DataGenerator:
             coll = self.database.database[coll_info.name]
             if self.config.write_mode == WriteMode.REPLACE:
                 await coll.drop()
-            tasks.append(
-                asyncio.create_task(self._populate_collection(coll, coll_info))
-            )
+            tasks.append(asyncio.create_task(self._populate_collection(coll, coll_info)))
             if self.config.create_indexes:
                 tasks.append(
-                    asyncio.create_task(
-                        create_single_field_indexes(coll, coll_info.fields)
-                    )
+                    asyncio.create_task(create_single_field_indexes(coll, coll_info.fields))
                 )
-                tasks.append(
-                    asyncio.create_task(create_compound_indexes(coll, coll_info))
-                )
+                tasks.append(asyncio.create_task(create_compound_indexes(coll, coll_info)))
 
         for task in tasks:
             await task
@@ -144,15 +138,11 @@ class DataGenerator:
         batch_size = self.config.batch_size
         tasks = []
         for _ in range(coll_info.documents_count // batch_size):
-            tasks.append(
-                asyncio.create_task(populate_batch(coll, batch_size, coll_info.fields))
-            )
+            tasks.append(asyncio.create_task(populate_batch(coll, batch_size, coll_info.fields)))
         if coll_info.documents_count % batch_size > 0:
             tasks.append(
                 asyncio.create_task(
-                    populate_batch(
-                        coll, coll_info.documents_count % batch_size, coll_info.fields
-                    )
+                    populate_batch(coll, coll_info.documents_count % batch_size, coll_info.fields)
                 )
             )
 
@@ -165,9 +155,7 @@ async def populate_batch(
 ) -> None:
     """Generate collection data and write it to the collection."""
 
-    await coll.insert_many(
-        generate_collection_data(documents_count, fields), ordered=False
-    )
+    await coll.insert_many(generate_collection_data(documents_count, fields), ordered=False)
 
 
 def generate_collection_data(documents_count: int, fields: Sequence[FieldInfo]):
@@ -175,9 +163,7 @@ def generate_collection_data(documents_count: int, fields: Sequence[FieldInfo]):
 
     documents = [{} for _ in range(documents_count)]
     for field in fields:
-        for field_index, field_data in enumerate(
-            field.distribution.generate(documents_count)
-        ):
+        for field_index, field_data in enumerate(field.distribution.generate(documents_count)):
             documents[field_index][field.name] = field_data
     return documents
 
@@ -187,29 +173,19 @@ async def create_single_field_indexes(
 ) -> None:
     """Create single-fields indexes on the given collection."""
 
-    indexes = [
-        IndexModel([(field.name, pymongo.ASCENDING)])
-        for field in fields
-        if field.indexed
-    ]
+    indexes = [IndexModel([(field.name, pymongo.ASCENDING)]) for field in fields if field.indexed]
     if len(indexes) > 0:
         await coll.create_indexes(indexes)
-        print(
-            f"create_single_field_indexes done. {[index.document for index in indexes]}"
-        )
+        print(f"create_single_field_indexes done. {[index.document for index in indexes]}")
 
 
-async def create_compound_indexes(
-    coll: AsyncIOMotorCollection, coll_info: CollectionInfo
-) -> None:
+async def create_compound_indexes(coll: AsyncIOMotorCollection, coll_info: CollectionInfo) -> None:
     """Create a coumpound indexes on the given collection."""
 
     indexes_spec = []
     index_specs = []
     for compound_index in coll_info.compound_indexes:
-        index_spec = IndexModel(
-            [(field, pymongo.ASCENDING) for field in compound_index]
-        )
+        index_spec = IndexModel([(field, pymongo.ASCENDING) for field in compound_index])
         indexes_spec.append(index_spec)
         index_specs.append([(field, pymongo.ASCENDING) for field in compound_index])
     if len(indexes_spec) > 0:

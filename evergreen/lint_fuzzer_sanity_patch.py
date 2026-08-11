@@ -9,9 +9,7 @@ from pathlib import Path
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(
-        os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
-    )
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 # pylint: disable=wrong-import-position
 from buildscripts import simple_report

@@ -18,9 +18,7 @@ class TestSuiteGeneration(unittest.TestCase):
     def verify_suite_generation(self):
         tested_suite = "test_matrix_suite"
 
-        generated_suite_path = self.matrix_suite_config.get_generated_suite_path(
-            tested_suite
-        )
+        generated_suite_path = self.matrix_suite_config.get_generated_suite_path(tested_suite)
         if os.path.exists(generated_suite_path):
             os.remove(generated_suite_path)
 
@@ -40,9 +38,7 @@ class TestSuiteGeneration(unittest.TestCase):
 
     def verify_altered_generated_suite(self):
         tested_suite = "test_matrix_suite"
-        generated_suite_path = self.matrix_suite_config.get_generated_suite_path(
-            tested_suite
-        )
+        generated_suite_path = self.matrix_suite_config.get_generated_suite_path(tested_suite)
         self.matrix_suite_config.generate_matrix_suite_file(tested_suite)
         with open(generated_suite_path, "a") as file:
             file.write("test change")
@@ -64,9 +60,7 @@ class TestSuiteGeneration(unittest.TestCase):
 
     def run_generated_suite(self):
         tested_suite = "test_matrix_suite"
-        generated_suite_path = self.matrix_suite_config.get_generated_suite_path(
-            tested_suite
-        )
+        generated_suite_path = self.matrix_suite_config.get_generated_suite_path(tested_suite)
 
         self.matrix_suite_config.generate_matrix_suite_file(tested_suite)
 

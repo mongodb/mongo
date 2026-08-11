@@ -211,12 +211,8 @@ def get_summary_for_patch(version_id: str) -> str:
 
 
 @click.command()
-@click.option(
-    "--ticket", help="Only report on TODOs associated with given Jira ticket."
-)
-@click.option(
-    "--base-dir", default=BASE_SEARCH_DIR, help="Base directory to search in."
-)
+@click.option("--ticket", help="Only report on TODOs associated with given Jira ticket.")
+@click.option("--base-dir", default=BASE_SEARCH_DIR, help="Base directory to search in.")
 @click.option(
     "--commit-message",
     help="For commit-queue execution only, ensure no TODOs for this commit",

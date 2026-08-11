@@ -148,9 +148,7 @@ class TestRunner(Subcommand):
     def list_suites(self):
         """List the suites that are available to execute."""
         suite_names = suitesconfig.get_named_suites()
-        self._resmoke_logger.info(
-            "Suites available to execute:\n%s", "\n".join(suite_names)
-        )
+        self._resmoke_logger.info("Suites available to execute:\n%s", "\n".join(suite_names))
 
     def find_suites(self):
         """List the suites that run the specified tests."""
@@ -192,13 +190,9 @@ class TestRunner(Subcommand):
         if config.SUITE_FILES == [config.DEFAULTS["suite_files"]]:
             out_tag_docs = tag_docs
         else:
-            out_tag_docs = {
-                tag: doc for tag, doc in tag_docs.items() if tag in out_tag_names
-            }
+            out_tag_docs = {tag: doc for tag, doc in tag_docs.items() if tag in out_tag_names}
 
-        self._resmoke_logger.info(
-            "Found tags in suites:%s", list_tags.make_output(out_tag_docs)
-        )
+        self._resmoke_logger.info("Found tags in suites:%s", list_tags.make_output(out_tag_docs))
 
     def generate_multiversion_exclude_tags(self):
         """Generate multiversion exclude tags file."""
@@ -227,15 +221,9 @@ class TestRunner(Subcommand):
         suites = self._get_suites()
         for suite in suites:
             self._shuffle_tests(suite)
-            sb = [
-                "Tests that would be run in suite {}".format(suite.get_display_name())
-            ]
+            sb = ["Tests that would be run in suite {}".format(suite.get_display_name())]
             sb.extend(suite.tests or ["(no tests)"])
-            sb.append(
-                "Tests that would be excluded from suite {}".format(
-                    suite.get_display_name()
-                )
-            )
+            sb.append("Tests that would be excluded from suite {}".format(suite.get_display_name()))
             sb.extend(suite.excluded or ["(no tests)"])
             self._exec_logger.info("\n".join(sb))
 
@@ -256,9 +244,7 @@ class TestRunner(Subcommand):
                 "Evergreen task documentation:\n%s", config.EVERGREEN_TASK_DOC
             )
         elif config.EVERGREEN_TASK_NAME:
-            self._resmoke_logger.info(
-                "Evergreen task documentation is absent for this task."
-            )
+            self._resmoke_logger.info("Evergreen task documentation is absent for this task.")
             task_name = utils.get_task_name_without_suffix(
                 config.EVERGREEN_TASK_NAME, config.EVERGREEN_VARIANT_NAME
             )
@@ -282,9 +268,7 @@ class TestRunner(Subcommand):
 
             for suite in suites:
                 self._interrupted = self._run_suite(suite)
-                if self._interrupted or (
-                    suite.options.fail_fast and suite.return_code != 0
-                ):
+                if self._interrupted or (suite.options.fail_fast and suite.return_code != 0):
                     self._log_resmoke_summary(suites)
                     self.exit(suite.return_code)
 
@@ -313,9 +297,7 @@ class TestRunner(Subcommand):
 
         # Currently, you can only run one suite at a time from within a workload container
         suite = self._get_suites()[0]
-        if "jstestfuzz/out/*.js" in suite.get_selector_config().get(
-            "roots", []
-        ) and not any(
+        if "jstestfuzz/out/*.js" in suite.get_selector_config().get("roots", []) and not any(
             filename.endswith(".js") for filename in os.listdir(jstestfuzz_tests_dir)
         ):
             subprocess.run(
@@ -346,9 +328,7 @@ class TestRunner(Subcommand):
 
         # Do not log local args if this is not being ran in evergreen
         if not config.EVERGREEN_TASK_ID:
-            print(
-                "Skipping local invocation because evergreen task id was not provided."
-            )
+            print("Skipping local invocation because evergreen task id was not provided.")
             return
 
         evg_conf = parse_evergreen_file(config.EVERGREEN_PROJECT_CONFIG_PATH)
@@ -386,17 +366,13 @@ class TestRunner(Subcommand):
                     break
 
         if task is None:
-            raise RuntimeError(
-                f"Error: Could not find evergreen task definition for {suite_name}"
-            )
+            raise RuntimeError(f"Error: Could not find evergreen task definition for {suite_name}")
 
         is_multiversion = "multiversion" in task.tags
         generate_func = task.find_func_command("generate resmoke tasks")
         is_jstestfuzz = False
         if generate_func:
-            is_jstestfuzz = (
-                get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) == "true"
-            )
+            is_jstestfuzz = get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) == "true"
 
         local_args = to_local_args()
         local_args = strip_fuzz_config_params(local_args)
@@ -407,9 +383,7 @@ class TestRunner(Subcommand):
         using_config_fuzzer = False
         if config.FUZZ_MONGOD_CONFIGS:
             using_config_fuzzer = True
-            local_resmoke_invocation += (
-                f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS}"
-            )
+            local_resmoke_invocation += f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS}"
 
             self._resmoke_logger.info(
                 "Fuzzed mongodSetParameters:\n%s", config.MONGOD_SET_PARAMETERS
@@ -420,18 +394,14 @@ class TestRunner(Subcommand):
 
         if config.FUZZ_MONGOS_CONFIGS:
             using_config_fuzzer = True
-            local_resmoke_invocation += (
-                f" --fuzzMongosConfigs={config.FUZZ_MONGOS_CONFIGS}"
-            )
+            local_resmoke_invocation += f" --fuzzMongosConfigs={config.FUZZ_MONGOS_CONFIGS}"
 
             self._resmoke_logger.info(
                 "Fuzzed mongosSetParameters:\n%s", config.MONGOS_SET_PARAMETERS
             )
 
         if using_config_fuzzer:
-            local_resmoke_invocation += (
-                f" --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
-            )
+            local_resmoke_invocation += f" --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
 
         if multiversion_bin_version:
             default_tag_file = config.DEFAULTS["exclude_tags_file_path"]
@@ -579,7 +549,9 @@ class TestRunner(Subcommand):
 
             for proc in rogue_procs:
                 if config.AUTO_KILL == "on":
-                    proc_msg = f"    Target acquired: pid: {str(proc.pid).ljust(5)} name: {proc.exe()}"
+                    proc_msg = (
+                        f"    Target acquired: pid: {str(proc.pid).ljust(5)} name: {proc.exe()}"
+                    )
                     try:
                         proc.kill()
                     except (
@@ -738,9 +710,7 @@ class TestRunner(Subcommand):
         try:
             return suitesconfig.get_suites(config.SUITE_FILES, config.TEST_FILES)
         except errors.SuiteNotFound as err:
-            self._resmoke_logger.error(
-                "Failed to parse YAML suite definition: %s", str(err)
-            )
+            self._resmoke_logger.error("Failed to parse YAML suite definition: %s", str(err))
             self.list_suites()
             self.exit(1)
         except errors.InvalidMatrixSuiteError as err:
@@ -800,9 +770,7 @@ class TestRunner(Subcommand):
         sys.exit(exit_code)
 
 
-_TagInfo = collections.namedtuple(
-    "_TagInfo", ["tag_name", "evergreen_aware", "suite_options"]
-)
+_TagInfo = collections.namedtuple("_TagInfo", ["tag_name", "evergreen_aware", "suite_options"])
 
 
 class TestRunnerEvg(TestRunner):
@@ -836,9 +804,7 @@ class TestRunnerEvg(TestRunner):
                 tags_format.append("{tag_name}|{task_name}|{variant_name}")
 
                 if config.EVERGREEN_DISTRO_ID is not None:
-                    tags_format.append(
-                        "{tag_name}|{task_name}|{variant_name}|{distro_id}"
-                    )
+                    tags_format.append("{tag_name}|{task_name}|{variant_name}|{distro_id}")
 
         return [
             tag.format(
@@ -860,12 +826,8 @@ class TestRunnerEvg(TestRunner):
 
         combinations = []
 
-        combinations.append(
-            ("resource intensive", [(cls.RESOURCE_INTENSIVE_TAG, True)])
-        )
-        combinations.append(
-            ("not resource intensive", [(cls.RESOURCE_INTENSIVE_TAG, False)])
-        )
+        combinations.append(("resource intensive", [(cls.RESOURCE_INTENSIVE_TAG, True)]))
+        combinations.append(("not resource intensive", [(cls.RESOURCE_INTENSIVE_TAG, False)]))
 
         return combinations
 
@@ -897,9 +859,7 @@ class TestRunnerEvg(TestRunner):
                         include_tags = tag_info.tag_name
 
                     if enabled:
-                        suite_options = tag_info.suite_options._replace(
-                            include_tags=include_tags
-                        )
+                        suite_options = tag_info.suite_options._replace(include_tags=include_tags)
                     else:
                         suite_options = config.SuiteOptions.ALL_INHERITED._replace(
                             include_tags={"$not": include_tags}
@@ -1052,9 +1012,7 @@ class RunPlugin(PluginInterface):
             help=(
                 "Comma separated list of tags. Any jstest that contains any of the"
                 " specified tags will be excluded from any suites that are run."
-                " The tag '{}' is implicitly part of this list.".format(
-                    config.EXCLUDED_TAG
-                )
+                " The tag '{}' is implicitly part of this list.".format(config.EXCLUDED_TAG)
             ),
         )
 
@@ -1136,9 +1094,7 @@ class RunPlugin(PluginInterface):
             dest="docker_compose_tag",
             metavar="TAG",
             default="development",
-            help=(
-                "The `tag` name to use for images built during a `--dockerComposeBuildImages`."
-            ),
+            help=("The `tag` name to use for images built during a `--dockerComposeBuildImages`."),
         )
 
         parser.add_argument(
@@ -1403,8 +1359,7 @@ class RunPlugin(PluginInterface):
             dest="linear_chain",
             choices=("on", "off"),
             metavar="ON|OFF",
-            help="Enable or disable linear chaining for tests using "
-            "ReplicaSetFixture.",
+            help="Enable or disable linear chaining for tests using " "ReplicaSetFixture.",
         )
 
         parser.add_argument(
@@ -1555,10 +1510,7 @@ class RunPlugin(PluginInterface):
             dest="majority_read_concern",
             choices=("on", "off"),
             metavar="ON|OFF",
-            help=(
-                "Enable or disable majority read concern support."
-                " Defaults to %(default)s."
-            ),
+            help=("Enable or disable majority read concern support." " Defaults to %(default)s."),
         )
 
         mongodb_server_options.add_argument(
@@ -1600,8 +1552,7 @@ class RunPlugin(PluginInterface):
             "--storageEngineCacheSizeGB",
             dest="storage_engine_cache_size_gb",
             metavar="CONFIG",
-            help="Sets the storage engine cache size configuration"
-            " setting for all mongod's.",
+            help="Sets the storage engine cache size configuration" " setting for all mongod's.",
         )
 
         mongodb_server_options.add_argument(
@@ -1899,10 +1850,7 @@ class RunPlugin(PluginInterface):
             "--patchBuild",
             action="store_true",
             dest="patch_build",
-            help=(
-                "Indicates that the Evergreen task running the tests is a"
-                " patch build."
-            ),
+            help=("Indicates that the Evergreen task running the tests is a" " patch build."),
         )
 
         evergreen_options.add_argument(
@@ -1978,9 +1926,7 @@ class RunPlugin(PluginInterface):
             dest="benchmark_list_tests",
             action="store_true",
             # metavar="BENCHMARK_LIST_TESTS",
-            help=(
-                "Lists all Google benchmark test configurations in each" " test file."
-            ),
+            help=("Lists all Google benchmark test configurations in each" " test file."),
         )
 
         benchmark_min_time_help = (
@@ -2074,9 +2020,7 @@ class RunPlugin(PluginInterface):
         )
 
     @classmethod
-    def _add_generate_multiversion_exclude_tags(
-        cls, subparser: argparse._SubParsersAction
-    ):
+    def _add_generate_multiversion_exclude_tags(cls, subparser: argparse._SubParsersAction):
         """Create and add the parser for the generate-multiversion-exclude-tags subcommand."""
         parser = subparser.add_parser(
             "generate-multiversion-exclude-tags",
@@ -2221,9 +2165,7 @@ def strip_fuzz_config_params(input_args: List[str]):
 
     ret = []
     for arg in input_args:
-        if not arg.startswith(
-            ("--fuzzMongodConfigs", "--fuzzMongosConfigs", "--configFuzzSeed")
-        ):
+        if not arg.startswith(("--fuzzMongodConfigs", "--fuzzMongosConfigs", "--configFuzzSeed")):
             ret.append(arg)
 
     return ret

@@ -31,10 +31,7 @@ class AdherenceChecker(ast.NodeVisitor):
         self.allowed_imports = allowed_imports
 
     def check_breakage(self, module):
-        if (
-            module.split(".")[0] == self.disallowed_root
-            and module not in self.allowed_imports
-        ):
+        if module.split(".")[0] == self.disallowed_root and module not in self.allowed_imports:
             self.breakages.append(module)
 
     def visit_Import(self, node):  # pylint: disable=invalid-name
@@ -51,9 +48,7 @@ class TestFixtureAPIAdherence(unittest.TestCase):
     def test_api_adherence(self):
         (_, _, filenames) = next(os.walk(FIXTURE_PATH))
         pathnames = [
-            os.path.join(FIXTURE_PATH, file)
-            for file in filenames
-            if file not in IGNORED_FILES
+            os.path.join(FIXTURE_PATH, file) for file in filenames if file not in IGNORED_FILES
         ]
         for path in pathnames:
             self._check_file(path)

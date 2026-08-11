@@ -94,9 +94,7 @@ class BulkWriteFixture(interface.MultiClusterFixture):
         for cluster in self.clusters:
             out.extend(cluster.pids())
         if not out:
-            self.logger.debug(
-                "No clusters when gathering multi replicaset fixture pids."
-            )
+            self.logger.debug("No clusters when gathering multi replicaset fixture pids.")
         return out
 
     def setup(self):
@@ -117,9 +115,7 @@ class BulkWriteFixture(interface.MultiClusterFixture):
 
         running_at_start = self.is_running()
         if not running_at_start:
-            self.logger.warning(
-                "All clusters were expected to be running, but weren't."
-            )
+            self.logger.warning("All clusters were expected to be running, but weren't.")
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
@@ -140,17 +136,13 @@ class BulkWriteFixture(interface.MultiClusterFixture):
     def get_internal_connection_string(self):
         """Return the internal connection string to the replica set that currently starts out owning the data."""
         if not self.setup_complete:
-            raise ValueError(
-                "Must call setup() before calling get_internal_connection_string()"
-            )
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
         return self.clusters[0].get_internal_connection_string()
 
     def get_driver_connection_url(self):
         """Return the driver connection URL to the replica set that currently starts out owning the data."""
         if not self.setup_complete:
-            raise ValueError(
-                "Must call setup() before calling get_driver_connection_url"
-            )
+            raise ValueError("Must call setup() before calling get_driver_connection_url")
         return self.clusters[0].get_driver_connection_url()
 
     def get_node_info(self):

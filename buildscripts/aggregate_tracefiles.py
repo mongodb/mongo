@@ -51,9 +51,7 @@ def main():
                 inputs.append(path)
 
         elif ext == ".txt":
-            inputs += [
-                line.strip() for line in open(path) if getfilesize(line.strip()) > 0
-            ]
+            inputs += [line.strip() for line in open(path) if getfilesize(line.strip()) > 0]
         else:
             return "unrecognized file type"
 

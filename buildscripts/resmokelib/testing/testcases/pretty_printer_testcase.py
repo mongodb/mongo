@@ -24,6 +24,4 @@ class PrettyPrinterTestCase(interface.ProcessTestCase):
         program_options = self.program_options.copy()
         self._merge_environment_variables(program_options)
 
-        return core.programs.make_process(
-            self.logger, [self.program_executable], **program_options
-        )
+        return core.programs.make_process(self.logger, [self.program_executable], **program_options)

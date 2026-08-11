@@ -86,12 +86,8 @@ def _download_binary_file(url, save_path):
         raise RuntimeError("Failed to download the file " + url)
 
 
-def _download_sys_perf_binaries(
-    version_id, build_variant, evergreen_api_user, evergreen_api_key
-):
-    url = _get_binary_url(
-        version_id, build_variant, evergreen_api_user, evergreen_api_key
-    )
+def _download_sys_perf_binaries(version_id, build_variant, evergreen_api_user, evergreen_api_key):
+    url = _get_binary_url(version_id, build_variant, evergreen_api_user, evergreen_api_key)
     _download_binary_file(url, "binary.tar.gz")
 
 

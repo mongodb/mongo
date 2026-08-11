@@ -62,9 +62,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
     def __init__(self, hook_logger, fixture):
         """Initialize GenerateAndCheckPerfResults."""
-        interface.Hook.__init__(
-            self, hook_logger, fixture, GenerateAndCheckPerfResults.DESCRIPTION
-        )
+        interface.Hook.__init__(self, hook_logger, fixture, GenerateAndCheckPerfResults.DESCRIPTION)
         self.cedar_report_file = _config.CEDAR_REPORT_FILE
         self.variant = _config.EVERGREEN_VARIANT_NAME
         self.cedar_reports: List[CedarTestReport] = []
@@ -91,9 +89,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
         self.cedar_reports.extend(cedar_formatted_results)
 
-        self._check_pass_fail(
-            benchmark_reports, cedar_formatted_results, test, test_report
-        )
+        self._check_pass_fail(benchmark_reports, cedar_formatted_results, test, test_report)
 
     def _check_pass_fail(
         self,
@@ -213,12 +209,8 @@ class GenerateAndCheckPerfResults(interface.Hook):
             bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res)
 
             if bm_name_obj.base_name not in benchmark_reports:
-                benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(
-                    context
-                )
-            benchmark_reports[bm_name_obj.base_name].add_report(
-                bm_name_obj, benchmark_res
-            )
+                benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
+            benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
         return benchmark_reports
 
 
@@ -236,9 +228,7 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
         reported_metrics: Dict[ReportedMetric, CedarMetric],
     ):
         super().__init__(logger, test_name, description, base_test_name, hook)
-        self.thresholds_to_check: List["IndividualMetricThreshold"] = (
-            thresholds_to_check
-        )
+        self.thresholds_to_check: List["IndividualMetricThreshold"] = thresholds_to_check
         self.reported_metrics: Dict[ReportedMetric, CedarMetric] = reported_metrics
 
     def run_test(self):
@@ -390,9 +380,7 @@ class _BenchmarkThreadsReport(object):
 
     def __init__(self, context_dict):
         # `context_dict` was parsed from a json file and might have additional fields.
-        relevant = dict(
-            filter(lambda e: e[0] in self.Context._fields, context_dict.items())
-        )
+        relevant = dict(filter(lambda e: e[0] in self.Context._fields, context_dict.items()))
         self.context = self.Context(**relevant)
 
         # list of benchmark runs for each thread.
@@ -518,9 +506,9 @@ class _BenchmarkThreadsReport(object):
                         # cedar_type becomes `MEAN`.
 
                         metric_name = f"{metric_cedar_name}_{aggregate_name}"
-                        metric_cedar_type = (
-                            self.AGGREGATE_TYPE_TO_CEDAR_METRIC_TYPE_MAP[aggregate_name]
-                        )
+                        metric_cedar_type = self.AGGREGATE_TYPE_TO_CEDAR_METRIC_TYPE_MAP[
+                            aggregate_name
+                        ]
                     else:
                         # Call out what iteration this metric came from. For example, if we are looking at iteration 2
                         # and the `latency` metric, metric_name becomes `latency_2`.

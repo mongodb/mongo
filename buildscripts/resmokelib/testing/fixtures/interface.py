@@ -54,9 +54,7 @@ class APIVersion(object, metaclass=registry.make_registry_metaclass(_VERSIONS)):
             return int(version.split(".")[1])
 
         expected = cls.FIXTURE_API_VERSION
-        return to_major(expected) == to_major(actual) and to_minor(
-            expected
-        ) <= to_minor(actual)
+        return to_major(expected) == to_major(actual) and to_minor(expected) <= to_minor(actual)
 
 
 _FIXTURES = {}  # type: ignore
@@ -115,9 +113,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         self.logger = logger
         self.job_num = job_num
 
-        dbpath_prefix = self.fixturelib.default_if_none(
-            self.config.DBPATH_PREFIX, dbpath_prefix
-        )
+        dbpath_prefix = self.fixturelib.default_if_none(self.config.DBPATH_PREFIX, dbpath_prefix)
         dbpath_prefix = self.fixturelib.default_if_none(
             dbpath_prefix, self.config.DEFAULT_DBPATH_PREFIX
         )
@@ -125,9 +121,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
 
     def pids(self):
         """Return any pids owned by this fixture."""
-        raise NotImplementedError(
-            "pids must be implemented by Fixture subclasses %s" % self
-        )
+        raise NotImplementedError("pids must be implemented by Fixture subclasses %s" % self)
 
     def setup(self):
         """Create the fixture."""
@@ -251,9 +245,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
             if self.config.TLS_CA_FILE:
                 kwargs["tlsCAFile"] = self.config.TLS_CA_FILE
             if self.config.SHELL_TLS_CERTIFICATE_KEY_FILE:
-                kwargs["tlsCertificateKeyFile"] = (
-                    self.config.SHELL_TLS_CERTIFICATE_KEY_FILE
-                )
+                kwargs["tlsCertificateKeyFile"] = self.config.SHELL_TLS_CERTIFICATE_KEY_FILE
 
         return pymongo.MongoClient(
             host=self.get_driver_connection_url(),
@@ -349,15 +341,11 @@ class ReplFixture(Fixture):
 
     def get_primary(self):
         """Return the primary of a replica set."""
-        raise NotImplementedError(
-            "get_primary must be implemented by ReplFixture subclasses"
-        )
+        raise NotImplementedError("get_primary must be implemented by ReplFixture subclasses")
 
     def get_secondaries(self):
         """Return a list containing the secondaries of a replica set."""
-        raise NotImplementedError(
-            "get_secondaries must be implemented by ReplFixture subclasses"
-        )
+        raise NotImplementedError("get_secondaries must be implemented by ReplFixture subclasses")
 
     def retry_until_wtimeout(self, insert_fn):
         """Retry until wtimeout reached.
@@ -528,9 +516,7 @@ def create_fixture_table(fixture):
     return "Fixture status:\n" + table
 
 
-def build_client(
-    node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY
-):
+def build_client(node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY):
     """Authenticate client for the 'authenticationDatabase' and return the client."""
     if auth_options is not None:
         return node.mongo_client(

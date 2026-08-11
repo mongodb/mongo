@@ -21,9 +21,7 @@ class CheckOrphansDeleted(jsfile.DataConsistencyHook):
             )
 
         description = "Check orphan documents are eventually deleted"
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_check_orphans_are_deleted.js"
-        )
+        js_filename = os.path.join("jstests", "hooks", "run_check_orphans_are_deleted.js")
         super().__init__(
             hook_logger, fixture, js_filename, description, shell_options=shell_options
         )

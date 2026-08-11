@@ -15,9 +15,7 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
 
     def __init__(self, logger, json_test_file, program_options=None, **kwargs):
         """Initialize the TestCase with the executable to run."""
-        interface.ProcessTestCase.__init__(
-            self, logger, "SDAM Json Test", json_test_file, **kwargs
-        )
+        interface.ProcessTestCase.__init__(self, logger, "SDAM Json Test", json_test_file, **kwargs)
 
         self.program_executable = self._find_executable()
         self.json_test_file = os.path.normpath(json_test_file)
@@ -29,9 +27,7 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
             binary += ".exe"
 
         if not os.path.isfile(binary):
-            raise errors.StopExecution(
-                f"Failed to locate sdam_json_test binary at {binary}"
-            )
+            raise errors.StopExecution(f"Failed to locate sdam_json_test binary at {binary}")
         return binary
 
     def _make_process(self):

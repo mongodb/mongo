@@ -163,9 +163,7 @@ def get_generic_buildvariant_name(config: SetupMultiversionConfig, major_minor_v
     return generic_buildvariant_name
 
 
-def get_evergreen_version(
-    evg_api: RetryingEvergreenApi, evg_ref: str
-) -> Optional[Version]:
+def get_evergreen_version(evg_api: RetryingEvergreenApi, evg_ref: str) -> Optional[Version]:
     """Return evergreen version by reference (commit_hash or evergreen_version_id)."""
     from buildscripts.resmokelib import multiversionconstants
 
@@ -173,8 +171,7 @@ def get_evergreen_version(
     evg_refs = [evg_ref]
     # Evergreen reference as {project_name}_{commit_hash}
     evg_refs.extend(
-        f"{proj.replace('-', '_')}_{evg_ref}"
-        for proj in multiversionconstants.EVERGREEN_PROJECTS
+        f"{proj.replace('-', '_')}_{evg_ref}" for proj in multiversionconstants.EVERGREEN_PROJECTS
     )
 
     for ref in evg_refs:
@@ -192,9 +189,7 @@ def get_evergreen_version(
     return None
 
 
-def get_evergreen_versions(
-    evg_api: RetryingEvergreenApi, evg_project: str
-) -> Iterator[Version]:
+def get_evergreen_versions(evg_api: RetryingEvergreenApi, evg_project: str) -> Iterator[Version]:
     """Return the list of evergreen versions by evergreen project name."""
     return evg_api.versions_by_project(evg_project)
 
@@ -212,9 +207,7 @@ def get_compile_artifact_urls(
         raise EvergreenConnError(f"Buildvariant {buildvariant_name} not found.")
 
     evg_build = evg_api.build_by_id(build_id)
-    LOGGER.debug(
-        "Found evergreen build.", evergreen_build=f"{EVERGREEN_HOST}/build/{build_id}"
-    )
+    LOGGER.debug("Found evergreen build.", evergreen_build=f"{EVERGREEN_HOST}/build/{build_id}")
     evg_tasks: Deque[Union[Task, str]] = deque(evg_build.get_tasks())
     tasks_wrapper = _filter_successful_tasks(evg_api, evg_tasks)
     LOGGER.info(
@@ -286,9 +279,7 @@ def _get_multiversion_urls(tasks_wrapper: _MultiversionTasks):
             task_id=f"{EVERGREEN_HOST}/task/{required_tasks[0].task_id}",
         )
     else:
-        LOGGER.error(
-            "There are no `compile` and/or 'push' tasks in the evergreen build"
-        )
+        LOGGER.error("There are no `compile` and/or 'push' tasks in the evergreen build")
 
     return compile_artifact_urls
 
@@ -351,6 +342,4 @@ def _filter_successful_tasks(
         dependent_tasks = evg_task.depends_on if evg_task.depends_on else []
         for dep_task in dependent_tasks:
             evg_tasks.append(dep_task["id"])
-    return _MultiversionTasks(
-        symbols=archive_symbols_task, binary=compile_task, push=push_task
-    )
+    return _MultiversionTasks(symbols=archive_symbols_task, binary=compile_task, push=push_task)

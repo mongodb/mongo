@@ -47,9 +47,7 @@ class PowercycleCommand(Subcommand):
     def _call(cmd):
         cmd = shlex.split(cmd)
         # Use a common pipe for stdout & stderr for logging.
-        process = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-        )
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         buff_stdout, _ = process.communicate()
         buff = buff_stdout.decode("utf-8", "replace")
         return process.poll(), buff

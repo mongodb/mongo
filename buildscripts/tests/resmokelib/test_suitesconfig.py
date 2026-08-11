@@ -14,15 +14,11 @@ RESMOKELIB = "buildscripts.resmokelib"
 class TestSuitesConfig(unittest.TestCase):
     @mock.patch(RESMOKELIB + ".testing.suite.Suite")
     @mock.patch(RESMOKELIB + ".suitesconfig.get_named_suites")
-    def test_no_suites_matching_test_kind(
-        self, mock_get_named_suites, mock_suite_class
-    ):
+    def test_no_suites_matching_test_kind(self, mock_get_named_suites, mock_suite_class):
         all_suites = ["core", "replica_sets_jscore_passthrough"]
         mock_get_named_suites.return_value = all_suites
 
-        membership_map = suitesconfig.create_test_membership_map(
-            test_kind="nonexistent_test"
-        )
+        membership_map = suitesconfig.create_test_membership_map(test_kind="nonexistent_test")
         self.assertEqual(membership_map, {})
         self.assertEqual(mock_suite_class.call_count, 2)
 

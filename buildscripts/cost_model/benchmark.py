@@ -168,9 +168,7 @@ class ExperimentResult:
         self.execution_tree[index].print()
 
 
-async def benchmark(
-    config: BenchmarkConfig, database: DatabaseInstance, task: BenchmarkTask
-):
+async def benchmark(config: BenchmarkConfig, database: DatabaseInstance, task: BenchmarkTask):
     """Run the A/B performance task.
 
     It executes the given pipeline for both overrides of Cost Model Coefficients,
@@ -179,9 +177,7 @@ async def benchmark(
     value (usually 0.05 or 0.01) we can say that the Null hypothesis is proven and there is
     no significant difference in the execution times.
     """
-    async with get_database_parameter(
-        database, "internalCostModelCoefficients"
-    ) as db_param:
+    async with get_database_parameter(database, "internalCostModelCoefficients") as db_param:
         await db_param.set(json.dumps(task.cost_model_a.to_dict()))
         result_a = await run(config, database, task.collection_name, task.pipeline)
 
@@ -194,9 +190,7 @@ async def benchmark(
     execution_times_a = [et.total_execution_time for et in variant_a.execution_tree]
     execution_times_b = [et.total_execution_time for et in variant_b.execution_tree]
 
-    ttest_result = stats.ttest_ind(
-        execution_times_a, execution_times_b, equal_var=False
-    )
+    ttest_result = stats.ttest_ind(execution_times_a, execution_times_b, equal_var=False)
 
     return BenchmarkResult(
         task=task, variant_a=variant_a, variant_b=variant_b, pvalue=ttest_result.pvalue
@@ -205,15 +199,10 @@ async def benchmark(
 
 def make_variant(explain: Sequence[dict[str, any]]) -> ExperimentResult:
     """Make one variant of the A/B test."""
-    pt = [
-        physical_tree.build(e["queryPlanner"]["winningPlan"]["queryPlan"])
-        for e in explain
-    ]
+    pt = [physical_tree.build(e["queryPlanner"]["winningPlan"]["queryPlan"]) for e in explain]
     et = [execution_tree.build_execution_tree(e["executionStats"]) for e in explain]
     mean = sum(et.total_execution_time for et in et) / len(et)
-    return ExperimentResult(
-        explain=explain, physical_tree=pt, execution_tree=et, mean=mean
-    )
+    return ExperimentResult(explain=explain, physical_tree=pt, execution_tree=et, mean=mean)
 
 
 async def run(

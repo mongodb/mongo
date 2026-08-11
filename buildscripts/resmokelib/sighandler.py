@@ -45,14 +45,10 @@ def register(logger, suites, start_time):
                 # Wait for task time out to dump stacks.
                 ret = win32event.WaitForSingleObject(event_handle, win32event.INFINITE)
                 if ret != win32event.WAIT_OBJECT_0:
-                    logger.error(
-                        "_handle_set_event WaitForSingleObject failed: %d" % ret
-                    )
+                    logger.error("_handle_set_event WaitForSingleObject failed: %d" % ret)
                     return
             except win32event.error as err:
-                logger.error(
-                    "Exception from win32event.WaitForSingleObject with error: %s" % err
-                )
+                logger.error("Exception from win32event.WaitForSingleObject with error: %s" % err)
             else:
                 HANG_ANALYZER_CALLED.set()
                 header_msg = "Dumping stacks due to signal from win32event.SetEvent"
@@ -144,9 +140,7 @@ def _analyze_pids(logger, pids):
     # If 'test_analysis' is specified, we will just write the pids out to a file and kill them
     # Instead of running analysis. This option will only be specified in resmoke selftests.
     if "test_analysis" in config.INTERNAL_PARAMS:
-        with open(
-            os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "w"
-        ) as analysis_file:
+        with open(os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "w") as analysis_file:
             analysis_file.write("\n".join([str(pid) for pid in pids]))
             for pid in pids:
                 try:
@@ -191,9 +185,7 @@ def _analyze_pids(logger, pids):
         logger.warning(
             "Resmoke invoked hang analyzer thread did not finish, but will continue running in the background. The thread may be disruputed and may show extraneous output."
         )
-        logger.warning(
-            "Cleaning up resmoke child processes so that resmoke can fail gracefully."
-        )
+        logger.warning("Cleaning up resmoke child processes so that resmoke can fail gracefully.")
         _hang_analyzer.kill_rogue_processes()
 
     else:

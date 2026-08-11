@@ -12,9 +12,7 @@ class JSHook(interface.Hook):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(
-        self, hook_logger, fixture, js_filename, description, shell_options=None
-    ):
+    def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
         """Initialize JSHook."""
         interface.Hook.__init__(self, hook_logger, fixture, description)
         self._js_filename = js_filename
@@ -127,9 +125,7 @@ class DynamicJSTestCase(interface.DynamicTestCase):
         """Configure the fixture."""
         super().configure(fixture, *args, **kwargs)
         self._js_test_builder.configure(fixture, *args, **kwargs)
-        self._js_test_case = self._js_test_builder.create_test_case_for_thread(
-            self.logger
-        )
+        self._js_test_case = self._js_test_builder.create_test_case_for_thread(self.logger)
 
     def run_test(self):
         """Execute the test."""

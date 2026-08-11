@@ -36,9 +36,7 @@ class TestSimpleReport(unittest.TestCase):
     @patch(ns("try_combine_reports"))
     @patch(ns("_clean_log_file"))
     @patch(ns("put_report"))
-    def _test_trivial_report(
-        self, mock_put_report, mock_clean_log_file, _mock_try_combine_reports
-    ):
+    def _test_trivial_report(self, mock_put_report, mock_clean_log_file, _mock_try_combine_reports):
         exit_code = self.rng.randint(0, 254)
         print(f"Trying exit code: {exit_code}")
         mock_clean_log_file.return_value = "I'm a little test log, short and stdout."

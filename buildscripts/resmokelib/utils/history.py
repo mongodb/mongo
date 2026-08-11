@@ -69,9 +69,7 @@ class Historic(ABC, metaclass=registry.make_registry_metaclass(_HISTORICS, type(
 
     def unsubscribe(self, subscriber):
         """Allow a subscriber to unsubscribe from notifications."""
-        self._subscribers = [
-            sub for sub in self._subscribers if sub.obj is not subscriber
-        ]
+        self._subscribers = [sub for sub in self._subscribers if sub.obj is not subscriber]
 
     def notify_subscriber_write(self):
         """Notify the subscribers that a write has happened."""
@@ -147,9 +145,7 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         super(HistoryDict, self).__init__()
 
         if filename is not None and yaml_string is not None:
-            raise ValueError(
-                "Cannot construct HistoryDict from both yaml object and file."
-            )
+            raise ValueError("Cannot construct HistoryDict from both yaml object and file.")
 
         self._history_store = defaultdict(list)
         self._value_store = dict()
@@ -256,9 +252,7 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
     def from_python_obj(obj):
         """Convert from a python object, overrides Historic."""
         if not isinstance(obj, dict):
-            raise ValueError(
-                "HistoryDict can only be converted from dict python objects."
-            )
+            raise ValueError("HistoryDict can only be converted from dict python objects.")
         history_dict = HistoryDict()
         for key, value in obj.items():
             history_dict[key] = make_historic(value)

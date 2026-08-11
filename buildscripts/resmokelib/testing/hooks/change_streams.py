@@ -45,9 +45,7 @@ class RunChangeStreamsInBackground(interface.Hook):
         """Start the background thread if it is not already started."""
         if self._change_streams_thread is None:
             mongo_client = self._fixture.mongo_client()
-            self._change_streams_thread = _ChangeStreamsThread(
-                self.logger, mongo_client
-            )
+            self._change_streams_thread = _ChangeStreamsThread(self.logger, mongo_client)
             self.logger.info("Starting the background change streams thread.")
             self._change_streams_thread.start()
             self._test_run = 0

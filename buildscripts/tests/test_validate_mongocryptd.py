@@ -20,16 +20,12 @@ class TestCanValidationBeSkipped(unittest.TestCase):
     def test_non_existing_variant_can_be_skipped(self):
         mock_evg_config = MagicMock()
         mock_evg_config.get_variant.return_value = None
-        self.assertTrue(
-            under_test.can_validation_be_skipped(mock_evg_config, "variant")
-        )
+        self.assertTrue(under_test.can_validation_be_skipped(mock_evg_config, "variant"))
 
     def test_variant_with_no_push_task_can_be_skipped(self):
         mock_evg_config = MagicMock()
         mock_evg_config.get_variant.return_value.task_names = ["task 1", "task 2"]
-        self.assertTrue(
-            under_test.can_validation_be_skipped(mock_evg_config, "variant")
-        )
+        self.assertTrue(under_test.can_validation_be_skipped(mock_evg_config, "variant"))
 
     def test_variant_with_push_task_cannot_be_skipped(self):
         mock_evg_config = MagicMock()
@@ -38,9 +34,7 @@ class TestCanValidationBeSkipped(unittest.TestCase):
             "push",
             "task 2",
         ]
-        self.assertFalse(
-            under_test.can_validation_be_skipped(mock_evg_config, "variant")
-        )
+        self.assertFalse(under_test.can_validation_be_skipped(mock_evg_config, "variant"))
 
 
 class TestReadVariableFromYml(unittest.TestCase):
@@ -68,6 +62,4 @@ class TestReadVariableFromYml(unittest.TestCase):
         }
 
         yaml_mock.safe_load.return_value = mock_nodes
-        self.assertEqual(
-            expected_value, under_test.read_variable_from_yml("filename", search_key)
-        )
+        self.assertEqual(expected_value, under_test.read_variable_from_yml("filename", search_key))

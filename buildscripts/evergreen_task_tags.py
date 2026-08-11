@@ -26,9 +26,7 @@ def parse_command_line():
         default=False,
         help="List all tags used by tasks in evergreen yml.",
     )
-    parser.add_argument(
-        "--list-tasks", type=str, help="List all tasks for the given buildvariant."
-    )
+    parser.add_argument("--list-tasks", type=str, help="List all tasks for the given buildvariant.")
     parser.add_argument(
         "--list-variants-and-tasks",
         action="store_true",
@@ -141,9 +139,7 @@ def get_tasks_with_tag(evg_config, tags, filters):
     :param filters: lst of tags to filter out.
     :return: list of tasks marked with the given tag.
     """
-    return sorted(
-        [task.name for task in evg_config.tasks if is_task_tagged(task, tags, filters)]
-    )
+    return sorted([task.name for task in evg_config.tasks if is_task_tagged(task, tags, filters)])
 
 
 def list_tasks_with_tag(evg_config, tags, filters):
@@ -175,9 +171,7 @@ def main():
         list_all_tasks(evg_config, options.list_tasks)
 
     if options.tasks_for_tag:
-        list_tasks_with_tag(
-            evg_config, options.tasks_for_tag, options.remove_tasks_for_tag_filter
-        )
+        list_tasks_with_tag(evg_config, options.tasks_for_tag, options.remove_tasks_for_tag_filter)
 
 
 if __name__ == "__main__":

@@ -35,9 +35,7 @@ __all__ = [
     "Toolchains",
 ]
 
-DEFAULT_DATA_FILE: pathlib.Path = (
-    pathlib.Path(__file__).parent / "../etc/toolchains.yaml"
-)
+DEFAULT_DATA_FILE: pathlib.Path = pathlib.Path(__file__).parent / "../etc/toolchains.yaml"
 
 
 class ToolchainVersionName(str, enum.Enum):
@@ -150,9 +148,7 @@ class ToolchainDataException(Exception):
 class ToolchainPlatform:
     """Represents a platform for which the toolchain is built."""
 
-    def __init__(
-        self, distro_id: str, arch: Optional[ToolchainArchName] = None
-    ) -> None:
+    def __init__(self, distro_id: str, arch: Optional[ToolchainArchName] = None) -> None:
         """Parse a distro_id into a full toolchain platform."""
 
         self._distro_id: str = distro_id
@@ -166,9 +162,7 @@ class ToolchainPlatform:
         self._arch_span: Tuple[int, int] = self._find_arch_span()
 
     def _split_distro_id(self, start: int = 0) -> Tuple[str, str]:
-        return self._distro_id[start:].split("-", 1)[0], self._distro_id[start:].split(
-            "."
-        )[0]
+        return self._distro_id[start:].split("-", 1)[0], self._distro_id[start:].split(".")[0]
 
     def _find_distro_length(self) -> int:
         for distro in ToolchainDistroName:
@@ -195,9 +189,10 @@ class ToolchainPlatform:
                         arch_span = (iter_start, len(name))
 
                     iter_start += len(name)
-                    if iter_start < len(self._distro_id) and self._distro_id[
-                        iter_start
-                    ] in ("-", "."):
+                    if iter_start < len(self._distro_id) and self._distro_id[iter_start] in (
+                        "-",
+                        ".",
+                    ):
                         iter_start += 1
 
         if arch_span is None:
@@ -407,9 +402,7 @@ class Toolchain:
 
         return path
 
-    def exec_path(
-        self, version: Union[ToolchainVersionName, str]
-    ) -> Optional[pathlib.Path]:
+    def exec_path(self, version: Union[ToolchainVersionName, str]) -> Optional[pathlib.Path]:
         """Return a path to a specific toolchain version."""
 
         install_path = self.install_path
@@ -442,18 +435,14 @@ class Toolchains(Mapping[Union[ToolchainReleaseName, str], Toolchain]):
 
         releases_dir: Optional[pathlib.Path] = self._config.releases_dir
         if releases_dir and releases_dir.exists():
-            release_dirs.extend(
-                [path for path in releases_dir.iterdir() if path.is_dir()]
-            )
+            release_dirs.extend([path for path in releases_dir.iterdir() if path.is_dir()])
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             revisions_dir: Optional[pathlib.Path] = self._config.revisions_dir
 
         if revisions_dir and revisions_dir.exists():
-            release_dirs.extend(
-                [path for path in revisions_dir.iterdir() if path.is_dir()]
-            )
+            release_dirs.extend([path for path in revisions_dir.iterdir() if path.is_dir()])
 
         if release_dirs:
             return [
@@ -662,9 +651,7 @@ class DictChoiceAction(argparse._StoreAction):
     """An action with nicer per-choice formatting."""
 
     class _ChoicesPseudoAction(argparse.Action):
-        def __init__(
-            self, name: str, aliases: List[str], help: Optional[str] = None
-        ) -> None:
+        def __init__(self, name: str, aliases: List[str], help: Optional[str] = None) -> None:
             metavar = dest = name
             if aliases:
                 metavar += f" {' | '.join(aliases)}"
@@ -800,9 +787,7 @@ if __name__ == "__main__":
         type=str,
         default=str(DEFAULT_DATA_FILE),
     )
-    parser.add_argument(
-        "-d", "--distro-id", help="Evergreen distro_id", type=str, required=True
-    )
+    parser.add_argument("-d", "--distro-id", help="Evergreen distro_id", type=str, required=True)
     parser.add_argument("-a", "--arch", help="Host architecture", type=str)
 
     subparsers = parser.add_subparsers(title="Commands", dest="command", required=True)
@@ -922,9 +907,7 @@ if __name__ == "__main__":
     obj: Optional[object] = None
 
     # Set up the objects required for each command
-    toolchain_platform = ToolchainPlatform(
-        distro_id=parsed_args.distro_id, arch=parsed_args.arch
-    )
+    toolchain_platform = ToolchainPlatform(distro_id=parsed_args.distro_id, arch=parsed_args.arch)
     if parsed_args.command == "platform":
         obj = toolchain_platform
     elif parsed_args.command in ("show", "config", "toolchain"):

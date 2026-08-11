@@ -145,9 +145,7 @@ def explicit_bzero_present_flag() -> list[HeaderDefinition]:
 
 
 def pthread_setname_np_present_flag() -> list[HeaderDefinition]:
-    log_check(
-        "[MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP] Checking for pthread_setname_np..."
-    )
+    log_check("[MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP] Checking for pthread_setname_np...")
 
     if compile_check("""
         #ifndef _GNU_SOURCE
@@ -379,9 +377,7 @@ def altivec_vbpermq_output_flag() -> list[HeaderDefinition]:
 
     for index in [0, 1]:
         if check_altivec_vbpermq_output(index):
-            return [
-                HeaderDefinition("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", index)
-            ]
+            return [HeaderDefinition("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", index)]
     return []
 
 
@@ -389,9 +385,7 @@ def usdt_provider_flags() -> list[HeaderDefinition]:
     if platform.system() == "Darwin":
         return []
 
-    log_check(
-        "[MONGO_CONFIG_USDT_PROVIDER] Checking if SDT usdt provider is available..."
-    )
+    log_check("[MONGO_CONFIG_USDT_PROVIDER] Checking if SDT usdt provider is available...")
     if compile_check("""
         #include <sys/sdt.h>
         int main(void) { return 0; }

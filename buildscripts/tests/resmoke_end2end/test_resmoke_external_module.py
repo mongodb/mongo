@@ -37,9 +37,7 @@ class TestExternalModule(unittest.TestCase):
         repo_root = config.RESMOKE_ROOT
 
         # Run from resmoke_end2end directory to simulate external project
-        end2end_dir = os.path.join(
-            repo_root, "buildscripts", "tests", "resmoke_end2end"
-        )
+        end2end_dir = os.path.join(repo_root, "buildscripts", "tests", "resmoke_end2end")
 
         # Use absolute path to resmoke.py since we're running from a different directory
         resmoke_path = os.path.join(repo_root, "buildscripts", "resmoke.py")
@@ -79,9 +77,7 @@ class TestExternalModule(unittest.TestCase):
         env = os.environ.copy()
         env["EXTERNAL_MODULE_CONFIG"] = self.external_config_path
 
-        result = self.run_resmoke(
-            ["suiteconfig", "--suite", self.external_suite_name], env=env
-        )
+        result = self.run_resmoke(["suiteconfig", "--suite", self.external_suite_name], env=env)
         self.assertEqual(result.returncode, 0, f"resmoke failed: {result.stderr}")
 
         # Verify suite config contains expected content
@@ -119,9 +115,7 @@ class TestExternalModule(unittest.TestCase):
         env = os.environ.copy()
         env["EXTERNAL_MODULE_CONFIG"] = self.external_config_path
 
-        result = self.run_resmoke(
-            ["test-discovery", "--suite", self.external_suite_name], env=env
-        )
+        result = self.run_resmoke(["test-discovery", "--suite", self.external_suite_name], env=env)
         self.assertEqual(result.returncode, 0, f"resmoke failed: {result.stderr}")
 
         # Should discover both external test files
@@ -135,9 +129,7 @@ class TestExternalModule(unittest.TestCase):
         env = os.environ.copy()
         env["EXTERNAL_MODULE_CONFIG"] = self.external_config_path
 
-        result = self.run_resmoke(
-            ["test-discovery", "--suite", self.builtin_suite_name], env=env
-        )
+        result = self.run_resmoke(["test-discovery", "--suite", self.builtin_suite_name], env=env)
         self.assertEqual(result.returncode, 0, f"resmoke failed: {result.stderr}")
 
         # Should include both external and built-in tests
@@ -174,9 +166,7 @@ class TestExternalModule(unittest.TestCase):
 
         # Check that the suite ran successfully
         if result.returncode != 0:
-            self.fail(
-                f"resmoke failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-            )
+            self.fail(f"resmoke failed:\nstdout: {result.stdout}\nstderr: {result.stderr}")
 
         # Should have run both external and builtin tests
         self.assertIn("mongo_test.js", result.stdout)
@@ -187,9 +177,7 @@ class TestExternalModule(unittest.TestCase):
         env = os.environ.copy()
         env["EXTERNAL_MODULE_CONFIG"] = self.external_config_path
 
-        result = self.run_resmoke(
-            ["test-discovery", "--suite", self.external_suite_name], env=env
-        )
+        result = self.run_resmoke(["test-discovery", "--suite", self.external_suite_name], env=env)
         self.assertEqual(result.returncode, 0, f"resmoke failed: {result.stderr}")
 
         # External suite paths should be relative since we're running from external module directory

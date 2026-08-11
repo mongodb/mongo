@@ -468,9 +468,7 @@ def get_args(distros, arch_choices):
         default=[],
         action="append",
     )
-    parser.add_argument(
-        "-p", "--prefix", help="Directory to build into", required=False
-    )
+    parser.add_argument("-p", "--prefix", help="Directory to build into", required=False)
     parser.add_argument(
         "-a",
         "--arches",
@@ -636,16 +634,13 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # directory, so the debian directory is needed in all cases (and
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
-        print(
-            "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
-        )
+        print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         sysassert(
             [
                 "sh",
                 "-c",
-                '(cd "%s" && tar cf - %s ) | (cd "%s" && tar xvf -)'
-                % (srcdir, pkgdir, sdir),
+                '(cd "%s" && tar cf - %s ) | (cd "%s" && tar xvf -)' % (srcdir, pkgdir, sdir),
             ]
         )
     # Splat the binaries under sdir.  The "build" stages of the
@@ -911,9 +906,7 @@ def write_debian_changelog(path, spec, srcdir):
         lines[0],
     )
     # Rewrite every changelog entry starting in mongodb<space>
-    lines = [
-        re.sub("^mongodb ", "mongodb%s " % (spec.suffix()), line) for line in lines
-    ]
+    lines = [re.sub("^mongodb ", "mongodb%s " % (spec.suffix()), line) for line in lines]
     lines = [re.sub("^  --", " --", line) for line in lines]
     sb = "\n".join(lines)
     with open(path, "w") as fh:
@@ -965,8 +958,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
             [
                 "tar",
                 "-cpzf",
-                topdir
-                + "SOURCES/mongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)),
+                topdir + "SOURCES/mongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)),
                 os.path.basename(os.path.dirname(sdir)),
             ]
         )
@@ -1017,9 +1009,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     ensure_dir(repo_dir)
     # FIXME: see if some combination of shutil.copy<hoohah> and glob
     # can do this without shelling out.
-    sysassert(
-        ["sh", "-c", 'cp -v "%s/RPMS/%s/"*.rpm "%s"' % (topdir, distro_arch, repo_dir)]
-    )
+    sysassert(["sh", "-c", 'cp -v "%s/RPMS/%s/"*.rpm "%s"' % (topdir, distro_arch, repo_dir)])
     return repo_dir
 
 

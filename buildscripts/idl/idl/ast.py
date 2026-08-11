@@ -298,10 +298,7 @@ class Field(common.SourceLocation):
 
     @property
     def should_shapify(self):
-        return (
-            self.query_shape is not None
-            and self.query_shape != QueryShapeFieldType.PARAMETER
-        )
+        return self.query_shape is not None and self.query_shape != QueryShapeFieldType.PARAMETER
 
 
 class Privilege(common.SourceLocation):

@@ -56,9 +56,7 @@ CRUD_CLIENT = "jstests/hooks/crud_client.js"
 CONFIG_CRUD_CLIENT = "buildscripts/resmokeconfig/suites/with_external_server.yml"
 NUM_FSM_CLIENTS = 20
 FSM_CLIENT = "jstests/libs/fsm_serial_client.js"
-SET_READ_AND_WRITE_CONCERN = (
-    "jstests/libs/override_methods/set_read_and_write_concerns.js"
-)
+SET_READ_AND_WRITE_CONCERN = "jstests/libs/override_methods/set_read_and_write_concerns.js"
 
 REPORT_JSON_FILE = "report.json"
 POWERCYCLE_EXIT_FILE = "powercycle_exit.yml"

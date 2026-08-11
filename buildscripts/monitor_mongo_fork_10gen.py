@@ -65,9 +65,7 @@ def are_users_members_of_org(users: List[str], org: str, token: str) -> List[str
     try:
         github_client = Github(token)
         organization = github_client.get_organization(org)
-        org_member_usernames = set(
-            member.login for member in organization.get_members()
-        )
+        org_member_usernames = set(member.login for member in organization.get_members())
         return [user for user in users if user in org_member_usernames]
     except GithubException as e:
         print(f"An exception occurred: {e}")
@@ -76,9 +74,7 @@ def are_users_members_of_org(users: List[str], org: str, token: str) -> List[str
 
 def main():
     # Set up argument parsing
-    parser = argparse.ArgumentParser(
-        description="Monitor forks of MongoDB repo by 10gen members."
-    )
+    parser = argparse.ArgumentParser(description="Monitor forks of MongoDB repo by 10gen members.")
     parser.add_argument(
         "-l",
         "--log-file",
@@ -114,9 +110,7 @@ def main():
         return
 
     # Retrieve list of users who forked mongodb/mongo repo
-    forked_users = get_users_who_forked_mongo_repo(
-        "mongodb", "mongo", access_token_mongodb_forks
-    )
+    forked_users = get_users_who_forked_mongo_repo("mongodb", "mongo", access_token_mongodb_forks)
     print(f"Recent forks info: {forked_users}")
 
     # TODO: SERVER-83253: Request for Deletion of mongodb/mongo Fork
@@ -126,9 +120,7 @@ def main():
     # Filter out users who are members of the specified organization
     members_from_10gen = [
         user
-        for user in are_users_members_of_org(
-            forked_users, "10gen", access_token_10gen_member
-        )
+        for user in are_users_members_of_org(forked_users, "10gen", access_token_10gen_member)
         if user not in exclude_list
     ]
 
@@ -145,9 +137,7 @@ def main():
         )
         print(users_list_message)
     else:
-        users_list_message = (
-            "No users who recently forked mongodb/mongo are members of 10gen."
-        )
+        users_list_message = "No users who recently forked mongodb/mongo are members of 10gen."
 
     # Make report
     exit_code = 1 if members_from_10gen else 0

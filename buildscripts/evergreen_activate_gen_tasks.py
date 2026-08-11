@@ -93,9 +93,7 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
         task_list = evg_api.tasks_by_build(expansions.build_id)
         for task in task_list:
             if task.display_name == expansions.task:
-                LOGGER.info(
-                    "Activating task", task_id=task.task_id, task_name=task.display_name
-                )
+                LOGGER.info("Activating task", task_id=task.task_id, task_name=task.display_name)
                 try:
                     evg_api.configure_task(task.task_id, activated=True)
                 except Exception:

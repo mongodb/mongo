@@ -18,7 +18,9 @@ class MagicRestoreEveryN(interface.Hook):
 
     def __init__(self, hook_logger, fixture, n=DEFAULT_N, randomize_pit=False):
         """Initialize MagicRestoreEveryN."""
-        description = "MagicRestoreEveryN (runs magic restore against a new cluster every `n` tests)"
+        description = (
+            "MagicRestoreEveryN (runs magic restore against a new cluster every `n` tests)"
+        )
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
         self.n = n  # pylint: disable=invalid-name
@@ -51,9 +53,7 @@ class MagicRestoreEveryN(interface.Hook):
 
         if run_backup:
             # Collect data files from backup cursor
-            hook_test_case = BackupCursorTestCase.create_after_test(
-                test.logger, test, self
-            )
+            hook_test_case = BackupCursorTestCase.create_after_test(test.logger, test, self)
             hook_test_case.configure(self.fixture)
             hook_test_case.run_dynamic_test(test_report)
 

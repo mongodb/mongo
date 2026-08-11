@@ -106,9 +106,7 @@ class TestTestFileExplorer(unittest.TestCase):
 
     def test_fnmatchcase(self):
         pattern = "dir*/file.js"
-        self.assertTrue(
-            self.test_file_explorer.fnmatchcase("directory/file.js", pattern)
-        )
+        self.assertTrue(self.test_file_explorer.fnmatchcase("directory/file.js", pattern))
         self.assertFalse(self.test_file_explorer.fnmatchcase("other/file.js", pattern))
 
     def test_parse_tag_files_single_file(self):
@@ -231,18 +229,14 @@ class TestTestList(unittest.TestCase):
 
     def test_roots(self):
         roots = ["a", "b"]
-        test_list = selector._TestList(
-            self.test_file_explorer, roots, tests_are_files=False
-        )
+        test_list = selector._TestList(self.test_file_explorer, roots, tests_are_files=False)
         selected, excluded = test_list.get_tests()
         self.assertEqual(roots, selected)
         self.assertEqual([], excluded)
 
     def test_roots_normpath(self):
         roots = ["dir/a/abc.js", "dir/b/xyz.js"]
-        test_list = selector._TestList(
-            self.test_file_explorer, roots, tests_are_files=False
-        )
+        test_list = selector._TestList(self.test_file_explorer, roots, tests_are_files=False)
         selected, excluded = test_list.get_tests()
         for root_file, selected_file in zip(roots, selected):
             self.assertEqual(os.path.normpath(root_file), selected_file)
@@ -369,9 +363,7 @@ class TestTestList(unittest.TestCase):
         )
         # 3 patterns and 1 matching
         test_list = selector._TestList(self.test_file_explorer, roots)
-        test_list.include_any_pattern(
-            ["dir/*3/a/*", "notmaching/*", "notmatching2/*.js"]
-        )
+        test_list.include_any_pattern(["dir/*3/a/*", "notmaching/*", "notmatching2/*.js"])
         selected, excluded = test_list.get_tests()
         self.assertEqual(["dir/subdir3/a/test3a1.js"], selected)
         self.assertEqual(
@@ -380,9 +372,7 @@ class TestTestList(unittest.TestCase):
         )
         # 3 patterns and 0 matching
         test_list = selector._TestList(self.test_file_explorer, roots)
-        test_list.include_any_pattern(
-            ["dir2/*3/a/*", "notmaching/*", "notmatching2/*.js"]
-        )
+        test_list.include_any_pattern(["dir2/*3/a/*", "notmaching/*", "notmatching2/*.js"])
         selected, excluded = test_list.get_tests()
         self.assertEqual([], selected)
         self.assertEqual(
@@ -396,9 +386,7 @@ class TestTestList(unittest.TestCase):
         )
         # 3 patterns and 3 matching
         test_list = selector._TestList(self.test_file_explorer, roots)
-        test_list.include_any_pattern(
-            ["dir/*1/*11*", "dir/subdir3/**", "dir/subdir2/*.js"]
-        )
+        test_list.include_any_pattern(["dir/*1/*11*", "dir/subdir3/**", "dir/subdir2/*.js"])
         selected, excluded = test_list.get_tests()
         self.assertEqual(
             [
@@ -421,9 +409,7 @@ class TestTestList(unittest.TestCase):
 
     def test_tests_are_not_files(self):
         roots = ["a", "b"]
-        test_list = selector._TestList(
-            self.test_file_explorer, roots, tests_are_files=False
-        )
+        test_list = selector._TestList(self.test_file_explorer, roots, tests_are_files=False)
         with self.assertRaises(TypeError):
             test_list.include_files([])
         with self.assertRaises(TypeError):
@@ -550,17 +536,13 @@ class TestMultiJSSelector(unittest.TestCase):
         total = 0
 
         for group in selected[:-1]:
-            self.assertEqual(
-                len(group), 3, "{} did not have 3 unique tests".format(group)
-            )
+            self.assertEqual(len(group), 3, "{} did not have 3 unique tests".format(group))
             total += 3
 
         self.assertLessEqual(
             len(selected[-1]),
             3,
-            "Last selected group did not have 3 or fewer tests: {}".format(
-                selected[-1]
-            ),
+            "Last selected group did not have 3 or fewer tests: {}".format(selected[-1]),
         )
         total += len(selected[-1])
 
@@ -603,9 +585,7 @@ class TestFilterTests(unittest.TestCase):
         # When roots are specified for cpp tests they override all filtering since
         # 'roots' are populated with the command line arguments.
         config = {"include_files": "unknown_file", "roots": ["build/testC"]}
-        selected, excluded = selector.filter_tests(
-            "cpp_unit_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("cpp_unit_test", config, self.test_file_explorer)
         self.assertEqual(["build/testC"], selected)
         self.assertEqual([], excluded)
         selected, excluded = selector.filter_tests(
@@ -622,9 +602,7 @@ class TestFilterTests(unittest.TestCase):
         self.assertEqual(["build/testA", "build/testB", "build/testC"], selected)
         self.assertEqual([], excluded)
 
-        selected, excluded = selector.filter_tests(
-            "cpp_unit_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("cpp_unit_test", config, self.test_file_explorer)
         self.assertEqual(["build/testA", "build/testB", "build/testC"], selected)
         self.assertEqual([], excluded)
 
@@ -647,9 +625,7 @@ class TestFilterTests(unittest.TestCase):
             "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],
             "include_tags": "tag1",
         }
-        selected, excluded = selector.filter_tests(
-            "js_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("js_test", config, self.test_file_explorer)
         self.assertEqual(["dir/subdir1/test11.js"], selected)
         self.assertEqual(
             [
@@ -665,9 +641,7 @@ class TestFilterTests(unittest.TestCase):
             "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],
             "exclude_tags": "tag1",
         }
-        selected, excluded = selector.filter_tests(
-            "js_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("js_test", config, self.test_file_explorer)
         self.assertEqual(
             [
                 "dir/subdir1/test12.js",
@@ -683,13 +657,9 @@ class TestFilterTests(unittest.TestCase):
             "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],
             "exclude_with_any_tags": ["tag2"],
         }
-        selected, excluded = selector.filter_tests(
-            "js_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("js_test", config, self.test_file_explorer)
         self.assertEqual(["dir/subdir1/test11.js", "dir/subdir2/test21.js"], excluded)
-        self.assertEqual(
-            ["dir/subdir1/test12.js", "dir/subdir3/a/test3a1.js"], selected
-        )
+        self.assertEqual(["dir/subdir1/test12.js", "dir/subdir3/a/test3a1.js"], selected)
 
     @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def test_filter_temporarily_disabled_tests(self):
@@ -701,9 +671,7 @@ class TestFilterTests(unittest.TestCase):
             "dir/subdir2/test21.js": ["tag2", "tag4"],
         }
         config = {"roots": ["dir/subdir1/*.js", "dir/subdir2/*.js"]}
-        selected, excluded = selector.filter_tests(
-            "js_test", config, test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("js_test", config, test_file_explorer)
         self.assertEqual(["dir/subdir1/test11.js"], excluded)
         self.assertEqual(["dir/subdir1/test12.js", "dir/subdir2/test21.js"], selected)
 
@@ -713,21 +681,13 @@ class TestFilterTests(unittest.TestCase):
             "include_files": ["dir/subdir1/*.js"],
             "exclude_tags": "tag1",
         }
-        selected, excluded = selector.filter_tests(
-            "js_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("js_test", config, self.test_file_explorer)
         self.assertEqual(["dir/subdir1/test11.js", "dir/subdir1/test12.js"], selected)
-        self.assertEqual(
-            ["dir/subdir2/test21.js", "dir/subdir3/a/test3a1.js"], excluded
-        )
+        self.assertEqual(["dir/subdir2/test21.js", "dir/subdir3/a/test3a1.js"], excluded)
 
     def test_jstest_all(self):
-        config = {
-            "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"]
-        }
-        selected, excluded = selector.filter_tests(
-            "js_test", config, self.test_file_explorer
-        )
+        config = {"roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"]}
+        selected, excluded = selector.filter_tests("js_test", config, self.test_file_explorer)
         self.assertEqual(
             [
                 "dir/subdir1/test11.js",
@@ -744,13 +704,9 @@ class TestFilterTests(unittest.TestCase):
             "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],
             "include_with_any_tags": ["tag2"],
         }
-        selected, excluded = selector.filter_tests(
-            "js_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("js_test", config, self.test_file_explorer)
         self.assertEqual(["dir/subdir1/test11.js", "dir/subdir2/test21.js"], selected)
-        self.assertEqual(
-            ["dir/subdir1/test12.js", "dir/subdir3/a/test3a1.js"], excluded
-        )
+        self.assertEqual(["dir/subdir1/test12.js", "dir/subdir3/a/test3a1.js"], excluded)
 
     def test_jstest_unknown_file(self):
         config = {"roots": ["dir/subdir1/*.js", "dir/subdir1/unknown"]}
@@ -805,9 +761,7 @@ class TestFilterTests(unittest.TestCase):
     )
     def test_db_tests_all(self):
         config = {"binary": self.test_file_explorer.binary}
-        selected, excluded = selector.filter_tests(
-            "db_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("db_test", config, self.test_file_explorer)
         self.assertEqual(["dbtestA", "dbtestB", "dbtestC"], selected)
         self.assertEqual([], excluded)
 
@@ -819,9 +773,7 @@ class TestFilterTests(unittest.TestCase):
             "include_suites": ["dbtestB"],
             "roots": ["dbtestOverride"],
         }
-        selected, excluded = selector.filter_tests(
-            "db_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("db_test", config, self.test_file_explorer)
         self.assertEqual(["dbtestOverride"], selected)
         self.assertEqual([], excluded)
 
@@ -834,8 +786,6 @@ class TestFilterTests(unittest.TestCase):
             "binary": self.test_file_explorer.binary,
             "include_suites": ["dbtestB"],
         }
-        selected, excluded = selector.filter_tests(
-            "db_test", config, self.test_file_explorer
-        )
+        selected, excluded = selector.filter_tests("db_test", config, self.test_file_explorer)
         self.assertEqual(["dbtestB"], selected)
         self.assertEqual(["dbtestA", "dbtestC"], excluded)

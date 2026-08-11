@@ -104,9 +104,7 @@ def DumpGSC(_debugger, _command, exec_ctx, _result, _internal_dict):  # pylint: 
         type_name = constructor
         type_name = type_name[0 : len(type_name) - 1]
         type_name = type_name[0 : type_name.rindex(">")]
-        type_name = type_name[type_name.index("constructAt<") :].replace(
-            "constructAt<", ""
-        )
+        type_name = type_name[type_name.index("constructAt<") :].replace("constructAt<", "")
 
         # If the type is a pointer type, strip the * at the end.
         if type_name.endswith("*"):

@@ -61,9 +61,7 @@ def main(diff_file, ent_path):
         base_feature_flags = fh.read().split()
     with open("patch_all_feature_flags.txt", "r") as fh:
         patch_feature_flags = fh.read().split()
-    enabled_feature_flags = [
-        flag for flag in base_feature_flags if flag not in patch_feature_flags
-    ]
+    enabled_feature_flags = [flag for flag in base_feature_flags if flag not in patch_feature_flags]
 
     if not enabled_feature_flags:
         print(
@@ -71,9 +69,7 @@ def main(diff_file, ent_path):
         )
         sys.exit(0)
 
-    tests_with_feature_flag_tag = get_tests_with_feature_flag_tags(
-        enabled_feature_flags, ent_path
-    )
+    tests_with_feature_flag_tag = get_tests_with_feature_flag_tags(enabled_feature_flags, ent_path)
 
     _run_git_cmd(["apply", diff_file])
     _run_git_cmd(["apply", diff_file], cwd=ent_path)
@@ -93,8 +89,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--diff-file-name", type=str, help="Name of the file containing the git diff"
     )
-    parser.add_argument(
-        "--enterprise-path", type=str, help="Path to the enterprise module"
-    )
+    parser.add_argument("--enterprise-path", type=str, help="Path to the enterprise module")
     args = parser.parse_args()
     main(args.diff_file_name, args.enterprise_path)

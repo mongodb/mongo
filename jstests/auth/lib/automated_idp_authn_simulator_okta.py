@@ -24,7 +24,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 def get_input_box_with_label(driver, label_to_match, timeout):
     caps = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    label_xpath = f"//label[contains(translate(., '{caps}', '{caps.lower()}'), '{label_to_match.lower()}')]"
+    label_xpath = (
+        f"//label[contains(translate(., '{caps}', '{caps.lower()}'), '{label_to_match.lower()}')]"
+    )
     label = WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.XPATH, label_xpath))
     )
@@ -48,9 +50,7 @@ def authenticate_okta(activation_endpoint, userCode, username, test_credentials)
 
     try:
         # Wait for activation code input box and next button to load and click.
-        activationCode_input_box = get_input_box_with_label(
-            driver, "Activation Code", 30
-        )
+        activationCode_input_box = get_input_box_with_label(driver, "Activation Code", 30)
         next_button = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable(
                 (By.XPATH, "//input[@class='button button-primary'][@value='Next']")
@@ -107,9 +107,7 @@ def authenticate_okta(activation_endpoint, userCode, username, test_credentials)
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Okta Automated Authentication Simulator"
-    )
+    parser = argparse.ArgumentParser(description="Okta Automated Authentication Simulator")
 
     parser.add_argument(
         "-e", "--activationEndpoint", type=str, help="Endpoint to start activation at"
@@ -120,9 +118,7 @@ def main():
         type=str,
         help="Code to be added in the endpoint to authenticate",
     )
-    parser.add_argument(
-        "-u", "--username", type=str, help="Username to authenticate as"
-    )
+    parser.add_argument("-u", "--username", type=str, help="Username to authenticate as")
     parser.add_argument(
         "-s",
         "--setupFile",
@@ -137,9 +133,7 @@ def main():
         assert args.username in setup_information
         assert setup_information[args.username]
 
-        authenticate_okta(
-            args.activationEndpoint, args.userCode, args.username, setup_information
-        )
+        authenticate_okta(args.activationEndpoint, args.userCode, args.username, setup_information)
 
 
 if __name__ == "__main__":

@@ -25,9 +25,7 @@ def main():
 
     build_bin_dir = os.path.join("build", "install", "bin")
     binary_directories = [MULTIVERSION_BIN_DIR, LOCAL_BIN_DIR, build_bin_dir]
-    entitlements_file = os.path.abspath(
-        os.path.join("etc", "macos_dev_entitlements.xml")
-    )
+    entitlements_file = os.path.abspath(os.path.join("etc", "macos_dev_entitlements.xml"))
     assert os.path.exists(entitlements_file), f"{entitlements_file} does not exist"
 
     for binary_dir in binary_directories:

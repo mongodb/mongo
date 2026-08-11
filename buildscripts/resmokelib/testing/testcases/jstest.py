@@ -30,14 +30,10 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         **kwargs,
     ):
         """Initialize the _SingleJSTestCase with the JS file to run."""
-        interface.ProcessTestCase.__init__(
-            self, logger, "JSTest", js_filename, **kwargs
-        )
+        interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename, **kwargs)
 
         # Command line options override the YAML configuration.
-        self.shell_executable = utils.default_if_none(
-            config.MONGO_EXECUTABLE, shell_executable
-        )
+        self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
 
         self.js_filename = js_filename
         self._id = _id
@@ -58,27 +54,18 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         data_dir = self._get_data_dir(global_vars)
 
         # Set MongoRunner.dataPath if overridden at command line or not specified in YAML.
-        if (
-            config.DBPATH_PREFIX is not None
-            or "MongoRunner.dataPath" not in global_vars
-        ):
+        if config.DBPATH_PREFIX is not None or "MongoRunner.dataPath" not in global_vars:
             # dataPath property is the dataDir property with a trailing slash.
             data_path = os.path.join(data_dir, "")
         else:
-            data_path = os.path.join(
-                os.path.abspath(global_vars["MongoRunner.dataPath"]), ""
-            )
+            data_path = os.path.join(os.path.abspath(global_vars["MongoRunner.dataPath"]), "")
 
         global_vars["MongoRunner.dataDir"] = data_dir
         global_vars["MongoRunner.dataPath"] = data_path
 
         test_data = global_vars.get("TestData", {}).copy()
-        test_data["minPort"] = core.network.PortAllocator.min_test_port(
-            self.fixture.job_num
-        )
-        test_data["maxPort"] = core.network.PortAllocator.max_test_port(
-            self.fixture.job_num
-        )
+        test_data["minPort"] = core.network.PortAllocator.min_test_port(self.fixture.job_num)
+        test_data["maxPort"] = core.network.PortAllocator.max_test_port(self.fixture.job_num)
         test_data["peerPids"] = self.fixture.pids()
         test_data["alwaysUseLogFiles"] = config.ALWAYS_USE_LOG_FILES
         test_data["ignoreUnterminatedProcesses"] = False
@@ -130,9 +117,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         data_dir_prefix = utils.default_if_none(
             config.DBPATH_PREFIX, global_vars.get("MongoRunner.dataDir")
         )
-        data_dir_prefix = utils.default_if_none(
-            data_dir_prefix, config.DEFAULT_DBPATH_PREFIX
-        )
+        data_dir_prefix = utils.default_if_none(data_dir_prefix, config.DEFAULT_DBPATH_PREFIX)
         return os.path.abspath(
             os.path.join(
                 data_dir_prefix,
@@ -334,18 +319,14 @@ class JSTestCase(MultiClientsTestCase):
     REGISTERED_NAME = "js_test"
     TEST_KIND = "JSTest"
 
-    def __init__(
-        self, logger, js_filename, shell_executable=None, shell_options=None, **kwargs
-    ):
+    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None, **kwargs):
         """Initialize the TestCase for running JS files."""
 
         test_id = uuid.uuid4()
         factory = JSTestCaseBuilder(
             logger, js_filename, test_id, shell_executable, shell_options, **kwargs
         )
-        MultiClientsTestCase.__init__(
-            self, logger, self.TEST_KIND, js_filename, test_id, factory
-        )
+        MultiClientsTestCase.__init__(self, logger, self.TEST_KIND, js_filename, test_id, factory)
 
 
 class AllVersionsJSTestCase(JSTestCase):

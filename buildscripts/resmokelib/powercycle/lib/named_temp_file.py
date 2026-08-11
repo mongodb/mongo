@@ -46,9 +46,7 @@ class NamedTempFile(object):
         try:
             os.remove(name)
         except (IOError, OSError) as err:
-            LOGGER.warning(
-                "Unable to delete temporary file %s with error %s", name, err
-            )
+            LOGGER.warning("Unable to delete temporary file %s with error %s", name, err)
         if not os.path.exists(name):
             del cls._FILE_MAP[name]
 
@@ -64,9 +62,7 @@ class NamedTempFile(object):
         try:
             shutil.rmtree(directory)
         except (IOError, OSError) as err:
-            LOGGER.warning(
-                "Unable to delete temporary directory %s with error %s", directory, err
-            )
+            LOGGER.warning("Unable to delete temporary directory %s with error %s", directory, err)
         if not os.path.exists(directory):
             cls._DIR_LIST.remove(directory)
 

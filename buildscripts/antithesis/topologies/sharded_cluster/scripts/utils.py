@@ -25,7 +25,5 @@ def retry_until_success(func, kwargs=None, wait_time=1, timeout_period=30):
             func(**kwargs)
             break
         except:  # pylint: disable=bare-except
-            print(
-                f"Retrying {func.__name__} called with {kwargs} after {wait_time} second(s)."
-            )
+            print(f"Retrying {func.__name__} called with {kwargs} after {wait_time} second(s).")
             time.sleep(wait_time)

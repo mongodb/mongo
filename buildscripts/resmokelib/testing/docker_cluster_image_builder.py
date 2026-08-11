@@ -55,17 +55,11 @@ class DockerComposeImageBuilder:
         self.WORKLOAD_BUILD_CONTEXT = "buildscripts/antithesis/base_images/workload"
         self.WORKLOAD_DOCKERFILE = f"{self.WORKLOAD_BUILD_CONTEXT}/Dockerfile"
 
-        self.MONGO_BINARIES_BUILD_CONTEXT = (
-            "buildscripts/antithesis/base_images/mongo_binaries"
-        )
-        self.MONGO_BINARIES_DOCKERFILE = (
-            f"{self.MONGO_BINARIES_BUILD_CONTEXT}/Dockerfile"
-        )
+        self.MONGO_BINARIES_BUILD_CONTEXT = "buildscripts/antithesis/base_images/mongo_binaries"
+        self.MONGO_BINARIES_DOCKERFILE = f"{self.MONGO_BINARIES_BUILD_CONTEXT}/Dockerfile"
 
         # Artifact constants
-        self.DIST_TEST_DIR = (
-            "dist-test" if self.in_evergreen else "antithesis-dist-test"
-        )
+        self.DIST_TEST_DIR = "dist-test" if self.in_evergreen else "antithesis-dist-test"
         self.MONGODB_BINARIES_DIR = os.path.join(self.DIST_TEST_DIR, "bin")
         self.MONGODB_LIBRARIES_DIR = os.path.join(self.DIST_TEST_DIR, "lib")
         self.TSAN_SUPPRESSIONS_SOURCE = "etc/tsan.suppressions"
@@ -78,9 +72,7 @@ class DockerComposeImageBuilder:
 
         # MongoDB Enterprise Modules constants
         self.MODULES_RELATIVE_PATH = "src/mongo/db/modules"
-        self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH = (
-            f"{self.MODULES_RELATIVE_PATH}/enterprise"
-        )
+        self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH = f"{self.MODULES_RELATIVE_PATH}/enterprise"
 
         # Port suffix ranging from 1-24 is subject to fault injection while ports 130+ are safe.
         self.next_available_fault_enabled_ip = 2
@@ -113,9 +105,7 @@ class DockerComposeImageBuilder:
         # (2) it should add the `--externalSUT` flag
         command = sys.argv
         rm_index = command.index("--dockerComposeBuildImages")
-        return " ".join(
-            command[0:rm_index] + command[rm_index + 2 :] + ["--externalSUT"]
-        )
+        return " ".join(command[0:rm_index] + command[rm_index + 2 :] + ["--externalSUT"])
 
     def _add_docker_compose_configuration_to_build_context(self, build_context) -> None:
         """
@@ -148,9 +138,7 @@ class DockerComposeImageBuilder:
                     f"./data/{name}:/data/db",
                 ],
                 "command": f"/bin/bash /scripts/{name}.sh",
-                "networks": {
-                    "antithesis-net": {"ipv4_address": f"10.20.20.{ip_suffix}"}
-                },
+                "networks": {"antithesis-net": {"ipv4_address": f"10.20.20.{ip_suffix}"}},
                 "depends_on": depends_on,
             }
 
@@ -174,37 +162,27 @@ class DockerComposeImageBuilder:
             },
         }
         print("Writing workload init script...")
-        with open(
-            os.path.join(build_context, "scripts", "workload.sh"), "w"
-        ) as workload_init:
+        with open(os.path.join(build_context, "scripts", "workload.sh"), "w") as workload_init:
             workload_init.write("tail -f /dev/null\n")
 
         print("Writing resmoke run script for convenience...")
-        with open(
-            os.path.join(build_context, "scripts", "run_resmoke.sh"), "w"
-        ) as run_resmoke:
+        with open(os.path.join(build_context, "scripts", "run_resmoke.sh"), "w") as run_resmoke:
             run_resmoke.write(f'{self.get_resmoke_run_command()} "$@"\n')
 
         print("Writing mongo{d,s} init scripts...")
         for process in self.suite_fixture.all_processes():
             # Add the `Process` as a service in the docker-compose.yml
             service_name = process.logger.external_sut_hostname
-            docker_compose_yml["services"][service_name] = (
-                create_docker_compose_service(
-                    service_name, fault_injection=True, depends_on=[]
-                )
+            docker_compose_yml["services"][service_name] = create_docker_compose_service(
+                service_name, fault_injection=True, depends_on=[]
             )
 
             # Write the `Process` args as an init script
-            with open(
-                os.path.join(build_context, "scripts", f"{service_name}.sh"), "w"
-            ) as file:
+            with open(os.path.join(build_context, "scripts", f"{service_name}.sh"), "w") as file:
                 file.write(" ".join(map(shlex.quote, process.args)) + "\n")
 
         print("Writing `docker-compose.yml`...")
-        with open(
-            os.path.join(build_context, "docker-compose.yml"), "w"
-        ) as docker_compose:
+        with open(os.path.join(build_context, "docker-compose.yml"), "w") as docker_compose:
             docker_compose.write(yaml.dump(docker_compose_yml) + "\n")
 
         print("Writing Dockerfile...")
@@ -259,13 +237,9 @@ class DockerComposeImageBuilder:
         :return: None
         """
         # Build out the directory structure and write the startup scripts for the config image
-        print(
-            f"Preparing antithesis config image build context for `{self.suite_name}`..."
-        )
+        print(f"Preparing antithesis config image build context for `{self.suite_name}`...")
         self._initialize_docker_compose_build_context(self.DOCKER_COMPOSE_BUILD_CONTEXT)
-        self._add_docker_compose_configuration_to_build_context(
-            self.DOCKER_COMPOSE_BUILD_CONTEXT
-        )
+        self._add_docker_compose_configuration_to_build_context(self.DOCKER_COMPOSE_BUILD_CONTEXT)
 
         # Our official builds happen in Evergreen. Assert debug symbols are on system.
         # If this is running locally, this is for development purposes only and debug symbols are not required.
@@ -279,9 +253,7 @@ class DockerComposeImageBuilder:
                 os.path.join(self.DOCKER_COMPOSE_BUILD_CONTEXT, "debug"),
             )
 
-        print(
-            f"Done setting up antithesis config image build context for `{self.suite_name}..."
-        )
+        print(f"Done setting up antithesis config image build context for `{self.suite_name}...")
         print("Building antithesis config image...")
         self._docker_build(
             self.suite_name,
@@ -314,9 +286,7 @@ class DockerComposeImageBuilder:
 
         # Build docker image
         print("Building workload image...")
-        self._docker_build(
-            "workload", self.WORKLOAD_DOCKERFILE, self.WORKLOAD_BUILD_CONTEXT
-        )
+        self._docker_build("workload", self.WORKLOAD_DOCKERFILE, self.WORKLOAD_BUILD_CONTEXT)
         print("Done building workload image.")
 
     def build_mongo_binaries_image(self):
@@ -426,13 +396,12 @@ class DockerComposeImageBuilder:
             # Our official builds happen in Evergreen.
             # We want to ensure the binaries are linked with `libvoidstar.so` during image build.
             if self.in_evergreen:
-                assert (
-                    "libvoidstar"
-                    in subprocess.run(
-                        ["ldd", required_binary],
-                        check=True,
-                        capture_output=True,
-                    ).stdout.decode("utf-8")
+                assert "libvoidstar" in subprocess.run(
+                    ["ldd", required_binary],
+                    check=True,
+                    capture_output=True,
+                ).stdout.decode(
+                    "utf-8"
                 ), f"MongoDB binary is not linked to `libvoidstar.so`: {required_binary}"
 
     def _copy_mongo_binary_to_build_context(self, dir_path):
@@ -469,9 +438,7 @@ class DockerComposeImageBuilder:
             assert os.path.exists(
                 mongo_repo_destination
             ), f"No `mongo` repo available at: {mongo_repo_destination}"
-            print(
-                "Running in Evergreen -- no need to clone `mongo` repo since it already exists."
-            )
+            print("Running in Evergreen -- no need to clone `mongo` repo since it already exists.")
             return
 
         # Clean up any old artifacts in the build context.
@@ -505,9 +472,7 @@ class DockerComposeImageBuilder:
             print(f"\n\tFound existing QA repo at: {qa_repo_destination}\n")
         else:
             print("Cloning QA repo to build context...")
-            self._clone_repo(
-                "10gen", "QA", qa_repo_destination, get_expansion("github_token_qa")
-            )
+            self._clone_repo("10gen", "QA", qa_repo_destination, get_expansion("github_token_qa"))
             print("Done cloning QA repo to build context.")
 
     def _clone_jstestfuzz_to_build_context(self, dir_path):
@@ -520,9 +485,7 @@ class DockerComposeImageBuilder:
 
         # Clone jstestfuzz repo if it does not already exist
         if os.path.exists(jstestfuzz_repo_destination):
-            print(
-                f"\n\tFound existing jstestfuzz repo at: {jstestfuzz_repo_destination}\n"
-            )
+            print(f"\n\tFound existing jstestfuzz repo at: {jstestfuzz_repo_destination}\n")
         else:
             print("Cloning jstestfuzz repo to build context...")
             self._clone_repo(
@@ -620,9 +583,7 @@ class DockerComposeImageBuilder:
             url = f"https://x-access-token:{token}@github.com/{owner}/{repo}.git"
         else:
             print(f"No token found for {owner}/{repo} git repo, using ssh clone")
-            assert (
-                not self.in_evergreen
-            ), "SSH cloning should only be done when not in evergreen"
+            assert not self.in_evergreen, "SSH cloning should only be done when not in evergreen"
             url = f"git@github.com:{owner}/{repo}.git"
 
         git.Repo.clone_from(url, destination)

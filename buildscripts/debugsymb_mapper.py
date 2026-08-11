@@ -208,9 +208,7 @@ class Mapper:
         self.evg_variant = evg_variant
         self.is_san_variant = is_san_variant
         self.cache_dir = cache_dir or self.default_cache_dir
-        self.web_service_base_url = (
-            web_service_base_url or self.default_web_service_base_url
-        )
+        self.web_service_base_url = web_service_base_url or self.default_web_service_base_url
 
         if not logger:
             logging.basicConfig()
@@ -254,17 +252,13 @@ class Mapper:
                 )
                 if time.time() < expire_time:
                     # credentials haven't expired yet
-                    self.http_client.headers.update(
-                        {"Authorization": f"Bearer {access_token}"}
-                    )
+                    self.http_client.headers.update({"Authorization": f"Bearer {access_token}"})
                     return
 
         credentials = get_client_cred_oauth_credentials(
             self.client_id, self.client_secret, configs=self.configs
         )
-        self.http_client.headers.update(
-            {"Authorization": f"Bearer {credentials.access_token}"}
-        )
+        self.http_client.headers.update({"Authorization": f"Bearer {credentials.access_token}"})
 
         # write credentials to local file for further usage
         with open(self.default_creds_file_path, "w") as cfile:
@@ -313,9 +307,9 @@ class Mapper:
             # Sanitizer builds are not stripped and contain debug symbols
             download_symbols_url = binaries_url
         else:
-            download_symbols_url = urlinfo.urls.get(
-                "mongo-debugsymbols.tgz"
-            ) or urlinfo.urls.get("mongo-debugsymbols.zip")
+            download_symbols_url = urlinfo.urls.get("mongo-debugsymbols.tgz") or urlinfo.urls.get(
+                "mongo-debugsymbols.zip"
+            )
 
         if not download_symbols_url:
             self.logger.error(
@@ -398,9 +392,7 @@ class Mapper:
             )
             return
         else:
-            self.logger.info(
-                "Extracted mongodb version: %s", bin_version_output.mongodb_version
-            )
+            self.logger.info("Extracted mongodb version: %s", bin_version_output.mongodb_version)
 
         # start with main binary folder
         for binary in self.selected_binaries:

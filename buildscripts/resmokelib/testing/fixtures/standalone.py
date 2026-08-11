@@ -31,9 +31,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         uds_path_prefix=None,
     ):
         """Initialize MongoDFixture with different options for the mongod process."""
-        interface.Fixture.__init__(
-            self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix
-        )
+        interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {})
         )
@@ -46,9 +44,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 self.mongod_options["set_parameters"][ff] = "true"
 
         if "dbpath" in self.mongod_options and dbpath_prefix is not None:
-            raise ValueError(
-                "Cannot specify both mongod_options.dbpath and dbpath_prefix"
-            )
+            raise ValueError("Cannot specify both mongod_options.dbpath and dbpath_prefix")
 
         # Default to command line options if the YAML configuration is not passed in.
         self.mongod_executable = self.fixturelib.default_if_none(
@@ -79,9 +75,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.uds_path = None
         if self.uds_path_prefix:
             # MongoDB creates socket at {unixSocketPrefix}/mongodb-{port}.sock
-            self.uds_path = os.path.join(
-                self.uds_path_prefix, f"mongodb-{self.port}.sock"
-            )
+            self.uds_path = os.path.join(self.uds_path_prefix, f"mongodb-{self.port}.sock")
             self.mongod_options["unixSocketPrefix"] = self.uds_path_prefix
 
         if launch_mongot:
@@ -89,9 +83,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.mongot_port = fixturelib.get_next_port(job_num)
             self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
             # In future architectures, this could change
-            self.mongod_options["searchIndexManagementHostAndPort"] = (
-                self.mongod_options["mongotHost"]
-            )
+            self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
+                "mongotHost"
+            ]
         else:
             self.launch_mongot = False
         # If a suite enables launching mongot, the MongoTFixture will be created in setup_mongot,
@@ -107,9 +101,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         backtrace_log_file_name = os.path.join(
             self.get_dbpath_prefix(), uuid.uuid4().hex + ".stacktrace"
         )
-        self.mongod_options["set_parameters"]["backtraceLogFile"] = (
-            backtrace_log_file_name
-        )
+        self.mongod_options["set_parameters"]["backtraceLogFile"] = backtrace_log_file_name
 
     def setup(self):
         """Set up the mongod."""
@@ -158,9 +150,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         """:return: pids owned by this fixture if any."""
         out = [x.pid for x in [self.mongod] if x is not None]
         if not out:
-            self.logger.debug(
-                "Mongod not running when gathering standalone fixture pid."
-            )
+            self.logger.debug("Mongod not running when gathering standalone fixture pid.")
         return out
 
     def _handle_await_ready_retry(self, deadline):
@@ -181,9 +171,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         mongot_options["port"] = self.mongot_port
 
         if "keyFile" not in self.mongod_options:
-            raise self.fixturelib.ServerFailure(
-                "Cannot launch mongot without providing a keyfile"
-            )
+            raise self.fixturelib.ServerFailure("Cannot launch mongot without providing a keyfile")
 
         mongot_options["keyFile"] = self.mongod_options["keyFile"]
 
@@ -263,13 +251,12 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         # Python's subprocess module returns negative versions of system calls.
         if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
-            self.logger.info(
-                "Successfully stopped the mongod on port {:d}.".format(self.port)
-            )
+            self.logger.info("Successfully stopped the mongod on port {:d}.".format(self.port))
         else:
             self.logger.warning(
-                "Stopped the mongod on port {:d}. "
-                "Process exited with code {:d}.".format(self.port, exit_code)
+                "Stopped the mongod on port {:d}. " "Process exited with code {:d}.".format(
+                    self.port, exit_code
+                )
             )
             raise self.fixturelib.ServerFailure(
                 "mongod on port {:d} with pid {:d} exited with code {:d}".format(
@@ -317,11 +304,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
-        return (
-            "mongodb://"
-            + self.get_internal_connection_string()
-            + "/?directConnection=true"
-        )
+        return "mongodb://" + self.get_internal_connection_string() + "/?directConnection=true"
 
     def get_uds_path(self):
         """Return the Unix domain socket path for this mongod."""
@@ -341,9 +324,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         # Provide UDS path if available (single and list forms for consistency)
         if self.uds_path:
             env_vars["MONGODB_UDS_PATH"] = self.uds_path
-            env_vars["MONGODB_UDS_PATHS"] = (
-                self.uds_path
-            )  # Single item, but consistent naming
+            env_vars["MONGODB_UDS_PATHS"] = self.uds_path  # Single item, but consistent naming
 
         # Provide connection string
         env_vars["MONGODB_CONNECTION_STRING"] = self.get_internal_connection_string()
@@ -407,14 +388,12 @@ class MongodLauncher(object):
         suite_set_parameters = mongod_options.setdefault("set_parameters", {})
 
         if self.config.MONGOD_SET_PARAMETERS is not None:
-            suite_set_parameters.update(
-                yaml.safe_load(self.config.MONGOD_SET_PARAMETERS)
-            )
+            suite_set_parameters.update(yaml.safe_load(self.config.MONGOD_SET_PARAMETERS))
 
         if "mongotHost" in mongod_options:
             suite_set_parameters["mongotHost"] = mongod_options.pop("mongotHost")
-            suite_set_parameters["searchIndexManagementHostAndPort"] = (
-                mongod_options.pop("searchIndexManagementHostAndPort")
+            suite_set_parameters["searchIndexManagementHostAndPort"] = mongod_options.pop(
+                "searchIndexManagementHostAndPort"
             )
         # Some storage options are both a mongod option (as in config file option and its equivalent
         # "--xyz" command line parameter) and a "--setParameter". In case of conflict, for instance
@@ -463,13 +442,8 @@ class MongodLauncher(object):
         # Set coordinateCommitReturnImmediatelyAfterPersistingDecision to false so that tests do
         # not need to rely on causal consistency or explicitly wait for the transaction to finish
         # committing.
-        if (
-            "coordinateCommitReturnImmediatelyAfterPersistingDecision"
-            not in suite_set_parameters
-        ):
-            suite_set_parameters[
-                "coordinateCommitReturnImmediatelyAfterPersistingDecision"
-            ] = False
+        if "coordinateCommitReturnImmediatelyAfterPersistingDecision" not in suite_set_parameters:
+            suite_set_parameters["coordinateCommitReturnImmediatelyAfterPersistingDecision"] = False
 
         # There's a periodic background thread that checks for and aborts expired transactions.
         # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
@@ -490,10 +464,7 @@ class MongodLauncher(object):
         # the potential to mask issues such as SERVER-31609 because it allows the operationTime of
         # cluster to advance even if the client is blocked for other reasons. We should disable the
         # periodic no-op writer. Set in the .yml file to override this.
-        if (
-            "replSet" in mongod_options
-            and "writePeriodicNoops" not in suite_set_parameters
-        ):
+        if "replSet" in mongod_options and "writePeriodicNoops" not in suite_set_parameters:
             suite_set_parameters["writePeriodicNoops"] = False
 
         # The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds. Reduce
@@ -504,10 +475,7 @@ class MongodLauncher(object):
         ) and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters:
             suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
 
-        if (
-            "enableFlowControl" not in suite_set_parameters
-            and self.config.FLOW_CONTROL is not None
-        ):
+        if "enableFlowControl" not in suite_set_parameters and self.config.FLOW_CONTROL is not None:
             suite_set_parameters["enableFlowControl"] = self.config.FLOW_CONTROL == "on"
 
         if (
@@ -531,25 +499,16 @@ class MongodLauncher(object):
 
         if self.config.STORAGE_ENGINE == "inMemory":
             shortcut_opts["inMemorySizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
-        elif (
-            self.config.STORAGE_ENGINE == "wiredTiger"
-            or self.config.STORAGE_ENGINE is None
-        ):
-            shortcut_opts["wiredTigerCacheSizeGB"] = (
-                self.config.STORAGE_ENGINE_CACHE_SIZE
-            )
-            shortcut_opts["wiredTigerCacheSizePct"] = (
-                self.config.STORAGE_ENGINE_CACHE_SIZE_PCT
-            )
+        elif self.config.STORAGE_ENGINE == "wiredTiger" or self.config.STORAGE_ENGINE is None:
+            shortcut_opts["wiredTigerCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
+            shortcut_opts["wiredTigerCacheSizePct"] = self.config.STORAGE_ENGINE_CACHE_SIZE_PCT
 
         # These options are just flags, so they should not take a value.
         opts_without_vals = "logappend"
 
         # Ensure that config servers run with journaling enabled.
         if "configsvr" in mongod_options:
-            suite_set_parameters.setdefault(
-                "reshardingMinimumOperationDurationMillis", 5000
-            )
+            suite_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
             suite_set_parameters.setdefault(
                 "reshardingCriticalSectionTimeoutMillis", 24 * 60 * 60 * 1000
             )  # 24 hours
@@ -599,9 +558,5 @@ def _add_testing_set_parameters(suite_set_parameters):
     # Set it to true for now as a placeholder that will error if no further processing is done.
     # The placeholder is needed so older versions don't have this option won't have this value set.
     suite_set_parameters.setdefault("backtraceLogFile", True)
-    suite_set_parameters.setdefault(
-        "disableTransitionFromLatestToLastContinuous", False
-    )
-    suite_set_parameters.setdefault(
-        "oplogApplicationEnforcesSteadyStateConstraints", True
-    )
+    suite_set_parameters.setdefault("disableTransitionFromLatestToLastContinuous", False)
+    suite_set_parameters.setdefault("oplogApplicationEnforcesSteadyStateConstraints", True)

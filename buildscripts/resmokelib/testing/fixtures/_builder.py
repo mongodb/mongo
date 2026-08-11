@@ -30,9 +30,7 @@ RETRIEVE_LOCK = threading.Lock()
 _BUILDERS = {}  # type: ignore
 
 
-def make_fixture(
-    class_name, logger, job_num, *args, enable_feature_flags=True, **kwargs
-):
+def make_fixture(class_name, logger, job_num, *args, enable_feature_flags=True, **kwargs):
     """Provide factory function for creating Fixture instances."""
 
     fixturelib = FixtureLib()
@@ -79,9 +77,7 @@ def make_dummy_fixture(suite_name):
     return make_fixture(fixture_class, fixture_logger, job_num=0, **fixture_config)
 
 
-class FixtureBuilder(
-    ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, type(ABC))
-):  # pylint: disable=invalid-metaclass
+class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, type(ABC))):  # pylint: disable=invalid-metaclass
     """
     ABC for fixture builders.
 
@@ -93,9 +89,7 @@ class FixtureBuilder(
     REGISTERED_NAME = "Builder"
 
     @abstractmethod
-    def build_fixture(
-        self, logger, job_num, fixturelib, *args, existing_nodes=None, **kwargs
-    ):
+    def build_fixture(self, logger, job_num, fixturelib, *args, existing_nodes=None, **kwargs):
         """Abstract method to build a fixture."""
         return
 
@@ -207,13 +201,11 @@ class ReplSetBuilder(FixtureBuilder):
         self._mutate_kwargs(kwargs)
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
-        mongod_class, mongod_executables, mongod_binary_versions = (
-            self._get_mongod_assets(kwargs, mixed_bin_versions, old_bin_version)
+        mongod_class, mongod_executables, mongod_binary_versions = self._get_mongod_assets(
+            kwargs, mixed_bin_versions, old_bin_version
         )
 
-        replset = _FIXTURES[self.REGISTERED_NAME](
-            logger, job_num, fixturelib, *args, **kwargs
-        )
+        replset = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args, **kwargs)
 
         is_multiversion = mixed_bin_versions is not None
         fcv = self._get_fcv(is_multiversion, old_bin_version)
@@ -284,8 +276,7 @@ class ReplSetBuilder(FixtureBuilder):
             num_versions = len(mixed_bin_versions)
             replset_config_options = kwargs.get("replset_config_options", {})
             is_config_svr = (
-                "configsvr" in replset_config_options
-                and replset_config_options["configsvr"]
+                "configsvr" in replset_config_options and replset_config_options["configsvr"]
             )
 
             if num_versions != kwargs["num_nodes"] and not is_config_svr:
@@ -450,9 +441,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         is_multiversion = mixed_bin_versions is not None
         is_config_shard = kwargs["config_shard"] is not None
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
-        self._validate_embedded_router_mode_options(
-            kwargs, is_config_shard, is_multiversion
-        )
+        self._validate_embedded_router_mode_options(kwargs, is_config_shard, is_multiversion)
 
         mongos_class, mongos_executables = self._get_mongos_assets(
             kwargs, mixed_bin_versions, old_bin_version
@@ -469,9 +458,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         # currently hold collection data, a mongot enabled shared cluster doesn't couple/launch
         # the config server with an accompanying mongot
         if config_shard is None:
-            config_svr = self._new_configsvr(
-                sharded_cluster, is_multiversion, old_bin_version
-            )
+            config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
         else:
             config_svr = self._new_rs_shard(
                 sharded_cluster,
@@ -541,9 +528,7 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         num_rs_nodes_per_shard = kwargs.pop("num_rs_nodes_per_shard", 1)
         num_rs_nodes_per_shard = (
-            num_rs_nodes_per_shard
-            if not config.NUM_REPLSET_NODES
-            else config.NUM_REPLSET_NODES
+            num_rs_nodes_per_shard if not config.NUM_REPLSET_NODES else config.NUM_REPLSET_NODES
         )
         kwargs["num_rs_nodes_per_shard"] = num_rs_nodes_per_shard
 
@@ -567,9 +552,7 @@ class ShardedClusterBuilder(FixtureBuilder):
             and not config_shard
         ):
             config_shard = 0
-        kwargs["embedded_router"] = kwargs.pop(
-            "embedded_router", config.EMBEDDED_ROUTER
-        )
+        kwargs["embedded_router"] = kwargs.pop("embedded_router", config.EMBEDDED_ROUTER)
         kwargs["config_shard"] = config_shard
 
     @staticmethod
@@ -611,10 +594,7 @@ class ShardedClusterBuilder(FixtureBuilder):
             # Add the configsvr as a mongos if it is not already counted as a config shard.
             if not is_config_shard:
                 num_configsvr_nodes = 1
-                if (
-                    "configsvr_options" in kwargs
-                    and "num_nodes" in kwargs["configsvr_options"]
-                ):
+                if "configsvr_options" in kwargs and "num_nodes" in kwargs["configsvr_options"]:
                     num_configsvr_nodes = kwargs["configsvr_options"]["num_nodes"]
                 num_routers += num_configsvr_nodes
 
@@ -623,9 +603,7 @@ class ShardedClusterBuilder(FixtureBuilder):
                     "When running in embedded router mode, num_mongos must be <= the total number of shardsvrs in the cluster."
                 )
             if is_multiversion:
-                raise ValueError(
-                    "Embedded router mode does not support multiversion testing."
-                )
+                raise ValueError("Embedded router mode does not support multiversion testing.")
 
     @classmethod
     def _get_mongos_assets(

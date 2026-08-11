@@ -71,9 +71,7 @@ small_query_cardinality = sum(small_query_weights)
 
 int_choice_values = [i for i in range(1, 1000, 50)]
 random.shuffle(int_choice_values)
-distributions["int_choice"] = RandomDistribution.choice(
-    int_choice_values, small_query_weights
-)
+distributions["int_choice"] = RandomDistribution.choice(int_choice_values, small_query_weights)
 
 distributions["random_string"] = ArrayRandomDistribution(
     RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 5, 10, 2)),
@@ -106,15 +104,9 @@ distributions["string_choice_small"] = RandomDistribution.choice(
     small_string_choice, small_query_weights
 )
 
-string_range_4 = RandomDistribution.normal(
-    RangeGenerator(DataType.STRING, "abca", "abc_")
-)
-string_range_5 = RandomDistribution.normal(
-    RangeGenerator(DataType.STRING, "abcda", "abcd_")
-)
-string_range_7 = RandomDistribution.normal(
-    RangeGenerator(DataType.STRING, "hello_a", "hello__")
-)
+string_range_4 = RandomDistribution.normal(RangeGenerator(DataType.STRING, "abca", "abc_"))
+string_range_5 = RandomDistribution.normal(RangeGenerator(DataType.STRING, "abcda", "abcd_"))
+string_range_7 = RandomDistribution.normal(RangeGenerator(DataType.STRING, "hello_a", "hello__"))
 string_range_12 = RandomDistribution.normal(
     RangeGenerator(DataType.STRING, "helloworldaa", "helloworldd_")
 )
@@ -133,9 +125,7 @@ distributions["int_normal"] = RandomDistribution.normal(
 )
 
 lengths_distr = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 10))
-distributions["array_small"] = ArrayRandomDistribution(
-    lengths_distr, distributions["int_normal"]
-)
+distributions["array_small"] = ArrayRandomDistribution(lengths_distr, distributions["int_normal"])
 
 # Database settings
 database = config.DatabaseConfig(
@@ -148,9 +138,7 @@ database = config.DatabaseConfig(
 
 
 # Collection template settings
-def create_index_scan_collection_template(
-    name: str, cardinality: int
-) -> config.CollectionTemplate:
+def create_index_scan_collection_template(name: str, cardinality: int) -> config.CollectionTemplate:
     values = [
         "iqtbr5b5is",
         "vt5s3tf8o6",
@@ -360,9 +348,7 @@ abt_nodes = [
     config.AbtNodeCalibrationConfig(
         type="IndexScan", filter_function=make_filter_by_note("IndexScan")
     ),
-    config.AbtNodeCalibrationConfig(
-        type="Seek", filter_function=make_filter_by_note("IndexScan")
-    ),
+    config.AbtNodeCalibrationConfig(type="Seek", filter_function=make_filter_by_note("IndexScan")),
     config.AbtNodeCalibrationConfig(
         type="Filter", filter_function=make_filter_by_note("PhysicalScan")
     ),

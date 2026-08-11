@@ -24,14 +24,10 @@ class DBTestCase(interface.ProcessTestCase):
     ):
         """Initialize the DBTestCase with the dbtest suite to run."""
 
-        interface.ProcessTestCase.__init__(
-            self, logger, "dbtest suite", dbtest_suite, **kwargs
-        )
+        interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suite, **kwargs)
 
         # Command line options override the YAML configuration.
-        self.dbtest_executable = utils.default_if_none(
-            config.DBTEST_EXECUTABLE, dbtest_executable
-        )
+        self.dbtest_executable = utils.default_if_none(config.DBTEST_EXECUTABLE, dbtest_executable)
 
         self.dbtest_suite = dbtest_suite
         self.dbtest_options = utils.default_if_none(dbtest_options, {}).copy()
@@ -41,9 +37,7 @@ class DBTestCase(interface.ProcessTestCase):
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # If a dbpath was specified, then use it as a container for all other dbpaths.
-        dbpath_prefix = self.dbtest_options.pop(
-            "dbpath", DBTestCase._get_dbpath_prefix()
-        )
+        dbpath_prefix = self.dbtest_options.pop("dbpath", DBTestCase._get_dbpath_prefix())
         dbpath = os.path.join(dbpath_prefix, "job%d" % self.fixture.job_num, "unittest")
         self.dbtest_options["dbpath"] = dbpath
 

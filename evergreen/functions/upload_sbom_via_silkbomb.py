@@ -13,16 +13,12 @@ app = typer.Typer(
 )
 
 
-def get_changed_files_from_latest_commit(
-    local_repo_path: str, branch_name: str = "master"
-) -> dict:
+def get_changed_files_from_latest_commit(local_repo_path: str, branch_name: str = "master") -> dict:
     try:
         repo = Repo(local_repo_path)
 
         if branch_name not in repo.heads:
-            raise ValueError(
-                f"Branch '{branch_name}' does not exist in the repository."
-            )
+            raise ValueError(f"Branch '{branch_name}' does not exist in the repository.")
 
         last_commit = repo.heads[branch_name].commit
         title = last_commit.summary
@@ -109,9 +105,7 @@ def upload_sbom_via_silkbomb(
 
     try:
         print(f"Running command: {' '.join(command)}")
-        subprocess.run(
-            command, check=True, text=True, capture_output=True, timeout=timeout_seconds
-        )
+        subprocess.run(command, check=True, text=True, capture_output=True, timeout=timeout_seconds)
         print("Updated SBOM file upload via Silkbomb successful!")
     except FileNotFoundError as e:
         print(f"Error: '{container_command}' command not found.")
@@ -141,15 +135,11 @@ def run(
     ],
     github_repo: Annotated[
         str,
-        typer.Option(
-            ..., envvar="GITHUB_REPO", help="Repo name in 'owner/repo' format."
-        ),
+        typer.Option(..., envvar="GITHUB_REPO", help="Repo name in 'owner/repo' format."),
     ],
     local_repo_path: Annotated[
         str,
-        typer.Option(
-            ..., envvar="LOCAL_REPO_PATH", help="Path to the local git repository."
-        ),
+        typer.Option(..., envvar="LOCAL_REPO_PATH", help="Path to the local git repository."),
     ],
     branch_filter: Annotated[
         str,
@@ -214,9 +204,7 @@ def run(
     ] = True,
     check_sbom_file_change: Annotated[
         bool,
-        typer.Option(
-            "--check-sbom-file-change", help="Check for changes to the SBOM file."
-        ),
+        typer.Option("--check-sbom-file-change", help="Check for changes to the SBOM file."),
     ] = False,
 ):
     # Check if branch name matches the branch filter regex
@@ -235,9 +223,7 @@ def run(
     try:
         sbom_file_changed = True
         if check_sbom_file_change:
-            commit_changed_files = get_changed_files_from_latest_commit(
-                repo_path, branch_name
-            )
+            commit_changed_files = get_changed_files_from_latest_commit(repo_path, branch_name)
             if commit_changed_files:
                 print(
                     f"Latest commit '{commit_changed_files['title']}' ({commit_changed_files['hash']}) in branch '{branch_name}' has the following changed files:"

@@ -80,7 +80,9 @@ class GatherRemoteMongoCoredumps(PowercycleCommand):
 
         remote_dir = powercycle_constants.REMOTE_DIR
         # Find all core files and move to $remote_dir
-        cmds = "core_files=$(/usr/bin/find -H . \\( -name '*.core' -o -name '*.mdmp' \\) 2> /dev/null)"
+        cmds = (
+            "core_files=$(/usr/bin/find -H . \\( -name '*.core' -o -name '*.mdmp' \\) 2> /dev/null)"
+        )
         cmds = f'{cmds}; if [ -z "$core_files" ]; then exit 0; fi'
         cmds = f"{cmds}; echo Found remote core files $core_files, moving to $(pwd)"
         cmds = f"{cmds}; for core_file in $core_files"
@@ -108,9 +110,7 @@ class CopyRemoteMongoCoredumps(PowercycleCommand):
 
         remote_dir = powercycle_constants.REMOTE_DIR
         # Core file may not exist so we ignore the return code.
-        self.remote_op.operation(
-            SSHOperation.SHELL, f"{remote_dir}/*.{core_suffix}", None, True
-        )
+        self.remote_op.operation(SSHOperation.SHELL, f"{remote_dir}/*.{core_suffix}", None, True)
 
 
 class CopyEC2MonitorFiles(PowercycleCommand):

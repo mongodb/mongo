@@ -70,9 +70,7 @@ class HookTestArchival(object):
             return
 
         if result.hook and result.hook.REGISTERED_NAME in self.hooks:
-            test_name = "{}:{}".format(
-                result.test.short_name(), result.hook.REGISTERED_NAME
-            )
+            test_name = "{}:{}".format(result.test.short_name(), result.hook.REGISTERED_NAME)
             should_archive = True
         else:
             test_name = result.test.test_name
@@ -100,15 +98,11 @@ class HookTestArchival(object):
         """Trigger archive of data files for a test or hook."""
 
         archive_hook_or_test_span = trace.get_current_span()
-        archive_hook_or_test_span.set_attributes(
-            attributes=test.get_test_otel_attributes()
-        )
+        archive_hook_or_test_span.set_attributes(attributes=test.get_test_otel_attributes())
 
         # We can still attempt archiving even if the teardown fails.
         if not manager.teardown_fixture(logger, abort=True):
-            logger.warning(
-                "Error while aborting test fixtures; data files may be invalid."
-            )
+            logger.warning("Error while aborting test fixtures; data files may be invalid.")
         with self._lock:
             # Test repeat number is how many times the particular test has been archived.
             if test_name not in self._tests_repeat:
@@ -117,10 +111,7 @@ class HookTestArchival(object):
                 self._tests_repeat[test_name] += 1
         # Normalize test path from a test or hook name.
         test_path = (
-            test_name.replace("/", "_")
-            .replace("\\", "_")
-            .replace(".", "_")
-            .replace(":", "_")
+            test_name.replace("/", "_").replace("\\", "_").replace(".", "_").replace(":", "_")
         )
         file_name = "mongo-data-{}-{}-{}-{}.tgz".format(
             config.EVERGREEN_TASK_ID,
@@ -150,13 +141,9 @@ class HookTestArchival(object):
             logger.info("Archive succeeded for %s: %s", test_name, message)
 
         if HANG_ANALYZER_CALLED.is_set():
-            logger.info(
-                "Hang Analyzer has been called. Fixtures will not be restarted."
-            )
+            logger.info("Hang Analyzer has been called. Fixtures will not be restarted.")
             raise errors.StopExecution(
                 "Hang analyzer has been called. Stopping further execution of tests."
             )
         elif not manager.setup_fixture(logger):
-            raise errors.StopExecution(
-                "Error while restarting test fixtures after archiving."
-            )
+            raise errors.StopExecution("Error while restarting test fixtures after archiving.")

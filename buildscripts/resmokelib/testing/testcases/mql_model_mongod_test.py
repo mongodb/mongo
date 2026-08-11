@@ -11,9 +11,7 @@ class MqlModelMongodTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = "mql_model_mongod_test"
 
-    def __init__(
-        self, logger, json_filename, shell_executable=None, shell_options=None
-    ):
+    def __init__(self, logger, json_filename, shell_executable=None, shell_options=None):
         """Initialize the MqlModelMongodTestCase with the JSON test file."""
 
         jsrunnerfile.JSRunnerFileTestCase.__init__(

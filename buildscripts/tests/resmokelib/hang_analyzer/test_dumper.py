@@ -47,9 +47,7 @@ class TestBinaryParsing(unittest.TestCase):
         self.dumper = GDBDumper(self.logger, "stdout")
 
     def _get_binary_from_core_dump(self, gdb_output):
-        with patch(
-            "buildscripts.resmokelib.hang_analyzer.dumper.subprocess.run"
-        ) as run:
+        with patch("buildscripts.resmokelib.hang_analyzer.dumper.subprocess.run") as run:
             run.return_value = MagicMock(stdout=gdb_output)
             return self.dumper.get_binary_from_core_dump("core")
 

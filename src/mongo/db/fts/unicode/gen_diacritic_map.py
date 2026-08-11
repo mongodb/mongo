@@ -98,13 +98,7 @@ def generate(target):
     sorted_mappings = sorted(mappings_list, key=lambda mapping: mapping[0])
 
     for mapping in sorted_mappings:
-        out.write(
-            "    case "
-            + str(hex(mapping[0]))
-            + ": return "
-            + str(hex(mapping[1]))
-            + ";\n"
-        )
+        out.write("    case " + str(hex(mapping[0])) + ": return " + str(hex(mapping[1])) + ";\n")
 
     out.write("    default: return codepoint;\n    }\n}")
 

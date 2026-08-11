@@ -19,10 +19,7 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
         java_binary is the full path to the "java" program, or None.
         """
-        message = (
-            f"Path '{model_config_file}' doesn't"
-            f" match **/<SpecName>/MC<SpecName>.cfg"
-        )
+        message = f"Path '{model_config_file}' doesn't" f" match **/<SpecName>/MC<SpecName>.cfg"
 
         # spec_dir should be like src/mongo/tla_plus/MongoReplReconfig.
         spec_dir, filename = os.path.split(model_config_file)
@@ -36,9 +33,7 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
         self.java_binary = java_binary
 
-        interface.ProcessTestCase.__init__(
-            self, logger, "TLA+ test", specname, **kwargs
-        )
+        interface.ProcessTestCase.__init__(self, logger, "TLA+ test", specname, **kwargs)
 
     def _make_process(self):
         process_kwargs = {"cwd": self.working_dir}

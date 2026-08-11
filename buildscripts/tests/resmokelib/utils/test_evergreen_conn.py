@@ -150,9 +150,7 @@ class TestGetEvergreenProjectAndVersion(unittest.TestCase):
             raise HTTPError()
 
         mock_evg_api.version_by_id.side_effect = version_by_id_side_effect
-        evg_version = evergreen_conn.get_evergreen_version(
-            mock_evg_api, evergreen_version_id
-        )
+        evg_version = evergreen_conn.get_evergreen_version(mock_evg_api, evergreen_version_id)
         self.assertEqual(mock_version, evg_version)
         self.assertEqual(mock_version.version_id, evergreen_version_id)
 
@@ -210,9 +208,7 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
         mock_push_task.get_execution_or_self.return_value = mock_push_task
         mock_build.get_tasks.return_value = [mock_compile_task, mock_push_task]
 
-        urls = evergreen_conn.get_compile_artifact_urls(
-            mock_evg_api, mock_version, "test"
-        )
+        urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
         self.assertEqual(urls, expected_urls)
 
     @patch("evergreen.task.Artifact")
@@ -262,9 +258,7 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
 
         mock_build.get_tasks.return_value = [mock_compile_task, mock_push_task]
 
-        urls = evergreen_conn.get_compile_artifact_urls(
-            mock_evg_api, mock_version, "test"
-        )
+        urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
         self.assertEqual(urls, expected_urls)
 
     @patch("evergreen.task.Task")
@@ -284,26 +278,20 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
         mock_push_task.get_execution_or_self.return_value = mock_push_task
         mock_build.get_tasks.return_value = [mock_compile_task, mock_push_task]
 
-        urls = evergreen_conn.get_compile_artifact_urls(
-            mock_evg_api, mock_version, "test"
-        )
+        urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
         self.assertEqual(urls, {})
 
     @patch("evergreen.task.Task")
     @patch("evergreen.build.Build")
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi")
-    def test_no_push_task(
-        self, mock_evg_api, mock_version, mock_build, mock_compile_task
-    ):
+    def test_no_push_task(self, mock_evg_api, mock_version, mock_build, mock_compile_task):
         mock_evg_api.build_by_id.return_value = mock_build
         mock_compile_task.display_name = "compile"
         mock_compile_task.status = "success"
         mock_build.get_tasks.return_value = [mock_compile_task]
 
-        urls = evergreen_conn.get_compile_artifact_urls(
-            mock_evg_api, mock_version, "test"
-        )
+        urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
         self.assertEqual(urls, {})
 
     @patch("evergreen.build.Build")
@@ -313,7 +301,5 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
         mock_evg_api.build_by_id.return_value = mock_build
         mock_build.get_tasks.return_value = []
 
-        urls = evergreen_conn.get_compile_artifact_urls(
-            mock_evg_api, mock_version, "test"
-        )
+        urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
         self.assertEqual(urls, {})

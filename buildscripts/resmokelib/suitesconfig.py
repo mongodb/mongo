@@ -52,9 +52,7 @@ def get_named_suites() -> List[SuiteName]:
 
 def get_suite_files() -> Dict[str, str]:
     """Get the physical files defining these suites for parsing comments."""
-    return merge_dicts(
-        ExplicitSuiteConfig.get_suite_files(), MatrixSuiteConfig.get_suite_files()
-    )
+    return merge_dicts(ExplicitSuiteConfig.get_suite_files(), MatrixSuiteConfig.get_suite_files())
 
 
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
@@ -191,9 +189,7 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
             if os.path.isfile(suite_name):
                 suite_path = suite_name
             else:
-                raise ValueError(
-                    "Expected a suite YAML config, but got '%s'" % suite_name
-                )
+                raise ValueError("Expected a suite YAML config, but got '%s'" % suite_name)
         else:
             # Not an explicit suite, return None.
             return None
@@ -215,9 +211,7 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
 
                 # Add external module suite directories - use EXTERNAL_MODULE_ROOT
                 for external_suite_dir in _config.EXTERNAL_MODULE_SUITE_DIRS:
-                    suites_dirs.append(
-                        (external_suite_dir, _config.EXTERNAL_MODULE_ROOT)
-                    )
+                    suites_dirs.append((external_suite_dir, _config.EXTERNAL_MODULE_ROOT))
 
                 for suites_dir, suite_root in suites_dirs:
                     suites_dir_abs = os.path.abspath(suites_dir)
@@ -272,9 +266,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             mappings_dir = os.path.join(suites_dir, "mappings")
             for suite_name, path in cls.__get_suite_files_in_dir(mappings_dir).items():
                 if suite_name in result:
-                    raise ValueError(
-                        f"Duplicate matrix suite definition for {suite_name}"
-                    )
+                    raise ValueError(f"Duplicate matrix suite definition for {suite_name}")
                 result[suite_name] = path
                 cls._suite_roots[suite_name] = suite_root
         return result
@@ -399,9 +391,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
 
         if base_suite is None:
-            raise ValueError(
-                f"Unknown base suite {base_suite_name} for matrix suite {suite_name}"
-            )
+            raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")
 
         res = copy.deepcopy(base_suite)
         res["matrix_suite"] = True
@@ -445,9 +435,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
 
                 for key in excludes_dict:
                     if key not in ["exclude_with_any_tags", "exclude_files"]:
-                        raise ValueError(
-                            f"{excludes_name}  is not supported in the 'excludes' tag"
-                        )
+                        raise ValueError(f"{excludes_name}  is not supported in the 'excludes' tag")
                     value = excludes_dict[key]
 
                     if not isinstance(value, list):
@@ -505,9 +493,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                         if "name" in override_config and "value" in override_config:
                             key = f"{filename}.{override_config['name']}"
                             if key in cls._all_overrides:
-                                raise ValueError(
-                                    f"Duplicate override definition for {key}"
-                                )
+                                raise ValueError(f"Duplicate override definition for {key}")
                             cls._all_overrides[key] = override_config["value"]
                         else:
                             raise ValueError(
@@ -550,9 +536,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
 
                 for suite_name, suite_config in mappings_files.items():
                     if suite_name in cls._all_mappings:
-                        raise ValueError(
-                            f"Duplicate matrix suite definition for {suite_name}"
-                        )
+                        raise ValueError(f"Duplicate matrix suite definition for {suite_name}")
 
                     if "base_suite" in suite_config:
                         cls._all_mappings[suite_name] = suite_config

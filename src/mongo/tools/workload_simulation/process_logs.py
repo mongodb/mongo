@@ -8,9 +8,7 @@ import matplotlib.pyplot as pyplot
 LOG_ID_WORKLOAD_NAME = 7782100
 LOG_ID_METRICS = 7782101
 
-parser = argparse.ArgumentParser(
-    description="Process simulator log output piped to stdin"
-)
+parser = argparse.ArgumentParser(description="Process simulator log output piped to stdin")
 parser.add_argument(
     "-o",
     "--outputDirectory",
@@ -46,9 +44,7 @@ for line in sys.stdin:
         # Normalize time values so that first time value in series is '0', displayed in seconds.
         if len(workloads[currentWorkload]["time"]) == 0:
             firstTime = parsed["attr"]["time"]
-        workloads[currentWorkload]["time"].append(
-            (parsed["attr"]["time"] - firstTime) / 1e9
-        )
+        workloads[currentWorkload]["time"].append((parsed["attr"]["time"] - firstTime) / 1e9)
 
         # Process the metrics, initializing structures as necessary
         metrics = parsed["attr"]["metrics"]

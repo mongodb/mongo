@@ -49,6 +49,4 @@ class TestNumJobsToStart(unittest.TestCase):
         num_repeat = 2
         under_test._config.JOBS = 100
         under_test._config.REPEAT_TESTS = num_repeat
-        self.assertEqual(
-            self.num_tests * num_repeat, self.suite.get_num_jobs_to_start()
-        )
+        self.assertEqual(self.num_tests * num_repeat, self.suite.get_num_jobs_to_start())

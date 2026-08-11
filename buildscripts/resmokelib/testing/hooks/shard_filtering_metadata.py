@@ -19,9 +19,7 @@ class CheckShardFilteringMetadata(jsfile.DataConsistencyHook):
             )
 
         description = "Inspect filtering metadata on shards"
-        js_filename = os.path.join(
-            "jstests", "hooks", "run_check_shard_filtering_metadata.js"
-        )
+        js_filename = os.path.join("jstests", "hooks", "run_check_shard_filtering_metadata.js")
         super().__init__(
             hook_logger, fixture, js_filename, description, shell_options=shell_options
         )

@@ -6,13 +6,9 @@ import unittest
 
 class TestMultiversionconstantsLocation(unittest.TestCase):
     def test_multiversionconstants_location(self):
-        multiversionconstants_module_name = (
-            "buildscripts.resmokelib.multiversionconstants"
-        )
+        multiversionconstants_module_name = "buildscripts.resmokelib.multiversionconstants"
         try:
-            under_test_module = importlib.import_module(
-                multiversionconstants_module_name
-            )
+            under_test_module = importlib.import_module(multiversionconstants_module_name)
         except ImportError:
             self.fail(
                 f"Failed to import `{multiversionconstants_module_name}` module. One-click"

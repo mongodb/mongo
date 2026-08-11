@@ -195,9 +195,7 @@ class ParserErrorCollection(object):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error message with file (line, column) information."""
         self._errors.append(
-            ParserError(
-                error_id, msg, location.file_name, location.line, location.column
-            )
+            ParserError(error_id, msg, location.file_name, location.line, location.column)
         )
 
     def has_errors(self):
@@ -262,9 +260,7 @@ class ParserContext(object):
         # type: (yaml.nodes.Node, str, str) -> None
         """Add an error with source location information based on a YAML node."""
         self.errors.add(
-            common.SourceLocation(
-                self.file_name, node.start_mark.line, node.start_mark.column
-            ),
+            common.SourceLocation(self.file_name, node.start_mark.line, node.start_mark.column),
             error_id,
             msg,
         )
@@ -291,9 +287,7 @@ class ParserContext(object):
             "Unknown IDL node '%s' for YAML entity '%s'" % (node.value, name),
         )
 
-    def add_duplicate_symbol_error(
-        self, location, name, duplicate_class_name, original_class_name
-    ):
+    def add_duplicate_symbol_error(self, location, name, duplicate_class_name, original_class_name):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a duplicate symbol."""
         self._add_error(
@@ -412,8 +406,7 @@ class ParserContext(object):
             self._add_node_error(
                 node,
                 ERROR_ID_IS_NODE_VALID_BOOL,
-                "Illegal bool value for '%s', expected either 'true' or 'false'."
-                % node_name,
+                "Illegal bool value for '%s', expected either 'true' or 'false'." % node_name,
             )
             return False
 
@@ -464,16 +457,13 @@ class ParserContext(object):
             "IDL node '%s' is missing required scalar '%s'" % (node_parent, node_name),
         )
 
-    def add_missing_ast_required_field_error(
-        self, location, ast_type, ast_parent, ast_name
-    ):
+    def add_missing_ast_required_field_error(self, location, ast_type, ast_parent, ast_name):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a AST node missing a required child."""
         self._add_error(
             location,
             ERROR_ID_MISSING_AST_REQUIRED_FIELD,
-            "%s '%s' is missing required scalar '%s'"
-            % (ast_type, ast_parent, ast_name),
+            "%s '%s' is missing required scalar '%s'" % (ast_type, ast_parent, ast_name),
         )
 
     def add_array_not_valid_error(self, location, ast_type, name):
@@ -495,9 +485,7 @@ class ParserContext(object):
             % (bson_type_name, ast_type, ast_parent),
         )
 
-    def add_bad_bson_scalar_type_error(
-        self, location, ast_type, ast_parent, bson_type_name
-    ):
+    def add_bad_bson_scalar_type_error(self, location, ast_type, ast_parent, bson_type_name):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a bad list of bson types."""
         self._add_error(
@@ -510,9 +498,7 @@ class ParserContext(object):
             % (bson_type_name, ast_type, ast_parent),
         )
 
-    def add_bad_bson_bindata_subtype_error(
-        self, location, ast_type, ast_parent, bson_type_name
-    ):
+    def add_bad_bson_bindata_subtype_error(self, location, ast_type, ast_parent, bson_type_name):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a bindata_subtype associated with a type that is not bindata."""
         self._add_error(
@@ -522,9 +508,7 @@ class ParserContext(object):
             % (ast_type, ast_parent, bson_type_name),
         )
 
-    def add_bad_bson_bindata_subtype_value_error(
-        self, location, ast_type, ast_parent, value
-    ):
+    def add_bad_bson_bindata_subtype_value_error(self, location, ast_type, ast_parent, value):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a bad value for bindata_subtype."""
         self._add_error(
@@ -540,8 +524,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_BAD_SETAT_SPECIFIER,
-            ("Unexpected set_at specifier: '%s', expected 'startup' or 'runtime'")
-            % (specifier),
+            ("Unexpected set_at specifier: '%s', expected 'startup' or 'runtime'") % (specifier),
         )
 
     def add_no_string_data_error(self, location, ast_type, ast_parent):
@@ -606,9 +589,7 @@ class ParserContext(object):
             % (bson_type, ast_type, ast_parent),
         )
 
-    def add_bad_cpp_numeric_type_use_error(
-        self, location, ast_type, ast_parent, cpp_type
-    ):
+    def add_bad_cpp_numeric_type_use_error(self, location, ast_type, ast_parent, cpp_type):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about any being used in a list of bson types."""
         self._add_error(
@@ -684,18 +665,13 @@ class ParserContext(object):
             % (type_name, bson_type_name),
         )
 
-    def add_duplicate_field_error(
-        self, location, field_container, field_name, duplicate_location
-    ):
+    def add_duplicate_field_error(self, location, field_container, field_name, duplicate_location):
         # type: (common.SourceLocation, str, str, common.SourceLocation) -> None
         """Add an error about duplicate fields as a result of chained structs/types."""
         self._add_error(
             location,
             ERROR_ID_CHAINED_DUPLICATE_FIELD,
-            (
-                "Chained Struct or Type '%s' duplicates an existing field '%s' at location"
-                + "'%s'."
-            )
+            ("Chained Struct or Type '%s' duplicates an existing field '%s' at location" + "'%s'.")
             % (field_container, field_name, duplicate_location),
         )
 
@@ -721,9 +697,7 @@ class ParserContext(object):
             ("Type '%s' is not a valid chained struct") % (struct_name),
         )
 
-    def add_chained_nested_struct_no_strict_error(
-        self, location, struct_name, nested_struct_name
-    ):
+    def add_chained_nested_struct_no_strict_error(self, location, struct_name, nested_struct_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about strict parser validate and chained types."""
         self._add_error(
@@ -736,9 +710,7 @@ class ParserContext(object):
             % (nested_struct_name, struct_name),
         )
 
-    def add_chained_nested_struct_no_nested_error(
-        self, location, struct_name, chained_name
-    ):
+    def add_chained_nested_struct_no_nested_error(self, location, struct_name, chained_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about struct's chaining being a struct with nested chaining."""
         self._add_error(
@@ -837,16 +809,11 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL,
-            (
-                "Field '%s' can only be marked as optional or have a default value,"
-                + " not both."
-            )
+            ("Field '%s' can only be marked as optional or have a default value," + " not both.")
             % (field_name),
         )
 
-    def add_bad_struct_field_as_doc_sequence_error(
-        self, location, struct_name, field_name
-    ):
+    def add_bad_struct_field_as_doc_sequence_error(self, location, struct_name, field_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about using a field in a struct being marked with supports_doc_sequence."""
         self._add_error(
@@ -859,9 +826,7 @@ class ParserContext(object):
             % (field_name, struct_name),
         )
 
-    def add_bad_non_array_as_doc_sequence_error(
-        self, location, struct_name, field_name
-    ):
+    def add_bad_non_array_as_doc_sequence_error(self, location, struct_name, field_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about using a non-array type field being marked with supports_doc_sequence."""
         self._add_error(
@@ -999,8 +964,7 @@ class ParserContext(object):
             self._add_node_error(
                 node,
                 ERROR_ID_IS_NODE_VALID_INT,
-                "Illegal integer value for '%s', message '%s'."
-                % (node_name, value_error),
+                "Illegal integer value for '%s', message '%s'." % (node_name, value_error),
             )
             return False
 
@@ -1013,17 +977,13 @@ class ParserContext(object):
 
         return int(node.value)
 
-    def add_duplicate_comparison_order_field_error(
-        self, location, struct_name, comparison_order
-    ):
+    def add_duplicate_comparison_order_field_error(self, location, struct_name, comparison_order):
         # type: (common.SourceLocation, str, int) -> None
         """Add an error about fields having duplicate comparison_orders."""
         self._add_error(
             location,
             ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER,
-            (
-                "Struct '%s' cannot have two fields with the same comparison_order value '%d'."
-            )
+            ("Struct '%s' cannot have two fields with the same comparison_order value '%d'.")
             % (struct_name, comparison_order),
         )
 
@@ -1033,9 +993,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS,
-            (
-                "Command '%s' cannot have a 'type' property unless namespace equals 'type'."
-            )
+            ("Command '%s' cannot have a 'type' property unless namespace equals 'type'.")
             % (command_name),
         )
 
@@ -1045,8 +1003,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_VALUE_NOT_NUMERIC,
-            ("'%s' requires a numeric value, but %s can not be cast")
-            % (attrname, value),
+            ("'%s' requires a numeric value, but %s can not be cast") % (attrname, value),
         )
 
     def add_server_parameter_invalid_attr(self, location, attrname, conflicts):
@@ -1055,18 +1012,13 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
-            ("'%s' attribute not permitted with '%s' server parameter")
-            % (attrname, conflicts),
+            ("'%s' attribute not permitted with '%s' server parameter") % (attrname, conflicts),
         )
 
-    def add_server_parameter_required_attr(
-        self, location, attrname, required, dependant=None
-    ):
+    def add_server_parameter_required_attr(self, location, attrname, required, dependant=None):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about missing fields in a server parameter definition."""
-        qualifier = (
-            "" if dependant is None else (" when using '%s' attribute" % (dependant))
-        )
+        qualifier = "" if dependant is None else (" when using '%s' attribute" % (dependant))
         self._add_error(
             location,
             ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR,
@@ -1163,9 +1115,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
-            (
-                "The 'version' attribute is not allowed for feature flag that defaults to false"
-            ),
+            ("The 'version' attribute is not allowed for feature flag that defaults to false"),
         )
 
     def add_feature_flag_fcv_gated_false_has_version(self, location):
@@ -1185,10 +1135,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_INVALID_REPLY_TYPE,
-            (
-                "Command '%s' has invalid reply_type '%s'"
-                % (command_name, reply_type_name)
-            ),
+            ("Command '%s' has invalid reply_type '%s'" % (command_name, reply_type_name)),
         )
 
     def add_stability_no_api_version(self, location, command_name):
@@ -1197,10 +1144,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_STABILITY_NO_API_VERSION,
-            (
-                "Command '%s' specifies 'stability' but has no 'api_version'"
-                % (command_name,)
-            ),
+            ("Command '%s' specifies 'stability' but has no 'api_version'" % (command_name,)),
         )
 
     def add_missing_reply_type(self, location, command_name):
@@ -1218,8 +1162,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL,
-            ("Field '%s' specifies 'always_serialize' but 'optional' isn't true.")
-            % (field_name),
+            ("Field '%s' specifies 'always_serialize' but 'optional' isn't true.") % (field_name),
         )
 
     def add_duplicate_command_name_and_alias(self, node):
@@ -1332,9 +1275,7 @@ class ParserContext(object):
             f"Field '{field_name}' cannot specify 'query_shape_literal' property since struct '{struct_name}' is not a query shape component.",
         )
 
-    def add_query_shape_anonymize_must_be_string(
-        self, location, field_name, field_type
-    ):
+    def add_query_shape_anonymize_must_be_string(self, location, field_name, field_type):
         self._add_error(
             location,
             ERROR_ID_INVALID_TYPE_FOR_SHAPIFY,

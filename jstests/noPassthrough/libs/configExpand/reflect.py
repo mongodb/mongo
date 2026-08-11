@@ -11,9 +11,7 @@ import time
 def main():
     """Main Method."""
 
-    parser = argparse.ArgumentParser(
-        description="MongoDB Mock Config Expandsion EXEC Endpoint."
-    )
+    parser = argparse.ArgumentParser(description="MongoDB Mock Config Expandsion EXEC Endpoint.")
     parser.add_argument(
         "-s",
         "--sleep",

@@ -38,9 +38,7 @@ def make_hooks_compatible(suite):
         # it's either a list of strings, or a list of dicts, each with key 'class'
         if isinstance(suite["executor"]["hooks"][0], str):
             suite["executor"]["hooks"] = ["AntithesisLogging"] + [
-                hook
-                for hook in suite["executor"]["hooks"]
-                if hook not in INCOMPATIBLE_HOOKS
+                hook for hook in suite["executor"]["hooks"] if hook not in INCOMPATIBLE_HOOKS
             ]
         elif isinstance(suite["executor"]["hooks"][0], dict):
             suite["executor"]["hooks"] = [{"class": "AntithesisLogging"}] + [
@@ -74,9 +72,7 @@ def update_shell(suite):
     suite.setdefault("executor", {}).setdefault("config", {}).setdefault(
         "shell_options", {}
     ).setdefault("eval", "")
-    suite["executor"]["config"]["shell_options"]["eval"] += (
-        "jsTestLog = Function.prototype;"
-    )
+    suite["executor"]["config"]["shell_options"]["eval"] += "jsTestLog = Function.prototype;"
 
 
 def update_exclude_tags(suite):

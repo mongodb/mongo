@@ -9,16 +9,12 @@ import yaml
 
 # Parser for OWNERS.yml files version 1.0.0
 class OwnersParserV1:
-    def parse(
-        self, directory: str, owners_file_path: str, contents: Dict[str, any]
-    ) -> List[str]:
+    def parse(self, directory: str, owners_file_path: str, contents: Dict[str, any]) -> List[str]:
         lines = []
         no_parent_owners = False
         if "options" in contents:
             options = contents["options"]
-            no_parent_owners = (
-                "no_parent_owners" in options and options["no_parent_owners"]
-            )
+            no_parent_owners = "no_parent_owners" in options and options["no_parent_owners"]
 
         if no_parent_owners:
             # Specfying no owners will ensure that no file in this directory has an owner unless it
@@ -41,9 +37,7 @@ class OwnersParserV1:
                     del _filter["metadata"]
 
                 # the last key remaining should be the pattern for the filter
-                assert (
-                    len(_filter) == 1
-                ), f"Filter in {owners_file_path} has incorrect values."
+                assert len(_filter) == 1, f"Filter in {owners_file_path} has incorrect values."
                 pattern = next(iter(_filter))
                 owners: set[str] = set()
 
@@ -51,9 +45,7 @@ class OwnersParserV1:
                     if "@" in owner:
                         # approver is email, just add as is
                         if not owner.endswith("@mongodb.com"):
-                            raise RuntimeError(
-                                "Any emails specified must be a mongodb.com email."
-                            )
+                            raise RuntimeError("Any emails specified must be a mongodb.com email.")
                         owners.add(owner)
                     else:
                         # approver is github username, need to prefix with @
@@ -119,9 +111,7 @@ class OwnersParserV1:
             parsed_pattern = f"/{directory}/**/{pattern}"
 
         if not self.test_pattern(parsed_pattern):
-            raise (
-                RuntimeError(f"Can not find any files that match pattern: `{pattern}`")
-            )
+            raise (RuntimeError(f"Can not find any files that match pattern: `{pattern}`"))
 
         return self.get_line(parsed_pattern, owners)
 

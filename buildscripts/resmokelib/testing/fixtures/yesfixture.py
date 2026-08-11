@@ -8,9 +8,7 @@ from buildscripts.resmokelib.testing.fixtures import interface
 class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
     """Fixture which spawns several 'yes' executables to generate lots of log messages."""
 
-    def __init__(
-        self, logger, job_num, fixturelib, num_instances=1, message_length=100
-    ):
+    def __init__(self, logger, job_num, fixturelib, num_instances=1, message_length=100):
         """Initialize YesFixture."""
         interface.Fixture.__init__(self, logger, job_num, fixturelib)
 
@@ -73,7 +71,4 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
 
     def is_running(self):
         """Return true if the yes processes are running."""
-        return all(
-            process is not None and process.poll() is None
-            for process in self.__processes
-        )
+        return all(process is not None and process.poll() is None for process in self.__processes)

@@ -15,9 +15,7 @@ class TestEvergreenProjectConfig(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         env = os.environ.copy()
-        cls.conf = _evergreen.parse_evergreen_file(
-            TEST_FILE_PATH, evergreen_binary=None
-        )
+        cls.conf = _evergreen.parse_evergreen_file(TEST_FILE_PATH, evergreen_binary=None)
 
         # Assert there is no leakage of env variables from this function
         assert env == os.environ
@@ -170,9 +168,7 @@ class TestTask(unittest.TestCase):
         )
 
     def test_is_run_tests_task(self):
-        task_commands = [
-            {"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}
-        ]
+        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -181,9 +177,7 @@ class TestTask(unittest.TestCase):
         self.assertFalse(task.is_initialize_multiversion_tasks_task)
 
     def test_run_tests_command(self):
-        task_commands = [
-            {"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}
-        ]
+        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -265,9 +259,7 @@ class TestTask(unittest.TestCase):
             }
         )
 
-        self.assertDictEqual(
-            task_commands[0], task.initialize_multiversion_tasks_command
-        )
+        self.assertDictEqual(task_commands[0], task.initialize_multiversion_tasks_command)
         self.assertEqual("multiversion_sanity_check", task.generated_task_name)
 
     def test_get_resmoke_command_vars_from_run_tests_command(self):
@@ -280,9 +272,7 @@ class TestTask(unittest.TestCase):
 
     def test_get_resmoke_command_vars_from_generate_resmoke_tasks_command(self):
         resmoke_command_vars = {"suite": "core"}
-        task_commands = [
-            {"func": "generate resmoke tasks", "vars": resmoke_command_vars}
-        ]
+        task_commands = [{"func": "generate resmoke tasks", "vars": resmoke_command_vars}]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -404,9 +394,7 @@ class TestTask(unittest.TestCase):
             }
         )
 
-        self.assertEqual(
-            ["suite_last_continuous", "suite_last_lts"], task.get_suite_names()
-        )
+        self.assertEqual(["suite_last_continuous", "suite_last_lts"], task.get_suite_names())
 
     def test_generate_task_name_non_gen_tasks(self):
         task_name = "jsCore"
@@ -452,9 +440,7 @@ class TestVariant(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = _evergreen.parse_evergreen_file(
-            TEST_FILE_PATH, evergreen_binary=None
-        )
+        cls.conf = _evergreen.parse_evergreen_file(TEST_FILE_PATH, evergreen_binary=None)
 
     def test_from_dict(self):
         task = _evergreen.Task({"name": "compile"})
@@ -500,16 +486,12 @@ class TestVariant(unittest.TestCase):
 
     def test_expansion(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual(
-            "--param=value --ubuntu", variant_ubuntu.expansion("test_flags")
-        )
+        self.assertEqual("--param=value --ubuntu", variant_ubuntu.expansion("test_flags"))
         self.assertEqual(None, variant_ubuntu.expansion("not_a_valid_expansion_name"))
 
     def test_expansions(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual(
-            {"test_flags": "--param=value --ubuntu"}, variant_ubuntu.expansions
-        )
+        self.assertEqual({"test_flags": "--param=value --ubuntu"}, variant_ubuntu.expansions)
 
     def test_modules(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")

@@ -27,9 +27,7 @@ class ParserOutput(TypedDict):
 
 _JEPSEN_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 _JEPSEN_MILLI_RE = re.compile("([0-9]+){(.*)}")
-_JEPSEN_TIME_RE = re.compile(
-    "[0-9]{4}-[0-8]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]+{.*}"
-)
+_JEPSEN_TIME_RE = re.compile("[0-9]{4}-[0-8]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]+{.*}")
 
 
 def _time_parse(time: str):

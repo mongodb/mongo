@@ -37,8 +37,7 @@ def get_processes(process_ids, interesting_processes, process_match, logger):
     # Canonicalize the process names to lowercase to handle cases where the name of the Python
     # process is /System/Library/.../Python on OS X and -p python is specified to the hang analyzer.
     all_processes = [
-        Pinfo(name=process_name.lower(), pidv=pid)
-        for (pid, process_name) in all_processes
+        Pinfo(name=process_name.lower(), pidv=pid) for (pid, process_name) in all_processes
     ]
 
     if process_ids:
@@ -110,9 +109,7 @@ class _ProcessList(object):
         :param logger: Where to log output.
         :return: A list of process names.
         """
-        raise NotImplementedError(
-            "dump_process must be implemented in OS-specific subclasses"
-        )
+        raise NotImplementedError("dump_process must be implemented in OS-specific subclasses")
 
 
 class _WindowsProcessList(_ProcessList):
@@ -154,9 +151,7 @@ class _DarwinProcessList(_ProcessList):
         ret = callo([ps, "-axco", "pid,comm"], logger)
 
         buff = io.StringIO(ret)
-        csv_reader = csv.reader(
-            buff, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True
-        )
+        csv_reader = csv.reader(buff, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         return [[int(row[0]), row[1]] for row in csv_reader if row[0] != "PID"]
 
@@ -180,26 +175,15 @@ class _LinuxProcessList(_ProcessList):
         ret = callo([ps, "-eo", "pid,args"], logger)
 
         buff = io.StringIO(ret)
-        csv_reader = csv.reader(
-            buff, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True
-        )
+        csv_reader = csv.reader(buff, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
-        return [
-            [int(row[0]), os.path.split(row[1])[1]]
-            for row in csv_reader
-            if row[0] != "PID"
-        ]
+        return [[int(row[0]), os.path.split(row[1])[1]] for row in csv_reader if row[0] != "PID"]
 
 
 def _pname_match(match_type, pname, interesting_processes):
     """Return True if the pname matches an interesting_processes."""
     pname = os.path.splitext(pname)[0]
     for ip in interesting_processes:
-        if (
-            match_type == "exact"
-            and pname == ip
-            or match_type == "contains"
-            and ip in pname
-        ):
+        if match_type == "exact" and pname == ip or match_type == "contains" and ip in pname:
             return True
     return False

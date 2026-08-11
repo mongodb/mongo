@@ -53,14 +53,10 @@ def maybe_attach_core_analyzer_task(
     # If the task is a part of a display task, search the parent's execution tasks
     # If the task has no parent search the whole build variant
     parent_id = current_task.parent_task_id
-    search_tasks = (
-        evg_api.task_by_id(parent_id).execution_tasks if parent_id else build.tasks
-    )
+    search_tasks = evg_api.task_by_id(parent_id).execution_tasks if parent_id else build.tasks
 
     # The task id uses underscores instead of hyphens
-    task_id_search_term = (
-        f"{GENERATED_TASK_PREFIX}_{current_task_name.replace('-', '_')}"
-    )
+    task_id_search_term = f"{GENERATED_TASK_PREFIX}_{current_task_name.replace('-', '_')}"
 
     matching_task = None
     matching_execution = None

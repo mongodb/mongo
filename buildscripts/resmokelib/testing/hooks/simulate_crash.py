@@ -67,9 +67,7 @@ class SimulateCrash(bghook.BGHook):
             node.mongod.pause()
 
             self.logger.info(
-                "Starting to copy data files. DBPath: {}".format(
-                    node.get_dbpath_prefix()
-                )
+                "Starting to copy data files. DBPath: {}".format(node.get_dbpath_prefix())
             )
 
             try:
@@ -103,9 +101,7 @@ class SimulateCrash(bghook.BGHook):
 
         total_bytes_sent = 0
         while total_bytes_sent < in_bytes:
-            bytes_sent = os.sendfile(
-                out_fd, in_fd, total_bytes_sent, in_bytes - total_bytes_sent
-            )
+            bytes_sent = os.sendfile(out_fd, in_fd, total_bytes_sent, in_bytes - total_bytes_sent)
             if bytes_sent == 0:
                 raise ValueError("Unexpectedly reached EOF copying file")
             total_bytes_sent += bytes_sent
@@ -116,13 +112,9 @@ class SimulateCrash(bghook.BGHook):
     def validate_all(self):
         """Start a standalone node to validate all collections on the copied data files."""
         for node in self.fixture.nodes:
-            path = node.get_dbpath_prefix() + "/simulateCrashes/{}".format(
-                self.backup_num
-            )
+            path = node.get_dbpath_prefix() + "/simulateCrashes/{}".format(self.backup_num)
             self.logger.info(
-                "Starting to validate. DBPath: {} Port: {}".format(
-                    path, self.validate_port
-                )
+                "Starting to validate. DBPath: {} Port: {}".format(path, self.validate_port)
             )
 
             mdb = process.Process(
@@ -172,6 +164,4 @@ class SimulateCrash(bghook.BGHook):
             )
             raise self._background_job.err
         else:
-            self.logger.info(
-                "Reached end of cycle in the hook, killing background thread."
-            )
+            self.logger.info("Reached end of cycle in the hook, killing background thread.")

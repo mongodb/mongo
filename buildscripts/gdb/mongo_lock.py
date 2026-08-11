@@ -70,9 +70,7 @@ class Thread(object):
         return not self == other
 
     def __str__(self):
-        return "{} (Thread 0x{:012x} (LWP {}))".format(
-            self.name, self.thread_id, self.lwpid
-        )
+        return "{} (Thread 0x{:012x} (LWP {}))".format(self.name, self.thread_id, self.lwpid)
 
     def key(self):
         """Return thread key."""
@@ -195,8 +193,7 @@ class Graph(object):
             " Lock C is currently held in MODE_IX"
         )
         sb.append(
-            "#    Lock C (MODE_IX) -> Thread 2 indicates Lock C is held by Thread 2 in"
-            " MODE_IX"
+            "#    Lock C (MODE_IX) -> Thread 2 indicates Lock C is held by Thread 2 in" " MODE_IX"
         )
         if message is not None:
             sb.append(message)
@@ -218,11 +215,7 @@ class Graph(object):
             if nodes and node_key in nodes:
                 color = "color = red"
 
-            sb.append(
-                '    "{0}" [label="{0}" {1}]'.format(
-                    self._get_node_escaped(node_key), color
-                )
-            )
+            sb.append('    "{0}" [label="{0}" {1}]'.format(self._get_node_escaped(node_key), color))
         sb.append("}")
         return "\n".join(sb)
 
@@ -256,9 +249,7 @@ class Graph(object):
             if node not in nodes_visited:
                 cycle_path = self.depth_first_search(node, nodes_visited)
                 if cycle_path:
-                    return [
-                        str(self.nodes[node_key]["node"]) for node_key in cycle_path
-                    ]
+                    return [str(self.nodes[node_key]["node"]) for node_key in cycle_path]
         return None
 
 
@@ -332,9 +323,7 @@ def find_mutex_holder(graph, thread_dict, show):
     mutex_waiter = thread_dict[mutex_waiter_lwpid]
     if show:
         print(
-            "Mutex at {} held by {} waited on by {}".format(
-                mutex_value, mutex_holder, mutex_waiter
-            )
+            "Mutex at {} held by {} waited on by {}".format(mutex_value, mutex_holder, mutex_waiter)
         )
     if graph:
         graph.add_edge(mutex_waiter, Lock(int(mutex_value), "Mutex"))

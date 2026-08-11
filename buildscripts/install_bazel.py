@@ -65,10 +65,7 @@ def install_buildozer(download_location: str = "./"):
 def install_bazel(binary_directory: str) -> str:
     install_buildozer(binary_directory)
     normalized_arch = (
-        platform.machine()
-        .lower()
-        .replace("aarch64", "arm64")
-        .replace("x86_64", "amd64")
+        platform.machine().lower().replace("aarch64", "arm64").replace("x86_64", "amd64")
     )
     normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
     is_bazelisk_supported = normalized_arch not in ["ppc64le", "s390x"]
@@ -163,19 +160,13 @@ def main():
             else:
                 print("To add it to your PATH, run: \n")
                 if os.path.exists(os.path.expanduser("~/.bashrc")):
-                    print(
-                        f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bashrc'
-                    )
+                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bashrc')
                     print("source ~/.bashrc")
                 elif os.path.exists(os.path.expanduser("~/.bash_profile")):
-                    print(
-                        f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bash_profile'
-                    )
+                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bash_profile')
                     print("source ~/.bash_profile")
                 elif os.path.exists(os.path.expanduser("~/.zshrc")):
-                    print(
-                        f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.zshrc'
-                    )
+                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.zshrc')
                     print("source ~/.zshrc")
                 else:
                     print(f"export PATH={abs_binary_directory}:$PATH")

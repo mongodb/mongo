@@ -9,9 +9,7 @@ class TestExternalFixture(interface.Fixture):
     REGISTERED_NAME = "TestExternalFixture"
 
     def __init__(self, logger, job_num, fixturelib, dbpath_prefix=None):
-        interface.Fixture.__init__(
-            self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix
-        )
+        interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
 
     def setup(self):
         """Setup the fixture."""

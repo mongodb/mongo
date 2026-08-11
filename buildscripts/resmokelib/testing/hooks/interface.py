@@ -98,9 +98,7 @@ class DynamicTestCase(testcase.TestCase):  # pylint: disable=abstract-method
         base_test_name = base_test.short_name()
         test_name = cls._make_test_name(base_test_name, hook)
         description = "{} before running '{}'".format(hook.description, base_test_name)
-        return cls(
-            logger, test_name, description, base_test_name, hook, *args, **kwargs
-        )
+        return cls(logger, test_name, description, base_test_name, hook, *args, **kwargs)
 
     @classmethod
     def create_after_test(cls, logger, base_test, hook, *args, **kwargs):
@@ -108,9 +106,7 @@ class DynamicTestCase(testcase.TestCase):  # pylint: disable=abstract-method
         base_test_name = base_test.short_name()
         test_name = cls._make_test_name(base_test_name, hook)
         description = "{} after running '{}'".format(hook.description, base_test_name)
-        return cls(
-            logger, test_name, description, base_test_name, hook, *args, **kwargs
-        )
+        return cls(logger, test_name, description, base_test_name, hook, *args, **kwargs)
 
     @staticmethod
     def _make_test_name(base_test_name, hook):

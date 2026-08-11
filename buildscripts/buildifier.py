@@ -34,8 +34,7 @@ def find_all_failed(bin_path: str) -> list[str]:
         if (
             not result["formatted"]
             and not any(
-                result["filename"].startswith(ignored_path)
-                for ignored_path in ignored_paths
+                result["filename"].startswith(ignored_path) for ignored_path in ignored_paths
             )
         )
     ]
@@ -147,9 +146,7 @@ def main():
     else:
         # we purposefully do not use sub.choices.keys() so it does not print as a dict_keys object
         choices = [key for key in sub.choices]
-        raise RuntimeError(
-            f"One of the following subcommands must be specified: {choices}"
-        )
+        raise RuntimeError(f"One of the following subcommands must be specified: {choices}")
 
 
 if __name__ == "__main__":

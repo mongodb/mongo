@@ -79,9 +79,7 @@ class Repository(object):
 
     def get_origin_url(self):
         """Return the URL of the origin repository."""
-        return self._callgito(
-            "config", ["--local", "--get", "remote.origin.url"]
-        ).rstrip()
+        return self._callgito("config", ["--local", "--get", "remote.origin.url"]).rstrip()
 
     def get_branch_name(self):
         """
@@ -112,9 +110,7 @@ class Repository(object):
         """Return True if the specified parent hash an ancestor of child hash."""
         # If the common point between parent_revision and child_revision is
         # parent_revision, then parent_revision is an ancestor of child_revision.
-        merge_base = self._callgito(
-            "merge-base", [parent_revision, child_revision]
-        ).rstrip()
+        merge_base = self._callgito("merge-base", [parent_revision, child_revision]).rstrip()
         return parent_revision == merge_base
 
     def is_commit(self, revision):
@@ -220,18 +216,14 @@ class Repository(object):
 
     @staticmethod
     def _run_process(cmd, params, cwd=None):
-        process = subprocess.Popen(
-            params, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd
-        )
+        process = subprocess.Popen(params, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
         (stdout, stderr) = process.communicate()
         if process.returncode:
             if stdout:
                 LOGGER.error("Output of '%s': %s", " ".join(params), stdout)
             if stderr:
                 LOGGER.error("Error output of '%s': %s", " ".join(params), stderr)
-        return GitCommandResult(
-            cmd, params, process.returncode, stdout=stdout, stderr=stderr
-        )
+        return GitCommandResult(cmd, params, process.returncode, stdout=stdout, stderr=stderr)
 
 
 class GitException(Exception):

@@ -43,9 +43,7 @@ def run(port, tls_cert_key_file, bind_ip):
     listener.listen()
 
     # Printed (and flushed) so the launching jstest can detect readiness.
-    print(
-        "Malformed staple TLS server listening on %s:%d" % (bind_ip, port), flush=True
-    )
+    print("Malformed staple TLS server listening on %s:%d" % (bind_ip, port), flush=True)
 
     while True:
         try:
@@ -74,27 +72,19 @@ def run(port, tls_cert_key_file, bind_ip):
 
 def main():
     parser = argparse.ArgumentParser(description="Malformed OCSP staple TLS server.")
-    parser.add_argument(
-        "-p", "--port", type=int, default=8100, help="Port to listen on"
-    )
-    parser.add_argument(
-        "-b", "--bind_ip", type=str, default="0.0.0.0", help="IP to listen on"
-    )
+    parser.add_argument("-p", "--port", type=int, default=8100, help="Port to listen on")
+    parser.add_argument("-b", "--bind_ip", type=str, default="0.0.0.0", help="IP to listen on")
     parser.add_argument(
         "--tls_cert_key_file",
         type=str,
         required=True,
         help="PEM file with the certificate chain and private key the TLS server presents",
     )
-    parser.add_argument(
-        "-v", "--verbose", action="count", help="Enable verbose tracing"
-    )
+    parser.add_argument("-v", "--verbose", action="count", help="Enable verbose tracing")
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=level, format="%(asctime)s %(levelname)s %(module)s: %(message)s"
-    )
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(module)s: %(message)s")
 
     # Exit promptly and cleanly when the launching jstest sends SIGINT.
     signal.signal(signal.SIGINT, lambda _sig, _frame: os._exit(0))

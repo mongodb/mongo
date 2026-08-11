@@ -78,9 +78,7 @@ class GenerateFuzzConfig(Subcommand):
             except shutil.SameFileError:
                 pass
             except FileNotFoundError:
-                print(
-                    "There is no mongos template in the path, skip generating mongos.conf."
-                )
+                print("There is no mongos template in the path, skip generating mongos.conf.")
                 return
 
         fuzz_config = utils.dump_yaml(conf)

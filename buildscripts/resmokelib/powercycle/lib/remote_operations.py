@@ -42,9 +42,7 @@ def posix_path(path):
         path = path[1:-1]
     drive, new_path = os.path.splitdrive(path)
     if drive:
-        new_path = posixpath.join(
-            "/cygdrive", drive.split(":")[0], *re.split("/|\\\\", new_path)
-        )
+        new_path = posixpath.join("/cygdrive", drive.split(":")[0], *re.split("/|\\\\", new_path))
     return "{quote}{path}{quote}".format(quote=path_quote, path=new_path)
 
 
@@ -65,9 +63,7 @@ class RemoteOperations(object):
         """Initialize RemoteOperations."""
 
         self.user_host = user_host
-        self.ssh_connection_options = (
-            ssh_connection_options if ssh_connection_options else ""
-        )
+        self.ssh_connection_options = ssh_connection_options if ssh_connection_options else ""
         self.ssh_options = ssh_options if ssh_options else ""
         self.scp_options = scp_options if scp_options else ""
         self.retry_sleep = 10
@@ -98,9 +94,7 @@ class RemoteOperations(object):
         while True:
             ret, buff = self._call(cmd)
             # Ignore any connection errors before sshd has fully initialized.
-            if not ret and not any(
-                ssh_error in buff for ssh_error in _SSH_CONNECTION_ERRORS
-            ):
+            if not ret and not any(ssh_error in buff for ssh_error in _SSH_CONNECTION_ERRORS):
                 return ret, buff
             attempt_num += 1
             if attempt_num > retry_count:
@@ -162,9 +156,7 @@ class RemoteOperations(object):
 
         if not self.access_established():
             code, output = self.access_info()
-            print(
-                f"Exiting, unable to establish access. Code=${code}, output=${output}"
-            )
+            print(f"Exiting, unable to establish access. Code=${code}, output=${output}")
             return
 
         # File names with a space must be quoted, since we permit the
@@ -199,18 +191,14 @@ class RemoteOperations(object):
             for copy_file in operation_param:
                 # Quote file on Posix.
                 quote = '"' if not _IS_WINDOWS else ""
-                cmd += "{quote}{file}{quote} ".format(
-                    quote=quote, file=posix_path(copy_file)
-                )
+                cmd += "{quote}{file}{quote} ".format(quote=quote, file=posix_path(copy_file))
             operation_dir = operation_dir if operation_dir else ""
             cmd += " {}:{}".format(self.user_host, posix_path(operation_dir))
 
         elif operation_type == "copy_from":
             operation_dir = operation_dir if operation_dir else "."
             if not os.path.isdir(operation_dir):
-                raise ValueError(
-                    "Local directory '{}' does not exist.".format(operation_dir)
-                )
+                raise ValueError("Local directory '{}' does not exist.".format(operation_dir))
 
             # We support multiple files being copied from the remote host
             # by invoking scp for each file specified.

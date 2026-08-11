@@ -39,18 +39,8 @@ class TestParseTagsBlocks(unittest.TestCase):
 
     def test_two_tags_blocks(self):
         tags_blocks = [
-            (
-                "exclude_with_any_tags:\n"
-                "  - dummy_tag_1\n"
-                "  - dummy_tag_2\n"
-                "  - dummy_tag_3"
-            ),
-            (
-                "include_with_any_tags:\n"
-                "  - dummy_tag_4\n"
-                "  - dummy_tag_5\n"
-                "  - dummy_tag_6"
-            ),
+            ("exclude_with_any_tags:\n" "  - dummy_tag_1\n" "  - dummy_tag_2\n" "  - dummy_tag_3"),
+            ("include_with_any_tags:\n" "  - dummy_tag_4\n" "  - dummy_tag_5\n" "  - dummy_tag_6"),
         ]
         suite = _get_suite(tags_blocks)
         result = list_tags.parse_tags_blocks(suite)
@@ -119,12 +109,7 @@ class TestSplitIntoTags(unittest.TestCase):
         self.assertCountEqual([[""]], result)
 
     def test_block_with_tags_no_comments(self):
-        block = (
-            "exclude_with_any_tags:\n"
-            "  - dummy_tag_1\n"
-            "  - dummy_tag_2\n"
-            "  - dummy_tag_3"
-        )
+        block = "exclude_with_any_tags:\n" "  - dummy_tag_1\n" "  - dummy_tag_2\n" "  - dummy_tag_3"
         expected = [
             ["- dummy_tag_1"],
             ["- dummy_tag_2"],

@@ -20,9 +20,7 @@ class TestMergeMongoOptionDicts(unittest.TestCase):
         }
 
         override = {}
-        merged = self.under_test.merge_mongo_option_dicts(
-            copy.deepcopy(original), override
-        )
+        merged = self.under_test.merge_mongo_option_dicts(copy.deepcopy(original), override)
 
         self.assertDictEqual(merged, original)
 
@@ -66,11 +64,7 @@ class TestMergeMongoOptionDicts(unittest.TestCase):
             },
         }
 
-        override = {
-            self.under_test.SET_PARAMETERS_KEY: {
-                "param2": {"param3": {"param4": "value"}}
-            }
-        }
+        override = {self.under_test.SET_PARAMETERS_KEY: {"param2": {"param3": {"param4": "value"}}}}
         self.under_test.merge_mongo_option_dicts(original, override)
 
         expected = {

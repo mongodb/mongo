@@ -18,9 +18,7 @@ MAX_EXPECTED_TIMEOUT = int(timedelta(hours=48).total_seconds())
 DEFAULT_SCALING_FACTOR = 3.0
 
 
-def calculate_timeout(
-    avg_runtime: float, scaling_factor: Optional[float] = None
-) -> int:
+def calculate_timeout(avg_runtime: float, scaling_factor: Optional[float] = None) -> int:
     """
     Determine how long a runtime to set based on average runtime and a scaling factor.
 
@@ -57,9 +55,7 @@ class TimeoutEstimate(NamedTuple):
 
     def is_specified(self) -> bool:
         """Determine if any specific timeout value has been specified."""
-        return (
-            self.max_test_runtime is not None or self.expected_task_runtime is not None
-        )
+        return self.max_test_runtime is not None or self.expected_task_runtime is not None
 
     def calculate_test_timeout(
         self, repeat_factor: int, scaling_factor: Optional[float] = None
@@ -74,9 +70,7 @@ class TimeoutEstimate(NamedTuple):
         if self.max_test_runtime is None:
             return None
 
-        timeout = (
-            calculate_timeout(self.max_test_runtime, scaling_factor) * repeat_factor
-        )
+        timeout = calculate_timeout(self.max_test_runtime, scaling_factor) * repeat_factor
         LOGGER.debug(
             "Setting timeout",
             timeout=timeout,
@@ -100,8 +94,7 @@ class TimeoutEstimate(NamedTuple):
             return None
 
         exec_timeout = (
-            calculate_timeout(self.expected_task_runtime, scaling_factor)
-            * repeat_factor
+            calculate_timeout(self.expected_task_runtime, scaling_factor) * repeat_factor
             + AVG_TASK_SETUP_TIME
         )
         LOGGER.debug(
@@ -196,9 +189,7 @@ class TimeoutInfo(object):
     def cmd(self):
         """Create a command that sets timeouts as specified."""
         if not self.use_defaults:
-            return timeout_update(
-                exec_timeout_secs=self.exec_timeout, timeout_secs=self.timeout
-            )
+            return timeout_update(exec_timeout_secs=self.exec_timeout, timeout_secs=self.timeout)
 
         return None
 

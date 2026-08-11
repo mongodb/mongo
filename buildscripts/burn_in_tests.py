@@ -107,14 +107,10 @@ class RepeatConfig(object):
 
         if self.repeat_tests_max:
             if not self.repeat_tests_secs:
-                raise ValueError(
-                    "Must specify --repeat-tests-secs with --repeat-tests-max"
-                )
+                raise ValueError("Must specify --repeat-tests-secs with --repeat-tests-max")
 
             if self.repeat_tests_min and self.repeat_tests_min > self.repeat_tests_max:
-                raise ValueError(
-                    "--repeat-tests-secs-min is greater than --repeat-tests-max"
-                )
+                raise ValueError("--repeat-tests-secs-min is greater than --repeat-tests-max")
 
         if self.repeat_tests_min and not self.repeat_tests_secs:
             raise ValueError("Must specify --repeat-tests-secs with --repeat-tests-min")
@@ -134,9 +130,7 @@ class RepeatConfig(object):
                 repeat_options += f" --repeatTestsMax={self.repeat_tests_max} "
             return repeat_options
 
-        repeat_suites = (
-            self.repeat_tests_num if self.repeat_tests_num else REPEAT_SUITES
-        )
+        repeat_suites = self.repeat_tests_num if self.repeat_tests_num else REPEAT_SUITES
         return f" --repeatSuites={repeat_suites} "
 
     def __repr__(self):
@@ -179,9 +173,7 @@ def find_excludes(selector_file: str) -> Tuple[List, List, List]:
     try:
         js_test = yml["selector"]["js_test"]
     except KeyError:
-        raise Exception(
-            f"The selector file {selector_file} is missing the 'selector.js_test' key"
-        )
+        raise Exception(f"The selector file {selector_file} is missing the 'selector.js_test' key")
 
     return (
         default_if_none(js_test.get("exclude_suites"), []),
@@ -221,9 +213,7 @@ def create_executor_list(suites, exclude_suites):
     try:
         with open(BURN_IN_TEST_MEMBERSHIP_FILE) as file:
             test_membership = collections.defaultdict(list, json.load(file))
-        LOGGER.info(
-            f"Using cached test membership file {BURN_IN_TEST_MEMBERSHIP_FILE}."
-        )
+        LOGGER.info(f"Using cached test membership file {BURN_IN_TEST_MEMBERSHIP_FILE}.")
     except FileNotFoundError:
         LOGGER.info("Getting test membership data.")
         test_membership = create_test_membership_map(test_kind=SUPPORTED_TEST_KINDS)
@@ -232,9 +222,7 @@ def create_executor_list(suites, exclude_suites):
     for suite in suites:
         LOGGER.debug("Adding tests for suite", suite=suite, tests=suite.tests)
         for test in suite.tests:
-            LOGGER.debug(
-                "membership for test", test=test, membership=test_membership[test]
-            )
+            LOGGER.debug("membership for test", test=test, membership=test_membership[test])
             for executor in set(test_membership[test]) - set(exclude_suites):
                 if test not in memberships[executor]:
                     memberships[executor].append(test)
@@ -446,9 +434,7 @@ def run_tests(tests_by_task: Dict[str, TaskToBurnInInfo], resmoke_cmd: [str]) ->
             try:
                 subprocess.check_call(new_resmoke_cmd, shell=False)
             except subprocess.CalledProcessError as err:
-                log.warning(
-                    "Resmoke returned an error with suite", error=err.returncode
-                )
+                log.warning("Resmoke returned an error with suite", error=err.returncode)
                 sys.exit(err.returncode)
 
 
@@ -468,9 +454,7 @@ def _configure_logging(verbose: bool):
         logging.getLogger(log_name).setLevel(logging.WARNING)
 
 
-def _get_evg_build_variant_by_name(
-    evergreen_conf: EvergreenProjectConfig, name: str
-) -> Variant:
+def _get_evg_build_variant_by_name(evergreen_conf: EvergreenProjectConfig, name: str) -> Variant:
     """
     Get the evergreen build variant by name from the evergreen config file.
 
@@ -513,11 +497,7 @@ class FileChangeDetector(ABC):
         LOGGER.info("Calculated revision map", revision_map=revision_map)
 
         changed_files = find_changed_files_in_repos(repos, revision_map)
-        return {
-            os.path.normpath(path)
-            for path in changed_files
-            if is_file_a_test_file(path)
-        }
+        return {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
 
 
 class LocalFileChangeDetector(FileChangeDetector):
@@ -749,9 +729,7 @@ def cli():
     default=False,
     help="Output discovered tasks in YAML. Tests will not be run.",
 )
-@click.option(
-    "--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging."
-)
+@click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option(
     "--origin-rev",
     "origin_rev",
@@ -836,9 +814,7 @@ def run(
     elif no_exec:
         executor = NopBurnInExecutor()
 
-    burn_in_orchestrator = BurnInOrchestrator(
-        change_detector, executor, evg_conf, install_dir
-    )
+    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf, install_dir)
     burn_in_orchestrator.burn_in(repos, build_variant)
 
 

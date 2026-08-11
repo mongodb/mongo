@@ -77,22 +77,16 @@ def get_command_definitions(
     def gen():
         for idl_path in sorted(list_idls(directory)):
             if not is_test_or_third_party_idl(idl_path):
-                for command in parse_idl(
-                    idl_path, import_directories
-                ).spec.symbols.commands:
+                for command in parse_idl(idl_path, import_directories).spec.symbols.commands:
                     if command.api_version == api_version:
                         yield command.command_name, command
 
     idl_commands = dict(gen())
-    LOGGER.debug(
-        "Found %s IDL commands in API Version %s", len(idl_commands), api_version
-    )
+    LOGGER.debug("Found %s IDL commands in API Version %s", len(idl_commands), api_version)
     return idl_commands
 
 
-def list_commands_for_api(
-    api_version: str, mongod_or_mongos: str, install_dir: str
-) -> Set[str]:
+def list_commands_for_api(api_version: str, mongod_or_mongos: str, install_dir: str) -> Set[str]:
     """Get a list of commands in a given API version by calling listCommands."""
     assert mongod_or_mongos in ("mongod", "mongos")
     logging.info("Calling listCommands on %s", mongod_or_mongos)
@@ -131,9 +125,7 @@ def list_commands_for_api(
         client = MongoClient(fixture.get_driver_connection_url())  # type: MongoClient
         reply = client.admin.command("listCommands")  # type: Mapping[str, Any]
         commands = {
-            name
-            for name, info in reply["commands"].items()
-            if api_version in info["apiVersions"]
+            name for name, info in reply["commands"].items() if api_version in info["apiVersions"]
         }
         logging.info(
             "Found %s commands in API Version %s on %s",
@@ -150,9 +142,7 @@ def assert_command_sets_equal(api_version: str, command_sets: Dict[str, Set[str]
     """Check that all sources have the same set of commands for a given API version."""
     LOGGER.info("Comparing %s command sets", len(command_sets))
     for name, commands in command_sets.items():
-        LOGGER.info(
-            "--------- %s API Version %s commands --------------", name, api_version
-        )
+        LOGGER.info("--------- %s API Version %s commands --------------", name, api_version)
         for command in sorted(commands):
             LOGGER.info("%s", command)
 
@@ -212,12 +202,8 @@ def main():
         required=True,
         help="Directory to search for MongoDB binaries",
     )
-    arg_parser.add_argument(
-        "-v", "--verbose", action="count", help="Enable verbose logging"
-    )
-    arg_parser.add_argument(
-        "api_version", metavar="API_VERSION", help="API Version to check"
-    )
+    arg_parser.add_argument("-v", "--verbose", action="count", help="Enable verbose logging")
+    arg_parser.add_argument("api_version", metavar="API_VERSION", help="API Version to check")
     args = arg_parser.parse_args()
 
     class FakeArgs:
@@ -235,20 +221,12 @@ def main():
     loggers.configure_loggers()
     loggers.new_job_logger(sys.argv[0], 0)
     logging.basicConfig(level=logging.WARNING)
-    logging.getLogger(LOGGER_NAME).setLevel(
-        logging.DEBUG if args.verbose else logging.INFO
-    )
+    logging.getLogger(LOGGER_NAME).setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     command_sets = {}
-    command_sets["mongod"] = list_commands_for_api(
-        args.api_version, "mongod", args.install_dir
-    )
-    command_sets["mongos"] = list_commands_for_api(
-        args.api_version, "mongos", args.install_dir
-    )
-    command_sets["idl"] = set(
-        get_command_definitions(args.api_version, os.getcwd(), args.include)
-    )
+    command_sets["mongod"] = list_commands_for_api(args.api_version, "mongod", args.install_dir)
+    command_sets["mongos"] = list_commands_for_api(args.api_version, "mongos", args.install_dir)
+    command_sets["idl"] = set(get_command_definitions(args.api_version, os.getcwd(), args.include))
     remove_skipped_commands(command_sets)
     assert_command_sets_equal(args.api_version, command_sets)
 

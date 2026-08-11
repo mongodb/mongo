@@ -105,9 +105,10 @@ class Process(object):
 
         # If we are running against an External System Under Test & this is a `mongo{d,s}` process, we make this process a NOOP.
         # `mongo{d,s}` processes are not running locally for an External System Under Test.
-        self.NOOP = _config.NOOP_MONGO_D_S_PROCESSES and os.path.basename(
-            self.args[0]
-        ) in ["mongod", "mongos"]
+        self.NOOP = _config.NOOP_MONGO_D_S_PROCESSES and os.path.basename(self.args[0]) in [
+            "mongod",
+            "mongos",
+        ]
 
         # The `pid` attribute is assigned after the local process is started. If this process is a NOOP, we assign it a dummy value.
         self.pid = 1 if self.NOOP else None
@@ -145,9 +146,7 @@ class Process(object):
             # Record unittests directly since resmoke doesn't not interact with them and they can finish
             # too quickly for the recorder to have a chance at attaching.
             recorder_args = []
-            if _config.UNDO_RECORDER_PATH is not None and self.args[0].endswith(
-                "_test"
-            ):
+            if _config.UNDO_RECORDER_PATH is not None and self.args[0].endswith("_test"):
                 now_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
                 # Only use the process name since we have to be able to correlate the recording name
                 # with the binary name easily.
@@ -194,12 +193,8 @@ class Process(object):
                     creationflags=creation_flags,
                 )
 
-        self._stdout_pipe = pipe.LoggerPipe(
-            self.logger, logging.INFO, self._process.stdout
-        )
-        self._stderr_pipe = pipe.LoggerPipe(
-            self.logger, logging.ERROR, self._process.stderr
-        )
+        self._stdout_pipe = pipe.LoggerPipe(self.logger, logging.INFO, self._process.stdout)
+        self._stderr_pipe = pipe.LoggerPipe(self.logger, logging.ERROR, self._process.stderr)
 
         self._stdout_pipe.wait_until_started()
         self._stderr_pipe.wait_until_started()
@@ -242,8 +237,7 @@ class Process(object):
                     self._process.send_signal(mode.value)
                 else:
                     raise errors.ProcessError(
-                        "Process wrapper given unrecognized teardown mode: "
-                        + mode.value
+                        "Process wrapper given unrecognized teardown mode: " + mode.value
                     )
 
             except OSError as err:
@@ -266,9 +260,7 @@ class Process(object):
             status = None
             try:
                 # Wait 60 seconds for the program to exit.
-                status = win32event.WaitForSingleObject(
-                    self._process._handle, 60 * 1000
-                )
+                status = win32event.WaitForSingleObject(self._process._handle, 60 * 1000)
             except win32process.error as err:
                 # ERROR_FILE_NOT_FOUND (winerror=2)
                 # ERROR_ACCESS_DENIED (winerror=5)
@@ -288,9 +280,7 @@ class Process(object):
         return_code = self._process.wait(timeout)
 
         if self._recorder is not None:
-            self.logger.info(
-                "Saving the UndoDB recording; it may take a few minutes..."
-            )
+            self.logger.info("Saving the UndoDB recording; it may take a few minutes...")
             recorder_return = self._recorder.wait(timeout)
             if recorder_return != 0:
                 raise errors.ServerFailure(

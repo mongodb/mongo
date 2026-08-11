@@ -102,9 +102,7 @@ class S3BuildidDbgFileResolver(DbgFileResolver):
             except Exception:  # noqa pylint: disable=broad-except
                 ex = sys.exc_info()[0]
                 sys.stderr.write(
-                    "Failed to find debug symbols for {} in s3: {}\n".format(
-                        build_id, ex
-                    )
+                    "Failed to find debug symbols for {} in s3: {}\n".format(build_id, ex)
                 )
                 return None
         if not os.path.exists(build_id_path):
@@ -116,9 +114,7 @@ class S3BuildidDbgFileResolver(DbgFileResolver):
         subprocess.check_call(
             [
                 "wget",
-                "https://s3.amazonaws.com/{}/{}.debug.gz".format(
-                    self._s3_bucket, build_id
-                ),
+                "https://s3.amazonaws.com/{}/{}.debug.gz".format(self._s3_bucket, build_id),
             ],
             cwd=self._cache_dir,
         )
@@ -269,9 +265,7 @@ class PathResolver(DbgFileResolver):
                 )
                 if time.time() < expire_time:
                     # credentials not expired yet
-                    self.http_client.headers.update(
-                        {"Authorization": f"Bearer {access_token}"}
-                    )
+                    self.http_client.headers.update({"Authorization": f"Bearer {access_token}"})
                     return
 
         if self.client_id and self.client_secret:
@@ -281,12 +275,8 @@ class PathResolver(DbgFileResolver):
             )
         else:
             # since we don't have access to secrets, ask user to auth manually
-            credentials = get_oauth_credentials(
-                configs=self.configs, print_auth_url=True
-            )
-        self.http_client.headers.update(
-            {"Authorization": f"Bearer {credentials.access_token}"}
-        )
+            credentials = get_oauth_credentials(configs=self.configs, print_auth_url=True)
+        self.http_client.headers.update({"Authorization": f"Bearer {credentials.access_token}"})
 
         # write credentials to local file for further useage
         with open(self.default_creds_file_path, "w") as cfile:
@@ -382,9 +372,7 @@ class PathResolver(DbgFileResolver):
         :param url: URL string
         :param local_path: full name for local file
         """
-        with requests.get(
-            url, stream=True, timeout=self.download_timeout_secs
-        ) as response:
+        with requests.get(url, stream=True, timeout=self.download_timeout_secs) as response:
             with open(local_path, "wb") as file:
                 for chunk in response.iter_content(chunk_size=2 * 1024 * 1024):
                     file.write(chunk)
@@ -407,12 +395,8 @@ class PathResolver(DbgFileResolver):
                 search_parameters = {"build_id": build_id}
                 if version:
                     search_parameters["version"] = version
-                print(
-                    f"Getting data from service... Search parameters: {search_parameters}"
-                )
-                response = self.http_client.get(
-                    f"{self.host}/find_by_id", params=search_parameters
-                )
+                print(f"Getting data from service... Search parameters: {search_parameters}")
+                response = self.http_client.get(f"{self.host}/find_by_id", params=search_parameters)
                 if response.status_code != 200:
                     sys.stderr.write(
                         f"Server returned unsuccessful status: {response.status_code}, "
@@ -577,9 +561,7 @@ def symbolize_frames(
                 step = 1
             else:
                 file_name, line, column = line.strip().rsplit(":", 3)
-                result[-1].update(
-                    {"file": file_name, "column": int(column), "line": int(line)}
-                )
+                result[-1].update({"file": file_name, "column": int(column), "line": int(line)})
                 step = 0
         return result
 
@@ -664,9 +646,7 @@ def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argumen
         symbinfo = frame.get("symbinfo")
         if symbinfo:
             for sframe in symbinfo:
-                outfile.write(
-                    " {file:s}:{line:d}:{column:d}: {fn:s}\n".format(**sframe)
-                )
+                outfile.write(" {file:s}:{line:d}:{column:d}: {fn:s}\n".format(**sframe))
         else:
             outfile.write(
                 " Couldn't extract symbols: path={path}\n".format(
@@ -682,18 +662,14 @@ def make_argument_parser(parser=None, **kwargs):
 
     parser.add_argument("--dsym-hint", default=[], action="append")
     parser.add_argument("--symbolizer-path", default="")
-    parser.add_argument(
-        "--input-format", choices=["classic", "thin"], default="classic"
-    )
+    parser.add_argument("--input-format", choices=["classic", "thin"], default="classic")
     parser.add_argument(
         "--output-format",
         choices=["classic", "json"],
         default="classic",
         help='"json" shows some extra information',
     )
-    parser.add_argument(
-        "--debug-file-resolver", choices=["path", "s3", "pr"], default="pr"
-    )
+    parser.add_argument("--debug-file-resolver", choices=["path", "s3", "pr"], default="pr")
     parser.add_argument(
         "--src-dir-to-move",
         action="store",
@@ -733,9 +709,7 @@ def make_argument_parser(parser=None, **kwargs):
         default="",
         help="Full path to a directory to store cache/files",
     )
-    pr_group.add_argument(
-        "--client-secret", default="", help="Secret key for Okta Oauth"
-    )
+    pr_group.add_argument("--client-secret", default="", help="Secret key for Okta Oauth")
     pr_group.add_argument("--client-id", default="", help="Client id for Okta Oauth")
     # caching mechanism is currently not fully developed and needs more advanced cleaning techniques, we add an option
     # to enable it after completing the implementation

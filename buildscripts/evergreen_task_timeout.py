@@ -99,9 +99,7 @@ class TimeoutOverrides(BaseModel):
         with open(file_path) as file_handler:
             return cls(**yaml.safe_load(file_handler))
 
-    def _lookup_override(
-        self, build_variant: str, task_name: str
-    ) -> Optional[TimeoutOverride]:
+    def _lookup_override(self, build_variant: str, task_name: str) -> Optional[TimeoutOverride]:
         """
         Check if the given task on the given build variant has an override defined.
 
@@ -124,15 +122,11 @@ class TimeoutOverrides(BaseModel):
                     task=task_name,
                     overrides=[override.dict() for override in overrides],
                 )
-                raise ValueError(
-                    f"Found multiple overrides for '{task_name}' on '{build_variant}'"
-                )
+                raise ValueError(f"Found multiple overrides for '{task_name}' on '{build_variant}'")
             return overrides[0]
         return None
 
-    def lookup_exec_override(
-        self, build_variant: str, task_name: str
-    ) -> Optional[timedelta]:
+    def lookup_exec_override(self, build_variant: str, task_name: str) -> Optional[timedelta]:
         """
         Look up the exec timeout override of the given build variant/task.
 
@@ -145,9 +139,7 @@ class TimeoutOverrides(BaseModel):
             return override.get_exec_timeout()
         return None
 
-    def lookup_idle_override(
-        self, build_variant: str, task_name: str
-    ) -> Optional[timedelta]:
+    def lookup_idle_override(self, build_variant: str, task_name: str) -> Optional[timedelta]:
         """
         Look up the idle timeout override of the given build variant/task.
 
@@ -265,10 +257,7 @@ class TaskTimeoutOrchestrator:
             determined_timeout = COMMIT_QUEUE_TIMEOUT
 
         # The timeout needs to be at least as large as the idle timeout.
-        if (
-            idle_timeout
-            and determined_timeout.total_seconds() < idle_timeout.total_seconds()
-        ):
+        if idle_timeout and determined_timeout.total_seconds() < idle_timeout.total_seconds():
             LOGGER.info(
                 "Making exec timeout as large as idle timeout",
                 exec_timeout_secs=idle_timeout.total_seconds(),
@@ -430,9 +419,7 @@ def main():
         required=True,
         help="Path to bin directory of testable installation",
     )
-    parser.add_argument(
-        "--task-name", dest="task", required=True, help="Task being executed."
-    )
+    parser.add_argument("--task-name", dest="task", required=True, help="Task being executed.")
     parser.add_argument(
         "--suite-name",
         dest="suite_name",
@@ -462,9 +449,7 @@ def main():
         dest="test_flags",
         help="Test flags that are used for `resmoke.py run` command call.",
     )
-    parser.add_argument(
-        "--timeout", dest="timeout", type=int, help="Timeout to use (in sec)."
-    )
+    parser.add_argument("--timeout", dest="timeout", type=int, help="Timeout to use (in sec).")
     parser.add_argument(
         "--exec-timeout",
         dest="exec_timeout",
@@ -477,9 +462,7 @@ def main():
         type=float,
         help="Exec timeout factor to use (in sec).",
     )
-    parser.add_argument(
-        "--out-file", dest="outfile", help="File to write configuration to."
-    )
+    parser.add_argument("--out-file", dest="outfile", help="File to write configuration to.")
     parser.add_argument(
         "--timeout-overrides",
         dest="timeout_overrides_file",
@@ -517,9 +500,7 @@ def main():
     def dependencies(binder: inject.Binder) -> None:
         binder.bind(
             EvergreenApi,
-            RetryingEvergreenApi.get_api(
-                config_file=os.path.expanduser(options.evg_api_config)
-            ),
+            RetryingEvergreenApi.get_api(config_file=os.path.expanduser(options.evg_api_config)),
         )
         binder.bind(TimeoutOverrides, timeout_overrides)
         binder.bind(

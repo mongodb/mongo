@@ -80,9 +80,7 @@ class OAuthCredentials(BaseModel):
         return self.created_time + timedelta(seconds=self.expires_in) < datetime.now()
 
     @classmethod
-    def get_existing_credentials_from_file(
-        cls, file_path: str
-    ) -> Optional[OAuthCredentials]:
+    def get_existing_credentials_from_file(cls, file_path: str) -> Optional[OAuthCredentials]:
         """
         Try to get OAuth credentials from a file location.
 
@@ -176,9 +174,7 @@ class _Handler(BaseHTTPRequestHandler):
         expires_in = resp.get("expires_in")
 
         if not access_token or not expires_in:
-            raise ValueError(
-                "Could not get access token or expires_in data about access token"
-            )
+            raise ValueError("Could not get access token or expires_in data about access token")
 
         headers = {"Authorization": f"Bearer {access_token}"}
         resp = requests.get(
@@ -209,9 +205,7 @@ class PKCEOauthTools:
     redirect_uri: str
     scope: str
 
-    def __init__(
-        self, auth_domain: str, client_id: str, redirect_port: int, scope: str
-    ):
+    def __init__(self, auth_domain: str, client_id: str, redirect_port: int, scope: str):
         """
         Create a new PKCEOauth tools instance.
 
@@ -273,9 +267,7 @@ class PKCEOauthTools:
         return httpd.pkce_credentials
 
 
-def get_oauth_credentials(
-    configs: Configs, print_auth_url: bool = False
-) -> OAuthCredentials:
+def get_oauth_credentials(configs: Configs, print_auth_url: bool = False) -> OAuthCredentials:
     """
     Run the OAuth workflow to get credentials for a human user.
 
@@ -316,9 +308,7 @@ def get_client_cred_oauth_credentials(
     expires_in = token.get("expires_in")
 
     if not access_token or not expires_in:
-        raise ValueError(
-            "Could not get access token or expires_in data about access token"
-        )
+        raise ValueError("Could not get access token or expires_in data about access token")
 
     return OAuthCredentials(
         access_token=access_token,
