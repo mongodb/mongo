@@ -582,6 +582,14 @@ void TransactionCoordinator::_done(Status status) {
                             << "Coordinator " << _lsid << ':' << _txnNumberAndRetryCounter.toBSON()
                             << " stopped due to: " << status.reason());
 
+    // The 'CallbackCanceled' error code may only terminate a TransactionCoordinator continuation if
+    // the coordinator is stepping down from primary while awaiting majority write concern.
+    if (status == ErrorCodes::CallbackCanceled)
+        status = Status(ErrorCodes::InterruptedDueToReplStateChange,
+                        str::stream()
+                            << "Coordinator " << _lsid << ':' << _txnNumberAndRetryCounter.toBSON()
+                            << " stopped due to stepDown with: " << status.reason());
+
     LOGV2_DEBUG(22447,
                 3,
                 "Two-phase commit completed",
@@ -608,6 +616,12 @@ void TransactionCoordinator::_done(Status status) {
         _logSlowTwoPhaseCommit(*_decision);
     }
 
+    // No concurrent writers exist here (_done runs after the 2PC chain completes and
+    // _scheduler is shut down), but snapshot under the lock to future-proof against
+    // refactors and satisfy static analyzers (Coverity/TSAN).
+    const auto stepSnapshot = _step;
+    const bool participantsDurableSnapshot = _participantsDurable;
+
     ul.unlock();
 
     if (!_decisionPromise.getFuture().isReady()) {
@@ -618,6 +632,16 @@ void TransactionCoordinator::_done(Status status) {
     }
 
     if (!status.isOK()) {
+        if (!status.isA<ErrorCategory::NotPrimaryError>() &&
+            !status.isA<ErrorCategory::ShutdownError>()) {
+            LOGV2_WARNING(12111100,
+                          "TransactionCoordinator terminating with unexpected error",
+                          "sessionId"_attr = _lsid,
+                          "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
+                          "step"_attr = toString(stepSnapshot),
+                          "participantsDurable"_attr = participantsDurableSnapshot,
+                          "error"_attr = redact(status));
+        }
         _completionPromise.setError(status);
     } else {
         _completionPromise.setFrom(_decisionPromise.getFuture().getNoThrow().getStatus());

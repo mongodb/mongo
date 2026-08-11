@@ -1558,6 +1558,34 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
     ASSERT_BSONOBJ_EQ(o2.Obj(), expectedO2);
 }
 
+TEST_F(TransactionCoordinatorTest,
+       CoordinatorTerminatedWithUnexpectedErrorBeforeDurablyWritingDecision) {
+    startCapturingLogMessages();
+
+    // Create the coordinator.
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    coordinator->start(operationContext());
+
+    // Wait until the coordinator is writing the participant list.
+    FailPointEnableBlock fp("hangBeforeWaitingForParticipantListWriteConcern");
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
+
+    // Shut down the coordinator's AWS with unexpected error.
+    killClientOpCtx(getServiceContext(),
+                    "hangBeforeWaitingForParticipantListWriteConcern",
+                    ErrorCodes::InternalError);
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    ASSERT_THROWS_CODE(coordinator->onCompletion().get(), DBException, ErrorCodes::InternalError);
+    coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
+    stopCapturingLogMessages();
+    ASSERT_GT(countBSONFormatLogLinesIsSubset(BSON("id" << 12111100)), 0);
+}
+
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
 protected:
     TransactionCoordinatorMetricsTest()
