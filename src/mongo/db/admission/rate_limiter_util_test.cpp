@@ -767,7 +767,7 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         // the mock clock. Use a real-time deadline instead of a bounded retry loop so the wait
         // scales correctly under slow sanitizer builds (e.g. AUBSAN ~10x slower).
         const auto enqueueDeadline = Date_t::now() + Seconds(60);
-        while (rateLimiter.queued() != numThreads - maxTokens) {
+        while (rateLimiter.stats().addedToQueue() < (numThreads - maxTokens)) {
             if (Date_t::now() >= enqueueDeadline) {
                 break;
             }
