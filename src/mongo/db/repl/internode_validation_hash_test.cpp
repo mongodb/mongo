@@ -12,6 +12,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -21,9 +22,20 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
 
+#include <string>
+#include <string_view>
+#include <vector>
+
 namespace mongo {
 namespace repl {
 namespace {
+
+// The log emitted for a mismatch when 'continuousInternodeValidationFatalOnMismatch' is disabled.
+constexpr int32_t kMismatchLogId = 12882800;
+// The 'fieldLevelDiff' logged when the two documents the diff is taken over are identical.
+constexpr std::string_view kEmptyFieldLevelDiff = "{}";
+// The 'fieldLevelDiff' logged for deletes, where no diff can be derived.
+constexpr std::string_view kNoFieldLevelDiff = "<not derivable>";
 
 /**
  * End-to-end tests that exercise the per-document hash check.
@@ -67,6 +79,90 @@ protected:
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
             MODE_IS);
         return shouldVerifyValidationHash(opCtx, coll.getCollectionPtr(), mode, op);
+    }
+
+    /**
+     * Asserts that '_nss' holds exactly 'expected' at 'rid'.
+     */
+    void assertDocumentIs(const RecordId& rid, const BSONObj& expected) {
+        ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+        ASSERT_BSONOBJ_EQ(expected, *documentAtRecordId(_opCtx.get(), _nss, rid));
+    }
+
+    /**
+     * Asserts that '_nss' holds no document at 'rid'.
+     */
+    void assertNoDocumentAt(const RecordId& rid) {
+        EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+    }
+
+    /**
+     * Returns 'hash' with a bit flipped, standing in for a hash this node disagrees with.
+     */
+    static int64_t corrupt(int64_t hash) {
+        return hash ^ 0x1;
+    }
+
+    /**
+     * One non-fatal mismatch log line, as expected by assertOnlyLogsMismatches().
+     */
+    struct ExpectedMismatch {
+        int64_t expectedHash;
+        int64_t actualHash;
+        std::string_view opType;
+        std::string fieldLevelDiff;
+    };
+
+    /**
+     * The mismatch expected from an insert of 'doc' whose hash was corrupted.
+     */
+    static ExpectedMismatch insertMismatch(const BSONObj& doc) {
+        const int64_t actualHash = computeDocValidationHash(doc);
+        return {corrupt(actualHash), actualHash, "i", std::string{kEmptyFieldLevelDiff}};
+    }
+
+    /**
+     * The mismatch expected from a delete of 'doc' whose hash was corrupted.
+     */
+    static ExpectedMismatch deleteMismatch(const BSONObj& doc) {
+        const int64_t actualHash = computeDocValidationHash(doc);
+        return {corrupt(actualHash), actualHash, "d", std::string{kNoFieldLevelDiff}};
+    }
+
+    /**
+     * The mismatch expected from an update whose hash was corrupted. 'preImage' is what this node
+     * held, which is what the logged field-level diff is taken against.
+     */
+    static ExpectedMismatch updateMismatch(const BSONObj& preImage, const BSONObj& postImage) {
+        const int64_t actualHash = computeUpdateValidationHash(preImage, postImage);
+        return {corrupt(actualHash),
+                actualHash,
+                "u",
+                doc_diff::computeInlineDiff(preImage, postImage)->toString()};
+    }
+
+    /**
+     * Applies 'applyOps' with log capture active and asserts that it succeeded having reported
+     * exactly one mismatch log line per entry of 'expected', and no others.
+     */
+    template <typename ApplyFn>
+    void assertOnlyLogsMismatches(ApplyFn&& applyOps,
+                                  const std::vector<ExpectedMismatch>& expected) {
+        unittest::LogCaptureGuard logs;
+        ASSERT_OK(applyOps());
+        logs.stop();
+
+        for (const auto& mismatch : expected) {
+            EXPECT_EQ(logs.countBSONContainingSubset(
+                          BSON("id" << kMismatchLogId << "attr"
+                                    << BSON("expectedHash" << mismatch.expectedHash << "actualHash"
+                                                           << mismatch.actualHash << "opType"
+                                                           << mismatch.opType << "fieldLevelDiff"
+                                                           << mismatch.fieldLevelDiff))),
+                      1)
+                << "opType: " << mismatch.opType << ", expectedHash: " << mismatch.expectedHash;
+        }
+        EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMismatchLogId)), expected.size());
     }
 
     NamespaceString _nss;
@@ -139,7 +235,22 @@ TEST_F(VerifyValidationHashTest, FalseForUnsupportedCollection) {
         shouldVerify(_opCtx.get(), _plainNss, OplogApplication::Mode::kSecondary, int64_t{123}));
 }
 
-using VerifyValidationHashDeathTest = VerifyValidationHashTest;
+template <typename Base>
+class FatalOnMismatchTest : public Base {
+protected:
+    unittest::ServerParameterGuard _fatalOnMismatch{"continuousInternodeValidationFatalOnMismatch",
+                                                    true};
+};
+
+template <typename Base>
+class LogOnlyMismatchTest : public Base {
+protected:
+    unittest::ServerParameterGuard _fatalOnMismatch{"continuousInternodeValidationFatalOnMismatch",
+                                                    false};
+};
+
+using VerifyValidationHashDeathTest = FatalOnMismatchTest<VerifyValidationHashTest>;
+using VerifyValidationHashLogOnlyTest = LogOnlyMismatchTest<VerifyValidationHashTest>;
 
 DEATH_TEST_F(VerifyValidationHashDeathTest, MismatchedHashFasserts, "12851600") {
     const RecordId rid(1);
@@ -149,6 +260,38 @@ DEATH_TEST_F(VerifyValidationHashDeathTest, MismatchedHashFasserts, "12851600") 
     OplogEntry op =
         makeInsertOplogEntryWithRecordIdAndHash(nextOpTime(), _nss, _uuid, doc, rid, wrongHash);
     std::ignore = runOpSteadyState(op);
+}
+
+TEST_F(VerifyValidationHashTest, FatalOnMismatchDefaultsToEnabled) {
+    EXPECT_TRUE(continuousInternodeValidationFatalOnMismatch.load());
+}
+
+// With 'continuousInternodeValidationFatalOnMismatch' disabled the mismatch is only logged, and
+// oplog application proceeds.
+TEST_F(VerifyValidationHashLogOnlyTest, InsertMismatchedHashOnlyLogs) {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+
+    OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, doc, rid, corrupt(computeDocValidationHash(doc)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {insertMismatch(doc)});
+
+    assertDocumentIs(rid, doc);
+}
+
+// A mismatch on a delete is logged and the document is still removed.
+TEST_F(VerifyValidationHashLogOnlyTest, DeleteMismatchedHashOnlyLogs) {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    OplogEntry op = makeDeleteOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, corrupt(computeDocValidationHash(doc)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {deleteMismatch(doc)});
+
+    assertNoDocumentAt(rid);
 }
 
 TEST_F(VerifyValidationHashTest, InsertWithNestedArraysMatchingHashAppliesCleanly) {
@@ -201,6 +344,27 @@ DEATH_TEST_F(VerifyValidationHashDeathTest,
     std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
 
     std::ignore = applyGroupedInsertsSteadyState(ops);
+}
+
+// Every mismatch in a grouped insert is reported, not just the first one, and the batch still
+// commits.
+TEST_F(VerifyValidationHashLogOnlyTest, GroupedInsertsMismatchOnEveryEntryOnlyLogs) {
+    const RecordId rid1(1);
+    const RecordId rid2(2);
+    const BSONObj doc1 = BSON("_id" << 1 << "x" << 100);
+    const BSONObj doc2 = BSON("_id" << 2 << "x" << 200);
+
+    OplogEntry op1 = makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, doc1, rid1, corrupt(computeDocValidationHash(doc1)));
+    OplogEntry op2 = makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, doc2, rid2, corrupt(computeDocValidationHash(doc2)));
+    std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
+
+    assertOnlyLogsMismatches([&] { return applyGroupedInsertsSteadyState(ops); },
+                             {insertMismatch(doc1), insertMismatch(doc2)});
+
+    assertDocumentIs(rid1, doc1);
+    assertDocumentIs(rid2, doc2);
 }
 
 TEST_F(VerifyValidationHashTest, DeleteMatchingHashAppliesCleanly) {
@@ -276,6 +440,60 @@ DEATH_TEST_F(VerifyValidationHashDeathTest, UpdateMismatchedHashFasserts, "12851
     OplogEntry op = makeUpdateOplogEntryWithRecordIdAndHash(
         nextOpTime(), _nss, query, postImage, rid, wrongHash);
     std::ignore = runOpSteadyState(op);
+}
+
+// A mismatch on an update is logged, and the post-image is still applied. The logged field-level
+// diff is taken between the pre-image and what this node stored.
+TEST_F(VerifyValidationHashLogOnlyTest, UpdateMismatchedHashOnlyLogs) {
+    const RecordId rid(1);
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, preImage, rid);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    OplogEntry op = makeUpdateOplogEntryWithRecordIdAndHash(
+        nextOpTime(),
+        _nss,
+        BSON("_id" << 1),
+        postImage,
+        rid,
+        corrupt(computeUpdateValidationHash(preImage, postImage)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); },
+                             {updateMismatch(preImage, postImage)});
+
+    assertDocumentIs(rid, postImage);
+}
+
+// The log-only counterpart of 'UpdateWithDeltaDivergentPreImageFasserts'. The divergence is only
+// visible through the hash, so the node records it and then converges on the primary's post-image,
+// leaving no trace of the divergence on disk.
+TEST_F(VerifyValidationHashLogOnlyTest, UpdateWithDeltaDivergentPreImageOnlyLogs) {
+    const RecordId rid(1);
+    const BSONObj localPreImage = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, localPreImage, rid);
+
+    const BSONObj primaryPreImage = BSON("_id" << 1 << "x" << 150);
+    const BSONObj sharedPostImage = BSON("_id" << 1 << "x" << 200);
+    const int64_t primaryHash = computeUpdateValidationHash(primaryPreImage, sharedPostImage);
+
+    OplogEntry op =
+        makeUpdateOplogEntryWithRecordIdAndHash(nextOpTime(),
+                                                _nss,
+                                                BSON("_id" << 1),
+                                                makeDelta(primaryPreImage, sharedPostImage),
+                                                rid,
+                                                primaryHash);
+
+    // The primary's hash is not this node's hash with a bit flipped, so the expectation cannot come
+    // from updateMismatch().
+    assertOnlyLogsMismatches(
+        [&] { return runOpSteadyState(op); },
+        {{primaryHash,
+          computeUpdateValidationHash(localPreImage, sharedPostImage),
+          "u",
+          doc_diff::computeInlineDiff(localPreImage, sharedPostImage)->toString()}});
+
+    assertDocumentIs(rid, sharedPostImage);
 }
 
 TEST_F(VerifyValidationHashTest, UpdateWrongHashInInitialSyncModeIsIgnored) {
@@ -505,6 +723,63 @@ protected:
         return op;
     }
 
+    /**
+     * The documents of the mixed-CRUD batch built by makeCorruptedMixedCrudOps().
+     */
+    struct MixedCrudDocs {
+        RecordId updateRid{1};
+        RecordId deleteRid{2};
+        RecordId insertRid{3};
+        BSONObj updatePreImage = BSON("_id" << 1 << "x" << 100);
+        BSONObj updatePostImage = BSON("_id" << 1 << "x" << 150);
+        BSONObj deleteDoc = BSON("_id" << 2 << "x" << 200);
+        BSONObj insertDoc = BSON("_id" << 3 << "arr" << BSON_ARRAY(1 << 2));
+    };
+
+    /**
+     * Seeds the update's pre-image and the delete's target, then returns an insert, an update and a
+     * delete over 'docs', each carrying a hash this node disagrees with.
+     */
+    std::vector<ReplOperation> makeCorruptedMixedCrudOps(const MixedCrudDocs& docs) {
+        insertDocumentAtRecordId(_opCtx.get(), _nss, docs.updatePreImage, docs.updateRid);
+        insertDocumentAtRecordId(_opCtx.get(), _nss, docs.deleteDoc, docs.deleteRid);
+
+        return {makeInnerOp(OpTypeEnum::kInsert,
+                            docs.insertDoc,
+                            boost::none,
+                            docs.insertRid,
+                            corrupt(computeDocValidationHash(docs.insertDoc))),
+                makeInnerOp(OpTypeEnum::kUpdate,
+                            docs.updatePostImage,
+                            BSON("_id" << 1),
+                            docs.updateRid,
+                            corrupt(computeUpdateValidationHash(docs.updatePreImage,
+                                                                docs.updatePostImage))),
+                makeInnerOp(OpTypeEnum::kDelete,
+                            BSON("_id" << 2),
+                            boost::none,
+                            docs.deleteRid,
+                            corrupt(computeDocValidationHash(docs.deleteDoc)))};
+    }
+
+    /**
+     * Asserts that every op of a makeCorruptedMixedCrudOps() batch landed on disk.
+     */
+    void assertMixedCrudOpsApplied(const MixedCrudDocs& docs) {
+        assertDocumentIs(docs.updateRid, docs.updatePostImage);
+        assertNoDocumentAt(docs.deleteRid);
+        assertDocumentIs(docs.insertRid, docs.insertDoc);
+    }
+
+    /**
+     * The mismatches expected from a makeCorruptedMixedCrudOps() batch.
+     */
+    std::vector<ExpectedMismatch> mixedCrudMismatches(const MixedCrudDocs& docs) {
+        return {insertMismatch(docs.insertDoc),
+                updateMismatch(docs.updatePreImage, docs.updatePostImage),
+                deleteMismatch(docs.deleteDoc)};
+    }
+
     OperationSessionInfo sessionInfo() const {
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(_lsid);
@@ -555,7 +830,8 @@ protected:
     }
 };
 
-using TransactionValidationHashDeathTest = TransactionValidationHashTest;
+using TransactionValidationHashDeathTest = FatalOnMismatchTest<TransactionValidationHashTest>;
+using TransactionValidationHashLogOnlyTest = LogOnlyMismatchTest<TransactionValidationHashTest>;
 
 // An insert, an update and a delete batched into one transaction, each carrying its own hash.
 TEST_F(TransactionValidationHashTest, TransactionMixedCrudMatchingHashesApplyCleanly) {
@@ -629,6 +905,18 @@ DEATH_TEST_F(TransactionValidationHashDeathTest,
     const int64_t wrongHash = computeDocValidationHash(doc) ^ 0x1;
     std::ignore = runTransactionSteadyState(
         {makeInnerOp(OpTypeEnum::kDelete, BSON("_id" << 1), boost::none, rid, wrongHash)});
+}
+
+// A wrong hash on an inner op does not abort the transaction: each mismatch is reported separately
+// and every op still commits.
+TEST_F(TransactionValidationHashLogOnlyTest, TransactionMixedCrudMismatchedHashesOnlyLog) {
+    const MixedCrudDocs docs;
+    const std::vector<ReplOperation> ops = makeCorruptedMixedCrudOps(docs);
+
+    assertOnlyLogsMismatches([&] { return runTransactionSteadyState(ops); },
+                             mixedCrudMismatches(docs));
+
+    assertMixedCrudOpsApplied(docs);
 }
 
 // A batched write tagged kApplyOpsAppliedSeparately. The inner ops keep their own hashes, so the
@@ -763,7 +1051,10 @@ protected:
     }
 };
 
-using PreparedTransactionValidationHashDeathTest = PreparedTransactionValidationHashTest;
+using PreparedTransactionValidationHashDeathTest =
+    FatalOnMismatchTest<PreparedTransactionValidationHashTest>;
+using PreparedTransactionValidationHashLogOnlyTest =
+    LogOnlyMismatchTest<PreparedTransactionValidationHashTest>;
 
 TEST_F(PreparedTransactionValidationHashTest,
        PreparedTransactionMixedCrudMatchingHashesApplyCleanly) {
@@ -838,6 +1129,18 @@ DEATH_TEST_F(PreparedTransactionValidationHashDeathTest,
     const int64_t wrongHash = computeDocValidationHash(doc) ^ 0x1;
     std::ignore = runPreparedTransactionSteadyState(
         {makeInnerOp(OpTypeEnum::kDelete, BSON("_id" << 1), boost::none, rid, wrongHash)});
+}
+
+// A wrong hash on an inner op does not prevent the prepared transaction from committing.
+TEST_F(PreparedTransactionValidationHashLogOnlyTest,
+       PreparedTransactionMixedCrudMismatchedHashesOnlyLog) {
+    const MixedCrudDocs docs;
+    const std::vector<ReplOperation> ops = makeCorruptedMixedCrudOps(docs);
+
+    assertOnlyLogsMismatches([&] { return runPreparedTransactionSteadyState(ops); },
+                             mixedCrudMismatches(docs));
+
+    assertMixedCrudOpsApplied(docs);
 }
 
 /**

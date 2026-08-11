@@ -1636,8 +1636,10 @@ boost::optional<int64_t> getValidationHash(const OplogEntry& op) {
 }
 
 // Compares 'actualHash', recomputed by this non-primary, against the hash the primary recorded on
-// 'op', and fasserts on mismatch. 'diagnosticDoc' is used only to compute the field-level diff. It
-// is the post-image for inserts, and the pre-image for deletes and updates.
+// 'op'. On mismatch this fasserts, or only logs when
+// 'continuousInternodeValidationFatalOnMismatch' is disabled. 'diagnosticDoc' is used only to
+// compute the field-level diff. It is the post-image for inserts, and the pre-image for deletes and
+// updates.
 void verifyValidationHash(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const RecordId& recordId,
@@ -1660,6 +1662,22 @@ void verifyValidationHash(OperationContext* opCtx,
         : doc_diff::computeInlineDiff(diagnosticDoc, storedDocument);
 
     const HostAndPort nodeId = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
+
+    if (!continuousInternodeValidationFatalOnMismatch.load()) {
+        LOGV2_ERROR(12882800,
+                    "Document validation hash mismatch",
+                    "expectedHash"_attr = *expectedHash,
+                    "actualHash"_attr = actualHash,
+                    logAttrs(op.getNss()),
+                    "id"_attr = redact(op.getIdElement().wrap()),
+                    "recordId"_attr = recordId,
+                    "timestamp"_attr = op.getTimestamp().toString(),
+                    "opType"_attr = idl::serialize(op.getOpType()),
+                    "nodeId"_attr = nodeId,
+                    "fieldLevelDiff"_attr = (fieldLevelDiff ? redact(*fieldLevelDiff).toString()
+                                                            : std::string("<not derivable>")));
+        return;
+    }
 
     LOGV2_FATAL(12851600,
                 "Document validation hash mismatch",
