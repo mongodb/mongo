@@ -86,7 +86,12 @@ enum class Builtin : uint16_t {
     // An agg function which can be used to sum a sequence of DoubleDouble inputs, producing the
     // resulting total as a DoubleDouble.
     aggMergeDoubleDoubleSums,
-
+    // Implements the $sum expression (ExpressionFromAccumulator<AccumulatorSum>): sums its
+    // arguments (or the elements of a single array argument) using the same DoubleDouble state as
+    // the $sum accumulator, ignoring non-numeric inputs, and returns the finalized scalar.
+    doubleDoubleSumFromAcc,
+    stdDevPopFromAcc,
+    stdDevSampFromAcc,
     // Implements Welford's online algorithm for computing sample or population standard deviation
     // in a single pass.
     aggStdDev,
@@ -233,9 +238,12 @@ enum class Builtin : uint16_t {
     aggBottomNArray,
     aggBottomNMerge,
     aggBottomNFinalize,
+    avgFromAcc,
+    maxFromAcc,
     aggMaxN,
     aggMaxNMerge,
     aggMaxNFinalize,
+    minFromAcc,
     aggMinN,
     aggMinNMerge,
     aggMinNFinalize,
