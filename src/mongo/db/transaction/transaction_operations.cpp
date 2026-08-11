@@ -417,6 +417,10 @@ std::size_t TransactionOperations::logOplogEntries(
         auto isPartialTxn = !lastOp && !applyOpsAppliedSeparately;
 
         if (imageToWrite) {
+            tassert(13286500,
+                    "Expected a non-null prePostImageToWriteToImageCollection when a pre/post "
+                    "image was extracted",
+                    prePostImageToWriteToImageCollection);
             uassert(6054002,
                     str::stream() << NamespaceString::kConfigImagesNamespace.toStringForErrorMsg()
                                   << " can only store the pre or post image of one "
