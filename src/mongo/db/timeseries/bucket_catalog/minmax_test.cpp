@@ -303,6 +303,16 @@ TEST(MinMax, DuplicateFieldNamesWithLookupMap) {
     obj.insert(obj.begin(), "x");
     ASSERT_THROWS(obj.insert(obj.begin(), "x"), AssertionException);
 
+    // Ensure that the _entries vector is still well-formed by checking that searching for each
+    // field 'field', using the offset values from before the aborted duplicate insert, still
+    // retrieves the correct field 'field'.
+    for (int i = 0; i < 12; ++i) {
+        auto field = std::to_string(i);
+        auto it = obj.search(obj.begin(), field);
+        ASSERT(it != obj.end());
+        ASSERT_EQ(it->fieldName(), field);
+    }
+
     // Searching for "a" or "x" is possible as we inserted one of them into the map.
     auto found = obj.search(obj.begin(), "a");
     ASSERT(found != obj.end());
