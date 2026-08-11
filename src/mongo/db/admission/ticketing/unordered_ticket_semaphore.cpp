@@ -56,9 +56,13 @@ bool UnorderedTicketSemaphore::acquire(OperationContext* opCtx,
         Date_t deadline = nextDeadline(until);
 
         if (!hasStartedWaiting) {
+            // Read maxWaiters before we increment _waiters so callers can rely on
+            // changes to maxWaiters not affecting any waiters already visible in
+            // the count returned by waiters().
+            const auto maxWaiters = _maxWaiters.loadRelaxed();
             const auto previousWaiters = _waiters.fetchAndAdd(1);
             hasStartedWaiting = true;
-            if (previousWaiters >= _maxWaiters.loadRelaxed()) {
+            if (previousWaiters >= maxWaiters) {
                 admCtx->recordOperationLoadShed();
                 uasserted(
                     ErrorCodes::AdmissionQueueOverflow,
