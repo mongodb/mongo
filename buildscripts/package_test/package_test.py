@@ -33,7 +33,7 @@ from buildscripts.package_test.package_test_provenance import (
     fetch_release_execution_log_from_tasks,
     fetch_task_artifact_to_file,
     find_build_task,
-    find_task_artifact_url,
+    find_task_artifact_url_with_retry,
     hash_release_binaries_in_archive,
     is_release_branch_project,
     is_server_release_project,
@@ -89,7 +89,14 @@ def download_packages_from_build(
     package_task = find_build_task(tasks, package_task_display_name)
     logging.info("Found package task: %s", package_task.task_id)
 
-    packages_url = find_task_artifact_url(package_task, "Packages")
+    # The Evergreen API may serve a stale artifact list for the package task
+    # due to secondary replication lag (DEVPROD-32223, BF-45409). Retry the
+    # "Packages" artifact lookup, refetching the task each attempt.
+    packages_url = find_task_artifact_url_with_retry(
+        package_task,
+        "Packages",
+        lambda: find_build_task(evg_api.tasks_by_build(build_id), package_task_display_name),
+    )
     logging.info("Found Packages artifact URL: %s", packages_url)
 
     # Download the packages file

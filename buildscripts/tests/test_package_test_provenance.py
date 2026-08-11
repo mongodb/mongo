@@ -186,6 +186,82 @@ class PackageTestProvenanceTest(unittest.TestCase):
         )
         response.raise_for_status.assert_called_once()
 
+    def test_find_task_artifact_url_with_retry_returns_url_when_present(self) -> None:
+        task = types.SimpleNamespace(
+            display_name="package",
+            task_id="task_id",
+            artifacts=[
+                types.SimpleNamespace(name="Packages", url="https://example.invalid/packages.tgz")
+            ],
+        )
+
+        url = under_test.find_task_artifact_url_with_retry(
+            task, "Packages", refetch_task=mock.Mock()
+        )
+
+        self.assertEqual("https://example.invalid/packages.tgz", url)
+
+    def test_find_task_artifact_url_with_retry_refetches_until_artifact_appears(self) -> None:
+        missing_task = types.SimpleNamespace(
+            display_name="package", task_id="task_id", artifacts=[]
+        )
+        present_task = types.SimpleNamespace(
+            display_name="package",
+            task_id="task_id",
+            artifacts=[
+                types.SimpleNamespace(name="Packages", url="https://example.invalid/packages.tgz")
+            ],
+        )
+
+        refetch_task = mock.Mock(side_effect=[present_task])
+        with mock.patch.object(under_test.time, "sleep") as sleep_mock:
+            url = under_test.find_task_artifact_url_with_retry(
+                missing_task, "Packages", refetch_task=refetch_task
+            )
+
+        self.assertEqual("https://example.invalid/packages.tgz", url)
+        refetch_task.assert_called_once_with()
+        sleep_mock.assert_called_once()
+
+    def test_find_task_artifact_url_with_retry_raises_after_exhausting_retries(self) -> None:
+        missing_task = types.SimpleNamespace(
+            display_name="package", task_id="task_id", artifacts=[]
+        )
+        refetch_task = mock.Mock(return_value=missing_task)
+
+        with mock.patch.object(under_test.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "Could not find 'Packages' artifact"):
+                under_test.find_task_artifact_url_with_retry(
+                    missing_task, "Packages", refetch_task=refetch_task
+                )
+
+        # The initial task is used for the first attempt, then refetched once
+        # before each subsequent attempt except the last.
+        self.assertEqual(under_test.NUM_ARTIFACT_URL_RETRIES - 1, refetch_task.call_count)
+
+    def test_find_task_artifact_url_with_retry_raises_immediately_for_duplicate_artifacts(
+        self,
+    ) -> None:
+        task = types.SimpleNamespace(
+            display_name="package",
+            task_id="task_id",
+            artifacts=[
+                types.SimpleNamespace(name="Packages", url="https://example.invalid/packages1.tgz"),
+                types.SimpleNamespace(name="Packages", url="https://example.invalid/packages2.tgz"),
+            ],
+        )
+        refetch_task = mock.Mock()
+
+        with mock.patch.object(under_test.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "Found multiple 'Packages' artifacts"):
+                under_test.find_task_artifact_url_with_retry(
+                    task, "Packages", refetch_task=refetch_task
+                )
+
+        # A duplicate artifact is a configuration error, not secondary lag, so
+        # it must fail fast without retrying or refetching.
+        refetch_task.assert_not_called()
+
     def test_compact_execution_log_with_local_runner_passes(self):
         summary = under_test.validate_compact_execution_log_bytes(
             compact_log_with_spawns(("linux-sandbox", False))
