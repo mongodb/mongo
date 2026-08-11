@@ -5,18 +5,14 @@
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
 
-#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <ios>
-#include <limits>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -179,24 +175,16 @@ uint64_t PerformanceReporter::extractNumberOfDocuments(const BSONObj& response) 
 }
 
 std::string PerformanceReporter::readURI(std::ifstream& inFile) {
-    std::array<char, sizeof(uint64_t)> lenBuf;
-    inFile.read(lenBuf.data(), lenBuf.size());
+    std::string_view::size_type uriLen = 0;
+    inFile.read((char*)(&uriLen), sizeof(uriLen));
     uassert(ErrorCodes::ReplayClientInternalError,
             "Reading perf file URI length header failed",
             !(inFile.fail() || inFile.eof()));
-    const uint64_t encodedLen = ConstDataView(lenBuf.data()).read<LittleEndian<uint64_t>>();
-    uassert(ErrorCodes::ReplayClientInternalError,
-            fmt::format("Perf file URI length header is out of range: {}", encodedLen),
-            encodedLen <= std::numeric_limits<std::string::size_type>::max());
-    const auto uriLen = static_cast<std::string::size_type>(encodedLen);
     if (!uriLen) {
         return {};
     }
     std::string buf;
     buf.resize(uriLen);
-    uassert(ErrorCodes::ReplayClientInternalError,
-            fmt::format("Perf file URI length is out of range: {}", uriLen),
-            uriLen <= std::numeric_limits<std::streamsize>::max());
     inFile.read(buf.data(), uriLen);
     uassert(ErrorCodes::ReplayClientInternalError,
             "Reading perf file URI failed",
@@ -205,11 +193,8 @@ std::string PerformanceReporter::readURI(std::ifstream& inFile) {
 }
 
 void PerformanceReporter::writeURI(std::string_view uri) {
-    uassert(ErrorCodes::ReplayClientInternalError,
-            fmt::format("URI length is out of range: {}", uri.size()),
-            uri.size() <= std::numeric_limits<uint64_t>::max());
     DataBuilder db;
-    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(uri.size()));
+    uassertStatusOK(db.writeAndAdvance<LittleEndian<std::string_view::size_type>>(uri.size()));
     uassertStatusOK(db.writeAndAdvance<std::string_view>(uri));
     _outFile.write(db.getCursor().data(), db.size());
 }
