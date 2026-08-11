@@ -2526,28 +2526,24 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
 
-    // Get the next sequential OID so that we can trigger an ID collision down the line.
-    auto OIDAndRoundedTime = internal::generateBucketOID(time, batchedInsertCtx.options);
-    OID nextBucketOID = std::get<OID>(OIDAndRoundedTime);
+    [[maybe_unused]] auto [currentOID, unusedTs] =
+        internal::generateBucketOID(time, batchedInsertCtx.options);
+    auto collidingOID = predictNextBucketOID(currentOID);
+    BucketId collidingBucketId{_uuid1, collidingOID, batchedInsertCtx.key.signature()};
 
-    BucketId nextBucketId{_uuid1, nextBucketOID, batchedInsertCtx.key.signature()};
+    // Mark the bucketID as frozen, which creates an entry for this bucketId in the bucket state
+    // registry but not in the openBucketsById map. This simulates a bucket that was reopened, found
+    // to be corrupted, and frozen during compression.
+    freezeBucket(_bucketCatalog->bucketStateRegistry, collidingBucketId);
+    ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
 
-    // Mark the next bucketID as being frozen. We could arrive at this state if there was a bucket
-    // that we tried reopening that was not compressed, and was also corrupted; when we try to
-    // compress it and fail to do so successfully because it is corrupted, we freeze it. When it is
-    // in this state, it wouldn't in memory in the openBucketsByKey/openBucketsById structures of
-    // any stripe, but it would have an entry in the bucketStateRegistry for its id. This is an edge
-    // case since currently there should be no way to end up with the same bucketID across
-    // stripes/within the same stripe.
-    freezeBucket(_bucketCatalog->bucketStateRegistry, nextBucketId);
-
-    // We should see bucket collision that gets retried, leading to the insert eventually
-    // succeeding.
     auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "B"));
-    EXPECT_NE(nextBucketId, batch2->bucketId) << batch2->toBSON();
-    // We should check that the bucketID that we failed to create is not stored in the stripe.
-    ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
+    EXPECT_NE(collidingBucketId, batch2->bucketId) << batch2->toBSON();
+    // There should be no id in the openBucketsById map for the bucketId - the frozen bucket did not
+    // have an entry, and we should have erased the one we added when trying to allocate a new
+    // bucket that ended up colliding with the existing entry in the bucket state registry.
+    ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
 }
 
 TEST_F(BucketCatalogTest, WriteConflictIfPrepareCommitOnClearedBucket) {

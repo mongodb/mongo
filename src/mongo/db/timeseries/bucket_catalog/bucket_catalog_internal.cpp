@@ -1079,12 +1079,13 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     OID oid;
     Date_t roundedTime;
     tracking::unordered_map<BucketId, tracking::unique_ptr<Bucket>, BucketHasher>::iterator it;
-    bool successfullyCreatedId = false;
-    for (int retryAttempts = 0; !successfullyCreatedId && retryAttempts < maxRetries;
+    bool successfullyAllocatedBucket = false;
+    for (int retryAttempts = 0; !successfullyAllocatedBucket && retryAttempts < maxRetries;
          ++retryAttempts) {
         std::tie(oid, roundedTime) = generateBucketOID(time, timeseriesOptions);
         auto bucketId = BucketId{key.collectionUUID, oid, key.signature()};
-        std::tie(it, successfullyCreatedId) = stripe.openBucketsById.try_emplace(
+        bool successfullyInsertedBucketId = false;
+        std::tie(it, successfullyInsertedBucketId) = stripe.openBucketsById.try_emplace(
             bucketId,
             tracking::make_unique<Bucket>(
                 getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
@@ -1094,22 +1095,27 @@ Bucket& allocateBucket(BucketCatalog& catalog,
                 timeseriesOptions.getTimeField(),
                 roundedTime,
                 catalog.bucketStateRegistry));
-        if (successfullyCreatedId) {
+        if (successfullyInsertedBucketId) {
             Bucket* bucket = it->second.get();
             auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
-            if (!status.isOK()) {
-                successfullyCreatedId = false;
+            if (status.isOK()) {
+                successfullyAllocatedBucket = true;
+            } else {
+                // We successfully inserted the bucketId into the openBucketsById map but failed to
+                // initialize the bucket - remove the entry from openBucketsById.
+                stripe.openBucketsById.erase(it);
             }
         }
-        if (!successfullyCreatedId) {
-            stripe.openBucketsById.erase(bucketId);
+        if (!successfullyAllocatedBucket) {
+            // We collided with an existing oid, either in the openBucketsById map or in the bucket
+            // state registry - reset the oid counter and try again.
             resetBucketOIDCounter();
         }
     }
     uassert(6130900,
             "Unable to insert documents due to internal OID generation collision. Increase the "
             "value of server parameter 'timeseriesInsertMaxRetriesOnDuplicates' and try again",
-            successfullyCreatedId);
+            successfullyAllocatedBucket);
     stripe.numOpenBucketsByIdCount.addAndFetch(1);
 
     Bucket* bucket = it->second.get();
