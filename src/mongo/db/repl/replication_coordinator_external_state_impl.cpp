@@ -126,6 +126,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAfterJournalFlusherGetToken);
+MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringLastVoteCollection);
 
 // The maximum size of the oplog write buffer is set to 256MB.
 constexpr std::size_t kOplogWriteBufferSize = 256 * 1024 * 1024;
@@ -874,22 +875,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                   AdmissionContext::Priority::kExempt,
               "Writes that are part of elections should not be throttled");
 
-    try {
-        // If we are casting a vote in a new election immediately after stepping down, we
-        // don't want to have this process interrupted due to us stepping down, since we
-        // want to be able to cast our vote for a new primary right away. Both the write's lock
-        // acquisition and the "waitUntilDurable" lock acquisition must be uninterruptible.
-        //
-        // It is not safe to take an uninterruptible lock during STARTUP2, so we only take this lock
-        // if we are primary or secondary.  We do not have the RSTL but that is OK because we never
-        // move in to STARTUP2 from PRIMARY or SECONDARY, so the consequence of a stale state is
-        // only that we don't take an uninterruptible lock when we should.
-        auto* replCoord = ReplicationCoordinator::get(opCtx);
-
-        boost::optional<UninterruptibleLockGuard> noInterrupt;
-        if (replCoord->isInPrimaryOrSecondaryState_UNSAFE())
-            noInterrupt.emplace(opCtx);
-
+    auto storeLastVote = [&]() -> Status {
         Status status = writeConflictRetry(
             opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
                 auto coll =
@@ -900,6 +886,13 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                                           repl::ReadConcernArgs::get(opCtx),
                                           AcquisitionPrerequisites::kWrite),
                                       MODE_IX);
+
+                if (MONGO_unlikely(hangAfterAcquiringLastVoteCollection.shouldFail())) {
+                    LOGV2(12885000,
+                          "Hanging due to hangAfterAcquiringLastVoteCollection failpoint");
+                    hangAfterAcquiringLastVoteCollection.pauseWhileSet(opCtx);
+                }
+
                 WriteUnitOfWork wunit(opCtx);
 
                 // We only want to replace the last vote document if the new last vote document
@@ -929,6 +922,30 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
         JournalFlusher::get(opCtx)->waitForJournalFlush();
 
         return Status::OK();
+    };
+
+    try {
+        // If we are casting a vote in a new election immediately after stepping down, we
+        // don't want to have this process interrupted due to us stepping down, since we
+        // want to be able to cast our vote for a new primary right away. Beyond making the lock
+        // acquisitions uninterruptible, we must also ignore the kill flag since the stepdown
+        // kill-ops sweep can mark this operation killed.
+        //
+        // It is not safe to do either during STARTUP2, so we only do so if we are primary or
+        // secondary. We never move in to STARTUP2 from PRIMARY or SECONDARY, so the consequence of
+        // a stale state is only that we don't protect the write when we should.
+        //
+        // TODO(SERVER-91733): Both the UninterruptibleLockGuard and the
+        // runWithoutInterruptionExceptAtGlobalShutdown below can be removed once intent based
+        // kill-ops is used exclusively.
+        auto* replCoord = ReplicationCoordinator::get(opCtx);
+
+        boost::optional<UninterruptibleLockGuard> noInterrupt;
+        if (replCoord->isInPrimaryOrSecondaryState_UNSAFE()) {
+            noInterrupt.emplace(opCtx);
+            return opCtx->runWithoutInterruptionExceptAtGlobalShutdown(storeLastVote);
+        }
+        return storeLastVote();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
