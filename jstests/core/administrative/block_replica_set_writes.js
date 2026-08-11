@@ -606,7 +606,12 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
 
         // Leave background compaction off.
-        assert.commandWorked(this.replicaSetPrimaryAdminDB.runCommand({autoCompact: false}));
+        assert.soon(() => {
+            const res = this.replicaSetPrimaryAdminDB.runCommand({autoCompact: false});
+            if (res.code === ErrorCodes.ObjectIsBusy) return false;
+            assert.commandWorked(res);
+            return true;
+        }, "Timed out waiting to disable autoCompact");
 
         // Disable write block.
         disableReplicaSetWriteBlock(
