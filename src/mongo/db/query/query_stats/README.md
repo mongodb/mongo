@@ -218,8 +218,100 @@ the metric is computed.
 | `writes.nDeleteOps`                                            | Number of delete operations in request                                                                                                                                      | Zero for reads; for writes, number of delete ops in client batch                                          |
 | `writes.keysInserted`                                          | Index keys inserted during write index maintenance                                                                                                                          | Zero for reads; for writes, summed from shards                                                            |
 | `writes.keysDeleted`                                           | Index keys deleted during write index maintenance                                                                                                                           | Zero for reads; for writes, summed from shards                                                            |
-| **Supplemental Metrics**                                       |                                                                                                                                                                             |                                                                                                           |
+| **Supplemental Metrics** (`supplementalMetrics`)               |                                                                                                                                                                             |                                                                                                           |
 | Engine type (Bonsai/SBE/Classic)                               | Which query engine was used                                                                                                                                                 | Always taken from local OpDebug                                                                           |
+| `supplementalMetrics.VectorSearch`                             | `$vectorSearch`-specific metrics                                                                                                                                            | Always taken from local OpDebug                                                                           |
+| `supplementalMetrics.JoinOptimization`                         | Join optimization metrics, see [Join Optimization Metrics](#join-optimization-metrics)                                                                                      | Always taken from local OpDebug (join optimization is unsupported on sharded collections)                 |
+
+### Supplemental Metrics
+
+Metrics that only apply to some queries live under `supplementalMetrics`, keyed by
+[`SupplementalMetricType`][supplemental metrics stats]. Each key is present only for shapes that
+actually produced that kind of metric, so the section stays empty for queries that don't use the
+corresponding feature. See [supplemental_metrics_stats.h][supplemental metrics stats] for how to add
+a new type.
+
+#### Join Optimization Metrics
+
+Collected under `supplementalMetrics.JoinOptimization` for aggregations that reach the join
+optimizer (see [join_ordering][join optimizer]). Because join optimization does not run on sharded
+collections, these are always collected locally and never rolled up from shards.
+
+Numeric metrics are `AggregatedMetric`s, reported as a subobject of `{sum, max, min, sumOfSquares}`
+over all recorded executions of the shape. Boolean metrics are `AggregatedBool`s, reported as
+`{true, false}` counts.
+
+| Metric                             | Type             | Description                                                                                            |
+| ---------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `updateCount`                      | count            | Number of executions of this shape aggregated into this entry. Denominator for the metrics below.      |
+| `joinOptimizable`                  | bool             | Whether the query was eligible for join optimization.                                                  |
+| `fallbackReasons`                  | sparse counts    | Why join optimization stopped, broken down by reason. See [Fallback Reasons](#fallback-reasons).       |
+| `numNamespaces`                    | counter          | Total number of namespaces in the query.                                                               |
+| `numLookupsInSuffix`               | counter          | Number of `$lookup` stages in the query that could not be pushed into the join graph.                  |
+| `numJoinGraphNodes`                | counter          | Number of nodes in the join graph.                                                                     |
+| `numSyntacticEdges`                | counter          | Number of edges in the join graph before inference.                                                    |
+| `numInferredEdges`                 | counter          | Number of edges added by predicate inference.                                                          |
+| `numSyntacticExprJoinPredicates`   | counter          | Number of `$expr` equality join predicates in the join graph, before inference.                        |
+| `numSyntacticEqJoinPredicates`     | counter          | Number of simple equality (`$eq`) join predicates in the join graph, before inference.                 |
+| `numInferredEqJoinPredicates`      | counter          | Number of simple equality (`$eq`) join predicates that were inferred.                                  |
+| `numInferredSingleTablePredicates` | counter          | Number of single-table predicates propagated to other tables.                                          |
+| `isStar`                           | bool             | Whether the join graph is a star.                                                                      |
+| `isChain`                          | bool             | Whether the join graph is a chain (linear).                                                            |
+| `isCycle`                          | bool             | Whether the join graph contains a cycle.                                                               |
+| `isClique`                         | bool             | Whether the join graph forms a clique.                                                                 |
+| `numSuffixSourcesPushedToSbe`      | counter          | Number of document sources after the join-optimizable prefix that were lowered into SBE.               |
+| `numResidualClassicSources`        | counter          | Number of "residual" document sources that could not be lowered to SBE and ran in DocumentSource land. |
+| `joinModelingTimeMicros`           | counter (micros) | Time to extract a join model from the query: graph construction, path resolution, predicate inference. |
+| `sbeLoweringTimeMicros`            | counter (micros) | Time to lower the chosen QSN tree to SBE.                                                              |
+
+The join graph shape flags are not mutually exclusive: a two-node graph is a clique, a star and a
+chain at once, and a three-node path is both a chain and a star.
+
+##### Plan Enumeration Metrics
+
+The metrics below are only recorded when plan enumeration actually runs, which it does not on a join
+plan cache hit. They are therefore reported alongside their own counter, `numPlanEnumerations`,
+which should be used as the denominator rather than `updateCount`. The whole group is omitted when
+this shape never enumerated a plan.
+
+| Metric                               | Type             | Description                                                                                 |
+| ------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------- |
+| `numPlanEnumerations`                | count            | Number of executions of this shape that ran plan enumeration.                               |
+| `numPlansEnumerated`                 | counter          | Number of plans considered in the final subset.                                             |
+| `numHashJoins`                       | counter          | Number of hash joins enumerated.                                                            |
+| `numIndexedNestedLoopJoins`          | counter          | Number of indexed nested loop joins enumerated.                                             |
+| `numNestedLoopJoins`                 | counter          | Number of nested loop joins enumerated.                                                     |
+| `numFinalPlanHashJoins`              | counter          | Number of hash joins in the winning plan.                                                   |
+| `numFinalPlanIndexedNestedLoopJoins` | counter          | Number of indexed nested loop joins in the winning plan.                                    |
+| `numFinalPlanNestedLoopJoins`        | counter          | Number of nested loop joins in the winning plan.                                            |
+| `numJoinNodesRejectedByCost`         | counter          | Number of join nodes considered but not memoized because their cost was too high.           |
+| `numMemoizedNodes`                   | counter          | Number of nodes memoized.                                                                   |
+| `winningPlanCost`                    | counter (double) | Cost of the winning plan.                                                                   |
+| `numSamplingCalls`                   | counter          | Number of times join optimization sampled for cardinality estimation.                       |
+| `numPersistentSamplesUsed`           | counter          | Number of persistent samples that could be reused instead of sampling.                      |
+| `numUniqueIndexesUsedForNDV`         | counter          | Number of unique indexes used for NDV estimation.                                           |
+| `samplingTimeMicros`                 | counter (micros) | Time spent acquiring samples for cardinality estimation.                                    |
+| `cbrPlanningTimeMicros`              | counter (micros) | Time spent generating single-table access plans in CBR.                                     |
+| `planEnumerationTimeMicros`          | counter (micros) | Time spent enumerating plans and picking a winner.                                          |
+| `ceTimeMicros`                       | counter (micros) | Time spent evaluating cardinality estimates for join optimization, separate from CE in CBR. |
+
+##### Fallback Reasons
+
+`fallbackReasons` is a sparse counter map: only reasons actually hit by this shape appear, and the
+whole subobject is omitted when no execution ever fell back. Reasons are reported under their
+[`JoinFallbackReason`][fallback reason] enumerator name with the leading `k` stripped and the first
+character lowercased, e.g. `kTooManyNodes` is reported as `tooManyNodes`.
+
+At most one reason is recorded per execution, and it is interpreted alongside `joinOptimizable`:
+
+- `joinOptimizable: false` — why join optimization bailed out entirely and the query ran as regular
+  `$lookup`s.
+- `joinOptimizable: true` — why the join graph prefix stopped growing. The query was optimized, but
+  only over that prefix; `numJoinGraphNodes` and `numLookupsInSuffix` say how much.
+
+Where both apply — a prefix that stopped early and then failed later anyway — the terminal reason
+wins, since it is the one that decided the outcome. The full list of reasons and their meanings
+lives in [fallback_reason.h][fallback reason].
 
 ### Metrics Categorization Guidelines
 
@@ -612,7 +704,10 @@ output one document per query stats key - output in the "key" field.
 <!-- Links -->
 
 [disambiguation]: /src/mongo/db/query/README_query_shape_disambiguation.md
+[fallback reason]: /src/mongo/db/query/compiler/optimizer/join/fallback_reason.h
+[join optimizer]: /src/mongo/db/query/compiler/optimizer/join/
 [query shape]: /src/mongo/db/query/query_shape/README.md
+[supplemental metrics stats]: /src/mongo/db/query/query_stats/supplemental_metrics_stats.h
 [query stats store]:
   https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L100-L104
 [partition calculation comment]:
