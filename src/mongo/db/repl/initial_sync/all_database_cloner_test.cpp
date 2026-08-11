@@ -45,12 +45,14 @@ public:
 
 protected:
     std::unique_ptr<AllDatabaseCloner> makeAllDatabaseCloner() {
-        return std::make_unique<AllDatabaseCloner>(getSharedData(),
-                                                   _source,
-                                                   _mockClient.get(),
-                                                   &_storageInterface,
-                                                   _dbWorkThreadPool.get(),
-                                                   _summaryStats);
+        return std::make_unique<AllDatabaseCloner>(
+            getSharedData(),
+            _source,
+            _mockClient.get(),
+            &_storageInterface,
+            _dbWorkThreadPool.get(),
+            _summaryStats,
+            std::shared_ptr<FastCountInitialSyncAggregator>{});
     }
 
     std::shared_ptr<InitialSyncSummaryStats> _summaryStats =

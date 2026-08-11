@@ -423,6 +423,83 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
     }
 }
 
+void ReplicatedFastCountManager::finalizeMetadataFromInitialSync(OperationContext* opCtx) {
+    Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
+
+    // The bound _timestampStore reflects the donor's checkpoint timestamp seeded during initial
+    // sync. All seeded per-collection entries are consistent as of this timestamp, so it is the
+    // correct point to begin accumulating oplog deltas from.
+    const boost::optional<Timestamp> persistedTimestamp = _timestampStore->read(opCtx);
+    const Timestamp seekAfterTimestamp = persistedTimestamp.value_or(Timestamp::min());
+
+    // Scan the oplog once, accumulating size/count deltas per UUID since the checkpoint. Done in a
+    // dedicated scope before any collection handles are acquired below, to avoid the lock-cycle
+    // fassert in the collection-backed metadata read path.
+    SizeCountAccumulator deltasByUuid;
+    {
+        const Date_t oplogScanStartTime = Date_t::now();
+        const auto scanResult = [&]() -> OplogScanResult {
+            AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+            const auto& oplogColl = oplogRead.getCollection();
+            massert(12554004, "oplog collection not found", oplogColl);
+
+            auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+                opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+            // Pass the oplog UUID so the oplog's own size and count are included in the
+            // aggregation.
+            return aggregateSizeCountDeltasInOplog(
+                *oplogCursor, seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
+        }();
+        for (const auto& [uuid, delta] : scanResult.deltas) {
+            deltasByUuid[uuid].count += delta.sizeCount.count;
+            deltasByUuid[uuid].size += delta.sizeCount.size;
+        }
+        LOGV2(12554005,
+              "ReplicatedFastCountManager oplog scan during initial sync finalization complete",
+              "seekAfterTimestamp"_attr = seekAfterTimestamp,
+              "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
+              "duration"_attr = Date_t::now() - oplogScanStartTime);
+    }
+
+    // Gather the eligible collections up front so the per-collection persisted reads below do not
+    // acquire a collection (collection-backed read path) while iterating the catalog. The catalog
+    // snapshot keeps each RecordStore alive for the duration of this function.
+    const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
+    int numFromCheckpoint = 0;
+    for (const auto& dbName : catalog->getAllDbNames()) {
+        for (const auto& coll : catalog->range(dbName)) {
+            if (!isReplicatedFastCountEligible(coll->ns())) {
+                continue;
+            }
+            const auto& uuid = coll->uuid();
+            auto recordStore = coll->getRecordStore();
+            const auto persisted = _sizeCountStore->read(opCtx, uuid);
+            // The persisted entry is authoritative as of the checkpoint timestamp; add every oplog
+            // delta since then to obtain the final count, avoiding a full collection scan. If there
+            // is no persisted entry, that collection's size and count haven't been flushed yet so
+            // treat that as 0 size/0 count.
+            int64_t size = 0;
+            int64_t count = 0;
+            if (persisted) {
+                size = persisted->size;
+                count = persisted->count;
+            }
+
+            if (auto it = deltasByUuid.find(uuid); it != deltasByUuid.end()) {
+                size += it->second.size;
+                count += it->second.count;
+            }
+            recordStore->setAccurateSizeCount(size, count);
+            ++numFromCheckpoint;
+        }
+    }
+
+    LOGV2(12554006,
+          "Reconciled in-memory replicated fast count after initial sync",
+          "numCollectionsFromCheckpoint"_attr = numFromCheckpoint,
+          "numOplogDeltas"_attr = deltasByUuid.size());
+}
+
 void ReplicatedFastCountManager::commit(
     OperationContext* opCtx, const boost::container::flat_map<UUID, CollectionSizeCount>& changes) {
     const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
@@ -462,6 +539,30 @@ ReplicatedFastCountManager::findPersisted(OperationContext* opCtx, UUID uuid) co
 boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampStoreTs(
     OperationContext* opCtx) const {
     return _timestampStore->read(opCtx);
+}
+
+void ReplicatedFastCountManager::populateFromInitialSync(
+    OperationContext* opCtx,
+    const std::vector<std::pair<UUID, FastCountEntry>>& entries,
+    boost::optional<Timestamp> timestampStoreTs) {
+    LOGV2(12549701,
+          "Populating replicated fast count stores from initial sync",
+          "numEntries"_attr = entries.size(),
+          "timestampStoreTs"_attr = timestampStoreTs);
+    {
+        // Use writeToTable() rather than write() here: this node is still in INITIAL_SYNC, so it
+        // cannot accept replicated writes and these entries are seeded locally without going
+        // through the oplog.
+        WriteUnitOfWork wuow(opCtx);
+        for (const auto& [uuid, entry] : entries) {
+            _sizeCountStore->writeToTable(
+                opCtx, uuid, SizeCountStore::Entry{entry.timestamp, entry.size, entry.count});
+        }
+        if (timestampStoreTs) {
+            _timestampStore->writeToTable(opCtx, *timestampStoreTs);
+        }
+        wuow.commit();
+    }
 }
 
 void ReplicatedFastCountManager::flushAsync() {

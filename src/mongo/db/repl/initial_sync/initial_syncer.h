@@ -710,6 +710,12 @@ private:
                                     std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
+     * Writes the persisted replicated fast count metadata harvested from listCollections during
+     * cloning to the local ReplicatedFastCountManager stores. Must be called with `_mutex` held.
+     */
+    void _seedFastCountFromInitialSync(WithLock lock);
+
+    /**
      * Callback for second '_lastOplogEntryFetcher' callback. This is scheduled to obtain the stop
      * timestamp after DatabasesCloner has completed and enables us to determine if the oplog on
      * the sync source has advanced since we started cloning the databases.

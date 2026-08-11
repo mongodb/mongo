@@ -7,6 +7,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -201,6 +202,48 @@ TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
     unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, ContainersFollowSnapshotAndExplicitFCV) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+
+    // With the flag on and a stable latest FCV, both forms report container mode.
+    EXPECT_TRUE(shouldUseReplicatedFastCountContainers(operationContext()));
+    // (Generic FCV reference): feature flag test
+    EXPECT_TRUE(shouldUseReplicatedFastCountContainers(operationContext(),
+                                                       multiversion::GenericFCV::kLatest));
+    EXPECT_FALSE(shouldUseReplicatedFastCountContainers(operationContext(),
+                                                        multiversion::GenericFCV::kLastLTS));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, ContainersExplicitFCVOverloadDuringTransitionalFCV) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+
+    // Simulate the FCV upgrade transitional state, during which fcv-gated flags evaluate as
+    // disabled.
+    const auto originalVersion =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    // (Generic FCV reference): feature flag test
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+    const auto restoreFCV =
+        ScopeGuard([&] { serverGlobalParams.mutableFCV.setVersion(originalVersion); });
+
+    // The snapshot-based check sees the transitional FCV and reports collection mode...
+    EXPECT_FALSE(shouldUseReplicatedFastCountContainers(operationContext()));
+    // ...but the explicit-FCV overload evaluates against the requested FCV, matching the mode the
+    // node will use once the upgrade completes.
+    // (Generic FCV reference): feature flag test
+    EXPECT_TRUE(shouldUseReplicatedFastCountContainers(operationContext(),
+                                                       multiversion::GenericFCV::kLatest));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, ContainersExplicitFCVOverloadRespectsDisabledFlag) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
+    EXPECT_FALSE(shouldUseReplicatedFastCountContainers(operationContext()));
+    // (Generic FCV reference): feature flag test
+    EXPECT_FALSE(shouldUseReplicatedFastCountContainers(operationContext(),
+                                                        multiversion::GenericFCV::kLatest));
 }
 
 TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,

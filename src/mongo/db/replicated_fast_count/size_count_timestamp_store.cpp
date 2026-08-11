@@ -136,6 +136,10 @@ void CollectionSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp
     }
 }
 
+void CollectionSizeCountTimestampStore::writeToTable(OperationContext* opCtx, Timestamp timestamp) {
+    MONGO_UNREACHABLE_TASSERT(12549703);
+}
+
 boost::optional<Timestamp> ContainerSizeCountTimestampStore::read(OperationContext* opCtx) const {
     massert(12915200,
             "Must hold the GlobalLock in a read mode when calling SizeCountTimestampStore::read()",
@@ -173,5 +177,20 @@ void ContainerSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp 
 
 RecordStore* ContainerSizeCountTimestampStore::rs_ForTest() const {
     return _recordStore.get();
+}
+
+void ContainerSizeCountTimestampStore::writeToTable(OperationContext* opCtx, Timestamp timestamp) {
+    assertInWriteUnitOfWorkAndLocked(opCtx);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto& container = getIntegerKeyedContainer(*_recordStore);
+    auto val = BSON(kValidAsOfKey << timestamp);
+    std::span<const char> valSpan{val.objdata(), static_cast<size_t>(val.objsize())};
+
+    // Bypass container_write — it checks canAcceptWritesFor which fails on a secondary in
+    // INITIAL_SYNC state. This write is unreplicated so we can safely use
+    // container::ExistingKeyPolicy::Overwrite.
+    massertStatusOK(container.insert(
+        ru, kTimestampContainerKey, valSpan, container::ExistingKeyPolicy::overwrite));
 }
 }  // namespace mongo::replicated_fast_count

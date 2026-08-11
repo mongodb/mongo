@@ -10,6 +10,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/initial_sync/base_cloner.h"
 #include "mongo/db/repl/initial_sync/collection_cloner.h"
+#include "mongo/db/repl/initial_sync/fast_count_initial_sync_aggregator.h"
 #include "mongo/db/repl/initial_sync/initial_sync_base_cloner.h"
 #include "mongo/db/repl/initial_sync/initial_sync_shared_data.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -51,7 +52,8 @@ public:
                    DBClientConnection* client,
                    StorageInterface* storageInterface,
                    ThreadPool* dbPool,
-                   std::shared_ptr<InitialSyncSummaryStats> summaryStats);
+                   std::shared_ptr<InitialSyncSummaryStats> summaryStats,
+                   std::shared_ptr<FastCountInitialSyncAggregator> fastCountAggregator);
 
     ~DatabaseCloner() override = default;
 
@@ -101,10 +103,11 @@ private:
     const DatabaseName _dbName;                         // (R)
     ClonerStage<DatabaseCloner> _listCollectionsStage;  // (R)
     std::vector<std::tuple<NamespaceString, CollectionOptions, bool /*recordIdsReplicated*/>>
-        _collections;                                            // (X)
-    std::unique_ptr<CollectionCloner> _currentCollectionCloner;  // (MX)
-    Stats _stats;                                                // (MX)
-    std::shared_ptr<InitialSyncSummaryStats> _summaryStats;      // (R)
+        _collections;                                                      // (X)
+    std::unique_ptr<CollectionCloner> _currentCollectionCloner;            // (MX)
+    Stats _stats;                                                          // (MX)
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats;                // (R)
+    std::shared_ptr<FastCountInitialSyncAggregator> _fastCountAggregator;  // (R)
 };
 
 }  // namespace repl

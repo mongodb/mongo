@@ -85,6 +85,10 @@ bool AttachedPersistenceProvider::shouldUseReplicatedFastCount() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::relaxContainerOplogConstraints() const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::shouldUseOplogWritesForFlowControlSampling() const {
     return true;
 }

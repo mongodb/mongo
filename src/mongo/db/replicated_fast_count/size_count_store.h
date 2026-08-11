@@ -123,6 +123,13 @@ public:
                                             SizeCountDeltas& deltas) const = 0;
 
     virtual bool usesContainers() const = 0;
+
+    /**
+     * Performs a single write of `entry` for `uuid` directly to the underlying physical table.
+     * Unlike write(), this does not log to the oplog: it skips invoking op observers and bypasses
+     * the `canAcceptWritesFor` primary check, so the write is not replicated.
+     */
+    virtual void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) = 0;
 };
 
 /**
@@ -139,6 +146,7 @@ public:
     size_t remove(OperationContext* opCtx, UUID uuid) override;
     void readAndIncrementSizeCounts(OperationContext* opCtx,
                                     SizeCountDeltas& deltas) const override;
+    void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
 
     bool usesContainers() const override {
         return false;
@@ -162,6 +170,7 @@ public:
     size_t remove(OperationContext* opCtx, UUID uuid) override;
     void readAndIncrementSizeCounts(OperationContext* opCtx,
                                     SizeCountDeltas& deltas) const override;
+    void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
 
     bool usesContainers() const override {
         return true;

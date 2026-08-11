@@ -21,6 +21,27 @@ types:
         is_view: false
 
 structs:
+    CollectionInfoFastCount:
+        description: >-
+            A struct representing the 'info.fastCount' subobject emitted by listCollections when
+            run with rawData and the replicated fast count feature flags are enabled. Mirrors
+            ListCollectionsReplyInfoFastCount in list_collections.idl.
+        strict: false
+        fields:
+            size:
+                type: safeInt64
+                optional: true
+            count:
+                type: safeInt64
+                optional: true
+            validAsOf:
+                type: timestamp
+                optional: true
+            timestampStoreTs:
+                type: timestamp
+                optional: true
+        mod_visibility: public
+
     CollectionInfo:
         description: "A struct representing the 'info' field in the listCollections output."
         strict: false
@@ -32,6 +53,9 @@ structs:
                 type: uuid
             recordIdsReplicated:
                 type: bool
+                optional: true
+            fastCount:
+                type: CollectionInfoFastCount
                 optional: true
         mod_visibility: public
 

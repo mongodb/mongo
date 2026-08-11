@@ -19,6 +19,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -93,12 +94,18 @@ void _writeInitReplicatedFastCountOplogEntry(OperationContext* opCtx) {
 }
 }  // namespace
 
-void setUpReplicatedFastCount(OperationContext* opCtx) {
+void setUpReplicatedFastCount(
+    OperationContext* opCtx, boost::optional<multiversion::FeatureCompatibilityVersion> targetFCV) {
     auto& manager =
         replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext());
 
-    // Containers and collections should be mutually exclusive.
-    if (shouldUseReplicatedFastCountContainers(opCtx)) {
+    // Containers and collections should be mutually exclusive. When a target FCV is provided
+    // (i.e. we are running inside an FCV upgrade, where the transitional FCV state makes
+    // fcv-gated flags evaluate as disabled), decide the store mode against that FCV so the
+    // stores created here match the mode the node will use once the transition completes.
+    const bool useContainers = targetFCV ? shouldUseReplicatedFastCountContainers(opCtx, *targetFCV)
+                                         : shouldUseReplicatedFastCountContainers(opCtx);
+    if (useContainers) {
         auto status = createInternalFastCountContainers(opCtx,
                                                         NamespaceString::kAdminCommandNamespace,
                                                         ident::kFastCountMetadataStore,
@@ -139,6 +146,10 @@ void setUpReplicatedFastCount(OperationContext* opCtx) {
     // Register the manager as the storage engine's FlushAllFilesObserver so the engine notifies it
     // to flush size and count metadata when flushing all files.
     opCtx->getServiceContext()->getStorageEngine()->setFlushAllFilesObserver(&manager);
+
+    // Standalones reach an invariant that there are no active storage transactions during setFCV so
+    // we abandon the snapshot.
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 }
 
 namespace {
@@ -284,6 +295,29 @@ Status createInternalFastCountContainers(OperationContext* opCtx,
         wuow.commit();
     }
     return existingIdentStatus;
+}
+
+void dropInternalFastCountContainers(OperationContext* opCtx) {
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto* engine = storageEngine->getEngine();
+    if (!engine) {
+        // No underlying KVEngine (e.g. mock storage engines used in unit tests). There are no
+        // internal fast count container idents to drop.
+        return;
+    }
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    for (std::string_view containerIdent :
+         {ident::kFastCountMetadataStore, ident::kFastCountMetadataStoreTimestamps}) {
+        if (!engine->hasIdent(ru, containerIdent)) {
+            continue;
+        }
+        storageEngine->addDropPendingIdent(StorageEngine::Immediate{},
+                                           std::make_shared<Ident>(std::string(containerIdent)));
+        LOGV2(12549700,
+              "Marked internal replicated fast count container ident for immediate drop",
+              "ident"_attr = containerIdent);
+    }
 }
 
 namespace replicated_fast_count {

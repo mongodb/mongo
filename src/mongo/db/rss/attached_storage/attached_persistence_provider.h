@@ -71,6 +71,13 @@ public:
     bool shouldUseReplicatedFastCount() const override;
 
     /**
+     * Attached storage nodes own their physical container state, and initial sync cannot seed
+     * container contents for unreplicated namespaces (e.g. the oplog's own fast count entry), so
+     * container op application self-heals on state mismatches.
+     */
+    bool relaxContainerOplogConstraints() const override;
+
+    /**
      * Flow control is based on the rate of generation of oplog data and the ability of the
      * secondaries to keep the majority commit point relatively up-to-date.
      */

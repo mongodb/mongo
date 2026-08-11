@@ -10,6 +10,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/repl/initial_sync/base_cloner.h"
 #include "mongo/db/repl/initial_sync/database_cloner.h"
+#include "mongo/db/repl/initial_sync/fast_count_initial_sync_aggregator.h"
 #include "mongo/db/repl/initial_sync/initial_sync_base_cloner.h"
 #include "mongo/db/repl/initial_sync/initial_sync_shared_data.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -46,7 +47,8 @@ public:
                       DBClientConnection* client,
                       StorageInterface* storageInterface,
                       ThreadPool* dbPool,
-                      std::shared_ptr<InitialSyncSummaryStats> summaryStats);
+                      std::shared_ptr<InitialSyncSummaryStats> summaryStats,
+                      std::shared_ptr<FastCountInitialSyncAggregator> fastCountAggregator);
 
     ~AllDatabaseCloner() override = default;
 
@@ -126,13 +128,14 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
     // (MX) Write access with mutex from main flow of control, read access with mutex from other
     //      threads, read access allowed from main flow without mutex.
-    ConnectStage _connectStage;                              // (R)
-    ConnectStage _getInitialSyncIdStage;                     // (R)
-    ClonerStage<AllDatabaseCloner> _listDatabasesStage;      // (R)
-    std::vector<DatabaseName> _databases;                    // (X)
-    std::unique_ptr<DatabaseCloner> _currentDatabaseCloner;  // (MX)
-    Stats _stats;                                            // (MX)
-    std::shared_ptr<InitialSyncSummaryStats> _summaryStats;  // (R)
+    ConnectStage _connectStage;                                            // (R)
+    ConnectStage _getInitialSyncIdStage;                                   // (R)
+    ClonerStage<AllDatabaseCloner> _listDatabasesStage;                    // (R)
+    std::vector<DatabaseName> _databases;                                  // (X)
+    std::unique_ptr<DatabaseCloner> _currentDatabaseCloner;                // (MX)
+    Stats _stats;                                                          // (MX)
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats;                // (R)
+    std::shared_ptr<FastCountInitialSyncAggregator> _fastCountAggregator;  // (R)
 };
 
 }  // namespace repl

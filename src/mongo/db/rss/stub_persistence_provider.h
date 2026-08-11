@@ -77,6 +77,12 @@ public:
                   "StubPersistenceProvider::shouldUseReplicatedFastCount() method not implemented");
     }
 
+    bool relaxContainerOplogConstraints() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::relaxContainerOplogConstraints() method not "
+                  "implemented");
+    }
+
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::shouldUseOplogWritesForFlowControlSampling method not "

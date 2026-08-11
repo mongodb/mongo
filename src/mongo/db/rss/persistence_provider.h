@@ -99,6 +99,12 @@ public:
     virtual bool shouldUseReplicatedFastCount() const = 0;
 
     /**
+     * If true, applying replicated container operations (ci/cu/cd) tolerates state mismatches by
+     * converting between insert/update and ignoring deletes of missing keys.
+     */
+    virtual bool relaxContainerOplogConstraints() const = 0;
+
+    /**
      * If true, writes to the oplog should be used as the unit of progress for flow control
      * sampling.
      */

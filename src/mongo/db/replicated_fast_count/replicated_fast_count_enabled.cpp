@@ -72,6 +72,14 @@ bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx) {
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
+bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx,
+                                            multiversion::FeatureCompatibilityVersion fcv) {
+    return rss::ReplicatedStorageService::get(opCtx)
+               .getPersistenceProvider()
+               .mustUseContainerWrites() ||
+        feature_flags::gContainerWrites.isEnabledOnVersion(fcv);
+}
+
 bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
     if (!getTestCommandsEnabled()) {
         return false;

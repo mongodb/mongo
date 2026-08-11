@@ -75,7 +75,8 @@ protected:
                                                 _mockClient.get(),
                                                 &_storageInterface,
                                                 _dbWorkThreadPool.get(),
-                                                _summaryStats);
+                                                _summaryStats,
+                                                std::shared_ptr<FastCountInitialSyncAggregator>{});
     }
 
     std::shared_ptr<InitialSyncSummaryStats> _summaryStats =
@@ -547,7 +548,8 @@ protected:
                                                 _mockClient.get(),
                                                 &_storageInterface,
                                                 _dbWorkThreadPool.get(),
-                                                _summaryStats);
+                                                _summaryStats,
+                                                std::shared_ptr<FastCountInitialSyncAggregator>{});
     }
 
     std::shared_ptr<InitialSyncSummaryStats> _summaryStats =

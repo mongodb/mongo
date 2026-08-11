@@ -20,6 +20,7 @@
 
 #include <mutex>
 #include <string_view>
+#include <vector>
 
 #include <boost/container/flat_map.hpp>
 #include <boost/optional/optional.hpp>
@@ -111,6 +112,19 @@ public:
     void initializeMetadata(OperationContext* opCtx);
 
     /**
+     * Derives every replicated-fast-count-eligible collection's in-memory `RecordStore` size/count
+     * at the end of initial sync, after `populateFromInitialSync()` has seeded the local persisted
+     * stores and the local oplog has been replayed.
+     *
+     * The caller must hold no conflicting locks; this acquires a MODE_IS GlobalLock internally.
+     *
+     * This runs after _sizeCountStore is initialized so it can use the SizeCountStore API directly
+     * to read the fast count metadata + timestamp.
+     * TODO (SERVER-128586): Can this be consolidated with initializeMetadata?
+     */
+    void finalizeMetadataFromInitialSync(OperationContext* opCtx);
+
+    /**
      * Adjusts each collection's `RecordStore` by the corresponding delta in `changes`.
      *
      * This function updates the in-memory representation of each collection's size and count only.
@@ -145,7 +159,29 @@ public:
         OperationContext* opCtx, UUID uuid) const;
 
     /**
-     * Signals the checkpointer thread to perform a flush.
+     * Public representation of a collection's persisted replicated fast count metadata.
+     */
+    struct FastCountEntry {
+        Timestamp timestamp{0, 0};
+        int64_t size{0};
+        int64_t count{0};
+        bool operator==(const FastCountEntry&) const = default;
+    };
+
+    /**
+     * Populates the persisted `_sizeCountStore` and `_timestampStore` from data fetched during
+     * initial sync. The provided entries overwrite any existing entries for the same UUIDs. If
+     * `timestampStoreTs` is provided, `recordCheckpointAdvanced` is invoked after the WUOW commits
+     * so the in-memory checkpoint gauge reflects the freshly persisted timestamp.
+     *
+     * The caller must hold a MODE_IX GlobalLock.
+     */
+    void populateFromInitialSync(OperationContext* opCtx,
+                                 const std::vector<std::pair<UUID, FastCountEntry>>& entries,
+                                 boost::optional<Timestamp> timestampStoreTs);
+
+    /**
+     * Signals the background thread to perform a flush.
      */
     void flushAsync();
 

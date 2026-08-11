@@ -43,18 +43,21 @@ namespace mongo {
 namespace repl {
 using namespace std::literals::string_view_literals;
 
-AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
-                                     const HostAndPort& source,
-                                     DBClientConnection* client,
-                                     StorageInterface* storageInterface,
-                                     ThreadPool* dbPool,
-                                     std::shared_ptr<InitialSyncSummaryStats> summaryStats)
+AllDatabaseCloner::AllDatabaseCloner(
+    InitialSyncSharedData* sharedData,
+    const HostAndPort& source,
+    DBClientConnection* client,
+    StorageInterface* storageInterface,
+    ThreadPool* dbPool,
+    std::shared_ptr<InitialSyncSummaryStats> summaryStats,
+    std::shared_ptr<FastCountInitialSyncAggregator> fastCountAggregator)
     : InitialSyncBaseCloner(
           "AllDatabaseCloner"sv, sharedData, source, client, storageInterface, dbPool),
       _connectStage("connect", this, &AllDatabaseCloner::connectStage),
       _getInitialSyncIdStage("getInitialSyncId", this, &AllDatabaseCloner::getInitialSyncIdStage),
       _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage),
-      _summaryStats(summaryStats) {}
+      _summaryStats(summaryStats),
+      _fastCountAggregator(std::move(fastCountAggregator)) {}
 
 BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
     return {&_connectStage, &_getInitialSyncIdStage, &_listDatabasesStage};
@@ -247,7 +250,8 @@ void AllDatabaseCloner::postStage() {
                                                                       getClient(),
                                                                       getStorageInterface(),
                                                                       getDBPool(),
-                                                                      _summaryStats);
+                                                                      _summaryStats,
+                                                                      _fastCountAggregator);
         }
         auto dbStatus = _currentDatabaseCloner->run();
         if (dbStatus.isOK()) {

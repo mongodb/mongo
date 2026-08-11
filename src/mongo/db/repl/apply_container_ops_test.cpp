@@ -11,6 +11,9 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -43,10 +46,11 @@ StatusWith<UniqueBuffer> _get(OperationContext* opCtx, std::string_view ident, i
 /**
  * Applies a single container oplog entry as a secondary.
  */
-Status applyContainerOpHelper(OperationContext* opCtx, const OplogEntry& e) {
+Status applyContainerOpHelper(OperationContext* opCtx,
+                              const OplogEntry& e,
+                              OplogApplication::Mode mode = OplogApplication::Mode::kSecondary) {
     auto op = ApplierOperation{&e};
-    return applyContainerOperations(
-        opCtx, std::span<const ApplierOperation>{&op, 1}, OplogApplication::Mode::kSecondary);
+    return applyContainerOperations(opCtx, std::span<const ApplierOperation>{&op, 1}, mode);
 }
 
 DurableOplogEntryParams makeBaseParams(const NamespaceString& nss,
@@ -243,6 +247,165 @@ TEST_F(ApplyContainerOpsTest, ContainerOpUpdateNonexistentKeyFails) {
     auto entry = makeContainerUpdateOplogEntry(OpTime(), _intIdent, kMissing, v);
     auto status = applyContainerOpHelper(_opCtx.get(), entry);
     ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpDeleteNonexistentKeyFails) {
+    int64_t kInserted = 1;
+    int64_t kMissing = 2;
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+
+    // Insert a key so the container is non-empty.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeContainerInsertOplogEntry(OpTime(), _intIdent, kInserted, v)));
+
+    // Deleting a different, non-existent key should fail.
+    auto entry = makeContainerDeleteOplogEntry(OpTime(), _intIdent, kMissing);
+    auto status = applyContainerOpHelper(_opCtx.get(), entry);
+    ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
+}
+
+class ApplyFastCountContainerOpsTest : public ApplyContainerOpsTest {
+protected:
+    void setUp() override {
+        ApplyContainerOpsTest::setUp();
+
+        auto* se = getServiceContext()->getStorageEngine();
+        auto ru = se->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
+        _fastCountRS = se->getEngine()->makeInternalRecordStore(
+            *ru, ident::kFastCountMetadataStore, KeyFormat::String);
+        swt.commit();
+    }
+
+    OplogEntry makeUpdateMissingKey() {
+        return makeContainerUpdateOplogEntry(OpTime(),
+                                             ident::kFastCountMetadataStore,
+                                             BSONBinData{_key, 2, BinDataGeneral},
+                                             BSONBinData("A", 1, BinDataGeneral));
+    }
+
+    OplogEntry makeInsertExistingKey() {
+        auto v = BSONBinData("A", 1, BinDataGeneral);
+        ASSERT_OK(applyContainerOpHelper(
+            _opCtx.get(),
+            makeContainerInsertOplogEntry(
+                OpTime(), ident::kFastCountMetadataStore, BSONBinData{_key, 2, BinDataGeneral}, v),
+            OplogApplication::Mode::kInitialSync));
+        return makeContainerInsertOplogEntry(OpTime(),
+                                             ident::kFastCountMetadataStore,
+                                             BSONBinData{_key, 2, BinDataGeneral},
+                                             BSONBinData("B", 1, BinDataGeneral));
+    }
+
+    OplogEntry makeDeleteMissingKey() {
+        return makeContainerDeleteOplogEntry(
+            OpTime(), ident::kFastCountMetadataStore, BSONBinData{_key, 2, BinDataGeneral});
+    }
+
+    StatusWith<UniqueBuffer> getKey() {
+        return _get(_opCtx.get(), ident::kFastCountMetadataStore, std::span<const char>(_key, 2));
+    }
+
+    const char _key[3] = "K1";
+    std::unique_ptr<RecordStore> _fastCountRS;
+};
+
+// During initial sync oplog application, the seeded fast count store legitimately diverges from
+// the state the sync source's oplog assumes, so mismatching container writes self-heal.
+
+TEST_F(ApplyFastCountContainerOpsTest, InitialSyncUpdateNonexistentKeyIsPromotedToInsert) {
+    // A replicated fast count store seeded by initial sync may be missing entries the sync
+    // source flushes later. Updates for missing keys must succeed so the store self-heals.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeUpdateMissingKey(), OplogApplication::Mode::kInitialSync));
+
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "A", 1));
+}
+
+TEST_F(ApplyFastCountContainerOpsTest, InitialSyncInsertExistingKeyIsPromotedToUpdate) {
+    // A replicated fast count store seeded by initial sync may already hold an entry that a
+    // replayed flush from the sync source inserts. Inserts for existing keys must overwrite.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeInsertExistingKey(), OplogApplication::Mode::kInitialSync));
+
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "B", 1));
+}
+
+TEST_F(ApplyFastCountContainerOpsTest, InitialSyncDeleteNonexistentKeyIsNoOp) {
+    // A replicated fast count store seeded by initial sync may be missing entries for
+    // collections dropped on the sync source. Deletes for missing keys must be a no-op.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeDeleteMissingKey(), OplogApplication::Mode::kInitialSync));
+
+    ASSERT_EQ(getKey().getStatus(), ErrorCodes::NoSuchKey);
+}
+
+// In steady state the strictness of fast count container writes is governed by the persistence
+// provider's relaxContainerOplogConstraints(). Attached storage (the default provider) relaxes
+// the constraints: each node owns its physical container state and initial sync cannot seed
+// container contents for unreplicated namespaces (e.g. the oplog's own fast count entry), so
+// mismatching writes self-heal. Disaggregated storage keeps the usual exactness guarantees.
+
+TEST_F(ApplyFastCountContainerOpsTest, SecondarySelfHealsWhenProviderRelaxesConstraints) {
+    // The default test provider is attached storage, which relaxes container oplog constraints.
+    ASSERT_TRUE(rss::ReplicatedStorageService::get(getServiceContext())
+                    .getPersistenceProvider()
+                    .relaxContainerOplogConstraints());
+
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeDeleteMissingKey()));
+    ASSERT_EQ(getKey().getStatus(), ErrorCodes::NoSuchKey);
+
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeUpdateMissingKey()));
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "A", 1));
+
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeInsertExistingKey()));
+    g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "B", 1));
+}
+
+class ApplyFastCountContainerOpsStrictProviderTest : public ApplyFastCountContainerOpsTest {
+protected:
+    // Mimics disaggregated storage's strict container op application on top of the attached
+    // provider so the test does not depend on the enterprise module.
+    class StrictContainerConstraintsProvider : public rss::AttachedPersistenceProvider {
+        bool relaxContainerOplogConstraints() const override {
+            return false;
+        }
+    };
+
+    void setUp() override {
+        ApplyFastCountContainerOpsTest::setUp();
+        rss::ReplicatedStorageService::get(getServiceContext())
+            .setPersistenceProvider(std::make_unique<StrictContainerConstraintsProvider>());
+    }
+};
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, SecondaryUpdateNonexistentKeyFails) {
+    ASSERT_EQ(applyContainerOpHelper(_opCtx.get(), makeUpdateMissingKey()), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, SecondaryInsertExistingKeyFails) {
+    ASSERT_EQ(applyContainerOpHelper(_opCtx.get(), makeInsertExistingKey()), ErrorCodes::KeyExists);
+}
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, SecondaryDeleteNonexistentKeyFails) {
+    ASSERT_EQ(applyContainerOpHelper(_opCtx.get(), makeDeleteMissingKey()), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, InitialSyncStillSelfHeals) {
+    // Initial sync mode self-heals regardless of the provider.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeUpdateMissingKey(), OplogApplication::Mode::kInitialSync));
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "A", 1));
 }
 
 TEST_F(ApplyContainerOpsTest, ContainerOpUpdateOplogVersion) {

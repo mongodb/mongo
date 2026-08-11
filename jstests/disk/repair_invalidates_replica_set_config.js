@@ -2,7 +2,15 @@
  * This test corrupts WiredTiger data files on a secondary, repairs the data, and asserts that the
  * node is unable to re-join its original replica set without an initial sync.
  *
- * @tags: [requires_wiredtiger, requires_replication]
+ * @tags: [
+ *   requires_wiredtiger,
+ *   requires_replication,
+ *   # TODO(SERVER-129381): This test drops the catalog but the replicated fast count container
+ *   # idents are preserved since they aren't tracked in the catalog and are never dropped during
+ *   # recovery. Replicated fast count initialization will proceed as normal because the containers
+ *   # exist but then fail because the oplog doesn't exist.
+ *   requires_replicated_fast_count_recovery
+ * ]
  */
 
 import {

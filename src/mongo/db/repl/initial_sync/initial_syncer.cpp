@@ -19,9 +19,11 @@
 #include "mongo/db/repl/initial_sync/all_database_cloner.h"
 #include "mongo/db/repl/initial_sync/collection_cloner.h"
 #include "mongo/db/repl/initial_sync/database_cloner.h"
+#include "mongo/db/repl/initial_sync/fast_count_initial_sync_aggregator.h"
 #include "mongo/db/repl/initial_sync/initial_sync_state.h"
 #include "mongo/db/repl/initial_sync/initial_syncer_common_stats.h"
 #include "mongo/db/repl/initial_sync/initial_syncer_factory.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -37,11 +39,16 @@
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store_oplog.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/remote_command_request.h"
@@ -596,6 +603,19 @@ void InitialSyncer::_tearDown(WithLock lk,
     const bool orderedCommit = true;
     _storage->oplogDiskLocRegister(opCtx, initialDataTimestamp, orderedCommit);
 
+    // Now that the oplog has been fully replayed, re-derive the in-memory replicated fast count
+    // values from the seeded persisted stores combined with the oplog from the validAsOf timestamp
+    // onwards. This must run before reconstructPreparedTransactions(): that call materializes
+    // in-flight prepared transactions as prepared (uncommitted) updates in user collections, which
+    // would cause the per-collection scan inside finalizeMetadataFromInitialSync() to block on a
+    // prepare conflict that cannot resolve until initial sync completes. Running beforehand, the
+    // collections hold only committed data, which is also the correct fast count (a prepared
+    // transaction's delta is counted when its commitTransaction oplog entry applies).
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+            .finalizeMetadataFromInitialSync(opCtx);
+    }
+
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 
     _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
@@ -874,7 +894,17 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
 
     // 2b.) Drop user databases.
     LOGV2_DEBUG(21175, 2, "Dropping user databases");
-    return _storage->dropReplicatedDatabases(opCtx.get());
+    status = _storage->dropReplicatedDatabases(opCtx.get());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // 2c.) Drop the internal replicated fast count containers. They are internal idents that aren't
+    // dropped on startup and live outside of any database, so dropReplicatedDatabases() does not
+    // touch them.
+    dropInternalFastCountContainers(opCtx.get());
+
+    return Status::OK();
 }
 
 void InitialSyncer::_rollbackCheckerResetCallback(
@@ -1845,8 +1875,16 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                                                 _allowedOutageDuration,
                                                 getGlobalServiceContext()->getFastClockSource());
     _client = _createClientFn();
-    _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<AllDatabaseCloner>(
-        _sharedData.get(), _syncSource, _client.get(), _storage, _workerPool, _summaryStats));
+    auto fastCountAggregator = std::make_shared<FastCountInitialSyncAggregator>();
+    _initialSyncState =
+        std::make_unique<InitialSyncState>(std::make_unique<AllDatabaseCloner>(_sharedData.get(),
+                                                                               _syncSource,
+                                                                               _client.get(),
+                                                                               _storage,
+                                                                               _workerPool,
+                                                                               _summaryStats,
+                                                                               fastCountAggregator),
+                                           fastCountAggregator);
 
     // Create oplog applier.
     auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
@@ -1997,6 +2035,11 @@ void InitialSyncer::_allDatabaseClonerCallback(
         return;
     }
 
+    // Seed the local replicated fast count stores from data harvested during cloning so that
+    // container writes applied during the upcoming oplog scan have a well-defined baseline to
+    // converge from.
+    _seedFastCountFromInitialSync(lock);
+
     // Since the stopTimestamp is retrieved after we have done all the work of retrieving collection
     // data, we handle retries within this class by retrying for
     // 'initialSyncTransientErrorRetryPeriodSeconds' (default 24 hours).  This is the same retry
@@ -2013,6 +2056,65 @@ void InitialSyncer::_allDatabaseClonerCallback(
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
         return;
+    }
+}
+
+void InitialSyncer::_seedFastCountFromInitialSync(WithLock) {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtxPtr = opCtxHolder.get();
+
+    // Only seed when this node maintains a replicated fast count.
+    if (!isReplicatedFastCountEnabled(opCtxPtr)) {
+        return;
+    }
+
+    auto entries = _initialSyncState->fastCountAggregator->takeEntries();
+    const auto tsStoreTs = _initialSyncState->fastCountAggregator->getTimestampStoreTs();
+
+    LOGV2(12549702,
+          "Seeding local replicated fast count stores from initial sync data",
+          "numEntries"_attr = entries.size(),
+          "timestampStoreTs"_attr = tsStoreTs);
+
+    {
+        auto& mgr =
+            replicated_fast_count::ReplicatedFastCountManager::get(getGlobalServiceContext());
+
+        if (shouldUseReplicatedFastCountContainers(opCtxPtr)) {
+            // The secondary's local backing stores will not be created otherwise since containers
+            // don't get picked up by regular collection cloning.
+            massertStatusOK(
+                createInternalFastCountContainers(opCtxPtr,
+                                                  NamespaceString::kAdminCommandNamespace,
+                                                  ident::kFastCountMetadataStore,
+                                                  KeyFormat::String,
+                                                  ident::kFastCountMetadataStoreTimestamps,
+                                                  KeyFormat::Long,
+                                                  /*writeToOplog=*/false));
+            auto* engine = opCtxPtr->getServiceContext()->getStorageEngine()->getEngine();
+            auto metadataRS =
+                engine->getRecordStore(opCtxPtr,
+                                       NamespaceString::kAdminCommandNamespace,
+                                       ident::kFastCountMetadataStore,
+                                       RecordStore::Options{.keyFormat = KeyFormat::String},
+                                       /*uuid=*/boost::none);
+            auto timestampsRS =
+                engine->getRecordStore(opCtxPtr,
+                                       NamespaceString::kAdminCommandNamespace,
+                                       ident::kFastCountMetadataStoreTimestamps,
+                                       RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                       /*uuid=*/boost::none);
+            mgr.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
+        }
+        // The secondary is in INITIAL_SYNC state and rejects regular Write intent. Take a
+        // global IX lock with LocalWrite intent so populateFromInitialSync's writes don't
+        // trip `canAcceptWritesFor()`.
+        Lock::GlobalLock globalLock(
+            opCtxPtr,
+            MODE_IX,
+            Lock::GlobalLockOptions{.explicitIntent =
+                                        rss::consensus::IntentRegistry::Intent::LocalWrite});
+        mgr.populateFromInitialSync(opCtxPtr, entries, tsStoreTs);
     }
 }
 

@@ -6,8 +6,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/key_format.h"
+#include "mongo/util/version/releases.h"
 
 #include <string_view>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 /**
@@ -19,8 +22,15 @@ namespace mongo {
  * When trying to create containers, this will throw if one container does not exist and the other
  * exists and is non-empty. Since the metadata and timestamp containers are always written to in the
  * same transaction, such a state is indicative of some form of data corruption.
+ *
+ * 'targetFCV' selects the FCV against which the container-vs-collection store decision is made.
+ * Callers running while the FCV is in a transitional state must pass the requested FCV so the
+ * stores created here match the mode the node will use once the transition completes. When
+ * 'targetFCV' is not provided, the node's current FCV snapshot is used.
  */
-[[MONGO_MOD_PUBLIC]] void setUpReplicatedFastCount(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] void setUpReplicatedFastCount(
+    OperationContext* opCtx,
+    boost::optional<multiversion::FeatureCompatibilityVersion> targetFCV = boost::none);
 
 [[MONGO_MOD_PUBLIC]] Status createInternalFastCountContainers(OperationContext* opCtx,
                                                               const NamespaceString& nss,
@@ -29,6 +39,13 @@ namespace mongo {
                                                               std::string_view timestampsIdent,
                                                               KeyFormat timestampsKeyFormat,
                                                               bool writeToOplog);
+
+/**
+ * Drops the internal replicated fast count container idents (`kFastCountMetadataStore` and
+ * `kFastCountMetadataStoreTimestamps`) if they exist. This is a no-op for any ident that is not
+ * present.
+ */
+[[MONGO_MOD_PUBLIC]] void dropInternalFastCountContainers(OperationContext* opCtx);
 
 /**
  * Handles an ident with the provided `existingIdentFormat` existing in the storage engine.

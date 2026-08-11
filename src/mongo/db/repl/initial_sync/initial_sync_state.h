@@ -7,6 +7,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/initial_sync/all_database_cloner.h"
+#include "mongo/db/repl/initial_sync/fast_count_initial_sync_aggregator.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -16,11 +17,15 @@ namespace repl {
  * Holder of state for initial sync (InitialSyncer).
  */
 struct InitialSyncState {
-    InitialSyncState(std::unique_ptr<AllDatabaseCloner> cloner)
-        : allDatabaseCloner(std::move(cloner)) {};
+    InitialSyncState(std::unique_ptr<AllDatabaseCloner> cloner,
+                     std::shared_ptr<FastCountInitialSyncAggregator> aggregator)
+        : allDatabaseCloner(std::move(cloner)), fastCountAggregator(std::move(aggregator)) {};
 
     std::unique_ptr<AllDatabaseCloner>
-        allDatabaseCloner;                 // Cloner for all databases included in initial sync.
+        allDatabaseCloner;  // Cloner for all databases included in initial sync.
+    std::shared_ptr<FastCountInitialSyncAggregator>
+        fastCountAggregator;  // Accumulator for replicated fast count metadata harvested
+                              // from listCollections during cloning.
     Future<void> allDatabaseClonerFuture;  // Future for holding result of AllDatabaseCloner
     Timestamp beginApplyingTimestamp;  // Timestamp from the latest entry in oplog when started. It
                                        // is also the timestamp after which we will start applying

@@ -54,6 +54,13 @@ public:
      * error.
      */
     virtual void write(OperationContext* opCtx, Timestamp timestamp) = 0;
+
+    /**
+     * Performs a single write of `timestamp` directly to the underlying physical table. Unlike
+     * write(), this does not log to the oplog: it skips invoking op observers and bypasses the
+     * `canAcceptWritesFor` primary check, so the write is not replicated.
+     */
+    virtual void writeToTable(OperationContext* opCtx, Timestamp timestamp) = 0;
 };
 
 /**
@@ -66,6 +73,7 @@ public:
 
     boost::optional<Timestamp> read(OperationContext* opCtx) const override;
     void write(OperationContext* opCtx, Timestamp timestamp) override;
+    void writeToTable(OperationContext* opCtx, Timestamp timestamp) override;
 };
 
 /**
@@ -81,6 +89,7 @@ public:
 
     boost::optional<Timestamp> read(OperationContext* opCtx) const override;
     void write(OperationContext* opCtx, Timestamp timestamp) override;
+    void writeToTable(OperationContext* opCtx, Timestamp timestamp) override;
 
     RecordStore* rs_ForTest() const;
 

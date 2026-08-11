@@ -2065,6 +2065,8 @@ mongo_cc_unit_test(
         ":task_executor_mock",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/storage:checkpointer",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",

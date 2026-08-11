@@ -159,6 +159,12 @@ void CollectionSizeCountStore::write(OperationContext* opCtx, UUID uuid, const E
     }
 }
 
+void CollectionSizeCountStore::writeToTable(OperationContext* opCtx,
+                                            UUID uuid,
+                                            const Entry& entry) {
+    MONGO_UNREACHABLE_TASSERT(12549704);
+}
+
 void CollectionSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
     assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
 
@@ -278,6 +284,21 @@ void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const En
     } else {
         massertStatusOK(container_write::insert(opCtx, ru, container, keySpan, valSpan));
     }
+}
+
+void ContainerSizeCountStore::writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto& container = _getStringKeyedContainer();
+    auto val = entryToContainerValue(entry);
+    auto keySpan = uuidToContainerKey(uuid);
+    auto valSpan = bsonToSpan(val);
+
+    // Bypass container_write::insert/update — those check canAcceptWritesFor which fails on a
+    // secondary in INITIAL_SYNC state. Write directly to the container and skip op observers
+    // since these writes are not user-visible operations. This write is unreplicated so we can
+    // safely use container::ExistingKeyPolicy::Overwrite.
+    massertStatusOK(
+        container.insert(ru, keySpan, valSpan, container::ExistingKeyPolicy::overwrite));
 }
 
 void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
