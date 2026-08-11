@@ -20,6 +20,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -29,6 +30,8 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo::ce {
 
@@ -111,44 +114,73 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt) {
     std::vector<BSONObj> pages;
-
     size_t docIdx = 0;
     int pageNo = 0;
+    size_t numDiscarded = 0;
+
+    const double maxDiscardFraction = internalQueryMaxPersistentSampleDiscardFraction.load();
     do {
         BSONObjBuilder builder;
         appendSamplePageMetadata(
             builder, collectionUuid, method, sampleSize, numChunks, pageNo, createdAt);
         BSONArrayBuilder docsArr(builder.subarrayStart(PersistentSampleDoc::kDocsFieldName));
 
+        // Size of this page with its metadata but no documents.
+        const int emptyPageLenBytes = builder.len();
+
         int docsOnPage = 0;
         while (docIdx < sample.size()) {
             const BSONObj& doc = sample[docIdx];
 
-            // Calculate the maximum size the page could be after adding this document.
-            const int projectedSize =
-                builder.len() + doc.objsize() + kArrayElementMaxOverheadBytes + kBytesToClosePage;
+            // Calculate the maximum number of bytes this document would add to a page.
+            const int docSizeWithOverheadBytes =
+                doc.objsize() + kArrayElementMaxOverheadBytes + kBytesToClosePage;
 
-            if (docsOnPage == 0) {
-                // A document that cannot fit on a page by itself can never be persisted.
-                uassert(12980001,
-                        str::stream()
-                            << "Single sampled document of " << doc.objsize()
-                            << " bytes is too large to persist on a sample page (assembled page "
-                               "would be "
-                            << projectedSize << " bytes, exceeding the maximum BSON size of "
-                            << BSONObjMaxUserSize << " bytes)",
-                        projectedSize <= BSONObjMaxUserSize);
-            } else if (projectedSize > BSONObjMaxUserSize) {
-                // This doc does not fit on the current page; leave it for the next one.
+            // Calculate the maximum size the page could be after adding this document.
+            const int projectedPageSize = builder.len() + docSizeWithOverheadBytes;
+
+            if (emptyPageLenBytes + docSizeWithOverheadBytes > BSONObjMaxUserSize) {
+                // A document that cannot fit on an otherwise empty page can never be persisted.
+                // Discard it and continue filling the current page, unless too much of the full
+                // sample has been discarded already.
+                ++numDiscarded;
+                ++docIdx;
+                LOGV2_WARNING(13106001,
+                              "Discarding sampled document that exceeds the maximum persistable "
+                              "size",
+                              "collectionUuid"_attr = collectionUuid,
+                              "docSizeBytes"_attr = doc.objsize(),
+                              "numDiscarded"_attr = numDiscarded,
+                              "sampleSize"_attr = sample.size());
+                uassert(13106000,
+                        str::stream() << "Sampled documents discarded due to exceeding the maximum "
+                                         "persistable size ("
+                                      << numDiscarded << " of " << sample.size()
+                                      << ") exceed the maximum discardable fraction of the sample ("
+                                      << maxDiscardFraction * 100 << "%)",
+                        static_cast<double>(numDiscarded) <=
+                            maxDiscardFraction * static_cast<double>(sample.size()));
+                continue;
+            } else if (projectedPageSize > BSONObjMaxUserSize) {
+                // This doc doesn't fit on the current page but might fit on a fresh one. Leave
+                // it for the next page.
                 break;
             }
-
             docsArr.append(doc);
             ++docsOnPage;
             ++docIdx;
         }
 
+
         docsArr.done();
+
+        // Every doc left for this page turned out to be too large to persist, so the page would be
+        // empty. Don't persist an empty page unless it is the only page of an empty sample.
+        // TODO SERVER-127501
+        if (docsOnPage == 0 && pageNo > 0) {
+            break;
+        }
+
         BSONObj page = builder.obj();
         tassert(13044800,
                 str::stream() << "Assembled sample page of " << page.objsize()

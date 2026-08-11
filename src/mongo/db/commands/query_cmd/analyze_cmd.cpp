@@ -244,7 +244,6 @@ void runSampleMode(OperationContext* opCtx,
 
         // Copy the sample so it outlives the estimator and can be persisted.
         docsArr = estimator.getSample();
-        docsPersistedCount = docsArr.size();
 
         // Store the sampling method that was actually used (which may differ from
         // requestedSamplingMethod when test-only knobs like
@@ -294,6 +293,13 @@ void runSampleMode(OperationContext* opCtx,
     inserts.reserve(pageDocs.size());
     for (auto& pageDoc : pageDocs) {
         totalBytesPersisted += pageDoc.objsize();
+        const BSONElement docsField = pageDoc.getField(ce::PersistentSampleDoc::kDocsFieldName);
+        tassert(13106002,
+                str::stream() << "Expected " << ce::PersistentSampleDoc::kDocsFieldName
+                              << " to be an array, but found " << typeName(docsField.type()),
+                docsField.type() == BSONType::array);
+        // kDocsFieldName is an array and nFields return its size
+        docsPersistedCount += static_cast<size_t>(docsField.Obj().nFields());
         inserts.emplace_back(std::move(pageDoc));
     }
 

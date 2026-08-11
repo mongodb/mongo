@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -563,13 +564,146 @@ std::vector<BSONObj> makeRandomSamplePageDocs(const std::vector<BSONObj>& sample
                                         Date_t::now());
 }
 
-TEST(MakePersistentSamplePageDocs, OversizedSingleDocFails) {
-    std::vector<BSONObj> sample{
-        makeSizedDoc(0, 1024),
-        makeSizedDoc(1, BSONObjMaxUserSize),
-        makeSizedDoc(2, 1024),
-    };
-    ASSERT_THROWS_CODE(makeRandomSamplePageDocs(sample, sample.size()), DBException, 12980001);
+// Returns the ids of every doc across all pages of `pages` in order.
+std::vector<int> collectPagedDocIds(const std::vector<BSONObj>& pages) {
+    std::vector<int> ids;
+    for (const auto& page : pages) {
+        auto swParsed = parsePersistentSample(page);
+        ASSERT_OK(swParsed.getStatus());
+        for (const auto& doc : swParsed.getValue().getDocs()) {
+            ids.push_back(doc["_id"].numberInt());
+        }
+    }
+    return ids;
+}
+
+// Builds a sample of `numDocs` small docs with ids [0, numDocs), replacing the docs at
+// `oversizedIdxs` with docs too large to ever fit on a page.
+std::vector<BSONObj> makeSampleWithOversizedDocs(int numDocs,
+                                                 const std::vector<int>& oversizedIdxs) {
+    std::vector<BSONObj> sample;
+    sample.reserve(numDocs);
+    for (int i = 0; i < numDocs; ++i) {
+        const bool oversized =
+            std::find(oversizedIdxs.begin(), oversizedIdxs.end(), i) != oversizedIdxs.end();
+        sample.push_back(makeSizedDoc(i, oversized ? BSONObjMaxUserSize : 1024));
+    }
+    return sample;
+}
+
+void assertOversizedDocsAbsent(const std::vector<BSONObj>& pages,
+                               const std::vector<int>& oversizedIdxs) {
+    const auto ids = collectPagedDocIds(pages);
+    for (int oversizedIdx : oversizedIdxs) {
+        ASSERT_TRUE(std::find(ids.begin(), ids.end(), oversizedIdx) == ids.end())
+            << "oversized doc " << oversizedIdx << " should have been discarded";
+    }
+}
+
+TEST(MakePersistentSamplePageDocs, ScatteredDiscardsDoNotAddPages) {
+    // Discards spread through the sample must not each force a page boundary: what remains is 27
+    // tiny docs, which belong on a single page.
+    // 3 out of the 30 docs (<= 10%) will be discarded.
+    const auto sample = makeSampleWithOversizedDocs(/*numDocs=*/30, /*oversizedIdxs=*/{1, 14, 27});
+    const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+    ASSERT_EQ(pages.size(), 1u);
+    ASSERT_EQ(collectPagedDocIds(pages).size(), 27u);
+    assertOversizedDocsAbsent(pages, {1, 14, 27});
+}
+
+TEST(MakePersistentSamplePageDocs, DiscardsAtExactlyThresholdSucceed) {
+    // Exactly 10% of the sample is unpersistable, which is still allowed.
+    const auto sample = makeSampleWithOversizedDocs(/*numDocs=*/10, /*oversizedIdxs=*/{3});
+    const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+    ASSERT_EQ(collectPagedDocIds(pages).size(), 9u);
+    assertOversizedDocsAbsent(pages, {3});
+}
+
+TEST(MakePersistentSamplePageDocs, DiscardsAboveThresholdFail) {
+    // 2 of 10 docs (20%) unpersistable exceeds the 10% budget, so the whole sample fails.
+    const auto sample = makeSampleWithOversizedDocs(/*numDocs=*/10, /*oversizedIdxs=*/{3, 8});
+    ASSERT_THROWS_CODE(makeRandomSamplePageDocs(sample, sample.size()), DBException, 13106000);
+}
+
+TEST(MakePersistentSamplePageDocs, SoleOversizedDocFails) {
+    // A single-doc sample has no discard budget at all: 1 of 1 is 100%.
+    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize)};
+    ASSERT_THROWS_CODE(makeRandomSamplePageDocs(sample, sample.size()), DBException, 13106000);
+}
+
+TEST(MakePersistentSamplePageDocs, DiscardBudgetIsRelativeToTheSampleNotTheRequestedSampleSize) {
+    // Only 5 docs were actually sampled even though 100 were requested, so the budget is 0 docs.
+    const auto sample = makeSampleWithOversizedDocs(/*numDocs=*/5, /*oversizedIdxs=*/{2});
+    ASSERT_THROWS_CODE(makeRandomSamplePageDocs(sample, /*sampleSize=*/100), DBException, 13106000);
+}
+
+TEST(MakePersistentSamplePageDocs, DiscardFractionIsControlledByServerParameter) {
+    // 2 of 10 docs (20%) are unpersistable: rejected at the 10% default, but allowed once the
+    // knob is raised to permit it.
+    const auto sample = makeSampleWithOversizedDocs(/*numDocs=*/10, /*oversizedIdxs=*/{3, 8});
+    ASSERT_THROWS_CODE(makeRandomSamplePageDocs(sample, sample.size()), DBException, 13106000);
+
+    {
+        unittest::ServerParameterGuard guard{"internalQueryMaxPersistentSampleDiscardFraction",
+                                             0.2};
+        const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+        ASSERT_EQ(collectPagedDocIds(pages).size(), 8u);
+        assertOversizedDocsAbsent(pages, {3, 8});
+    }
+
+    {
+        // Lowering the knob to 0 forbids discarding anything at all, even a single doc.
+        unittest::ServerParameterGuard guard{"internalQueryMaxPersistentSampleDiscardFraction",
+                                             0.0};
+        const auto oneOversized =
+            makeSampleWithOversizedDocs(/*numDocs=*/10, /*oversizedIdxs=*/{3});
+        ASSERT_THROWS_CODE(
+            makeRandomSamplePageDocs(oneOversized, oneOversized.size()), DBException, 13106000);
+    }
+}
+
+TEST(MakePersistentSamplePageDocs, DiscardedDocAtEndOfSampleDoesNotProduceEmptyTrailingPage) {
+    // The oversized doc is discarded from a fresh page which then has nothing else to hold; that
+    // page must not be persisted.
+    std::vector<BSONObj> sample;
+    for (int i = 0; i < 20; ++i) {
+        sample.push_back(makeSizedDoc(i, 1024));
+    }
+    sample.push_back(makeSizedDoc(20, BSONObjMaxUserSize));
+
+    const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+    ASSERT_EQ(pages.size(), 1u);
+    ASSERT_EQ(collectPagedDocIds(pages).size(), 20u);
+    assertOversizedDocsAbsent(pages, {20});
+}
+
+TEST(MakePersistentSamplePageDocs, DiscardsAcrossMultiplePagesRoundTrip) {
+    // Large but persistable docs force several pages; the unpersistable ones among them are
+    // discarded without disturbing paging.
+    constexpr int kNumDocs = 40;
+    std::vector<BSONObj> sample;
+    sample.reserve(kNumDocs);
+    for (int i = 0; i < kNumDocs; ++i) {
+        // ids 11 and 29 (2 of 40 == 5%) will be discarded.
+        sample.push_back(
+            makeSizedDoc(i, (i == 11 || i == 29) ? BSONObjMaxUserSize : 1 * 1024 * 1024));
+    }
+
+    const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
+    ASSERT_GTE(pages.size(), 3u);
+    for (size_t pageNo = 0; pageNo < pages.size(); ++pageNo) {
+        auto swParsed = parsePersistentSample(pages[pageNo]);
+        ASSERT_OK(swParsed.getStatus());
+        ASSERT_EQ(swParsed.getValue().get_id().getPageNo(), static_cast<int>(pageNo));
+        ASSERT_LTE(pages[pageNo].objsize(), BSONObjMaxUserSize);
+        ASSERT_GTE(swParsed.getValue().getDocs().size(), 1u);
+    }
+
+    auto swReassembled = reassemblePersistentSample(pages);
+    ASSERT_OK(swReassembled.getStatus());
+    ASSERT_EQ(swReassembled.getValue().getDocs().size(), static_cast<size_t>(kNumDocs) - 2);
+
+    assertOversizedDocsAbsent(pages, {11, 29});
 }
 
 TEST(MakePersistentSamplePageDocs, LargeDocJustUnderMaxFitsOnOwnPage) {

@@ -3,6 +3,8 @@
 global:
     cpp_namespace: "mongo::ce"
     mod_visibility: private
+    cpp_includes:
+        - "mongo/platform/atomic.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -74,3 +76,17 @@ structs:
             # cache-friendly scanning.
             docs:
                 type: array<object>
+
+server_parameters:
+    internalQueryMaxPersistentSampleDiscardFraction:
+        description: >-
+            The maximum fraction of a sample that may be discarded before persisting it to the
+            persistent samples collection fails.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxPersistentSampleDiscardFraction"
+        cpp_vartype: Atomic<double>
+        default: 0.1
+        validator:
+            gte: 0.0
+            lte: 1.0
+        redact: false

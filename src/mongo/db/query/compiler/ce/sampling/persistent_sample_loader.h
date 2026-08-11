@@ -28,8 +28,9 @@ inline constexpr int kPersistentSampleSchemaVersion = 1;
  * Serializes a sample into the minimum number of page documents such that each page stays under the
  * BSON size limit.
  *
- * Always returns at least one page (empty if `sample` is empty). Errors if any single document is
- * too large to fit on a page on its own.
+ * Always returns at least one page (empty if `sample` is empty). Any single document too large to
+ * fit on a page on its own is discarded. Errors if the discarded documents exceed the maximum
+ * discardable fraction of the sample.
  */
 std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   SamplingTechniqueEnum method,

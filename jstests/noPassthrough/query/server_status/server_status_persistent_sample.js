@@ -266,6 +266,54 @@ describe("persistent sample serverStatus metrics", function () {
         });
     });
 
+    it("excludes discarded documents from docsPersisted", function () {
+        const discardCollName = collName + "_discard";
+        const discardColl = db[discardCollName];
+        discardColl.drop();
+
+        // 1 of 20 docs (5%) is unpersistable, which is within the 10% discard budget.
+        const bigDoc = PersistentSamplesUtils.makeDocOfSize(16 * 1024 * 1024); // 16 MB
+        const smallDoc = PersistentSamplesUtils.makeDocOfSize(1024);
+        const kNumDocs = 20;
+        const docs = Array.from({length: kNumDocs}, (_, i) =>
+            Object.assign({}, i === 10 ? bigDoc : smallDoc, {_id: i}),
+        );
+        docs.forEach((doc) => assert.commandWorked(discardColl.insert(doc)));
+
+        const before = getAnalyzeMetrics(db);
+
+        // sampleSize == numRecords so all docs will be in the sample.
+        assert.commandWorked(
+            db.runCommand({
+                analyze: discardCollName,
+                mode: "sample",
+                samplingMethod: "random",
+                sampleSize: kNumDocs,
+            }),
+        );
+
+        const after = getAnalyzeMetrics(db);
+
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: discardCollName,
+            samplingMethod: "random",
+            requestedSampleSize: kNumDocs,
+            // The oversized doc is discarded, so only 19 docs are persisted.
+            actualSampleSize: kNumDocs - 1,
+            expectedFields: ["pad"],
+            expectedNumPages: 1,
+        });
+
+        assert.eq(
+            after.docsPersisted,
+            before.docsPersisted + kNumDocs - 1,
+            "docsPersisted should not count the doc discarded during paging",
+            {before, after},
+        );
+
+        discardColl.drop();
+    });
+
     it("increments read-path hit metrics when a persisted sample is loaded", function () {
         assert.commandWorked(
             db.runCommand({

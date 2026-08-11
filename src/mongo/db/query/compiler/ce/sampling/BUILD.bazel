@@ -133,6 +133,7 @@ mongo_cc_unit_test(
     deps = [
         ":persistent_samples",
         ":sampling_test_utils",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
