@@ -443,6 +443,122 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
     });
 });
 
+describeOrSkip("dropDatabase during an FCV upgrade", function () {
+    const dbName = "dropDatabaseDuringFcvUpgrade";
+    let st;
+
+    beforeEach(function () {
+        st = new ShardingTest({shards: 1, config: 1, rs: {nodes: 2}});
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
+    });
+
+    afterEach(function () {
+        st.stop();
+    });
+
+    it("removes the dropped database's shard-local metadata", function () {
+        const configPrimary = st.configRS.getPrimary();
+        const shardPrimary = st.rs0.getPrimary();
+
+        function getFCV(conn) {
+            return assert.commandWorked(
+                conn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+            ).featureCompatibilityVersion;
+        }
+
+        function getGlobalDatabaseMetadata() {
+            return st.s.getDB("config").databases.findOne({_id: dbName});
+        }
+
+        function getShardDatabaseMetadata(node) {
+            return node.getDB("config").shard.catalog.databases.findOne({_id: dbName});
+        }
+
+        function countDropDatabaseMetadataEntries() {
+            return shardPrimary
+                .getDB("local")
+                .getCollection("oplog.rs")
+                .countDocuments({op: "c", "o.dropDatabaseMetadata": {$exists: true}});
+        }
+
+        // Stop the upgrade after the config server enters upgrading FCV but before it transitions
+        // the shards. The config server can create authoritative database metadata while the shard
+        // still uses the non-authoritative metadata path.
+        const failPoint = configureFailPoint(
+            configPrimary,
+            "failAfterReachingTransitioningState",
+            {},
+            {times: 1},
+        );
+        assert.commandFailed(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        failPoint.wait();
+
+        const configFCV = getFCV(configPrimary);
+        assert.eq(lastLTSFCV, configFCV.version);
+        assert.eq(latestFCV, configFCV.targetVersion);
+        assert.eq(lastLTSFCV, getFCV(shardPrimary).version);
+
+        // Create a database. Since the configsvr is in kUpgrading state, we expect it to write
+        // authoritative database metadata on the shard.
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
+        const globalMetadata = getGlobalDatabaseMetadata();
+        const shardMetadata = getShardDatabaseMetadata(shardPrimary);
+        assert.neq(null, globalMetadata);
+        assert.neq(null, shardMetadata);
+        assert.eq(globalMetadata.version, shardMetadata.version);
+        const dropDatabaseMetadataEntriesBefore = countDropDatabaseMetadataEntries();
+
+        // Drop the database. dropDatabase runs on the shard, which still has not initiated the FCV
+        // upgrade. However, we expect it to still remove the authoritative database metadata.
+        assert.commandWorked(st.s.getDB(dbName).dropDatabase());
+        st.rs0.awaitReplication();
+        assert.eq(null, getGlobalDatabaseMetadata());
+        st.rs0.nodes.forEach((node) => assert.eq(null, getShardDatabaseMetadata(node)));
+        // The `dropDatabaseMetadata` oplog entry must not be written, since the shard has not yet
+        // transitioned to kUpgrading or kUpgraded FCV.
+        assert.eq(dropDatabaseMetadataEntriesBefore, countDropDatabaseMetadataEntries());
+
+        // Recreate the database.
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
+        const recreatedGlobalMetadata = getGlobalDatabaseMetadata();
+        const recreatedShardMetadata = getShardDatabaseMetadata(shardPrimary);
+        assert.neq(null, recreatedGlobalMetadata);
+        assert.neq(null, recreatedShardMetadata);
+        assert.eq(recreatedGlobalMetadata.version, recreatedShardMetadata.version);
+
+        // Complete FCV upgrade.
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        st.rs0.awaitReplication();
+        assert.eq(recreatedGlobalMetadata.version, getGlobalDatabaseMetadata().version);
+        st.rs0.nodes.forEach((node) => {
+            const metadata = getShardDatabaseMetadata(node);
+            assert.neq(null, metadata);
+            assert.eq(recreatedGlobalMetadata.version, metadata.version);
+        });
+
+        // Drop the database again. The shard is now in kUpgraded FCV, so it must write a `dropDatabaseMetadata` oplog entry.
+        const dropDatabaseMetadataEntriesBeforeAuthoritative = countDropDatabaseMetadataEntries();
+        assert.commandWorked(st.s.getDB(dbName).dropDatabase());
+        st.rs0.awaitReplication();
+        assert.eq(null, getGlobalDatabaseMetadata());
+        st.rs0.nodes.forEach((node) => assert.eq(null, getShardDatabaseMetadata(node)));
+        assert.eq(
+            dropDatabaseMetadataEntriesBeforeAuthoritative + 1,
+            countDropDatabaseMetadataEntries(),
+        );
+    });
+});
+
 // Fresh cluster: the authoritative collections are created by addShard's lastLTS->latest FCV upgrade.
 describeOrSkip("authoritative shard catalog on a new latestFCV cluster", function () {
     it("exists on the shard", function () {

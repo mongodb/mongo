@@ -55,11 +55,12 @@ protected:
             operationContext(), dbType, fromClone);
     }
 
-    void dropDatabase() {
+    void dropDatabase(bool writeDropDBMetadataEntry = true) {
         BypassDatabaseMetadataAccess bypass(  // NOLINT
             operationContext(),
             BypassDatabaseMetadataAccess::Type::kWriteOnly);
-        shard_catalog_commit::commitDropDatabaseMetadataLocally(operationContext(), kDbName);
+        shard_catalog_commit::commitDropDatabaseMetadataLocally(
+            operationContext(), kDbName, writeDropDBMetadataEntry);
     }
 
     long long countLocalDocs(const NamespaceString& nss) {
@@ -263,6 +264,17 @@ TEST_F(CommitDatabaseMetadataLocallyTest, DropDeletesMetadataAndClearsDSR) {
     auto counters = getDatabaseVersionUpdateCounters();
     ASSERT_EQ(counters.getIntField("countLocalDatabaseMetadataDrops"), 1);
     ASSERT_EQ(counters.getIntField("countLocalDatabaseMetadataCommits"), 1);
+}
+
+TEST_F(CommitDatabaseMetadataLocallyTest, DropDeletesMetadataWithoutInvalidationOplogEntry) {
+    const auto dbType = makeDatabaseType();
+    commitCreate(dbType);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogDatabasesNamespace), 1);
+
+    dropDatabase(false /* writeDropDBMetadataEntry */);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogDatabasesNamespace), 0);
+    ASSERT_EQ(countCommandOplogEntries("dropDatabaseMetadata"), 0);
 }
 
 TEST_F(CommitDatabaseMetadataLocallyTest, InvalidateAllDatabaseMetadataClearsAllDSRs) {

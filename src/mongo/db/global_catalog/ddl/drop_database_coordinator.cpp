@@ -88,12 +88,22 @@ BSONObj makeDatabaseQuery(const DatabaseName& dbName, const DatabaseVersion& dbV
 
 void removeDatabaseMetadataFromShard(OperationContext* opCtx,
                                      const DatabaseName& dbName,
-                                     const OperationSessionInfo& osi,
-                                     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                     const CancellationToken& token) {
-    const auto thisShardId = ShardingState::get(opCtx)->shardId();
-    sharding_ddl_util::commitDropDatabaseMetadataToShardCatalog(
-        opCtx, dbName, thisShardId, osi, executor, token);
+                                     AuthoritativeMetadataAccessLevelEnum authoritativeLevel) {
+    // Remove config.shard.catalog.database entry.
+    //
+    // Only write the dropDatabaseMetadata oplog entry when in kWritesAllowed or
+    // kWritesAndReadsAllowed. Otherwise there could be replicas that are still running an old
+    // binary that does not understand that oplog entry.
+    const bool writeDropDBMetadataEntry =
+        authoritativeLevel >= AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+    shard_catalog_commit::commitDropDatabaseMetadataLocally(
+        opCtx, dbName, writeDropDBMetadataEntry);
+
+    // Wait for majority write concern.
+    WriteConcernResult ignoreResult;
+    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, defaultMajorityWriteConcernDoNotUse(), &ignoreResult));
 }
 
 /**
@@ -594,11 +604,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         }
                     }
 
-                    if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                        const auto& session = getNewSession(opCtx);
-                        removeDatabaseMetadataFromShard(opCtx, _dbName, session, executor, token);
-                    }
+                    removeDatabaseMetadataFromShard(
+                        opCtx, _dbName, _doc.getAuthoritativeMetadataAccessLevel());
 
                     {
                         auto buildNewSessionFn = [this](OperationContext* opCtx) {

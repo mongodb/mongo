@@ -33,8 +33,13 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
  * Deletes the database metadata from the shard catalog (config.shard.catalog.databases), writes an
  * oplog 'c' entry to invalidate the DatabaseShardingState (DSS) on secondaries, and clears the
  * in-memory DatabaseShardingRuntime (DSR) on this (primary) node.
+ *
+ * `writeDropDBMetadataEntry` controls whether the dropDatabaseMetadata oplog entry is to be
+ * logged or not.
  */
-void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseName& dbName);
+void commitDropDatabaseMetadataLocally(OperationContext* opCtx,
+                                       const DatabaseName& dbName,
+                                       bool writeDropDBMetadataEntry = true);
 
 /**
  * Clears every known DSR entry on the node, based on local DSS knowledge, without changing
