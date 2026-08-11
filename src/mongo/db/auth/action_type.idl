@@ -99,6 +99,7 @@ enums:
             getShardMap: "getShardMap"
             getShardVersion: "getShardVersion"
             getTransitionToDedicatedConfigServerStatus: "getTransitionToDedicatedConfigServerStatus"
+            getUnfilteredMetrics: "getUnfilteredMetrics"
             grantRole: "grantRole"
             grantPrivilegesToRole: "grantPrivilegesToRole" # ID only
             grantRolesToRole: "grantRolesToRole" # ID only
