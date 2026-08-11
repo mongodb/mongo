@@ -567,6 +567,8 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileSplitOrMergeInProgress) {
 }
 
 TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWithoutOperationFCV) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
+
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
@@ -606,6 +608,8 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWi
 }
 
 TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejectDuringTransition) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
+
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });

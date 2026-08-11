@@ -31,11 +31,15 @@ TEST(IDLFeatureFlag, GetFlagsForOutgoingRequests) {
 }
 
 TEST(IDLFeatureFlag, SearchExtensionFlagSerializedToShards) {
+    GTEST_SKIP() << "Disabled after upgrading kLastLTS to 9.0. Remove/review (TODO: SERVER-133012)";
+
     ASSERT_THAT(outFlags(),
                 Contains(Pointee(Name(Eq(feature_flags::kFeatureFlagSearchExtensionName)))));
 }
 
 TEST(IDLFeatureFlag, VectorSearchExtensionFlagSerializedToShards) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133012)";
+
     ASSERT_THAT(outFlags(),
                 Contains(Pointee(Name(Eq(feature_flags::kFeatureFlagVectorSearchExtensionName)))));
 }

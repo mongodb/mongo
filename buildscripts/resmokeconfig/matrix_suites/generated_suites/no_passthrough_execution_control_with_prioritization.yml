@@ -39,6 +39,13 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
+    - jstests/noPassthrough/ddl/move_primary_ban_authoritative_mixed_fcv.js
+    - jstests/noPassthrough/catalog/out_timeseries_concurrent_viewless_upgrade.js
+    - jstests/noPassthrough/global_catalog/clone_authoritative_db_metadata.js
+    - jstests/noPassthrough/ddl/check_metadata_consistency.js
+    - jstests/noPassthrough/ddl/check_metadata_consistency_expire_after_seconds_type.js
+    - jstests/noPassthrough/extensions/aggregation_ifr_flag_propagation.js
+    - jstests/noPassthrough/catalog/out_fixed_bucketing_options_check.js
   exclude_with_any_tags:
     - requires_kernel_619
     - requires_kernel_7014

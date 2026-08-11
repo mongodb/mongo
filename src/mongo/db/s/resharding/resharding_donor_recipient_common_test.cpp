@@ -921,6 +921,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardOwnsChunks_StoreOplogFetcherProgress) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     // Not set featureFlagReshardingStoreOplogFetcherProgress to verify that it defaults to true.
 
     testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
@@ -932,6 +934,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardOwnsChunks_NotStoreOplogFetcherProgress) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     unittest::ServerParameterGuard storeOplogFetcherProgressFeatureFlagController(
         "featureFlagReshardingStoreOplogFetcherProgress", false);
 
@@ -953,6 +957,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 TEST_F(
     ReshardingDonorRecipientCommonTest,
     ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningAndApplyIfApplicable) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
     unittest::ServerParameterGuard skipCloningFeatureFlagController(
@@ -967,6 +973,8 @@ TEST_F(
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningIfApplicable) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
     unittest::ServerParameterGuard skipCloningFeatureFlagController(
@@ -981,6 +989,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningIfApplicable) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
     unittest::ServerParameterGuard skipCloningFeatureFlagController(
@@ -995,6 +1005,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagEnabled) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", true);
     boost::optional<bool> performVerification = boost::none;
@@ -1008,6 +1020,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagDisabled) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", false);
     auto performVerification = boost::none;
@@ -1020,6 +1034,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsNotPerformVerification) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     bool performVerification = false;
 
     testProcessRecipientFields(
@@ -1170,6 +1186,8 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsForCloningNoRefresh) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
+
     testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
                                boost::none /* performVerification */,

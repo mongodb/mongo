@@ -3,3 +3,5 @@ overrides:
   - "multiversion.sharding_temporarily_disable_due_to_fcv_upgrade"
   - "multiversion.sharded_fixture_last_lts_new_old_old_new"
   - "multiversion.sharding_multiversion_mongos_testdata_last_lts"
+excludes:
+  - "multiversion.sharding_jscore_passthrough_last_lts_new_old_old_new_excluded_files"

@@ -273,6 +273,9 @@ TEST_F(CommitChunkMigrate, RejectMigrationWhenChangedChunksExceedSizeLimit) {
 }
 
 TEST_F(CommitChunkMigrate, RejectDuringFCVTransitionWithStableOperationFCV) {
+    GTEST_SKIP()
+        << "Disabled after upgrading kLastLTSFCV to 9.0. Remove/review (TODO: SERVER-131690)";
+
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });

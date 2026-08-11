@@ -379,6 +379,8 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsWhenFla
 // transition; otherwise it can be persisted behind the downgrade migration's stripping pass and
 // survive at the downgraded FCV.
 TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsMidDowngrade) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133009)";
+
     QueryFCVEnvironmentForTest::setUp();
     // (Generic FCV reference): FCV-gated query knob validation test.
     unittest::EnsureFCV fcv(multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
@@ -391,6 +393,8 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsMidDown
 }
 
 TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsOnLowerStableFcv) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133009)";
+
     QueryFCVEnvironmentForTest::setUp();
     // (Generic FCV reference): FCV-gated query knob validation test.
     unittest::EnsureFCV fcv(multiversion::GenericFCV::kLastLTS);

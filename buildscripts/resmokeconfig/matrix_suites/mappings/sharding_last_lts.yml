@@ -2,3 +2,5 @@ base_suite: sharding
 overrides:
   - "multiversion.sharding_multiversion_selector"
   - "multiversion.sharding_multiversion_testdata_last_lts"
+excludes:
+  - "multiversion.sharding_last_lts_excluded_files"

@@ -18,6 +18,40 @@ selector:
     - jstests/concurrency/*.js
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
+
+    # TODO SERVER-132952: this test expects movePrimary to be rejected while
+    # authoritative shards are in mixed FCV states. Now that last-LTS is 9.0, authoritative metadata
+    # is enabled at the downgrade FCV and movePrimary succeeds, invalidating the rejection assertion.
+    - jstests/noPassthrough/ddl/move_primary_ban_authoritative_mixed_fcv.js
+
+    # TODO SERVER-132953: featureFlagCreateViewlessTimeseriesCollections
+    # is FCV-gated at 9.0. The test expects a last-LTS-created timeseries collection to be legacy
+    # viewful, but last-LTS is now 9.0 and the collection is already viewless.
+    - jstests/noPassthrough/catalog/out_timeseries_concurrent_viewless_upgrade.js
+
+    # TODO SERVER-132952: the test exercises authoritative metadata cloning during
+    # the upgrade from a pre-9.0 last-LTS FCV. With last-LTS now at 9.0, the authoritative model is
+    # already enabled at the starting FCV and the cloning expectations no longer apply.
+    - jstests/noPassthrough/global_catalog/clone_authoritative_db_metadata.js
+
+    # TODO SERVER-132952: authoritative shard catalog collections are valid at
+    # last-LTS now that it is 9.0, so the expected inconsistency is no longer reported.
+    - jstests/noPassthrough/ddl/check_metadata_consistency.js
+
+    # TODO SERVER-132952: the test expects expireAfterSeconds numeric type
+    # mismatches to be tolerated below FCV 9.0. Now that last-LTS is 9.0, the mismatch is reported
+    # as an inconsistency and the zero-inconsistency assertion fails.
+    - jstests/noPassthrough/ddl/check_metadata_consistency_expire_after_seconds_type.js
+
+    # TODO QUERY-INTEGRATION-EXTENSIONS-API: featureFlagVectorSearchExtension was introduced in 8.3.
+    # When last-LTS was 8.0, a direct shard request without ifrFlags conservatively disabled it and
+    # the test expected SearchNotEnabled. Now last-LTS is 9.0, the shard uses its local default and
+    # the direct request succeeds. Re-enable after updating the expectation for the new last-LTS.
+    - jstests/noPassthrough/extensions/aggregation_ifr_flag_propagation.js
+
+    # TODO SERVER-132953: this test's FCV downgrade/upgrade case covers
+    # the pre-9.0 fixedBucketing transition, which no longer occurs when 9.0 is last-LTS.
+    - jstests/noPassthrough/catalog/out_fixed_bucketing_options_check.js
   exclude_with_any_tags:
     - requires_kernel_619
     - requires_kernel_7014

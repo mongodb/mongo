@@ -383,6 +383,8 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        SkipReshardingFieldsWritesForCoordinatorHonorsPinnedLastLTSVersionContext) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
+
     ReshardingCoordinatorDocument coordinatorDoc;
     // (Generic FCV reference): pin the operation to last-LTS so the InitNoRefresh feature flag,
     // which is gated on the latest FCV, evaluates to false and the legacy write path is

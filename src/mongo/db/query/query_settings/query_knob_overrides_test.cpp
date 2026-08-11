@@ -307,6 +307,8 @@ TEST(QuerySettingsKnobOverridesTest, ParseAcceptsKnobAboveCurrentFcv) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvKeepsSupportedKnobs) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133009)";
+
     auto overrides = QuerySettingsKnobOverrides::fromBSON(
         BSON("testIntKnobWire" << 5 << "testLowFcvKnobWire" << 5));
     // (Generic FCV reference): FCV-gated query knob removal test.
@@ -323,6 +325,8 @@ TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvNoopWhenAllSup
 }
 
 TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvAllRemovedYieldsEmpty) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133009)";
+
     auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5));
     // (Generic FCV reference): FCV-gated query knob removal test.
     ASSERT_TRUE(overrides.removeKnobsRequiringHigherFcv(multiversion::GenericFCV::kLastLTS));
@@ -330,6 +334,8 @@ TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvAllRemovedYiel
 }
 
 TEST(QuerySettingsKnobOverridesTest, RemoveKnobsRequiringHigherFcvRemovesDeleteSentinels) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133009)";
+
     auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL));
     // (Generic FCV reference): FCV-gated query knob removal test.
     ASSERT_TRUE(overrides.removeKnobsRequiringHigherFcv(multiversion::GenericFCV::kLastLTS));

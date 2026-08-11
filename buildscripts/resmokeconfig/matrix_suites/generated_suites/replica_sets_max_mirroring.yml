@@ -16,7 +16,8 @@ executor:
       nodb: ""
 matrix_suite: true
 selector:
-  exclude_files: null
+  exclude_files:
+    - jstests/replsets/rollback_upgrade_downgrade_viewless_timeseries.js
   roots:
     - jstests/replsets/*.js
 test_kind: js_test
