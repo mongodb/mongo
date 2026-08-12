@@ -58,6 +58,9 @@ public:
     // Name for the collection storing persistent document samples.
     static constexpr std::string_view kStatsSamplesCollectionName{"system.stats.samples"};
 
+    // Name for the collection storing persistent per-field statistics, e.g. NDV sketches.
+    static constexpr std::string_view kStatsFieldStatsCollectionName{"system.stats.field_stats"};
+
     // Name for the profile collection
     static constexpr std::string_view kSystemDotProfileCollectionName{"system.profile"};
 
@@ -434,6 +437,9 @@ public:
     bool isStatsSamplesCollection() const {
         return coll() == kStatsSamplesCollectionName;
     }
+    bool isFieldStatsCollection() const {
+        return coll() == kStatsFieldStatsCollectionName;
+    }
     bool isPrivilegeCollection() const {
         if (!isAdminDB()) {
             return false;
@@ -534,7 +540,9 @@ public:
     static bool isFLE2StateCollection(std::string_view coll);
 
     /**
-     * Returns true if the namespace is a system.statistics collection, false otherwise.
+     * Returns true for the collections storing optimizer statistics: histograms
+     * (system.statistics.*) and per-field statistics (system.stats.field_stats).
+     * TODO SERVER-127371: collapse once the statistics namespaces are consolidated.
      */
     bool isSystemStatsCollection() const;
 

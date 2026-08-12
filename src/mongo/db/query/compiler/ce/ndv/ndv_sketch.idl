@@ -19,7 +19,7 @@ structs:
     NdvSketch:
         description: >-
             A single HyperLogLog sketch document as emitted by the accumulator and persisted
-            in system.stats.ndv.
+            in system.stats.field_stats.
         strict: true
         fields:
             ndv:

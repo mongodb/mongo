@@ -27,6 +27,41 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "field_stats_gen",
+    src = "field_stats.idl",
+    deps = [
+        ":ndv_sketch_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "field_stats",
+    srcs = [
+        "field_stats.cpp",
+        ":field_stats_gen",
+    ],
+    hdrs = [
+        "field_stats.h",
+    ],
+    deps = [
+        ":ndv_sketch_gen_lib",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "field_stats_test",
+    srcs = [
+        "field_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":field_stats",
+    ],
+)
+
 mongo_cc_library(
     name = "hyperloglog",
     srcs = [

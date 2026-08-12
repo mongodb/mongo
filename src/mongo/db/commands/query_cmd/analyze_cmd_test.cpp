@@ -5,7 +5,7 @@
  * IDL-parse-time validation tests for the analyze command. These exercise only the IDL parser
  * generated from src/mongo/db/query/analyze_command.idl — no opCtx, no catalog, no fixture.
  * Runtime checks that require a real collection acquisition live in
- * jstests/noPassthrough/query/analyze_sample_persist.js instead.
+ * jstests/noPassthrough/query/analyze_sample_persist.js and analyze_ndv_persist.js instead.
  */
 
 #include "mongo/bson/bsonmisc.h"
@@ -79,6 +79,16 @@ TEST(AnalyzeCommandParseTest, ModeRejectsUnknownValue) {
     ASSERT_THROWS_CODE(AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze")),
                        DBException,
                        ErrorCodes::BadValue);
+}
+
+TEST(AnalyzeCommandParseTest, NdvModeParses) {
+    auto cmd = BSON("analyze" << "myColl"
+                              << "$db" << "test"
+                              << "mode" << "ndv"
+                              << "key" << "a.b");
+    auto request = AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze"));
+    ASSERT(request.getMode() == AnalyzeModeEnum::kNdv);
+    ASSERT_EQ(*request.getKey(), "a.b");
 }
 
 }  // namespace

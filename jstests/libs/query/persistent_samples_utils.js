@@ -102,14 +102,23 @@ export function getSamplesColl(db) {
     return db[samplesCollName];
 }
 
-export function dropSamplesColl(db) {
-    // This is needed because system collections are special and need to be whitelisted for dropping individually.
-    // Not whitelisting it since we don't expect customers to ever drop the collection themselves.
+// Drops a stats system collection, e.g. system.stats.samples or system.stats.field_stats.
+// This is needed because system collections are special and need to be whitelisted for dropping
+// individually. Not whitelisting them since we don't expect customers to ever drop stats
+// collections themselves.
+export function dropStatsColl(db, collName) {
+    if (!db[collName].exists()) {
+        return;
+    }
     assert.commandWorked(
         db.adminCommand({
-            applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {drop: samplesCollName}}],
+            applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {drop: collName}}],
         }),
     );
+}
+
+export function dropSamplesColl(db) {
+    dropStatsColl(db, samplesCollName);
 }
 
 // Asserts that the persistent samples collection exists and is clustered on _id.

@@ -1,0 +1,47 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+global:
+    cpp_namespace: "mongo::ce"
+    mod_visibility: private
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/query/compiler/ce/ndv/ndv_sketch.idl"
+
+structs:
+    NdvStats:
+        description: "The NDV section of a field-stats document."
+        strict: true
+        fields:
+            sketches:
+                # One sketch per null/missing folding variant: exactly one for a single field.
+                # TODO SERVER-131763: composite NDV adds the other variants.
+                type: array<NdvSketch>
+
+    FieldStatsDoc:
+        description: >-
+            On-disk document stored in <db>.system.stats.field_stats holding per-field
+            statistics. Written by the analyze command and consumed by the optimizer's read
+            path. Each statistic kind lives in its own top-level section so more can be added
+            over time.
+        strict: true
+        fields:
+            _id:
+                # Canonical id string built by makeFieldStatsId(); a string key avoids the
+                # field-order sensitivity of BSON object equality.
+                type: string
+            schemaVersion:
+                type: int
+                validator: {gte: 1}
+            collectionUuid:
+                type: uuid
+            sortedFieldPaths:
+                # Sorted canonically, matching the order the _id string is built in. The order
+                # carries no meaning; the statistics describe the set of fields.
+                type: array<string>
+            createdAt:
+                type: date
+            ndv:
+                # Required for now since NDV is the only statistic kind; relax to optional with
+                # a schemaVersion bump once another kind can be written first.
+                type: NdvStats

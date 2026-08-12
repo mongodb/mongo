@@ -27,6 +27,8 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
+#include "mongo/db/query/compiler/ce/ndv/field_stats.h"
+#include "mongo/db/query/compiler/ce/ndv/ndv_sketch_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
@@ -56,6 +58,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -100,6 +103,28 @@ auto& analyzeTotalBytesPersisted =
 auto& analyzeBytesPersistedHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.analyze.sample.histograms.bytesPersisted"}
          .bind(HistogramServerStatusMetric::pow(11, 256, 4));
+
+
+/**
+ * Validates a user-provided key path. Shared by the histograms and ndv modes.
+ */
+void validateKeyPath(std::string_view key) {
+    const FieldRef keyFieldRef(key);
+
+    // Empty path
+    uassert(6799703, "Key path is empty", !keyFieldRef.empty());
+
+    for (size_t i = 0; i < keyFieldRef.numParts(); ++i) {
+        uassertStatusOK(FieldPath::validateFieldName(keyFieldRef.getPart(i)));
+    }
+
+    // Numerics
+    const auto numericPathComponents = keyFieldRef.getNumericPathComponents(0);
+    uassert(6799704,
+            str::stream() << "Key path contains numeric component "
+                          << keyFieldRef.getPart(*(numericPathComponents.begin())),
+            numericPathComponents.empty());
+}
 
 StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                                                        std::string_view collection,
@@ -161,6 +186,181 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                             << BSONObj() << "allowDiskUse" << false);
 }
 
+/**
+ * Builds the ndv-mode aggregation. For the key "a.b" the pipeline looks like this:
+ *
+ *      [
+ *          { $project: { _id: 0, "a.b": 1 } },
+ *          { $group: {
+ *              _id: "1|<collection uuid>|a.b",
+ *              sketches: { $_internalConstructNdvSketch: { val: "$$ROOT", fields: ["a.b"] } }
+ *          } },
+ *          { $project: {
+ *              schemaVersion: {$literal: 1},
+ *              collectionUuid: <UUID>,
+ *              sortedFieldPaths: {$literal: ["a.b"]},
+ *              createdAt: "$$NOW",
+ *              ndv: { sketches: "$sketches" }
+ *          } },
+ *          { $merge: { into: "system.stats.field_stats", on: "_id",
+ *                      whenMatched: "replace", whenNotMatched: "insert" } }
+ *      ]
+ */
+BSONObj analyzeNdvModeAsAggregationCommand(std::string_view collection,
+                                           const std::string& keyPath,
+                                           const UUID& collUuid,
+                                           const std::string& docId) {
+    BSONArrayBuilder pipelineBuilder;
+    {
+        // Narrow the stream to the analyzed field. An inclusion projection preserves document
+        // structure and missing-ness, both of which the accumulator relies on. _id can only be
+        // excluded when it is not the analyzed field itself.
+        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
+        BSONObjBuilder projectBob(stageBob.subobjStart("$project"));
+        if (FieldRef(keyPath).getPart(0) != "_id") {
+            projectBob.append("_id", 0);
+        }
+        projectBob.append(keyPath, 1);
+    }
+    {
+        // The sketch-building $group.
+        InternalConstructNdvSketchAccumulatorParams sketchParams;
+        sketchParams.setVal("$$ROOT");
+        sketchParams.setFields(std::vector<std::string>{keyPath});
+
+        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
+        BSONObjBuilder groupBob(stageBob.subobjStart("$group"));
+        // The id string always starts with the schema version digit, never '$', so it parses
+        // as a plain string constant.
+        groupBob.append("_id", docId);
+        groupBob.append("sketches", BSON("$_internalConstructNdvSketch" << sketchParams.toBSON()));
+    }
+    {
+        // The stamping $project. All values are constants except the sketches reference; the
+        // BinData UUID and $literal-wrapped values cannot be mistaken for inclusion flags or
+        // paths.
+        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
+        BSONObjBuilder projectBob(stageBob.subobjStart("$project"));
+        projectBob.append("schemaVersion", BSON("$literal" << ce::kFieldStatsSchemaVersion));
+        collUuid.appendToBuilder(&projectBob, "collectionUuid");
+        projectBob.append("sortedFieldPaths", BSON("$literal" << BSON_ARRAY(keyPath)));
+        projectBob.append("createdAt", "$$NOW");
+        projectBob.append("ndv", BSON("sketches" << "$sketches"));
+    }
+    {
+        // 'replace' is only safe while ndv is the sole statistic section in the document; once
+        // a second one exists this must become a $set-style pipeline update so sections written
+        // by other analyze runs survive.
+        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
+        BSONObjBuilder mergeBob(stageBob.subobjStart("$merge"));
+        mergeBob.append("into", NamespaceString::kStatsFieldStatsCollectionName);
+        mergeBob.append("on", "_id");
+        mergeBob.append("whenMatched", "replace");
+        mergeBob.append("whenNotMatched", "insert");
+    }
+
+    BSONObjBuilder aggBob;
+    aggBob.append("aggregate", collection);
+    aggBob.appendArray("pipeline", pipelineBuilder.arr());
+    // The acquisition used for validation is released by the time this command runs; the UUID
+    // check makes the aggregation fail instead of persisting stats for a dropped-and-recreated
+    // collection under the old UUID.
+    collUuid.appendToBuilder(&aggBob, "collectionUUID");
+    aggBob.append("cursor", BSONObj());
+    aggBob.append("allowDiskUse", false);
+    // TODO SERVER-132681: Consider using a covered IXSCAN instead of the collection scan.
+    aggBob.append("hint", BSON("$natural" << 1));
+    return aggBob.obj();
+}
+
+/**
+ * Acquires 'nss' for reading and performs the collection validation shared by the sample and
+ * ndv modes: the collection must exist ('notFoundCode' preserves each mode's error code) and
+ * must not be timeseries. Views never reach this point; the acquisition rejects them.
+ */
+CollectionAcquisition acquireAndValidateCollection(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   int notFoundCode) {
+    auto coll = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+
+    uassert(notFoundCode,
+            str::stream() << "Couldn't find collection " << nss.toStringForErrorMsg(),
+            coll.exists());
+
+    // A scan of a timeseries collection sees the internal bucket documents rather than the
+    // user's fields, so statistics would be measured on the wrong thing.
+    uassert(ErrorCodes::CommandNotSupported,
+            "Analyze command is not supported on timeseries collections",
+            !coll.getCollectionPtr()->isTimeseriesCollection() ||
+                !coll.getCollectionPtr()->isNewTimeseriesWithoutView());
+
+    return coll;
+}
+
+void runNdvMode(OperationContext* opCtx, const NamespaceString& nss, const std::string& key) {
+    uassert(ErrorCodes::CommandNotSupported,
+            "The analyze command with ndv mode requires featureFlagPersistentStats to be enabled",
+            feature_flags::gFeatureFlagPersistentStats.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+    // The knob gates the whole persistent-NDV feature: while it is off, statistics are neither
+    // collected nor consumed.
+    uassert(ErrorCodes::CommandNotSupported,
+            "The analyze command with ndv mode requires internalQueryEnablePersistentNDVStats to "
+            "be enabled",
+            QueryKnobConfiguration(query_settings::QuerySettings{}).getEnablePersistentNDVStats());
+
+    validateKeyPath(key);
+
+    boost::optional<UUID> collUuid;
+    {
+        // Shared validation deliberately mirrors sample mode, not histograms mode: capped
+        // collections are fine to read for NDV.
+        const auto coll = acquireAndValidateCollection(opCtx, nss, 13175802);
+
+        // Same restriction as histograms mode: no NDV statistics on system collections.
+        uassert(13175804,
+                str::stream() << nss.toStringForErrorMsg()
+                              << " is not a normal or clustered collection",
+                nss.isNormalCollection() || coll.getCollectionPtr()->isClustered());
+
+        // system.stats.field_stats is shard-local and invisible through mongos.
+        // TODO SERVER-133119: Support NDV statistics for sharded collections.
+        uassert(13175803,
+                "ndv mode is not supported on sharded collections",
+                !coll.getShardingDescription().isSharded());
+
+        collUuid = coll.getCollectionPtr()->uuid();
+    }
+
+    // The pipeline uses an internal-only accumulator and merges into a system collection, both
+    // of which require internal permissions.
+    const bool wasInternalClient = isInternalClient(opCtx->getClient());
+    if (!wasInternalClient) {
+        opCtx->getClient()->setIsInternalClient(true);
+    }
+    ScopeGuard resetInternalClient([&] {
+        if (!wasInternalClient) {
+            opCtx->getClient()->setIsInternalClient(false);
+        }
+    });
+
+    DBDirectClient client(opCtx);
+    const std::string docId = ce::makeFieldStatsId(*collUuid, {key});
+
+    // Note: an empty collection produces no $group output, so a previous stats document is left
+    // in place. Stats invalidation (also after emptying or dropping a collection) is out of
+    // scope for now; the read path guards against staleness instead.
+    BSONObj result;
+    client.runCommand(nss.dbName(),
+                      analyzeNdvModeAsAggregationCommand(nss.coll(), key, *collUuid, docId),
+                      result);
+    uassertStatusOK(getStatusFromCommandResult(result));
+}
+
 void runSampleMode(OperationContext* opCtx,
                    const NamespaceString& nss,
                    boost::optional<int> sampleSizeOpt,
@@ -190,22 +390,10 @@ void runSampleMode(OperationContext* opCtx,
     size_t docsPersistedCount = 0;
 
     {
-        // Acquire the collection to read metadata and run the sampling estimator. The
-        // acquisition must remain live for the duration of sampling.
-        auto coll = acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
-
-        uassert(12433000,
-                str::stream() << "Couldn't find collection " << nss.toStringForErrorMsg(),
-                coll.exists());
+        // Acquire the collection to read metadata and run the sampling estimator. The acquisition
+        // must remain live for the duration of sampling.
+        auto coll = acquireAndValidateCollection(opCtx, nss, 12433000);
         const auto& collectionPtr = coll.getCollectionPtr();
-
-        // TODO SERVER-127022: Remove this once samplingCE supports timeseries collections
-        uassert(ErrorCodes::CommandNotSupported,
-                "Analyze command is not supported on timeseries collections",
-                !collectionPtr->isTimeseriesCollection() ||
-                    !collectionPtr->isNewTimeseriesWithoutView());
 
         collUUID = collectionPtr->uuid();
         long long numRecords = collectionPtr->numRecords(opCtx);
@@ -362,6 +550,96 @@ void runSampleMode(OperationContext* opCtx,
     analyzeBytesPersistedHistogram.increment(totalBytesPersisted);
 }
 
+void runHistogramsMode(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       bool explicitHistogramsMode,
+                       boost::optional<std::string_view> key,
+                       boost::optional<double> sampleRate,
+                       boost::optional<int> sampleSize,
+                       boost::optional<int> numberBuckets) {
+    uassert(ErrorCodes::CommandNotSupported, "no such command: analyze", getTestCommandsEnabled());
+
+    // Without an explicit mode this is the legacy default flow, where a missing key merely
+    // validates the collection.
+    if (explicitHistogramsMode) {
+        uassert(9820001, "Histograms mode requires a key to be specified", key);
+    }
+
+    // Sample rate and sample size can't both be present
+    uassert(6799705,
+            "Only one of sampleRate and sampleSize may be present",
+            !sampleRate || !sampleSize);
+
+    // Validate collection
+    {
+        const auto coll = acquireAndValidateCollection(opCtx, nss, 6799700);
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::ReadLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                          .getDatabaseProfileLevel(nss.dbName()));
+        const auto& collectionPtr = coll.getCollectionPtr();
+
+        // Namespace cannot be capped collection
+        uassert(6799701,
+                str::stream() << "Analyze command is not supported on capped collections",
+                !collectionPtr->isCapped());
+
+        // Namespace is normal or clustered collection
+        uassert(6799702,
+                str::stream() << nss.toStringForErrorMsg()
+                              << " is not a normal or clustered collection",
+                nss.isNormalCollection() || collectionPtr->isClustered());
+
+        if (sampleSize) {
+            const auto numRecords = collectionPtr->numRecords(opCtx);
+            if (numRecords == 0 || *sampleSize > numRecords) {
+                sampleRate = 1.0;
+            } else {
+                sampleRate = double(*sampleSize) / numRecords;
+            }
+        }
+    }
+
+    // Validate key
+    if (key) {
+        validateKeyPath(*key);
+
+        // We need to perform this operation with internal permissions.
+        const bool wasInternalClient = isInternalClient(opCtx->getClient());
+        if (!wasInternalClient) {
+            opCtx->getClient()->setIsInternalClient(true);
+        }
+
+        DBDirectClient client(opCtx);
+
+        // Run Aggregate
+        BSONObj analyzeResult;
+        client.runCommand(nss.dbName(),
+                          analyzeCommandAsAggregationCommand(
+                              opCtx, nss.coll(), std::string{*key}, sampleRate, numberBuckets)
+                              .getValue(),
+                          analyzeResult);
+
+        // We must reset the internal flag.
+        if (!wasInternalClient) {
+            opCtx->getClient()->setIsInternalClient(false);
+        }
+
+        uassertStatusOK(getStatusFromCommandResult(analyzeResult));
+
+        // Invalidate statistics in the cache for the analyzed path
+        stats::StatsCatalog& statsCatalog = stats::StatsCatalog::get(opCtx);
+        uassertStatusOK(statsCatalog.invalidatePath(nss, std::string{*key}));
+    } else if (sampleSize || sampleRate) {
+        uassert(6799706,
+                "It is illegal to pass sampleRate or sampleSize without a key in "
+                "histograms mode",
+                key);
+    }
+}
+
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {
 public:
     using Request = AnalyzeCommandRequest;
@@ -395,129 +673,28 @@ public:
             const NamespaceString& nss = ns();
 
             // TODO SERVER-127476: Make sample mode the default
-            auto mode = cmd.getMode();
+            // TODO SERVER-133120: Model the analyze command as an abstract class with one
+            // implementation per mode instead of dispatching here.
+            const auto mode = cmd.getMode();
             if (mode && *mode == AnalyzeModeEnum::kSample) {
                 runSampleMode(
                     opCtx, nss, cmd.getSampleSize(), cmd.getSamplingMethod(), cmd.getNumChunks());
-                return;
-            }
-
-            uassert(ErrorCodes::CommandNotSupported,
-                    "no such command: analyze",
-                    getTestCommandsEnabled());
-
-            auto key = cmd.getKey();
-            if (mode && *mode == AnalyzeModeEnum::kHistograms) {
-                uassert(9820001, "Histograms mode requires a key to be specified", key);
-            }
-
-            // Sample rate and sample size can't both be present
-            auto sampleRate = cmd.getSampleRate();
-            auto sampleSize = cmd.getSampleSize();
-            uassert(6799705,
-                    "Only one of sampleRate and sampleSize may be present",
-                    !sampleRate || !sampleSize);
-
-            // Validate collection
-            {
-                auto coll = acquireCollectionMaybeLockFree(
-                    opCtx,
-                    CollectionAcquisitionRequest::fromOpCtx(
-                        opCtx, nss, AcquisitionPrerequisites::kRead));
-                AutoStatsTracker statsTracker(
-                    opCtx,
-                    nss,
-                    Top::LockType::ReadLocked,
-                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                    DatabaseProfileSettings::get(opCtx->getServiceContext())
-                        .getDatabaseProfileLevel(nss.dbName()));
-                const auto& collectionPtr = coll.getCollectionPtr();
-
-                // Namespace exists
-                uassert(6799700,
-                        str::stream() << "Couldn't find collection " << nss.toStringForErrorMsg(),
-                        coll.exists());
-
-                // Namespace cannot be capped collection
-                const bool isCapped = collectionPtr->isCapped();
-                uassert(6799701,
-                        str::stream() << "Analyze command is not supported on capped collections",
-                        !isCapped);
-
-                uassert(ErrorCodes::CommandNotSupported,
-                        "Analyze command is not supported on timeseries collections",
-                        !collectionPtr->isTimeseriesCollection() ||
-                            !collectionPtr->isNewTimeseriesWithoutView());
-
-                // Namespace is normal or clustered collection
-                const bool isNormalColl = nss.isNormalCollection();
-                const bool isClusteredColl = collectionPtr->isClustered();
-                uassert(6799702,
-                        str::stream() << nss.toStringForErrorMsg()
-                                      << " is not a normal or clustered collection",
-                        isNormalColl || isClusteredColl);
-
-                if (sampleSize) {
-                    auto numRecords = collectionPtr->numRecords(opCtx);
-                    if (numRecords == 0 || *sampleSize > numRecords) {
-                        sampleRate = 1.0;
-                    } else {
-                        sampleRate = double(*sampleSize) / collectionPtr->numRecords(opCtx);
-                    }
-                }
-            }
-
-            // Validate key
-            if (key) {
-                const FieldRef keyFieldRef(*key);
-
-                // Empty path
-                uassert(6799703, "Key path is empty", !keyFieldRef.empty());
-
-                for (size_t i = 0; i < keyFieldRef.numParts(); ++i) {
-                    uassertStatusOK(FieldPath::validateFieldName(keyFieldRef.getPart(i)));
-                }
-
-                // Numerics
-                const auto numericPathComponents = keyFieldRef.getNumericPathComponents(0);
-                uassert(6799704,
-                        str::stream() << "Key path contains numeric component "
-                                      << keyFieldRef.getPart(*(numericPathComponents.begin())),
-                        numericPathComponents.empty());
-
-                // We need to perform this operation with internal permissions.
-                const bool wasInternalClient = isInternalClient(opCtx->getClient());
-                if (!wasInternalClient) {
-                    opCtx->getClient()->setIsInternalClient(true);
-                }
-
-                DBDirectClient client(opCtx);
-
-                // Run Aggregate
-                BSONObj analyzeResult;
-                client.runCommand(
-                    nss.dbName(),
-                    analyzeCommandAsAggregationCommand(
-                        opCtx, nss.coll(), std::string{*key}, sampleRate, cmd.getNumberBuckets())
-                        .getValue(),
-                    analyzeResult);
-
-                // We must reset the internal flag.
-                if (!wasInternalClient) {
-                    opCtx->getClient()->setIsInternalClient(false);
-                }
-
-                uassertStatusOK(getStatusFromCommandResult(analyzeResult));
-
-                // Invalidate statistics in the cache for the analyzed path
-                stats::StatsCatalog& statsCatalog = stats::StatsCatalog::get(opCtx);
-                uassertStatusOK(statsCatalog.invalidatePath(nss, std::string{*key}));
-
-            } else if (sampleSize || sampleRate) {
-                uassert(6799706,
-                        "It is illegal to pass sampleRate or sampleSize without a key in "
-                        "histograms mode",
-                        key);
+            } else if (mode && *mode == AnalyzeModeEnum::kNdv) {
+                uassert(13175800, "ndv mode requires a key to be specified", cmd.getKey());
+                uassert(13175801,
+                        "sampleRate, sampleSize, numberBuckets, samplingMethod and numChunks "
+                        "are not supported with ndv mode",
+                        !cmd.getSampleRate() && !cmd.getSampleSize() && !cmd.getNumberBuckets() &&
+                            !cmd.getSamplingMethod() && !cmd.getNumChunks());
+                runNdvMode(opCtx, nss, std::string{*cmd.getKey()});
+            } else {
+                runHistogramsMode(opCtx,
+                                  nss,
+                                  mode.has_value() /* explicitHistogramsMode */,
+                                  cmd.getKey(),
+                                  cmd.getSampleRate(),
+                                  cmd.getSampleSize(),
+                                  cmd.getNumberBuckets());
             }
         }
 

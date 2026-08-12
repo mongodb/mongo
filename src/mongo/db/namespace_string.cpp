@@ -310,7 +310,7 @@ bool NamespaceString::isFLE2StateCollection(std::string_view coll) {
 }
 
 bool NamespaceString::isSystemStatsCollection() const {
-    return coll().starts_with(kStatisticsCollectionPrefix);
+    return coll().starts_with(kStatisticsCollectionPrefix) || isFieldStatsCollection();
 }
 
 bool NamespaceString::isOutStageTmpCollection() const {
