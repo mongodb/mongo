@@ -35,7 +35,7 @@ using namespace std::literals::string_view_literals;
 
 class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {
 protected:
-    void doReadAndIncrement(CollectionSizeCountStore& store, SizeCountDeltas& deltas) {
+    void doReadAndIncrement(CollectionSizeCountStore& store, ReplicatedMetadataDeltas& deltas) {
         Lock::GlobalLock lk(operationContext(), MODE_IS);
         store.readAndIncrementSizeCounts(operationContext(), deltas);
     }
@@ -46,16 +46,17 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     CollectionSizeCountStore store;
 
     const UUID uuid = UUID::gen();
-    SizeCountDeltas deltas;
-    deltas[uuid] = SizeCountDelta{.sizeCount = {0, 0}, .state = DDLState::kNone};
+    ReplicatedMetadataDeltas deltas;
+    deltas[uuid] =
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = {0, 0}}, .state = DDLState::kNone};
 
     // Read before the document exists.
     doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
-    EXPECT_EQ(deltas[uuid].sizeCount.size, 0);
-    EXPECT_EQ(deltas[uuid].sizeCount.count, 0);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.size, 0);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.count, 0);
 
     test_helpers::insertSizeCountEntry(
         operationContext(),
@@ -68,8 +69,8 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
-    EXPECT_EQ(deltas[uuid].sizeCount.size, 0);
-    EXPECT_EQ(deltas[uuid].sizeCount.count, 0);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.size, 0);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.count, 0);
 }
 
 TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
@@ -83,16 +84,16 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
         uuid,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
-    SizeCountDeltas deltas;
-    deltas[uuid] =
-        SizeCountDelta{.sizeCount = {.size = -400, .count = -20}, .state = DDLState::kNone};
+    ReplicatedMetadataDeltas deltas;
+    deltas[uuid] = ReplicatedMetadataDelta{.metadata = {.sizeCount = {.size = -400, .count = -20}},
+                                           .state = DDLState::kNone};
 
     doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
-    EXPECT_EQ(deltas[uuid].sizeCount.size, -200);
-    EXPECT_EQ(deltas[uuid].sizeCount.count, -10);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.size, -200);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.count, -10);
 }
 
 /**
@@ -118,7 +119,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
         uuid2,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
-    SizeCountDeltas deltas;
+    ReplicatedMetadataDeltas deltas;
 
     doReadAndIncrement(store, deltas);
 
@@ -148,19 +149,21 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
         uuid2,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
-    SizeCountDeltas deltas;
-    deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
-    deltas[uuid2] = SizeCountDelta{.sizeCount = {50, 10}, .state = DDLState::kNone};
+    ReplicatedMetadataDeltas deltas;
+    deltas[uuid1] =
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = {5, 1}}, .state = DDLState::kNone};
+    deltas[uuid2] =
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = {50, 10}}, .state = DDLState::kNone};
 
     doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 2);
     ASSERT_TRUE(deltas.contains(uuid1));
-    EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
-    EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
+    EXPECT_EQ(deltas[uuid1].metadata.sizeCount.size, 205);
+    EXPECT_EQ(deltas[uuid1].metadata.sizeCount.count, 11);
     ASSERT_TRUE(deltas.contains(uuid2));
-    EXPECT_EQ(deltas[uuid2].sizeCount.size, 150);
-    EXPECT_EQ(deltas[uuid2].sizeCount.count, 15);
+    EXPECT_EQ(deltas[uuid2].metadata.sizeCount.size, 150);
+    EXPECT_EQ(deltas[uuid2].metadata.sizeCount.count, 15);
 }
 
 /**
@@ -186,15 +189,16 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
         uuid2,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
-    SizeCountDeltas deltas;
-    deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
+    ReplicatedMetadataDeltas deltas;
+    deltas[uuid1] =
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = {5, 1}}, .state = DDLState::kNone};
 
     doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid1));
-    EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
-    EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
+    EXPECT_EQ(deltas[uuid1].metadata.sizeCount.size, 205);
+    EXPECT_EQ(deltas[uuid1].metadata.sizeCount.count, 11);
 }
 
 /**
@@ -214,19 +218,21 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
-    SizeCountDeltas deltas;
-    deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
-    deltas[uuid2] = SizeCountDelta{.sizeCount = {50, 10}, .state = DDLState::kNone};
+    ReplicatedMetadataDeltas deltas;
+    deltas[uuid1] =
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = {5, 1}}, .state = DDLState::kNone};
+    deltas[uuid2] =
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = {50, 10}}, .state = DDLState::kNone};
 
     doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 2);
     ASSERT_TRUE(deltas.contains(uuid1));
-    EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
-    EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
+    EXPECT_EQ(deltas[uuid1].metadata.sizeCount.size, 205);
+    EXPECT_EQ(deltas[uuid1].metadata.sizeCount.count, 11);
     ASSERT_TRUE(deltas.contains(uuid2));
-    EXPECT_EQ(deltas[uuid2].sizeCount.size, 50);
-    EXPECT_EQ(deltas[uuid2].sizeCount.count, 10);
+    EXPECT_EQ(deltas[uuid2].metadata.sizeCount.size, 50);
+    EXPECT_EQ(deltas[uuid2].metadata.sizeCount.count, 10);
 }
 
 /**
@@ -253,15 +259,16 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
     const UUID uuid3 = UUID::gen();
-    SizeCountDeltas deltas;
-    deltas[uuid3] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
+    ReplicatedMetadataDeltas deltas;
+    deltas[uuid3] =
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = {5, 1}}, .state = DDLState::kNone};
 
     doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid3));
-    EXPECT_EQ(deltas[uuid3].sizeCount.size, 5);
-    EXPECT_EQ(deltas[uuid3].sizeCount.count, 1);
+    EXPECT_EQ(deltas[uuid3].metadata.sizeCount.size, 5);
+    EXPECT_EQ(deltas[uuid3].metadata.sizeCount.count, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -456,8 +463,8 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNssWithoutSi
 }
 
 // ===========================================================================
-// Test fixture for extractSizeCountDeltasForApplyOps() -- needs full infrastructure for real
-// writes.
+// Test fixture for extractReplicatedMetadataDeltasForApplyOps() -- needs full infrastructure for
+// real writes.
 // ===========================================================================
 
 class ExtractSizeCountDeltaForApplyOpsTest : public CatalogTestFixture {
@@ -871,13 +878,14 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithNoPriorState) 
         .wallClockTime = Date_t::now(),
     }}};
 
-    SizeCountDeltas sizeCountDeltas;
-    extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas);
+    ReplicatedMetadataDeltas replicatedMetadataDeltas;
+    extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, replicatedMetadataDeltas);
 
-    EXPECT_EQ(sizeCountDeltas.size(), 1u);
-    ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
-    EXPECT_EQ(sizeCountDeltas.at(_uuid1).sizeCount, (CollectionSizeCount{.size = 0, .count = 0}));
-    EXPECT_EQ(sizeCountDeltas.at(_uuid1).state, DDLState::kCreated);
+    EXPECT_EQ(replicatedMetadataDeltas.size(), 1u);
+    ASSERT_TRUE(replicatedMetadataDeltas.contains(_uuid1));
+    EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).state, DDLState::kCreated);
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDrop) {
@@ -904,13 +912,14 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDrop) {
         .wallClockTime = Date_t::now(),
     }}};
 
-    SizeCountDeltas sizeCountDeltas;
-    extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas);
+    ReplicatedMetadataDeltas replicatedMetadataDeltas;
+    extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, replicatedMetadataDeltas);
 
-    EXPECT_EQ(sizeCountDeltas.size(), 1u);
-    ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
-    EXPECT_EQ(sizeCountDeltas.at(_uuid1).sizeCount, (CollectionSizeCount{.size = 0, .count = 0}));
-    EXPECT_EQ(sizeCountDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
+    EXPECT_EQ(replicatedMetadataDeltas.size(), 1u);
+    ASSERT_TRUE(replicatedMetadataDeltas.contains(_uuid1));
+    EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDropThenInserts) {
@@ -939,14 +948,14 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDropThenInser
         .wallClockTime = Date_t::now(),
     }}};
 
-    SizeCountDeltas sizeCountDeltas;
-    extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas);
+    ReplicatedMetadataDeltas replicatedMetadataDeltas;
+    extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, replicatedMetadataDeltas);
 
-    EXPECT_EQ(sizeCountDeltas.size(), 1u);
-    ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
-    EXPECT_EQ(sizeCountDeltas.at(_uuid1).sizeCount,
+    EXPECT_EQ(replicatedMetadataDeltas.size(), 1u);
+    ASSERT_TRUE(replicatedMetadataDeltas.contains(_uuid1));
+    EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).metadata.sizeCount,
               (CollectionSizeCount{.size = document.objsize(), .count = 1}));
-    EXPECT_EQ(sizeCountDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
+    EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithPreExistingWritesFails) {
@@ -972,9 +981,11 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithPreExistingWri
         .wallClockTime = Date_t::now(),
     }}};
 
-    SizeCountDeltas sizeCountDeltas;
+    ReplicatedMetadataDeltas replicatedMetadataDeltas;
     ASSERT_THROWS_CODE(
-        extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas), DBException, 12554002);
+        extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, replicatedMetadataDeltas),
+        DBException,
+        12554002);
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest,
@@ -1001,13 +1012,15 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest,
         .wallClockTime = Date_t::now(),
     }}};
 
-    SizeCountDeltas sizeCountDeltas;
+    ReplicatedMetadataDeltas replicatedMetadataDeltas;
     ASSERT_THROWS_CODE(
-        extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas), DBException, 12054100);
+        extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, replicatedMetadataDeltas),
+        DBException,
+        12054100);
 }
 
 // ===========================================================================
-// Mock oplog cursor for aggregateSizeCountDeltasInOplog() tests.
+// Mock oplog cursor for aggregateReplicatedMetadataDeltasInOplog() tests.
 // ===========================================================================
 
 /**
@@ -1115,9 +1128,9 @@ protected:
 
     // Runs the aggregation with the fixture's oplog UUID and drops the oplog's own self-delta,
     // leaving only the per-collection deltas the tests assert on.
-    OplogScanResult aggregateCollectionSizeCountDeltas(SeekableRecordCursor& oplogCursor,
-                                                       const Timestamp& seekAfterTS) {
-        auto result = aggregateSizeCountDeltasInOplog(oplogCursor, seekAfterTS, oplogUuid);
+    OplogScanResult aggregateCollectionReplicatedMetadataDeltas(SeekableRecordCursor& oplogCursor,
+                                                                const Timestamp& seekAfterTS) {
+        auto result = aggregateReplicatedMetadataDeltasInOplog(oplogCursor, seekAfterTS, oplogUuid);
         result.deltas.erase(oplogUuid);
         return result;
     }
@@ -1127,9 +1140,9 @@ protected:
                                       const UUID& uuid,
                                       const Timestamp& seekAfterTS,
                                       SeekableRecordCursor& oplogCursor) {
-        const auto deltas = aggregateCollectionSizeCountDeltas(oplogCursor, seekAfterTS);
+        const auto deltas = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, seekAfterTS);
         ASSERT_TRUE(deltas.deltas.contains(uuid));
-        EXPECT_EQ(deltas.deltas.at(uuid).sizeCount, expected.delta);
+        EXPECT_EQ(deltas.deltas.at(uuid).metadata.sizeCount, expected.delta);
         EXPECT_EQ(deltas.lastTimestamp, expected.lastTimestamp);
     }
 };
@@ -1165,7 +1178,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateSingleColl) {
 
     // (3) Timestamp at or past the last entry yields no deltas.
     // Check the result without a uuid filter.
-    const auto oplogScanResult = aggregateCollectionSizeCountDeltas(oplogCursor, ts3);
+    const auto oplogScanResult = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, ts3);
     EXPECT_EQ(oplogScanResult.deltas.size(), 0u);
 }
 
@@ -1197,7 +1210,8 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateMultipleCollections) {
     // Aggregating from Timestamp::min() aggregates all entries.
     {
         // 2 collections tracked.
-        EXPECT_EQ(aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()).deltas.size(),
+        EXPECT_EQ(aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min())
+                      .deltas.size(),
                   2u);
         assertExpectedAggregateDelta(
             {.delta = CollectionSizeCount{.size = (insertA1 + insertA2 + delA1), .count = 1},
@@ -1214,7 +1228,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateMultipleCollections) {
 
     // Aggregating after ts3 (the last insert) only sees the two deletes.
     {
-        EXPECT_EQ(aggregateCollectionSizeCountDeltas(oplogCursor, ts3).deltas.size(), 2u);
+        EXPECT_EQ(aggregateCollectionReplicatedMetadataDeltas(oplogCursor, ts3).deltas.size(), 2u);
         assertExpectedAggregateDelta(
             {.delta = CollectionSizeCount{.size = delA1, .count = -1}, .lastTimestamp = ts5},
             collA.uuid,
@@ -1230,15 +1244,16 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateMultipleCollections) {
     // Aggregating with ts5 doesn't yield deltas because the aggregation excludes the timestamp
     // provided.
     {
-        const auto oplogScanResult = aggregateCollectionSizeCountDeltas(oplogCursor, ts5);
+        const auto oplogScanResult = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, ts5);
         EXPECT_EQ(oplogScanResult.deltas.size(), 0u);
     }
 
     {
         // Timestamp::max() is too large a value to extract a RecordId from the oplog from.
-        ASSERT_THROWS_CODE(aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::max()),
-                           DBException,
-                           ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE(
+            aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::max()),
+            DBException,
+            ErrorCodes::BadValue);
     }
 }
 
@@ -1266,13 +1281,13 @@ TEST_F(AggregateSizeCountFromOplogTest, ForwardCursorRespectsOplogVisibilityTime
     auto cursor =
         oplogColl->getRecordStore()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 
-    const auto result = aggregateCollectionSizeCountDeltas(*cursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(*cursor, Timestamp::min());
 
     // Only the ts1 entry was visible; ts2 must not appear in the deltas.
     EXPECT_EQ(result.deltas.size(), 1u);
     ASSERT_TRUE(result.deltas.count(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 10);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 10);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
     ASSERT_TRUE(result.lastTimestamp.has_value());
     EXPECT_EQ(result.lastTimestamp.value(), ts1);
 }
@@ -1399,12 +1414,12 @@ TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationMarksStateCreated) {
     std::list<repl::OplogEntry> entries{test_helpers::makeCreateOplogEntry(ts1, collA)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 0);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 0);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 0);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 0);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, CollectionDropMarksStateDropped) {
@@ -1412,7 +1427,7 @@ TEST_F(AggregateSizeCountFromOplogTest, CollectionDropMarksStateDropped) {
     std::list<repl::OplogEntry> entries{test_helpers::makeDropOplogEntry(ts1, collA)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDropped);
@@ -1429,12 +1444,12 @@ TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationThenInsertsMarkedCreat
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 30);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 2);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 30);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 2);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, InsertAndDropMarkedDropped) {
@@ -1448,7 +1463,7 @@ TEST_F(AggregateSizeCountFromOplogTest, InsertAndDropMarkedDropped) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDropped);
@@ -1510,7 +1525,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsWithMixedSizeMetadata) 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateEmptyOplog) {
     OplogCursorMock oplogCursor({});
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp.has_value());
 }
@@ -1528,7 +1543,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateOplogWithNoSizeMetadata) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
     EXPECT_TRUE(result.deltas.empty());
 }
 
@@ -1553,8 +1568,9 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateCrudWithSizeMetadataMissingUiTh
         }}},
     };
     OplogCursorMock oplogCursor(std::move(entries));
-    ASSERT_THROWS_CODE(
-        aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()), DBException, 12116001);
+    ASSERT_THROWS_CODE(aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min()),
+                       DBException,
+                       12116001);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsInnerOpMissingUiThrows) {
@@ -1574,8 +1590,9 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsInnerOpMissingUiThrows)
         }}},
     };
     OplogCursorMock oplogCursor(std::move(entries));
-    ASSERT_THROWS_CODE(
-        aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()), DBException, 12116001);
+    ASSERT_THROWS_CODE(aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min()),
+                       DBException,
+                       12116001);
 }
 
 class AggregateSizeCountFromOplogTxnVisibilityTest : public AggregateSizeCountFromOplogTest {
@@ -1662,7 +1679,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityN
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
     EXPECT_TRUE(result.deltas.empty());
 }
 
@@ -1695,7 +1712,9 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityW
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    EXPECT_EQ(aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()).deltas.size(), 2u);
+    EXPECT_EQ(
+        aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min()).deltas.size(),
+        2u);
     assertExpectedAggregateDelta(
         {.delta = CollectionSizeCount{.size = 50, .count = 1}, .lastTimestamp = ts2},
         collA.uuid,
@@ -1728,10 +1747,10 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, NotPreparedChainAccountedFo
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
               (CollectionSizeCount{.size = 350, .count = 3}));
     EXPECT_EQ(result.lastTimestamp, ts3);
 }
@@ -1750,13 +1769,13 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     // collA's partial chain (100 bytes) is discarded when the non-txn entry interrupts it.
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     // collB's regular insert is still counted normally.
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount,
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount,
               (CollectionSizeCount{.size = 70, .count = 1}));
 }
 
@@ -1783,7 +1802,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PartialTxnOpenAtEndOfLogIsD
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.lastTimestamp, ts2);
@@ -1822,12 +1841,12 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     // The commit's size metadata (300 bytes, 3 docs) is used, not the sum of the partial
     // entries (100+150 = 250 bytes) or the prepared applyOps (50 bytes).
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
               (CollectionSizeCount{.size = 300, .count = 3}));
     EXPECT_EQ(result.lastTimestamp, ts4);
 }
@@ -1844,7 +1863,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnFollowedByAbortP
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_TRUE(result.deltas.empty());
 }
@@ -1868,7 +1887,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_TRUE(result.deltas.empty());
 }
@@ -1892,11 +1911,11 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
               (CollectionSizeCount{.size = 100, .count = 1}));
 }
 
@@ -1921,7 +1940,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, ChainedTxnWithCreateThenDro
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     // A create followed by a drop within the same transaction chain cancels out.
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
@@ -1953,7 +1972,7 @@ DEATH_TEST_F(AggregateSizeCountFromOplogTxnVisibilityDeathTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 }
 
 TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
@@ -1979,10 +1998,10 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
               (CollectionSizeCount{.size = -300, .count = -3}));
     EXPECT_EQ(result.lastTimestamp, ts3);
 }
@@ -2005,7 +2024,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, NoSessionPartialTxnOpenAtEn
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.lastTimestamp, ts2);
@@ -2019,12 +2038,12 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionCreatesEntry) {
         test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, numRecords);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, dataSize);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, DryRunImportCollectionIsIgnored) {
@@ -2035,7 +2054,7 @@ TEST_F(AggregateSizeCountFromOplogTest, DryRunImportCollectionIsIgnored) {
         ts1, collA, numRecords, dataSize, /*dryRun=*/true)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
 }
@@ -2059,12 +2078,12 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionAndInsert) {
 
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, importedNumRecords + 1 + 1);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size,
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, importedNumRecords + 1 + 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size,
               importedDataSize + sizeDelta1 + sizeDelta2);
 }
 
@@ -2090,7 +2109,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionInsertAndDrop) {
 
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
 }
@@ -2103,12 +2122,12 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionFilterWithMatchingUUID) 
         test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, numRecords);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, dataSize);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollection) {
@@ -2122,12 +2141,12 @@ TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollection) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDroppedAndRecreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, numRecords);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, dataSize);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollectionThenInserts) {
@@ -2144,12 +2163,12 @@ TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollectionThenInserts) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDroppedAndRecreated);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords + 1);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize + sizeDelta);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, numRecords + 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, dataSize + sizeDelta);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionWithPreExistingWritesFails) {
@@ -2164,8 +2183,9 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionWithPreExistingWritesFai
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    ASSERT_THROWS_CODE(
-        aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()), DBException, 12601900);
+    ASSERT_THROWS_CODE(aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min()),
+                       DBException,
+                       12601900);
 }
 
 // Verifies that the local `isFastCountEligibleNonStore` helper agrees with the canonical

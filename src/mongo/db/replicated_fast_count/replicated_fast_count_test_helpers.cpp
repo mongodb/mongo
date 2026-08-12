@@ -695,11 +695,11 @@ CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const Name
 
 absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
     const repl::OplogEntry& applyOpsEntry) {
-    replicated_fast_count::SizeCountDeltas entries;
-    replicated_fast_count::extractSizeCountDeltasForApplyOps(applyOpsEntry, entries);
+    replicated_fast_count::ReplicatedMetadataDeltas entries;
+    replicated_fast_count::extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, entries);
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
     for (const auto& [uuid, entry] : entries) {
-        deltas[uuid] = entry.sizeCount;
+        deltas[uuid] = entry.metadata.sizeCount;
     }
     return deltas;
 }

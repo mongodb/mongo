@@ -354,8 +354,8 @@ boost::optional<repl::OplogEntry> getMostRecentOplogEntry(OperationContext* opCt
 CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
- * Convenience wrapper around extractSizeCountDeltasForApplyOps that constructs and returns the
- * result map.
+ * Convenience wrapper around extractReplicatedMetadataDeltasForApplyOps that constructs and returns
+ * the result map.
  */
 absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
     const repl::OplogEntry& applyOpsEntry);

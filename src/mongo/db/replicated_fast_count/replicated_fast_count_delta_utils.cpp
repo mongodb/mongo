@@ -93,28 +93,33 @@ CollectionSizeCount extractSizeCountDeltaForTruncateRange(const repl::OplogEntry
                                .count = -truncateRangeEntry.getDocsDeleted()};
 }
 
-// Updates the 'sizeCountDeltasOut' to track the new 'sizeCountDelta' for 'uuid'.
+// Updates the 'replicatedMetadataDeltasOut' to track the new 'sizeCountDelta' for 'uuid'.
 void recordCollectionSizeCountDelta(const UUID& uuid,
                                     const CollectionSizeCount& sizeCountDelta,
-                                    SizeCountDeltas& sizeCountDeltasOut) {
-    auto [it, inserted] =
-        sizeCountDeltasOut.try_emplace(uuid, SizeCountDelta{sizeCountDelta, DDLState::kNone});
+                                    ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
+        uuid,
+        ReplicatedMetadataDelta{.metadata = {.sizeCount = sizeCountDelta},
+                                .state = DDLState::kNone});
     if (!inserted) {
         // Entry exists, so update as needed.
-        it->second.sizeCount = it->second.sizeCount + sizeCountDelta;
+        it->second.metadata.sizeCount = it->second.metadata.sizeCount + sizeCountDelta;
     }
 }
 
 void recordCollectionImport(const UUID& uuid,
                             const ImportCollectionOplogEntry& importEntry,
-                            SizeCountDeltas& sizeCountDeltasOut) {
+                            ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
 
     const CollectionSizeCount importedSizeCount{.size = importEntry.getDataSize(),
                                                 .count = importEntry.getNumRecords()};
 
-    auto it = sizeCountDeltasOut.find(uuid);
-    if (it == sizeCountDeltasOut.end()) {
-        sizeCountDeltasOut.emplace(uuid, SizeCountDelta{importedSizeCount, DDLState::kCreated});
+    auto it = replicatedMetadataDeltasOut.find(uuid);
+    if (it == replicatedMetadataDeltasOut.end()) {
+        replicatedMetadataDeltasOut.emplace(
+            uuid,
+            ReplicatedMetadataDelta{.metadata = {.sizeCount = importedSizeCount},
+                                    .state = DDLState::kCreated});
         return;
     }
 
@@ -124,26 +129,31 @@ void recordCollectionImport(const UUID& uuid,
             "Encountered writes to a collection before it was imported",
             it->second.state == DDLState::kDropped);
 
-    it->second = SizeCountDelta{importedSizeCount, DDLState::kDroppedAndRecreated};
+    it->second = ReplicatedMetadataDelta{.metadata = {.sizeCount = importedSizeCount},
+                                         .state = DDLState::kDroppedAndRecreated};
 }
 
-void recordCollectionCreate(const UUID& uuid, SizeCountDeltas& sizeCountDeltasOut) {
-    auto [it, inserted] = sizeCountDeltasOut.try_emplace(
-        uuid, SizeCountDelta{CollectionSizeCount{.size = 0, .count = 0}, DDLState::kCreated});
+void recordCollectionCreate(const UUID& uuid,
+                            ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
+        uuid,
+        ReplicatedMetadataDelta{
+            .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0}},
+            .state = DDLState::kCreated});
     massert(12054100, "Encountered writes to a collection before it was created", inserted);
 }
 
 void recordCollectionCreateFromMigrate(const repl::OplogEntry& entry,
-                                       SizeCountDeltas& sizeCountDeltasOut) {
-    auto it = sizeCountDeltasOut.find(*entry.getUuid());
-    invariant(it != sizeCountDeltasOut.end());
+                                       ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    auto it = replicatedMetadataDeltasOut.find(*entry.getUuid());
+    invariant(it != replicatedMetadataDeltasOut.end());
 
     // When processing oplog entries, we generally expect a collection create oplog entry to precede
     // any other oplog entries with the same UUID, but there is one exception. During shard
     // migration, a collection can be created on a shard, migrated away from the shard, then
     // migrated back to the shard. When this happens, the collection is dropped then re-created with
     // the same UUID because UUIDs are preserved across migrations. To handle this case, we allow
-    // the existing sizeCountDeltasOut key-value pair to be reset to zero.
+    // the existing replicatedMetadataDeltasOut key-value pair to be reset to zero.
     massert(12554002,
             fmt::format("Unexpected pre-existing size/count state when processing shard migration "
                         "collection create oplog entry. entry: {}, sizeCountDelta: {}",
@@ -154,20 +164,24 @@ void recordCollectionCreateFromMigrate(const repl::OplogEntry& entry,
     // We use DDLState::kDroppedAndRecreated so that:
     //  1. persistCheckpoint() permits a pre-existing entry for this UUID in the SizeCountStore. It
     //  expects no prior entry for kCreated.
-    //  2. readAndIncrementSizeCounts() knows not to increment this SizeCountDelta entry with the
-    //  stale persisted size/count of this collection before it was dropped.
-    it->second =
-        SizeCountDelta{CollectionSizeCount{.size = 0, .count = 0}, DDLState::kDroppedAndRecreated};
+    //  2. readAndIncrementSizeCounts() knows not to increment this ReplicatedMetadataDelta entry
+    //  with the stale persisted size/count of this collection before it was dropped.
+    it->second = ReplicatedMetadataDelta{
+        .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0}},
+        .state = DDLState::kDroppedAndRecreated};
 }
 
-void recordCollectionDrop(const UUID& uuid, SizeCountDeltas& sizeCountDeltasOut) {
-    auto [it, inserted] = sizeCountDeltasOut.try_emplace(
-        uuid, SizeCountDelta{CollectionSizeCount{.size = 0, .count = 0}, DDLState::kDropped});
+void recordCollectionDrop(const UUID& uuid, ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
+        uuid,
+        ReplicatedMetadataDelta{
+            .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0}},
+            .state = DDLState::kDropped});
     if (!inserted) {
         if (it->second.state == DDLState::kCreated) {
             // If we had a creation and a drop in the same checkpoint, we can remove the entry since
             // they would cancel each other out.
-            sizeCountDeltasOut.erase(it);
+            replicatedMetadataDeltasOut.erase(it);
         } else {
             it->second.state = DDLState::kDropped;
         }
@@ -234,10 +248,10 @@ boost::optional<UUID> getUUIDFromOplogEntry(const repl::OplogEntry& oplogEntry) 
 }
 
 // Unpacks MultiOpSizeMetadata from a commitTransaction entry and records per-collection deltas.
-int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
-                                       SizeCountDeltas& sizeCountDeltasOut) {
+int extractReplicatedMetadataDeltasForCommitTxn(
+    const repl::OplogEntry& entry, ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     tassert(12406401,
-            "extractSizeCountDeltasForCommitTxn called on non-commitTransaction entry",
+            "extractReplicatedMetadataDeltasForCommitTxn called on non-commitTransaction entry",
             entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction);
     const auto& sizeMd = entry.getSizeMetadata();
     if (!sizeMd) {
@@ -253,7 +267,7 @@ int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
         recordCollectionSizeCountDelta(
             meta.getUuid(),
             CollectionSizeCount{.size = meta.getSz(), .count = meta.getCt()},
-            sizeCountDeltasOut);
+            replicatedMetadataDeltasOut);
         ++processed;
     }
     return processed;
@@ -262,14 +276,15 @@ int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
 }  // namespace
 
 // Processes a single oplog entry and accumulates its size/count contribution into
-// 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, commitTransaction, and
-// CRUD operations.
-int processOplogEntry(const repl::OplogEntry& entry, SizeCountDeltas& sizeCountDeltasOut) {
+// 'replicatedMetadataDeltasOut'. Handles applyOps (including nested), truncateRange,
+// commitTransaction, and CRUD operations.
+int processOplogEntry(const repl::OplogEntry& entry,
+                      ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction) {
-        return extractSizeCountDeltasForCommitTxn(entry, sizeCountDeltasOut);
+        return extractReplicatedMetadataDeltasForCommitTxn(entry, replicatedMetadataDeltasOut);
     }
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        return extractSizeCountDeltasForApplyOps(entry, sizeCountDeltasOut);
+        return extractReplicatedMetadataDeltasForApplyOps(entry, replicatedMetadataDeltasOut);
     }
 
     const auto& entryUuid = getUUIDFromOplogEntry(entry);
@@ -280,39 +295,40 @@ int processOplogEntry(const repl::OplogEntry& entry, SizeCountDeltas& sizeCountD
             if (importEntry.getDryRun()) {
                 return 0;
             }
-            recordCollectionImport(*entryUuid, importEntry, sizeCountDeltasOut);
+            recordCollectionImport(*entryUuid, importEntry, replicatedMetadataDeltasOut);
             return 1;
         }
         case repl::OplogEntry::CommandType::kTruncateRange: {
             const auto delta = extractSizeCountDeltaForTruncateRange(entry);
             // Truncation returns an estimate on the number of records and bytes that were removed.
             // We accept that size and count might be slightly off after performing truncation.
-            recordCollectionSizeCountDelta(*entryUuid, delta, sizeCountDeltasOut);
+            recordCollectionSizeCountDelta(*entryUuid, delta, replicatedMetadataDeltasOut);
             return 1;
         }
         case repl::OplogEntry::CommandType::kCreate:
-            if (entry.getFromMigrate().value_or(false) && sizeCountDeltasOut.contains(*entryUuid)) {
-                recordCollectionCreateFromMigrate(entry, sizeCountDeltasOut);
+            if (entry.getFromMigrate().value_or(false) &&
+                replicatedMetadataDeltasOut.contains(*entryUuid)) {
+                recordCollectionCreateFromMigrate(entry, replicatedMetadataDeltasOut);
             } else {
-                recordCollectionCreate(*entryUuid, sizeCountDeltasOut);
+                recordCollectionCreate(*entryUuid, replicatedMetadataDeltasOut);
             }
             return 1;
         case repl::OplogEntry::CommandType::kDrop:
-            recordCollectionDrop(*entryUuid, sizeCountDeltasOut);
+            recordCollectionDrop(*entryUuid, replicatedMetadataDeltasOut);
             return 1;
         default:
             break;
     }
 
     if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
-        recordCollectionSizeCountDelta(*entryUuid, *delta, sizeCountDeltasOut);
+        recordCollectionSizeCountDelta(*entryUuid, *delta, replicatedMetadataDeltasOut);
         return 1;
     }
 
     return 0;
 }
 
-void mergeDeltas(const SizeCountDeltas& src, SizeCountDeltas& dst) {
+void mergeDeltas(const ReplicatedMetadataDeltas& src, ReplicatedMetadataDeltas& dst) {
     for (const auto& [uuid, delta] : src) {
         tassert(12406403,
                 "Unexpected kDropped state in mergeDeltas: drops are not permitted in "
@@ -320,11 +336,11 @@ void mergeDeltas(const SizeCountDeltas& src, SizeCountDeltas& dst) {
                 delta.state != DDLState::kDropped);
         if (delta.state == DDLState::kCreated) {
             recordCollectionCreate(uuid, dst);
-            if (delta.sizeCount.size != 0 || delta.sizeCount.count != 0) {
-                recordCollectionSizeCountDelta(uuid, delta.sizeCount, dst);
+            if (delta.metadata.sizeCount.size != 0 || delta.metadata.sizeCount.count != 0) {
+                recordCollectionSizeCountDelta(uuid, delta.metadata.sizeCount, dst);
             }
         } else {
-            recordCollectionSizeCountDelta(uuid, delta.sizeCount, dst);
+            recordCollectionSizeCountDelta(uuid, delta.metadata.sizeCount, dst);
         }
     }
 }
@@ -336,7 +352,7 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
 
 template <OpSizeCountExtractable T>
 std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadataImpl(const std::vector<T>& ops) {
-    SizeCountDeltas deltas;
+    ReplicatedMetadataDeltas deltas;
     for (const auto& op : ops) {
         if (auto delta = extractSizeCountDeltaForOpImpl(op)) {
             recordCollectionSizeCountDelta(*op.getUuid(), *delta, deltas);
@@ -348,8 +364,8 @@ std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadataImpl(const std::vec
     for (const auto& [uuid, sizeCountDelta] : deltas) {
         MultiOpSizeMetadata meta;
         meta.setUuid(uuid);
-        meta.setSz(sizeCountDelta.sizeCount.size);
-        meta.setCt(sizeCountDelta.sizeCount.count);
+        meta.setSz(sizeCountDelta.metadata.sizeCount.size);
+        meta.setCt(sizeCountDelta.metadata.sizeCount.count);
         result.push_back(std::move(meta));
     }
     // Stable UUID order for deterministic serialization and persistence of the result.
@@ -369,8 +385,8 @@ std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
     return aggregateMultiOpSizeMetadataImpl(ops);
 }
 
-int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
-                                      SizeCountDeltas& sizeCountDeltasOut) {
+int extractReplicatedMetadataDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry, ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     massert(12116000,
             str::stream() << "Unexpected input: Expected applyOps oplog entry for extracting size "
                              "metadata, instead received entry of command type '"
@@ -384,7 +400,7 @@ int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
 
     int processed = 0;
     for (const auto& op : innerEntries) {
-        processed += processOplogEntry(op, sizeCountDeltasOut);
+        processed += processOplogEntry(op, replicatedMetadataDeltasOut);
     }
     return processed;
 }

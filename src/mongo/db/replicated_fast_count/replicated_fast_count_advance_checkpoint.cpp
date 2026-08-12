@@ -24,10 +24,10 @@ SizeCountCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
         // read up until the no holes point.
         auto oplogCursor = oplogColl->getRecordStore()->getCursor(
             opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-        return aggregateSizeCountDeltasInOplog(*oplogCursor,
-                                               seekAfterTimestamp,
-                                               oplogColl->uuid(),
-                                               /*isCheckpoint=*/true);
+        return aggregateReplicatedMetadataDeltasInOplog(*oplogCursor,
+                                                        seekAfterTimestamp,
+                                                        oplogColl->uuid(),
+                                                        /*isCheckpoint=*/true);
     }();
 
     return materializeCheckpointSnapshot(
@@ -52,11 +52,12 @@ size_t persistCheckpointSnapshot(OperationContext* opCtx,
     for (const auto& [uuid, entry] : checkpoint.updatedCollections) {
         switch (entry.state) {
             case DDLState::kCreated: {
-                sizeCountStore.insert(opCtx,
-                                      uuid,
-                                      SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
-                                                            .size = entry.sizeCount.size,
-                                                            .count = entry.sizeCount.count});
+                sizeCountStore.insert(
+                    opCtx,
+                    uuid,
+                    SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                          .size = entry.metadata.sizeCount.size,
+                                          .count = entry.metadata.sizeCount.count});
                 entryWriteCount++;
                 break;
             }
@@ -66,11 +67,12 @@ size_t persistCheckpointSnapshot(OperationContext* opCtx,
             }
             case DDLState::kDroppedAndRecreated:
             case DDLState::kNone: {
-                sizeCountStore.write(opCtx,
-                                     uuid,
-                                     SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
-                                                           .size = entry.sizeCount.size,
-                                                           .count = entry.sizeCount.count});
+                sizeCountStore.write(
+                    opCtx,
+                    uuid,
+                    SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                          .size = entry.metadata.sizeCount.size,
+                                          .count = entry.metadata.sizeCount.count});
                 entryWriteCount++;
                 break;
             }

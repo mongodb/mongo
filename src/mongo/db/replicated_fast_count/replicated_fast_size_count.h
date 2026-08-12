@@ -121,14 +121,15 @@ enum class DDLState {
 };
 
 /**
- * Stores the size and count values for a collection along with state indicating whether the
- * collection had been created or dropped.
+ * Stores the size, count, and validation hash values for a collection along with state indicating
+ * whether the collection had been created or dropped.
  */
-struct SizeCountDelta {
-    CollectionSizeCount sizeCount{0, 0};
+struct ReplicatedMetadataDelta {
+    CollectionReplicatedMetadata metadata{.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                          .hash = boost::none};
     DDLState state{DDLState::kNone};
 
-    bool operator==(const SizeCountDelta&) const = default;
+    bool operator==(const ReplicatedMetadataDelta&) const = default;
 
     std::string toString() const {
         auto stateStr = [&] {
@@ -144,23 +145,23 @@ struct SizeCountDelta {
             }
             MONGO_UNREACHABLE;
         }();
-        return fmt::format("sizeCount: {}, state: {}", sizeCount.toString(), stateStr);
+        return fmt::format("metadata: {}, state: {}", metadata.toString(), stateStr);
     }
 };
 
-inline std::ostream& operator<<(std::ostream& s, const SizeCountDelta& delta) {
+inline std::ostream& operator<<(std::ostream& s, const ReplicatedMetadataDelta& delta) {
     return (s << delta.toString());
 }
 
 namespace replicated_fast_count {
 
 /**
- * Data structure mapping collection UUIDs to their size and count deltas.
+ * Data structure mapping collection UUIDs to their replicated-metadata deltas.
  *
- * Useful for tracking changes to collections' size and count while scanning the oplog during
- * both checkpoints and size/count lookups.
+ * Useful for tracking changes to collections' size, count, and hash while scanning the oplog during
+ * checkpoints.
  */
-using SizeCountDeltas = absl::flat_hash_map<UUID, SizeCountDelta>;
+using ReplicatedMetadataDeltas = absl::flat_hash_map<UUID, ReplicatedMetadataDelta>;
 
 }  // namespace replicated_fast_count
 

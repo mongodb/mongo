@@ -208,7 +208,7 @@ size_t CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
 }
 
 void CollectionSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
-                                                          SizeCountDeltas& deltas) const {
+                                                          ReplicatedMetadataDeltas& deltas) const {
     massert(12915207,
             "Must hold the GlobalLock in a read mode when calling "
             "SizeCountStore::readAndIncrementSizeCounts()",
@@ -229,8 +229,8 @@ void CollectionSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCt
         Snapshotted<BSONObj> doc;
         if (coll->findDoc(opCtx, rid, &doc)) {
             const Entry entry = parseEntry(doc.value());
-            delta.sizeCount.count += entry.count;
-            delta.sizeCount.size += entry.size;
+            delta.metadata.sizeCount.count += entry.count;
+            delta.metadata.sizeCount.size += entry.size;
         }
     }
 }
@@ -329,7 +329,7 @@ size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
 }
 
 void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
-                                                         SizeCountDeltas& deltas) const {
+                                                         ReplicatedMetadataDeltas& deltas) const {
     massert(12915202,
             "Must hold the GlobalLock in a read mode when calling "
             "SizeCountStore::readAndIncrementSizeCounts()",
@@ -347,8 +347,8 @@ void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx
             continue;
         }
         auto entry = parseContainerValue(*result);
-        delta.sizeCount.count += entry.count;
-        delta.sizeCount.size += entry.size;
+        delta.metadata.sizeCount.count += entry.count;
+        delta.metadata.sizeCount.size += entry.size;
     }
 }
 

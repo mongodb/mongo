@@ -237,8 +237,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, SingleEntry_AccumulatesAndAdvancesTim
     const auto result = runAccumulator(
         {test_helpers::makeOplogEntry(ts, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 10);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 10);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -251,11 +251,11 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, MultipleEntries_LastTimestampIsLatest
                         test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 20),
                         test_helpers::makeOplogEntry(ts3, collB, repl::OpTypeEnum::kInsert, 30)});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 30);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 2);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 30);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 2);
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 30);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 30);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts3);
 }
 
@@ -269,8 +269,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TracksRawBytesAcrossAllReco
     const auto result =
         runAccumulator({.oplogUuid = oplogUuid}, {std::move(entry1), std::move(entry2)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 2);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 2);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TrackedEvenForInternalEntries) {
@@ -279,8 +279,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TrackedEvenForInternalEntri
     const int64_t expectedBytes = entry.getEntry().toBSON().objsize();
     const auto result = runAccumulator({.oplogUuid = oplogUuid}, {std::move(entry)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 1);
     EXPECT_FALSE(result.lastTimestamp);
     EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
 }
@@ -301,8 +301,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, InternalThenUser_LastTimestampIsUserE
          test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 50)});
     EXPECT_EQ(result.lastTimestamp, ts2);
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 50);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 50);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, UserThenInternal_LastTimestampDoesNotRegress) {
@@ -335,8 +335,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_KeepsOplogUuidWhenUserEntr
     const auto result = runAccumulator({.isCheckpoint = true, .oplogUuid = oplogUuid},
                                        {std::move(fastCountEntry), std::move(userEntry)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedOplogBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 2);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedOplogBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 2);
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.lastTimestamp, ts2);
 }
@@ -348,8 +348,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, NonCheckpoint_KeepsOplogUuidEvenWithN
     const auto result =
         runAccumulator({.isCheckpoint = false, .oplogUuid = oplogUuid}, {std::move(entry)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 1);
     EXPECT_FALSE(result.lastTimestamp);
 }
 
@@ -366,8 +366,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, PartialTxn_FollowedByNonApplyOps_Chai
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     // The regular insert for collB is counted normally.
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 70);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 70);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts2);
 }
 
@@ -518,11 +518,11 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
         ts, BSON_ARRAY(makeInnerInsertBson(collA, 100) << makeInnerInsertBson(collB, 200)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 100);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 200);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 200);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -547,7 +547,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
         ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 1) << makeInnerInsertBson(collA, 100)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 100);
     EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -598,8 +598,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
                                     << makeInnerInsertBson(collA, 100)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 100);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.deltas.size(), 1u);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -624,11 +624,11 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     mArr.append(BSON("uuid" << collB.uuid << "sz" << int64_t{500} << "ct" << int64_t{5}));
     const auto result = runAccumulatorRaw({makeCommitTxnBson(ts, mArr.arr())});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 300);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 3);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 300);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 3);
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 500);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 5);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 500);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 5);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 

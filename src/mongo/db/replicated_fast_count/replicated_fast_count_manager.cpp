@@ -364,13 +364,13 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
                 opCtx, *shard_role_details::getRecoveryUnit(opCtx));
             // We pass the oplog UUID here to include the oplog's own size and count in the
             // aggregation.
-            return aggregateSizeCountDeltasInOplog(
+            return aggregateReplicatedMetadataDeltasInOplog(
                 *oplogCursor, *seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
         }();
 
         for (const auto& [uuid, delta] : scanResult.deltas) {
-            accumulator[uuid].count += delta.sizeCount.count;
-            accumulator[uuid].size += delta.sizeCount.size;
+            accumulator[uuid].count += delta.metadata.sizeCount.count;
+            accumulator[uuid].size += delta.metadata.sizeCount.size;
         }
 
         LOGV2(12554001,
@@ -447,12 +447,12 @@ void ReplicatedFastCountManager::finalizeMetadataFromInitialSync(OperationContex
                 opCtx, *shard_role_details::getRecoveryUnit(opCtx));
             // Pass the oplog UUID so the oplog's own size and count are included in the
             // aggregation.
-            return aggregateSizeCountDeltasInOplog(
+            return aggregateReplicatedMetadataDeltasInOplog(
                 *oplogCursor, seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
         }();
         for (const auto& [uuid, delta] : scanResult.deltas) {
-            deltasByUuid[uuid].count += delta.sizeCount.count;
-            deltasByUuid[uuid].size += delta.sizeCount.size;
+            deltasByUuid[uuid].count += delta.metadata.sizeCount.count;
+            deltasByUuid[uuid].size += delta.metadata.sizeCount.size;
         }
         LOGV2(12554005,
               "ReplicatedFastCountManager oplog scan during initial sync finalization complete",
@@ -517,12 +517,12 @@ void ReplicatedFastCountManager::commit(
         }
         collection->getRecordStore()->adjustAccurateSizeCount(delta.size, delta.count);
         // TODO SERVER-120203: Re-enable this invariant once outstanding bugs are fixed.
-        // invariant(stored.sizeCount.size >= 0 && stored.sizeCount.count >= 0,
+        // invariant(stored.metadata.sizeCount.size >= 0 && stored.metadata.sizeCount.count >= 0,
         //           fmt::format("Expected fast count size and count to be non-negative, but saw
         //           size "
         //                       "{} and count {}",
-        //                       stored.sizeCount.size,
-        //                       stored.sizeCount.count));
+        //                       stored.metadata.sizeCount.size,
+        //                       stored.metadata.sizeCount.count));
     }
 }
 

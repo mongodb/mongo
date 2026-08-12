@@ -455,8 +455,8 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
 
     // -- Entry 1: applyOps with 3 user inserts, each carrying size metadata.
     // operationsOnFastCountCollections() returns false (user ops present), so this entry is
-    // counted as processed. extractSizeCountDeltasForApplyOps sees 3 inner ops with "m.sz",
-    // so sizeCount is incremented 3 times.
+    // counted as processed. extractReplicatedMetadataDeltasForApplyOps sees 3 inner ops with
+    // "m.sz", so sizeCount is incremented 3 times.
     const BSONObj userInsert1 = BSON("op" << "i"
                                           << "ns" << collA.nss.ns_forTest() << "ui" << collA.uuid
                                           << "o" << BSON("_id" << 1) << "m" << BSON("sz" << 10));

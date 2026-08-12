@@ -51,10 +51,13 @@ TEST(SizeCountCheckpointBufferTest, CheckoutGetsScannedDeltas) {
 
     const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
     const OplogScanResult expectedCheckedOutBuffer{
-        .deltas = SizeCountDeltas{{coll.uuid,
-                                   SizeCountDelta{.sizeCount =
-                                                      CollectionSizeCount{.size = 25, .count = 1}}},
-                                  {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+        .deltas =
+            ReplicatedMetadataDeltas{
+                {coll.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1}}}},
+                {oplogUuid,
+                 ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
         .lastTimestamp = Timestamp(3, 3)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
@@ -83,10 +86,13 @@ TEST(SizeCountCheckpointBufferTest, MultipleScansAccumulateIntoOneCheckout) {
     ASSERT_TRUE(checkedOutBuffer.has_value());
     const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
     const OplogScanResult expectedCheckedOutBuffer{
-        .deltas = SizeCountDeltas{{coll.uuid,
-                                   SizeCountDelta{.sizeCount =
-                                                      CollectionSizeCount{.size = 30, .count = 2}}},
-                                  {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+        .deltas =
+            ReplicatedMetadataDeltas{
+                {coll.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}},
+                {oplogUuid,
+                 ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
         .lastTimestamp = Timestamp(2, 2)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
@@ -111,10 +117,13 @@ TEST(SizeCountCheckpointBufferTest, InFlightBatchIsRetriedUntilAcknowledged) {
 
     const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
     const OplogScanResult expectedCheckedOutBuffer{
-        .deltas = SizeCountDeltas{{coll.uuid,
-                                   SizeCountDelta{.sizeCount =
-                                                      CollectionSizeCount{.size = 40, .count = 1}}},
-                                  {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+        .deltas =
+            ReplicatedMetadataDeltas{
+                {coll.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 40, .count = 1}}}},
+                {oplogUuid,
+                 ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
         .lastTimestamp = Timestamp(6, 6)};
 
     EXPECT_EQ(retried, expectedCheckedOutBuffer);
@@ -160,10 +169,12 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
         const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
         const OplogScanResult expectedCheckedOutBuffer{
             .deltas =
-                SizeCountDeltas{
+                ReplicatedMetadataDeltas{
                     {coll.uuid,
-                     SizeCountDelta{.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}},
-                    {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}},
+                    {oplogUuid,
+                     ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
             .lastTimestamp = Timestamp(2, 1)};
 
         EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
@@ -187,10 +198,12 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
             calculateOplogSizeCount(std::list<repl::OplogEntry>{entries.back()});
         const OplogScanResult expectedCheckedOutBuffer{
             .deltas =
-                SizeCountDeltas{
+                ReplicatedMetadataDeltas{
                     {coll.uuid,
-                     SizeCountDelta{.sizeCount = CollectionSizeCount{.size = 20, .count = 1}}},
-                    {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1}}}},
+                    {oplogUuid,
+                     ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
             .lastTimestamp = Timestamp(3, 1)};
 
         EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
@@ -235,11 +248,14 @@ TEST(SizeCountCheckpointBufferTest, DropThenImportAcrossScansYieldsDroppedAndRec
 
     const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
     const OplogScanResult expectedCheckedOutBuffer{
-        .deltas = SizeCountDeltas{{coll.uuid,
-                                   SizeCountDelta{.sizeCount =
-                                                      CollectionSizeCount{.size = 90, .count = 3},
-                                                  .state = DDLState::kDroppedAndRecreated}},
-                                  {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+        .deltas =
+            ReplicatedMetadataDeltas{
+                {coll.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 90, .count = 3}},
+                     .state = DDLState::kDroppedAndRecreated}},
+                {oplogUuid,
+                 ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
         .lastTimestamp = Timestamp(2, 2)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
@@ -292,10 +308,13 @@ TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictDoesNotDoubleCou
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
     const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
     const OplogScanResult expectedCheckedOutBuffer{
-        .deltas = SizeCountDeltas{{coll.uuid,
-                                   SizeCountDelta{.sizeCount =
-                                                      CollectionSizeCount{.size = 60, .count = 3}}},
-                                  {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+        .deltas =
+            ReplicatedMetadataDeltas{
+                {coll.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 60, .count = 3}}}},
+                {oplogUuid,
+                 ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
         .lastTimestamp = Timestamp(2, 3)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
@@ -320,10 +339,13 @@ TEST(SizeCountCheckpointBufferTest, SeekExactDoesNotDoubleCountLastBufferedRid) 
     const CollectionSizeCount expectedOplogSizeCount =
         calculateOplogSizeCount(std::list<repl::OplogEntry>{entries.back()});
     const OplogScanResult expectedCheckedOutBuffer{
-        .deltas = SizeCountDeltas{{coll.uuid,
-                                   SizeCountDelta{.sizeCount =
-                                                      CollectionSizeCount{.size = 30, .count = 1}}},
-                                  {oplogUuid, SizeCountDelta{.sizeCount = expectedOplogSizeCount}}},
+        .deltas =
+            ReplicatedMetadataDeltas{
+                {coll.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 1}}}},
+                {oplogUuid,
+                 ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
         .lastTimestamp = Timestamp(2, 3)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);

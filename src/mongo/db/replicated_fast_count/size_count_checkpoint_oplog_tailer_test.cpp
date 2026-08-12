@@ -70,12 +70,14 @@ TEST_F(OplogTailerTest, ScanFromBeginningAccountsAllVisibleEntries) {
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
     const OplogScanResult expectedCheckedOutBuffer{
         .deltas =
-            SizeCountDeltas{
+            ReplicatedMetadataDeltas{
                 {_collA.uuid,
-                 SizeCountDelta{.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}},
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}},
                 {oplogUuid(),
-                 SizeCountDelta{.sizeCount = scanForAccurateSizeCount(
-                                    _opCtx, NamespaceString::kRsOplogNamespace)}}},
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = scanForAccurateSizeCount(
+                                      _opCtx, NamespaceString::kRsOplogNamespace)}}}},
         .lastTimestamp = Timestamp(1, 2)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
@@ -126,14 +128,17 @@ TEST_F(OplogTailerTest, MultipleIterationsAccumulateInBuffer) {
     EXPECT_EQ(checkedOutBuffer->lastTimestamp, Timestamp(1, 3));
     const OplogScanResult expectedCheckedOutBuffer{
         .deltas =
-            SizeCountDeltas{
+            ReplicatedMetadataDeltas{
                 {_collA.uuid,
-                 SizeCountDelta{.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}},
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}},
                 {_collB.uuid,
-                 SizeCountDelta{.sizeCount = CollectionSizeCount{.size = 7, .count = 1}}},
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 7, .count = 1}}}},
                 {oplogUuid(),
-                 SizeCountDelta{.sizeCount = scanForAccurateSizeCount(
-                                    _opCtx, NamespaceString::kRsOplogNamespace)}}},
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = scanForAccurateSizeCount(
+                                      _opCtx, NamespaceString::kRsOplogNamespace)}}}},
         .lastTimestamp = Timestamp(1, 3)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
@@ -196,12 +201,14 @@ TEST_F(OplogTailerTest, RetriesScanOnWriteConflict) {
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
     const OplogScanResult expectedCheckedOutBuffer{
         .deltas =
-            SizeCountDeltas{
+            ReplicatedMetadataDeltas{
                 {_collA.uuid,
-                 SizeCountDelta{.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}},
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}},
                 {oplogUuid(),
-                 SizeCountDelta{.sizeCount = scanForAccurateSizeCount(
-                                    _opCtx, NamespaceString::kRsOplogNamespace)}}},
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = scanForAccurateSizeCount(
+                                      _opCtx, NamespaceString::kRsOplogNamespace)}}}},
         .lastTimestamp = Timestamp(1, 2)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 

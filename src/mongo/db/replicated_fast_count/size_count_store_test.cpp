@@ -313,7 +313,7 @@ TEST_P(SizeCountStoreTest, ReadMassertsWithoutGlobalReadLock) {
 
 TEST_P(SizeCountStoreTest, ReadAndIncrementSizeCountsMassertsWithoutGlobalReadLock) {
     auto storePtr = makeStore();
-    SizeCountDeltas deltas;
+    ReplicatedMetadataDeltas deltas;
     ASSERT_THROWS_CODE(storePtr->readAndIncrementSizeCounts(operationContext(), deltas),
                        DBException,
                        expectedReadAndIncrementLockCode());
@@ -432,12 +432,12 @@ TEST_P(SizeCountStoreTest, ReadAndIncrementSizeCountsIgnoresHash) {
 
     rawInsert(store, uuid, makeMetadataDoc(makeTestHash()));
 
-    SizeCountDeltas deltas;
-    deltas[uuid] = SizeCountDelta{.sizeCount = {.size = 8, .count = 1}};
+    ReplicatedMetadataDeltas deltas;
+    deltas[uuid] = ReplicatedMetadataDelta{.metadata = {.sizeCount = {.size = 8, .count = 1}}};
     store.readAndIncrementSizeCounts(opCtx, deltas);
 
-    EXPECT_EQ(50, deltas[uuid].sizeCount.size);
-    EXPECT_EQ(8, deltas[uuid].sizeCount.count);
+    EXPECT_EQ(50, deltas[uuid].metadata.sizeCount.size);
+    EXPECT_EQ(8, deltas[uuid].metadata.sizeCount.count);
 }
 
 INSTANTIATE_TEST_SUITE_P(,

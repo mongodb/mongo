@@ -31,7 +31,7 @@ namespace replicated_fast_count {
 namespace {
 
 // Minimal SeekableRecordCursor backed by an in-memory vector<BSONObj>. Ignores
-// the seek bound and yields every record in order; aggregateSizeCountDeltasInOplog
+// the seek bound and yields every record in order; aggregateReplicatedMetadataDeltasInOplog
 // only needs forward iteration after a seek and never inspects the RecordIds.
 class InMemoryOplogCursor : public SeekableRecordCursor {
 public:
@@ -278,7 +278,7 @@ constexpr int64_t kApplyOpsInnerSweepStart = 1LL << 4;
 constexpr int64_t kApplyOpsInnerSweepEnd = 1LL << 10;
 
 // Synthetic "transactional" applyOps. We do not set the prepare/commit fields because
-// extractSizeCountDeltasForApplyOps drives off `o.applyOps` only.
+// extractReplicatedMetadataDeltasForApplyOps drives off `o.applyOps` only.
 std::vector<BSONObj> genTransactionalApplyOps(int numApplyOpsEntries, int innerOpsPerEntry) {
     std::vector<BSONObj> out;
     out.reserve(numApplyOpsEntries);
@@ -366,7 +366,7 @@ void runScan(benchmark::State& state, const std::vector<BSONObj>& entries) {
     const auto oplogUuid = UUID::gen();
     for (auto _ : state) {
         InMemoryOplogCursor cursor(&entries);
-        auto result = aggregateSizeCountDeltasInOplog(cursor, Timestamp(0, 0), oplogUuid);
+        auto result = aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp(0, 0), oplogUuid);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
@@ -400,7 +400,7 @@ void BM_Scan_TransactionalApplyOps(benchmark::State& state) {
     const auto oplogUuid = UUID::gen();
     for (auto _ : state) {
         InMemoryOplogCursor cursor(&entries);
-        auto result = aggregateSizeCountDeltasInOplog(cursor, Timestamp(0, 0), oplogUuid);
+        auto result = aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp(0, 0), oplogUuid);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }

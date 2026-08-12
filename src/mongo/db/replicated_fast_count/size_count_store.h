@@ -120,7 +120,7 @@ public:
      * across all UUIDs in `deltas`, since this is the checkpoint hot path.
      */
     virtual void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                            SizeCountDeltas& deltas) const = 0;
+                                            ReplicatedMetadataDeltas& deltas) const = 0;
 
     virtual bool usesContainers() const = 0;
 
@@ -145,7 +145,7 @@ public:
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     size_t remove(OperationContext* opCtx, UUID uuid) override;
     void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                    SizeCountDeltas& deltas) const override;
+                                    ReplicatedMetadataDeltas& deltas) const override;
     void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
 
     bool usesContainers() const override {
@@ -169,7 +169,7 @@ public:
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     size_t remove(OperationContext* opCtx, UUID uuid) override;
     void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                    SizeCountDeltas& deltas) const override;
+                                    ReplicatedMetadataDeltas& deltas) const override;
     void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
 
     bool usesContainers() const override {

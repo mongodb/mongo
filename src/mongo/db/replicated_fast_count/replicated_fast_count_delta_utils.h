@@ -40,26 +40,28 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::Oplo
 
 /**
  * Accumulates cumulative size and count deltas for each uuid across the inner operations of the
- * 'applyOpsEntry' into 'sizeCountDeltasOut'. Returns the number of size/count entries processed.
+ * 'applyOpsEntry' into 'replicatedMetadataDeltasOut'. Returns the number of size/count entries
+ * processed.
  *
  * The OplogEntry provided must be of type 'repl::OplogEntry::CommandType::kApplyOps'; otherwise,
  * the method throws and terminates the current operation.
  */
-int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
-                                      SizeCountDeltas& sizeCountDeltasOut);
+int extractReplicatedMetadataDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry, ReplicatedMetadataDeltas& replicatedMetadataDeltasOut);
 
 /**
  * Processes a single oplog entry and accumulates its size/count contribution into
- * 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, commitTransaction,
- * and CRUD operations. Returns the number of size/count entries processed.
+ * 'replicatedMetadataDeltasOut'. Handles applyOps (including nested), truncateRange,
+ * commitTransaction, and CRUD operations. Returns the number of size/count entries processed.
  */
-int processOplogEntry(const repl::OplogEntry& entry, SizeCountDeltas& sizeCountDeltasOut);
+int processOplogEntry(const repl::OplogEntry& entry,
+                      ReplicatedMetadataDeltas& replicatedMetadataDeltasOut);
 
 /**
  * Merges per-UUID deltas from 'src' into 'dst', handling DDL states (kCreated requires recording
  * a create; kDropped is not permitted as drops are disallowed in multi-document transactions).
  */
-void mergeDeltas(const SizeCountDeltas& src, SizeCountDeltas& dst);
+void mergeDeltas(const ReplicatedMetadataDeltas& src, ReplicatedMetadataDeltas& dst);
 
 /**
  * Fast-scan eligibility predicate used inside the cursor scan's Layer 2 / Layer 2.5 fast path.

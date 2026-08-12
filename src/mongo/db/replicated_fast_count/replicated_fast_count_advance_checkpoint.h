@@ -12,10 +12,10 @@ namespace mongo::replicated_fast_count {
 /**
  * Materialized checkpoint snapshot ready to persist.
  *
- * `updatedCollections` contains absolute size/count totals, not incremental deltas.
+ * `updatedCollections` contains absolute replicated-metadata totals, not incremental deltas.
  */
 struct SizeCountCheckpointSnapshot {
-    SizeCountDeltas updatedCollections;
+    ReplicatedMetadataDeltas updatedCollections;
     Timestamp validAsOf;
 
     bool empty() const {
