@@ -25,6 +25,8 @@ last-continuous:
     ticket: SERVER-127985
   - test_file: jstests/noPassthrough/regex_utf8_boundary_flag_disabled.js
     ticket: SERVER-127985
+  - test_file: jstests/core/doc_validation/doc_validation_options.js
+    ticket: SERVER-124538
   - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
     ticket: SERVER-130759
   - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
@@ -996,6 +998,8 @@ last-lts:
     ticket: SERVER-127985
   - test_file: jstests/noPassthrough/regex_utf8_boundary_flag_disabled.js
     ticket: SERVER-127985
+  - test_file: jstests/core/doc_validation/doc_validation_options.js
+    ticket: SERVER-124538
   - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
     ticket: SERVER-130759
   - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
