@@ -310,7 +310,7 @@ __check_leaf_key_range(
      * First, confirm we have the right parent page-index slot, and quit if we don't. We don't
      * search for the correct slot, that would make this cheap test expensive.
      */
-    WT_INTL_INDEX_GET(session, leaf->home, pindex);
+    WT_INTL_INDEX_GET(session, (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&leaf->home), pindex);
     indx = leaf->pindex_hint;
     if (indx >= pindex->entries || pindex->index[indx] != leaf)
         return (0);
@@ -322,7 +322,7 @@ __check_leaf_key_range(
      * build it, it may not be a valid key.
      */
     if (indx != 0) {
-        __wt_ref_key(leaf->home, leaf, &item->data, &item->size);
+        __wt_ref_key_home(leaf, &item->data, &item->size);
         WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
         if (cmp < 0) {
             cbt->compare = 1; /* page keys > search key */
@@ -336,7 +336,7 @@ __check_leaf_key_range(
      */
     ++indx;
     if (indx < pindex->entries) {
-        __wt_ref_key(leaf->home, pindex->index[indx], &item->data, &item->size);
+        __wt_ref_key_home(pindex->index[indx], &item->data, &item->size);
         WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
         if (cmp >= 0) {
             cbt->compare = -1; /* page keys < search key */

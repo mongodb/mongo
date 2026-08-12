@@ -87,7 +87,7 @@ class test_truncate15(wttest.WiredTigerTestCase):
             hi_cursor.close()
         return err
 
-    def check(self, uri, make_key, nrows, nzeros, value, ts):
+    def check(self, uri, make_key, nrows, nzeros, value, ts, expect_dirty_charge=None):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
         seen = 0
@@ -97,6 +97,20 @@ class test_truncate15(wttest.WiredTigerTestCase):
             seen += 1
         self.assertEqual(seen, nrows)
         self.assertEqual(zseen, 0)
+
+        # A read whose timestamp precedes the not-yet-visible truncate commit must instantiate
+        # the truncated pages to preserve their pre-truncate values. Column-store instantiation
+        # charges the resulting dirty bytes to this reader's own txn (FIXME-WT-18271); row-store
+        # instantiation does not, so it never charges anything here.
+        if expect_dirty_charge is not None:
+            statc = self.session.open_cursor('statistics:session', None, None)
+            dirty = statc[stat.session.txn_bytes_dirty][2]
+            statc.close()
+            if self.key_format == 'r' and expect_dirty_charge:
+                self.assertGreater(dirty, 0)
+            else:
+                self.assertEqual(dirty, 0)
+
         self.session.rollback_transaction()
         cursor.close()
 
@@ -169,20 +183,22 @@ class test_truncate15(wttest.WiredTigerTestCase):
 
         # Validate the data.
         try:
-            # At time 10 we should see all value_a.
-            self.check(ds.uri, ds.key, nrows, 0, value_a, 10)
+            # At time 10 we should see all value_a. The truncate commit isn't visible yet, so
+            # this read must instantiate the truncated pages to recover their old values.
+            self.check(ds.uri, ds.key, nrows, 0, value_a, 10, expect_dirty_charge=True)
             #self.evict_cursor(ds.uri, ds, nrows, 10)
 
-            # At time 20 we should still see all value_a.
-            self.check(ds.uri, ds.key, nrows, 0, value_a, 20)
+            # At time 20 we should still see all value_a, for the same reason as above.
+            self.check(ds.uri, ds.key, nrows, 0, value_a, 20, expect_dirty_charge=True)
             #self.evict_cursor(ds.uri, ds, nrows, 20)
 
-            # At time 25 we should still see half value_a.
-            self.check(ds.uri, ds.key, nrows // 2, nrows // 2, value_a, 25)
+            # At time 25 we should still see half value_a. The truncate is visible now, so the
+            # deleted pages can be skipped outright without instantiating them.
+            self.check(ds.uri, ds.key, nrows // 2, nrows // 2, value_a, 25, expect_dirty_charge=False)
             #self.evict_cursor(ds.uri, ds, nrows // 2, 25)
 
-            # At time 30 we should also see half value_a.
-            self.check(ds.uri, ds.key, nrows // 2, nrows // 2, value_a, 30)
+            # At time 30 we should also see half value_a, for the same reason as above.
+            self.check(ds.uri, ds.key, nrows // 2, nrows // 2, value_a, 30, expect_dirty_charge=False)
             #self.evict_cursor(ds.uri, ds, nrows // 2, 30)
         except WiredTigerError as e:
             # If we get WT_ROLLBACK while reading, assume it's because we overflowed the

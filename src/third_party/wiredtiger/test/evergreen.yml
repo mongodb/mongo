@@ -1118,9 +1118,7 @@ functions:
           echo Iteration $i/${times}
           rm -rf RUNDIR
           ./t -c ../../../test/format/CONFIG.disagg ${format_args|} ${extra_arg|} || fail
-          if [ ${reopen|true} = true ]; then
-            ./t -R $format_args ${extra_args|} || fail
-          fi
+          ./t -R $format_args ${extra_args|} || fail
         done
   "many dbs test":
     command: shell.exec
@@ -1864,7 +1862,6 @@ variables:
           # FIXME-WT-16732: Enable truncate for multi node once predictable replay supports it.
           format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 runs.ops=1000000:2000000 ops.truncate=0
           times: 10
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
   - &format-stress-test-disagg-multi-pull-request
     depends_on:
@@ -1876,7 +1873,6 @@ variables:
           # FIXME-WT-16732: Enable truncate for multi node once predictable replay supports it.
           format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 runs.rows=20000 runs.ops=100000 ops.truncate=0
           times: 10
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
 #######################################
 #               Tasks                 #

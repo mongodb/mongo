@@ -110,14 +110,18 @@ timestamp_query(const char *query, wt_timestamp_t *tsp)
 
 /*
  * timestamp_init --
- *     Set the timestamp on open to the database's recovery timestamp, or some non-zero value.
+ *     Set the timestamp on open to the recovery or stable timestamp, or some non-zero value.
  */
 void
 timestamp_init(void)
 {
     testutil_check(timestamp_query("get=recovery", &g.timestamp));
+    if (g.reopen)
+        g.timestamp = WT_MAX(g.timestamp, g.stable_timestamp);
     if (g.timestamp == WT_TS_NONE)
         g.timestamp = MIN_TIMESTAMP;
+    if (g.reopen && disagg_is_multi_node())
+        g.reopen_timestamp = g.timestamp;
 }
 
 /*

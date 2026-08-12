@@ -256,7 +256,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
             WT_ENTER_PAGE_INDEX(session);
             __wt_ref_index_slot(session, cbt->ref, &pindex, &slot);
             if (slot != 0) {
-                __wt_ref_key(cbt->ref->home, cbt->ref, &ref_key.data, &ref_key.size);
+                __wt_ref_key_home(cbt->ref, &ref_key.data, &ref_key.size);
                 WT_IGNORE_RET(__wt_compare(session, S2BT(session)->collator, key, &ref_key, &cmp));
                 WT_ASSERT(session, cmp >= 0);
             }

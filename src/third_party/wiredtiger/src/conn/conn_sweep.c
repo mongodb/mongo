@@ -145,6 +145,13 @@ __sweep_close_dhandle_locked(WT_SESSION_IMPL *session)
     WT_ASSERT(session, FLD_ISSET(dhandle->lock_flags, WT_DHANDLE_LOCK_WRITE));
 
     /*
+     * A tree awaiting publication holds the only copy of its contents, and that state cannot be
+     * recovered once the handle is closed.
+     */
+    if (btree != NULL && F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH))
+        return (0);
+
+    /*
      * Sweep only closes clean trees, with one exception: an ingest btree whose entire contents are
      * known to be durable in the stable table.
      */

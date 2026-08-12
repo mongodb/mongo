@@ -167,6 +167,10 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         // Set the transaction to have 1 modification.
         session_impl->txn->mod_count = 1;
 
+        // The oldest-for-eviction check only applies once eviction reports itself stuck.
+        conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
+        F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
+
         // Check if the transaction's ID or its pinned ID is equal to the oldest transaction ID.
         CHECK(__wt_txn_is_blocking(session_impl) == 0);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);

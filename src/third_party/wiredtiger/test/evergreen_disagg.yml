@@ -592,7 +592,6 @@ variables:
           # FIXME-WT-17278 Enable removes in disagg multi mode once the related issues have been resolved.
           format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000 ops.pct.delete=0
           times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
   - &format-stress-test-disagg-multi-data-validation
     depends_on:
@@ -605,7 +604,6 @@ variables:
           # FIXME-WT-17278 Enable removes in disagg multi mode once the related issues have been resolved.
           format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 disagg.preserve=1 runs.ops=500000:2000000 ops.pct.delete=0
           times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
   # FIXME-WT-17278 We can get rid of this task once the issues related to removes in disagg multi mode have been resolved.
   - &format-stress-test-disagg-multi-delete-enabled
@@ -617,7 +615,6 @@ variables:
         vars:
           format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000
           times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
   # FIXME-WT-17278 We can get rid of this task once the issues related to removes in disagg multi mode have been resolved.
   - &format-stress-test-disagg-multi-delete-enabled-data-validation
@@ -630,7 +627,6 @@ variables:
           # Validate data with a non-layered table.
           format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 disagg.preserve=1 runs.ops=500000:2000000
           times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
   # Long-running randomized stress for snapshot transactions without a read timestamp racing
   # checkpoint pickups on a follower: multi-node runs verify pre-commit re-reads through freshly
@@ -652,7 +648,6 @@ variables:
             disagg.multi=1 disagg.multi_validation=1 disagg.snapshot_read=1
             runs.predictable_replay=1 runs.rows=50000:200000 runs.ops=500000:2000000
           times: 10
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
   - &timestamp-abort-test-disagg
     depends_on:

@@ -2695,9 +2695,6 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
         __wt_atomic_store_uint64_v_relaxed(&s->metadata_pinned, WT_TXN_NONE);
     }
 
-    conn->ckpt_eviction_snap[0].snap_min = WT_TXN_NONE;
-    conn->ckpt_eviction_snap[1].snap_min = WT_TXN_NONE;
-
     return (0);
 }
 
@@ -2874,23 +2871,28 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
 
 /*
  * __wt_txn_is_blocking --
- *     Return an error if this transaction is likely blocking eviction because of a pinned
- *     transaction ID, called by eviction to determine if a worker thread should be released from
- *     eviction.
+ *     Return an error if this transaction is likely blocking eviction from making progress, called
+ *     by eviction to determine if a worker thread should be released.
  */
 int
 __wt_txn_is_blocking(WT_SESSION_IMPL *session)
 {
+    WT_CONNECTION_IMPL *conn;
+    WT_EVICT *evict;
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
+    double trigger;
     uint64_t global_oldest;
+    bool is_txn_id_global_oldest;
 
+    conn = S2C(session);
+    evict = conn->evict;
     txn = session->txn;
     txn_shared = WT_SESSION_TXN_SHARED(session);
-    global_oldest = __wt_atomic_load_uint64_v_relaxed(&S2C(session)->txn_global.oldest_id);
+    global_oldest = __wt_atomic_load_uint64_v_relaxed(&conn->txn_global.oldest_id);
 
-    /* We can't roll back prepared transactions. */
-    if (F_ISSET(txn, WT_TXN_PREPARE))
+    /* We can't roll back prepared transactions, nor any transaction during recovery. */
+    if (F_ISSET(txn, WT_TXN_PREPARE) || F_ISSET(conn, WT_CONN_RECOVERING))
         return (0);
 
 #ifndef WT_STANDALONE_BUILD
@@ -2915,18 +2917,45 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
 #endif
 
     /*
-     * Check if either the transaction's ID or its pinned ID is equal to the oldest transaction ID.
+     * Once eviction is stuck, check if either the transaction's ID or its pinned ID is equal to the
+     * oldest transaction ID: it is likely to be the reason the cache is stuck full.
      */
-    bool is_txn_id_global_oldest;
-    if (((is_txn_id_global_oldest =
-            __wt_atomic_load_uint64_v_relaxed(&txn_shared->id) == global_oldest)) ||
-      __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id) == global_oldest) {
+    if (__wt_evict_cache_stuck(session) &&
+      (((is_txn_id_global_oldest =
+           __wt_atomic_load_uint64_v_relaxed(&txn_shared->id) == global_oldest)) ||
+        __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id) == global_oldest)) {
         if (is_txn_id_global_oldest)
             WT_STAT_CONN_INCR(session, txn_rollback_oldest_id);
         else
             WT_STAT_CONN_INCR(session, txn_rollback_oldest_pinned);
         WT_RET_SUB(
           session, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION, WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
+    }
+
+    /*
+     * A transaction whose own unresolved dirty content already exceeds the updates trigger (or the
+     * dirty trigger, whichever is lower, since the two are not guaranteed to be ordered) can never
+     * bring the cache back under that trigger by staying alive, so roll it back now while that is
+     * still legal.
+     *
+     * Requires an actual modification: instantiating a fast-truncated column-store page while
+     * reading it charges dirty bytes to whichever transaction happens to touch the page
+     * (FIXME-WT-18271), and rolling back a reader over that would be both useless and unsupported.
+     */
+    if (txn->mod_count != 0) {
+        trigger = WT_MIN(__wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger),
+          __wt_atomic_load_double_relaxed(&evict->eviction_dirty_trigger));
+        /*
+         * A zero trigger would rebuild the threshold as zero and roll back every transaction that
+         * dirtied anything at all. Configuration never leaves either trigger at zero, so treat it
+         * as a value we raced with rather than a threshold to enforce.
+         */
+        if (trigger > DBL_EPSILON &&
+          txn->bytes_dirty > (uint64_t)(trigger * conn->cache_size) / 100) {
+            WT_STAT_CONN_INCR(session, txn_rollback_too_large_for_cache);
+            WT_RET_SUB(session, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+              WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE);
+        }
     }
     return (0);
 }

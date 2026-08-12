@@ -175,7 +175,7 @@ check_data_rows(WT_SESSION *session, const SLOT_STATE states[MAX_POOL_SIZE], uin
         WT_CURSOR *cursor;
         testutil_check(session->open_cursor(session, states[s].uri, NULL, NULL, &cursor));
 
-        /* Rows are valued with their commit timestamp; a mismatch means another generation's
+        /* Rows hold their commit timestamp; a mismatch means another generation's
          * data. */
         char expected_val[32];
         testutil_snprintf(expected_val, sizeof(expected_val), "%" PRIu64, states[s].commit_ts);

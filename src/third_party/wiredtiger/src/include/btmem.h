@@ -879,6 +879,7 @@ struct __wt_page {
 struct __wt_page_walk_skip_stats {
     size_t total_del_pages_skipped;
     size_t total_inmem_del_pages_skipped;
+    uint64_t total_skip_lock_contended;
 };
 
 /*

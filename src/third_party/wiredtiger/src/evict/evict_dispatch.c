@@ -295,6 +295,7 @@ __wti_evict_app_assist_worker(
     WT_CONNECTION_IMPL *conn = S2C(session);
     WT_EVICT *evict = conn->evict;
     uint64_t time_start = 0;
+    uint64_t initial_progress;
     WT_TXN_GLOBAL *txn_global = &conn->txn_global;
     WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
 
@@ -325,26 +326,25 @@ __wti_evict_app_assist_worker(
         time_start = __wt_clock(session);
 
     /*
-     * Note that this for loop is designed to reset expected eviction error codes before exiting,
+     * Note that this loop is designed to reset expected eviction error codes before exiting,
      * namely, the busy return and empty eviction queue. We do not need the calling functions to
      * have to deal with internal eviction return codes.
      */
-    for (uint64_t initial_progress = __wt_atomic_load_uint64_v_relaxed(&evict->eviction_progress);;
-      ret = 0) {
+    initial_progress = __wt_atomic_load_uint64_v_relaxed(&evict->eviction_progress);
+    while (true) {
         /*
-         * If eviction is stuck, check if this thread is likely causing problems and should be
-         * rolled back. Ignore if in recovery, those transactions can't be rolled back.
+         * Check if this thread is likely causing problems and should be rolled back. Recovery and
+         * prepared transactions are skipped internally, and the cache-stuck-dependent checks only
+         * apply once eviction is actually stuck.
          */
-        if (!F_ISSET(conn, WT_CONN_RECOVERING) && __wt_evict_cache_stuck(session)) {
-            ret = __wt_txn_is_blocking(session);
-            if (ret == WT_ROLLBACK) {
-                __wt_atomic_decrement_if_positive(&evict->evict_aggressive_score);
-                if (F_ISSET(session, WT_SESSION_SAVE_ERRORS))
-                    __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "rollback reason: %s",
-                      session->err_info.err_msg);
-            }
-            WT_ERR(ret);
+        ret = __wt_txn_is_blocking(session);
+        if (ret == WT_ROLLBACK) {
+            __wt_atomic_decrement_if_positive(&evict->evict_aggressive_score);
+            if (F_ISSET(session, WT_SESSION_SAVE_ERRORS))
+                __wt_verbose_debug1(
+                  session, WT_VERB_TRANSACTION, "rollback reason: %s", session->err_info.err_msg);
         }
+        WT_ERR(ret);
 
         /*
          * Check if we've exceeded our operation timeout, this would also get called from the
@@ -356,7 +356,8 @@ __wti_evict_app_assist_worker(
         if (__wt_op_timer_fired(session))
             break;
 
-        /* Check if we have exceeded the global or the session timeout for waiting on the cache. */
+        /* Check if we have exceeded the global or the session timeout for waiting on the cache.
+         */
         if (time_start != 0 && cache_max_wait_us != 0) {
             uint64_t time_stop = __wt_clock(session);
             if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) > cache_max_wait_us)

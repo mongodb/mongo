@@ -69,8 +69,8 @@ set_ts(WT_CONNECTION *conn, const char *name, uint64_t ts)
 /*
  * set_frontier --
  *     Move the connection's frontier - the oldest and stable timestamps and the stable schema epoch
- *     - to one allocator value. The three always advance together: a single counter feeds both the
- *     timestamp and the epoch axis, so everything at or below the value is committed and published.
+ *     - to one timestamp. The three always advance together, so everything at or below that
+ *     timestamp is committed and published.
  */
 void
 set_frontier(WT_CONNECTION *conn, uint64_t ts)

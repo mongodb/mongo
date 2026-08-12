@@ -69,7 +69,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
     case WT_PAGE_COL_INT:
         recno = 0; /* Less than any valid record number. */
         WT_INTL_FOREACH_BEGIN (session, page, ref) {
-            WT_ASSERT_ALWAYS(session, ref->home == page,
+            WT_ASSERT_ALWAYS(session, __wt_atomic_load_ptr_relaxed(&ref->home) == page,
               "Internal page in illegal state, child ref is referencing an incorrect page");
             WT_ASSERT_ALWAYS(
               session, ref->ref_recno > recno, "Out of order refs detected in parent index");
@@ -85,7 +85,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 
         slot = 0;
         WT_INTL_FOREACH_BEGIN (session, page, ref) {
-            WT_ASSERT_ALWAYS(session, ref->home == page,
+            WT_ASSERT_ALWAYS(session, __wt_atomic_load_ptr_relaxed(&ref->home) == page,
               "Internal page in illegal state, child ref is referencing an incorrect page");
 
             /*
@@ -228,7 +228,8 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
         if ((ikey = __wt_ref_key_instantiated(ref)) == NULL) {
             __wt_ref_key(from_home, ref, &key, &size);
             WT_RET(__wti_row_ikey(session, 0, key, size, ref));
-            ikey = ref->ref_ikey;
+            /* Relaxed: this thread published the key immediately above. */
+            ikey = __wt_atomic_load_ptr_relaxed(&ref->ref_ikey);
         } else {
             WT_RET(__split_ovfl_key_cleanup(session, from_home, ref));
             *decrp += sizeof(WT_IKEY) + ikey->size;
@@ -368,10 +369,21 @@ __split_ref_prepare(
 
         WT_PAGE_LOCK(session, child);
 
-        /* Switch the WT_REF's to their new page. */
+        /*
+         * Switch the WT_REF's to their new page. The created children have no disk image, so every
+         * key must already have been instantiated: an encoded key would decode against a NULL image
+         * once a reader picks up the new home page.
+         */
         j = 0;
         WT_INTL_FOREACH_BEGIN (session, child, child_ref) {
-            child_ref->home = child;
+            WT_ASSERT(session,
+              child->type != WT_PAGE_ROW_INT || __wt_ref_key_instantiated(child_ref) != NULL);
+            /*
+             * Publish the new home page with a release so a reader that picks it up also sees the
+             * key and address instantiated above; the created page has no disk image, so an on-page
+             * key or address paired with it would be decoded against nothing.
+             */
+            __wt_atomic_store_ptr_release(&child_ref->home, child);
             child_ref->pindex_hint = j++;
         }
         WT_INTL_FOREACH_END;
@@ -466,7 +478,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
          * Initialize the page's child reference; we need a copy of the page's key.
          */
         ref = *alloc_refp++;
-        ref->home = root;
+        __wt_atomic_store_ptr_relaxed(&ref->home, root);
         ref->page = child;
         ref->addr = NULL;
         if (root->type == WT_PAGE_ROW_INT) {
@@ -672,7 +684,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
 #endif
 
     btree = S2BT(session);
-    parent = ref->home;
+    parent = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
 
     alloc_index = pindex = NULL;
     parent_decr = 0;
@@ -771,7 +783,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
         next_ref = pindex->index[i];
         if (next_ref == ref) {
             for (j = 0; j < new_entries; ++j) {
-                ref_new[j]->home = parent;
+                __wt_atomic_store_ptr_relaxed(&ref_new[j]->home, parent);
                 ref_new[j]->pindex_hint = hint++;
                 *alloc_refp++ = ref_new[j];
             }
@@ -1041,7 +1053,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
          * Initialize the page's child reference; we need a copy of the page's key.
          */
         ref = *alloc_refp++;
-        ref->home = parent;
+        __wt_atomic_store_ptr_relaxed(&ref->home, parent);
         ref->page = child;
         ref->addr = NULL;
         if (page->type == WT_PAGE_ROW_INT) {
@@ -1248,7 +1260,7 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock, WT_PA
      * to use a different lock if we have to block reconciliation anyway.
      */
     for (;;) {
-        parent = ref->home;
+        parent = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
 
         /* Encourage races. */
         __wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_7, NULL);
@@ -1260,7 +1272,7 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock, WT_PA
             WT_RET(WT_PAGE_TRYLOCK(session, parent));
         } else
             WT_PAGE_LOCK(session, parent);
-        if (parent == ref->home)
+        if (parent == (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home))
             break;
         WT_PAGE_UNLOCK(session, parent);
     }
@@ -1935,7 +1947,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
     case WT_PAGE_ROW_LEAF:
         delta_enabled = WT_DELTA_ENABLED_FOR_PAGE(session, page->type);
         if (delta_enabled && first) {
-            __wt_ref_key(old_ref->home, old_ref, &key, &key_size);
+            __wt_ref_key_home(old_ref, &key, &key_size);
             WT_RET(__wti_row_ikey(session, 0, key, key_size, ref));
             if (incrp)
                 *incrp += sizeof(WT_IKEY) + key_size;
@@ -1986,7 +1998,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
         WT_REF_SET_STATE(ref, WT_REF_DISK);
     } else if (delta_enabled && multi_entries == 1 && old_ref->addr != NULL) {
         old_addr = (WT_ADDR *)old_ref->addr;
-        if (!__wt_off_page(old_ref->home, old_addr))
+        if (!__wt_off_page((WT_PAGE *)__wt_atomic_load_ptr_relaxed(&old_ref->home), old_addr))
             ref->addr = old_addr;
         else {
             WT_RET(__wt_calloc_one(session, &addr));
@@ -2065,13 +2077,13 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     parent_incr += sizeof(WT_REF);
     child = split_ref[0];
     child->page = ref->page;
-    child->home = ref->home;
+    __wt_atomic_store_ptr_relaxed(&child->home, __wt_atomic_load_ptr_relaxed(&ref->home));
     child->pindex_hint = ref->pindex_hint;
     F_SET(child, WT_REF_FLAG_LEAF);
     WT_REF_SET_STATE(child, WT_REF_MEM); /* Visible as soon as the split completes. */
     child->addr = ref->addr;
     if (type == WT_PAGE_ROW_LEAF) {
-        __wt_ref_key(ref->home, ref, &key, &key_size);
+        __wt_ref_key_home(ref, &key, &key_size);
         WT_ERR(__wti_row_ikey(session, 0, key, key_size, child));
         parent_incr += sizeof(WT_IKEY) + key_size;
     } else

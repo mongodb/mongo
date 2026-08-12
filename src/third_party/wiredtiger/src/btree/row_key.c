@@ -411,7 +411,8 @@ __wti_row_ikey(
     {
         uintptr_t oldv;
 
-        oldv = (uintptr_t)ref->ref_ikey;
+        /* Relaxed: the compare-and-swap below provides the ordering. */
+        oldv = (uintptr_t)__wt_atomic_load_ptr_relaxed(&ref->ref_ikey);
         WT_DIAGNOSTIC_YIELD;
 
         /*
@@ -424,7 +425,12 @@ __wti_row_ikey(
         WT_ASSERT(session, cas_success);
     }
 #else
-    ref->ref_ikey = ikey;
+    /*
+     * Publish the key before a split can move this reference to a home page with no disk image; a
+     * reader that sees the new home must see the instantiated key. Pairs with the acquire reads of
+     * the key.
+     */
+    __wt_atomic_store_ptr_release(&ref->ref_ikey, ikey);
 #endif
     return (0);
 }

@@ -22,7 +22,7 @@ __disagg_get_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64
   uint64_t lsn, WT_ITEM *item)
 {
     WT_PAGE_LOG_GET_ARGS get_args;
-    u_int count, retry;
+    u_int count;
 
     if (page_log == NULL)
         return (ENOTSUP);
@@ -31,30 +31,21 @@ __disagg_get_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64
 
     WT_CLEAR(get_args);
     get_args.lsn = lsn;
+    count = 1;
 
-    retry = 0;
-    for (;;) {
-        count = 1;
-        WT_RET(page_log->plh_get(page_log, &session->iface, page_id, 0, &get_args, item, &count));
-        WT_ASSERT(session, count <= 1); /* Corrupt data. */
+    /*
+     * FIXME-WT-18278 Distinguish "not found" from other error returns. count == 0 may be a
+     * redundant not-found check, revisit later.
+     */
+    WT_RET(page_log->plh_get(page_log, &session->iface, page_id, 0, &get_args, item, &count));
+    WT_ASSERT(session, count <= 1); /* Corrupt data. */
 
-        /* Found the data. */
-        if (count == 1)
-            break;
+    /* Found the data. */
+    if (count == 1)
+        return (0);
 
-        /* Otherwise retry up to 100 times to account for page materialization delay. */
-        if (retry > 100) {
-            __wt_verbose_error(session, WT_VERB_READ,
-              "read failed for page ID %" PRIu64 ", lsn %" PRIu64, page_id, lsn);
-            return (EIO);
-        }
-        __wt_verbose_notice(session, WT_VERB_READ,
-          "retry #%" PRIu32 " for page_id %" PRIu64 ", lsn %" PRIu64, retry, page_id, lsn);
-        __wt_sleep(0, 10000 + retry * 5000);
-        ++retry;
-    }
-
-    return (0);
+    WT_RET_MSG(session, EIO,
+      "Page ID %" PRIu64 ", LSN %" PRIu64 " not found in disaggregated storage", page_id, lsn);
 }
 
 /*

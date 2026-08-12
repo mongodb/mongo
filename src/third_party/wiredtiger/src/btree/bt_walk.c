@@ -90,7 +90,7 @@ __split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp
      * until the page-index is updated, but I'm not willing to debug that
      * one if I'm wrong.)
      */
-    if (pindex->index[pindex->entries - 1]->home != ref->page)
+    if (__wt_atomic_load_ptr_relaxed(&pindex->index[pindex->entries - 1]->home) != ref->page)
         return (true);
 
     *pindexp = pindex;

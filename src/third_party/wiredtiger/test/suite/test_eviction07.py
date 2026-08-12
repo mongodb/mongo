@@ -52,13 +52,19 @@ class test_eviction07(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all),' \
         'eviction_dirty_target=1,eviction_dirty_trigger=5,eviction=(threads_max=1)'
 
-    def _pin_dirty_content(self, pin_session, pin_cursor):
-        # Hold dirty content above the trigger in an uncommitted transaction. Reconciliation has to
-        # restore these updates to the page, so eviction cannot reclaim them.
-        pin_session.begin_transaction()
+    def _pin_dirty_content(self, pin_sessions_and_cursors):
+        # Hold dirty content above the trigger across several uncommitted transactions.
+        # Reconciliation has to restore these updates to the page, so eviction cannot reclaim them.
+        # No single transaction's own dirty content may exceed the (lower of the updates or dirty)
+        # trigger, or it becomes a candidate for rollback in its own right rather than a page
+        # eviction cannot reconcile.
         value = 'a' * 4096
-        for i in range(1500):
-            pin_cursor[i] = value
+        rows_per_txn = 200
+        for txn_num, (pin_session, pin_cursor) in enumerate(pin_sessions_and_cursors):
+            pin_session.begin_transaction()
+            base = txn_num * rows_per_txn
+            for i in range(rows_per_txn):
+                pin_cursor[base + i] = value
 
     def _resolve_until_bounded_wait(self, cursor, stat_session):
         # Resolve modified transactions while the pinned transaction prevents eviction from
@@ -91,19 +97,22 @@ class test_eviction07(wttest.WiredTigerTestCase):
 
     def test_bounded_assist_at_transaction_resolution(self):
         self.session.create(self.uri, 'key_format=i,value_format=S')
-        stat_session = pin_session = None
-        pin_cursor = cursor = None
-        pin_txn_active = resolution_txn_active = False
+        stat_session = None
+        pin_sessions_and_cursors = []
+        cursor = None
+        pin_txns_active = resolution_txn_active = False
 
         try:
             # Reading statistics is a cursor operation that can itself be pulled into an eviction
             # assist, so read them from a session that never waits for the cache.
             stat_session = self.conn.open_session('cache_max_wait_ms=1')
 
-            pin_session = self.conn.open_session()
-            pin_cursor = pin_session.open_cursor(self.uri)
-            self._pin_dirty_content(pin_session, pin_cursor)
-            pin_txn_active = True
+            for _ in range(8):
+                pin_session = self.conn.open_session()
+                pin_sessions_and_cursors.append(
+                    (pin_session, pin_session.open_cursor(self.uri)))
+            self._pin_dirty_content(pin_sessions_and_cursors)
+            pin_txns_active = True
 
             dirty_trigger = self.cache_bytes * self.dirty_trigger_pct // 100
             dirty = self.get_stat(stat.conn.cache_bytes_dirty, session=stat_session)
@@ -122,15 +131,15 @@ class test_eviction07(wttest.WiredTigerTestCase):
             dirty = self.get_stat(stat.conn.cache_bytes_dirty, session=stat_session)
             self.assertGreater(dirty, dirty_trigger)
         finally:
-            if pin_txn_active:
-                pin_session.rollback_transaction()
+            if pin_txns_active:
+                for pin_session, _ in pin_sessions_and_cursors:
+                    pin_session.rollback_transaction()
             if resolution_txn_active:
                 self.session.rollback_transaction()
             if cursor is not None:
                 cursor.close()
-            if pin_cursor is not None:
+            for pin_session, pin_cursor in pin_sessions_and_cursors:
                 pin_cursor.close()
-            if pin_session is not None:
                 pin_session.close()
             if stat_session is not None:
                 stat_session.close()

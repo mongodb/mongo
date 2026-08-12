@@ -318,12 +318,14 @@ __prepared_discover_tree_walk_skip(
 {
     WT_ADDR *addr;
     WT_CELL_UNPACK_ADDR vpack;
+    WT_PAGE *home;
     WT_PAGE_DELETED *page_del;
     WT_TIME_AGGREGATE *ta;
 
     WT_UNUSED(context);
     WT_UNUSED(visible_all);
     addr = ref->addr;
+    home = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
 
     *skipp = false; /* Default to reading */
 
@@ -361,9 +363,9 @@ __prepared_discover_tree_walk_skip(
     /*
      * Check whether this on-disk page or it's children has any prepared content.
      */
-    if (!__wt_off_page(ref->home, addr)) {
+    if (!__wt_off_page(home, addr)) {
         /* Check if the page is obsolete using the page disk address. */
-        __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &vpack);
+        __wt_cell_unpack_addr(session, home->dsk, (WT_CELL *)addr, &vpack);
         /* Retrieve the time aggregate from the unpacked address cell. */
         __wt_cell_get_ta(&vpack, &ta);
         if (!ta->prepare)

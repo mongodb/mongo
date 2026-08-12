@@ -459,8 +459,11 @@ __checkpoint_disagg_maybe_publish(WT_SESSION_IMPL *session, WT_BTREE *btree)
               dhandle->name);
     }
 
-    if (published)
+    if (published) {
         F_CLR_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH);
+        __wt_evict_file_exclusive_off(session);
+    }
+
     return (0);
 }
 
@@ -1267,29 +1270,43 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, WT_CHECKPOINT_DB
      * the retiring buffer once.
      */
     if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
-        WT_TXN_SNAPSHOT *src, *dst;
+        WT_CKPT_EVICTION_SNAP *buf;
+        WT_TXN_SNAPSHOT *dst, *src;
         uint32_t capacity, count, cur_idx, new_idx;
 
         src = &txn->snapshot_data;
         count = src->snapshot_count;
         capacity = (uint32_t)conn->session_array.size;
 
+        /* The previous checkpoint must have retired its snapshot before finishing. */
+        WT_ASSERT(session, !__wt_atomic_load_bool_relaxed(&conn->ckpt_eviction_snap_published));
+
+        /* Write the second buffer, so readers of the published one are undisturbed. */
         cur_idx = __wt_atomic_load_uint32_relaxed(&conn->ckpt_eviction_snap_idx);
         new_idx = 1 - cur_idx;
+        buf = &conn->ckpt_eviction_snap[new_idx];
 
-        WT_ERR(__wt_realloc_def(session, &conn->ckpt_eviction_snap_capacity[new_idx], capacity,
-          &conn->ckpt_eviction_snap_array[new_idx]));
+        WT_ERR(__wt_realloc_def(session, &buf->snap_capacity, capacity, &buf->snap_array));
 
-        dst = &conn->ckpt_eviction_snap[new_idx];
+        dst = &buf->snap;
         dst->snap_min = src->snap_min;
         dst->snap_max = src->snap_max;
         dst->snapshot_count = count;
-        dst->snapshot = conn->ckpt_eviction_snap_array[new_idx];
+        dst->snapshot = buf->snap_array;
         if (count > 0)
             memcpy(dst->snapshot, src->snapshot, count * sizeof(src->snapshot[0]));
 
-        WT_RELEASE_WRITE_WITH_BARRIER(conn->ckpt_eviction_snap_published, true);
-        __wt_atomic_store_uint32_release(&conn->ckpt_eviction_snap_idx, new_idx);
+#ifdef HAVE_DIAGNOSTIC
+        __wt_atomic_store_uint64_relaxed(&buf->gen, __wt_gen(session, WT_GEN_CHECKPOINT));
+#endif
+        __wt_atomic_store_uint32_relaxed(&conn->ckpt_eviction_snap_idx, new_idx);
+
+        /*
+         * Publish. The release store orders the buffer and the index ahead of it, so a reader that
+         * sees the snapshot published sees both. The index must not be stored after this, or a
+         * reader could pair it with an index the previous checkpoint published.
+         */
+        __wt_atomic_store_bool_release(&conn->ckpt_eviction_snap_published, true);
         /*
          * Wait for eviction threads still copying from the retiring buffer before it can be reused.
          * In practice this returns immediately: readers hold the generation only for a memcpy. This
@@ -1690,6 +1707,63 @@ __checkpoint_log_stage(WT_SESSION_IMPL *session, uint32_t log_flags)
 }
 
 /*
+ * __wt_ckpt_eviction_snap_current --
+ *     Return the snapshot the running checkpoint published, else NULL. Callers must hold the
+ *     checkpoint snapshot generation across this call and any use of the result.
+ */
+WT_TXN_SNAPSHOT *
+__wt_ckpt_eviction_snap_current(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    uint32_t snap_idx;
+#ifdef HAVE_DIAGNOSTIC
+    uint64_t ckpt_gen;
+#endif
+
+    conn = S2C(session);
+
+    /*
+     * Read the generation before the flag below, so that a checkpoint boundary crossed between the
+     * two can only raise the current generation, never the stamp we compare against it.
+     */
+#ifdef HAVE_DIAGNOSTIC
+    ckpt_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
+#endif
+
+    /*
+     * Nothing is published between checkpoints, or before a checkpoint takes its snapshot. Make
+     * sure to acquire this before the index, not after: the index is ordered by this load, so
+     * reading the index first could pair an index the last checkpoint published with a snapshot the
+     * running one published.
+     */
+    if (!__wt_atomic_load_bool_acquire(&conn->ckpt_eviction_snap_published))
+        return (NULL);
+
+    /*
+     * A published snapshot belongs to the checkpoint still running, so it cannot predate the
+     * generation sampled above. A newer one is legal rather than a defect, which is why this is not
+     * an equality check: a checkpoint starting between that sample and this read publishes a higher
+     * stamp. Only an older one is a defect, meaning a checkpoint finished without retiring its
+     * snapshot.
+     */
+    snap_idx = __wt_atomic_load_uint32_relaxed(&conn->ckpt_eviction_snap_idx);
+    WT_ASSERT(session,
+      __wt_atomic_load_uint64_relaxed(&conn->ckpt_eviction_snap[snap_idx].gen) >= ckpt_gen);
+
+    return (&conn->ckpt_eviction_snap[snap_idx].snap);
+}
+
+/*
+ * __checkpoint_eviction_snapshot_retire --
+ *     Retire the eviction snapshot this checkpoint published.
+ */
+static WT_INLINE void
+__checkpoint_eviction_snapshot_retire(WT_SESSION_IMPL *session)
+{
+    __wt_atomic_store_bool_release(&S2C(session)->ckpt_eviction_snap_published, false);
+}
+
+/*
  * __checkpoint_db_internal --
  *     Checkpoint a database or a list of objects in the database.
  */
@@ -1921,6 +1995,12 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     }
     WT_ERR(__wt_meta_sysinfo_set(session, ckpt_cfg.name, ckpt_cfg.name_len));
 
+    /*
+     * Retire the snapshot before releasing it. Once it is released nothing pins these ids and the
+     * oldest id can advance past them, so eviction must stop using it first.
+     */
+    __checkpoint_eviction_snapshot_retire(session);
+
     /* Release the snapshot so we aren't pinning updates in cache. */
     WT_ERR(__wti_checkpoint_parallel_release_snapshot(session));
     __wt_txn_release_snapshot(session);
@@ -2123,6 +2203,12 @@ __checkpoint_db_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RELEASE_BARRIER();
 
     ret = __checkpoint_db_internal(session, cfg);
+
+    /*
+     * The checkpoint retires its published eviction snapshot before releasing it. Repeat that here
+     * to cover the paths that fail before reaching it.
+     */
+    __checkpoint_eviction_snapshot_retire(session);
 
     __wt_atomic_store_bool_v_release(&txn_global->checkpoint_running, false);
 
@@ -2742,6 +2828,12 @@ bool
 __ut_checkpoint_skip_ckptlist(WT_CKPT *ckptbase)
 {
     return (__checkpoint_skip_ckptlist(ckptbase, NULL));
+}
+
+void
+__ut_checkpoint_eviction_snapshot_retire(WT_SESSION_IMPL *session)
+{
+    __checkpoint_eviction_snapshot_retire(session);
 }
 #endif
 

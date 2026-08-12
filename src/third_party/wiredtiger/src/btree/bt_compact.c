@@ -105,6 +105,7 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     WT_ADDR *addr;
     WT_CELL_UNPACK_ADDR unpack;
     WT_DECL_RET;
+    WT_PAGE *home;
     uint8_t *new_cookie;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
@@ -119,10 +120,12 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     new_cookie = NULL;
     WT_ERR(__wt_strndup(session, copy->addr, copy->size, &new_cookie));
 
-    if (__wt_off_page(ref->home, addr))
+    /* Read the home page once; the off-page test and the cell it selects have to agree. */
+    home = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
+    if (__wt_off_page(home, addr))
         __wti_ref_addr_safe_free(session, addr->block_cookie, addr->block_cookie_size);
     else {
-        __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &unpack);
+        __wt_cell_unpack_addr(session, home->dsk, (WT_CELL *)addr, &unpack);
 
         WT_ERR(__wt_calloc_one(session, &addr));
         addr->ta.newest_start_durable_ts = unpack.ta.newest_start_durable_ts;

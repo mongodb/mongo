@@ -300,7 +300,8 @@ __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
     /* Ignore internal pages, these are taken care of during reconciliation. */
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
         __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
-          "%p: skipping internal page with parent: %p", (void *)ref, (void *)ref->home);
+          "%p: skipping internal page with parent: %p", (void *)ref,
+          (void *)__wt_atomic_load_ptr_relaxed(&ref->home));
         return (0);
     }
 

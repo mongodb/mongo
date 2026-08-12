@@ -1894,6 +1894,8 @@ __txn_incr_bytes_dirty(WT_SESSION_IMPL *session, size_t size, bool new_update)
     if (__wt_session_gen(session, WT_GEN_EVICT) != 0)
         return;
 
+    session->txn->bytes_dirty += size;
+
     WT_STAT_CONN_INCRV_ATOMIC(session, cache_updates_txn_uncommitted_bytes, (int64_t)size);
     WT_STAT_CONN_INCRV_ATOMIC(session, cache_updates_txn_uncommitted_count, 1);
     WT_STAT_SESSION_INCRV(session, txn_bytes_dirty, (int64_t)size);
@@ -1908,6 +1910,8 @@ static void
 __txn_clear_bytes_dirty(WT_SESSION_IMPL *session)
 {
     int64_t val;
+
+    session->txn->bytes_dirty = 0;
 
     val = WT_STAT_SESSION_READ(&(session)->stats, txn_bytes_dirty);
     if (val != 0) {

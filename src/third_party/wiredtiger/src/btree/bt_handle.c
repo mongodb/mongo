@@ -631,10 +631,17 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
       !WT_IS_URI_METADATA(btree->dhandle->name) &&
       (__wt_get_stable_disaggregated_schema_epoch(session) != WT_SCHEMA_EPOCH_NONE);
 
-    if (awaits_publish)
+    if (awaits_publish) {
         F_SET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH);
-    else
+        /*
+         * Disable eviction because it can leave pages clean without a durable address, causing the
+         * publishing checkpoint to skip them.
+         */
+        WT_RET(__wt_evict_file_exclusive_on(session));
+    } else if (F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH)) {
         F_CLR_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH);
+        __wt_evict_file_exclusive_off(session);
+    }
 
     /*
      * This option allows the tree to be reconciled by eviction. But we only replace the disk image
@@ -1031,7 +1038,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool empty_ckpt)
 
         WT_INTL_INDEX_GET_SAFE(root, pindex);
         ref = pindex->index[0];
-        ref->home = root;
+        __wt_atomic_store_ptr_relaxed(&ref->home, root);
         ref->page = NULL;
         ref->addr = NULL;
         F_SET(ref, WT_REF_FLAG_LEAF);
@@ -1044,7 +1051,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool empty_ckpt)
 
         WT_INTL_INDEX_GET_SAFE(root, pindex);
         ref = pindex->index[0];
-        ref->home = root;
+        __wt_atomic_store_ptr_relaxed(&ref->home, root);
         ref->page = NULL;
         ref->addr = NULL;
         F_SET(ref, WT_REF_FLAG_LEAF);

@@ -33,6 +33,8 @@
     "Transaction has the oldest pinned transaction ID"
 #define WT_TXN_ROLLBACK_REASON_STEP_DOWN \
     "Write transaction straddled the step-down timestamp setting boundary"
+#define WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE \
+    "Transaction dirty content alone exceeds the eviction updates or dirty trigger"
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TXN_LOG_CKPT_CLEANUP 0x01u
@@ -461,6 +463,13 @@ struct __wt_txn {
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
+
+    /*
+     * Cache bytes this transaction has dirtied and not yet resolved. Eviction cannot reclaim these
+     * bytes, so it is maintained unconditionally rather than tracked only through the equivalent
+     * session statistic.
+     */
+    uint64_t bytes_dirty;
 
     /* Checkpoint status. */
     WT_LSN ckpt_lsn;

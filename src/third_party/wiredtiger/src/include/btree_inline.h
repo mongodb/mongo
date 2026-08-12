@@ -1259,7 +1259,7 @@ __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_onl
      * marking the original parent and all of the newly-created children as dirty. In other words,
      * if we have the wrong parent page, everything was marked dirty already.
      */
-    parent = ref->home;
+    parent = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
     WT_RET(__wt_page_modify_init(session, parent));
     if (page_only)
         __wt_page_only_modify_set(session, parent);
@@ -1290,6 +1290,7 @@ static WT_INLINE void
 __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 {
     uintptr_t v;
+    void *ikey;
 
 /*
  * An internal page key is in one of two places: if we instantiated the
@@ -1318,14 +1319,50 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 #define WT_IK_DECODE_KEY_LEN(v) ((v) >> 32)
 #define WT_IK_ENCODE_KEY_OFFSET(v) ((uintptr_t)(v) << 1)
 #define WT_IK_DECODE_KEY_OFFSET(v) (((v) & 0xFFFFFFFF) >> 1)
-    v = (uintptr_t)ref->ref_ikey;
+    /*
+     * Read the key once: both forms are valid at any instant, but the flag test and the value used
+     * have to agree. A split can instantiate the key underneath us, so a caller handed an
+     * instantiated key has to see its contents. That is consume ordering, which we spell as acquire
+     * because consume is not usable in practice; pairs with the release store that publishes an
+     * instantiated key.
+     *
+     * This says nothing about which page the key belongs to. An encoded key is an offset into the
+     * disk image of the page it was encoded from, so the caller owes us a page it is valid against.
+     */
+    ikey = __wt_atomic_load_ptr_acquire(&ref->ref_ikey);
+    v = (uintptr_t)ikey;
     if (v & WT_IK_FLAG) {
         *(void **)keyp = WT_PAGE_REF_OFFSET(page, WT_IK_DECODE_KEY_OFFSET(v));
         *sizep = WT_IK_DECODE_KEY_LEN(v);
     } else {
-        *(void **)keyp = WT_IKEY_DATA(ref->ref_ikey);
-        *sizep = ((WT_IKEY *)ref->ref_ikey)->size;
+        *(void **)keyp = WT_IKEY_DATA(ikey);
+        *sizep = ((WT_IKEY *)ikey)->size;
     }
+}
+
+/*
+ * __wt_ref_key_home --
+ *     Return a reference to a row-store internal page key, relative to the reference's own home
+ *     page.
+ */
+static WT_INLINE void
+__wt_ref_key_home(WT_REF *ref, void *keyp, size_t *sizep)
+{
+    WT_PAGE *home;
+
+    /*
+     * A split instantiates a moved reference's key before pointing the reference at a newly created
+     * page, which has no disk image. Acquire the home page so the key cannot be read from an
+     * earlier state than it: a new home page paired with a still-encoded key decodes the offset
+     * against a NULL image and yields the offset itself as the key. The acquire belongs on this
+     * read, not on the key, because it has to keep the read that follows from moving ahead of it.
+     * Pairs with the release store that publishes a new home page.
+     *
+     * Callers holding the page a reference was encoded against decode against it directly; a stale
+     * encoded key is still correct there, so they need no ordering.
+     */
+    home = (WT_PAGE *)__wt_atomic_load_ptr_acquire(&ref->home);
+    __wt_ref_key(home, ref, keyp, sizep);
 }
 
 /*
@@ -1352,13 +1389,16 @@ __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK_ADDR *unpack)
 static WT_INLINE WT_IKEY *
 __wt_ref_key_instantiated(WT_REF *ref)
 {
-    uintptr_t v;
+    void *ikey;
 
     /*
-     * See the comment in __wt_ref_key for an explanation of the magic.
+     * See the comment in __wt_ref_key for an explanation of the magic. Read once so the flag test
+     * and the returned value can't disagree, and acquire so a caller that sees the key can safely
+     * dereference it: consume ordering is what that needs, but acquire is how we spell it. Pairs
+     * with the release store that publishes an instantiated key.
      */
-    v = (uintptr_t)ref->ref_ikey;
-    return (v & WT_IK_FLAG ? NULL : (WT_IKEY *)ref->ref_ikey);
+    ikey = __wt_atomic_load_ptr_acquire(&ref->ref_ikey);
+    return ((uintptr_t)ikey & WT_IK_FLAG ? NULL : (WT_IKEY *)ikey);
 }
 
 /*
@@ -2513,7 +2553,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * matter the size of the key.)
      */
     if (__wt_btree_syncing_by_other_sessions(session) &&
-      F_ISSET_ATOMIC_16(ref->home, WT_PAGE_INTL_OVERFLOW_KEYS)) {
+      F_ISSET_ATOMIC_16(
+        (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home), WT_PAGE_INTL_OVERFLOW_KEYS)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_overflow_keys);
         return (false);
     }
@@ -2740,7 +2781,7 @@ __wt_split_descent_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX *sa
      * this code, don't re-order that acquisition with this check.
      */
     WT_COMPILER_BARRIER();
-    WT_INTL_INDEX_GET(session, ref->home, pindex);
+    WT_INTL_INDEX_GET(session, (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home), pindex);
     return (pindex != saved_pindex);
 }
 
@@ -2862,6 +2903,7 @@ __wt_btcur_skip_page(
     WT_PAGE_WALK_SKIP_STATS *walk_skip_stats;
     WT_REF_STATE previous_state;
     WT_TIME_AGGREGATE *ta;
+    uint64_t sleep_usecs, yield_count;
     bool clean_page;
 
     WT_UNUSED(context);
@@ -2886,12 +2928,16 @@ __wt_btcur_skip_page(
 
     /*
      * We are making these decisions while holding a lock for the page as checkpoint or eviction can
-     * make changes to the data structures (i.e., aggregate timestamps) we are reading. Skipping is
-     * only an optimization, so try the lock once and read the page rather than spin under
-     * contention.
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
+     *
+     * Wait for the lock rather than giving up on the skip: abandoning it does not avoid the wait,
+     * it moves the thread into the page-in path, which is more expensive. Back off while waiting
+     * rather than yielding on every iteration, which drives kernel CPU under contention.
      */
-    if (WT_REF_TRYLOCK(session, ref, &previous_state) != 0)
-        return (0);
+    for (sleep_usecs = yield_count = 0; WT_REF_TRYLOCK(session, ref, &previous_state) != 0;)
+        __wt_spin_backoff(&yield_count, &sleep_usecs);
+    if (yield_count != 0)
+        ++walk_skip_stats->total_skip_lock_contended;
 
     /*
      * Check the fast-truncate information; there are 3 cases:
@@ -2981,7 +3027,7 @@ __wt_ref_index_slot(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pinde
          * Copy the parent page's index value: the page can split at any time, but the index's value
          * is always valid, even if it's not up-to-date.
          */
-        WT_INTL_INDEX_GET(session, ref->home, pindex);
+        WT_INTL_INDEX_GET(session, (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home), pindex);
         entries = pindex->entries;
 
         /*
@@ -3044,7 +3090,7 @@ __wt_ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp
          * Find our parent slot on the next higher internal page, the slot from which we move to a
          * next/prev slot, checking that we haven't reached the root.
          */
-        parent_ref = ref->home->pg_intl_parent_ref;
+        parent_ref = ((WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home))->pg_intl_parent_ref;
         if (__wt_ref_is_root(parent_ref))
             break;
         if (pindexp)
@@ -3088,7 +3134,7 @@ __wt_ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp
          * our search doesn't point to the same page as that initial
          * WT_REF, there's a race and we start over again.
          */
-        if (ref->home == parent_ref->page)
+        if ((WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home) == parent_ref->page)
             break;
     }
 

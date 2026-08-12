@@ -348,12 +348,12 @@ main(int argc, char *argv[])
         /* For disagg follower node pick up the latest checkpoint. */
         if (g.disagg_storage_config && !g.disagg_leader)
             follower_read_latest_checkpoint();
-        timestamp_init();
         /* Update the oldest and stable timestamps if they have been previously set. */
         ret = timestamp_query("get=oldest_timestamp", &g.oldest_timestamp);
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
         ret = timestamp_query("get=stable_timestamp", &g.stable_timestamp);
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+        timestamp_init();
         locks_init(g.wts_conn);
     } else {
         wts_create_home();

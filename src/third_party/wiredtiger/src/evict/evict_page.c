@@ -610,7 +610,7 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      * have already been freed.
      */
     if (!LF_ISSET(WT_EVICT_CALL_NO_SPLIT | WT_EVICT_CALL_CLOSING)) {
-        parent = ref->home;
+        parent = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
         WT_INTL_INDEX_GET(session, parent, pindex);
         ndeleted = __wt_atomic_add_uint32_v(&pindex->deleted_entries, 1);
 
@@ -1215,24 +1215,25 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 /*
  * __evict_precise_ckpt_copy_snapshot --
  *     Copy the published checkpoint snapshot into the session's transaction snapshot so that
- *     reconciliation can use it for precise checkpoint eviction visibility. Returns true if the
- *     snapshot was copied, false if no snapshot has been published yet.
+ *     reconciliation can use it for precise checkpoint eviction visibility. Returns false if the
+ *     running checkpoint has not published a snapshot.
  */
 static bool
 __evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *session)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_TXN_SNAPSHOT *snap;
-    uint32_t snap_idx;
-    bool published;
+    bool copied;
 
-    conn = S2C(session);
+    copied = false;
 
+    /*
+     * Hold the generation across the reads below. The publisher writes the inactive buffer and
+     * drains this generation after swapping, so holding it stops the buffer named here from being
+     * recycled while we read it.
+     */
     WT_ENTER_GENERATION(session, WT_GEN_HAS_CKPT_SNAPSHOT);
-    snap_idx = __wt_atomic_load_uint32_acquire(&conn->ckpt_eviction_snap_idx);
-    snap = &conn->ckpt_eviction_snap[snap_idx];
-    WT_ACQUIRE_READ_WITH_BARRIER(published, conn->ckpt_eviction_snap_published);
-    if (published) {
+    /* Take the buffer only when the checkpoint that published it is the one still running. */
+    if ((snap = __wt_ckpt_eviction_snap_current(session)) != NULL) {
         session->txn->snapshot_data.snap_min = snap->snap_min;
         session->txn->snapshot_data.snap_max = snap->snap_max;
         session->txn->snapshot_data.snapshot_count = snap->snapshot_count;
@@ -1240,10 +1241,12 @@ __evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *session)
             memcpy(session->txn->snapshot_data.snapshot, snap->snapshot,
               snap->snapshot_count * sizeof(snap->snapshot[0]));
         F_SET(session->txn, WT_TXN_HAS_SNAPSHOT);
-    }
+        copied = true;
+    } else
+        WT_STAT_CONN_INCR(session, eviction_ckpt_snapshot_declined);
     WT_LEAVE_GENERATION(session, WT_GEN_HAS_CKPT_SNAPSHOT);
 
-    return (published);
+    return (copied);
 }
 
 /*

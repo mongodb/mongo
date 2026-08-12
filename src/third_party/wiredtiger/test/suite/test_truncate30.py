@@ -77,13 +77,22 @@ class test_truncate30(wttest.WiredTigerTestCase):
         # cause leaf splits and those splits propagate to level-2 internal page
         # splits, the page_del from the truncation is already present on the
         # refs inside those level-2 pages.
-        lo = self.session.open_cursor(self.uri)
-        hi = self.session.open_cursor(self.uri)
-        lo.set_key(self.trunc_lo)
-        hi.set_key(self.trunc_hi)
-        self.session.truncate(None, lo, hi, None)
-        lo.close()
-        hi.close()
+        #
+        # Truncate in chunks rather than the whole range in one call: with a 1MB
+        # cache, a single truncate spanning the full range dirties enough content
+        # that its own transaction exceeds the eviction updates/dirty trigger,
+        # tripping the own-transaction rollback in __wt_txn_is_blocking rather than
+        # completing the truncate.
+        chunk = 1000
+        for chunk_lo in range(self.trunc_lo, self.trunc_hi + 1, chunk):
+            chunk_hi = min(chunk_lo + chunk - 1, self.trunc_hi)
+            lo = self.session.open_cursor(self.uri)
+            hi = self.session.open_cursor(self.uri)
+            lo.set_key(chunk_lo)
+            hi.set_key(chunk_hi)
+            self.session.truncate(None, lo, hi, None)
+            lo.close()
+            hi.close()
 
         # Update every non-truncated key with a 15-char value. Each leaf page
         # (512 B, ~39 keys at 3 chars) will reconstitute to ~1170 B during

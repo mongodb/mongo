@@ -152,8 +152,8 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_free(session, conn->recovery_ckpt_snapshot);
 
     /* Free checkpoint eviction snapshot buffer backing arrays. */
-    __wt_free(session, conn->ckpt_eviction_snap_array[0]);
-    __wt_free(session, conn->ckpt_eviction_snap_array[1]);
+    __wt_free(session, conn->ckpt_eviction_snap[0].snap_array);
+    __wt_free(session, conn->ckpt_eviction_snap[1].snap_array);
 
     /* Free allocated memory. */
     __wt_free(session, conn->cfg);

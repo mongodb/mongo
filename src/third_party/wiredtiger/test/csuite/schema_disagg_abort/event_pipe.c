@@ -19,13 +19,16 @@
 #include <sys/select.h>
 
 /*
- * node_event_send --
+ * pipe_relay_event --
  *     Relay one event to the peer over the node's out-pipe. Returns false without failing when
- *     there is no peer (no pipe, or the peer is gone), leaving the caller to decide whether
- *     delivery is optional (the workload relay) or mandatory (the hand-over).
+ *     there is no peer, leaving the caller to decide whether delivery is optional (the workload
+ *     relay) or mandatory (the hand-over).
+ *
+ * This owns the write side of peer death: a write that finds the pipe gone closes the descriptor
+ *     and clears peer_alive, so the node continues alone. The read side is the reader's pipe EOF.
  */
 bool
-node_event_send(TEST_CONFIG *cfg, const SCHEMA_EVENT *ev)
+pipe_relay_event(TEST_CONFIG *cfg, const SCHEMA_EVENT *ev)
 {
     if (cfg->pipe_write_fd < 0)
         return (false);

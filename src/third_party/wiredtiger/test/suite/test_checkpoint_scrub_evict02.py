@@ -54,10 +54,13 @@ class test_checkpoint_scrub_evict02(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(ckpt_threads)
 
     # A large cache so eviction only runs when a test asks for it, and scrub eviction forced on so
-    # the tests don't depend on the eviction server's scrub heuristic.
+    # the tests don't depend on the eviction server's scrub heuristic. The dirty thresholds are
+    # raised as the default 5% target causes the eviction server to run alongside the some tests,
+    # which can race with the retained images.
     def conn_config(self):
         return ('cache_size=200MB,statistics=(all),precise_checkpoint=true,'
                 'checkpoint_threads=%d,'
+                'eviction_dirty_target=80,eviction_dirty_trigger=90,'
                 'eviction=(checkpoint_scrub_eviction=on)' % self.ckpt_threads)
 
     def get_stat(self, statistic, uri=None):

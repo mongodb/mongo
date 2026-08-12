@@ -106,6 +106,7 @@ main(int argc, char *argv[])
     g.failpoint_rec_before_wrapup = false;
     g.hs_checkpoint_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
+    g.prepare_checkpoint_delay_timing_stress = false;
     g.no_ts_deletes = false;
     g.precise_checkpoint = false;
     g.predictable_replay = false;
@@ -175,6 +176,9 @@ main(int argc, char *argv[])
                 break;
             case '8':
                 g.failpoint_rec_before_wrapup = true;
+                break;
+            case '9':
+                g.prepare_checkpoint_delay_timing_stress = true;
                 break;
             default:
                 return (usage());
@@ -407,8 +411,10 @@ wt_connect(const char *config_open)
 
     if (g.evict_reposition_timing_stress || g.sweep_stress || g.failpoint_eviction_split ||
       g.failpoint_hs_delete_key_from_ts || g.failpoint_rec_before_wrapup ||
-      g.hs_checkpoint_timing_stress || g.checkpoint_slow_timing_stress) {
-        testutil_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s%s]",
+      g.hs_checkpoint_timing_stress || g.checkpoint_slow_timing_stress ||
+      g.prepare_checkpoint_delay_timing_stress) {
+        testutil_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s%s%s]",
+          g.prepare_checkpoint_delay_timing_stress ? "prepare_checkpoint_delay" : "",
           g.checkpoint_slow_timing_stress ? "checkpoint_slow" : "",
           g.evict_reposition_timing_stress ? "evict_reposition" : "",
           g.failpoint_eviction_split ? "failpoint_eviction_split" : "",
@@ -589,7 +595,7 @@ usage(void)
       "    [-DmpeRkvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k "
       "keys] "
       "[-l log]\n"
-      "    [-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t r|v]\n"
+      "    [-n ops] [-r runs] [-s 1|2|3|5|6|7|8|9] [-T table-config] [-t r|v]\n"
       "    [-W workers]\n",
       progname, g.opts.usage);
     fprintf(stderr, "%s",
@@ -605,7 +611,7 @@ usage(void)
       "\t-e use precise checkpoint\n"
       "\t-r set number of runs (0 for continuous)\n"
       "\t-R configure predictable replay\n"
-      "\t-s specify which timing stress configuration to use ( 1 | 2 | 3 | 4 | 5 )\n"
+      "\t-s specify which timing stress configuration to use ( 1 | 2 | 3 | 5 | 6 | 7 | 8 | 9 )\n"
       "\t-S set a stable timestamp to stop the test run\n"
       "\t\t1: sweep_stress\n"
       "\t\t2: failpoint_hs_delete_key_from_ts\n"
@@ -614,6 +620,7 @@ usage(void)
       "\t\t6: evict_reposition_timing_stress\n"
       "\t\t7: failpoint_eviction_split\n"
       "\t\t8: failpoint_rec_before_wrapup\n"
+      "\t\t9: prepare_checkpoint_delay\n"
       "\t-T specify a table configuration\n"
       "\t-t set a file type ( col | mix | row )\n"
       "\t-v verify only\n"
