@@ -303,7 +303,7 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *uri, const char *ch
                  * previous leader era.
                  */
                 if (WT_DHANDLE_BTREE(dhandle) &&
-                  F_ISSET((WT_BTREE *)dhandle->handle, WT_BTREE_READONLY)) {
+                  F_ISSET_ATOMIC_32((WT_BTREE *)dhandle->handle, WT_BTREE_READONLY)) {
                     if (__wt_atomic_load_int32_acquire(&dhandle->session_inuse) == 0 ||
                       !WT_URI_IS_STABLE_CHECKPOINT(dhandle->name))
                         continue;

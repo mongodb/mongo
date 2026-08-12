@@ -29,7 +29,7 @@
 # helper_layered_stepdown.py
 #   Shared helpers for the async (planned) step-down layered table tests.
 
-import wiredtiger
+import errno, os, wiredtiger
 from wiredtiger import stat
 
 # Shared helpers for the layered async step-down test suite.
@@ -130,13 +130,14 @@ class LayeredStepdownMixin:
         cursor.close()
 
     # The key/value map visible through a cursor on uri at read_ts.
-    def read_kvs_at(self, uri, read_ts):
-        cursor = self.session.open_cursor(uri, None, None)
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
+    def read_kvs_at(self, uri, read_ts, session=None):
+        session = session or self.session
+        cursor = session.open_cursor(uri, None, None)
+        session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         kv = {}
         while cursor.next() == 0:
             kv[cursor.get_key()] = cursor.get_value()
-        self.session.rollback_transaction()
+        session.rollback_transaction()
         cursor.close()
         return kv
 
@@ -165,6 +166,16 @@ class LayeredStepdownMixin:
         count = stat_cursor[stat.conn.txn_rollback_stepdown][2]
         stat_cursor.close()
         return count
+
+    # Whether an exception is a WT_ROLLBACK, of any reason. Classifies the exception itself so
+    # it works before deciding whether to roll back, when get_last_error is not yet safe to call.
+    def is_rollback(self, exception):
+        return wiredtiger.wiredtiger_strerror(wiredtiger.WT_ROLLBACK) in str(exception)
+
+    # Whether an exception is an EBUSY, of any reason. Match on the strerror text, which differs
+    # across platforms.
+    def is_busy(self, exception):
+        return os.strerror(errno.EBUSY) in str(exception)
 
     # Run op and expect WT_ROLLBACK, with no claim about the reason.
     def expect_rollback(self, op):

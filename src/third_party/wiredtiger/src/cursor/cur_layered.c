@@ -337,7 +337,7 @@ __clayered_assert_stable_mode(WTI_CURSOR_LAYERED *clayered)
      *
      * WT_ASSERT(CUR2S(clayered),
      *   (clayered->last_role == WTI_CLAYERED_ROLE_LEADER) !=
-     *     F_ISSET(CUR2BT(clayered->stable_cursor), WT_BTREE_READONLY));
+     *     F_ISSET_ATOMIC_32(CUR2BT(clayered->stable_cursor), WT_BTREE_READONLY));
      */
 }
 

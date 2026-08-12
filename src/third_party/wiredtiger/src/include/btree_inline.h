@@ -43,7 +43,8 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
 static WT_INLINE bool
 __wt_btree_is_stale_disagg(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED | WT_BTREE_READONLY) &&
+    return ((F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) ||
+              F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_READONLY)) &&
       F_ISSET(session->dhandle, WT_DHANDLE_OUTDATED));
 }
 
@@ -987,7 +988,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_ASSERT_ALWAYS(session, !F_ISSET(page->modify, WT_PAGE_MODIFY_EXCLUSIVE),
       "Illegal attempt to modify a page that is being exclusively reconciled");
 
-    if (F_ISSET(btree, WT_BTREE_READONLY))
+    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return;
 
     WT_ASSERT(session,
@@ -1100,7 +1101,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
     btree = S2BT(session);
     conn = S2C(session);
 
-    if (F_ISSET(btree, WT_BTREE_READONLY))
+    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return;
 
     WT_ASSERT(session,
@@ -1202,7 +1203,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
      * Prepared records in the datastore require page updates, even for read-only handles, don't
      * mark the tree or page dirty.
      */
-    if (F_ISSET(btree, WT_BTREE_READONLY))
+    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return;
 
     WT_ASSERT(session,
@@ -1243,7 +1244,7 @@ __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_onl
 
     btree = S2BT(session);
 
-    if (F_ISSET(btree, WT_BTREE_READONLY))
+    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return (0);
 
     WT_ASSERT(session,
@@ -2503,7 +2504,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
         return (false);
     }
 
-    if (F_ISSET(btree, WT_BTREE_READONLY))
+    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return (true);
 
     /*

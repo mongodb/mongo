@@ -17,7 +17,8 @@
 #   NEWER_RELEASE_BRANCHES                            -- forward/backward/upgrade/downgrade (-n)
 #   PATCH_VERSION_UPGRADE_DOWNGRADE_RELEASE_BRANCHES  -- patch-version test (-p)
 #   TEST_CHECKPOINT_RELEASE_BRANCHES                  -- checkpoint recovery (part of -n)
-#   UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES  -- upgrade-to-latest (-u) and dirty-restart (-d)
+#   UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES  -- upgrade-to-latest (-u)
+#   DIRTY_RESTART_RELEASE_BRANCHES                        -- dirty-restart (-d)
 #
 #
 # HOW TO REMOVE AN EOL RELEASE BRANCH
@@ -48,3 +49,6 @@ export TEST_CHECKPOINT_RELEASE_BRANCHES="develop mongodb-9.0 mongodb-8.3 mongodb
 
 # This array is used to configure the release branches we'd like to run upgrade to latest test.
 export UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES="mongodb-9.0 mongodb-8.3 mongodb-8.2 mongodb-8.0 mongodb-7.0 mongodb-6.0"
+
+# This array is used to configure the branches we'd like to run dirty restart tests.
+export DIRTY_RESTART_RELEASE_BRANCHES="develop mongodb-9.0 mongodb-8.3 mongodb-8.0 mongodb-7.0 mongodb-6.0"

@@ -1235,14 +1235,14 @@ __disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
 
         btree = (WT_BTREE *)dhandle->handle;
 
-        if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED) || F_ISSET(btree, WT_BTREE_READONLY))
+        if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED) || F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
             continue;
 
         WT_WITH_BTREE(session, btree, ret = __wt_evict_file_exclusive_on(session));
         WT_RET(ret);
 
         /* Mark the disaggregated as readonly. */
-        F_SET(btree, WT_BTREE_READONLY);
+        F_SET_ATOMIC_32(btree, WT_BTREE_READONLY);
 
         /*
          * Mark the handle outdated so that if we step back up as leader in the future, we open a

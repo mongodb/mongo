@@ -489,7 +489,8 @@ skip_disk_read:
     WT_ERR(__wt_conn_page_history_track_read(session, page));
 
     /* Read only page must be clean. */
-    WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_READONLY) || !__wt_page_is_modified(page));
+    WT_ASSERT(
+      session, !F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) || !__wt_page_is_modified(page));
 
 skip_read:
     F_CLR_ATOMIC_8(ref, WT_REF_FLAG_READING);

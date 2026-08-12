@@ -363,20 +363,23 @@ struct __wt_btree {
  * explanation.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 12 */
-#define WT_BTREE_BULK 0x0001000u            /* Bulk-load handle */
-#define WT_BTREE_CLOSED 0x0002000u          /* Handle closed */
-#define WT_BTREE_DISAGGREGATED 0x0004000u   /* In disaggregated storage */
-#define WT_BTREE_GARBAGE_COLLECT 0x0008000u /* Content becomes obsolete automatically */
-#define WT_BTREE_IGNORE_CACHE 0x0010000u    /* Cache-resident object */
-#define WT_BTREE_IN_MEMORY 0x0020000u       /* Cache-resident object */
-#define WT_BTREE_LOGGED 0x0040000u          /* Commit-level durability without timestamps */
-#define WT_BTREE_NO_CHECKPOINT 0x0080000u   /* Disable checkpoints */
-#define WT_BTREE_NO_EVICT 0x0100000u        /* Cache-resident object. Never run eviction on it. */
-#define WT_BTREE_READONLY 0x0200000u        /* Handle is readonly */
-#define WT_BTREE_SALVAGE 0x0400000u         /* Handle is for salvage */
-#define WT_BTREE_SKIP_CKPT 0x0800000u       /* Handle skipped checkpoint */
-#define WT_BTREE_VERIFY 0x1000000u          /* Handle is for verify */
-                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WT_BTREE_BULK 0x001000u            /* Bulk-load handle */
+#define WT_BTREE_CLOSED 0x002000u          /* Handle closed */
+#define WT_BTREE_DISAGGREGATED 0x004000u   /* In disaggregated storage */
+#define WT_BTREE_GARBAGE_COLLECT 0x008000u /* Content becomes obsolete automatically */
+#define WT_BTREE_IGNORE_CACHE 0x010000u    /* Cache-resident object */
+#define WT_BTREE_IN_MEMORY 0x020000u       /* Cache-resident object */
+#define WT_BTREE_LOGGED 0x040000u          /* Commit-level durability without timestamps */
+#define WT_BTREE_NO_CHECKPOINT 0x080000u   /* Disable checkpoints */
+#define WT_BTREE_NO_EVICT 0x100000u        /* Cache-resident object. Never run eviction on it. */
+#define WT_BTREE_SALVAGE 0x200000u         /* Handle is for salvage */
+#define WT_BTREE_VERIFY 0x400000u          /* Handle is for verify */
+                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    /*
+     * These flags are only modified while the data handle is held exclusively, that is, at open, at
+     * close, or by an operation that has locked out all other users of the handle. Anything that
+     * can change while other threads are using the tree belongs in the atomic flags below.
+     */
     uint32_t flags;
 
 /*
@@ -385,6 +388,8 @@ struct __wt_btree {
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_BTREE_AWAITS_PUBLISH 0x1u /* An unpublished btree, which will be published later */
+#define WT_BTREE_READONLY 0x2u       /* Handle is readonly */
+#define WT_BTREE_SKIP_CKPT 0x4u      /* Handle skipped checkpoint */
                                      /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags_atomic;
 };

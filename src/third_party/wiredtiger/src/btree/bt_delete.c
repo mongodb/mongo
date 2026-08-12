@@ -723,7 +723,8 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
      * don't need to also store the length. No need to do this for read-only btrees as we will never
      * resolve the updates.
      */
-    if (!F_ISSET(S2BT(session), WT_BTREE_READONLY) && page_del != NULL && !page_del->committed) {
+    if (!F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_READONLY) && page_del != NULL &&
+      !page_del->committed) {
         count = 0;
         switch (page->type) {
         case WT_PAGE_COL_VAR:

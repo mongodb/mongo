@@ -129,7 +129,7 @@ __wt_checkpoint_apply_or_skip_handle_stats(WT_SESSION_IMPL *session, uint64_t ti
 {
     WT_CKPT_CONNECTION *ckpt = &S2C(session)->ckpt;
 
-    if (F_ISSET(S2BT(session), WT_BTREE_SKIP_CKPT)) {
+    if (F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_SKIP_CKPT)) {
         ++ckpt->handle_stats.skip;
         ckpt->handle_stats.skip_time += time_us;
     } else {
