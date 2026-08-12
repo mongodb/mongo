@@ -354,6 +354,7 @@ mongo_cc_library(
         "//src/mongo/s/client:shard_interface",
         "//src/mongo/s/query:cluster_cursor_manager",
         "//src/mongo/util:caching",
+        "//src/mongo/util:observable_mutex_registry",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/concurrency:thread_pool",
     ],

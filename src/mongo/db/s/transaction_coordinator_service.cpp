@@ -60,6 +60,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/observable_mutex_registry.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
@@ -73,7 +74,9 @@ const auto transactionCoordinatorServiceDecoration =
 
 }  // namespace
 
-TransactionCoordinatorService::TransactionCoordinatorService() = default;
+TransactionCoordinatorService::TransactionCoordinatorService() {
+    ObservableMutexRegistry::get().add("TransactionCoordinatorService::_mutex", _mutex);
+}
 
 TransactionCoordinatorService::~TransactionCoordinatorService() {
     joinPreviousRound();
@@ -108,7 +111,7 @@ void TransactionCoordinatorService::createCoordinator(
     auto coordinator = std::make_shared<TransactionCoordinator>(
         opCtx, lsid, txnNumberAndRetryCounter, scheduler.makeChildScheduler(), commitDeadline);
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard lock(_mutex);
         _activeTransactionCoordinators.insert(coordinator);
     }
     coordinator->start(opCtx);
@@ -222,7 +225,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 
     joinPreviousRound();
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard lg(_mutex);
     if (_isShuttingDown) {
         return;
     }
@@ -318,7 +321,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 void TransactionCoordinatorService::onStepDown() {
     std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard lg(_mutex);
         if (!_catalogAndScheduler)
             return;
         for (auto& ptr : _activeTransactionCoordinators) {
@@ -338,7 +341,7 @@ void TransactionCoordinatorService::onStepDown() {
 
 void TransactionCoordinatorService::shutdown() {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard lg(_mutex);
         _isShuttingDown = true;
     }
     onStepDown();
@@ -350,7 +353,7 @@ void TransactionCoordinatorService::onShardingInitialization(OperationContext* o
     if (!isPrimary)
         return;
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard lg(_mutex);
     if (_isShuttingDown) {
         return;
     }
@@ -364,7 +367,7 @@ void TransactionCoordinatorService::onShardingInitialization(OperationContext* o
 
 std::shared_ptr<TransactionCoordinatorService::CatalogAndScheduler>
 TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock ul(_mutex);
     uassert(ErrorCodes::NotWritablePrimary,
             "Transaction coordinator is not a primary",
             _catalogAndScheduler);
@@ -375,7 +378,7 @@ TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) 
 void TransactionCoordinatorService::joinPreviousRound() {
     std::shared_ptr<CatalogAndScheduler> schedulerToCleanup;
     {
-        stdx::unique_lock<Latch> ul(_mutex);
+        stdx::unique_lock ul(_mutex);
 
         // onStepDown must have been called
         invariant(!_catalogAndScheduler);
@@ -427,7 +430,7 @@ void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
 
 void TransactionCoordinatorService::notifyCoordinatorFinished(
     const std::shared_ptr<TransactionCoordinator> coordinator) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     // we don't need to know or care if we actually erased this weak ptr. its valid for this
     // service to cancel and clear its set of coordinators and have already erased them when
     // this continuation executes. all we're trying to do is bound memory usage.

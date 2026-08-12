@@ -49,6 +49,8 @@
 #include "mongo/transport/session_manager_common_gen.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_options_gen.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -170,6 +172,9 @@ std::size_t getSupportedMax() {
  */
 class SessionManagerCommon::Sessions {
 public:
+    Sessions() {
+        ObservableMutexRegistry::get().add("SessionManagerCommon::Sessions::_mutex", _mutex);
+    }
     struct Entry {
         explicit Entry(std::shared_ptr<SessionWorkflow> workflow) : workflow{std::move(workflow)} {}
         std::shared_ptr<SessionWorkflow> workflow;
@@ -236,7 +241,7 @@ public:
         }
 
         Sessions* _src;
-        stdx::unique_lock<Mutex> _lk;
+        stdx::unique_lock<ObservableMutex<stdx::mutex>> _lk;
     };
 
     /** Returns a proxy object providing synchronized mutable access to the Sessions object. */
@@ -260,7 +265,7 @@ public:
         return _rejected.load();
     }
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceEntryPointImpl::Sessions::_mutex");
+    mutable ObservableMutex<stdx::mutex> _mutex;
     stdx::condition_variable _cv;      ///< notified on `_byClient` changes.
     Atomic<std::size_t> _size{0};      ///< Kept in sync with `_byClient.size()`
     Atomic<std::size_t> _created{0};   ///< Increases with each `insert` call.

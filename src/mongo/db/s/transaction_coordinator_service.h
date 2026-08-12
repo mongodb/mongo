@@ -49,6 +49,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -178,7 +179,7 @@ private:
     std::shared_ptr<CatalogAndScheduler> _catalogAndSchedulerToCleanup;
 
     // Protects the state below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TransactionCoordinatorService::_mutex");
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     // The catalog + scheduler instantiated at the last step-up attempt. When nullptr, it means
     // onStepUp has not been called yet after the last stepDown (or construction).

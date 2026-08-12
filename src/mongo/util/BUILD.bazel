@@ -1188,6 +1188,50 @@ py_binary(
 )
 
 mongo_cc_unit_test(
+    name = "observable_mutex_test",
+    srcs = ["observable_mutex_test.cpp"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "networking-and-observability",
+    ],
+    # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "observable_mutex_registry",
+    srcs = [
+        "observable_mutex_registry.cpp",
+    ],
+    hdrs = ["observable_mutex_registry.h"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "observable_mutex_registry_test",
+    srcs = ["observable_mutex_registry_test.cpp"],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "networking-and-observability",
+    ],
+    # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":observable_mutex_registry",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "moving_average_test",
     srcs = [
         "moving_average_test.cpp",
@@ -1207,5 +1251,18 @@ mongo_cc_unit_test(
     deps = [
         "//src/mongo:base",
         "//src/third_party/folly:headers",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "observable_mutex_bm",
+    srcs = [
+        "observable_mutex_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        "processinfo",
     ],
 )

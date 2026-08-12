@@ -135,6 +135,7 @@ mongo_cc_library(
         "//src/mongo/executor:egress_connection_closer_manager",
         "//src/mongo/executor:remote_command",
         "//src/mongo/util:fail_point",
+        "//src/mongo/util:observable_mutex_registry",
         "//src/mongo/util/net:network",
     ],
 )

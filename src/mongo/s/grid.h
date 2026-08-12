@@ -44,6 +44,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/assert_util_core.h"
+#include "mongo/util/observable_mutex.h"
 
 namespace mongo {
 
@@ -182,7 +183,7 @@ private:
     AtomicWord<bool> _shardingInitialized{false};
     AtomicWord<bool> _isGridInitialized{false};
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Grid::_mutex");
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
 };

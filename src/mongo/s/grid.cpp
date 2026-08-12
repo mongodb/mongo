@@ -38,6 +38,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/observable_mutex_registry.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -46,7 +47,9 @@ namespace {
 const auto grid = ServiceContext::declareDecoration<Grid>();
 }  // namespace
 
-Grid::Grid() = default;
+Grid::Grid() {
+    ObservableMutexRegistry::get().add("Grid::_mutex", _mutex);
+}
 
 Grid::~Grid() = default;
 
@@ -106,12 +109,12 @@ void Grid::setShardingInitialized() {
 }
 
 Grid::CustomConnectionPoolStatsFn Grid::getCustomConnectionPoolStatsFn() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     return _customConnectionPoolStatsFn;
 }
 
 void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     invariant(!_customConnectionPoolStatsFn || !statsFn);
     _customConnectionPoolStatsFn = std::move(statsFn);
 }

@@ -145,7 +145,7 @@ Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset_inlock(Wit
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
                                                     const HostAndPort& target,
                                                     const std::string& replSetName) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
 
     _untrackHeartbeatHandle_inlock(cbData.myHandle);
     if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -206,7 +206,7 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
 
     std::string replSetNameString;
     {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock lk(_mutex);
 
         ReplSetConfig rsc = _rsConfig.unsafePeek();
         request.target = rsc.getMemberAt(targetIndex).getHostAndPort();
@@ -237,7 +237,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             StringData dtarget = data["target"].valueStringDataSafe();
             return dtarget == cbData.request.target.toString();
         });
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
 
     // remove handle from queued heartbeats
     _untrackHeartbeatHandle_inlock(cbData.myHandle);
@@ -448,10 +448,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     _handleHeartbeatResponseAction_inlock(action, hbStatusResponse, std::move(lk));
 }
 
-stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAction_inlock(
+stdx::unique_lock<ObservableMutex<stdx::mutex>>
+ReplicationCoordinatorImpl::_handleHeartbeatResponseAction_inlock(
     const HeartbeatResponseAction& action,
     const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
-    stdx::unique_lock<Latch> lock) {
+    stdx::unique_lock<ObservableMutex<stdx::mutex>> lock) {
     invariant(lock.owns_lock());
     auto rsc = _rsConfig.unsafePeek();
     switch (action.getAction()) {
@@ -582,7 +583,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
               "Blocking until fail point is disabled.");
 
         auto inShutdown = [&] {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard lk(_mutex);
             return _inShutdown;
         };
 
@@ -598,7 +599,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
 
     // This node has already stepped down due to reconfig. So, signal anyone who is waiting on the
     // step down event.
@@ -715,7 +716,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
                     "Ignoring new configuration in heartbeat response because it is invalid",
                     "status"_attr = swConfig.getStatus());
 
-                stdx::lock_guard<Latch> lg(_mutex);
+                stdx::lock_guard lg(_mutex);
                 invariant(_rsConfigState == kConfigHBReconfiguring);
                 _setConfigState_inlock(!rsc.isInitialized() ? kConfigUninitialized : kConfigSteady);
                 return;
@@ -733,7 +734,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
                                             isSplitRecipientConfig =
                                                 isSplitRecipientConfig](Status status) {
                 if (!status.isOK()) {
-                    stdx::lock_guard<Latch> lg(_mutex);
+                    stdx::lock_guard lg(_mutex);
                     _setConfigState_inlock(!_rsConfig.unsafePeek().isInitialized()
                                                ? kConfigUninitialized
                                                : kConfigSteady);
@@ -756,7 +757,7 @@ std::tuple<StatusWith<ReplSetConfig>, bool> ReplicationCoordinatorImpl::_resolve
         return {config, false};
     }
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
     auto rsc = _rsConfig.unsafePeek();
     if (!rsc.isInitialized()) {
         // Unlock the lock because isSelf performs network I/O.
@@ -819,7 +820,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         // We always check the config when _selfIndex is not valid, in order to be able to
         // recover from transient DNS errors.
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard lk(_mutex);
             if (_selfIndex >= 0 && sameConfigContents(rsc, newConfig)) {
                 LOGV2_FOR_HEARTBEATS(6351200,
                                      2,
@@ -836,7 +837,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     }();
 
     if (myIndex.getStatus() == ErrorCodes::NodeNotFound) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard lk(_mutex);
         // If this node absent in newConfig, and this node was not previously initialized,
         // return to kConfigUninitialized immediately, rather than storing the config and
         // transitioning into the RS_REMOVED state.  See SERVER-15740.
@@ -891,7 +892,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         bool isFirstConfig;
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard lk(_mutex);
             isFirstConfig = !rsc.isInitialized();
             if (!status.isOK()) {
                 LOGV2_ERROR(21488,
@@ -993,7 +994,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // we have already set our ReplicationCoordinatorImpl::_rsConfigState state to
     // "kConfigReconfiguring" which prevents new elections from happening.
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard lk(_mutex);
         if (auto electionFinishedEvent = _cancelElectionIfNeeded(lk)) {
             LOGV2_FOR_HEARTBEATS(4615629,
                                  0,
@@ -1015,7 +1016,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     auto opCtx = cc().makeOperationContext();
 
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
     auto rsc = _rsConfig.unsafePeek();
     if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
@@ -1163,7 +1164,7 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
 }
 
 void ReplicationCoordinatorImpl::restartScheduledHeartbeats_forTest() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
     invariant(getTestCommandsEnabled());
     _restartScheduledHeartbeats_inlock(_rsConfig.unsafePeek().getReplSetName().toString());
 };
@@ -1214,7 +1215,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock(WithLock lk) {
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     const executor::TaskExecutor::CallbackArgs& cbData) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
     if (!cbData.status.isOK()) {
         return;
     }
@@ -1346,7 +1347,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock(With
 }
 
 void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionReasonEnum reason) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     _startElectSelfIfEligibleV1(lock, reason);
 }
 

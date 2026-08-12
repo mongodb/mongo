@@ -859,6 +859,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:replication_process",
         "//src/mongo/db/repl:split_prepare_session_manager",
         "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:observable_mutex_registry",
         "//src/mongo/util/net:network",
     ],
 )
