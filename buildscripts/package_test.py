@@ -36,6 +36,14 @@ formatter = logging.Formatter('[%(asctime)s]%(levelname)s:%(message)s')
 handler.setFormatter(formatter)
 root.addHandler(handler)
 
+# The Evergreen API serves artifact lists from a secondary node
+# (DEVPROD-32223), so artifacts attached by a recently-finished task can be
+# missing from the response due to replication lag. Retry the "Packages"
+# artifact lookup with exponential backoff before giving up (BF-45409).
+NUM_ARTIFACT_URL_RETRIES = 8
+ARTIFACT_URL_RETRY_INITIAL_DELAY_SECS = 15
+ARTIFACT_URL_RETRY_MAX_DELAY_SECS = 120
+
 
 def download_packages_from_build(build_id: str, download_dir: Path) -> Path:
     """
@@ -48,29 +56,52 @@ def download_packages_from_build(build_id: str, download_dir: Path) -> Path:
     logging.info("Fetching packages artifact from Evergreen API for build: %s", build_id)
 
     evg_api = evergreen_conn.get_evergreen_api()
-    tasks = evg_api.tasks_by_build(build_id)
 
-    package_task = None
-    for task in tasks:
-        if task.display_name == "package":
-            package_task = task
-            break
-
-    if package_task is None:
-        raise RuntimeError(f"Could not find 'package' task in build {build_id}")
-
-    logging.info("Found package task: %s", package_task.task_id)
-
+    # The Evergreen API may serve a stale artifact list for the package task
+    # due to secondary replication lag (DEVPROD-32223, BF-45409). Retry the
+    # "Packages" artifact lookup, refetching the task each attempt.
     packages_url = None
-    for artifact in package_task.artifacts:
-        if artifact.name == "Packages":
-            packages_url = artifact.url
-            logging.info("Found Packages artifact URL: %s", packages_url)
+    package_task = None
+    for attempt in range(NUM_ARTIFACT_URL_RETRIES):
+        tasks = evg_api.tasks_by_build(build_id)
+        package_task = None
+        for task in tasks:
+            if task.display_name == "package":
+                package_task = task
+                break
+
+        if package_task is None:
+            raise RuntimeError(f"Could not find 'package' task in build {build_id}")
+        if attempt == 0:
+            logging.info("Found package task: %s", package_task.task_id)
+
+        for artifact in package_task.artifacts:
+            if artifact.name == "Packages":
+                packages_url = artifact.url
+                break
+
+        if packages_url is not None:
             break
 
-    if packages_url is None:
-        raise RuntimeError(
-            f"Could not find 'Packages' artifact for package task {package_task.task_id}")
+        if attempt + 1 >= NUM_ARTIFACT_URL_RETRIES:
+            raise RuntimeError(
+                f"Could not find 'Packages' artifact for package task {package_task.task_id}")
+        delay = min(
+            ARTIFACT_URL_RETRY_INITIAL_DELAY_SECS * (2**attempt),
+            ARTIFACT_URL_RETRY_MAX_DELAY_SECS,
+        )
+        logging.warning(
+            "Could not find 'Packages' artifact for package task %s on attempt %d of %d. "
+            "This can happen when the Evergreen API's secondary node lags behind on "
+            "recently attached artifacts; retrying in %ds.",
+            package_task.task_id,
+            attempt + 1,
+            NUM_ARTIFACT_URL_RETRIES,
+            delay,
+        )
+        time.sleep(delay)
+
+    logging.info("Found Packages artifact URL: %s", packages_url)
 
     # Download the packages file
     download_dir.mkdir(parents=True, exist_ok=True)
