@@ -15,6 +15,7 @@
 #include "mongo/db/storage/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/modules.h"
@@ -285,8 +286,122 @@ public:
             });
         }
         wuow.commit();
+        _lastWrittenKVBufferSize = size;
+    }
 
-        _lastAddedSize = size;
+    /**
+     * How much a call to SortedStorageWriter::addAlreadySorted() wrote: the number of KV pairs and
+     * their total serialized size. A range-accepting overload may write fewer pairs than it was
+     * given.
+     */
+    struct AddAlreadySortedResult {
+        size_t kvPairsWritten{0};
+        int64_t bytesWritten{0};
+    };
+
+    /**
+     * Provides a version of addAlreadySorted for internal class use that returns the size of the
+     * buffer written.
+     */
+    [[nodiscard]] AddAlreadySortedResult addAlreadySortedWrapper(const Key& key, const Value& val) {
+        _lastWrittenKVBufferSize = 0;
+        addAlreadySorted(key, val);
+        return {.kvPairsWritten = 1, .bytesWritten = _lastWrittenKVBufferSize};
+    }
+
+    /**
+     * Serializes a range of pre-sorted KV pairs and inserts them into the container as a single
+     * batched write -- the container reuses one cursor for the whole range, and the oplog entries
+     * for the consecutive keys collapse into one -- advancing the container key range.
+     *
+     * Stops early once the serialized size of the entries written reaches 'maxBytes', so the entry
+     * that crosses the threshold is still written and at least one entry is always written.
+     * Returns the number of entries written, which is less than 'data.size()' if 'maxBytes' was
+     * reached.
+     */
+    [[nodiscard]] AddAlreadySortedResult addAlreadySortedBatch(
+        std::span<const std::pair<Key, Value>> data,
+        int64_t maxBytes,
+        boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg = boost::none) {
+        if (data.empty()) {
+            return {.kvPairsWritten = 0, .bytesWritten = 0};
+        }
+
+        // Serialize into one buffer, recording each entry's extent, until the byte budget is met.
+        // The spans can only be formed once the buffer has stopped growing, since appending to it
+        // may reallocate.
+        BufBuilder buffer;
+        const auto [extents, bytesInExtents] = std::invoke([&] {
+            std::vector<std::pair<int, int>> extents;
+            extents.reserve(data.size());
+            for (auto&& [key, val] : data) {
+                const int start = buffer.len();
+                key.serializeForSorter(buffer);
+                val.serializeForSorter(buffer);
+                extents.push_back({start, buffer.len() - start});
+                if (buffer.len() >= maxBytes) {
+                    break;
+                }
+            }
+            return std::pair{extents, buffer.len()};
+        });
+
+        const int64_t rangeStart = _nextKey;
+        const auto count = static_cast<int64_t>(extents.size());
+        const auto totalSize = static_cast<int64_t>(buffer.len());
+        int64_t rangeEnd;
+        uassert(10896400,
+                "Sorter container key range overflowed",
+                !overflow::add(rangeStart, count, &rangeEnd));
+
+        std::vector<int64_t> keys(extents.size());
+        std::vector<std::span<const char>> values(extents.size());
+        for (size_t i = 0; i < extents.size(); ++i) {
+            const auto [start, len] = extents[i];
+            values[i] = len == 0 ? std::span<const char>{}
+                                 : std::span<const char>(buffer.buf() + start, len);
+            keys[i] = rangeStart + static_cast<int64_t>(i);
+        }
+
+        WriteUnitOfWork wuow(&_opCtx);
+        _ru.onCommit([this, totalSize, count](OperationContext*, boost::optional<Timestamp>) {
+            // The container-based sorter does not compress in the sorter layer, so report the same
+            // value for compressed and uncompressed bytes.
+            _containerStats.addSpilledDataSize(totalSize);
+            _containerStats.addSpilledDataSizeUncompressed(totalSize);
+            _containerStats.incrementNumSpilledEntries(count);
+        });
+        _ru.onRollback([this, rangeStart](OperationContext*) { _nextKey = rangeStart; });
+        uassertStatusOK(container_write::insert(&_opCtx,
+                                                _ru,
+                                                _container,
+                                                std::span<const int64_t>{keys},
+                                                std::span<const std::span<const char>>{values},
+                                                wg,
+                                                container_write::NonexistentKeyGuarantee{}));
+        _nextKey = rangeEnd;
+
+        // The reader checksums each container entry separately, so the chunk boundaries here must
+        // match it one entry at a time.
+        for (const auto& [start, len] : extents) {
+            if (len > 0) {
+                this->_checksumCalculator.addUncommittedData(buffer.buf() + start, len);
+            }
+        }
+        if (!_uncommittedChecksum) {
+            _uncommittedChecksum = true;
+            _ru.onCommit([this](OperationContext*, boost::optional<Timestamp>) {
+                this->_checksumCalculator.commit();
+                _uncommittedChecksum = false;
+            });
+            _ru.onRollback([this](OperationContext*) {
+                this->_checksumCalculator.abort();
+                _uncommittedChecksum = false;
+            });
+        }
+        wuow.commit();
+
+        return {.kvPairsWritten = extents.size(), .bytesWritten = bytesInExtents};
     }
 
     std::shared_ptr<Iterator> done() override {
@@ -308,10 +423,6 @@ public:
 
     void writeChunk() override {};
 
-    int64_t lastAddedSize() const {
-        return _lastAddedSize;
-    }
-
 private:
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
@@ -319,9 +430,9 @@ private:
     SorterContainerStats& _containerStats;
     int64_t _nextKey;
     int64_t _rangeStartKey;
-    int64_t _lastAddedSize = 0;
     bool _uncommittedChecksum = false;
     boost::optional<container_write::CanAcceptContainerWritesGuarantee> _writeableGuarantee;
+    int _lastWrittenKVBufferSize{0};
 };
 
 template <typename Key, typename Value>
@@ -388,7 +499,8 @@ public:
     };
 
     /**
-     * The lifetime of the container is managed by the user of the storage, so keeping is a no-op.
+     * The lifetime of the container is managed by the user of the storage, so keeping is a
+     * no-op.
      */
     void keep() override {};
 
@@ -586,35 +698,34 @@ private:
                     *static_cast<SortedContainerWriter<Key, Value>*>(writer.get());
                 while (mergeIterator->more()) {
                     batch.clear();
-                    writeConflictRetry(&_opCtx,
-                                       _ru,
-                                       "ContainerBasedSpiller::mergeSpills_insert",
-                                       NamespaceString::kEmpty,
-                                       [&] {
-                                           int64_t bytesInBatch = 0;
+                    writeConflictRetry(
+                        &_opCtx,
+                        _ru,
+                        "ContainerBasedSpiller::mergeSpills_insert",
+                        NamespaceString::kEmpty,
+                        [&] {
+                            int64_t bytesInBatch = 0;
 
-                                           WriteUnitOfWork wuow{&_opCtx};
+                            WriteUnitOfWork wuow{&_opCtx};
 
-                                           // In the case of a write conflict, re-add any buffered
-                                           // items from the batch before getting more from the
-                                           // merge iterator.
-                                           for (size_t i = 0; i < batch.size(); ++i) {
-                                               containerWriter.addAlreadySorted(batch[i].first,
-                                                                                batch[i].second);
-                                               bytesInBatch += containerWriter.lastAddedSize();
-                                           }
+                            // In the case of a write conflict, re-add any buffered
+                            // items from the batch before getting more from the
+                            // merge iterator.
+                            for (const auto& [k, v] : batch) {
+                                bytesInBatch +=
+                                    containerWriter.addAlreadySortedWrapper(k, v).bytesWritten;
+                            }
 
-                                           while (mergeIterator->more() &&
-                                                  static_cast<int64_t>(batch.size()) < _batchSize &&
-                                                  bytesInBatch < _batchBytes) {
-                                               batch.push_back(mergeIterator->next());
-                                               containerWriter.addAlreadySorted(
-                                                   batch.back().first, batch.back().second);
-                                               bytesInBatch += containerWriter.lastAddedSize();
-                                           }
+                            while (mergeIterator->more() &&
+                                   static_cast<int64_t>(batch.size()) < _batchSize &&
+                                   bytesInBatch < _batchBytes) {
+                                const auto& [k, v] = batch.emplace_back(mergeIterator->next());
+                                bytesInBatch +=
+                                    containerWriter.addAlreadySortedWrapper(k, v).bytesWritten;
+                            }
 
-                                           wuow.commit();
-                                       });
+                            wuow.commit();
+                        });
                     numSpilled += batch.size();
                 }
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
@@ -660,30 +771,20 @@ private:
         const SortOptions& opts,
         const SpillerBase<Key, Value, Comparator>::Settings& settings,
         std::span<std::pair<Key, Value>> data) override {
-        auto writer = this->_storage->makeWriter(opts, settings);
 
-        for (size_t i = 0; i < data.size();) {
-            auto batchStart = i;
-            auto batch = data.subspan(batchStart,
-                                      batchStart + _batchSize < data.size() ? _batchSize
-                                                                            : std::dynamic_extent);
+        auto writer = this->_storage->makeWriter(opts, settings);
+        auto& containerWriter = *static_cast<SortedContainerWriter<Key, Value>*>(writer.get());
+
+        for (size_t i = 0, lastBatchSize = 0; i < data.size(); i += lastBatchSize) {
+            const auto batch =
+                data.subspan(i, i + _batchSize < data.size() ? _batchSize : std::dynamic_extent);
             writeConflictRetry(
                 &_opCtx, _ru, "ContainerBasedSpiller::_spill", NamespaceString::kEmpty, [&] {
-                    i = batchStart;
-                    int64_t bytesInBatch = 0;
-
                     WriteUnitOfWork wuow{&_opCtx};
-                    for (auto&& [key, value] : batch) {
-                        writer->addAlreadySorted(key, value);
-                        ++i;
-
-                        bytesInBatch +=
-                            static_cast<SortedContainerWriter<Key, Value>*>(writer.get())
-                                ->lastAddedSize();
-                        if (bytesInBatch >= _batchBytes) {
-                            break;
-                        }
-                    }
+                    // Write spills as a batch, save the count of pairs written to increment the
+                    // counter for the next subspan.
+                    lastBatchSize =
+                        containerWriter.addAlreadySortedBatch(batch, _batchBytes).kvPairsWritten;
                     wuow.commit();
                 });
         }

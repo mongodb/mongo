@@ -13,6 +13,7 @@
 #include "mongo/util/modules.h"
 
 #include <climits>
+#include <type_traits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -21,10 +22,20 @@ static constexpr int64_t testSpillingMinAvailableDiskSpaceBytes = 500 * 1024 * 1
 //
 // Sorter framework testing utilities
 //
-class IntWrapper {
+
+/**
+ * Restricted to the types BufBuilder::appendNum() has an exact overload for.
+ */
+template <typename T>
+requires(std::is_same_v<T, char> || std::is_same_v<T, int16_t> || std::is_same_v<T, int32_t> ||
+         std::is_same_v<T, int64_t>)
+class ContainerElementWrapper {
 public:
-    IntWrapper(int i = 0) : _i(i) {}
-    operator const int&() const {
+    using ElementType = T;
+
+    ContainerElementWrapper() = default;
+    constexpr ContainerElementWrapper(T i) : _i{i} {}  // Implicit conversion is allowed.
+    constexpr operator const T&() const {
         return _i;
     }
 
@@ -33,13 +44,14 @@ public:
     void serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(_i);
     }
-    static IntWrapper deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-        return buf.read<LittleEndian<int>>().value;
+    static ContainerElementWrapper deserializeForSorter(BufReader& buf,
+                                                        const SorterDeserializeSettings&) {
+        return buf.read<LittleEndian<T>>().value;
     }
     int memUsageForSorter() const {
-        return sizeof(IntWrapper);
+        return sizeof(ContainerElementWrapper);
     }
-    IntWrapper getOwned() const {
+    ContainerElementWrapper getOwned() const {
         return *this;
     }
     void makeOwned() {}
@@ -49,8 +61,11 @@ public:
     }
 
 private:
-    int _i;
+    T _i{};
 };
+
+using IntWrapper = ContainerElementWrapper<int32_t>;
+static_assert(static_cast<int32_t>(IntWrapper{}) == 0, "IntWrapper default-constructs to 0");
 
 typedef std::pair<IntWrapper, IntWrapper> IWPair;
 typedef sorter::Iterator<IntWrapper, IntWrapper> IWIterator;

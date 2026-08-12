@@ -25,6 +25,7 @@
 
 #include <limits>
 #include <memory>
+#include <ostream>
 #include <span>
 #include <string>
 #include <utility>
@@ -557,6 +558,73 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeReflectsAverageEntrySize) {
     EXPECT_EQ(this->sorterTracker.bytesSpilled.load(), 16);
 }
 
+/**
+ * Runs over element types of differing serialized width, so a reported write size has to track the
+ * entries actually written rather than any fixed value.
+ */
+template <typename Element>
+class SortedContainerWriterElementTypedTest : public SortedContainerWriterTest {};
+
+using ContainerElementTypes = testing::Types<ContainerElementWrapper<char>,
+                                             ContainerElementWrapper<int16_t>,
+                                             ContainerElementWrapper<int32_t>,
+                                             ContainerElementWrapper<int64_t>>;
+TYPED_TEST_SUITE(SortedContainerWriterElementTypedTest, ContainerElementTypes);
+
+TYPED_TEST(SortedContainerWriterElementTypedTest,
+           AddAlreadySortedWrapperReportsBytesInsideNestedWriteUnitOfWork) {
+    using Element = TypeParam;
+
+    auto opCtx = this->makeOperationContext();
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(opCtx.get()));
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(
+        std::make_shared<Ident>(str::stream() << "bytes_written_test_" << sizeof(Element)));
+    SortOptions opts;
+    const int64_t startingKey = 11;
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
+    SortedContainerWriter<Element, Element> writer(
+        *opCtx,
+        ru,
+        container,
+        stats,
+        opts,
+        startingKey,
+        sorter::kLatestChecksumVersion,
+        typename SortedContainerWriter<Element, Element>::Settings{});
+
+    const Element k1{1};
+    const Element v1{2};
+    const Element k2{3};
+    const Element v2{4};
+
+    BufBuilder expected;
+    k1.serializeForSorter(expected);
+    v1.serializeForSorter(expected);
+    const int64_t entrySize = expected.len();
+    ASSERT_EQ(entrySize, 2 * static_cast<int64_t>(sizeof(typename Element::ElementType)));
+
+    // mergeSpills() calls addAlreadySortedWrapper() from inside an enclosing unit of work, so the
+    // writer's own unit of work is nested and its onCommit handlers do not run until this outer one
+    // commits. The reported size must be available as soon as the call returns.
+    {
+        WriteUnitOfWork wuow{opCtx.get()};
+        EXPECT_EQ(writer.addAlreadySortedWrapper(k1, v1).bytesWritten, entrySize);
+        EXPECT_EQ(writer.addAlreadySortedWrapper(k2, v2).bytesWritten, entrySize);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(stats.bytesSpilled(), 2 * entrySize);
+    EXPECT_EQ(stats.numSpilledEntries(), 2);
+
+    this->template exhaustIterators<Element, Element>(writer);
+}
+
 TEST_F(SortedContainerWriterTest, StatsUpdatedOnCommit) {
     auto opCtx = makeOperationContext();
     auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(
@@ -686,7 +754,27 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {
     }
 }
 
-TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSerialization) {
+enum class ContainerWriterMode {
+    Single,
+    Batched,
+};
+
+std::ostream& operator<<(std::ostream& os, ContainerWriterMode mode) {
+    switch (mode) {
+        case ContainerWriterMode::Single:
+            return os << "Single";
+        case ContainerWriterMode::Batched:
+            return os << "Batched";
+    }
+    MONGO_UNREACHABLE_TASSERT(11605901);
+}
+
+class SortedContainerWriterModeParameterizedTest
+    : public SortedContainerWriterTest,
+      public testing::WithParamInterface<ContainerWriterMode> {};
+
+TEST_P(SortedContainerWriterModeParameterizedTest,
+       ContainerWriterStoresEmptyValueForZeroLengthSerialization) {
     auto opCtx = makeOperationContext();
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
     auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
@@ -708,16 +796,33 @@ TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSe
         startingKey,
         sorter::kLatestChecksumVersion,
         SortedContainerWriter<NullValue, NullValue>::Settings{});
-    writer.addAlreadySorted(NullValue{}, NullValue{});
 
-    ASSERT_EQ(container.entries().size(), 1U);
-    EXPECT_EQ(container.entries()[0].first, startingKey);
-    EXPECT_TRUE(container.entries()[0].second.empty());
+    const std::vector<std::pair<NullValue, NullValue>> entries(3);
+    switch (GetParam()) {
+        case ContainerWriterMode::Single:
+            for (auto& [k, v] : entries) {
+                writer.addAlreadySorted(k, v);
+            }
+            break;
+        case ContainerWriterMode::Batched: {
+            const auto result =
+                writer.addAlreadySortedBatch(entries, std::numeric_limits<int64_t>::max());
+            EXPECT_EQ(result.kvPairsWritten, static_cast<int64_t>(entries.size()));
+            EXPECT_EQ(result.bytesWritten, 0);
+            break;
+        }
+    }
+
+    ASSERT_EQ(container.entries().size(), entries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        EXPECT_EQ(container.entries()[i].first, startingKey + static_cast<int64_t>(i));
+        EXPECT_TRUE(container.entries()[i].second.empty());
+    }
 
     exhaustIterators<NullValue, NullValue>(writer);
 }
 
-TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) {
+TEST_P(SortedContainerWriterModeParameterizedTest, ContainerWriterAllowsNullValueWithNonNullKey) {
     auto opCtx = makeOperationContext();
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
     auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
@@ -740,19 +845,40 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
         sorter::kLatestChecksumVersion,
         SortedContainerWriter<IntWrapper, NullValue>::Settings{});
 
-    const IntWrapper key{123};
-    writer.addAlreadySorted(key, NullValue{});
+    const std::vector<std::pair<IntWrapper, NullValue>> entries{{IntWrapper{123}, NullValue{}},
+                                                                {IntWrapper{124}, NullValue{}},
+                                                                {IntWrapper{125}, NullValue{}}};
+    switch (GetParam()) {
+        case ContainerWriterMode::Single:
+            for (auto& [k, v] : entries) {
+                writer.addAlreadySorted(k, v);
+            }
+            break;
+        case ContainerWriterMode::Batched: {
+            auto result =
+                writer.addAlreadySortedBatch(entries, std::numeric_limits<int64_t>::max());
+            EXPECT_EQ(result.kvPairsWritten, static_cast<int64_t>(entries.size()));
+            break;
+        }
+    }
 
-    ASSERT_EQ(container.entries().size(), 1U);
-    EXPECT_EQ(container.entries()[0].first, startingKey);
+    ASSERT_EQ(container.entries().size(), entries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        EXPECT_EQ(container.entries()[i].first, startingKey + static_cast<int64_t>(i));
 
-    BufBuilder expected;
-    key.serializeForSorter(expected);
-    NullValue{}.serializeForSorter(expected);
-    EXPECT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
+        BufBuilder expected;
+        entries[i].first.serializeForSorter(expected);
+        entries[i].second.serializeForSorter(expected);
+        EXPECT_EQ(container.entries()[i].second, std::string(expected.buf(), expected.len()));
+    }
 
     exhaustIterators<IntWrapper, NullValue>(writer);
 }
+
+INSTANTIATE_TEST_SUITE_P(NullValueSorterWrites,
+                         SortedContainerWriterModeParameterizedTest,
+                         testing::Values(ContainerWriterMode::Single, ContainerWriterMode::Batched),
+                         testing::PrintToStringParamName{});
 
 class ContainerBasedSpillerTest : public ServiceContextMongoDTest,
                                   public testing::WithParamInterface<std::tuple<int64_t, int64_t>> {
@@ -826,6 +952,59 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     EXPECT_EQ(it2->next().first, 75);
     ASSERT_TRUE(it2->more());
     EXPECT_EQ(it2->next().first, 125);
+}
+
+TEST_P(ContainerBasedSpillerTest, SpillWritesAllEntriesAcrossMultipleBatches) {
+    auto opCtx = makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(opCtx.get()))
+        ->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container{
+        std::make_shared<Ident>(ident::generateNewInternalIdent("multi_batch_spill"sv))};
+    SorterContainerStats stats{nullptr};
+    using Settings = Spiller<IntWrapper, IntWrapper, IWComparator>::Settings;
+
+    ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator> spiller{
+        *opCtx,
+        ru,
+        container,
+        stats,
+        boost::none,
+        sorter::kLatestChecksumVersion,
+        ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>::SpillCallbacks{},
+        batchSize(),
+        batchBytes(),
+        testSpillingMinAvailableDiskSpaceBytes};
+
+    // Enough entries that every (batchSize, batchBytes) combination needs many passes through the
+    // subspan loop. The count is coprime with every batchSize under test, so the final batch is
+    // always a short remainder rather than a full one.
+    static constexpr int kNumEntries = 101;
+    std::vector<std::pair<IntWrapper, IntWrapper>> data;
+    data.reserve(kNumEntries);
+    for (int i = 0; i < kNumEntries; ++i) {
+        data.push_back({IntWrapper{i * 10}, IntWrapper{-i * 10}});
+    }
+
+    spiller.spill(SortOptions{}, Settings{}, std::span{data});
+
+    ASSERT_EQ(container.entries().size(), static_cast<size_t>(kNumEntries));
+    EXPECT_EQ(stats.numSpilledEntries(), kNumEntries);
+    const int64_t firstKey = container.entries()[0].first;
+    for (size_t i = 0; i < container.entries().size(); ++i) {
+        EXPECT_EQ(container.entries()[i].first, firstKey + static_cast<int64_t>(i));
+    }
+
+    ASSERT_EQ(spiller.iterators().size(), 1U);
+    auto it = spiller.iterators()[0];
+    for (int i = 0; i < kNumEntries; ++i) {
+        ASSERT_TRUE(it->more());
+        auto [key, val] = it->next();
+        EXPECT_EQ(key, i * 10);
+        EXPECT_EQ(val, -i * 10);
+    }
+    EXPECT_FALSE(it->more());
 }
 
 TEST_P(ContainerBasedSpillerTest, MergeSpills) {

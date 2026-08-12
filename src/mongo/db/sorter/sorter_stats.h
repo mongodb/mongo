@@ -35,7 +35,7 @@ public:
     void addSpilledDataSize(long long size);
     void addSpilledDataSizeUncompressed(long long size);
 
-    void incrementNumSpilledEntries();
+    void incrementNumSpilledEntries(long long n = 1);
 
     long long bytesSpilled() const {
         return _bytesSpilled.load();

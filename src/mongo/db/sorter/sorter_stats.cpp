@@ -26,8 +26,8 @@ void SorterContainerStats::addSpilledDataSizeUncompressed(long long size) {
     }
 }
 
-void SorterContainerStats::incrementNumSpilledEntries() {
-    _numSpilledEntries.fetchAndAdd(1);
+void SorterContainerStats::incrementNumSpilledEntries(long long n) {
+    _numSpilledEntries.fetchAndAdd(n);
 }
 
 SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker) {};
