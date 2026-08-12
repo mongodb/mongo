@@ -1051,13 +1051,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         CurOp::get(opCtx)->stopQueryPlanningTimer();
     });
 
-    // isIdHackQuery was set at ExpCtx build time from the raw BSON filter (isSimpleIdQuery()),
-    // but filters like {_id: {$in: [v]}} only normalize to a simple _id equality after parsing.
-    // Upgrade the flag now that the MatchExpression and collection collator are both available.
-    // This must precede tryExpress() and chooseEngine() in both the deferred and non-deferred
-    // paths.
-    maybeUpgradeIdHackFlag(*canonicalQuery, collections.getMainCollection());
-
     if (canonicalQuery->getExpCtx()->getIfrContext()->getSavedFlagValue(
             feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice)) {
         return exec_deferred_engine_choice::getExecutorFindDeferredEngineChoice(
@@ -1389,7 +1382,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(canonicalDelete.releaseParsedQuery());
-    maybeUpgradeIdHackFlag(*cq, collectionPtr);
 
     const auto policy = canonicalDelete.yieldPolicy();
 
@@ -1578,7 +1570,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // This is the regular path for when we have a CanonicalQuery.
     UpdateStageParams updateStageParams(request, driver, opDebug, std::move(documentCounter));
     std::unique_ptr<CanonicalQuery> cq(canonicalUpdate.releaseParsedQuery());
-    maybeUpgradeIdHackFlag(*cq, collectionPtr);
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -1672,8 +1663,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
                                            false, /* whether we must return owned BSON */
                                            cq->getFindCommandRequest().getNamespaceOrUUID().nss());
     }
-
-    maybeUpgradeIdHackFlag(*cq, coll.getCollectionPtr());
 
     // Can't encode plan cache key for non-existent collections. Add plan cache key information to
     // curOp here so both FastCountStage and multi-planner codepaths properly populate it.

@@ -231,6 +231,7 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
         size_t plannerOptions = DEFAULT;
         boost::optional<TraversalPreference> traversalPreference = boost::none;
         QueryPlanRankerEnum planRanker = QueryPlanRankerEnum::kMixed;
+        bool alwaysFillOutCollectionInfo = false;
     };
 
     /**
@@ -278,7 +279,8 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
     explicit QueryPlannerParams(ArgsForSingleCollectionQuery&& args)
         : providedOptions(args.plannerOptions),
           traversalPreference(std::move(args.traversalPreference)),
-          planRanker(args.planRanker) {
+          planRanker(args.planRanker),
+          alwaysFillOutCollectionInfo(args.alwaysFillOutCollectionInfo) {
         // TODO: SERVER-129697: Remove when the featureFlagCostBasedRanker is removed.
         if (!feature_flags::gFeatureFlagCostBasedRanker.checkEnabled()) {
             planRanker = QueryPlanRankerEnum::kMultiPlanner;
@@ -446,6 +448,12 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
     };
     // Populated if we are replanning.
     boost::optional<ReplanningData> replanningData = boost::none;
+
+    // If true, the planner will always fill out collection info for the main collection, even if it
+    // is an _id hack query which would normally skip getting collection info from the catalog. This
+    // is used for the SbeSingleDocumentLookupExecutor which invokes the QueryPlanner on an _id hack
+    // eligible query but still expects the planner to construct a plan.
+    bool alwaysFillOutCollectionInfo = false;
 
 private:
     bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,

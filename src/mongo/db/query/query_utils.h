@@ -25,7 +25,7 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
 /**
  * Returns 'true' if the given match expression is of the shape {_id: {$eq: ...}}.
  */
-bool isMatchIdHackEligible(const MatchExpression* me);
+bool isMatchIdHackEligible(MatchExpression* me);
 
 /**
  * Returns true if 'query' describes an exact-match query on _id.
@@ -37,7 +37,7 @@ bool isMatchIdHackEligible(const MatchExpression* me);
  * without taking into account the collators.
  */
 inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand,
-                                                 const MatchExpression* me = nullptr) {
+                                                 MatchExpression* me = nullptr) {
     return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
         findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
         !findCommand.getSkip() &&
@@ -46,21 +46,13 @@ inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findC
 }
 
 /**
- * Upgrades the IDHACK eligibility flag on 'cq' if the parsed MatchExpression normalizes to a
- * simple _id equality (e.g. {_id: {$in: [v]}} → {_id: {$eq: v}}). This is a "late upgrade"
- * relative to the raw-BSON check done at ExpCtx build time, and must be called after the
- * collection is acquired so the collator can be compared. No-op if the flag is already set or
- * if the collators do not permit IDHACK.
+ * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
+ * TODO SERVER-123100: Remove isIdHackEligibleQuery() in favor of ExpCtx::isIdHackQuery() checks.
  */
-inline void maybeUpgradeIdHackFlag(CanonicalQuery& cq, const CollectionPtr& coll) {
-    if (cq.getExpCtx()->isIdHackQuery() || !coll)
-        return;
-    const bool collatorOK = cq.getFindCommandRequest().getCollation().isEmpty() ||
-        CollatorInterface::collatorsMatch(cq.getCollator(), coll->getDefaultCollator());
-    if (collatorOK &&
-        isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
-                                             cq.getPrimaryMatchExpression()))
-        cq.getExpCtx()->setIsIdHackQuery(true);
+inline bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& cq) {
+    return isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
+                                                cq.getPrimaryMatchExpression()) &&
+        CollatorInterface::collatorsMatch(cq.getCollator(), collection->getDefaultCollator());
 }
 
 /**
@@ -121,12 +113,7 @@ inline ExpressEligibility isExpressEligible(OperationContext* opCtx,
         (cq.getProj() != nullptr && !cq.getProj()->isSimple())) {
         return ExpressEligibility::Ineligible;
     }
-    // Use the authoritative live check rather than the pre-computed isIdHackQuery() flag,
-    // which can be stale when a sub-query inherits an outer ExpressionContext (e.g. from
-    // $graphLookup/$lookup at runtime) whose flag was set for the outer _id point query.
-    if (isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
-                                             cq.getPrimaryMatchExpression()) &&
-        CollatorInterface::collatorsMatch(cq.getCollator(), coll->getDefaultCollator()) &&
+    if (isIdHackEligibleQuery(coll, cq) &&
         (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
          clustered_util::isClusteredOnId(coll->getClusteredInfo()))) {
         return ExpressEligibility::IdPointQueryEligible;
