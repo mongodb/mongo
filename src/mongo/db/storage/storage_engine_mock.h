@@ -154,7 +154,7 @@ public:
         OldestActiveTransactionTimestampCallback callback) final {}
 
     Timestamp getAllDurableTimestamp() const final {
-        return {};
+        return _allDurableTimestamp;
     }
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
         return boost::none;
@@ -189,7 +189,9 @@ public:
     void stopTimestampMonitor() final {}
     void restartTimestampMonitor() final {}
 
-    void checkpoint() final {}
+    void checkpoint() final {
+        ++_checkpointCount;
+    }
 
     StorageEngine::CheckpointIteration getCheckpointIteration() const final {
         return StorageEngine::CheckpointIteration{0};
@@ -336,6 +338,14 @@ public:
         return _setStepDownTimestampCount;
     }
 
+    void setAllDurableTimestamp(Timestamp allDurableTimestamp) {
+        _allDurableTimestamp = allDurableTimestamp;
+    }
+
+    int getCheckpointCount() const {
+        return _checkpointCount;
+    }
+
 private:
     bool _isInLeaderMode = false;
     uint64_t _lastSetMaterializedLsn = 0;
@@ -344,7 +354,9 @@ private:
     bool _lastSetOldestTimestampForce = false;
     Timestamp _stableTimestamp;
     Timestamp _stepDownTimestamp;
+    Timestamp _allDurableTimestamp;
     int _setStepDownTimestampCount = 0;
+    int _checkpointCount = 0;
     std::vector<std::string> _operations;
 };
 
