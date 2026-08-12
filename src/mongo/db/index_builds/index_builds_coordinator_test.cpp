@@ -753,6 +753,36 @@ TEST_P(IndexBuildsCoordinatorResumeOnStepUpTest, StepUpResumesPrimaryDriven) {
         GetParam());
 }
 
+TEST_F(IndexBuildsCoordinatorTest, StepUpSkipsPrimaryDrivenIndexBuildWhoseCollectionWasDropped) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    auto& indexBuildsCoord = *IndexBuildsCoordinator::get(opCtx);
+    auto& registry = index_builds::primary_driven::registry(opCtx->getServiceContext());
+
+    // Two registry entries for collections that no longer exist.
+    auto dbName =
+        NamespaceString::createNamespaceString_forTest("IndexBuildsCoordinatorTest.test").dbName();
+    for (int i = 0; i < 2; ++i) {
+        registry.add(UUID::gen(),
+                     dbName,
+                     /*collectionUUID=*/UUID::gen(),
+                     toIndexBuildInfoVec(
+                         std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                                       << "a_1")},
+                         *opCtx->getServiceContext()->getStorageEngine(),
+                         dbName),
+                     /*indexBuildIdent=*/boost::none);
+    }
+    ASSERT_EQ(registry.all().size(), 2);
+
+    indexBuildsCoord.onStepUp(opCtx);
+    indexBuildsCoord.awaitStepUpThread_forTestOnly();
+
+    EXPECT_TRUE(registry.all().empty());
+}
+
 INSTANTIATE_TEST_SUITE_P(
     Phases,
     IndexBuildsCoordinatorResumeOnStepUpTest,

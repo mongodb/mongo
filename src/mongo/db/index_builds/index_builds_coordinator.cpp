@@ -2232,20 +2232,43 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
         }
 
         if (!resumeSucceeded) {
-            writeConflictRetry(opCtx,
-                               "abortPrimaryDrivenIndexBuildOnStepUp",
-                               {build.dbName, build.collectionUUID},
-                               [&] {
-                                   uassertStatusOK(index_builds::primary_driven::abort(
-                                       opCtx,
-                                       build.dbName,
-                                       build.collectionUUID,
-                                       buildUUID,
-                                       build.indexes,
-                                       build.indexBuildIdent,
-                                       {ErrorCodes::InterruptedDueToReplStateChange,
-                                        "Aborting primary-driven index build upon step up"}));
-                               });
+            try {
+                writeConflictRetry(opCtx,
+                                   "abortPrimaryDrivenIndexBuildOnStepUp",
+                                   {build.dbName, build.collectionUUID},
+                                   [&] {
+                                       uassertStatusOK(index_builds::primary_driven::abort(
+                                           opCtx,
+                                           build.dbName,
+                                           build.collectionUUID,
+                                           buildUUID,
+                                           build.indexes,
+                                           build.indexBuildIdent,
+                                           {ErrorCodes::InterruptedDueToReplStateChange,
+                                            "Aborting primary-driven index build upon step up"}));
+                                   });
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // The collection was dropped, which already aborted this build. So, there is
+                // nothing left to do.
+                LOGV2(13336800,
+                      "Index build: collection of primary-driven index build was dropped, nothing "
+                      "to abort",
+                      "buildUUID"_attr = buildUUID,
+                      "collectionUUID"_attr = build.collectionUUID);
+                index_builds::primary_driven::registry(opCtx->getServiceContext())
+                    .remove(buildUUID);
+                continue;
+            } catch (const DBException& ex) {
+                // Keep going: the remaining builds still need to be resumed or aborted.
+                LOGV2_WARNING(
+                    13336801,
+                    "Index build: failed to abort primary-driven index build upon step up",
+                    "buildUUID"_attr = buildUUID,
+                    "collectionUUID"_attr = build.collectionUUID,
+                    "error"_attr = ex);
+                continue;
+            }
+
             LOGV2(11130400,
                   "Index build: failed to resume primary-driven index build, aborting instead",
                   "buildUUID"_attr = buildUUID);
