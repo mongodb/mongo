@@ -6,14 +6,21 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder_mock.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_factory_mock.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -347,6 +354,71 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBWithTenantHitsDeadline) {
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), dbName, MODE_X, Date_t::now() + timeoutMs); },
         timeoutMs);
+}
+
+class AutoGetOplogFastPathTest : public ServiceContextMongoDTest {
+public:
+    AutoGetOplogFastPathTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtxHolder = makeOperationContext();
+
+        repl::ReplicationCoordinator::set(
+            getServiceContext(),
+            std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
+        repl::StorageInterface::set(getServiceContext(),
+                                    std::make_unique<repl::StorageInterfaceImpl>());
+        repl::createOplog(opCtx());
+    }
+
+    OperationContext* opCtx() const {
+        return _opCtxHolder.get();
+    }
+
+    repl::StorageInterface* storage() const {
+        return repl::StorageInterface::get(getServiceContext());
+    }
+
+    /**
+     * Returns a token that expires once nothing references the collection's ident.
+     */
+    std::weak_ptr<Ident> getIdentToken(const NamespaceString& nss) const {
+        // Scoped so this catalog reference is not itself a holder of the ident.
+        auto catalog = CollectionCatalog::get(opCtx());
+        auto collection = catalog->lookupCollectionByNamespace(opCtx(), nss);
+        ASSERT(collection);
+        return collection->getSharedIdent();
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+};
+
+// AutoGetOplogFastPath must not keep collections other than the oplog alive. Retaining a whole
+// catalog version here pins the idents of collections dropped afterwards, which makes a replicated
+// 'dropIdent' fatal on the applier.
+TEST_F(AutoGetOplogFastPathTest, DoesNotRetainUnrelatedDroppedCollectionIdent) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ASSERT_OK(storage()->createCollection(opCtx(), nss, options));
+    auto identToken = getIdentToken(nss);
+    ASSERT_FALSE(identToken.expired());
+
+    AutoGetOplogFastPath oplogWrite(opCtx(), OplogAccessMode::kWrite);
+    ASSERT(oplogWrite.getCollection());
+
+    {
+        // Drop without replicating, so the drop does not need an opTime assigned to it.
+        repl::UnreplicatedWritesBlock uwb(opCtx());
+        ASSERT_OK(storage()->dropCollection(opCtx(), nss));
+    }
+    // The drop stashed a catalog on this opCtx's snapshot, so isolate the oplog acquisition as the
+    // only remaining candidate holder.
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
+
+    EXPECT_TRUE(identToken.expired());
 }
 
 }  // namespace

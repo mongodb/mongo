@@ -628,15 +628,13 @@ AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
             opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow, globalLkOptions);
     }
 
-    _stashedCatalog = CollectionCatalog::get(opCtx);
     _oplogInfo = LocalOplogInfo::get(opCtx);
-    // The oplog is a special collection that is always present in the catalog and can't be dropped,
-    // so it will be found by the lookup.
-    // We also stash the catalog, so the Collection* returned by the lookup will not be invalidated
-    // by any catalog changes.
-    // The initialization here is therefore safe.
-    _oplog = CollectionPtr::CollectionPtr_UNSAFE(
-        _stashedCatalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace));
+    // Retain the collection itself rather than the catalog, so the Collection* stays valid without
+    // also keeping every other collection in that catalog version alive. The lookup returns null if
+    // the oplog does not exist, which callers of getCollection() must handle.
+    _oplogCollection =
+        CollectionCatalog::get(opCtx)->lookupOplogCollectionForFastPath_UNSAFE(opCtx);
+    _oplog = CollectionPtr::CollectionPtr_UNSAFE(_oplogCollection.get());
 }
 
 }  // namespace mongo

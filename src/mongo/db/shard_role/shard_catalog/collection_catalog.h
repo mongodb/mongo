@@ -346,6 +346,16 @@ public:
         OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
+     * Returns an owning reference to the oplog collection, which stays valid without retaining this
+     * catalog instance. Returns nullptr if no oplog is known.
+
+     * TODO SERVER-133360: Remove this function and its caller if possible. Do not add new callers
+     * of this function.
+     */
+    std::shared_ptr<const Collection> lookupOplogCollectionForFastPath_UNSAFE(
+        OperationContext* opCtx) const;
+
+    /**
      * This function gets the NamespaceString from the collection catalog entry that
      * corresponds to UUID uuid. If no collection exists with the uuid, return
      * boost::none. See onCloseCatalog/onOpenCatalog for more info.

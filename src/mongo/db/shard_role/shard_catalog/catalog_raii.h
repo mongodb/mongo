@@ -476,11 +476,12 @@ public:
 private:
     boost::optional<Lock::GlobalLock> _globalLock;
     LocalOplogInfo* _oplogInfo;
-    CollectionPtr _oplog;
 
-    // Retain the CollectionCatalog snapshot since this fast-path acquisition skips acquiring the
-    // oplog collection lock.
-    std::shared_ptr<const CollectionCatalog> _stashedCatalog;
+    // Retain the oplog collection since this fast-path acquisition skips acquiring the oplog
+    // collection lock. Declared before '_oplog', which points into it.
+    std::shared_ptr<const Collection> _oplogCollection;
+
+    CollectionPtr _oplog;
 };
 
 }  // namespace mongo

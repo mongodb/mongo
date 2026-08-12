@@ -2129,6 +2129,11 @@ const Collection* CollectionCatalog::lookupCollectionByNamespaceOrUUID(
     return lookupCollectionByNamespace(opCtx, nssOrUUID.nss());
 }
 
+std::shared_ptr<const Collection> CollectionCatalog::lookupOplogCollectionForFastPath_UNSAFE(
+    OperationContext* opCtx) const {
+    return _getCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
+}
+
 std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByNamespaceNoFindInstantiated(
     const NamespaceString& nss) const {
     const std::shared_ptr<Collection>* coll = _collections.find(nss);
