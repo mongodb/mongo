@@ -1300,8 +1300,20 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         // collection. There is a known race condition where a new search index could be created
         // after this check passes, in which case the index will be dropped when resharding commits.
         // TODO: SERVER-125557 (resolve the index-creation race)
-        if (_reshardingCoordinatorExternalState->searchIndexExistsForCollection(
-                opCtx.get(), _coordinatorDoc.getSourceNss())) {
+        bool searchIndexExists = false;
+        try {
+            searchIndexExists = _reshardingCoordinatorExternalState->searchIndexExistsForCollection(
+                opCtx.get(), _coordinatorDoc.getSourceNss());
+        } catch (const DBException& ex) {
+            // Since the check is best effort, any error while listing the search indexes is ignored
+            // rather than failing the resharding operation.
+            LOGV2(13315000,
+                  "Ignoring error while checking whether the collection has search indexes",
+                  logAttrs(_coordinatorDoc.getSourceNss()),
+                  "error"_attr = redact(ex));
+        }
+
+        if (searchIndexExists) {
             _metrics->onSearchIndexAbort();
             uasserted(ErrorCodes::IllegalOperation,
                       str::stream()
