@@ -11,47 +11,6 @@ permissions:
 
 jobs:
   update-version:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: v6.0-staging
-
-      - name: Parse version from tag
-        id: version
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          # The tag name is read from the environment rather than interpolated into this
-          # script, so a tag containing shell metacharacters cannot execute on the runner.
-          # Strip leading 'r' prefix (e.g. r9.0.0 -> 9.0.0)
-          VERSION="${REF_NAME#r}"
-          # Only plain version tags bump the file. Pre-release suffixes such as -rc0 and
-          # -alpha0 are accepted; anything else is ignored, which also keeps the value safe
-          # to use in the steps below.
-          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9._]+)?$ ]]; then
-            echo "Tag '${REF_NAME}' is not a version tag, skipping."
-            exit 0
-          fi
-          echo "version=${VERSION}" >>"$GITHUB_OUTPUT"
-
-      - name: Update .bazelrc.target_mongo_version
-        if: steps.version.outputs.version != ''
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          sed -i "s|^common --define=MONGO_VERSION=.*|common --define=MONGO_VERSION=${VERSION}|" .bazelrc.target_mongo_version
-
-      - name: Create Pull Request
-        if: steps.version.outputs.version != ''
-        id: create-pr
-        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6.1.0
-        with:
-          branch: auto/update-mongo-version-${{ steps.version.outputs.version }}
-          commit-message: "Update MONGO_VERSION to ${{ steps.version.outputs.version }}"
-          title: "Update MONGO_VERSION to ${{ steps.version.outputs.version }}"
-          body: |
-            Automated PR triggered by tag `${{ github.ref_name }}`.
-
-            Updates `MONGO_VERSION` in `.bazelrc.target_mongo_version` to `${{ steps.version.outputs.version }}`.
-          base: v6.0-staging
+    # intentionally points to @master so every branch always runs the
+    # latest implementation with no per-branch backporting required.
+    uses: 10gen/mongo/.github/workflows/_update-mongo-version-impl.yml@master
