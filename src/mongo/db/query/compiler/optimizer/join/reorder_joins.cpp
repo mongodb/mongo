@@ -80,6 +80,9 @@ std::unique_ptr<QuerySolutionNode> createIndexProbeQSN(
         matchExpr != nullptr && !matchExpr->isTriviallyTrue()) {
         qsn->filter = matchExpr->clone();
     }
+    if (auto proj = node.accessPath->getProj()) {
+        return std::make_unique<ProjectionNodeDefault>(std::move(qsn), nullptr, *proj);
+    }
     return qsn;
 }
 

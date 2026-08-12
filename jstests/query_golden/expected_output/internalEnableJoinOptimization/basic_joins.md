@@ -6184,3 +6184,589 @@ rightEmbeddingField: "y"
   filter: { "d" : { "$lt" : 3 } }
   direction: "forward"
 ```
+## 32. Hinted INLJ with a $project
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$_internalJoinHint" : {
+			"perSubsetLevelMode" : [
+				{
+					"level" : NumberInt(0),
+					"mode" : "CHEAPEST"
+				},
+				{
+					"level" : NumberInt(1),
+					"hint" : {
+						"node" : NumberInt(1),
+						"method" : "INLJ",
+						"isLeftChild" : false
+					},
+					"mode" : "CHEAPEST"
+				}
+			]
+		}
+	},
+	{
+		"$project" : {
+			"a" : 1,
+			"computed" : "foo"
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$project" : {
+						"a" : 1,
+						"computed" : "bar"
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$project" : {
+			"_id" : 0,
+			"x._id" : 0
+		}
+	}
+]
+```
+### Results
+```json
+{ "a" : 1, "computed" : "foo", "x" : { "a" : 1, "computed" : "bar" } }
+{ "a" : 1, "computed" : "foo", "x" : { "a" : 1, "computed" : "bar" } }
+{ "a" : 1, "computed" : "foo", "x" : { "a" : 1, "computed" : "bar" } }
+{ "a" : 1, "computed" : "foo", "x" : { "a" : 1, "computed" : "bar" } }
+{ "a" : 2, "computed" : "foo", "x" : { "a" : 2, "computed" : "bar" } }
+{ "a" : null, "computed" : "foo", "x" : { "a" : null, "computed" : "bar" } }
+{ "a" : null, "computed" : "foo", "x" : { "computed" : "bar" } }
+{ "computed" : "foo", "x" : { "a" : null, "computed" : "bar" } }
+{ "computed" : "foo", "x" : { "computed" : "bar" } }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : true, "computed" : { "$const" : "bar" } }
+  |  |
+  |  FETCH [test.basic_joins_md]
+  |  
+  |  |
+  |  INDEX_PROBE_NODE [test.basic_joins_md]
+  |  keyPattern: { "a" : 1 }
+  |  indexName: "a_1"
+  |  isMultiKey: false
+  |  isUnique: false
+  |  isSparse: false
+  |  isPartial: false
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "a" : true, "computed" : { "$const" : "foo" } }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+## 33. Hinted INLJ with a $project, reverse order
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$_internalJoinHint" : {
+			"perSubsetLevelMode" : [
+				{
+					"level" : NumberInt(0),
+					"mode" : "CHEAPEST"
+				},
+				{
+					"level" : NumberInt(1),
+					"hint" : {
+						"node" : NumberInt(1),
+						"method" : "INLJ",
+						"isLeftChild" : true
+					},
+					"mode" : "CHEAPEST"
+				}
+			]
+		}
+	},
+	{
+		"$project" : {
+			"a" : 1,
+			"computed" : "y"
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$project" : {
+						"a" : 1,
+						"computed" : "x"
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$project" : {
+			"_id" : 0,
+			"x._id" : 0
+		}
+	}
+]
+```
+### Results
+```json
+{ "a" : 1, "computed" : "y", "x" : { "a" : 1, "computed" : "x" } }
+{ "a" : 1, "computed" : "y", "x" : { "a" : 1, "computed" : "x" } }
+{ "a" : 1, "computed" : "y", "x" : { "a" : 1, "computed" : "x" } }
+{ "a" : 1, "computed" : "y", "x" : { "a" : 1, "computed" : "x" } }
+{ "a" : 2, "computed" : "y", "x" : { "a" : 2, "computed" : "x" } }
+{ "a" : null, "computed" : "y", "x" : { "a" : null, "computed" : "x" } }
+{ "a" : null, "computed" : "y", "x" : { "computed" : "x" } }
+{ "computed" : "y", "x" : { "a" : null, "computed" : "x" } }
+{ "computed" : "y", "x" : { "computed" : "x" } }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "a" : true, "computed" : { "$const" : "y" } }
+  |  |
+  |  FETCH [test.basic_joins_md]
+  |  
+  |  |
+  |  INDEX_PROBE_NODE [test.basic_joins_md]
+  |  keyPattern: { "a" : 1 }
+  |  indexName: "a_1"
+  |  isMultiKey: false
+  |  isUnique: false
+  |  isSparse: false
+  |  isPartial: false
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "a" : true, "computed" : { "$const" : "x" } }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+## 34. Hinted INLJ with a $project + rename on predicate
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$_internalJoinHint" : {
+			"perSubsetLevelMode" : [
+				{
+					"level" : NumberInt(0),
+					"mode" : "CHEAPEST"
+				},
+				{
+					"level" : NumberInt(1),
+					"hint" : {
+						"node" : NumberInt(1),
+						"method" : "INLJ",
+						"isLeftChild" : false
+					},
+					"mode" : "CHEAPEST"
+				}
+			]
+		}
+	},
+	{
+		"$project" : {
+			"m" : "$a"
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md",
+			"as" : "x",
+			"localField" : "m",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$project" : {
+						"n" : "$a"
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$project" : {
+			"_id" : 0,
+			"x._id" : 0
+		}
+	}
+]
+```
+### Results
+```json
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 2, "x" : { "n" : 2 } }
+{ "m" : null, "x" : { "n" : null } }
+{ "m" : null, "x" : { } }
+{ "x" : { "n" : null } }
+{ "x" : { } }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+INDEXED_NESTED_LOOP_JOIN_EMBEDDING [m = n]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "n" : "$a" }
+  |  |
+  |  FETCH [test.basic_joins_md]
+  |  
+  |  |
+  |  INDEX_PROBE_NODE [test.basic_joins_md]
+  |  keyPattern: { "a" : 1 }
+  |  indexName: "a_1"
+  |  isMultiKey: false
+  |  isUnique: false
+  |  isSparse: false
+  |  isPartial: false
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "m" : "$a" }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+## 35. Hinted INLJ with a $project + rename on predicate, reverse order
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$_internalJoinHint" : {
+			"perSubsetLevelMode" : [
+				{
+					"level" : NumberInt(0),
+					"mode" : "CHEAPEST"
+				},
+				{
+					"level" : NumberInt(1),
+					"hint" : {
+						"node" : NumberInt(1),
+						"method" : "INLJ",
+						"isLeftChild" : true
+					},
+					"mode" : "CHEAPEST"
+				}
+			]
+		}
+	},
+	{
+		"$project" : {
+			"m" : "$a"
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md",
+			"as" : "x",
+			"localField" : "m",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$project" : {
+						"n" : "$a"
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$project" : {
+			"_id" : 0,
+			"x._id" : 0
+		}
+	}
+]
+```
+### Results
+```json
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 2, "x" : { "n" : 2 } }
+{ "m" : null, "x" : { "n" : null } }
+{ "m" : null, "x" : { } }
+{ "x" : { "n" : null } }
+{ "x" : { } }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+INDEXED_NESTED_LOOP_JOIN_EMBEDDING [n = m]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "m" : "$a" }
+  |  |
+  |  FETCH [test.basic_joins_md]
+  |  
+  |  |
+  |  INDEX_PROBE_NODE [test.basic_joins_md]
+  |  keyPattern: { "a" : 1 }
+  |  indexName: "a_1"
+  |  isMultiKey: false
+  |  isUnique: false
+  |  isSparse: false
+  |  isPartial: false
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "n" : "$a" }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+## 36. Hinted INLJ with a $project + rename + trailing $match
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$_internalJoinHint" : {
+			"perSubsetLevelMode" : [
+				{
+					"level" : NumberInt(0),
+					"mode" : "CHEAPEST"
+				},
+				{
+					"level" : NumberInt(1),
+					"hint" : {
+						"node" : NumberInt(1),
+						"method" : "INLJ",
+						"isLeftChild" : false
+					},
+					"mode" : "CHEAPEST"
+				}
+			]
+		}
+	},
+	{
+		"$project" : {
+			"m" : "$a"
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md",
+			"as" : "x",
+			"pipeline" : [
+				{
+					"$project" : {
+						"n" : "$a"
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$match" : {
+			"$expr" : {
+				"$eq" : [
+					"$m",
+					"$x.n"
+				]
+			}
+		}
+	},
+	{
+		"$project" : {
+			"_id" : 0,
+			"x._id" : 0
+		}
+	}
+]
+```
+### Results
+```json
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 2, "x" : { "n" : 2 } }
+{ "m" : null, "x" : { "n" : null } }
+{ "x" : { } }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+INDEXED_NESTED_LOOP_JOIN_EMBEDDING [m $= n]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "n" : "$a" }
+  |  |
+  |  FETCH [test.basic_joins_md]
+  |  
+  |  |
+  |  INDEX_PROBE_NODE [test.basic_joins_md]
+  |  keyPattern: { "a" : 1 }
+  |  indexName: "a_1"
+  |  isMultiKey: false
+  |  isUnique: false
+  |  isSparse: false
+  |  isPartial: false
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "m" : "$a" }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+## 37. Hinted INLJ with a $project + rename + trailing $match, reverse order
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$_internalJoinHint" : {
+			"perSubsetLevelMode" : [
+				{
+					"level" : NumberInt(0),
+					"mode" : "CHEAPEST"
+				},
+				{
+					"level" : NumberInt(1),
+					"hint" : {
+						"node" : NumberInt(1),
+						"method" : "INLJ",
+						"isLeftChild" : true
+					},
+					"mode" : "CHEAPEST"
+				}
+			]
+		}
+	},
+	{
+		"$project" : {
+			"m" : "$a"
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md",
+			"as" : "x",
+			"pipeline" : [
+				{
+					"$project" : {
+						"n" : "$a"
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$match" : {
+			"$expr" : {
+				"$eq" : [
+					"$m",
+					"$x.n"
+				]
+			}
+		}
+	},
+	{
+		"$project" : {
+			"_id" : 0,
+			"x._id" : 0
+		}
+	}
+]
+```
+### Results
+```json
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 1, "x" : { "n" : 1 } }
+{ "m" : 2, "x" : { "n" : 2 } }
+{ "m" : null, "x" : { "n" : null } }
+{ "x" : { } }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+INDEXED_NESTED_LOOP_JOIN_EMBEDDING [n $= m]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "m" : "$a" }
+  |  |
+  |  FETCH [test.basic_joins_md]
+  |  
+  |  |
+  |  INDEX_PROBE_NODE [test.basic_joins_md]
+  |  keyPattern: { "a" : 1 }
+  |  indexName: "a_1"
+  |  isMultiKey: false
+  |  isUnique: false
+  |  isSparse: false
+  |  isPartial: false
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "n" : "$a" }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
