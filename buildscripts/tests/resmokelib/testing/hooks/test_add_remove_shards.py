@@ -11,7 +11,7 @@ from buildscripts.resmokelib.testing.hooks import add_remove_shards
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 
 
-def _make_thread(life_cycle=None):
+def _make_thread():
     """Return a (_AddRemoveShardThread, mock_client) pair with all external I/O mocked."""
     mock_client = mock.MagicMock()
     # listShards is called during __init__ via _current_fixture_mode.
@@ -25,7 +25,7 @@ def _make_thread(life_cycle=None):
     ):
         thread = add_remove_shards._AddRemoveShardThread(
             logger=logging.getLogger("test"),
-            life_cycle=life_cycle or lifecycle_interface.FlagBasedThreadLifecycle(),
+            life_cycle=lifecycle_interface.FlagBasedThreadLifecycle(),
             fixture=mock.MagicMock(),
             auth_options=None,
             random_balancer_on=False,
@@ -51,9 +51,7 @@ def _make_sharded_coll(namespace, num_chunks):
 
 class TestHandleStalledShardedCollections(unittest.TestCase):
     def setUp(self):
-        lifecycle = mock.MagicMock(spec=lifecycle_interface.FlagBasedThreadLifecycle)
-        lifecycle.poll_for_idle_request.return_value = False
-        self.thread, _ = _make_thread(life_cycle=lifecycle)
+        self.thread, _ = _make_thread()
 
     def _call(self, sharded_colls):
         self.thread._handle_stalled_sharded_collections(sharded_colls, "shard-rs0")
@@ -148,56 +146,6 @@ class TestHandleStalledShardedCollections(unittest.TestCase):
         self._call([_make_sharded_coll("db.coll", 1)])
         self.assertEqual(self.thread._sharded_colls_unchanged_rounds, 0)
         self.thread._check_and_reshard_if_index_inconsistent.assert_not_called()
-
-
-class TestIdleRequestReceivedMidDraining(unittest.TestCase):
-    """When in the middle of draining the resmoke runner has posted an idle_request, the hook must
-    send an acknowledgement and shut down immediately.
-    """
-
-    def setUp(self):
-        self.lifecycle = mock.MagicMock(spec=lifecycle_interface.FileBasedThreadLifecycle)
-        self.thread, _ = _make_thread(life_cycle=self.lifecycle)
-        self.thread._decomission_removed_shard = mock.MagicMock()
-        self.thread._run_post_remove_shard_checks = mock.MagicMock()
-        self.thread._check_and_reshard_if_index_inconsistent = mock.MagicMock()
-
-    def test_run_skips_decommission_and_post_checks_when_transition_raises_idle(self):
-        """Hook must skip decommissioning and post-checks when IdleRequestReceived raised while draining"""
-        self.lifecycle.wait_for_action_permitted.side_effect = [True, False]
-        self.lifecycle.wait_for_action_interval.return_value = None
-
-        self.thread._pick_shard_to_add_remove = mock.MagicMock(
-            return_value=("shard-rs0", "host:27017")
-        )
-        self.thread._transition_to_dedicated_or_remove_shard = mock.MagicMock(
-            side_effect=add_remove_shards.IdleRequestReceived()
-        )
-
-        self.thread.run()
-
-        self.thread._transition_to_dedicated_or_remove_shard.assert_called_once_with("shard-rs0")
-        self.thread._decomission_removed_shard.assert_not_called()
-        self.thread._run_post_remove_shard_checks.assert_not_called()
-
-    def test_transition_raises_idle_request_received_when_lifecycle_signals_idle(self):
-        """_transition_to_dedicated_or_remove_shard must raise IdleRequestReceived and send an acknowledgement when idle request received in the middle of the drain"""
-        self.thread._is_fcv_at_least = mock.MagicMock(return_value=False)
-
-        self.thread._client.admin.command.return_value = {
-            "state": "ongoing",
-            "dbsToMove": [],
-            "note": "",
-        }
-        self.thread._get_tracked_collections_on_shard = mock.MagicMock(return_value=[])
-        self.thread._get_untracked_collections_on_shard = mock.MagicMock(return_value=[])
-
-        self.lifecycle.poll_for_idle_request.return_value = True
-
-        with self.assertRaises(add_remove_shards.IdleRequestReceived):
-            self.thread._transition_to_dedicated_or_remove_shard("shard-rs0")
-
-        self.lifecycle.send_idle_acknowledgement.assert_called_once()
 
 
 class TestCheckAndReshardIfIndexInconsistent(unittest.TestCase):
