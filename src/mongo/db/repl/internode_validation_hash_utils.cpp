@@ -22,11 +22,29 @@ int64_t computeUpdateValidationHash(const BSONObj& preImage, const BSONObj& post
     return computeDocValidationHash(preImage) ^ computeDocValidationHash(postImage);
 }
 
-bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const auto& vCtx = VersionContext::getDecoration(opCtx);
+namespace {
+bool isPerDocumentEnabled(const VersionContext& vCtx,
+                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
     return gFeatureFlagContinuousInternodeValidationPerDocument
         .isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
+}
+}  // namespace
+
+bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) {
+    return isPerDocumentEnabled(VersionContext::getDecoration(opCtx),
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx) {
+    // Both flags need to be checked against the same FCV snapshot.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const auto& vCtx = VersionContext::getDecoration(opCtx);
+
+    // The collection hash is folded from the per-document hashes carried on the oplog entries, so
+    // it requires per-document validation to be enabled as well.
+    return isPerDocumentEnabled(vCtx, fcvSnapshot) &&
+        gFeatureFlagContinuousInternodeValidationPerCollection
+            .isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
 }
 }  // namespace repl
 }  // namespace mongo

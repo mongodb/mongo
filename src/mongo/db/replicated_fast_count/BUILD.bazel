@@ -483,6 +483,20 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "replicated_metadata_test",
+    srcs = [
+        "replicated_metadata_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "size_count_checkpoint_buffer_test",
     srcs = [
         "size_count_checkpoint_buffer_test.cpp",

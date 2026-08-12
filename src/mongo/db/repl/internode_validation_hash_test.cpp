@@ -235,6 +235,27 @@ TEST_F(VerifyValidationHashTest, FalseForUnsupportedCollection) {
         shouldVerify(_opCtx.get(), _plainNss, OplogApplication::Mode::kSecondary, int64_t{123}));
 }
 
+// Per-collection validation needs its own feature flag. The fixture already enables the
+// per-document one.
+TEST_F(VerifyValidationHashTest, PerCollectionDisabledWithoutItsOwnFeatureFlag) {
+    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
+
+    unittest::ServerParameterGuard enablePerCollection(
+        "featureFlagContinuousInternodeValidationPerCollection", true);
+    EXPECT_TRUE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
+}
+
+// The collection hash is accumulated from the per-document hashes, so it is off whenever
+// per-document validation is off, whatever its own flag says.
+TEST_F(VerifyValidationHashTest, PerCollectionDisabledWithoutPerDocument) {
+    unittest::ServerParameterGuard enablePerCollection(
+        "featureFlagContinuousInternodeValidationPerCollection", true);
+    unittest::ServerParameterGuard disablePerDocument(
+        "featureFlagContinuousInternodeValidationPerDocument", false);
+
+    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
+}
+
 template <typename Base>
 class FatalOnMismatchTest : public Base {
 protected:

@@ -10,8 +10,24 @@
 #include <cstdint>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+/**
+ * Combines two validation hashes with XOR, which is its own inverse: folding a contribution in and
+ * back out again restores the original value, and the order of the contributions does not matter.
+ *
+ * An absent operand makes the result absent, since a value that is missing one of its contributions
+ * is indistinguishable from a wrong one.
+ */
+inline boost::optional<int64_t> combineValidationHashes(const boost::optional<int64_t>& lhs,
+                                                        const boost::optional<int64_t>& rhs) {
+    if (!lhs || !rhs) {
+        return boost::none;
+    }
+    return *lhs ^ *rhs;
+}
 
 /**
  * Stores the last committed size and count values for a collection.
@@ -37,6 +53,44 @@ struct [[MONGO_MOD_PUBLIC]] CollectionSizeCount {
 
 inline std::ostream& operator<<(std::ostream& s, const CollectionSizeCount& collectionSizeCount) {
     return (s << collectionSizeCount.toString());
+}
+
+/**
+ * Stores a collection's size and count along with the validation hash accumulated over the same
+ * operations.
+ */
+struct CollectionReplicatedMetadata {
+    CollectionSizeCount sizeCount;
+
+    // Only populated when featureFlagContinuousInternodeValidationPerCollection is enabled. Absent
+    // means the collection is not being tracked.
+    boost::optional<int64_t> hash;
+
+    bool operator==(const CollectionReplicatedMetadata&) const = default;
+
+    CollectionReplicatedMetadata operator+(const CollectionReplicatedMetadata& other) const {
+        return CollectionReplicatedMetadata{sizeCount + other.sizeCount,
+                                            combineValidationHashes(hash, other.hash)};
+    }
+    CollectionReplicatedMetadata operator-(const CollectionReplicatedMetadata& other) const {
+        // XOR is its own inverse, so removing a hash contribution is the same operation as adding
+        // it.
+        return CollectionReplicatedMetadata{sizeCount - other.sizeCount,
+                                            combineValidationHashes(hash, other.hash)};
+    }
+
+    std::string toString() const {
+        str::stream s;
+        s << sizeCount.toString();
+        if (hash) {
+            s << ", hash: " << *hash;
+        }
+        return s;
+    }
+};
+
+inline std::ostream& operator<<(std::ostream& s, const CollectionReplicatedMetadata& metadata) {
+    return (s << metadata.toString());
 }
 
 /**

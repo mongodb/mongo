@@ -30,5 +30,13 @@ int64_t computeUpdateValidationHash(const BSONObj& preImage, const BSONObj& post
  * and stored on the oplog entries.
  */
 bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx);
+
+/**
+ * Returns true if continuous internode validation per collection is enabled for the given
+ * OperationContext. This indicates whether per-collection validation hashes should be accumulated
+ * from the per-document hashes on the oplog entries, and requires per-document validation to be
+ * enabled too.
+ */
+bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx);
 }  // namespace repl
 }  // namespace mongo
