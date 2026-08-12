@@ -59,13 +59,9 @@ bool isQuerySbeCompatible(const CollectionPtr& collection,
     auto expCtx = cq.getExpCtxRaw();
 
     // If we don't support all expressions used or the query is eligible for IDHack, don't use SBE.
-    // Relies on the pre-computed isIdHackQuery() flag being up-to-date: callers must invoke
-    // maybeUpgradeIdHackFlag() before calling isQuerySbeCompatible() so that filters which
-    // normalize to a simple _id equality after MatchExpression parsing (e.g. {_id:{$in:[v]}})
-    // are correctly reflected here.
     if (!expCtx || expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
         expCtx->getSbePipelineCompatibility() == SbeCompatibility::notCompatible ||
-        (collection && expCtx->isIdHackQuery())) {
+        (collection && isIdHackEligibleQuery(collection, cq))) {
         return false;
     }
 

@@ -16,6 +16,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings_decoration.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
@@ -560,7 +561,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     }
 
     // Populate collection statistics for CBR. In the case of clustered collections, a query may
-    // appear to be ID-hack eligible as per 'ExpCtx::isIdHackQuery()', but 'buildIdHackPlan()' fails
+    // appear to be ID-hack eligible as per 'isIdHackEligibleQuery()', but 'buildIdHackPlan()' fails
     // as there is no _id index. In these cases, we will end up invoking the query planner and CBR,
     // so we need this catalog information.
     if (cbrEnabled) {
@@ -569,9 +570,8 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     }
 
     // _id queries can skip checking the catalog for indices since they will always use the _id
-    // index. This applies to both find commands (flag set at ExpCtx build time) and aggregation
-    // pipelines starting with {$match: {_id: X}} (flag set later in prepareExecutor()).
-    if (canonicalQuery.getExpCtx()->isIdHackQuery()) {
+    // index. Only skip this step if alwaysFillOutCollectionInfo is false.
+    if (isIdHackEligibleQuery(mainColl, canonicalQuery) && !alwaysFillOutCollectionInfo) {
         return;
     }
 

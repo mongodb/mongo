@@ -41,9 +41,9 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern) {
     return false;
 }
 
-bool isMatchIdHackEligible(const MatchExpression* me) {
+bool isMatchIdHackEligible(MatchExpression* me) {
     if (me) {
-        const auto* cmpMeBase = dynamic_cast<const ComparisonMatchExpressionBase*>(me);
+        const auto& cmpMeBase = dynamic_cast<ComparisonMatchExpressionBase*>(me);
         if (!cmpMeBase) {
             return false;
         }

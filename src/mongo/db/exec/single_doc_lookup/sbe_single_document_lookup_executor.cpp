@@ -47,11 +47,8 @@ std::unique_ptr<CanonicalQuery> buildCanonicalQuery(OperationContext* opCtx,
     auto findCmd = std::make_unique<FindCommandRequest>(nss);
     findCmd->setFilter(filter);
 
-    // Clear the IDHACK flag that ExpressionContextBuilder auto-sets for an '{_id: X}' filter, so
-    // the planner enumerates indexes (and produces the index-aware SBE plan).
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx =
-            ExpressionContextBuilder{}.fromRequest(opCtx, *findCmd).isIdHackQuery(false).build(),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCmd).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCmd)},
     });
 
@@ -244,6 +241,9 @@ SbeSingleDocumentLookupExecutor::PreparedExecutor::make(OperationContext* opCtx,
         .canonicalQuery = *cq,
         .collections = collections,
         .plannerOptions = plannerOptions,
+        // The planner should enumerate indexes (and produces the index-aware SBE plan) even if the
+        // IDHACK path is eligible.
+        .alwaysFillOutCollectionInfo = true,
     });
 
     if (applyShardFilter) {
