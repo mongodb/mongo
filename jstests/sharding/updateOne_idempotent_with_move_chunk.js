@@ -7,6 +7,7 @@
  * ]
  */
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1, useBridge: true});
@@ -49,15 +50,24 @@ const cmdObj = {
     txnNumber: NumberLong(5),
 };
 
+// The unified write executor broadcasts a retryable update by _id to every shard in scope and sums
+// the per-shard replies without the dedup that BatchWriteExec performs. Once the concurrent
+// migration below has copied the session history to the recipient, a retry of the statement is
+// counted on both shards and reported as 'nModified: 2'.
+// TODO SERVER-54019 Avoid over-counting 'n' and 'nModified' values when retrying updates by _id
+// or deletes by _id after chunk migration.
+const uweEnabled = isUweEnabled(db);
+
 const joinUpdate = startParallelShell(
     funWithArgs(
-        function (cmdObj, testName) {
+        function (cmdObj, testName, uweEnabled) {
             const res = db.getSiblingDB(testName).runCommand(cmdObj);
             assert.commandWorked(res);
-            assert.eq(1, res.nModified, tojson(res));
+            assert.contains(res.nModified, uweEnabled ? [1, 2] : [1], res);
         },
         cmdObj,
         jsTestName(),
+        uweEnabled,
     ),
     mongos.port,
 );
@@ -82,5 +92,6 @@ const joinMoveChunk = startParallelShell(
 joinMoveChunk();
 joinUpdate();
 
+// Regardless of the reported count, the update must have been applied exactly once.
 assert.neq(null, coll.findOne({x: -1, counter: 1}));
 st.stop();
