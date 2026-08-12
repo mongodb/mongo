@@ -14,7 +14,7 @@ const dbpath = MongoRunner.dataPath + testName;
 const dbName = `db_${testName}`;
 const bucketCollName = "system.buckets.coll";
 
-function testUpgradeFromFCV(conn, fromFCV) {
+function testUpgradeFromFCV(conn, fromFCV, awaitReplicationFn) {
     const db = conn.getDB(dbName);
 
     // Downgrade to fromFCV version
@@ -52,6 +52,7 @@ function testUpgradeFromFCV(conn, fromFCV) {
     disableSystemBucketsCreationGuardrails(true);
     assert.commandWorked(db.createCollection(bucketCollName));
     assert.commandWorked(db[bucketCollName].insertOne({doc: 1}));
+    awaitReplicationFn();
     disableSystemBucketsCreationGuardrails(false);
 
     // Upgrade succeeds even though we have an invalid bucket collection
@@ -70,7 +71,7 @@ function testAllTopologies(fromFCV) {
         jsTest.log("Testing upgrade with standalone");
         let conn = MongoRunner.runMongod({dbpath: dbpath});
 
-        testUpgradeFromFCV(conn, fromFCV);
+        testUpgradeFromFCV(conn, fromFCV, () => {});
 
         MongoRunner.stopMongod(conn);
     }
@@ -81,7 +82,9 @@ function testAllTopologies(fromFCV) {
         rst.startSet();
         rst.initiate();
 
-        testUpgradeFromFCV(rst.getPrimary(), fromFCV);
+        testUpgradeFromFCV(rst.getPrimary(), fromFCV, () => {
+            rst.awaitReplication();
+        });
         rst.stopSet();
     }
 
@@ -89,7 +92,9 @@ function testAllTopologies(fromFCV) {
         jsTest.log("Testing upgrade with sharded cluster");
         const st = new ShardingTest({shards: 2});
 
-        testUpgradeFromFCV(st.s, fromFCV);
+        testUpgradeFromFCV(st.s, fromFCV, () => {
+            st.awaitReplicationOnShards();
+        });
 
         st.stop();
     }
