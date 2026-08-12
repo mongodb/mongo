@@ -467,6 +467,68 @@ TEST(Path, NestedArrayImplicitTraversal) {
     ASSERT(!cursor.more());
 }
 
+// We do not traverse into a nested array beyond the first level, so a doubly-nested array element
+// cannot be resolved against the remaining path (even though it contains a matching field further
+// inside), and produces an EOO element instead so that the matcher can check it against null.
+TEST(Path, DoublyNestedArrayImplicitTraversal) {
+    ElementPath p{"a.b"};
+    BSONObj doc = fromjson("{a: [[{b: 2}]]}");
+    BSONElementIterator cursor(&p, doc);
+
+    ASSERT(cursor.more());
+    ElementIterator::Context e = cursor.next();
+    ASSERT(e.element().eoo());
+
+    ASSERT(!cursor.more());
+}
+
+// Elements of a doubly-nested array which cannot be traversed produce an EOO element, so that the
+// matcher can check them against null.
+TEST(Path, DoublyNestedArrayOfScalarsImplicitTraversal) {
+    ElementPath p{"a.b"};
+    BSONObj doc = fromjson("{a: [[2], {b: 3}]}");
+    BSONElementIterator cursor(&p, doc);
+
+    ASSERT(cursor.more());
+    ElementIterator::Context e = cursor.next();
+    ASSERT(e.element().eoo());
+
+    ASSERT(cursor.more());
+    e = cursor.next();
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
+    ASSERT_EQUALS(3, e.element().numberInt());
+
+    ASSERT(!cursor.more());
+}
+
+// An empty nested array leaves path left over to check, so it produces an EOO element.
+TEST(Path, DoublyNestedEmptyArrayImplicitTraversal) {
+    ElementPath p{"a.b"};
+    BSONObj doc = fromjson("{a: [[], {b: 3}]}");
+    BSONElementIterator cursor(&p, doc);
+
+    ASSERT(cursor.more());
+    ElementIterator::Context e = cursor.next();
+    ASSERT(e.element().eoo());
+
+    ASSERT(cursor.more());
+    e = cursor.next();
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
+    ASSERT_EQUALS(3, e.element().numberInt());
+
+    ASSERT(!cursor.more());
+}
+
+// With internalQueryLegacyDottedPathNullSemantics enabled, nested arrays are not traversed at all.
+TEST(Path, DoublyNestedArrayImplicitTraversalOriginalBehavior) {
+    unittest::ServerParameterGuard parameter("internalQueryLegacyDottedPathNullSemantics", true);
+
+    ElementPath p{"a.b"};
+    BSONObj doc = fromjson("{a: [[{b: 2}]]}");
+    BSONElementIterator cursor(&p, doc);
+    ASSERT(!cursor.more());
+}
+
 // SERVER-14886: when an array is being traversed explictly at the same time that a nested array
 // is being traversed implicitly, ElementIterator::Context::arrayOffset() should return the
 // current offset of the array being implicitly traversed.

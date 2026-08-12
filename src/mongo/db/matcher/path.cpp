@@ -313,8 +313,7 @@ bool BSONElementIterator::more() {
                     emptyArray = false;
                 }
             } else if (!_path->legacyDottedPathNullSemantics() &&
-                       !_arrayIterationState.nextPieceOfPathIsNumber &&
-                       eltInArray.type() != BSONType::array) {
+                       !_arrayIterationState.nextPieceOfPathIsNumber) {
                 // We cannot traverse the path of this element, so return an empty element
                 // to check for a match against eoo.
                 // Do not set done, we will go to the next element next time if no match.

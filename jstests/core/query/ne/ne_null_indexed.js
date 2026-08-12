@@ -1,4 +1,4 @@
-// This is a test for the query correctness bug described in SERVER-36681. A {$nin: null} query
+// This is a test for the query correctness bug described in SERVER-36681. A {$ne: null} query
 // should not return documents where the value doesn't exist
 // @tags: [
 //   # SERVER-36681 changed the behavior of SBE and classic engines
@@ -15,6 +15,7 @@ function assertIds(query, expectedIds) {
 }
 
 coll.drop();
+coll.createIndex({"a.b": 1});
 
 const docs = [
     {_id: 0, a: [1, {c: 1}]},
@@ -48,18 +49,19 @@ assert.commandWorked(coll.insert(docs));
 const allIds = docs.map((doc) => doc._id);
 
 // "b" doesn't exist as a top-level field on any document, so every document matches null.
-assertIds({b: {$nin: [null]}}, []);
-assertIds({b: {$in: [null]}}, allIds);
+assertIds({b: {$ne: null}}, []);
+assertIds({b: {$eq: null}}, allIds);
 
 // None of the documents above have a genuinely reachable, non-null value at "a.b", so every
 // document matches null there as well.
-assertIds({"a.b": {$nin: [null]}}, []);
-assertIds({"a.b": {$in: [null]}}, allIds);
+assertIds({"a.b": {$ne: null}}, []);
+assertIds({"a.b": {$eq: null}}, allIds);
 
-assert.eq(coll.count({"a.b": {$in: [null]}}), allIds.length);
-assert.eq(coll.count({"a.b": {$nin: [null]}}), 0);
+assert.eq(coll.count({"a.b": {$eq: null}}), allIds.length);
+assert.eq(coll.count({"a.b": {$ne: null}}), 0);
 
 coll.drop();
+coll.createIndex({"a.b": 1});
 
 const docsWithRealValues = [
     {_id: 0, a: [{b: [[3]]}]},
@@ -69,8 +71,8 @@ assert.commandWorked(coll.insert(docsWithRealValues));
 const realValueIds = docsWithRealValues.map((doc) => doc._id);
 
 // Here "a.b" resolves directly to a non-null leaf value in both documents.
-assertIds({"a.b": {$nin: [null]}}, realValueIds);
-assertIds({"a.b": {$in: [null]}}, []);
+assertIds({"a.b": {$ne: null}}, realValueIds);
+assertIds({"a.b": {$eq: null}}, []);
 
-assert.eq(coll.count({"a.b": {$nin: [null]}}), realValueIds.length);
-assert.eq(coll.count({"a.b": {$in: [null]}}), 0);
+assert.eq(coll.count({"a.b": {$ne: null}}), realValueIds.length);
+assert.eq(coll.count({"a.b": {$eq: null}}), 0);

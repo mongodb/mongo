@@ -711,7 +711,7 @@ export function runTests(testConfig) {
         });
     })();
 
-    (function testMatchingMissingOnPath() {
+    (function testMatchingMissingOrNullOnPath() {
         const docs = [
             // "a.x" does not exist.
             {_id: 0, a: {no_x: 1}},
@@ -727,10 +727,20 @@ export function runTests(testConfig) {
             {_id: 10, a: []},
             {_id: 11, a: [[1]]},
             {_id: 12, a: [[]]},
+            {_id: 13, a: [1, {x: 1}]},
+            {_id: 14, a: [{x: 1}, 1]},
+            {_id: 15, a: [[], {x: 1}]},
+            {_id: 16, a: [{x: null}, {x: 1}]},
+            // Because we don't traverse into arrays beyond the first level,
+            // "a.x" doesn't exist in these documents either.
+            {_id: 17, a: [[{x: 1}]]},
+            {_id: 18, a: [[{x: 2}], {x: 3}]},
+            {_id: 19, a: [{x: 2}, [{x: 3}]]},
 
             // "a.x" exists.
             {_id: 20, a: {x: 2, y: 1}},
             {_id: 21, a: [{x: 2}, {x: 3}]},
+            {_id: 24, a: {x: [[2]]}},
         ];
 
         runTest_SingleForeignRecord(testConfig, {
@@ -739,7 +749,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: null},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12],
+            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level null in local and missing in foreign path",
@@ -747,7 +757,9 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            idsExpectedToMatch: [
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+            ],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -756,7 +768,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, no_b: 1},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12],
+            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level missing in local and missing in foreign path",
@@ -764,7 +776,9 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            idsExpectedToMatch: [
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+            ],
         });
     })();
 
