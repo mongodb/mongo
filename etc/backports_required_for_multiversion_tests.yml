@@ -49,6 +49,8 @@ last-patch:
       ticket: SERVER-127051
     - test_file: jstests/core/timeseries/ddl/timeseries_split_vector.js
       ticket: SERVER-127074
+    - test_file: jstests/core/timeseries/query/timeseries_bucket_level_filter.js
+      ticket: SERVER-131544
     - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
       ticket: SERVER-121084
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
@@ -106,6 +108,8 @@ last-continuous:
       ticket: SERVER-95530
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
       ticket: SERVER-127051
+    - test_file: jstests/core/timeseries/query/timeseries_bucket_level_filter.js
+      ticket: SERVER-131544
     - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
       ticket: SERVER-121084
     - test_file: jstests/core/timeseries/query/timeseries_explain_delete.js
@@ -505,6 +509,8 @@ last-lts:
       ticket: SERVER-100299
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
       ticket: SERVER-90833
+    - test_file: jstests/core/timeseries/query/timeseries_bucket_level_filter.js
+      ticket: SERVER-131544
     - test_file: jstests/core/timeseries/query/timeseries_computed_field.js
       ticket: SERVER-88072
     - test_file: jstests/core/timeseries/query/timeseries_cursor_batches.js
