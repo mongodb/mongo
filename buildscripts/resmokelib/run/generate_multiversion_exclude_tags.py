@@ -7,6 +7,14 @@ import subprocess
 import tempfile
 from collections import defaultdict
 
+from tenacity import (
+    Retrying,
+    before_sleep_log,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.core.programs import get_binary_version_output
 from buildscripts.resmokelib.testing import tags as _tags
@@ -18,6 +26,12 @@ BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
 ETC_DIR = "etc"
 BACKPORTS_REQUIRED_FILE = "backports_required_for_multiversion_tests.yml"
 BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
+
+# `git fetch` reaches out to GitHub, which intermittently returns transient HTTP errors. Retry
+# the fetch with exponential backoff rather than failing the whole task.
+FETCH_MAX_ATTEMPTS = 5
+FETCH_BACKOFF_SECONDS = 5
+FETCH_BACKOFF_MAX_SECONDS = 30
 
 
 def get_backports_required_hash(mongod_path: str | None = None):
@@ -41,7 +55,7 @@ def get_backports_required_hash(mongod_path: str | None = None):
     raise ValueError(f"Could not find a valid commit hash from the {mongod_path} mongo binary.")
 
 
-def get_git_file_content(commit_hash: str) -> str:
+def get_git_file_content(commit_hash: str, logger: logging.Logger) -> str:
     """Retrieve the content of a file from a specific commit in a local Git repository."""
 
     git_command = ["git", "show", f"{commit_hash}:{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}"]
@@ -51,22 +65,37 @@ def get_git_file_content(commit_hash: str) -> str:
         result = subprocess.run(git_command, capture_output=True, text=True, check=True)
         return result.stdout
     except subprocess.CalledProcessError:
-        try:
-            # If the git show command failed once, we attempt to shallow fetch the commit
-            # to ensure we have the commit's contents then try again.
-            _ = subprocess.run(git_fetch_command, capture_output=True, text=True, check=True)
-            result = subprocess.run(git_command, capture_output=True, text=True, check=True)
-            return result.stdout
-        except subprocess.CalledProcessError as err:
-            raise RuntimeError(
-                f"Failed to retrieve file content using command: {' '.join(git_command)}. Error: {err.stderr}"
-            )
+        pass
+
+    # If the git show command failed once, we attempt to shallow fetch the commit to ensure we
+    # have the commit's contents then try again. Both commands can reach out to GitHub -- the
+    # fetch obviously, and `git show` because Evergreen uses partial clones, so materializing a
+    # missing blob triggers a lazy fetch from the promisor remote. Either can therefore fail with
+    # a transient server-side error (e.g. the HTTP 503 in BF-45380), so retry the pair together
+    # with backoff.
+    try:
+        for attempt in Retrying(
+            stop=stop_after_attempt(FETCH_MAX_ATTEMPTS),
+            wait=wait_exponential(multiplier=FETCH_BACKOFF_SECONDS, max=FETCH_BACKOFF_MAX_SECONDS),
+            retry=retry_if_exception_type(subprocess.CalledProcessError),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        ):
+            with attempt:
+                _ = subprocess.run(git_fetch_command, capture_output=True, text=True, check=True)
+                result = subprocess.run(git_command, capture_output=True, text=True, check=True)
+                return result.stdout
+    except subprocess.CalledProcessError as err:
+        raise RuntimeError(
+            f"Failed to retrieve file content using command: {' '.join(git_command)} after "
+            f"{FETCH_MAX_ATTEMPTS} attempts. Error: {err.stderr}"
+        )
 
 
-def get_old_yaml(commit_hash: str):
+def get_old_yaml(commit_hash: str, logger: logging.Logger):
     """Download BACKPORTS_REQUIRED_FILE from the old commit and return the yaml."""
 
-    file_content = get_git_file_content(commit_hash)
+    file_content = get_git_file_content(commit_hash, logger)
 
     old_yaml_file = f"{commit_hash}_{BACKPORTS_REQUIRED_FILE}"
     temp_dir = tempfile.mkdtemp()
@@ -108,7 +137,7 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
 
     # Get the yaml contents from the old commit.
     logger.info(f"Downloading file from commit hash of old branch {old_version_commit_hash}")
-    backports_required_old = get_old_yaml(old_version_commit_hash)
+    backports_required_old = get_old_yaml(old_version_commit_hash, logger)
 
     def diff(list1, list2):
         return [elem for elem in (list1 or []) if elem not in (list2 or [])]
