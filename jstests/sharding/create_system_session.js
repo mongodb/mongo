@@ -43,15 +43,50 @@ const st = new ShardingTest({
 });
 
 function cleanUpSystemSessions(st) {
+    // Retry deletes to be resilient to stepdowns. We don't use retryWrites here because we are doing
+    // some multi-deletes which don't support retryWrites.
+    const kNumRetries = 10;
+    const kRetrySleepMs = 200;
+
+    let configDB = st.s.getDB(kConfig);
     // Unshard and drop system.sessions.
-    st.rs0.getPrimary().getDB(kConfig).getCollection(kSystemSessions).drop();
-    let uuid = st.config.collections.find({_id: kNs}).toArray()[0].uuid;
-    st.config.collections.remove({_id: kNs});
-    st.config.chunks.remove({uuid: uuid});
-    // Also clear the config server's authoritative shard catalog entry.
-    st.config.shard.catalog.collections.remove({_id: kNs});
-    assert.eq(0, st.config.collections.find().toArray().length);
-    assert.eq(0, st.config.chunks.find().toArray().length);
+    let uuid = configDB.getCollection("collections").find({_id: kNs}).toArray()[0].uuid;
+    // Shard local drops
+    retryOnRetryableError(
+        () => {
+            st.rs0.getPrimary().getDB(kConfig).getCollection(kSystemSessions).drop();
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB(kConfig)
+                    .getCollection("shard.catalog.collections")
+                    .deleteOne({_id: kNs}),
+            );
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB(kConfig)
+                    .getCollection("shard.catalog.chunks")
+                    .deleteMany({uuid: uuid}),
+            );
+        },
+        kNumRetries,
+        kRetrySleepMs,
+    );
+    // Config server drops plus clear the config server's authoritative shard catalog entry.
+    retryOnRetryableError(
+        () => {
+            assert.commandWorked(configDB.getCollection("collections").deleteOne({_id: kNs}));
+            assert.commandWorked(configDB.getCollection("chunks").deleteMany({uuid: uuid}));
+            assert.commandWorked(
+                configDB.getCollection("shard.catalog.collections").deleteOne({_id: kNs}),
+            );
+        },
+        kNumRetries,
+        kRetrySleepMs,
+    );
+    assert.eq(0, configDB.getCollection("collections").find().toArray().length);
+    assert.eq(0, configDB.getCollection("chunks").find().toArray().length);
     // force a refresh
     st.s.getDB(kConfig).getCollection(kSystemSessions).findOne();
 }
