@@ -39,4 +39,3 @@
 - featureFlagServerStatusMetricsFiltering
 - featureFlagReplSetGetStatusMetricsFiltering
 - featureFlagCollStatsMetricsFiltering
-- featureFlagEnableSchemaEpochs
