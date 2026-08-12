@@ -19,7 +19,7 @@
  * TODO(SERVER-91733): Remove the need for the failpoints once intent based kill-ops is used
  * exclusively.
  *
- * @tags: [requires_fcv_90]
+ * @tags: [requires_fcv_91]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
