@@ -35,6 +35,7 @@ constexpr std::string_view kCreateFunction = "create-function";
 constexpr std::string_view kInvokeFunction = "invoke-function";
 constexpr std::string_view kSetGlobal = "set-global";
 constexpr std::string_view kSetGlobalValue = "set-global-value";
+constexpr std::string_view kDeleteGlobal = "delete-global";
 constexpr std::string_view kInvokePredicate = "invoke-predicate";
 constexpr std::string_view kSetupEmit = "setup-emit";
 constexpr std::string_view kInvokeMap = "invoke-map";
@@ -222,6 +223,7 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
         _invokeFunctionFunc = _getFunc(kInvokeFunction);
         _setGlobalFunc = _getFunc(kSetGlobal);
         _setGlobalValueFunc = _getFunc(kSetGlobalValue);
+        _deleteGlobalFunc = _getFunc(kDeleteGlobal);
         _invokePredicateFunc = _getFunc(kInvokePredicate);
         _setupEmitFunc = _getFunc(kSetupEmit);
         _invokeMapFunc = _getFunc(kInvokeMap);
@@ -518,6 +520,19 @@ void MozJSWasmBridge::setGlobalValue(std::string_view name, const BSONObj& value
                      str::stream() << "Failed to set global JS value variable :: name = "
                                    << std::string(name),
                      ErrorCodes::Error{11542317});
+}
+
+void MozJSWasmBridge::deleteGlobal(std::string_view name) {
+    _assertUsable();
+    wc::Val nameArg = wasm_helpers::makeString(name);
+    wc::Val result(wc::WitResult::ok(std::nullopt));
+    uassert(13016700,
+            str::stream() << "Failed to call delete global JS variable " << std::string(name),
+            _callFunc(*_deleteGlobalFunc, &result, 1, std::move(nameArg)));
+    _assertWitResult(result,
+                     str::stream()
+                         << "Failed to delete global JS variable :: name = " << std::string(name),
+                     ErrorCodes::Error{13016701});
 }
 
 void MozJSWasmBridge::setupEmit(boost::optional<int64_t> byteLimit) {

@@ -95,6 +95,9 @@ interface mozjs {
   /// Set a named global to a single BSON element's JS value directly.
   set-global-value: func(name: string, bson-element: list<u8>) -> result<ok, wasm-mozjs-error>;
 
+  /// Delete a named global from the JS environment. A no-op if the name does not exist as a global.
+  delete-global: func(name: string) -> result<ok, wasm-mozjs-error>;
+
   /// Reset JS state without destroying the Store or JSContext.
   /// Clears user-defined globals and emit buffer; preserves compiled function handles.
   /// Much cheaper than shutdown + initialize for normal (non-kill) scope resets.

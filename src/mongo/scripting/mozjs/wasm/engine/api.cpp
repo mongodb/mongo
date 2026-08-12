@@ -506,6 +506,33 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global_value(
         err);
 }
 
+extern "C" bool exports_mongo_mozjs_mozjs_delete_global(
+    api_string_t* name,
+    exports_mongo_mozjs_mozjs_ok_t* ret,
+    exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
+    return run_safely(
+        [&]() -> bool {
+            ArgStringGuard nameGuard{name};
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+
+            if (!name || name->len == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
+
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.deleteGlobal(
+                reinterpret_cast<const char*>(name->ptr), name->len, &e));
+
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
+}
+
 extern "C" bool exports_mongo_mozjs_mozjs_setup_emit(
     int64_t* maybe_byte_limit,
     exports_mongo_mozjs_mozjs_ok_t* ret,

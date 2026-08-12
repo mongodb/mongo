@@ -154,6 +154,7 @@ public:
     BSONObj getGlobal(std::string_view name, bool implicitNull = false);
 
     void setGlobalValue(std::string_view name, const BSONObj& value);
+    void deleteGlobal(std::string_view name);
     BSONObj drainEmitBuffer();
 
     // Diagnostic memory statistics from inside the WASM instance:
@@ -326,6 +327,7 @@ private:
     boost::optional<wc::Func> _invokePredicateFunc = boost::none;
     boost::optional<wc::Func> _setGlobalFunc = boost::none;
     boost::optional<wc::Func> _setGlobalValueFunc = boost::none;
+    boost::optional<wc::Func> _deleteGlobalFunc = boost::none;
     boost::optional<wc::Func> _setupEmitFunc = boost::none;
     boost::optional<wc::Func> _invokeMapFunc = boost::none;
     boost::optional<wc::Func> _drainEmitBufferFunc = boost::none;

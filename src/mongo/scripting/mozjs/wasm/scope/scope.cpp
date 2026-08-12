@@ -469,6 +469,10 @@ void WasmtimeImplScope::setFunction(const char* field, const char* code) {
     _bridge->setGlobalValue(field, BSON("" << BSONCode(code)));
 }
 
+void WasmtimeImplScope::deleteGlobal(std::string_view name) {
+    _bridge->deleteGlobal(name);
+}
+
 int WasmtimeImplScope::type(const char* field) {
     BSONObj result = _resolveGlobal(field);
     BSONElement val = result[kReturnValueField];

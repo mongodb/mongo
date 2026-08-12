@@ -271,6 +271,9 @@ public:
                               const mongo::BSONObj& singleElementDoc,
                               wasm_mozjs_error_t* err);
 
+    /// Delete a named global from the JS environment. No-op if the name does not exist.
+    err_code_t deleteGlobal(const char* name, size_t name_len, wasm_mozjs_error_t* err);
+
     /// Reset JS state without destroying the Store or JSContext.
     /// Clears user-defined globals and emit buffer; preserves compiled function handles.
     err_code_t reset(wasm_mozjs_error_t* err);

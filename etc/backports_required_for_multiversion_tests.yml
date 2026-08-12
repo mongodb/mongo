@@ -45,6 +45,8 @@ last-patch:
       ticket: SERVER-118700
     - test_file: jstests/core/query/query_settings/query_settings_raw_data.js
       ticket: SERVER-112940
+    - test_file: jstests/core/query/where/where_system_js.js
+      ticket: SERVER-130167
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
       ticket: SERVER-127051
     - test_file: jstests/core/timeseries/ddl/timeseries_split_vector.js
