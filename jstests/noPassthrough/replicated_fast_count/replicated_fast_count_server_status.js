@@ -65,6 +65,8 @@ describe("fast count server status metric", function () {
                 kServerStatusAssertTimeoutMs,
             );
         }
+        // Insert a document so we flush again.
+        assert.commandWorked(this.db.foo.insert({x: 1}));
         {
             // Second flush with 100ms delay.
             const forceFlush = makeForceFlush(this.db, 100);
