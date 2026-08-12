@@ -24,3 +24,6 @@ filters:
   - "max_conns_override_helpers.js":
     approvers:
       - 10gen/server-networking-and-observability
+  - "*sasl*":
+    approvers:
+      - 10gen/server-security

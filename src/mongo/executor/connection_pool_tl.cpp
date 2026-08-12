@@ -17,6 +17,7 @@
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/auth_mechanism.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
@@ -41,6 +42,8 @@
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+#include <array>
 #include <functional>
 #include <mutex>
 #include <string_view>
@@ -225,6 +228,46 @@ void TLConnection::cancelTimeout() {
     _timer->cancelTimeout();
 }
 
+Status filterInternalAuthSaslMechs(const BSONObj& helloReply,
+                                   const HostAndPort& remoteHost,
+                                   std::vector<std::string>* mechs) {
+    // Only mechanisms known to be safe for internal authentication are accepted. The
+    // saslSupportedMechs array comes from the peer's unauthenticated hello reply, so a forged reply
+    // must not be able to downgrade us to PLAIN (which would send the raw keyfile in cleartext) or
+    // any other unexpected mechanism.
+    static constexpr std::array<std::string_view, 3> kInternalAuthAllowlist = {
+        auth::kMechanismScramSha256, auth::kMechanismScramSha1, auth::kMechanismMongoX509};
+
+    // The filtered result is derived solely from this reply, so discard anything already present.
+    mechs->clear();
+
+    const auto saslMechsElem = helloReply.getField("saslSupportedMechs");
+    if (saslMechsElem.type() != BSONType::array) {
+        return Status::OK();
+    }
+
+    bool advertisedAny = false;
+    for (const auto& elem : saslMechsElem.Array()) {
+        advertisedAny = true;
+        auto mech = elem.checkAndGetStringData();
+        if (std::find(kInternalAuthAllowlist.begin(), kInternalAuthAllowlist.end(), mech) !=
+            kInternalAuthAllowlist.end()) {
+            mechs->push_back(std::string{mech});
+        }
+    }
+
+    // If the peer advertised mechanisms but none survived filtering, fail rather than silently
+    // falling back to a default mechanism.
+    if (advertisedAny && mechs->empty()) {
+        return {ErrorCodes::AuthenticationFailed,
+                str::stream() << "Peer at " << remoteHost
+                              << " advertised no acceptable SASL mechanisms for internal "
+                                 "authentication"};
+    }
+
+    return Status::OK();
+}
+
 namespace {
 
 class TLConnectionSetupHook : public executor::NetworkConnectionHook {
@@ -254,17 +297,16 @@ public:
                         const RemoteCommandResponse& helloReply) override try {
         const auto& reply = helloReply.data;
 
-        // X.509 auth only means we only want to use a single mechanism regards of what hello says
+        // X.509 auth only means we only want to use a single mechanism regardless of what hello
+        // says
         if (_x509AuthOnly) {
             _saslMechsForInternalAuth.clear();
             _saslMechsForInternalAuth.push_back(std::string{auth::kMechanismMongoX509});
         } else {
-            const auto saslMechsElem = reply.getField("saslSupportedMechs");
-            if (saslMechsElem.type() == BSONType::array) {
-                auto array = saslMechsElem.Array();
-                for (const auto& elem : array) {
-                    _saslMechsForInternalAuth.push_back(std::string{elem.checkAndGetStringData()});
-                }
+            auto status =
+                filterInternalAuthSaslMechs(reply, remoteHost, &_saslMechsForInternalAuth);
+            if (!status.isOK()) {
+                return status;
             }
         }
 

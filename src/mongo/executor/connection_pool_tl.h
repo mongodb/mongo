@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/async_client.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/db/service_context.h"
@@ -36,6 +38,19 @@
 namespace mongo {
 namespace executor {
 namespace connection_pool_tl {
+
+/**
+ * Filters the peer-advertised "saslSupportedMechs" from an (unauthenticated) hello reply against
+ * the allowlist of mechanisms considered safe for internal authentication, storing the accepted
+ * mechanism names in 'mechs'. Any prior contents of 'mechs' are discarded; the result is derived
+ * solely from 'helloReply'. This prevents a forged reply from downgrading intra-cluster internal
+ * auth to PLAIN (which would transmit the keyfile in cleartext) or any other unexpected mechanism.
+ * Returns an error if the reply advertised mechanisms but none were acceptable, so that connection
+ * setup fails rather than silently falling back to a default mechanism.
+ */
+Status filterInternalAuthSaslMechs(const BSONObj& helloReply,
+                                   const HostAndPort& remoteHost,
+                                   std::vector<std::string>* mechs);
 
 class TLTypeFactory final : public ConnectionPool::DependentTypeFactoryInterface,
                             public std::enable_shared_from_this<TLTypeFactory> {

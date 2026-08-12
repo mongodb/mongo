@@ -33,3 +33,6 @@ filters:
   - "server_side_js_import_disabled.js":
     approvers:
       - 10gen/query-integration-features
+  - "*auth*":
+    approvers:
+      - 10gen/server-security
