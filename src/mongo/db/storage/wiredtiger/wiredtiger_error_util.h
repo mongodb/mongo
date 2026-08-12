@@ -16,6 +16,7 @@ class WiredTigerSession;
 
 bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, double threshold);
 bool rollbackReasonWasCachePressure(int sub_level_err);
+bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold, int sub_level_err);
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
                                               bool cacheIsInsufficientForTransaction,
                                               const char* reason,
