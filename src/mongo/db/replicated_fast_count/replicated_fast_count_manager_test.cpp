@@ -993,6 +993,37 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
     checkCommittedSizeCount(_opCtx, _coll2.uuid, {.size = expectedSize2, .count = expectedCount2});
 }
 
+TEST_F(ReplicatedFastCountManagerColdBootTest, InitializeScansOplogWhenContainerIdentIsMissing) {
+    unittest::ServerParameterGuard ffFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+
+    const Timestamp afterSetup = storageInterface()->getLatestOplogTimestamp(_opCtx);
+    const Timestamp ts1(afterSetup.getSecs(), afterSetup.getInc() + 1);
+    const Timestamp ts2(afterSetup.getSecs(), afterSetup.getInc() + 2);
+
+    // Intentionally do not create the fastCountMetadataStore/Timestamps containers.
+    auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStore));
+    ASSERT_FALSE(
+        storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStoreTimestamps));
+
+    test_helpers::writeToOplog(
+        _opCtx,
+        test_helpers::makeOplogEntry(ts1, _coll1, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    test_helpers::writeToOplog(
+        _opCtx,
+        test_helpers::makeOplogEntry(ts2, _coll2, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100));
+
+    checkCommittedSizeCount(_opCtx, _coll1.uuid, {.size = 0, .count = 0});
+    checkCommittedSizeCount(_opCtx, _coll2.uuid, {.size = 0, .count = 0});
+
+    _fastCountManager->initializeMetadata(_opCtx);
+
+    checkCommittedSizeCount(_opCtx, _coll1.uuid, {.size = 10, .count = 1});
+    checkCommittedSizeCount(_opCtx, _coll2.uuid, {.size = 100, .count = 1});
+}
+
 // Regression test for SERVER-127435: initializeMetadata() in container mode used to always scan
 // the oplog from Timestamp::min() because _timestampStore->read() returned boost::none
 // (the collection-backed implementation was still in place before initializeContainerStores()).
