@@ -34,3 +34,16 @@ monguard
 
 # Nested worktrees should be ignored
 .claude/worktrees
+
+# HermeticContainer and Linux container actions keep host-visible Bazel output roots, runtime
+# state, and patched repository overlays under .tmp. Keep generated trees
+# out of //... package expansion; they contain external repositories that are not
+# valid packages in this workspace.
+.tmp
+
+# Convenience output paths may temporarily be directories while hermetic_container switches
+# output roots. They are generated Bazel state, not source packages.
+bazel-bin
+bazel-mongo
+bazel-out
+bazel-testlogs
