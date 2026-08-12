@@ -13,6 +13,8 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_fcv_70,
+ *   # The explain assertions assume unsharded collection (getAggPlanStage).
+ *   assumes_unsharded_collection,
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";

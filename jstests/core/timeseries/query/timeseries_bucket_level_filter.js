@@ -11,7 +11,9 @@
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
  *   # SBE previously returned incorrect results for $gt(e): MinKey queries
- *   requires_fcv_90
+ *   requires_fcv_90,
+ *   # The explain assertions assume unsharded collection (getAggPlanStage).
+ *   assumes_unsharded_collection,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
