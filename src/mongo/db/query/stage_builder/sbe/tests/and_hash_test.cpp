@@ -48,13 +48,14 @@ protected:
 
         // Prepare the sbe::PlanStage for execution and collect all results.
         auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
-        auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessors[0]);
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+        sbe::value::TagValueOwned results =
+            sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]));
 
         // Convert the expected results to an sbe value and assert results.
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expected);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-        ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+        sbe::value::TagValueOwned expectedResult =
+            sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expected));
+        ASSERT_TRUE(valueEquals(
+            results.tag(), results.value(), expectedResult.tag(), expectedResult.value()));
     }
 };
 

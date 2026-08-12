@@ -44,8 +44,10 @@ protected:
     }
 
     void runMultiKeyTest(int numSlots, const BSONArray& input, const BSONArray& expected) {
-        value::TagValueOwned inputValue{stage_builder::makeValue(input)};
-        value::TagValueOwned expectedValue{stage_builder::makeValue(expected)};
+        value::TagValueOwned inputValue =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(input));
+        value::TagValueOwned expectedValue =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(expected));
 
         auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
             return std::make_pair(scanSlots, makeStreamingAgg(std::move(scanStage), scanSlots));
@@ -65,7 +67,8 @@ protected:
                        value::SlotAccessor* accessor,
                        value::TypeTags expectedTag,
                        value::Value expectedVal) {
-        value::TagValueOwned results{getAllResults(stage, accessor)};
+        value::TagValueOwned results =
+            value::TagValueOwned::fromRaw(getAllResults(stage, accessor));
         ASSERT_TRUE(valueEquals(results.tag(), results.value(), expectedTag, expectedVal));
     }
 };
@@ -109,8 +112,10 @@ TEST_F(StreamingAggStageTest, DoesNotDedupWhenOnlySecondSlotMatches) {
 }
 
 TEST_F(StreamingAggStageTest, RespectsCollation) {
-    value::TagValueOwned inputValue{stage_builder::makeValue(BSON_ARRAY("a" << "A" << "b"))};
-    value::TagValueOwned expectedValue{stage_builder::makeValue(BSON_ARRAY("a" << "b"))};
+    value::TagValueOwned inputValue =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY("a" << "A" << "b")));
+    value::TagValueOwned expectedValue =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY("a" << "b")));
 
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
@@ -133,8 +138,10 @@ TEST_F(StreamingAggStageTest, RespectsCollation) {
 }
 
 TEST_F(StreamingAggStageTest, ResetsStateAfterReopen) {
-    value::TagValueOwned inputValue{stage_builder::makeValue(BSON_ARRAY(1 << 1 << 2 << 3 << 3))};
-    value::TagValueOwned expectedValue{stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3))};
+    value::TagValueOwned inputValue =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 1 << 2 << 3 << 3)));
+    value::TagValueOwned expectedValue =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3)));
 
     auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputValue));
 
@@ -151,10 +158,11 @@ TEST_F(StreamingAggStageTest, ResetsStateAfterReopen) {
 }
 
 TEST_F(StreamingAggStageTest, SumAccumulatorGroupsByKey) {
-    value::TagValueOwned inputValue{stage_builder::makeValue(BSON_ARRAY(
-        BSON_ARRAY(1 << 2) << BSON_ARRAY(1 << 3) << BSON_ARRAY(2 << 2) << BSON_ARRAY(2 << 4)))};
-    value::TagValueOwned expectedValue{
-        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1 << 5) << BSON_ARRAY(2 << 6)))};
+    value::TagValueOwned inputValue =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(
+            BSON_ARRAY(1 << 2) << BSON_ARRAY(1 << 3) << BSON_ARRAY(2 << 2) << BSON_ARRAY(2 << 4))));
+    value::TagValueOwned expectedValue = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1 << 5) << BSON_ARRAY(2 << 6))));
 
     auto [scanSlots, scanStage] = generateVirtualScanMulti(2, inputValue.tag(), inputValue.value());
     inputValue.disown();
@@ -179,7 +187,8 @@ TEST_F(StreamingAggStageTest, SumAccumulatorGroupsByKey) {
     auto ctx = makeCompileCtx();
     auto resultAccessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(keySlot, sumSlot));
 
-    value::TagValueOwned results{getAllResultsMulti(stage.get(), resultAccessors)};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), resultAccessors));
     ASSERT_TRUE(
         valueEquals(results.tag(), results.value(), expectedValue.tag(), expectedValue.value()));
 }

@@ -47,7 +47,7 @@ TEST_F(SBEBuiltinConcatArraysTest, ConcatArraysWithinLimitSucceeds) {
     unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
                                          20 * 1024};
     auto [resTag, resVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(resTag, resVal);
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(resTag, resVal);
 
     ASSERT(value::isArray(resTag));
     ASSERT_EQUALS(value::getArrayView(resVal)->size(), 10u);

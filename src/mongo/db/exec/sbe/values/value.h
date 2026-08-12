@@ -545,15 +545,6 @@ public:
 
     TagValueOwned() = delete;
 
-    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(TypeTags tag, Value value)
-        : _tag(tag), _value(value) {}
-
-    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(bool owned, TypeTags tag, Value value)
-        : TagValueOwned(owned ? tag : TypeTags::Nothing, owned ? value : 0) {}
-
-    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(std::pair<TypeTags, Value> tv)
-        : TagValueOwned(tv.first, tv.second) {}
-
     MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(TagValueOwned&& o) {
         _tag = o._tag;
         _value = o._value;
@@ -626,6 +617,15 @@ public:
     }
 
 private:
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(TypeTags tag, Value value)
+        : _tag(tag), _value(value) {}
+
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(bool owned, TypeTags tag, Value value)
+        : TagValueOwned(owned ? tag : TypeTags::Nothing, owned ? value : 0) {}
+
+    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(std::pair<TypeTags, Value> tv)
+        : TagValueOwned(tv.first, tv.second) {}
+
     void release() {
         releaseValue(_tag, _value);
     }
@@ -635,8 +635,6 @@ private:
 };
 
 static_assert(sizeof(TagValueOwned) <= 16ULL, "TagValueOwned should not be larger than 16 bytes");
-
-using ValueGuard = TagValueOwned;
 
 inline void swap(TagValueOwned& a, TagValueOwned& b) noexcept {
     a.swap(b);
@@ -1318,7 +1316,7 @@ public:
 
     void push_back_raw(std::string_view name, TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
-            ValueGuard guard{tag, val};
+            auto owned = TagValueOwned::fromRaw(tag, val);
             // Reserve space in all vectors, they are the same size. We arbitrarily picked _typeTags
             // to determine the size.
             if (_typeTags.capacity() == _typeTags.size()) {
@@ -1333,7 +1331,7 @@ public:
             _typeTags.push_back(tag);
             _values.push_back(val);
 
-            guard.reset();
+            owned.reset();
         }
     }
 
@@ -1427,12 +1425,12 @@ public:
 
     void push_back_raw(TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
-            ValueGuard guard{tag, val};
+            auto owned = TagValueOwned::fromRaw(tag, val);
             MONGO_COMPILER_DIAGNOSTIC_PUSH
             MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
             _vals.push_back({tag, val});
             MONGO_COMPILER_DIAGNOSTIC_POP
-            guard.reset();
+            owned.reset();
         }
     }
 
@@ -1469,13 +1467,13 @@ public:
 
     TagValueOwned swapAt(std::size_t idx, TypeTags tag, Value val) {
         if (idx >= _vals.size() || tag == TypeTags::Nothing) {
-            return {TypeTags::Nothing, 0};
+            return TagValueOwned::nothing();
         }
 
         auto ret = _vals[idx];
         _vals[idx].first = tag;
         _vals[idx].second = val;
-        return ret;
+        return TagValueOwned::fromRaw(ret);
     }
 
     TagValueOwned swapAt(std::size_t idx, TagValueOwned value) {
@@ -1542,9 +1540,9 @@ public:
         reserve(other._values.size());
         for (const auto& p : other._values) {
             const auto copy = copyValue(p.first, p.second);
-            ValueGuard guard{copy.first, copy.second};
+            auto owned = TagValueOwned::fromRaw(copy.first, copy.second);
             _values.insert(copy);
-            guard.reset();
+            owned.reset();
         }
     }
 
@@ -1629,9 +1627,9 @@ public:
     ArrayMultiSet(const ArrayMultiSet& other) : _values(ValueCompare<true>(other.getCollator())) {
         for (const auto& p : other._values) {
             const auto copy = copyValue(p.first, p.second);
-            ValueGuard guard{copy.first, copy.second};
+            auto owned = TagValueOwned::fromRaw(copy.first, copy.second);
             _values.insert(copy);
-            guard.reset();
+            owned.reset();
         }
     }
     ArrayMultiSet(ArrayMultiSet&&) = default;
@@ -1647,9 +1645,9 @@ public:
      */
     void push_back_raw(TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
-            ValueGuard guard{tag, val};
+            auto owned = TagValueOwned::fromRaw(tag, val);
             _values.insert({tag, val});
-            guard.reset();
+            owned.reset();
         }
     }
 
@@ -1734,11 +1732,11 @@ public:
         for (const auto& [key, value] : other._values) {
             const auto copyKey = copyValue(key.first, key.second);
             const auto copyVal = copyValue(value.first, value.second);
-            ValueGuard keyGuard{copyKey.first, copyKey.second};
-            ValueGuard valueGuard{copyVal.first, copyVal.second};
+            auto keyOwned = TagValueOwned::fromRaw(copyKey.first, copyKey.second);
+            auto valOwned = TagValueOwned::fromRaw(copyVal.first, copyVal.second);
             _values.insert({copyKey, copyVal});
-            keyGuard.reset();
-            valueGuard.reset();
+            keyOwned.reset();
+            valOwned.reset();
         }
     }
 
@@ -1753,12 +1751,12 @@ public:
     }
 
     void insert(std::pair<TypeTags, Value> key, std::pair<TypeTags, Value> value) {
-        ValueGuard keyGuard{key};
-        ValueGuard valueGuard{value};
+        auto keyOwned = TagValueOwned::fromRaw(key);
+        auto valOwned = TagValueOwned::fromRaw(value);
         if (key.first != TypeTags::Nothing && value.first != TypeTags::Nothing) {
             _values.insert({key, value});
-            keyGuard.reset();
-            valueGuard.reset();
+            keyOwned.reset();
+            valOwned.reset();
         }
     }
 

@@ -24,9 +24,10 @@ protected:
      * Runs 'compiledExpr' and asserts it produced an object. Returns a non-owning view of it; the
      * returned pointer stays valid for the lifetime of 'guard'.
      */
-    value::Object* runAndGetObject(const vm::CodeFragment* compiledExpr, value::ValueGuard& guard) {
+    value::Object* runAndGetObject(const vm::CodeFragment* compiledExpr,
+                                   value::TagValueOwned& guard) {
         auto [tag, val] = runCompiledExpression(compiledExpr);
-        guard = value::ValueGuard{tag, val};
+        guard = value::TagValueOwned::fromRaw(tag, val);
 
         ASSERT_EQUALS(value::TypeTags::Object, tag);
         return value::getObjectView(val);
@@ -34,7 +35,7 @@ protected:
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
         auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned guard = value::TagValueOwned::fromRaw(tag, val);
 
         ASSERT_EQUALS(value::TypeTags::Nothing, tag);
     }
@@ -55,7 +56,7 @@ TEST_F(SBENewObjTest, BuildsEmptyObjectFromNoArguments) {
     auto expr = sbe::makeE<sbe::EFunction>(EFn::kNewObj, sbe::makeEs());
     auto compiledExpr = compileExpression(*expr);
 
-    value::ValueGuard guard{value::TypeTags::Nothing, 0};
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(value::TypeTags::Nothing, 0);
     auto obj = runAndGetObject(compiledExpr.get(), guard);
     ASSERT_EQUALS(0u, obj->size());
 }
@@ -69,7 +70,7 @@ TEST_F(SBENewObjTest, BuildsObjectFromNameValuePairs) {
                     makeE<EConstant>("hello")));
     auto compiledExpr = compileExpression(*expr);
 
-    value::ValueGuard guard{value::TypeTags::Nothing, 0};
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(value::TypeTags::Nothing, 0);
     auto obj = runAndGetObject(compiledExpr.get(), guard);
 
     ASSERT_EQUALS(2u, obj->size());
@@ -94,7 +95,7 @@ TEST_F(SBENewObjTest, PreservesFieldNamesLongerThanTheSmallStringLimit) {
                                                                 value::bitcastFrom<int32_t>(7))));
     auto compiledExpr = compileExpression(*expr);
 
-    value::ValueGuard guard{value::TypeTags::Nothing, 0};
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(value::TypeTags::Nothing, 0);
     auto obj = runAndGetObject(compiledExpr.get(), guard);
 
     ASSERT_EQUALS(1u, obj->size());
@@ -116,7 +117,7 @@ TEST_F(SBENewObjTest, OmitsFieldsWithNothingValues) {
                                                                 value::bitcastFrom<int32_t>(1))));
     auto compiledExpr = compileExpression(*expr);
 
-    value::ValueGuard guard{value::TypeTags::Nothing, 0};
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(value::TypeTags::Nothing, 0);
     auto obj = runAndGetObject(compiledExpr.get(), guard);
 
     ASSERT_EQUALS(1u, obj->size());
@@ -165,7 +166,7 @@ TEST_F(SBENewObjTest, DeepCopiesNestedObjectArgument) {
     inputAccessor.reset(innerTag, innerVal);
 
     auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(tag, val);
     ASSERT_EQUALS(value::TypeTags::Object, tag);
 
     auto [nestedTag, nestedVal] = value::getObjectView(val)->getField("nested");
@@ -185,7 +186,7 @@ TEST_F(SBENewObjTest, BuildsLargeObjectWithinMemoryLimit) {
     auto expr = makeNewObjOfLargeValues(10, 1024);
     auto compiledExpr = compileExpression(*expr);
 
-    value::ValueGuard guard{value::TypeTags::Nothing, 0};
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(value::TypeTags::Nothing, 0);
     auto obj = runAndGetObject(compiledExpr.get(), guard);
     ASSERT_EQUALS(10u, obj->size());
 }

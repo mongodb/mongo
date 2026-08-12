@@ -1256,7 +1256,8 @@ value::TagValueOwned ByteCode::builtinAggExpMovingAvgFinalize(ArityType arity) {
     uassert(7821206, "Unexpected isDecimal type", isDecimalTagVal.tag == value::TypeTags::Boolean);
 
     if (value::bitcastTo<bool>(isDecimalTagVal.value)) {
-        return value::copyValue(resultTagVal.tag, resultTagVal.value);
+        return value::TagValueOwned::fromRaw(
+            value::copyValue(resultTagVal.tag, resultTagVal.value));
     } else {
         auto result = value::bitcastTo<Decimal128>(resultTagVal.value).toDouble();
         return value::TagValueOwned::numberDouble(result);
@@ -1594,7 +1595,7 @@ void arrayQueuePush(value::Array* arrayQueue, value::TagValueOwned tagVal) {
 value::TagValueOwned arrayQueuePop(value::Array* arrayQueue) {
     auto [array, startIdx, queueSize] = getArrayQueueState(arrayQueue);
     if (queueSize == 0) {
-        return {value::TypeTags::Nothing, 0};
+        return value::TagValueOwned::nothing();
     }
     auto cap = array->size();
     auto pair = array->swapAt(startIdx, value::TypeTags::Null, 0);
@@ -2131,7 +2132,7 @@ void ByteCode::aggRemovableSumImpl(value::Array* state,
             negInfinityCount += sign;
         } else {
             if constexpr (sign == -1) {
-                auto negDec = value::TagValueOwned{value::makeCopyDecimal(value.negate())};
+                auto negDec = value::TagValueOwned::fromRaw(value::makeCopyDecimal(value.negate()));
                 aggDoubleDoubleSumImpl(sumAcc, negDec.tag(), negDec.value());
             } else {
                 aggDoubleDoubleSumImpl(sumAcc, rhsTag, rhsVal);
@@ -2340,7 +2341,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableConcatArraysAdd(ArityType
     // example where we might otherwise leak memory is if we get the input off the stack as type
     // 'bsonArray'. Iterating over a 'bsonArray' results in pointers into the underlying BSON. Thus,
     // (without passing 'true') calling 'arrayQueuePush' below would insert elements that are
-    // pointers to memory that will be destroyed with 'newElGuard' above, which is the source of a
+    // pointers to memory that will be destroyed with 'newElTagVal' above, which is the source of a
     // memory leak.
     value::arrayForEach<true>(
         newElTagVal.tag(),
@@ -2361,7 +2362,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableConcatArraysAdd(ArityType
                                         << elemSize << " bytes.");
             }
             // Update the state
-            arrayQueuePush(accArr, value::TagValueOwned{elemTag, elemVal});
+            arrayQueuePush(accArr, value::TagValueOwned::fromRaw(elemTag, elemVal));
             accArrSize += elemSize;
         });
     // Update the window field with the new total size.
@@ -2400,7 +2401,8 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableConcatArraysRemove(ArityT
         // capture a structured binding in a lambda expression.
         [&accArr = accArr, &accArrSize = accArrSize](value::TypeTags elemBeingRemovedTag,
                                                      value::Value elemBeingRemovedVal) {
-            value::TagValueOwned elemBeingRemoved(elemBeingRemovedTag, elemBeingRemovedVal);
+            value::TagValueOwned elemBeingRemoved =
+                value::TagValueOwned::fromRaw(elemBeingRemovedTag, elemBeingRemovedVal);
             auto elemSize =
                 value::getApproximateSize(elemBeingRemoved.tag(), elemBeingRemoved.value());
             tassert(11093708,
@@ -3019,7 +3021,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableSetUnionAdd(ArityType ari
     // example where we might otherwise leak memory is if we get the input off the stack as type
     // 'bsonArray'. Iterating over a 'bsonArray' results in pointers into the underlying BSON. Thus,
     // (without passing 'true') calling 'arrayQueuePush' below would insert elements that are
-    // pointers to memory that will be destroyed with 'newElGuard' above, which is the source of a
+    // pointers to memory that will be destroyed with 'newEl' above, which is the source of a
     // memory leak.
     value::arrayForEach<true>(
         newEl.tag(),
@@ -3084,7 +3086,8 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableSetUnionRemove(ArityType 
         // capture a structured binding in a lambda expression.
         [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize](
             value::TypeTags elemBeingRemovedTag, value::Value elemBeingRemovedVal) {
-            value::TagValueOwned removed{elemBeingRemovedTag, elemBeingRemovedVal};
+            value::TagValueOwned removed =
+                value::TagValueOwned::fromRaw(elemBeingRemovedTag, elemBeingRemovedVal);
             auto elemSize = value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
             tassert(11093711,
                     "Size of element is larger than size of accumulator multiset",

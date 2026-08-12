@@ -1036,7 +1036,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
 
     auto vsn = static_cast<const VirtualScanNode*>(root);
 
-    sbe::value::TagValueOwned input{sbe::value::makeNewArray()};
+    sbe::value::TagValueOwned input =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
     auto inputView = sbe::value::getArrayView(input.value());
 
     if (vsn->docs.size()) {
@@ -4144,9 +4145,10 @@ public:
                 return SbExpr{boundSlot};
             }
             if (unit) {
-                sbe::value::TagValueOwned unitStr{
-                    sbe::value::makeNewString(serializeTimeUnit(*unit))};
-                sbe::value::TagValueOwned timezoneStr{sbe::value::makeNewString("UTC")};
+                sbe::value::TagValueOwned unitStr = sbe::value::TagValueOwned::fromRaw(
+                    sbe::value::makeNewString(serializeTimeUnit(*unit)));
+                sbe::value::TagValueOwned timezoneStr =
+                    sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString("UTC"));
                 auto longOffset = genericNumConvert(
                     offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
                 auto unitConstant = b.makeConstant(unitStr.tag(), unitStr.value());

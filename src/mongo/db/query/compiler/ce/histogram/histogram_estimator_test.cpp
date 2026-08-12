@@ -736,8 +736,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
     const auto ceHist = CEHistogram::make(
         hist, stats::TypeCounts{{StringSmall, strCnt.toDouble()}}, strCnt.toDouble());
 
-    auto [tagLow, valLow] = value::makeNewString("TTV"sv);
-    value::ValueGuard vgLow(tagLow, valLow);
+    value::TagValueOwned strLow = value::TagValueOwned::fromRaw(value::makeNewString("TTV"sv));
 
     {  // {a: "TTV"}
         Interval interval(BSON("" << "TTV"
@@ -746,7 +745,8 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true,
                           true);
         auto estimatedCard =
-            estimateCardinalityEq(*ceHist, tagLow, valLow, true /*includeScalar*/).card;
+            estimateCardinalityEq(*ceHist, strLow.tag(), strLow.value(), true /*includeScalar*/)
+                .card;
         ASSERT_EQ(5.0, estimatedCard);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   (estimateIntervalCardinality(*ceHist,
@@ -756,8 +756,8 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
     }
 
     {  // {a: {$gte: "TTV", $lte: "YtzS"}}
-        auto [tagHigh, valHigh] = value::makeNewString("YtzS"sv);
-        value::ValueGuard vgHigh(tagHigh, valHigh);
+        value::TagValueOwned strHigh =
+            value::TagValueOwned::fromRaw(value::makeNewString("YtzS"sv));
         Interval interval(BSON("" << "TTV"
                                   << ""
                                   << "YtzS"),
@@ -765,11 +765,11 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
                                                       true /*lowInclusive*/,
-                                                      tagLow,
-                                                      valLow,
+                                                      strLow.tag(),
+                                                      strLow.value(),
                                                       true /*highInclusive*/,
-                                                      tagHigh,
-                                                      valHigh,
+                                                      strHigh.tag(),
+                                                      strHigh.value(),
                                                       true /*includeScalar*/,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;
@@ -782,8 +782,8 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
     }
 
     {  // {a: {$gte: "TTV", $lte: "VtzSlajdkajda"}} (tests for memory leaks for a large string)
-        auto [tagHigh, valHigh] = value::makeNewString("VtzSlajdkajda"sv);
-        value::ValueGuard vgHigh(tagHigh, valHigh);
+        value::TagValueOwned strHigh =
+            value::TagValueOwned::fromRaw(value::makeNewString("VtzSlajdkajda"sv));
         Interval interval(BSON("" << "TTV"
                                   << ""
                                   << "VtzSlajdkajda"),
@@ -791,11 +791,11 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
                                                       true /*lowInclusive*/,
-                                                      tagLow,
-                                                      valLow,
+                                                      strLow.tag(),
+                                                      strLow.value(),
                                                       true /*highInclusive*/,
-                                                      tagHigh,
-                                                      valHigh,
+                                                      strHigh.tag(),
+                                                      strHigh.value(),
                                                       true /*includeScalar*/,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;
@@ -872,15 +872,15 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
     }
 
     {  // {a: "04e"}
-        auto [tag, value] = sbe::value::makeNewString("04e"sv);
-        sbe::value::ValueGuard vg(tag, value);
+        sbe::value::TagValueOwned str =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString("04e"sv));
         Interval interval(BSON("" << "04e"
                                   << ""
                                   << "04e"),
                           true /*startIncluded*/,
                           true /*endIncluded*/);
         auto estimatedCard =
-            estimateCardinalityEq(*ceHist, tag, value, true /*includeScalar*/).card;
+            estimateCardinalityEq(*ceHist, str.tag(), str.value(), true /*includeScalar*/).card;
         ASSERT_APPROX_EQUAL(2.2, estimatedCard, 0.1);  // Actual: 3.
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
@@ -906,10 +906,10 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
     }
 
     {  // {$match: {a: {$lt: '04e'}}}
-        auto [tagLow, valLow] = sbe::value::makeNewString(""sv);
-        auto [tagHigh, valHigh] = sbe::value::makeNewString("04e"sv);
-        sbe::value::ValueGuard vgLow(tagLow, valLow);
-        sbe::value::ValueGuard vgHigh(tagHigh, valHigh);
+        sbe::value::TagValueOwned strLow =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(""sv));
+        sbe::value::TagValueOwned strHigh =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString("04e"sv));
         Interval interval(BSON("" << ""
                                   << ""
                                   << "04e"),
@@ -917,11 +917,11 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
                           false);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
                                                       false /* lowInclusive */,
-                                                      tagLow,
-                                                      valLow,
+                                                      strLow.tag(),
+                                                      strLow.value(),
                                                       false /* highInclusive */,
-                                                      tagHigh,
-                                                      valHigh,
+                                                      strHigh.tag(),
+                                                      strHigh.value(),
                                                       true /* includeScalar */,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;

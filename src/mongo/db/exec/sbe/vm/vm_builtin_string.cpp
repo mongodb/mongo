@@ -24,7 +24,7 @@ value::TagValueMaybeOwned ByteCode::builtinSplit(ArityType arity) {
     auto inputStr = value::getStringView(input.tag, input.value);
     auto separatorStr = value::getStringView(separator.tag, separator.value);
 
-    value::TagValueOwned result{value::makeNewArray()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arr = value::getArrayView(result.value());
 
     size_t splitPos;

@@ -33,7 +33,7 @@ TEST_F(SBEBuiltinNewArrayTest, NewArrayWithinLimitSucceeds) {
     auto compiledExpr = compileExpression(*newArrayExpr);
 
     auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(tag, val);
 
     ASSERT(value::isArray(tag));
     ASSERT_EQUALS(value::getArrayView(val)->size(), 10u);

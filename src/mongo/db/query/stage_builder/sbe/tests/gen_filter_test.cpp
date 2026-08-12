@@ -47,9 +47,10 @@ public:
                  PlanStageSlots slots = {}) {
         auto sbExpr = generateFilter(*_state, expr, rootSlot, slots, isFilterOverIxscan);
 
-        auto [expectedTag, expectedVal] = sbe::value::makeValue(Value(expected));
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-        GoldenSbeExprBuilderTestFixture::runTest(std::move(sbExpr), expectedTag, expectedVal, test);
+        sbe::value::TagValueOwned expectedValue =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(Value(expected)));
+        GoldenSbeExprBuilderTestFixture::runTest(
+            std::move(sbExpr), expectedValue.tag(), expectedValue.value(), test);
     }
 };
 
@@ -403,9 +404,10 @@ public:
                                      /*isFilterOverIxscan*/ false,
                                      /*canUsePathArrayness*/ true);
 
-        auto [expectedTag, expectedVal] = sbe::value::makeValue(Value(expected));
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-        GoldenSbeExprBuilderTestFixture::runTest(std::move(sbExpr), expectedTag, expectedVal, test);
+        sbe::value::TagValueOwned expectedValue =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(Value(expected)));
+        GoldenSbeExprBuilderTestFixture::runTest(
+            std::move(sbExpr), expectedValue.tag(), expectedValue.value(), test);
     }
 };
 

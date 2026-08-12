@@ -970,11 +970,13 @@ IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
     IndexIntervals intervals) {
-    sbe::value::TagValueOwned bounds{sbe::value::makeNewArray()};
+    sbe::value::TagValueOwned bounds =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
     auto arr = sbe::value::getArrayView(bounds.value());
     arr->reserve(intervals.size());
     for (auto&& [lowKey, highKey] : intervals) {
-        sbe::value::TagValueOwned interval{sbe::value::makeNewObject()};
+        sbe::value::TagValueOwned interval =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewObject());
         auto obj = sbe::value::getObjectView(interval.value());
         obj->reserve(2);
         obj->push_back_raw("l"sv,

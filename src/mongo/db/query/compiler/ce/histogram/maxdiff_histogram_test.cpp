@@ -202,20 +202,20 @@ TEST_F(HistogramTest, MaxDiffTestString) {
 
     sortValueVector(randData);
     const DataDistribution& dataDistrib = getDataDistribution(randData);
-    const auto [tag, val] = value::makeNewString("91YgOvBB"sv);
-    value::ValueGuard vg(tag, val);
+    value::TagValueOwned val = value::TagValueOwned::fromRaw(value::makeNewString("91YgOvBB"sv));
 
     const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);
     LOGV2(8674804, "Generated histogram", "histogram"_attr = hist.toString());
     ASSERT_LTE(hist.getBuckets().size(), nBuckets);
-    const double estimatedCard = estimateCardinality(hist, tag, val, EstimationType::kLess).card;
+    const double estimatedCard =
+        estimateCardinality(hist, val.tag(), val.value(), EstimationType::kLess).card;
     ASSERT_APPROX_EQUAL(15.9443, estimatedCard, kTolerance);
 
     const ScalarHistogram& histAreaDiff = genMaxDiffHistogram(dataDistrib, nBuckets);
     LOGV2(8674805, "Generated histogram", "histogram"_attr = histAreaDiff.toString());
     ASSERT_LTE(histAreaDiff.getBuckets().size(), nBuckets);
     const double estimatedCardAreaDiff =
-        estimateCardinality(histAreaDiff, tag, val, EstimationType::kLess).card;
+        estimateCardinality(histAreaDiff, val.tag(), val.value(), EstimationType::kLess).card;
     ASSERT_APPROX_EQUAL(9.59627, estimatedCardAreaDiff, kTolerance);
 }
 
@@ -299,12 +299,11 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const size_t actualCard =
             getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$eq: 2}}}]");
 
-        const auto [tag, val] = makeInt64Value(2);
-        value::ValueGuard vg(tag, val);
+        value::TagValueOwned val = value::TagValueOwned::fromRaw(makeInt64Value(2));
         const EstimationResult estimatedCard =
-            estimateCardinalityEq(*estimator, tag, val, true /*includeScalar*/);
+            estimateCardinalityEq(*estimator, val.tag(), val.value(), true /*includeScalar*/);
         const EstimationResult estimatedCardAreaDiff =
-            estimateCardinalityEq(*estimatorAreaDiff, tag, val, true);
+            estimateCardinalityEq(*estimatorAreaDiff, val.tag(), val.value(), true);
 
         ASSERT_EQ(4, actualCard);
         ASSERT_APPROX_EQUAL(4.0, estimatedCard.card, kTolerance);
@@ -315,16 +314,15 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const size_t actualCard =
             getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$lt: 3}}}]");
 
-        const auto [tag, val] = makeInt64Value(3);
-        value::ValueGuard vg(tag, val);
+        value::TagValueOwned val = value::TagValueOwned::fromRaw(makeInt64Value(3));
         const EstimationResult estimatedCard =
             estimateCardinalityRange(*estimator,
                                      false /*lowInclusive*/,
                                      value::TypeTags::MinKey,
                                      0,
                                      false /*highInclusive*/,
-                                     tag,
-                                     val,
+                                     val.tag(),
+                                     val.value(),
                                      true /* includeScalar */,
                                      ArrayRangeEstimationAlgo::kConjunctArrayCE);
         const EstimationResult estimatedCardAreaDiff =
@@ -333,8 +331,8 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
                                      value::TypeTags::MinKey,
                                      0,
                                      false /*highInclusive*/,
-                                     tag,
-                                     val,
+                                     val.tag(),
+                                     val.value(),
                                      true /* includeScalar */,
                                      ArrayRangeEstimationAlgo::kConjunctArrayCE);
 
@@ -347,29 +345,27 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const size_t actualCard = getActualCard(
             opCtx.get(), arrayData, "[{$match: {a: {$elemMatch: {$gt: 2, $lt: 5}}}}]");
 
-        const auto [lowTag, lowVal] = makeInt64Value(2);
-        value::ValueGuard vgLow(lowTag, lowVal);
-        const auto [highTag, highVal] = makeInt64Value(5);
-        value::ValueGuard vgHigh(highTag, highVal);
+        value::TagValueOwned low = value::TagValueOwned::fromRaw(makeInt64Value(2));
+        value::TagValueOwned high = value::TagValueOwned::fromRaw(makeInt64Value(5));
 
         const EstimationResult estimatedCard =
             estimateCardinalityRange(*estimator,
                                      false /*lowInclusive*/,
-                                     lowTag,
-                                     lowVal,
+                                     low.tag(),
+                                     low.value(),
                                      false /*highInclusive*/,
-                                     highTag,
-                                     highVal,
+                                     high.tag(),
+                                     high.value(),
                                      false /* includeScalar */,
                                      ArrayRangeEstimationAlgo::kExactArrayCE);
         const EstimationResult estimatedCardAreaDiff =
             estimateCardinalityRange(*estimatorAreaDiff,
                                      false /*lowInclusive*/,
-                                     lowTag,
-                                     lowVal,
+                                     low.tag(),
+                                     low.value(),
                                      false /*highInclusive*/,
-                                     highTag,
-                                     highVal,
+                                     high.tag(),
+                                     high.value(),
                                      false /* includeScalar */,
                                      ArrayRangeEstimationAlgo::kExactArrayCE);
 

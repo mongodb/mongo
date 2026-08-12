@@ -172,7 +172,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
     uint32_t codePointPos = 0;
 
     // Prepare the result array of matching objects.
-    value::TagValueOwned arr{value::makeNewArray()};
+    value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arrayView = value::getArrayView(arr.value());
 
     int resultSize = 0;

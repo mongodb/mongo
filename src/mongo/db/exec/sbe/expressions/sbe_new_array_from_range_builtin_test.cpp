@@ -166,7 +166,7 @@ TEST_F(SBEBuiltinNewArrayFromRangeTest, NewArrayFromRangeWithinLimitSucceeds) {
     // Range [0, 1000) produces 1000 int32 values; limit set well above that.
     unittest::ServerParameterGuard limit{"internalQueryMaxRangeBytes", 16 * 1024};
     auto [resTag, resVal] = runExpression(makeInt32(0), makeInt32(1000), makeInt32(1));
-    value::ValueGuard guard(resTag, resVal);
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(resTag, resVal);
 
     ASSERT(value::isArray(resTag));
     ASSERT_EQUALS(value::getArrayView(resVal)->size(), 1000u);

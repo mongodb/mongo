@@ -84,17 +84,16 @@ public:
                                 std::vector<BSONArray> inputDocs,
                                 const mongo::BSONArray& expectedValue,
                                 std::unique_ptr<CollatorInterface> collator = nullptr) {
-        auto [resultsTag, resultsVal] =
-            getSetWindowFieldsResults(fromjson(windowSpec.data()), inputDocs, std::move(collator));
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+        sbe::value::TagValueOwned results = sbe::value::TagValueOwned::fromRaw(
+            getSetWindowFieldsResults(fromjson(windowSpec.data()), inputDocs, std::move(collator)));
 
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        sbe::value::TagValueOwned expected =
+            sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedValue));
 
-        ASSERT_TRUE(
-            PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
-            << "expected: " << std::make_pair(expectedTag, expectedVal)
-            << " but got: " << std::make_pair(resultsTag, resultsVal);
+        ASSERT_TRUE(PlanStageTestFixture::valueEquals(
+            results.tag(), results.value(), expected.tag(), expected.value()))
+            << "expected: " << std::make_pair(expected.tag(), expected.value())
+            << " but got: " << std::make_pair(results.tag(), results.value());
     }
 
     // This function expects that the output has a field 'result' which contains the elements we
@@ -108,17 +107,15 @@ public:
         using namespace mongo::sbe::value;
 
         // Run the accumulator.
-        auto [resultsTag, resultsVal] =
-            getSetWindowFieldsResults(fromjson(windowSpec.data()), inputDocs, std::move(collator));
-        ValueGuard resultGuard{resultsTag, resultsVal};
-        ASSERT_EQ(resultsTag, TypeTags::Array);
-        auto resultArr = getArrayView(resultsVal);
+        TagValueOwned results = TagValueOwned::fromRaw(
+            getSetWindowFieldsResults(fromjson(windowSpec.data()), inputDocs, std::move(collator)));
+        ASSERT_EQ(results.tag(), TypeTags::Array);
+        auto resultArr = getArrayView(results.value());
 
         // Get an Array view of the expectedResult.
-        auto [expectedTag, expectedVal] = sbe::makeArray(expectedResult);
-        ValueGuard expectedGuard{expectedTag, expectedVal};
-        ASSERT_EQ(expectedTag, TypeTags::Array);
-        auto expectedArr = getArrayView(expectedVal);
+        TagValueOwned expected = TagValueOwned::fromRaw(sbe::makeArray(expectedResult));
+        ASSERT_EQ(expected.tag(), TypeTags::Array);
+        auto expectedArr = getArrayView(expected.value());
 
         ASSERT_EQ(resultArr->size(), expectedArr->size());
 
@@ -138,20 +135,19 @@ public:
                         << "Expected an array for field 'result' but got: "
                         << std::make_pair(arrTag, arrVal);
 
-                    auto [tmpTag, tmpVal] = copyValue(arrTag, arrVal);
-                    ValueGuard tmpGuard{tmpTag, tmpVal};
+                    TagValueOwned tmp = TagValueOwned::fromRaw(copyValue(arrTag, arrVal));
                     switch (accumType) {
                         case ArrayAccumType::kSetUnion: {
-                            std::tie(resultTag, resultVal) = arrayToSet(tmpTag, tmpVal);
+                            std::tie(resultTag, resultVal) = arrayToSet(tmp.tag(), tmp.value());
                             break;
                         }
                         case ArrayAccumType::kConcatArrays: {
                             // Need to convert the bsonArray to an Array.
-                            auto [arrTag, arrVal] = sbe::value::makeNewArray();
-                            sbe::value::ValueGuard guard{arrTag, arrVal};
-                            auto arrView = sbe::value::getArrayView(arrVal);
+                            sbe::value::TagValueOwned converted =
+                                sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+                            auto arrView = sbe::value::getArrayView(converted.value());
 
-                            sbe::value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+                            sbe::value::ArrayEnumerator enumerator{tmp.tag(), tmp.value()};
                             while (!enumerator.atEnd()) {
                                 auto [tag, val] = enumerator.getViewOfValue();
                                 enumerator.advance();
@@ -159,8 +155,7 @@ public:
                                 auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
                                 arrView->push_back_raw(copyTag, copyVal);
                             }
-                            std::tie(resultTag, resultVal) = std::tie(arrTag, arrVal);
-                            guard.reset();
+                            std::tie(resultTag, resultVal) = converted.releaseToRaw();
                             break;
                         }
                         default:
@@ -172,23 +167,23 @@ public:
             return std::make_pair(resultTag, resultVal);
         };
 
-        sbe::value::ArrayEnumerator arrEnumExpected{expectedTag, expectedVal};
-        sbe::value::ArrayEnumerator arrEnumActual{resultsTag, resultsVal};
+        sbe::value::ArrayEnumerator arrEnumExpected{expected.tag(), expected.value()};
+        sbe::value::ArrayEnumerator arrEnumActual{results.tag(), results.value()};
         while (!arrEnumExpected.atEnd()) {
             ASSERT_FALSE(arrEnumActual.atEnd());
 
             auto [nextActualTag, nextActualVal] = arrEnumActual.getViewOfValue();
-            auto [actualTag, actualResult] = extractResultArray(nextActualTag, nextActualVal);
-            ValueGuard actualValueGuard{actualTag, actualResult};
+            TagValueOwned actual =
+                TagValueOwned::fromRaw(extractResultArray(nextActualTag, nextActualVal));
 
             auto [nextExpectedTag, nextExpectedVal] = arrEnumExpected.getViewOfValue();
-            auto [expectedTag, expectedResult] =
-                extractResultArray(nextExpectedTag, nextExpectedVal);
-            ValueGuard expectedValueGuard{expectedTag, expectedResult};
+            TagValueOwned expectedElem =
+                TagValueOwned::fromRaw(extractResultArray(nextExpectedTag, nextExpectedVal));
 
-            ASSERT(valueEquals(expectedTag, expectedResult, actualTag, actualResult))
-                << "expected result: " << std::make_pair(expectedTag, expectedResult)
-                << " but got result: " << std::make_pair(actualTag, actualResult);
+            ASSERT(
+                valueEquals(expectedElem.tag(), expectedElem.value(), actual.tag(), actual.value()))
+                << "expected result: " << std::make_pair(expectedElem.tag(), expectedElem.value())
+                << " but got result: " << std::make_pair(actual.tag(), actual.value());
 
             arrEnumExpected.advance();
             arrEnumActual.advance();

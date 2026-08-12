@@ -70,7 +70,8 @@ void BM_isFullBracketInterval(benchmark::State& state) {
         benchmark::DoNotOptimize(
             isFullBracketInterval(start.first, start.second, true, end.first, end.second, false));
     }
-    sbe::value::ValueGuard startGuard{start}, endGuard{end};
+    sbe::value::TagValueOwned startOwner = sbe::value::TagValueOwned::fromRaw(start);
+    sbe::value::TagValueOwned endOwner = sbe::value::TagValueOwned::fromRaw(end);
 }
 
 void BM_bracketizeInterval(benchmark::State& state) {

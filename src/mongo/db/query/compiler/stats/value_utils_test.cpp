@@ -44,12 +44,10 @@ public:
 };
 
 void assertSameTypeBracketedInterval(const Interval& interval) {
-    auto [startTag, startVal] = sbe::bson::convertToOwned(interval.start).releaseToRaw();
-    auto [endTag, endVal] = sbe::bson::convertToOwned(interval.end).releaseToRaw();
-    sbe::value::ValueGuard startGuard{startTag, startVal};
-    sbe::value::ValueGuard endGuard{endTag, endVal};
+    auto start = sbe::bson::convertToOwned(interval.start);
+    auto end = sbe::bson::convertToOwned(interval.end);
 
-    ASSERT(sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal));
+    ASSERT(sameTypeBracketInterval(start.tag(), interval.endInclusive, end.tag(), end.value()));
 }
 
 TEST_F(ValueUtilsTest, SameTypeBracketedIntervalEqual) {
@@ -230,13 +228,12 @@ TEST_F(ValueUtilsTest, GetMinBoundAlignsWithAppendMinForType) {
         builder.appendMinForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
-        auto expected = sbe::bson::convertToOwned(elem).releaseToRaw();
-        sbe::value::ValueGuard guard{expected};
+        auto expected = sbe::bson::convertToOwned(elem);
 
         auto res = stats::compareValues(
-            actual.getTag(), actual.getValue(), expected.first, expected.second);
+            actual.getTag(), actual.getValue(), expected.tag(), expected.value());
         ASSERT_EQ(res, 0) << "tag: " << tag << ", getMinBound() returns: " << actual.get()
-                          << ", expected returning: " << expected;
+                          << ", expected returning: " << expected.raw();
         ASSERT_TRUE(inclusive);
     }
 }
@@ -258,13 +255,12 @@ TEST_F(ValueUtilsTest, GetMaxBoundAlignsWithAppendMaxForType) {
         builder.appendMaxForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
-        auto expected = sbe::bson::convertToOwned(elem).releaseToRaw();
-        sbe::value::ValueGuard guard{expected};
+        auto expected = sbe::bson::convertToOwned(elem);
 
         auto res = stats::compareValues(
-            actual.getTag(), actual.getValue(), expected.first, expected.second);
+            actual.getTag(), actual.getValue(), expected.tag(), expected.value());
         ASSERT_EQ(res, 0) << "tag: " << tag << ", getMaxBound() returns: " << actual.get()
-                          << ", expected returning: " << expected;
+                          << ", expected returning: " << expected.raw();
         ASSERT_EQ(inclusive, !isVariableWidthType(tag));
     }
 }
@@ -305,13 +301,11 @@ TEST_F(ValueUtilsTest, ReturnsTrueForFullBracketIntervals) {
         // Converts to SBE values.
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertToOwned(interval.start).releaseToRaw();
-        auto [endTag, endVal] = sbe::bson::convertToOwned(interval.end).releaseToRaw();
-        sbe::value::ValueGuard startGuard{startTag, startVal};
-        sbe::value::ValueGuard endGuard{endTag, endVal};
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
-        ASSERT_TRUE(
-            isFullBracketInterval(startTag, startVal, startInclusive, endTag, endVal, endInclusive))
+        ASSERT_TRUE(isFullBracketInterval(
+            start.tag(), start.value(), startInclusive, end.tag(), end.value(), endInclusive))
             << "type: " << typeName(BSONType(t));
     }
 }

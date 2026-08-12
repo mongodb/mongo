@@ -191,13 +191,14 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
     _gctx->verifyOutput();
 
     // Execute the plan to verify explain output is correct.
-    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessors[0]);
-    sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+    sbe::value::TagValueOwned results =
+        sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-    sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    sbe::value::TagValueOwned expectedResult =
+        sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedValue));
 
-    ASSERT_SBE_VALUE_EQ(resultsTag, resultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(
+        results.tag(), results.value(), expectedResult.tag(), expectedResult.value());
 }
 
 std::string GoldenSbeStageBuilderTestFixture::replaceUuid(std::string input, UUID uuid) {

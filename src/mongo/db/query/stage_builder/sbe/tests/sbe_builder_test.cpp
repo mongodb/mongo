@@ -696,16 +696,16 @@ public:
 
         stage->open(false);
         // Execute the plan to verify explain output is correct.
-        auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+        sbe::value::TagValueOwned results =
+            sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessor));
 
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        sbe::value::TagValueOwned expected =
+            sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedValue));
 
-        ASSERT_TRUE(
-            PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
-            << "expected: " << std::make_pair(expectedTag, expectedVal)
-            << " but got: " << std::make_pair(resultsTag, resultsVal);
+        ASSERT_TRUE(PlanStageTestFixture::valueEquals(
+            results.tag(), results.value(), expected.tag(), expected.value()))
+            << "expected: " << std::make_pair(expected.tag(), expected.value())
+            << " but got: " << std::make_pair(results.tag(), results.value());
     }
 
 protected:

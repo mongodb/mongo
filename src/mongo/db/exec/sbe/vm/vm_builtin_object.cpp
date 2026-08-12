@@ -32,7 +32,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
         restrictFieldsSet.emplace(value::getStringView(field.tag, field.value));
     }
 
-    value::TagValueOwned result{value::makeNewObject()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
     auto obj = value::getObjectView(result.value());
 
     if (inObj.tag == value::TypeTags::bsonObject) {
@@ -87,7 +87,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
         keepFieldsSet.emplace(value::getStringView(field.tag, field.value));
     }
 
-    value::TagValueOwned result{value::makeNewObject()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
     auto obj = value::getObjectView(result.value());
 
     if (inObj.tag == value::TypeTags::bsonObject) {
@@ -124,7 +124,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
     // Build the object directly from the stack in a single pass.
-    value::TagValueOwned result{value::makeNewObject()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
     auto obj = value::getObjectView(result.value());
     if (arity > 0) {
         // 'Object::reserve()' normalizes its argument to at least 1, so calling it for an empty
@@ -152,7 +152,8 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
                                     << " bytes) and cannot spill to disk. Memory limit: "
                                     << maxMemoryBytes << " bytes");
         }
-        obj->push_back(name, value::copyValue(fieldView.tag, fieldView.value));
+        obj->push_back(
+            name, value::TagValueOwned::fromRaw(value::copyValue(fieldView.tag, fieldView.value)));
     }
 
     return std::move(result);
@@ -184,7 +185,7 @@ value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
     value::TagValueOwned aggState = moveOwnedFromStack(0);
     // Create a new object if it does not exist yet.
     if (aggState.tag() == value::TypeTags::Nothing) {
-        aggState = value::TagValueOwned{value::makeNewObject()};
+        aggState = value::TagValueOwned::fromRaw(value::makeNewObject());
     }
 
     tassert(
@@ -262,21 +263,22 @@ value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
         return value::TagValueMaybeOwned::nothing();
     }
 
-    value::TagValueOwned arr{value::makeNewArray()};
+    value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto array = value::getArrayView(arr.value());
 
     value::ObjectEnumerator objectEnumerator(obj.tag, obj.value);
     while (!objectEnumerator.atEnd()) {
         // get key
         auto fieldName = objectEnumerator.getFieldName();
-        value::TagValueOwned key{value::makeNewString(fieldName)};
+        value::TagValueOwned key = value::TagValueOwned::fromRaw(value::makeNewString(fieldName));
 
         // get value
         auto [valueTag, valueVal] = objectEnumerator.getViewOfValue();
-        value::TagValueOwned valueCopy{value::copyValue(valueTag, valueVal)};
+        value::TagValueOwned valueCopy =
+            value::TagValueOwned::fromRaw(value::copyValue(valueTag, valueVal));
 
-        // create a new obejct
-        value::TagValueOwned elem{value::makeNewObject()};
+        // create a new object
+        value::TagValueOwned elem = value::TagValueOwned::fromRaw(value::makeNewObject());
         auto elemObj = value::getObjectView(elem.value());
 
         // insert key and value to the object

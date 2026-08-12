@@ -113,7 +113,7 @@ public:
         for (size_t i = 0; i < row.size(); i++) {
             // Own the string here; hand the row only a non-owning *view* of it.
             auto owned = value::makeNewString(longStrings[i % longStringsSize]);
-            value::ValueGuard guard(owned);
+            value::TagValueOwned guard = value::TagValueOwned::fromRaw(owned);
             // Ensure pointer comparisons are meaningful (i.e. we're not in the small-string inline
             // representation).
             ASSERT_GT(value::getStringLength(owned.first, owned.second),

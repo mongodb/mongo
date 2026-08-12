@@ -145,7 +145,7 @@ public:
                 return {slots.getResultObj().getId(), std::move(stage)};
             });
 
-        value::ValueGuard guard{resultsTag, resultsVal};
+        value::TagValueOwned guard = value::TagValueOwned::fromRaw(resultsTag, resultsVal);
         std::vector<BSONObj> results;
         auto* arrView = value::getArrayView(resultsVal);
         for (size_t i = 0; i < arrView->size(); ++i) {

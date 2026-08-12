@@ -2740,7 +2740,8 @@ public:
                 expr->getChildren().size() == 2);
         _context->ensureArity(2);
 
-        sbe::value::TagValueOwned arrayWithEmptyString{sbe::value::makeNewArray()};
+        sbe::value::TagValueOwned arrayWithEmptyString =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
         auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
         sbe::value::getArrayView(arrayWithEmptyString.value())
             ->push_back_raw(emptyStrTag, emptyStrVal);

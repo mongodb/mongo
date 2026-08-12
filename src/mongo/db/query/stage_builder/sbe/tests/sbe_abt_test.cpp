@@ -139,11 +139,11 @@ TEST_F(AbtToSbeExpression, Lower4) {
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    sbe::value::ValueGuard guard(resultTag, resultVal);
+    sbe::value::TagValueOwned result =
+        sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    ASSERT_EQ(sbe::value::TypeTags::Array, resultTag);
-    auto arrResult = sbe::value::getArrayView(resultVal);
+    ASSERT_EQ(sbe::value::TypeTags::Array, result.tag());
+    auto arrResult = sbe::value::getArrayView(result.value());
     ASSERT_EQ(4, arrResult->size());
     auto arrResult0 = arrResult->values()[0];
     ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult0.first);
@@ -204,11 +204,11 @@ TEST_F(AbtToSbeExpression, Lower4TwoArgsOneLevel) {
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    sbe::value::ValueGuard guard(resultTag, resultVal);
+    sbe::value::TagValueOwned result =
+        sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    ASSERT_EQ(sbe::value::TypeTags::Array, resultTag);
-    auto arrResult = sbe::value::getArrayView(resultVal);
+    ASSERT_EQ(sbe::value::TypeTags::Array, result.tag());
+    auto arrResult = sbe::value::getArrayView(result.value());
     ASSERT_EQ(2, arrResult->size());
     auto arrResult0 = arrResult->values()[0];
     ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult0.first);
@@ -258,11 +258,11 @@ TEST_F(AbtToSbeExpression, Lower4TwoArgsAnyLevel) {
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    sbe::value::ValueGuard guard(resultTag, resultVal);
+    sbe::value::TagValueOwned result =
+        sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-    ASSERT_EQ(sbe::value::TypeTags::Array, resultTag);
-    auto arrResult = sbe::value::getArrayView(resultVal);
+    ASSERT_EQ(sbe::value::TypeTags::Array, result.tag());
+    auto arrResult = sbe::value::getArrayView(result.value());
     ASSERT_EQ(2, arrResult->size());
     auto arrResult0 = arrResult->values()[0];
     ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult0.first);
@@ -330,19 +330,19 @@ TEST_F(AbtToSbeExpression, LowerFunctionCallConvert) {
     {
         inputAccessor.reset(sbe::value::TypeTags::NumberDouble,
                             sbe::value::bitcastFrom<double>(42.0));
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        sbe::value::ValueGuard guard(resultTag, resultVal);
-        ASSERT_EQ(resultTag, sbe::value::TypeTags::NumberInt64);
-        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 42);
+        sbe::value::TagValueOwned result =
+            sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        ASSERT_EQ(result.tag(), sbe::value::TypeTags::NumberInt64);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(result.value()), 42);
     }
 
     {
         auto [tag, val] = sbe::value::makeCopyDecimal(Decimal128{-73});
         inputAccessor.reset(tag, val);
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        sbe::value::ValueGuard guard(resultTag, resultVal);
-        ASSERT_EQ(resultTag, sbe::value::TypeTags::NumberInt64);
-        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), -73);
+        sbe::value::TagValueOwned result =
+            sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        ASSERT_EQ(result.tag(), sbe::value::TypeTags::NumberInt64);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(result.value()), -73);
     }
 }
 
@@ -416,11 +416,11 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
         auto rhsStr = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(rhs));
         rhsAccessor.reset(std::move(rhsStr));
 
-        auto [tag, value] = runCompiledExpression(compiledExpr.get());
-        sbe::value::ValueGuard guard(tag, value);
+        sbe::value::TagValueOwned cmpResult =
+            sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
 
-        ASSERT_EQ(sbe::value::TypeTags::NumberInt32, tag);
-        ASSERT_EQ(result, sbe::value::bitcastTo<int32_t>(value))
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt32, cmpResult.tag());
+        ASSERT_EQ(result, sbe::value::bitcastTo<int32_t>(cmpResult.value()))
             << "comparing string '" << lhs << "' and '" << rhs << "'";
     };
 
@@ -590,12 +590,12 @@ TEST_F(AbtToSbeExpression, NotOnNonBoolean) {
     for (auto&& runTypeChecker : {false, true}) {
         auto tree = makeTestTree(runTypeChecker);
 
-        auto [resultTag, resultVal] = evalExpr(tree, boost::none);
-        sbe::value::ValueGuard guard(resultTag, resultVal);
+        sbe::value::TagValueOwned result =
+            sbe::value::TagValueOwned::fromRaw(evalExpr(tree, boost::none));
 
         // fillEmpty catches the Nothing from not("foo") and returns "bar".
-        ASSERT_EQ(resultTag, sbe::value::TypeTags::StringSmall);
-        ASSERT_EQ(sbe::value::getStringView(resultTag, resultVal), "bar");
+        ASSERT_EQ(result.tag(), sbe::value::TypeTags::StringSmall);
+        ASSERT_EQ(sbe::value::getStringView(result.tag(), result.value()), "bar");
     }
 }
 

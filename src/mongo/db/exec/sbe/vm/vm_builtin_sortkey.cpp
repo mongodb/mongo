@@ -102,7 +102,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorToArray(ArityTy
         auto [copyTag, copyVal] = value::copyValue(tag, val);
         return {true, copyTag, copyVal};
     } else {
-        value::TagValueOwned arr{value::makeNewArray()};
+        value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
         auto array = value::getArrayView(arr.value());
         array->reserve(sortVec->elts.size());
         for (size_t i = 0; i < sortVec->elts.size(); ++i) {

@@ -175,16 +175,15 @@ public:
             }
 
             // Construct view to the expected document.
-            auto [expectedTag, expectedValue] =
-                copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(expected[i].objdata()));
-            ValueGuard expectedGuard{expectedTag, expectedValue};
+            TagValueOwned expectedDoc = TagValueOwned::fromRaw(
+                copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(expected[i].objdata())));
             if (enableDebugOutput) {
-                std::cout << "Expected document: " << std::make_pair(expectedTag, expectedValue)
-                          << std::endl;
+                std::cout << "Expected document: "
+                          << std::make_pair(expectedDoc.tag(), expectedDoc.value()) << std::endl;
             }
 
             // Assert that the document from SBE plan is equal to the expected one.
-            ASSERT_SBE_VALUE_EQ(resultTag, resultValue, expectedTag, expectedValue);
+            ASSERT_SBE_VALUE_EQ(resultTag, resultValue, expectedDoc.tag(), expectedDoc.value());
         }
 
         ASSERT_EQ(i, expected.size());
@@ -918,11 +917,10 @@ public:
 
             auto [tagResult, valResult] = resultAccessor->getViewOfValue();
 
-            auto [tagExpected, valExpected] =
-                copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(document.objdata()));
-            ValueGuard guardExpected(tagExpected, valExpected);
+            TagValueOwned expectedDoc = TagValueOwned::fromRaw(
+                copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(document.objdata())));
 
-            ASSERT_SBE_VALUE_EQ(tagResult, valResult, tagExpected, valExpected);
+            ASSERT_SBE_VALUE_EQ(tagResult, valResult, expectedDoc.tag(), expectedDoc.value());
         }
 
         if (enableDebugOutput) {

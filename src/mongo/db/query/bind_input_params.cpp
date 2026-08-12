@@ -288,13 +288,10 @@ private:
                    bool owned,
                    sbe::value::TypeTags tag,
                    sbe::value::Value val) {
-        // Set up a guard and call getAccessor().
-        sbe::value::ValueGuard guard(owned, tag, val);
+        // Hold 'owned/tag/val' so it is released if 'getAccessor()' throws.
+        auto protectedVal = sbe::value::TagValueMaybeOwned::fromRaw(owned, tag, val);
         auto accessor = _data.env->getAccessor(slotId);
-
-        // Reset the guard and store 'owned/tag/val' into 'accessor'.
-        guard.reset();
-        accessor->reset(sbe::value::TagValueMaybeOwned::fromRaw(owned, tag, val));
+        accessor->reset(std::move(protectedVal));
     }
 
     boost::optional<sbe::value::SlotId> getSlotId(

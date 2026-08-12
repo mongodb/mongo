@@ -27,7 +27,7 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
     // into an array which is the over-the-wire data format from a shard to a merging side.
     if (fieldTag == value::TypeTags::NumberInt32 || fieldTag == value::TypeTags::NumberInt64 ||
         fieldTag == value::TypeTags::NumberDouble) {
-        value::TagValueOwned result{value::makeNewArray()};
+        value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewArray());
         auto newArr = value::getArrayView(result.value());
 
         DoubleDoubleSummation res;
@@ -66,7 +66,7 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
                           << " elements but got: " << arr->size(),
             arr->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
 
-    value::TagValueOwned result{makeCopyArray(*arr)};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(makeCopyArray(*arr));
     auto newArr = value::getArrayView(result.value());
 
     // Replaces the first element by the corresponding 'BSONType'.

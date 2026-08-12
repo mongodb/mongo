@@ -97,15 +97,14 @@ protected:
                       return sbe::value::bitcastTo<int32_t>(compareVal) < 0;
                   });
 
-        auto [sortedResultsTag, sortedResultsVal] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard sortedResultsGuard{sortedResultsTag, sortedResultsVal};
-        auto sortedResultsView = sbe::value::getArrayView(sortedResultsVal);
+        sbe::value::TagValueOwned sortedResultsOwned =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+        auto sortedResultsView = sbe::value::getArrayView(sortedResultsOwned.value());
         for (auto [tag, val] : resultsContents) {
             auto [tagCopy, valCopy] = copyValue(tag, val);
             sortedResultsView->push_back_raw(tagCopy, valCopy);
         }
-        sortedResultsGuard.reset();
-        return {sortedResultsTag, sortedResultsVal};
+        return sortedResultsOwned.releaseToRaw();
     }
 
     std::pair<std::unique_ptr<QuerySolution>, boost::intrusive_ptr<DocumentSourceGroup>>
@@ -152,19 +151,21 @@ protected:
                                  std::vector<BSONArray> inputDocs,
                                  const mongo::BSONArray& expectedValue,
                                  std::unique_ptr<CollatorInterface> collator = nullptr) {
-        auto [resultsTag, resultsVal] =
-            getResultsForAggregation(fromjson(groupSpec.data()), inputDocs, std::move(collator));
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+        sbe::value::TagValueOwned resultOwned = sbe::value::TagValueOwned::fromRaw(
+            getResultsForAggregation(fromjson(groupSpec.data()), inputDocs, std::move(collator)));
 
-        auto [sortedResultsTag, sortedResultsVal] = sortResults(resultsTag, resultsVal);
-        sbe::value::ValueGuard sortedResultGuard{sortedResultsTag, sortedResultsVal};
+        sbe::value::TagValueOwned sortedResultOwned =
+            sbe::value::TagValueOwned::fromRaw(sortResults(resultOwned.tag(), resultOwned.value()));
 
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        sbe::value::TagValueOwned expectedOwned =
+            sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedValue));
 
-        ASSERT_TRUE(valueEquals(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal))
-            << "expected: " << std::make_pair(expectedTag, expectedVal)
-            << " but got: " << std::make_pair(sortedResultsTag, sortedResultsVal);
+        ASSERT_TRUE(valueEquals(sortedResultOwned.tag(),
+                                sortedResultOwned.value(),
+                                expectedOwned.tag(),
+                                expectedOwned.value()))
+            << "expected: " << std::make_pair(expectedOwned.tag(), expectedOwned.value())
+            << " but got: " << std::make_pair(sortedResultOwned.tag(), sortedResultOwned.value());
     }
 
     void runGroupAggregationToFail(std::string_view groupSpec,
@@ -196,20 +197,18 @@ protected:
         using namespace mongo::sbe::value;
 
         // Create ArraySet Value from the expectedResult.
-        auto [tmpTag, tmpVal] =
-            copyValue(TypeTags::bsonArray, bitcastFrom<const char*>(expectedResult.objdata()));
-        ValueGuard tmpGuard{tmpTag, tmpVal};
-        auto [expectedTag, expectedSet] = arrayToSet(tmpTag, tmpVal);
-        ValueGuard expectedValueGuard{expectedTag, expectedSet};
+        TagValueOwned tmpOwned = TagValueOwned::fromRaw(
+            copyValue(TypeTags::bsonArray, bitcastFrom<const char*>(expectedResult.objdata())));
+        TagValueOwned expectedSetOwned =
+            TagValueOwned::fromRaw(arrayToSet(tmpOwned.tag(), tmpOwned.value()));
 
         // Run the accumulator.
-        auto [resultsTag, resultsVal] =
-            getResultsForAggregation(fromjson(groupSpec.data()), inputDocs, std::move(collator));
-        ValueGuard resultGuard{resultsTag, resultsVal};
-        ASSERT_EQ(resultsTag, TypeTags::Array);
+        TagValueOwned resultOwned = TagValueOwned::fromRaw(
+            getResultsForAggregation(fromjson(groupSpec.data()), inputDocs, std::move(collator)));
+        ASSERT_EQ(resultOwned.tag(), TypeTags::Array);
 
         // Extract the accumulated ArraySet from the result and compare it to the expected.
-        auto arr = getArrayView(resultsVal);
+        auto arr = getArrayView(resultOwned.value());
         ASSERT_EQ(1, arr->size());
         auto [resObjTag, resObjVal] = arr->getAt(0);
         ASSERT_EQ(resObjTag, TypeTags::bsonObject)
@@ -225,14 +224,19 @@ protected:
                 ASSERT_EQ(arrTag, TypeTags::bsonArray)
                     << "Expected an array for field x but got: " << std::make_pair(arrTag, arrVal);
 
-                auto [tmpTag2, tmpVal2] = copyValue(TypeTags::bsonArray, arrVal);
-                ValueGuard tmpGuard2{tmpTag2, tmpVal2};
-                auto [actualTag, actualSet] = arrayToSet(tmpTag2, tmpVal2);
-                ValueGuard actualValueGuard{actualTag, actualSet};
+                TagValueOwned tmpOwned2 =
+                    TagValueOwned::fromRaw(copyValue(TypeTags::bsonArray, arrVal));
+                TagValueOwned actualSetOwned =
+                    TagValueOwned::fromRaw(arrayToSet(tmpOwned2.tag(), tmpOwned2.value()));
 
-                ASSERT(valueEquals(expectedTag, expectedSet, actualTag, actualSet))
-                    << "expected set: " << std::make_pair(expectedTag, expectedSet)
-                    << " but got set: " << std::make_pair(actualTag, actualSet);
+                ASSERT(valueEquals(expectedSetOwned.tag(),
+                                   expectedSetOwned.value(),
+                                   actualSetOwned.tag(),
+                                   actualSetOwned.value()))
+                    << "expected set: "
+                    << std::make_pair(expectedSetOwned.tag(), expectedSetOwned.value())
+                    << " but got set: "
+                    << std::make_pair(actualSetOwned.tag(), actualSetOwned.value());
                 return;
             }
 
@@ -2374,8 +2378,10 @@ public:
         _inputAccessor.reset();
         _aggAccessor.reset();
 
-        sbe::value::ValueGuard inputGuard{inputTag, inputVal};
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        sbe::value::TagValueOwned inputOwned =
+            sbe::value::TagValueOwned::fromRaw(inputTag, inputVal);
+        sbe::value::TagValueOwned expectedOwned =
+            sbe::value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
         sbe::value::ArrayEnumerator inputEnumerator{inputTag, inputVal};
         sbe::value::ArrayEnumerator expectedEnumerator{expectedTag, expectedVal};
@@ -2443,9 +2449,9 @@ public:
     enum class Accumulator { kPush, kAddToSet };
     std::pair<sbe::value::TypeTags, sbe::value::Value> makeArrayAccumVal(BSONArray bsonArray,
                                                                          Accumulator accumType) {
-        auto [resultTag, resultVal] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard resultGuard{resultTag, resultVal};
-        auto resultArr = sbe::value::getArrayView(resultVal);
+        sbe::value::TagValueOwned resultOwned =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+        auto resultArr = sbe::value::getArrayView(resultOwned.value());
 
         for (auto&& elt : bsonArray) {
             ASSERT(elt.type() == BSONType::array);
@@ -2479,8 +2485,7 @@ public:
             resultArr->push_back_raw(partialAggTag, partialAggVal);
         }
 
-        resultGuard.reset();
-        return {resultTag, resultVal};
+        return resultOwned.releaseToRaw();
     }
 
     std::pair<sbe::value::TypeTags, sbe::value::Value> bsonArrayToSbe(BSONArray arr) {
@@ -2544,10 +2549,10 @@ public:
      */
     std::pair<sbe::value::TypeTags, sbe::value::Value> makePartialAggArray(
         sbe::EFn aggFuncName, BSONArray arrayOfArrays) {
-        auto [arrTag, arrVal] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard guard{arrTag, arrVal};
+        sbe::value::TagValueOwned arrOwned =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
 
-        auto arr = sbe::value::getArrayView(arrVal);
+        auto arr = sbe::value::getArrayView(arrOwned.value());
 
         for (auto&& element : arrayOfArrays) {
             ASSERT(element.type() == BSONType::array);
@@ -2556,8 +2561,7 @@ public:
             arr->push_back_raw(tag, val);
         }
 
-        guard.reset();
-        return {arrTag, arrVal};
+        return arrOwned.releaseToRaw();
     }
 
     std::pair<sbe::value::TypeTags, sbe::value::Value> convertFromBSONArray(BSONArray arr) {

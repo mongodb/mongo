@@ -242,7 +242,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
 
     // Get date parts.
     auto dateParts = timezone.dateParts(date);
-    value::TagValueOwned result{value::makeNewObject()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
     auto dateObj = value::getObjectView(result.value());
     dateObj->reserve(7);
     dateObj->push_back_raw("year", value::TypeTags::NumberInt32, dateParts.year);
@@ -282,7 +282,7 @@ value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
 
     // Get date parts.
     auto dateParts = timezone.dateIso8601Parts(date);
-    value::TagValueOwned result{value::makeNewObject()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
     auto dateObj = value::getObjectView(result.value());
     dateObj->reserve(7);
     dateObj->push_back_raw("isoWeekYear", value::TypeTags::NumberInt32, dateParts.year);

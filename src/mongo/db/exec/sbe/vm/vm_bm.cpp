@@ -159,7 +159,8 @@ BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_NoCollator)(benchmark::S
     auto expr = makeE<EFunction>(
         sbe::EFn::kIsMember, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
     TagValue searchValue = generateRandomString(state.range(1) /*size*/);
-    value::ValueGuard guard{searchValue.first, searchValue.second};
+    value::TagValueOwned searchValueOwned =
+        value::TagValueOwned::fromRaw(searchValue.first, searchValue.second);
     benchmarkExpression(std::move(expr), {searchValue}, state);
 }
 
@@ -174,7 +175,8 @@ BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator)(benchmark::Sta
     auto expr = makeE<EFunction>(
         sbe::EFn::kIsMember, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
     TagValue searchValue = generateRandomString(state.range(1) /*size*/);
-    value::ValueGuard guard{searchValue.first, searchValue.second};
+    value::TagValueOwned searchValueOwned =
+        value::TagValueOwned::fromRaw(searchValue.first, searchValue.second);
     benchmarkExpression(std::move(expr), {searchValue}, state);
 }
 

@@ -101,13 +101,14 @@ protected:
 
         // Prepare the sbe::PlanStage for execution and collect all results.
         auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
-        auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessors[0]);
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+        sbe::value::TagValueOwned results =
+            sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]));
 
         // Convert the expected results to an sbe value and assert results.
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expected);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-        ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+        sbe::value::TagValueOwned expectedValue =
+            sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expected));
+        ASSERT_TRUE(valueEquals(
+            results.tag(), results.value(), expectedValue.tag(), expectedValue.value()));
     }
 };
 
@@ -230,11 +231,11 @@ public:
             }
             BSONObj classicShardKey = shardKeyPattern.extractShardKeyFromDoc(document);
 
-            const auto& [tag, val] = runCompiledExpression(compiledShardKey.get());
-            sbe::value::ValueGuard guard{tag, val};
-            ASSERT_EQ(sbe::value::TypeTags::bsonObject, tag);
+            sbe::value::TagValueOwned shardKeyValue =
+                sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledShardKey.get()));
+            ASSERT_EQ(sbe::value::TypeTags::bsonObject, shardKeyValue.tag());
 
-            BSONObj sbeShardKey{sbe::value::bitcastTo<const char*>(val)};
+            BSONObj sbeShardKey{sbe::value::bitcastTo<const char*>(shardKeyValue.value())};
             ASSERT_BSONOBJ_EQ(classicShardKey, sbeShardKey);
         }
     }

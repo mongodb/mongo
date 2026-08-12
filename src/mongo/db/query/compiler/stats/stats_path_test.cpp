@@ -45,9 +45,9 @@ TEST(StatsPath, BasicValidStatsPath) {
     };
 
     // Initialize histogram bounds.
-    auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
-    sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
-    auto bounds = sbe::value::getArrayView(boundsVal);
+    sbe::value::TagValueOwned boundsArray =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+    auto bounds = sbe::value::getArrayView(boundsArray.value());
     bounds->push_back_raw(sbe::value::TypeTags::NumberDouble, 1.0);
     bounds->push_back_raw(sbe::value::TypeTags::NumberDouble, 2.0);
     bounds->push_back_raw(sbe::value::TypeTags::NumberDouble, 3.0);

@@ -997,9 +997,9 @@ static void printBSONstr(PrinterType& printer,
 }
 
 std::string ExplainGenerator::explainBSONStr(const ABT::reference_type node) {
-    sbe::value::TagValueOwned vg{explainBSON(node)};
+    sbe::value::TagValueOwned bson = sbe::value::TagValueOwned::fromRaw(explainBSON(node));
     ExplainPrinterImpl<ExplainVersion::V2> printer;
-    printBSONstr(printer, vg.tag(), vg.value());
+    printBSONstr(printer, bson.tag(), bson.value());
     return printer.str();
 }
 }  // namespace mongo::abt

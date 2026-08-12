@@ -139,19 +139,17 @@ TEST(WriteValueToStream, MalformedByteArrayDeprecatedBSONBinDataTest) {
 }
 
 TEST(WriteValueToStream, ShortStringBigTest) {
-    auto [tag, val] = value::makeNewString(kStringShort);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString(kStringShort));
     std::ostringstream oss;
-    writeToStream(oss, {tag, val});
+    writeToStream(oss, {str.tag(), str.value()});
     auto expectedString = "\"" + std::string(kStringShort) + "\"";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
 TEST(WriteValueToStream, LongStringBigTest) {
-    auto [tag, val] = value::makeNewString(kStringLong);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString(kStringLong));
     std::ostringstream oss;
-    writeToStream(oss, {tag, val});
+    writeToStream(oss, {str.tag(), str.value()});
     auto expectedString = "\"" +
         std::string(kStringLong).substr(0, PrintOptions::kDefaultStringMaxDisplayLength) + "\"" +
         "...";
@@ -159,48 +157,43 @@ TEST(WriteValueToStream, LongStringBigTest) {
 }
 
 TEST(WriteValueToStream, BigArrayTest) {
-    auto [aTag, aVal] = value::makeNewArray();
-    value::ValueGuard aGuard{aTag, aVal};
-    auto [sTag, sVal] = value::makeNewString("a");
-    value::ValueGuard sGuard{sTag, sVal};
-    auto testArr = value::getArrayView(aVal);
+    value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString("a"));
+    auto testArr = value::getArrayView(arr.value());
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
-        testArr->push_back_raw(sTag, sVal);
+        testArr->push_back_raw(str.tag(), str.value());
     }
     std::ostringstream oss;
-    writeToStream(oss, {value::TypeTags::Array, aVal});
+    writeToStream(oss, {value::TypeTags::Array, arr.value()});
     auto expectedArray = R"(["a", "a", "a", "a", "a", "a", "a", "a", "a", "a", ...])";
     ASSERT_EQUALS(expectedArray, oss.str());
 }
 
 TEST(WriteValueToStream, NestedArrayTest) {
     auto [aTag, aVal] = value::makeNewArray();
-    auto [tag, val] =
-        makeNestedArray(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth, aVal, aVal);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned nested = value::TagValueOwned::fromRaw(
+        makeNestedArray(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth, aVal, aVal));
     std::ostringstream oss;
-    writeToStream(oss, {tag, val});
+    writeToStream(oss, {nested.tag(), nested.value()});
     auto expectedArray = "[[[[[[[[[[...]]]]]]]]]]";
     ASSERT_EQUALS(expectedArray, oss.str());
 }
 
 TEST(WriteValueToStream, NestedObjectTest) {
     auto [oTag, oVal] = value::makeNewObject();
-    auto [tag, val] =
-        makeNestedObject(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth, oVal, oVal);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned nested = value::TagValueOwned::fromRaw(
+        makeNestedObject(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth, oVal, oVal));
     std::ostringstream oss;
-    writeToStream(oss, {tag, val});
+    writeToStream(oss, {nested.tag(), nested.value()});
     auto expectedObj =
         R"({"10" : {"9" : {"8" : {"7" : {"6" : {"5" : {"4" : {"3" : {"2" : {...}}}}}}}}}})";
     ASSERT_EQUALS(expectedObj, oss.str());
 }
 
 TEST(WriteValueToStream, BigArrayInObjectInArrayTest) {
-    auto [aTag, aVal] = value::makeNewArray();
-    value::ValueGuard aGuard{aTag, aVal};
+    value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
 
-    auto arrV = value::getArrayView(aVal);
+    auto arrV = value::getArrayView(arr.value());
     auto [oTag, oVal] = value::makeNewObject();
     arrV->push_back_raw(oTag, oVal);
 
@@ -215,17 +208,16 @@ TEST(WriteValueToStream, BigArrayInObjectInArrayTest) {
     }
 
     std::ostringstream oss;
-    writeToStream(oss, {aTag, aVal});
+    writeToStream(oss, {arr.tag(), arr.value()});
     auto expectedObj = R"([{"field" : ["a", "a", "a", "a", "a", "a", "a", "a", "a", "a", ...]}])";
     ASSERT_EQUALS(expectedObj, oss.str());
 }
 
 
 TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
-    auto [oTag, oVal] = value::makeNewObject();
-    value::ValueGuard oGuard{oTag, oVal};
+    value::TagValueOwned obj = value::TagValueOwned::fromRaw(value::makeNewObject());
 
-    auto objV = value::getObjectView(oVal);
+    auto objV = value::getObjectView(obj.value());
     auto [aTag, aVal] = value::makeNewArray();
     objV->push_back_raw("field", aTag, aVal);
 
@@ -240,7 +232,7 @@ TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
     }
 
     std::ostringstream oss;
-    writeToStream(oss, {oTag, oVal});
+    writeToStream(oss, {obj.tag(), obj.value()});
     auto expectedObj =
         R"({"field" : [{"0" : "a", "1" : "a", "2" : "a", "3" : "a", "4" : "a", "5" : "a", "6" : "a",)"
         R"( "7" : "a", "8" : "a", "9" : "a", ...}]})";
@@ -248,31 +240,27 @@ TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
 }
 
 TEST(WriteValueToStream, SmallArrayTest) {
-    auto [aTag, aVal] = value::makeNewArray();
-    value::ValueGuard aGuard{aTag, aVal};
-    auto [sTag, sVal] = value::makeNewString("a");
-    value::ValueGuard sGuard{sTag, sVal};
-    auto testArr = value::getArrayView(aVal);
+    value::TagValueOwned arr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString("a"));
+    auto testArr = value::getArrayView(arr.value());
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth - 1; ++i) {
-        testArr->push_back_raw(sTag, sVal);
+        testArr->push_back_raw(str.tag(), str.value());
     }
     std::ostringstream oss;
-    writeToStream(oss, {aTag, aVal});
+    writeToStream(oss, {arr.tag(), arr.value()});
     auto expectedArray = R"(["a", "a", "a", "a", "a", "a", "a", "a", "a"])";
     ASSERT_EQUALS(expectedArray, oss.str());
 }
 
 TEST(WriteValueToStream, BigObjTest) {
-    auto [oTag, oVal] = value::makeNewObject();
-    value::ValueGuard aGuard{oTag, oVal};
-    auto [sTag, sVal] = value::makeNewString("a");
-    value::ValueGuard sGuard{sTag, sVal};
-    auto testObj = value::getObjectView(oVal);
+    value::TagValueOwned ownedObj = value::TagValueOwned::fromRaw(value::makeNewObject());
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString("a"));
+    auto testObj = value::getObjectView(ownedObj.value());
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
-        testObj->push_back_raw(std::to_string(i), sTag, sVal);
+        testObj->push_back_raw(std::to_string(i), str.tag(), str.value());
     }
     std::ostringstream oss;
-    writeToStream(oss, {value::TypeTags::Object, oVal});
+    writeToStream(oss, {value::TypeTags::Object, ownedObj.value()});
     auto expectedArray =
         R"({"0" : "a", "1" : "a", "2" : "a", "3" : "a", "4" : "a", "5" : "a", "6" : "a", "7" : "a",)"
         R"( "8" : "a", "9" : "a", ...})";
@@ -280,16 +268,14 @@ TEST(WriteValueToStream, BigObjTest) {
 }
 
 TEST(WriteValueToStream, SmallObjTest) {
-    auto [oTag, oVal] = value::makeNewObject();
-    value::ValueGuard aGuard{oTag, oVal};
-    auto [sTag, sVal] = value::makeNewString("a");
-    value::ValueGuard sGuard{sTag, sVal};
-    auto testObj = value::getObjectView(oVal);
+    value::TagValueOwned ownedObj = value::TagValueOwned::fromRaw(value::makeNewObject());
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString("a"));
+    auto testObj = value::getObjectView(ownedObj.value());
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth - 1; ++i) {
-        testObj->push_back_raw(std::to_string(i), sTag, sVal);
+        testObj->push_back_raw(std::to_string(i), str.tag(), str.value());
     }
     std::ostringstream oss;
-    writeToStream(oss, {value::TypeTags::Object, oVal});
+    writeToStream(oss, {value::TypeTags::Object, ownedObj.value()});
     auto expectedArray =
         R"({"0" : "a", "1" : "a", "2" : "a", "3" : "a", "4" : "a", "5" : "a", "6" : "a", "7" : "a",)"
         R"( "8" : "a"})";
@@ -297,19 +283,19 @@ TEST(WriteValueToStream, SmallObjTest) {
 }
 
 TEST(WriteValueToStream, SmallBsonRegex) {
-    auto [regTag, regVal] = value::makeNewBsonRegex(kPatternShort, kFlag);
-    value::ValueGuard regGuard{regTag, regVal};
+    value::TagValueOwned regex =
+        value::TagValueOwned::fromRaw(value::makeNewBsonRegex(kPatternShort, kFlag));
     std::ostringstream oss;
-    writeToStream(oss, {regTag, regVal});
+    writeToStream(oss, {regex.tag(), regex.value()});
     auto expectedRegex = "/^a.*/imxs";
     ASSERT_EQUALS(expectedRegex, oss.str());
 }
 
 TEST(WriteValueToStream, BigBsonRegex) {
-    auto [regTag, regVal] = value::makeNewBsonRegex(kPatternLong, kFlag);
-    value::ValueGuard regGuard{regTag, regVal};
+    value::TagValueOwned regex =
+        value::TagValueOwned::fromRaw(value::makeNewBsonRegex(kPatternLong, kFlag));
     std::ostringstream oss;
-    writeToStream(oss, {regTag, regVal});
+    writeToStream(oss, {regex.tag(), regex.value()});
     auto expectedRegex =
         "/a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a."
         "a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a. ... "
@@ -318,10 +304,9 @@ TEST(WriteValueToStream, BigBsonRegex) {
 }
 
 TEST(WriteValueToStream, StringSmallTest) {
-    auto [tag, val] = value::makeNewString("F");
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString("F"));
     std::ostringstream oss;
-    writeToStream(oss, {tag, val});
+    writeToStream(oss, {str.tag(), str.value()});
     ASSERT_EQUALS("\"F\"", oss.str());
 }
 
@@ -413,16 +398,14 @@ TEST(WriteValueToStream, TimezoneTest) {
 }
 
 TEST(WriteValueToStream, LongMultiMapTest) {
-    auto [mapTag, mapVal] = value::makeNewMultiMap();
-    value::ValueGuard mapGuard{mapTag, mapVal};
-    auto [sTag, sVal] = value::makeNewString("a");
-    value::ValueGuard sGuard{sTag, sVal};
-    auto testMap = value::getMultiMapView(mapVal);
+    value::TagValueOwned map = value::TagValueOwned::fromRaw(value::makeNewMultiMap());
+    value::TagValueOwned str = value::TagValueOwned::fromRaw(value::makeNewString("a"));
+    auto testMap = value::getMultiMapView(map.value());
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
-        testMap->insert({sTag, sVal}, {sTag, sVal});
+        testMap->insert({str.tag(), str.value()}, {str.tag(), str.value()});
     }
     std::ostringstream oss;
-    writeToStream(oss, {mapTag, mapVal});
+    writeToStream(oss, {map.tag(), map.value()});
     auto expectedArray =
         R"([{k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, ...])";
     ASSERT_EQUALS(expectedArray, oss.str());
@@ -430,11 +413,10 @@ TEST(WriteValueToStream, LongMultiMapTest) {
 
 TEST(WriteValueToStream, NestedMultiMapTest) {
     auto [mTag, mVal] = value::makeNewMultiMap();
-    auto [tag, val] =
-        makeNestedMultiMap(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1, mVal, mVal);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned nested = value::TagValueOwned::fromRaw(
+        makeNestedMultiMap(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1, mVal, mVal));
     std::ostringstream oss;
-    writeToStream(oss, {tag, val});
+    writeToStream(oss, {nested.tag(), nested.value()});
     auto expectedArray =
         "[{k : 11, v : [{k : 10, v : [{k : 9, v : [{k : 8, v : [{k : 7, v : [{k : 6, v : [{k : 5, "
         "v : [{k : 4, v : [{k : 3, v : [{k : 2, v : [...]}]}]}]}]}]}]}]}]}]}]";
@@ -444,11 +426,10 @@ TEST(WriteValueToStream, NestedMultiMapTest) {
 TEST(WriteValueToStream, LongKeyString) {
     key_string::Builder builder{key_string::Version::V1};
     builder.appendString(kStringLong);
-    const std::pair<value::TypeTags, value::Value> value =
-        value::makeKeyString(builder.getValueCopy());
-    value::ValueGuard guard{value};
+    value::TagValueOwned keyStr =
+        value::TagValueOwned::fromRaw(value::makeKeyString(builder.getValueCopy()));
     std::ostringstream oss;
-    writeToStream(oss, value);
+    writeToStream(oss, {keyStr.tag(), keyStr.value()});
     auto expectedString =
         "KS("
         "3C74686973206973206120737570657220647570657220647570657220647570657220647570657220647570"
@@ -457,11 +438,10 @@ TEST(WriteValueToStream, LongKeyString) {
 }
 
 TEST(WriteValueToStream, LongRecordId) {
-    const std::pair<value::TypeTags, value::Value> value =
-        value::makeNewRecordId(kStringLong, static_cast<int32_t>(strlen(kStringLong)));
-    value::ValueGuard guard{value};
+    value::TagValueOwned recordId = value::TagValueOwned::fromRaw(
+        value::makeNewRecordId(kStringLong, static_cast<int32_t>(strlen(kStringLong))));
     std::ostringstream oss;
-    writeToStream(oss, value);
+    writeToStream(oss, {recordId.tag(), recordId.value()});
     auto expectedString =
         "RecordId("
         "7468697320697320612073757065722064757065722064757065722064757065722064757065722064757065"
