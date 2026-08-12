@@ -3269,32 +3269,8 @@ public:
     void visit(const ExpressionYear* expr) final {
         generateDateExpressionAcceptingTimeZone(sbe::EFn::kYear, expr);
     }
-    void generateAccumulatorExpression(const Expression* expr,
-                                       sbe::EFn fn,
-                                       bool passCollator = false) {
-        size_t arity = expr->getChildren().size();
-        _context->ensureArity(arity);
-
-        SbExpr::Vector args;
-        args.reserve(arity + (passCollator ? 1 : 0));
-        for (size_t idx = 0; idx < arity; ++idx) {
-            args.emplace_back(popExpr());
-        }
-        std::reverse(args.begin(), args.end());
-
-        // If the accumulator is collation-aware and the query has a collation, pass the collator as
-        // the first argument.
-        if (passCollator) {
-            if (auto collatorSlot = _context->state.getCollatorSlot()) {
-                args.insert(args.begin(), SbExpr{SbVar{*collatorSlot}});
-            }
-        }
-
-        pushExpr(_b.makeFunction(fn, std::move(args)));
-    }
-
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kAvgFromAcc);
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3303,11 +3279,13 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kMaxFromAcc, true /* passCollator */);
+        unsupportedExpression(expr->getOpName());
     }
+
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kMinFromAcc, true /* passCollator */);
+        unsupportedExpression(expr->getOpName());
     }
+
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
@@ -3321,13 +3299,13 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kStdDevPopFromAcc);
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kStdDevSampFromAcc);
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kDoubleDoubleSumFromAcc);
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
         unsupportedExpression(expr->getOpName());

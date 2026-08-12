@@ -8,7 +8,6 @@
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
-#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
@@ -707,35 +706,6 @@ private:
 
     value::TagValueMaybeOwned builtinConvertSimpleSumToDoubleDoubleSum(ArityType arity);
     value::TagValueMaybeOwned builtinDoubleDoubleSum(ArityType arity);
-
-    /**
-     * Invokes 'processOne(tag, val)' on the stack arguments in the range [startIdx, endIdx), where
-     * a range holding a single array is processed element-wise, while a single non-array value or
-     * multiple values are each processed directly.
-     */
-    template <typename ProcessOne>
-    void processStackRange(ArityType startIdx, ArityType endIdx, const ProcessOne& processOne) {
-        if (endIdx - startIdx == 1) {
-            auto arg = viewFromStack(startIdx);
-            if (value::isArray(arg.tag)) {
-                value::arrayForEach(arg.tag, arg.value, [&](value::TypeTags tag, value::Value val) {
-                    processOne(tag, val);
-                });
-            } else {
-                processOne(arg.tag, arg.value);
-            }
-        } else {
-            for (ArityType idx = startIdx; idx < endIdx; ++idx) {
-                auto arg = viewFromStack(idx);
-                processOne(arg.tag, arg.value);
-            }
-        }
-    }
-
-    value::TagValueMaybeOwned builtinDoubleDoubleSumFromAcc(ArityType arity);
-    template <AccumulatorMinMaxN::MinMaxSense S>
-    value::TagValueMaybeOwned builtinMinMaxNFromAcc(ArityType arity);
-    value::TagValueMaybeOwned builtinAvgFromAcc(ArityType arity);
     // The template parameter is false for a regular DoubleDouble summation and true if merging
     // partially computed DoubleDouble sums.
     template <bool merging>
@@ -748,8 +718,6 @@ private:
     // standard devations.
     template <bool merging>
     value::TagValueMaybeOwned builtinAggStdDev(ArityType arity);
-    template <bool isSamp>
-    value::TagValueMaybeOwned builtinStdDevFromAcc(ArityType arity);
 
     value::TagValueMaybeOwned builtinStdDevPopFinalize(ArityType arity);
     value::TagValueMaybeOwned builtinStdDevSampFinalize(ArityType arity);
