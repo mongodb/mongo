@@ -293,6 +293,10 @@ private:
         private:
             bool _done = false;
 
+            // Retries scheduled against the current '_retryStrategy'; reset whenever a new
+            // strategy is emplaced, so it counts attempts within a single retry budget.
+            std::int32_t _retryCount = 0;
+
             // ShardId of the shard to which the command will be sent.
             ShardId _shardId;
 

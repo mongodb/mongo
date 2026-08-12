@@ -389,6 +389,9 @@ auto AsyncRequestsSender::Impl::RemoteData::scheduleRequest(std::shared_ptr<Impl
                     ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
                     : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
                 _retryStrategy.emplace(shard, impl->_retryPolicy, isStartTransaction);
+
+                // Track the refreshed retry budget for each fresh strategy.
+                _retryCount = 0;
             }
 
             if (!_designatedHostAndPort.empty()) {
@@ -496,12 +499,15 @@ auto AsyncRequestsSender::Impl::RemoteData::handleResponse(RemoteCommandCallback
                     rcr.response.getBaseBackoffMS()) &&
                 !impl->_stopRetrying) {
                 const auto delay = _retryStrategy->getNextRetryDelay();
+                ++_retryCount;
 
                 LOGV2_DEBUG(
                     4615637,
                     1,
                     "Command to remote shard failed with retryable error and will be retried",
                     "shardId"_attr = _shardId,
+                    "command"_attr = _cmdObj.firstElementFieldNameStringData(),
+                    "attempt"_attr = _retryCount,
                     "attemptedHosts"_attr = rcr.request.target,
                     "failedHost"_attr = rcr.response.target,
                     "error"_attr = redact(status),
