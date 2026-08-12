@@ -17,6 +17,33 @@ namespace {
 using namespace std::literals::string_view_literals;
 static constexpr auto kTransactionTooLargeForCache =
     "transaction is too large and will not fit in the storage engine cache"sv;
+/**
+ * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
+ * exceed a certain threshold on the proportion of total cache which is used by transaction.
+ *
+ * For instance, if the transaction uses 80% of WT cache and the threshold is set to 75%, the
+ * transaction is considered too large.
+ */
+bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
+    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
+        session, "statistics:session", "", WT_STAT_SESSION_TXN_BYTES_DIRTY);
+    if (!txnDirtyBytes.isOK()) {
+        tasserted(6190900,
+                  str::stream() << "unable to gather the WT session's txn dirty bytes: "
+                                << txnDirtyBytes.getStatus());
+    }
+
+    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
+        session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY_LEAF);
+    if (!cacheDirtyBytes.isOK()) {
+        tasserted(6190901,
+                  str::stream() << "unable to gather the WT connection's cache dirty bytes: "
+                                << txnDirtyBytes.getStatus());
+    }
+
+    return txnExceededCacheThreshold(
+        txnDirtyBytes.getValue(), cacheDirtyBytes.getValue(), threshold);
+}
 
 str::stream generateContextStrStream(std::string_view prefix,
                                      std::string_view reason,
@@ -45,49 +72,7 @@ bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, d
 }
 
 bool rollbackReasonWasCachePressure(int sub_level_err) {
-    return sub_level_err == WT_CACHE_OVERFLOW || sub_level_err == WT_OLDEST_FOR_EVICTION
-#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
-        || sub_level_err == WT_TXN_TOO_LARGE_FOR_CACHE
-#endif
-        ;
-}
-
-/**
- * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
- * exceed a certain threshold on the proportion of total cache which is used by transaction.
- *
- * For instance, if the transaction uses 80% of WT cache and the threshold is set to 75%, the
- * transaction is considered too large.
- *
- * WT_TXN_TOO_LARGE_FOR_CACHE means WT has already determined this transaction's own dirty content
- * alone exceeds the cache, so the ratio heuristic below (used for the other cache-pressure
- * reasons, where the rolled-back transaction isn't necessarily the cause) does not need to be
- * consulted.
- */
-bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold, int sub_level_err) {
-#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
-    if (sub_level_err == WT_TXN_TOO_LARGE_FOR_CACHE) {
-        return true;
-    }
-#endif
-    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
-        session, "statistics:session", "", WT_STAT_SESSION_TXN_BYTES_DIRTY);
-    if (!txnDirtyBytes.isOK()) {
-        tasserted(6190900,
-                  str::stream() << "unable to gather the WT session's txn dirty bytes: "
-                                << txnDirtyBytes.getStatus());
-    }
-
-    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
-        session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY_LEAF);
-    if (!cacheDirtyBytes.isOK()) {
-        tasserted(6190901,
-                  str::stream() << "unable to gather the WT connection's cache dirty bytes: "
-                                << txnDirtyBytes.getStatus());
-    }
-
-    return txnExceededCacheThreshold(
-        txnDirtyBytes.getValue(), cacheDirtyBytes.getValue(), threshold);
+    return sub_level_err == WT_CACHE_OVERFLOW || sub_level_err == WT_OLDEST_FOR_EVICTION;
 }
 
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
@@ -122,7 +107,7 @@ void throwAppropriateException(bool txnTooLargeEnabled,
     if (rollbackReasonWasCachePressure(sub_level_err)) {
         throwCachePressureExceptionIfAppropriate(
             txnTooLargeEnabled,
-            cacheIsInsufficientForTransaction(session, cacheThreshold, sub_level_err),
+            cacheIsInsufficientForTransaction(session, cacheThreshold),
             reason,
             prefix,
             retCode);
