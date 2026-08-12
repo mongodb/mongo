@@ -370,12 +370,17 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
             // primary, we will choose the primary. Otherwise, we choose the closest node.
             const auto closerCandidate =
                 (syncSourceCandidatePing > closestPing) ? closestIndex : candidateIndex;
-            const auto isAnyCandidatePrimary = _memberData[closestIndex].getState().primary() ||
-                _memberData[candidateIndex].getState().primary();
+
+            // Only prefer the primary when it is one of the two candidates we are comparing, both
+            // of which we have already vetted with '_isEligibleSyncSource'. Otherwise we could
+            // select a node we never vetted -- in particular ourselves while we are the primary
+            // running catchup.
+            const auto isPrimaryOneOfTheCandidates = _currentPrimaryIndex == closestIndex ||
+                _currentPrimaryIndex == static_cast<int>(candidateIndex);
 
             // Nodes are within the same data center and one of them is the current primary.
             // Choose the primary.
-            if (isWithinPingThreshold && isAnyCandidatePrimary) {
+            if (isWithinPingThreshold && isPrimaryOneOfTheCandidates) {
                 LOGV2_INFO(9649500,
                            "Candidate sync source pings are within a threshold, indicating they "
                            "are in the same data center. Prefer to select primary as sync source",

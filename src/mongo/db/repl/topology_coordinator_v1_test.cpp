@@ -1556,6 +1556,157 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
         true);
 }
 
+// Tests for the logic in '_chooseNearbySyncSource' that prefers the primary over an equally close
+// node. The primary state tracked in '_memberData' is self-reported and can be stale, so it can
+// disagree with '_currentPrimaryIndex'. These tests make sure we only ever pick a node we vetted as
+// an eligible sync source, and in particular that we never pick ourselves.
+class ChooseNearbySyncSourcePreferPrimaryTest : public TopoCoordTest {
+public:
+    void setUp() override {
+        TopoCoordTest::setUp();
+        updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself:27017")
+                                              << BSON("_id" << 1 << "host" << "host2:27017")
+                                              << BSON("_id" << 2 << "host" << "host3:27017")
+                                              << BSON("_id" << 3 << "host" << "host4:27017")
+                                              << BSON("_id" << 4 << "host" << "host5:27017"
+                                                            << "hidden" << true << "priority" << 0
+                                                            << "votes" << 0))),
+                     0);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        // Set 'changeSyncSourceThresholdMillis' to a non-zero value so that two candidates with
+        // similar ping times are considered to be in the same data center.
+        changeSyncSourceThresholdMillis.store(5LL);
+
+        // Receive up heartbeats from all other nodes so that they are eligible sync sources. We
+        // repeat this 5 times to satisfy that we have received at least 5N heartbeats.
+        for (auto i = 0; i < 5; i++) {
+            for (const auto& host : {host2, host3, host4, host5}) {
+                ASSERT_NO_ACTION(
+                    receiveUpHeartbeat(
+                        host, "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime)
+                        .getAction());
+            }
+        }
+
+        // 'host2' and 'host3' are in the same data center, while 'host4' is far away.
+        getTopoCoord().setPing_forTest(host2, closerPingTime);
+        getTopoCoord().setPing_forTest(host3, pingTime);
+        getTopoCoord().setPing_forTest(host4, farPingTime);
+        getTopoCoord().setPing_forTest(host5, pingTime);
+    }
+
+    // Makes the node at 'memberIndex' report itself as the primary, which also advances
+    // '_currentPrimaryIndex'.
+    void makeMemberPrimary(const HostAndPort& host, int memberIndex) {
+        ASSERT_NO_ACTION(
+            receiveUpHeartbeat(host, "rs0", MemberState::RS_PRIMARY, election, syncSourceOpTime)
+                .getAction());
+        ASSERT_EQUALS(memberIndex, getCurrentPrimaryIndex());
+    }
+
+    const HostAndPort hself = HostAndPort("hself", 27017);
+    const HostAndPort host2 = HostAndPort("host2", 27017);
+    const HostAndPort host3 = HostAndPort("host3", 27017);
+    const HostAndPort host4 = HostAndPort("host4", 27017);
+    // 'host5' is hidden, so it is never an eligible sync source on the first attempt.
+    const HostAndPort host5 = HostAndPort("host5", 27017);
+
+    const OpTime election = OpTime(Timestamp(1, 0), 0);
+    const OpTime syncSourceOpTime = OpTime(Timestamp(4, 0), 0);
+    // Set lastOpTimeFetched to be before the sync sources' OpTimes.
+    const OpTime lastOpTimeFetched = OpTime(Timestamp(3, 0), 0);
+
+    // 'closerPingTime' and 'pingTime' are within 'changeSyncSourceThresholdMillis' of each other,
+    // while 'farPingTime' is not within the threshold of either.
+    const Milliseconds closerPingTime = Milliseconds(4);
+    const Milliseconds pingTime = Milliseconds(7);
+    const Milliseconds farPingTime = Milliseconds(1000);
+};
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, PrefersPrimaryWhenPingsAreWithinThreshold) {
+    // 'host3' is the primary and is in the same data center as the slightly closer 'host2', so we
+    // should prefer the primary.
+    makeMemberPrimary(host3, 2);
+
+    unittest::LogCaptureGuard logs{};
+    ASSERT_EQUALS(
+        host3,
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest));
+    ASSERT_EQUALS(1, countLogLinesWithId(logs, 9649500));
+}
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, DoesNotSelectSelfWhenWeAreThePrimary) {
+    // 'host3' reports itself as the primary, and then we become the primary ourselves. 'host3' is
+    // still cached as a primary in '_memberData', but '_currentPrimaryIndex' now points at us.
+    makeMemberPrimary(host3, 2);
+    makeSelfPrimary(Timestamp(2, 0));
+    ASSERT_EQUALS(getSelfIndex(), getCurrentPrimaryIndex());
+    ASSERT_TRUE(getTopoCoord().getMemberData()[2].getState().primary());
+
+    // We must not choose ourselves. Since we cannot prefer a primary that is not a candidate, we
+    // fall back to choosing the closest node.
+    unittest::LogCaptureGuard logs{};
+    const auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest);
+    ASSERT_NOT_EQUALS(hself, syncSource);
+    ASSERT_EQUALS(host2, syncSource);
+    ASSERT_EQUALS(0, countLogLinesWithId(logs, 9649500));
+    ASSERT_LTE(1, countLogLinesWithId(logs, 9649501));
+
+    // Re-evaluating the sync source must not trip the invariant that our sync source is not
+    // ourselves.
+    ASSERT_FALSE(
+        getTopoCoord().shouldChangeSyncSource(syncSource,
+                                              makeReplSetMetadata(),
+                                              makeOplogQueryMetadata(syncSourceOpTime,
+                                                                     syncSourceOpTime,
+                                                                     -1 /* primaryIndex */,
+                                                                     1 /* syncSourceIndex */,
+                                                                     syncSource.toString()),
+                                              lastOpTimeFetched,
+                                              now()));
+}
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, IgnoresStalePrimaryWhenThereIsNoKnownPrimary) {
+    // 'host3' reports itself as the primary, and then the primary steps down. 'host3' is still
+    // cached as a primary in '_memberData', but '_currentPrimaryIndex' is now -1.
+    makeMemberPrimary(host3, 2);
+    getTopoCoord().setCurrentPrimary_forTest(-1);
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+    ASSERT_TRUE(getTopoCoord().getMemberData()[2].getState().primary());
+
+    // We should choose the closest node rather than poisoning our selection with -1, which would
+    // leave us with no sync source at all.
+    unittest::LogCaptureGuard logs{};
+    ASSERT_EQUALS(
+        host2,
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest));
+    ASSERT_EQUALS(0, countLogLinesWithId(logs, 9649500));
+}
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, IgnoresPrimaryThatIsNotACandidate) {
+    // 'host5' is the primary, but it is hidden, so it is not an eligible sync source. 'host2' and
+    // 'host3' are the two eligible candidates, and 'host3' is stale-cached as a primary.
+    makeMemberPrimary(host3, 2);
+
+    // Point '_currentPrimaryIndex' at the hidden 'host5'. We set this directly because
+    // '_updatePrimaryFromHBDataV1' breaks ties between members reporting themselves as primary by
+    // term, and the test heartbeat helpers give every member the same term.
+    getTopoCoord().setPrimaryIndex(4);
+    ASSERT_EQUALS(4, getCurrentPrimaryIndex());
+    ASSERT_TRUE(getTopoCoord().getMemberData()[2].getState().primary());
+
+    // We should choose the closest of the two eligible candidates instead of the ineligible
+    // primary, which we never vetted as a sync source.
+    unittest::LogCaptureGuard logs{};
+    ASSERT_EQUALS(
+        host2,
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest));
+    ASSERT_EQUALS(0, countLogLinesWithId(logs, 9649500));
+}
+
 void TopoCoordTest::testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
     BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
