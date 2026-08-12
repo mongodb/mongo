@@ -435,6 +435,12 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "audit",
     config = "//buildscripts/resmokeconfig:suites/audit.yml",
+    data = [
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_encrypt",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_manage_key",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:sts_http_server",
+    ],
     shard_count = 20,
     tags = [
         "audit",
@@ -466,7 +472,7 @@ resmoke_suite_test(
         "audit",
         "auth",
         "ci-release-critical",
-        "incompatible_with_bazel_remote_test",  # commands_builtin_roles_sharded.js timeout after 16 minutes.
+        "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
         "patch_build",
         "requires_replicated_fast_count_recovery",
     ],
@@ -537,6 +543,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )
@@ -564,6 +571,7 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )

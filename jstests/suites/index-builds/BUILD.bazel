@@ -39,6 +39,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_primary_driven_index_builds",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_sharded_replication_primary_driven_index_builds.yml",
     shard_count = 4,
     tags = [
@@ -111,6 +112,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_primary_driven_index_builds",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_primary_driven_index_builds.yml",
     shard_count = 50,
     tags = [
@@ -134,7 +136,7 @@ resmoke_suite_test(
         "//jstests/write_path/timeseries/pbt:all_subpackage_javascript_files",
     ],
     resmoke_args = [
-        "--fastCheckParameters='{\"numRuns\":25,\"seed\":42}'",
+        "--fastCheckParameters={\"numRuns\":25,\"seed\":42}",
     ],
     shard_count = 4,
     tags = [
@@ -207,7 +209,6 @@ resmoke_suite_test(
     tags = [
         "auth",
         "ci-default",
-        "incompatible_with_bazel_remote_test",  # commands_builtin_roles_sharded.js times out after 16 minutes.
         "primary_driven_index_builds",
     ],
     deps = [

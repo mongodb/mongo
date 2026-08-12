@@ -144,12 +144,15 @@ class TestMakeLocalResultsTask(unittest.TestCase):
 
 
 class _FakeVariant:
-    def __init__(self, name, large_distro_name=None):
+    def __init__(self, name, large_distro_name=None, xlarge_distro_name=None):
         self.name = name
-        self._large = large_distro_name
+        self._expansions = {
+            "large_distro_name": large_distro_name,
+            "xlarge_distro_name": xlarge_distro_name,
+        }
 
     def expansion(self, key):
-        return self._large if key == "large_distro_name" else None
+        return self._expansions.get(key)
 
 
 class TestResolveLargeHostDistro(unittest.TestCase):
@@ -176,6 +179,22 @@ class TestResolveLargeHostDistro(unittest.TestCase):
         tags = {"//local:big": [g.REQUIRES_LARGE_HOST_TAG]}
         with self.assertRaisesRegex(RuntimeError, "large_distro_name"):
             g.resolve_large_host_distro(variant, "//local:big", tags)
+
+    def test_returns_variant_xlarge_distro_when_tagged(self):
+        variant = _FakeVariant("v", large_distro_name="big", xlarge_distro_name="huge")
+        tags = {"//local:xl": [g.REQUIRES_XLARGE_HOST_TAG]}
+        self.assertEqual(g.resolve_large_host_distro(variant, "//local:xl", tags), "huge")
+
+    def test_xlarge_wins_over_large_when_both_tagged(self):
+        variant = _FakeVariant("v", large_distro_name="big", xlarge_distro_name="huge")
+        tags = {"//local:xl": [g.REQUIRES_LARGE_HOST_TAG, g.REQUIRES_XLARGE_HOST_TAG]}
+        self.assertEqual(g.resolve_large_host_distro(variant, "//local:xl", tags), "huge")
+
+    def test_raises_when_xlarge_tagged_but_variant_lacks_xlarge_distro(self):
+        variant = _FakeVariant("v", large_distro_name="big")
+        tags = {"//local:xl": [g.REQUIRES_XLARGE_HOST_TAG]}
+        with self.assertRaisesRegex(RuntimeError, "xlarge_distro_name"):
+            g.resolve_large_host_distro(variant, "//local:xl", tags)
 
 
 class TestQueryTargetTags(unittest.TestCase):

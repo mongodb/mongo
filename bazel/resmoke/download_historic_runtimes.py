@@ -73,12 +73,16 @@ def main():
             f"{S3_BASE}/{project}/{build_variant}/{args.suite}",
             f"{S3_BASE}/{project}/{build_variant}/{short_name(args.suite)}",
             f"{S3_BASE}/{DEFAULT_PROJECT}/{build_variant}/{args.suite}",
+            f"{S3_BASE}/{DEFAULT_PROJECT}/enterprise-amazon-linux2023-arm64-all-feature-flags/{short_name(args.suite)}",
         ]:
             if url not in seen:
                 seen.add(url)
                 urls.append(url)
     else:
-        urls = [f"{S3_BASE}/{DEFAULT_PROJECT}/{DEFAULT_BUILD_VARIANT}/{args.suite}"]
+        urls = [
+            f"{S3_BASE}/{DEFAULT_PROJECT}/{DEFAULT_BUILD_VARIANT}/{args.suite}",
+            f"{S3_BASE}/{DEFAULT_PROJECT}/enterprise-amazon-linux2023-arm64-all-feature-flags/{short_name(args.suite)}",
+        ]
 
     stats = None
     for url in urls:

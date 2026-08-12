@@ -82,6 +82,7 @@ BAZEL_EXEMPT_PATTERNS = (
     "manual",
     "local",
     "requires_large_host*",
+    "requires_xlarge_host*",
     "resmoke_suite_test",
     "resources:*",
     "ci-development-critical-single-variant",  # jsCore is special in that it is tagged default, but also needs to be included in the commit-queue variant by this tag.

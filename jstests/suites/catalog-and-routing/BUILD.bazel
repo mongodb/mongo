@@ -17,7 +17,7 @@ load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DA
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_with_balancer",
-    size = "large",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer.yml",
     data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
     shard_count = 20,
@@ -240,7 +240,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_with_balancer_and_config_transitions",
-    size = "large",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer_and_config_transitions.yml",
     shard_count = 20,
     tags = [
@@ -259,7 +259,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard",
-    size = "large",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard.yml",
     shard_count = 20,
     tags = [
@@ -647,6 +647,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "replica_sets_with_priority_ports",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/replica_sets_with_priority_ports.yml",
     data = [
         "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
@@ -691,6 +692,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "unsplittable_collections_created_on_any_shard_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/unsplittable_collections_created_on_any_shard_jscore_passthrough.yml",
     shard_count = 50,
     tags = [

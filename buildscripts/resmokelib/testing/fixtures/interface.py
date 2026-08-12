@@ -124,7 +124,11 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
         self.logger = logger
         self.job_num = job_num
 
-        dbpath_prefix = self.fixturelib.default_if_none(self.config.DBPATH_PREFIX, dbpath_prefix)
+        # An explicit dbpath_prefix wins over the global one. Parent fixtures pass it to give
+        # each of their sub-clusters a distinct directory, and those paths are already rooted
+        # under config.DBPATH_PREFIX. Preferring the global value here would collapse every
+        # sub-cluster of a multi-cluster fixture onto a single dbpath.
+        dbpath_prefix = self.fixturelib.default_if_none(dbpath_prefix, self.config.DBPATH_PREFIX)
         dbpath_prefix = self.fixturelib.default_if_none(
             dbpath_prefix, self.config.DEFAULT_DBPATH_PREFIX
         )

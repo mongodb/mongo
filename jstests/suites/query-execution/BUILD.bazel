@@ -14,6 +14,7 @@
 
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 load(":common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
+load("//jstests/noPassthrough:common.bzl", "NO_PASSTHROUGH_DATA")
 load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
 
 resmoke_suite_test(
@@ -1138,7 +1139,7 @@ resmoke_suite_test(
         "--fuzzMongodConfigs=normal",
         "--fuzzRuntimeParams",
         "--excludeWithAnyTags=does_not_support_config_fuzzer",
-        "--setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 120000}'",
+        "--setShellParameter={defaultFindReplicaSetHostTimeoutMS: 120000}",
     ],
     shard_count = 20,
     tags = [
@@ -1545,10 +1546,12 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "no_passthrough_qemp_ifr_batch1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_qemp_ifr_batch1.yml",
+    data = NO_PASSTHROUGH_DATA,
     shard_count = 40,
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",
+        "requires_large_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -1566,6 +1569,9 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "no_passthrough_with_mongod_qemp_ifr_batch1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_with_mongod_qemp_ifr_batch1.yml",
+    data = NO_PASSTHROUGH_DATA + [
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
     shard_count = 10,
     tags = [
         "ci-default",
@@ -1608,7 +1614,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_sharded_collections_passthrough_qemp_ifr_batch1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_sharded_collections_passthrough_qemp_ifr_batch1.yml",
-    shard_count = 8,
+    shard_count = 20,
     tags = [
         "ci-default",
     ],
@@ -1659,7 +1665,6 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "incompatible_debug_mode",
-        "incompatible_with_bazel_remote_test",  # Timeouts of accurate_percentiles_continuous.js, accurate_percentiles_discrete.js after 16 minutes.
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -1678,10 +1683,11 @@ resmoke_suite_test(
     name = "replica_sets_jscore_pqs_fallback",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_pqs_fallback.yml",
-    shard_count = 16,
+    shard_count = 50,
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",  # Timeout of express_pbt.js after 16 minutes
+        "requires_large_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -1699,10 +1705,11 @@ resmoke_suite_test(
     name = "sharded_collections_pqs_fallback",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_pqs_fallback.yml",
-    shard_count = 38,
+    shard_count = 50,
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",  # express_pbt.js times out after 16 minutes
+        "requires_large_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -1721,10 +1728,11 @@ resmoke_suite_test(
     name = "sharding_pqs_fallback",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_pqs_fallback.yml",
-    shard_count = 41,
+    shard_count = 50,
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",  # express_pbt.js times out after 16 minutes
+        "requires_large_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],

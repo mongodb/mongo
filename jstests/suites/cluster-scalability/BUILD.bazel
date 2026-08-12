@@ -191,6 +191,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_jscore_passthrough.yml",
     shard_count = 20,
     tags = [
@@ -374,7 +375,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "config_fuzzer_concurrency_sharded_replication_with_balancer",
-    size = "large",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer.yml",
     data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
     resmoke_args = [
@@ -624,7 +625,6 @@ resmoke_suite_test(
         tags = [
             "ci-default",
             "default",
-            "incompatible_with_bazel_remote_test",  # Even with 50 shards, some shards frequently time out
             "multiversion",
             "random_multiversion_ds",
             "requires_replicated_fast_count_recovery",

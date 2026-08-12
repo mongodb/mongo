@@ -65,9 +65,19 @@ LOCAL_INCOMPATIBLE_FILTER = ",incompatible_with_bazel_remote_test"
 # them early (and so they are excluded from the late RBE result-task activation).
 LOCAL_TASK_TAG = "resmoke_local_test"
 
-# Bazel-target tag requesting that the task be scheduled on the variant's large distro.
-# The generator reads it and resolves the variant's ${large_distro_name} into the task's run_on.
+# Local memory budget Bazel schedules test actions against, as a multiple of the host's physical
+# RAM.
+LOCAL_MEMORY_RAM_RATIO = "1.0"
+
+# Bazel-target tags requesting that the task be scheduled on a bigger distro than the variant's
+# default, if the test is tagged "incompatible_with_bazel_remote_test" and runs local.
 REQUIRES_LARGE_HOST_TAG = "requires_large_host"
+REQUIRES_XLARGE_HOST_TAG = "requires_xlarge_host"
+
+_HOST_SIZE_TAGS = (
+    (REQUIRES_XLARGE_HOST_TAG, "xlarge_distro_name"),
+    (REQUIRES_LARGE_HOST_TAG, "large_distro_name"),
+)
 
 
 def query_target_tags(targets: list[str]) -> dict[str, list[str]]:
@@ -187,7 +197,12 @@ def _make_setup_group(resmoke_task: str, resmoke_disable_rbe: bool) -> list:
         FunctionCall("set up venv"),
         FunctionCall("configure evergreen api credentials"),
         FunctionCall("set up credentials"),
-        FunctionCall("setup bazel (credentials, bazelrc)"),
+        FunctionCall(
+            "setup bazel (credentials, bazelrc)",
+            {"bazel_local_memory_ram_ratio": LOCAL_MEMORY_RAM_RATIO}
+            if resmoke_disable_rbe
+            else None,
+        ),
     ]
     if resmoke_disable_rbe:
         # Download and extract the pre-built dist-test binaries into src/ so that
@@ -547,16 +562,19 @@ def query_targets(
 def resolve_large_host_distro(
     variant, target: str, tags_by_target: dict[str, list[str]]
 ) -> Optional[str]:
-    """Return the large distro a local target must run on for this variant."""
-    if REQUIRES_LARGE_HOST_TAG not in tags_by_target.get(target, []):
-        return None
-    large_distro_name = variant.expansion("large_distro_name")
-    if not large_distro_name:
-        raise RuntimeError(
-            f"Target {target} is tagged '{REQUIRES_LARGE_HOST_TAG}' but variant "
-            f"'{variant.name}' has no 'large_distro_name' expansion to schedule it on."
-        )
-    return large_distro_name
+    """Return the larger distro a local target must run on for this variant, if any."""
+    tags = tags_by_target.get(target, [])
+    for tag, expansion_name in _HOST_SIZE_TAGS:
+        if tag not in tags:
+            continue
+        distro_name = variant.expansion(expansion_name)
+        if not distro_name:
+            raise RuntimeError(
+                f"Target {target} is tagged '{tag}' but variant "
+                f"'{variant.name}' has no '{expansion_name}' expansion to schedule it on."
+            )
+        return distro_name
+    return None
 
 
 def create_task_group_for_variant(variant_name: str, task_name: str, targets: list[str]) -> dict:
@@ -721,7 +739,8 @@ def main(outfile: Annotated[str, typer.Option()]):
     }
 
     # Fetch the bazel tags for every remote incompatible target in one query, so per-variant task refs
-    # can be scheduled on the variant's large distro when the suite is tagged requires_large_host.
+    # can be scheduled on the variant's large/xlarge distro when the suite is tagged
+    # requires_large_host / requires_xlarge_host.
     local_targets_union: set[str] = set()
     for _, local_targets in targets_per_variant:
         local_targets_union.update(local_targets)
@@ -754,7 +773,8 @@ def main(outfile: Annotated[str, typer.Option()]):
             local_dep = {"name": "archive_dist_test", "variant": compile_variant}
             for target in local_targets:
                 task_ref = {"name": target, "activate": False, "depends_on": [gen_dep, local_dep]}
-                # A suite tagged requires_large_host runs on this variant's large distro. Set run_on on
+                # A suite tagged requires_large_host / requires_xlarge_host runs on this variant's
+                # large / xlarge distro. Set run_on on
                 # the task ref (not the shared standalone task) so each variant gets its own distro.
                 large_distro_name = resolve_large_host_distro(variant, target, local_target_tags)
                 if large_distro_name:

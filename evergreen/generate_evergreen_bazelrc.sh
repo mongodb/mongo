@@ -50,6 +50,13 @@ if [[ -n "${bazel_jvm_heap_ram_ratio}" ]] && [[ -r /proc/meminfo ]]; then
     fi
 fi
 
+# Size the local test-scheduling memory budget as a fraction of the host's physical RAM, for
+# tasks that opt in via the bazel_local_memory_ram_ratio expansion. Unset, Bazel's default of
+# HOST_RAM*0.67 applies.
+if [[ -n "${bazel_local_memory_ram_ratio:-}" ]]; then
+    echo "test --local_resources=memory=HOST_RAM*${bazel_local_memory_ram_ratio}" >>.bazelrc.evergreen
+fi
+
 if [[ "${requester}" == "commit" ]]; then
     mongo_version=$(awk -F'MONGO_VERSION=' '/MONGO_VERSION=/ { split($2, version, /[[:space:]]/); print version[1]; exit }' .bazelrc.target_mongo_version)
     if [[ -z "${mongo_version}" ]]; then

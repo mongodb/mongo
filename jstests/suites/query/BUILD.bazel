@@ -114,7 +114,7 @@ resmoke_suite_test(
         "--fuzzMongodConfigs=normal",
         "--fuzzRuntimeParams",
         "--excludeWithAnyTags=does_not_support_config_fuzzer",
-        "--setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 120000}'",
+        "--setShellParameter={defaultFindReplicaSetHostTimeoutMS: 120000}",
     ],
     shard_count = 4,
     tags = [

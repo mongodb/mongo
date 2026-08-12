@@ -11,8 +11,8 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/bazel_test_results_shutils.sh"
 
-if [[ "${resmoke_disable_rbe_mirror}" == "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
-    echo "Skipping: resmoke_disable_rbe_mirror=true on RBE mirror variant. We have force-disabled testing on this variant while resolving remote execution issues. Report to #ask-devprod-test-infrastructure if you have any issues."
+if [[ "${resmoke_rbe_mirror_enabled}" != "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
+    echo "Skipping: the RBE mirror variant is disabled. Set the resmoke_rbe_mirror_enabled project variable to true to enable it. Report to #ask-devprod-test-infrastructure if you have any issues."
     exit 0
 fi
 

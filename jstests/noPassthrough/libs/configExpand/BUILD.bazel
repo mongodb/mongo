@@ -16,3 +16,9 @@ py_binary(
     name = "reflect",
     srcs = ["reflect.py"],
 )
+
+py_binary(
+    name = "rest_server",
+    srcs = ["rest_server.py"],
+    main = "rest_server.py",
+)
