@@ -6,3 +6,12 @@ filters:
   - "/ALLOWED_UNOWNED_FILES.yml":
     approvers:
       - alex.neben@mongodb.com
+  - "workflows/*":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+  - "workflows/update-mongo-version-on-tag.yml":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "workflows/_update-mongo-version-impl.yml":
+    approvers:
+      - 10gen/devprod-release-infrastructure
