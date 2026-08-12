@@ -950,6 +950,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_impl.cpp",
         "//src/mongo/db/query/compiler/optimizer/join:agg_join_model.cpp",
         "//src/mongo/db/query/compiler/optimizer/join:executor.cpp",
+        "//src/mongo/db/query/compiler/optimizer/join:server_status_metrics.cpp",
         "//src/mongo/db/query/compiler/optimizer/join:single_table_access.cpp",
         "//src/mongo/db/query/plan_ranking:cbr_for_no_mp_results.cpp",
         "//src/mongo/db/query/plan_ranking:cbr_plan_ranking.cpp",

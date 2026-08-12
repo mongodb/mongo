@@ -7,6 +7,8 @@ exports_files([
     "agg_join_model.cpp",
     "executor.h",
     "executor.cpp",
+    "server_status_metrics.h",
+    "server_status_metrics.cpp",
     "single_table_access.cpp",
     "single_table_access.h",
 ])

@@ -24,6 +24,7 @@
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 #include "mongo/db/query/compiler/optimizer/join/predicate_extractor.h"
 #include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
+#include "mongo/db/query/compiler/optimizer/join/server_status_metrics.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -250,11 +251,20 @@ std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
     }
 }
 
-bool isUnwindEligible(const DocumentSourceUnwind& unwind) {
+/**
+ * The helpers below return the reason the pipeline element is ineligible for join optimization, or
+ * boost::none if it is eligible.
+ */
+boost::optional<JoinFallbackReason> isUnwindEligible(const DocumentSourceUnwind& unwind) {
     // If 'preserveNullAndEmptyArrays' is set to true, this is an outer join, which is currently
     // ineligible for join-opt. Similarly, we don't support $unwinds that set the array index.
-    // TODO SERVER-132003: Record reason.
-    return !unwind.preserveNullAndEmptyArrays() && !unwind.indexPath();
+    if (unwind.preserveNullAndEmptyArrays()) {
+        return JoinFallbackReason::kOuterJoinUnwind;
+    }
+    if (unwind.indexPath()) {
+        return JoinFallbackReason::kUnwindIncludeArrayIndex;
+    }
+    return boost::none;
 }
 
 bool isSubPipelineOrPrefixEligible(auto start, auto end) {
@@ -266,37 +276,40 @@ bool isSubPipelineOrPrefixEligible(auto start, auto end) {
     });
 }
 
-bool isLookupEligible(const DocumentSourceLookUp& lookup) {
+boost::optional<JoinFallbackReason> isLookupEligible(const DocumentSourceLookUp& lookup) {
     if (lookup.getExpCtx()->getSubPipelineDepth() != 0) {
         // We've descended into a subpipeline, fallback.
-        // TODO SERVER-132003: Record reason as JoinFallbackReason::kInsideSubPipeline.
-        return false;
+        return JoinFallbackReason::kInsideSubPipeline;
     }
 
-    if (!lookup.hasUnwindSrc() || !isUnwindEligible(*lookup.getUnwindSource())) {
-        // TODO SERVER-132003: Record reason.
-        return false;
+    if (!lookup.hasUnwindSrc()) {
+        return JoinFallbackReason::kLookupNotUnwound;
+    }
+    if (auto reason = isUnwindEligible(*lookup.getUnwindSource())) {
+        return reason;
     }
 
     // $lookup specified with localField/foreignField only (no pipeline spec). An absorbed filter,
     // if any, is reachable via getAbsorbedFilter() and handled in extractPredicatesFromLookup().
     if (!lookup.hasPipeline()) {
-        return true;
+        return boost::none;
     }
 
     // pipeline:[] passes this check — the absorbed filter, if any, is read via
     // getAbsorbedFilter() in extractPredicatesFromLookup(). Disconnected graphs (no join
     // predicate from any source) are rejected later by constructJoinModel.
     if (lookup.getResolvedIntrospectionPipeline().empty()) {
-        return true;
+        return boost::none;
     }
 
     // Otherwise the sub-pipeline must contain a single $match stage. The absorbed filter (if any)
     // is combined with that $match in extractPredicatesFromLookup().
-    // TODO SERVER-132003: Record reason as JoinFallbackReason::kIneligibleSubPipelineStage.
-    return isSubPipelineOrPrefixEligible(
-        lookup.getResolvedIntrospectionPipeline().getSources().begin(),
-        lookup.getResolvedIntrospectionPipeline().getSources().end());
+    if (!isSubPipelineOrPrefixEligible(
+            lookup.getResolvedIntrospectionPipeline().getSources().begin(),
+            lookup.getResolvedIntrospectionPipeline().getSources().end())) {
+        return JoinFallbackReason::kIneligibleSubPipelineStage;
+    }
+    return boost::none;
 }
 
 bool addJoinPredicates(const std::vector<JoinPredicate>& joinPreds,
@@ -340,13 +353,16 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(it->get()); lookup) {
             // Found first $lookup- if prefix not valid, or if $lookup itself is not eligible,
             // bail!
-            if (isLookupEligible(*lookup) && isSubPipelineOrPrefixEligible(startIt, it)) {
-                foundLookup = true;
-            } else {
-                // First $lookup is ineligible.
-                // TODO SERVER-132003: Record reason.
+            if (auto reason = isLookupEligible(*lookup)) {
+                joinOptMetrics.fallbackReasons.increment(*reason);
                 return false;
             }
+            if (!isSubPipelineOrPrefixEligible(startIt, it)) {
+                joinOptMetrics.fallbackReasons.increment(
+                    JoinFallbackReason::kIneligiblePrefixStage);
+                return false;
+            }
+            foundLookup = true;
             // One eligible $lookup is enough to proceed.
             break;
         }
@@ -354,7 +370,7 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
     }
 
     if (!foundLookup) {
-        // TODO SERVER-132003: Record reason as JoinFallbackReason::kNoLookup.
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kNoLookup);
         return false;
     }
 
@@ -363,7 +379,7 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
 
     // We don't support non-simple collations.
     if (!CollatorInterface::isSimpleCollator(pipeline.getContext()->getCollator())) {
-        // TODO SERVER-132003: Record reason as JoinFallbackReason::kPipelineCollation.
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kPipelineCollation);
         return false;
     }
 
@@ -454,8 +470,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
 
         auto* stage = suffix->getSources().front().get();
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(stage); lookup) {
-            if (!isLookupEligible(*lookup)) {
-                // TODO SERVER-132003: Record reason.
+            if (auto reason = isLookupEligible(*lookup)) {
+                metrics.fallbackReason = *reason;
                 break;
             }
 

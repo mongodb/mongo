@@ -22,20 +22,6 @@ namespace {
 constexpr auto kFallbackReasonSection = "fallbackReasons";
 
 /**
- * Returns the name a reason is reported under: the enumerator name with the leading 'k' stripped
- * and the first character lowercased, as in 'plan_shape_counters::toCounterName()'.
- */
-std::string toReasonName(join_ordering::JoinFallbackReason reason) {
-    auto enumName = toStringData(reason);
-    tassert(13400900,
-            "Expected enum name to be length > 1 and begin with 'k'",
-            enumName.size() > 1 && enumName[0] == 'k');
-    std::string name{enumName.substr(1)};
-    name[0] = ctype::toLower(name[0]);
-    return name;
-}
-
-/**
  * Appends a reason-count section, omitting it entirely when no reason was ever recorded.
  */
 void appendReasonCounts(BSONObjBuilder& builder,
@@ -46,7 +32,7 @@ void appendReasonCounts(BSONObjBuilder& builder,
     }
     BSONObjBuilder sectionBuilder{builder.subobjStart(sectionName)};
     for (const auto& [reason, count] : counts) {
-        sectionBuilder.append(toReasonName(reason), static_cast<long long>(count));
+        sectionBuilder.append(join_ordering::toReasonName(reason), static_cast<long long>(count));
     }
 }
 

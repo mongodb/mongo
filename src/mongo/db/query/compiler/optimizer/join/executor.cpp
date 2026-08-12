@@ -15,11 +15,13 @@
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
+#include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/compiler/optimizer/join/hint.h"
 #include "mongo/db/query/compiler/optimizer/join/index_fingerprint.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
+#include "mongo/db/query/compiler/optimizer/join/server_status_metrics.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 #include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/query/plan_cache/join_plan_cache_key.h"
@@ -124,20 +126,42 @@ EnumerationStrategy getEnumerationStrategy(const QueryKnobConfiguration& qkc) {
             .enableHJOrderPruning = qkc.getEnableJoinEnumerationHJOrderPruning()};
 }
 
-bool isCollPtrEligibleForJoinOpt(const CollectionPtr& cptr) {
-    return !cptr->isCapped() && !cptr->isClustered() &&
-        CollatorInterface::isSimpleCollator(cptr->getDefaultCollator());
+/**
+ * These return the reason the collection is ineligible for join optimization, or boost::none if it
+ * is eligible.
+ */
+boost::optional<JoinFallbackReason> isCollPtrEligibleForJoinOpt(const CollectionPtr& coll) {
+    if (coll->isCapped()) {
+        return JoinFallbackReason::kCollectionCapped;
+    }
+    if (coll->isClustered()) {
+        return JoinFallbackReason::kCollectionClustered;
+    }
+    if (!CollatorInterface::isSimpleCollator(coll->getDefaultCollator())) {
+        return JoinFallbackReason::kCollectionCollation;
+    }
+    return boost::none;
 }
 
-bool isCollectionEligibleForJoinOpt(const CollectionAcquisition& coll) {
-    return coll.exists() && !coll.getShardingDescription().isSharded() &&
-        isCollPtrEligibleForJoinOpt(coll.getCollectionPtr());
+boost::optional<JoinFallbackReason> isCollectionEligibleForJoinOpt(
+    const CollectionAcquisition& coll) {
+    if (!coll.exists()) {
+        return JoinFallbackReason::kCollectionMissing;
+    }
+    if (coll.getShardingDescription().isSharded()) {
+        return JoinFallbackReason::kCollectionSharded;
+    }
+    return isCollPtrEligibleForJoinOpt(coll.getCollectionPtr());
 }
 
-bool isCollectionOrViewEligibleForJoinOpt(const CollectionOrViewAcquisition& coll) {
+boost::optional<JoinFallbackReason> isCollectionOrViewEligibleForJoinOpt(
+    const CollectionOrViewAcquisition& coll) {
     // TODO SERVER-112239: permit foreign collection views/ resolve them.
     // Note: timeseries views should automatically be excluded if they are resolved.
-    return coll.isCollection() && isCollectionEligibleForJoinOpt(coll.getCollection());
+    if (!coll.isCollection()) {
+        return JoinFallbackReason::kCollectionIsView;
+    }
+    return isCollectionEligibleForJoinOpt(coll.getCollection());
 }
 
 bool isJoinOrderingEnabled(const ExpressionContext& ctx) {
@@ -167,28 +191,28 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
     }
 
     if (queryHint.has_value() && !queryHint->isEmpty()) {
-        // TODO SERVER-132003: Record reason as JoinFallbackReason::kUserHintPresent.
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kUserHintPresent);
         return false;
     }
 
     if (!mca.hasMainCollection()) {
         // We can't determine if the base collection is sharded.
-        // TODO SERVER-132003: Record reason as JoinFallbackReason::kNoMainCollection.
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kNoMainCollection);
         return false;
     }
 
     // Ensure that the base collection is eligible. If not, this aggregation can't participate in
     // join optimization.
-    // TODO SERVER-132003: Record reason.
-    if (!isCollectionEligibleForJoinOpt(mca.getMainCollectionAcquisition())) {
+    if (auto reason = isCollectionEligibleForJoinOpt(mca.getMainCollectionAcquisition())) {
+        joinOptMetrics.fallbackReasons.increment(*reason);
         return false;
     }
 
     // Check that all foreign collections are eligible.
     // TODO SERVER-125401: instead of falling back, shorten the prefix.
     for (const auto& [_, collAcq] : mca.getSecondaryCollectionAcquisitions()) {
-        if (!isCollectionOrViewEligibleForJoinOpt(collAcq)) {
-            // TODO SERVER-132003: Record reason.
+        if (auto reason = isCollectionOrViewEligibleForJoinOpt(collAcq)) {
+            joinOptMetrics.fallbackReasons.increment(*reason);
             return false;
         }
     }
@@ -202,7 +226,7 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
         }
     });
     if (foundCrossDbLookup) {
-        // TODO SERVER-132003: Record reason as JoinFallbackReason::kCrossDbLookup.
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kCrossDbLookup);
         return false;
     }
 
@@ -500,6 +524,9 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     od.joinOptimizationMetrics.emplace();
     auto& metrics = *od.joinOptimizationMetrics;
 
+    // Record serverStatus metrics on every exit path, including the ones that throw.
+    ON_BLOCK_EXIT([&] { recordJoinOptimizationMetrics(metrics); });
+
     // Try to build JoinGraph.
     const auto& config = pipeline.getContext()->getQueryKnobConfiguration();
     AggModelBuildParams buildParams{
@@ -586,7 +613,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     auto swAccessPlans =
         singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators, peMetrics);
     if (!swAccessPlans.isOK()) {
-        metrics.fallbackReason = JoinFallbackReason::kCBRFailedToGetSingleTableAccess;
+        metrics.fallbackReason = JoinFallbackReason::kFailedToGetSingleTableAccessViaCBR;
         return swAccessPlans.getStatus();
     }
     auto singleTableAccess = std::move(swAccessPlans.getValue());

@@ -4,7 +4,12 @@
 #pragma once
 
 #include "mongo/db/query/util/named_enum.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/modules.h"
+
+#include <iterator>
+#include <string>
 
 /**
  * Reasons why an aggregation with $lookups did not end up being join-optimized, or was only
@@ -59,9 +64,26 @@ namespace mongo::join_ordering {
     F(kMatchVariableOperand)           \
     F(kMatchPredicateOnSameNode)       \
     F(kUnsupportedStage)               \
-    F(kCBRFailedToGetSingleTableAccess)
+    F(kFailedToGetSingleTableAccessViaCBR)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(JoinFallbackReason, JOIN_FALLBACK_REASON_TABLE)
 #undef JOIN_FALLBACK_REASON_TABLE
+
+inline constexpr size_t kNumJoinFallbackReasons = std::size(JoinFallbackReasonEnumString::arr_);
+
+/**
+ * Returns the name a reason is reported under in query stats and serverStatus: the enumerator name
+ * with the leading 'k' stripped and the first character lowercased, as in
+ * 'plan_shape_counters::toCounterName()'.
+ */
+inline std::string toReasonName(JoinFallbackReason reason) {
+    auto enumName = toStringData(reason);
+    tassert(13400900,
+            "Expected enum name to be length > 1 and begin with 'k'",
+            enumName.size() > 1 && enumName[0] == 'k');
+    std::string name{enumName.substr(1)};
+    name[0] = ctype::toLower(name[0]);
+    return name;
+}
 
 }  // namespace mongo::join_ordering
