@@ -14,12 +14,15 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
                            boost::optional<PlanExplainerData> maybeExplainData)
     : DeferredEngineChoicePlannerInterface(std::move(plannerData)),
       _maybeExplainData(std::move(maybeExplainData)) {
+    plan_cache_util::CacheMode shouldCache = plannerParams()->replanningData.has_value()
+        ? plannerParams()->replanningData->shouldCache
+        : plan_cache_util::CacheMode::AlwaysCache;
     _multiplanStage = std::make_unique<MultiPlanStage>(
         cq()->getExpCtxRaw(),
         collections().getMainCollectionPtrOrAcquisition(),
         cq(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx(),
-                                                collections().getMainCollectionPtrOrAcquisition()},
+        plan_cache_util::ConditionalClassicPlanCacheWriter{
+            shouldCache, opCtx(), collections().getMainCollectionPtrOrAcquisition()},
         boost::none /*replan reason, if present, will be returned via planner params*/,
         addingCBRChosenPlanToPlanCache);
     for (auto&& solution : solutions) {
