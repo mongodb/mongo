@@ -5,13 +5,12 @@
 system. It handles data requests, manages data access, and performs
 background management operations.
 .PP
-This document provides a complete overview of all command line options
-for \fBmongod\f1\&. These command line options are primarily useful
-for testing: In common operation, use the \fBconfiguration file
-options\f1 to control the behavior of
-your database.
+\fBmongod\f1 command\-line options should primarily be used for testing.
+In production environments, it is recommended to use
+\fBconfiguration file options\f1
+to control database behavior.
 .PP
-\fBSelf\-Managed Configuration File Settings and Command\-Line Options Mapping\f1
+\fBSelf\-Managed Configuration and Command\-Line Options Mapping\f1
 .PP
 MongoDB disables support for TLS 1.0 and TLS 1.1
 encryption on systems where TLS 1.2+ is available.
@@ -64,10 +63,9 @@ corresponding \fBnet.serviceExecutor\f1 configuration option.
 \fBmongod \-\-auth\f1
 .RS
 .PP
-Enables authorization to control user\(aqs access to database resources
+Enables authorization to control user access to database resources
 and operations. When authorization is enabled, MongoDB requires all
-clients to authenticate themselves first in order to determine the
-access for the client.
+clients to authenticate before it determines their access.
 .PP
 To configure users, use the \fBmongosh\f1\f1 client. If no users
 exist, the localhost interface has access to the
@@ -81,13 +79,17 @@ See \fBSecurity\f1 for more information.
 .PP
 \fIDefault\f1: localhost
 .PP
-The hostnames and/or IP addresses and/or full Unix domain socket
-paths on which \fBmongod\f1 should listen for client connections. You
-may attach \fBmongod\f1 to any interface. To bind to multiple
-addresses, enter a list of comma\-separated values.
+The hostnames, IP addresses, and full Unix domain socket paths on
+which \fBmongod\f1 listens for client connections. You can attach
+\fBmongod\f1 to any interface. To bind to multiple addresses, enter a
+comma\-separated list of values.
+.PP
+Example: \fBlocalhost,/tmp/mongod.sock\f1
 .PP
 You can specify both IPv4 and IPv6 addresses, or hostnames that
 resolve to an IPv4 or IPv6 address.
+.PP
+Example: \fBlocalhost, 2001:0DB8:e132:ba26:0d5c:2774:e7f9:d513\f1
 .PP
 If specifying an IPv6 address \fIor\f1 a hostname that resolves to an
 IPv6 address to \fB\-\-bind_ip\f1\f1, you must start \fBmongod\f1 with
@@ -98,7 +100,9 @@ If specifying a
 link\-local IPv6 address (https://en.wikipedia.org/wiki/Link\-local_address#IPv6)
 (\fBfe80::/10\f1), you must append the
 zone index (https://en.wikipedia.org/wiki/IPv6_address#Scoped_literal_IPv6_addresses_(with_zone_index))
-to that address (i.e. \fBfe80::<address>%<adapter\-name>\f1).
+to that address (that is, \fBfe80::<address>%<adapter\-name>\f1).
+.PP
+Example: \fBlocalhost,fe80::a00:27ff:fee0:1fcf%enp0s3\f1
 .PP
 To avoid configuration updates due to IP address changes, use DNS
 hostnames instead of IP addresses. It is particularly important to
@@ -454,14 +458,14 @@ If you specify multiple compressors, then the order in which you list
 the compressors matter as well as the communication initiator. For
 example, if \fBmongosh\f1\f1 specifies the following network
 compressors \fBzlib,snappy\f1 and the \fBmongod\f1\f1 specifies
-\fBsnappy,zlib\f1, messages between \fBmongosh\f1\f1 and
-\fBmongod\f1\f1 uses \fBzlib\f1\&.
+\fBsnappy,zlib\f1, messages between \fBmongosh\f1 and
+\fBmongod\f1 uses \fBzlib\f1\&.
 .PP
 If the parties do not share at least one common compressor, messages
 between the parties are uncompressed. For example, if
-\fBmongosh\f1\f1 specifies the network compressor
-\fBzlib\f1 and \fBmongod\f1\f1 specifies \fBsnappy\f1, messages
-between \fBmongosh\f1\f1 and \fBmongod\f1\f1 are not
+\fBmongosh\f1 specifies the network compressor
+\fBzlib\f1 and \fBmongod\f1 specifies \fBsnappy\f1, messages
+between \fBmongosh\f1 and \fBmongod\f1 are not
 compressed.
 .RE
 .PP
@@ -501,10 +505,8 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
 .RE
 .PP
-\fBmongod\f1 installed from official \fBInstall MongoDB Community Edition\f1
-and \fBInstall MongoDB Community Edition\f1 packages
-have the \fBbind_ip\f1 configuration set to \fB127.0.0.1\f1 by
-default.
+\fBmongod\f1 installed from official \fBDebian\f1 and \fBRed Hat or CentOS\f1 packages have the \fBbind_ip\f1
+configuration set to \fB127.0.0.1\f1 by default.
 .RE
 .PP
 \fBmongod \-\-outputConfig\f1
@@ -533,8 +535,8 @@ For usage examples, see:
 Specifies a file location to store the process ID (PID) of the \fBmongod\f1
 process. The user running the \fBmongod\f1 or \fBmongos\f1
 process must be able to write to this path. If the \fB\-\-pidfilepath\f1\f1 option is not
-specified, the process does not create a PID file. This option is generally
-only useful in combination with the \fB\-\-fork\f1\f1 option.
+specified, the process does not create a PID file. Use this option
+mainly with the \fB\-\-fork\f1\f1 option.
 .PP
 On Linux, PID file management is generally the responsibility of
 your distro\(aqs init system: usually a service file in the \fB/etc/init.d\f1
@@ -573,8 +575,7 @@ assigned by the operating system.
 \fBmongod \-\-quiet\f1
 .RS
 .PP
-Runs \fBmongod\f1 in a quiet mode that attempts to limit the amount
-of output.
+Runs \fBmongod\f1 in a quiet mode that limits output.
 .PP
 This option suppresses:
 .RS
@@ -608,12 +609,11 @@ Use \fB\-\-redactClientLogData\f1\f1 in conjunction with
 regulatory requirements.
 .PP
 For example, a MongoDB deployment might store Personally Identifiable
-Information (PII) in one or more collections. The \fBmongod\f1 logs events
-such as those related to CRUD operations, sharding metadata, etc. It is
-possible that the \fBmongod\f1 may expose PII as a part of these logging
-operations. A \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 removes any message
-accompanying these events before being output to the log, effectively
-removing the PII.
+Information (PII) in one or more collections. The \fBmongod\f1 instance
+logs events such as CRUD operations and sharding metadata, and might
+expose PII as part of these logging operations. A \fBmongod\f1 running
+with \fB\-\-redactClientLogData\f1\f1 removes any message accompanying
+these events before writing them to the log, which removes the PII.
 .PP
 Diagnostics on a \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 may be more difficult
 due to the lack of data related to a log event. See the
@@ -722,7 +722,7 @@ format. For example, for New York at the start of the Epoch:
 .RE
 .RE
 .PP
-\fB\-\-timeStampFormat\f1\f1 no longer supports \fBctime\f1\&. An example of \fBctime\f1
+The timestamp format no longer supports \fBctime\f1\&. An example of \fBctime\f1
 formatted date is: \fBWed Dec 31 18:17:54.811\f1\&.
 .RE
 .PP
@@ -747,7 +747,7 @@ the time zone database is available on our download site (https://downloads.mong
   mongod \-\-timeZoneInfo timezonedb\-2017b/
 .EE
 .PP
-MongoDB uses the third party timelib (https://github.com/derickr/timelib) library to provide accurate
+MongoDB uses the third\-party \fBtimelib\f1 library to provide accurate
 conversions between timezones. Due to a recent update, \fBtimelib\f1
 could create inaccurate time zone conversions in older versions of
 MongoDB.
@@ -780,7 +780,7 @@ For example, if using \fBkeyfiles\f1 for
 \fBinternal authentication\f1, the \fBmongod\f1 creates
 an authenticated connection with any \fBmongod\f1 or \fBmongos\f1\f1
 in the deployment using a matching keyfile. If the security mechanisms do
-not match, the \fBmongod\f1 utilizes a non\-authenticated connection instead.
+not match, the \fBmongod\f1 uses a non\-authenticated connection instead.
 .PP
 A \fBmongod\f1 running with \fB\-\-transitionToAuth\f1\f1 does not enforce \fBuser access
 controls\f1\&. Users may connect to your deployment without any
@@ -835,12 +835,11 @@ Returns the \fBmongod\f1 release number.
 .RE
 .SS LDAP AUTHENTICATION OR AUTHORIZATION OPTIONS
 .PP
-Starting in MongoDB 8.0, LDAP authentication and authorization is
-deprecated. LDAP is available and will continue to operate without
-changes throughout the lifetime of MongoDB 8. LDAP will be removed in a
-future major release.
+Starting in MongoDB 8.0 and continued in 9.0, LDAP authentication and
+authorization is deprecated. LDAP will be removed in a future release.
 .PP
-For details, see \fBLDAP Deprecation\f1\&.
+To learn about alternative authentication methods, see
+\fBLDAP Authentication Alternatives\f1\&.
 .PP
 \fBmongod \-\-ldapServers\f1
 .RS
@@ -918,22 +917,22 @@ both \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the s
 .PP
 The password used to bind to an LDAP server when using
 \fB\-\-ldapQueryUser\f1\f1\&. You must use \fB\-\-ldapQueryPassword\f1\f1 with
-\fB\-\-ldapQueryUser\f1\f1\&.
+\fB\-\-ldapQueryUser\f1\&.
 .PP
 If not set, \fBmongod\f1\f1 does not attempt to bind to the LDAP server.
 .PP
 You can configure this setting on a running \fBmongod\f1\f1 using
-\fBsetParameter\f1\f1\&.
+\fBsetParameter\f1\&.
 .PP
-The \fBldapQueryPassword\f1 \fBsetParameter\f1\f1 command accepts either a
+The \fBldapQueryPassword\f1 \fBsetParameter\f1 command accepts either a
 string or an array of strings. If \fBldapQueryPassword\f1 is set to an array,
 MongoDB tries each password in order until one succeeds. Use a password array
 to roll over the LDAP account password without downtime.
 .PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
-instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&.
-You cannot specify both \fB\-\-ldapQueryPassword\f1\f1 and
-\fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
+instead of \fB\-\-ldapQueryUser\f1 and \fB\-\-ldapQueryPassword\f1\&.
+You cannot specify both \fB\-\-ldapQueryPassword\f1 and
+\fB\-\-ldapBindWithOSDefaults\f1 at the same time.
 .PP
 \fBmongod \-\-ldapBindWithOSDefaults\f1
 .RS
@@ -1001,6 +1000,14 @@ SASL mechanism(s) on both the \fBmongod\f1 host and the remote
 LDAP server host. Your operating system may include certain SASL
 libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
+.PP
+On hosts with Cyrus SASL 2.1.28 or later, MongoDB does not support LDAP
+SASL binding with the \fBDIGEST\-MD5\f1 mechanism. If you set
+\fBsecurity.ldap.bind.method\f1\f1 to \fBsasl\f1 and specify
+\fBDIGEST\-MD5\f1 in \fBsecurity.ldap.bind.saslMechanisms\f1\f1,
+\fBmongod\f1 and \fBmongos\f1 fail to start.
+.PP
+For details and alternatives, see \fBDIGEST\-MD5 Not Supported with Cyrus SASL 2.1.28 and Later\f1\&.
 .PP
 If using the \fBGSSAPI\f1 SASL mechanism for use with
 \fBKerberos Authentication on Self\-Managed Deployments\f1, verify the following for the
@@ -1864,7 +1871,7 @@ architecture, consider the following:
 The write concern \fB"majority"\f1\f1 can cause
 performance issues if a secondary is unavailable or lagging. For
 advice on how to mitigate these issues, see
-\fBMitigate Performance Issues with a Self\-Managed PSA Replica Set\f1\&.
+\fBMitigate Performance Issues in Self\-Managed PSA Replica Sets\f1\&.
 .IP \(bu 2
 If you are using a global default \fB"majority"\f1\f1
 and the write concern is less than the size of the majority,
@@ -1942,7 +1949,7 @@ embedded config shard.
 .RE
 .SS TLS OPTIONS
 .PP
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 for full
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 for full
 documentation of MongoDB\(aqs support.
 .PP
 \fBmongod \-\-tlsMode\f1
@@ -1999,7 +2006,7 @@ If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2032,7 +2039,7 @@ use \fB\-\-tlsCertificateSelector\f1\f1\&.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2064,7 +2071,7 @@ PEM file. Use \fB\-\-tlsCertificateSelector\f1\f1 instead.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2129,7 +2136,7 @@ If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2161,7 +2168,7 @@ connection if the presented X.509 certificate expires within \fB30\f1
 days of the \fBmongod/mongos\f1 host system time.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 For Windows \fBonly\f1, MongoDB does not support
@@ -2347,7 +2354,7 @@ PEM file. Use \fB\-\-tlsClusterCertificateSelector\f1\f1 instead.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2380,7 +2387,7 @@ secure certificate store.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2417,7 +2424,7 @@ secure certificate store.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2444,7 +2451,7 @@ certificate store.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2466,7 +2473,7 @@ the \fB\-\-tlsAllowInvalidCertificates\f1\f1 setting, MongoDB
 logs a warning regarding the use of the invalid certificate.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2480,7 +2487,7 @@ to other members if the hostnames in their certificates do not match
 their configured hostname.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2507,7 +2514,7 @@ a mixed deployment that includes clients that do not or cannot present
 certificates to the \fBmongod\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL Encryption\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2637,11 +2644,11 @@ When \fBlogLevel\f1\f1 is set to \fB0\f1, MongoDB records \fIslow\f1
 operations to the diagnostic log at a rate determined by
 \fBslowOpSampleRate\f1\f1\&.
 .PP
-At higher \fBlogLevel\f1\f1 settings, all operations appear in
+At higher \fBlogLevel\f1 settings, all operations appear in
 the diagnostic log regardless of their latency with the following
 exception: the logging of slow oplog entry messages by the
 secondaries. The secondaries log only the slow oplog
-entries; increasing the \fBlogLevel\f1\f1 does not log all
+entries; increasing the \fBlogLevel\f1 does not log all
 oplog entries.
 .PP
 For \fBmongod\f1 instances, \fB\-\-slowms\f1\f1 affects the diagnostic log
@@ -2686,7 +2693,7 @@ Specifies the compression mode for \fBaudit log encryption\f1\&. You must also e
 encryption using either \fB\-\-auditEncryptionKeyUID\f1\f1 or
 \fB\-\-auditLocalKeyFile\f1\f1\&.
 .PP
-\fB\-\-auditCompressionMode\f1\f1 can be set to one of these values:
+You can set this option to one of these values:
 .RS
 .IP \(bu 2
 .RS
@@ -2772,7 +2779,7 @@ and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 Specifies the unique identifier of the Key Management
 Interoperability Protocol (KMIP) key for \fBaudit log encryption\f1\&.
 .PP
-You cannot use \fB\-\-auditEncryptionKeyUID\f1\f1 and
+You cannot use this option and
 \fB\-\-auditLocalKeyFile\f1\f1 together.
 .PP
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
@@ -2824,13 +2831,12 @@ and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 Specifies the path and file name for a local audit key file for
 \fBaudit log encryption\f1\&.
 .PP
-Only use \fB\-\-auditLocalKeyFile\f1\f1 for testing because the key is
+Only use this option for testing because the key is
 not secured. To secure the key, use
 \fB\-\-auditEncryptionKeyUID\f1\f1 and an external Key
 Management Interoperability Protocol (KMIP) server.
 .PP
-You cannot use \fB\-\-auditLocalKeyFile\f1\f1 and
-\fB\-\-auditEncryptionKeyUID\f1\f1 together.
+You cannot use both options together.
 .PP
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
