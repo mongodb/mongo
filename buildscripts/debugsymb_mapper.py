@@ -162,6 +162,14 @@ class Mapper:
     default_client_credentials_user_name = "client-user"
     default_creds_file_path = os.path.join(os.getcwd(), '.symbolizer_credentials.json')
 
+    # The Evergreen API serves artifact lists from a secondary node
+    # (DEVPROD-32223), so artifacts attached by a recently-finished compile
+    # task can be missing from the response due to replication lag. Retry the
+    # lookup with backoff before giving up.
+    num_url_retries = 8
+    url_retry_initial_delay_secs = 15
+    url_retry_max_delay_secs = 120
+
     def __init__(self, evg_version: str, evg_variant: str, is_san_variant: bool, client_id: str,
                  client_secret: str, cache_dir: str = None, web_service_base_url: str = None,
                  logger: logging.Logger = None):
@@ -263,19 +271,44 @@ class Mapper:
     def setup_urls(self):
         """Set up URLs using multiversion."""
 
-        urlinfo = self.multiversion_setup.get_urls(self.evg_version, self.evg_variant)
+        urlinfo = None
+        for attempt in range(self.num_url_retries):
+            urlinfo = self.multiversion_setup.get_urls(self.evg_version, self.evg_variant)
 
-        binaries_url = urlinfo.urls.get("Binaries", "")
-        if self.is_san_variant:
-            # Sanitizer builds are not stripped and contain debug symbols
-            download_symbols_url = binaries_url
-        else:
-            download_symbols_url = urlinfo.urls.get("mongo-debugsymbols.tgz") or urlinfo.urls.get(
-                "mongo-debugsymbols.zip")
+            binaries_url = urlinfo.urls.get("Binaries", "")
+            if self.is_san_variant:
+                # Sanitizer builds are not stripped and contain debug symbols
+                download_symbols_url = binaries_url
+            else:
+                download_symbols_url = urlinfo.urls.get(
+                    "mongo-debugsymbols.tgz") or urlinfo.urls.get("mongo-debugsymbols.zip")
 
-        if not download_symbols_url:
-            self.logger.error("Couldn't find URL for debug symbols. Version: %s, URLs dict: %s",
-                              self.evg_version, urlinfo.urls)
+            if binaries_url and download_symbols_url:
+                break
+
+            if attempt + 1 < self.num_url_retries:
+                delay = min(
+                    self.url_retry_initial_delay_secs * (2**attempt),
+                    self.url_retry_max_delay_secs,
+                )
+                self.logger.warning(
+                    "Couldn't find URL for binaries or debug symbols on attempt %d of %d. "
+                    "This can happen when the Evergreen API's secondary node lags behind on "
+                    "recently attached artifacts; retrying in %ds. Version: %s, URLs dict: %s",
+                    attempt + 1,
+                    self.num_url_retries,
+                    delay,
+                    self.evg_version,
+                    urlinfo.urls,
+                )
+                time.sleep(delay)
+
+        if not binaries_url or not download_symbols_url:
+            self.logger.error(
+                "Couldn't find URL for debug symbols. Version: %s, URLs dict: %s",
+                self.evg_version,
+                urlinfo.urls,
+            )
             raise ValueError(f"Debug symbols URL not found. URLs dict: {urlinfo.urls}")
 
         self.debug_symbols_url = download_symbols_url
