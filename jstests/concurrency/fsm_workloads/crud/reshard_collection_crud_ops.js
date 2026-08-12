@@ -1,5 +1,8 @@
 /**
- * Runs reshardCollection and CRUD operations concurrently.
+ * Runs reshardCollection and CRUD operations (insert, update, findAndModify, delete, read)
+ * concurrently.
+ * The collection carries a set of secondary indexes so that the resharding recipient has a
+ * non-trivial building-index phase.
  *
  * @tags: [
  *  requires_sharding,
@@ -18,18 +21,47 @@ export const $config = (function () {
     };
 
     const iterations = 25;
-    const kTotalWorkingDocuments = 1000;
+    const kTotalWorkingDocuments = 5000;
     const kMaxReshardingExecutions = TestData.runningWithShardStepdowns ? 4 : iterations;
+    const kNumSecondaryIndexes = 20;
+    const secondaryIndexFields = Array.from({length: kNumSecondaryIndexes}, (_, i) => "i" + i);
+
+    // Resharding drops the old collection once it commits, which kills the plans of the operations
+    // still running against it.
+    const kAcceptableCrudErrors = [ErrorCodes.QueryPlanKilled];
 
     /**
      * @summary Takes in a number of documents to create, creates each document. With two properties
-     * being equal to the index and one counter property.
+     * being equal to the index, one counter property, and one property per secondary index.
      * @param {number} numDocs
      * @returns {Array{Object}} an array of documents to be inserted into the collection.
      */
     function createDocuments(numDocs) {
-        const documents = Array.from({length: numDocs}).map((_, i) => ({a: i, b: i, c: 0}));
+        const documents = Array.from({length: numDocs}).map((_, i) => {
+            let value = Random.randInt(kTotalWorkingDocuments);
+            const doc = {a: value, b: value, c: 0, d: i};
+            secondaryIndexFields.forEach((field) => {
+                doc[field] = value++;
+            });
+            return doc;
+        });
         return documents;
+    }
+
+    /**
+     * @summary Returns a filter matching the documents created by createDocuments() for one value.
+     * The values of the shard key fields ('a' and 'b') are never modified by this workload, so a
+     * filter on both of them is fully targeted whichever of the two shard keys is the current one.
+     * That keeps every single-document write retryable under stepdowns.
+     * @returns {Object} a query filter.
+     */
+    function randomDocumentFilter() {
+        const value = Random.randInt(kTotalWorkingDocuments);
+        return {a: value, b: value};
+    }
+
+    function randomSecondaryIndexField() {
+        return secondaryIndexFields[Random.randInt(kNumSecondaryIndexes)];
     }
 
     function executeReshardCommand(db, collName, newShardKey, forceRedistribution) {
@@ -63,27 +95,60 @@ export const $config = (function () {
 
     const states = {
         insert: function insert(db, collName) {
-            const coll = db.getCollection(collName);
-            print(`Inserting documents for collection ${coll.getFullName()}.`);
             const totalDocumentsToInsert = 5;
-            assert.soon(() => {
-                try {
-                    coll.insert(createDocuments(totalDocumentsToInsert));
-                    return true;
-                } catch (err) {
-                    if (err instanceof BulkWriteError && err.hasWriteErrors()) {
-                        for (let writeErr of err.getWriteErrors()) {
-                            if (writeErr.code == 11000) {
-                                // 11000 is a duplicate key error. If the insert generates the same
-                                // _id object as another concurrent insert, retry the command.
-                                return false;
-                            }
-                        }
-                    }
-                    throw err;
-                }
+            const res = db.runCommand({
+                insert: collName,
+                documents: createDocuments(totalDocumentsToInsert),
             });
-            print(`Finished Inserting documents.`);
+            // A DuplicateKey write error is possible when a concurrent insert generates the same
+            // _id object.
+            assert.commandWorkedOrFailedWithCode(res, [
+                ...kAcceptableCrudErrors,
+                ErrorCodes.DuplicateKey,
+            ]);
+        },
+        update: function update(db, collName) {
+            const field = randomSecondaryIndexField();
+            const res = db.runCommand({
+                update: collName,
+                updates: [
+                    {
+                        q: randomDocumentFilter(),
+                        u: {$inc: {c: 1}, $set: {[field]: Random.randInt(kTotalWorkingDocuments)}},
+                        multi: false,
+                    },
+                ],
+            });
+            assert.commandWorkedOrFailedWithCode(res, kAcceptableCrudErrors);
+        },
+        findAndModify: function findAndModify(db, collName) {
+            const field = randomSecondaryIndexField();
+            const res = db.runCommand({
+                findAndModify: collName,
+                query: randomDocumentFilter(),
+                update: {$inc: {c: 1}, $unset: {[field]: 1}},
+                new: true,
+            });
+            assert.commandWorkedOrFailedWithCode(res, kAcceptableCrudErrors);
+        },
+        delete: function (db, collName) {
+            const res = db.runCommand({
+                delete: collName,
+                deletes: [{q: randomDocumentFilter(), limit: 1}],
+            });
+            assert.commandWorkedOrFailedWithCode(res, kAcceptableCrudErrors);
+        },
+        read: function read(db, collName) {
+            const field = randomSecondaryIndexField();
+            const value = Random.randInt(kTotalWorkingDocuments);
+            const res = db.runCommand({
+                find: collName,
+                filter: {[field]: value},
+                hint: {[field]: 1},
+                singleBatch: true,
+                limit: 200,
+            });
+            assert.commandWorkedOrFailedWithCode(res, kAcceptableCrudErrors);
         },
         reshardCollection: function reshardCollection(db, collName) {
             //'reshardingMinimumOperationDurationMillis' is set to 30 seconds when there are
@@ -152,21 +217,36 @@ export const $config = (function () {
         },
     };
 
-    const transitions = {
-        reshardCollection: {insert: 1},
-        reshardCollectionSameKey: {insert: 1},
-        insert: {
-            insert: 0.45,
-            reshardCollection: 0.2,
-            reshardCollectionSameKey: 0.2,
-            checkReshardingMetrics: 0.15,
-        },
-        checkReshardingMetrics: {insert: 1},
+    const nextStateProbabilities = {
+        insert: 0.1,
+        update: 0.1,
+        findAndModify: 0.1,
+        delete: 0.1,
+        read: 0.1,
+        reshardCollection: 0.2,
+        reshardCollectionSameKey: 0.2,
+        checkReshardingMetrics: 0.1,
     };
+
+    const transitions = Object.fromEntries(
+        Object.keys(nextStateProbabilities).map((state) => [
+            state,
+            Object.assign({}, nextStateProbabilities),
+        ]),
+    );
 
     function setup(db, collName, _cluster) {
         const coll = db.getCollection(collName);
         assert.commandWorked(coll.insert(createDocuments(kTotalWorkingDocuments)));
+        assert.commandWorked(
+            db.runCommand({
+                createIndexes: collName,
+                indexes: secondaryIndexFields.map((field) => ({
+                    key: {[field]: 1},
+                    name: field + "_idx",
+                })),
+            }),
+        );
         this._allowSameKeyResharding = true;
     }
 
