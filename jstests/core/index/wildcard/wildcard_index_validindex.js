@@ -5,6 +5,9 @@
  *   requires_background_index,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   # TODO (SERVER-91380): Remove the 'assumes_balancer_off' tag once create and drop indexes
+ *   # serialize correctly with chunk migrations.
+ *   assumes_balancer_off,
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
