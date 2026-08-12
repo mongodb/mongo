@@ -47,6 +47,7 @@
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -343,6 +344,66 @@ TEST_F(GenCollScanTest, ClusteredMultiRangeWithFilter) {
         checkClusteredScanResult(
             colls, forward, rangeList, filteredDocs, std::move(filterAndExpCtx));
     }
+}
+
+// The stage builder adds the top-level fields referenced by the filter to the scan's field list, so
+// that the scan extracts them into slots. Those additions must also be visible in the returned
+// PlanStageSlots: otherwise the filter finds no kField slot for the field and falls back to
+// re-extracting it from the result object with getField(), doing the work twice per document.
+TEST_F(GenCollScanTest, GenericScanFilterFieldsAreExposedAsSlots) {
+    // This test only inspects the shape of the plan and never runs it, so a mock collection (which
+    // just supplies a uuid and a namespace) is enough.
+    CollectionMock collMock{UUID::gen(), _nss};
+    // The initialization of the CollectionPtr is SAFE. The lifetime of the Mocked Collection
+    // instance is managed by the test and guaranteed to be valid for the entire duration of the
+    // test.
+    auto collection = CollectionPtr::CollectionPtr_UNSAFE(&collMock);
+
+    boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContextForTest(operationContext(), _nss));
+    // 'matchExpr' must outlive the parsed MatchExpression, which points into its buffer rather
+    // than owning it.
+    auto matchExpr = fromjson("{a: 0}");
+    auto filter = MatchExpressionParser::parse(matchExpr, expCtx);
+    ASSERT_OK(filter.getStatus());
+
+    auto csn = std::make_unique<CollectionScanNode>();
+    csn->nss = _nss;
+    csn->direction = CollectionScanParams::FORWARD;
+    csn->isClustered = true;
+    // An unbounded rangeList is not a clustered scan, so this takes the generic scan path.
+    csn->rangeList = RecordIdRangeList();
+    ASSERT_TRUE(csn->rangeList.isUnbounded());
+    csn->filter = std::move(filter.getValue());
+
+    stage_builder::Environment env{std::make_unique<RuntimeEnvironment>()};
+    auto data = std::make_unique<stage_builder::PlanStageStaticData>();
+    Variables variables;
+    value::FrameIdGenerator frameIdGenerator;
+    stage_builder::StageBuilderState builderState{operationContext(),
+                                                  env,
+                                                  data.get(),
+                                                  variables,
+                                                  getYieldPolicy(),
+                                                  getSlotIdGenerator(),
+                                                  &frameIdGenerator,
+                                                  nullptr /* spoolIdGenerator */,
+                                                  nullptr /* inListsMap */,
+                                                  nullptr /* collatorsMap */,
+                                                  nullptr /* sortSpecMap */,
+                                                  expCtx,
+                                                  false /* needsMerge */,
+                                                  false /* allowDiskUse */,
+                                                  *expCtx->getIfrContext()};
+
+    // 'a' is referenced only by the filter, not by the requested fields (which are empty here).
+    auto [stage, slots] =
+        stage_builder::generateCollScan(builderState, collection, csn.get(), {} /* fields */);
+
+    ASSERT((dynamic_cast<FilterStage<false, false>*>(stage.get())));
+    ASSERT_TRUE(
+        slots.has(std::make_pair(stage_builder::PlanStageSlots::kField, std::string_view{"a"})))
+        << "the filter's top-level field 'a' should be exposed as a kField slot";
 }
 
 }  // namespace mongo::sbe

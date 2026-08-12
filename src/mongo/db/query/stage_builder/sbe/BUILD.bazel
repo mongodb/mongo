@@ -200,5 +200,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe:clustered_scan_stage_test_fixtures",
         "//src/mongo/db/exec/sbe:sbe_plan_stage_test",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role/shard_catalog:collection_mock",
     ],
 )

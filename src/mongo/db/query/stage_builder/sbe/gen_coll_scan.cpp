@@ -59,6 +59,12 @@ sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const CollectionPtr& collection,
     }
 }
 
+// Unlike generateGenericCollScan() below, this takes 'scanFieldNames' by value: it does not add the
+// filter's dependencies to the list, so the caller's copy still describes exactly the fields the
+// scan produces. The consequence is that a field referenced only by the filter gets no slot here,
+// and the filter reads it from the result object instead. That is a missed optimization rather than
+// a correctness issue.
+// TODO(SERVER-133309): Consider extracting the filter's top-level fields into slots here too.
 SbBuilder::MakeScanResult generateClusteredCollScan(SbBuilder& b,
                                                     StageBuilderState& state,
                                                     const CollectionPtr& collection,
@@ -91,12 +97,16 @@ SbBuilder::MakeScanResult generateClusteredCollScan(SbBuilder& b,
 
 /**
  * Generates a generic collection scan sub-tree.
+ * Note that 'fields' is an in/out parameter: it is augmented with the top-level fields referenced
+ * by 'csn->filter' below, and the caller relies on seeing those additions so that it can map the
+ * scan's field slots into 'PlanStageSlots'. Otherwise the filter would have no kField slot to use
+ * and would redundantly re-extract the field from the result object.
  */
 SbBuilder::MakeScanResult generateGenericCollScan(SbBuilder& b,
                                                   StageBuilderState& state,
                                                   const CollectionPtr& collection,
                                                   const CollectionScanNode* csn,
-                                                  std::vector<std::string> fields) {
+                                                  std::vector<std::string>& fields) {
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
 
     tassert(9884951, "resumeScanPoint not supported in SBE", !csn->resumeScanPoint);
