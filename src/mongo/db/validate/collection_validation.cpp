@@ -457,11 +457,12 @@ void _validateCatalogEntry(OperationContext* opCtx,
         if (const auto& clusteredIndexName = clusteredIndex->getIndexSpec().getName()) {
             Status nameStatus = index_key_validate::validateIndexName(*clusteredIndexName);
             if (!nameStatus.isOK()) {
-                results->addWarning(
+                results->addError(
                     fmt::format("The clustered index name is not valid: {}. To remediate, migrate "
                                 "the data and drop the collection since clustered indexes cannot "
                                 "be independently dropped.",
-                                nameStatus.reason()));
+                                nameStatus.reason()),
+                    /*stopValidation=*/false);
             }
         }
     }

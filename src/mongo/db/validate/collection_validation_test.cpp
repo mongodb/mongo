@@ -292,15 +292,27 @@ TEST_F(CollectionValidationTest, ValidateClusteredIndexNameWithEmbeddedNulByte) 
     auto opCtx = operationContext();
     const auto nss =
         createClusteredCollectionWithIndexName(opCtx, storageInterface(), "leading\0trailing"sv);
-    foregroundValidate(
-        nss, opCtx, {.valid = true, .numRecords = 0, .numErrors = 0, .numWarnings = 1});
+    const auto allResults = foregroundValidate(
+        nss, opCtx, {.valid = false, .numRecords = 0, .numErrors = 1, .numWarnings = 0});
+    for (const auto& results : allResults) {
+        EXPECT_THAT(results.getErrors(),
+                    testing::ElementsAre(
+                        testing::AllOf(testing::HasSubstr("The clustered index name is not valid"),
+                                       testing::HasSubstr("index name cannot contain NUL bytes"))));
+    }
 }
 
 TEST_F(CollectionValidationTest, ValidateClusteredIndexNameEmpty) {
     auto opCtx = operationContext();
     const auto nss = createClusteredCollectionWithIndexName(opCtx, storageInterface(), ""sv);
-    foregroundValidate(
-        nss, opCtx, {.valid = true, .numRecords = 0, .numErrors = 0, .numWarnings = 1});
+    const auto allResults = foregroundValidate(
+        nss, opCtx, {.valid = false, .numRecords = 0, .numErrors = 1, .numWarnings = 0});
+    for (const auto& results : allResults) {
+        EXPECT_THAT(results.getErrors(),
+                    testing::ElementsAre(
+                        testing::AllOf(testing::HasSubstr("The clustered index name is not valid"),
+                                       testing::HasSubstr("index name cannot be empty"))));
+    }
 }
 
 TEST_F(CollectionValidationTest, ValidateClusteredIndexNameValid) {
