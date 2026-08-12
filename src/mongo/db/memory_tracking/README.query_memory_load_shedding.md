@@ -244,18 +244,21 @@ The random roll reuses the client's warm PRNG via `Client::getPrng().trueWithPro
 ### Eligibility is opt-in
 
 Shedding is opt-in: an operation is a candidate only after a user-facing read command marks it, via
-`markOperationQueryMemorySheddingEligible()` at the top of `run()`. The read commands opt in on both
-the shard (mongod) and router (mongos) sides: **find**, **aggregate**, **getMore**, and **distinct**
-(`count` is deliberately left out — its aggregation fallback is a single-group count with negligible
-tracked memory, so it is never a candidate). Everything unmarked is never shed — replication,
-migration, TTL, index builds, and internal reads that build executors directly (e.g. the resharding
-pipelines).
+`markOperationQueryMemorySheddingEligible()`. The read commands opt in on both the shard (mongod)
+and router (mongos) sides: **find**, **aggregate**, **getMore**, and **distinct** (`count` is
+deliberately left out — its aggregation fallback is a single-group count with negligible tracked
+memory, so it is never a candidate). Everything unmarked is never shed — replication, migration,
+TTL, index builds, and internal reads that build executors directly (e.g. the resharding pipelines).
 
-Keying off the command needs no sharding-specific reasoning: shard-side execution of a user query
-arrives as an `aggregate`/`find` command, the merging half of a sharded aggregation is an
-`aggregate` command (with `$mergeCursors`), and a getMore is its own command. So each opts in on its
-own opCtx — nothing is inferred from the connection or shard version, and nothing is stashed on the
-cursor.
+**aggregate**, **getMore**, and **distinct** mark at the top of `run()`. Shard-side **find** cannot
+do that, since it must stay unmarked while it might still take the express fast path. It marks from
+inside the find planning paths instead (`getExecutorFind()` and
+`getExecutorFindDeferredEngineChoice()`), each just past its own express decision, via
+`markShedEligibleIfFindCommand()`. Keying off the command needs no sharding-specific reasoning:
+shard-side execution of a user query arrives as an `aggregate`/`find` command, the merging half of a
+sharded aggregation is an `aggregate` command (with `$mergeCursors`), and a getMore is its own
+command. So each opts in on its own opCtx — nothing is inferred from the connection or shard
+version, and nothing is stashed on the cursor.
 
 The **router** (`cluster_*`) commands mark eligible too, so query work on an embedded-router mongod
 is sheddable (on a pure mongos the process gate below keeps shedding off, so the marks are no-ops

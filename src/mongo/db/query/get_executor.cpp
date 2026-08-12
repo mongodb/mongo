@@ -1068,6 +1068,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     if (expressResult.executor) {
         return std::move(expressResult.executor);
     }
+
+    // Past the express decision: this plan may build a memory tracker, so opting into load
+    // shedding can now be worth its cost. Express plans never track memory and are left ineligible.
+    markShedEligibleIfFindCommand(opCtx);
+
     // If no express executor was returned, we can reuse the planner params created by `tryExpress`
     // for other planning logic.
     tassert(11742300, "Expected planner params to be initialized.", expressResult.plannerParams);

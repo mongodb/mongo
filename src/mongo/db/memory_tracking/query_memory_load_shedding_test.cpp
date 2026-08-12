@@ -191,7 +191,7 @@ void setPressureOverride(int usagePercent) {
         ->setMode(FailPoint::alwaysOn, 0, BSON("usagePercent" << usagePercent));
 }
 
-// Below the low mark the fast path marks the dt baseline invalid (Date_t::max()), and the first
+// Below the low mark the fast path marks the dt baseline invalid (Date_t{}), and the first
 // check after RSS crosses above the mark primes the baseline to "now" without shedding -- so the
 // zero-hazard time spent below the mark is never credited as dt on the crossing. Without the
 // priming branch the baseline would stay at its initial value and each assertion below would fail.
@@ -213,14 +213,14 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, FastPathPrimesFirstCheckAfterCrossingLo
     // Below the low mark: not shed, and the baseline is marked invalid.
     setPressureOverride(10);
     ASSERT_OK(queryMemoryCheckLoadShedding(opCtx));
-    ASSERT_EQ(query_memory_load_shedding_detail::lastEvalTimeForTest(opCtx), Date_t::max());
+    ASSERT_EQ(query_memory_load_shedding_detail::lastEvalTimeForTest(opCtx), Date_t{});
 
     // Cross above the mark. The first check must not shed; it re-establishes the baseline at "now"
     // instead of crediting the below-mark interval as dt. That the baseline is no longer the
     // invalid sentinel proves the priming branch ran (and thus returned OK for that reason).
     setPressureOverride(90);
     ASSERT_OK(queryMemoryCheckLoadShedding(opCtx));
-    ASSERT_NE(query_memory_load_shedding_detail::lastEvalTimeForTest(opCtx), Date_t::max());
+    ASSERT_NE(query_memory_load_shedding_detail::lastEvalTimeForTest(opCtx), Date_t{});
 }
 
 // The test-only always-shed failpoint must be deterministic for any eligible (enabled,

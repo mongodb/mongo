@@ -11,11 +11,13 @@
 #include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -270,6 +272,13 @@ void captureCardinalityEstimationMethodForQueryStats(
                     break;
             }
         }
+    }
+}
+
+void markShedEligibleIfFindCommand(OperationContext* opCtx) {
+    const auto* command = CurOp::get(opCtx)->getCommand();
+    if (command && command->getName() == FindCommandRequest::kCommandName) {
+        markOperationQueryMemorySheddingEligible(opCtx);
     }
 }
 

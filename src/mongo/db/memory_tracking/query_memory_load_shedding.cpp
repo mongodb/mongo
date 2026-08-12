@@ -59,11 +59,11 @@ const auto getState = ServiceContext::declareDecoration<QueryMemoryLoadSheddingS
 struct LoadSheddingOpState {
     // Opt-in eligibility (see is/markOperationQueryMemorySheddingEligible). Defaults false.
     bool eligible = false;
-    // Wall-clock time of the previous shed evaluation, used to compute dt. Date_t::max() is the
-    // "no dt baseline yet" sentinel: set below the low mark and before the first evaluation after
-    // crossing above it, so the first post-crossing check only primes the clock instead of
-    // computing a bogus dt.
-    Date_t lastEvalTime = Date_t::max();
+    // Wall-clock time of the previous shed evaluation, used to compute dt. The default-constructed
+    // Date_t{} (epoch) is the "no dt baseline yet" sentinel: set below the low mark and before the
+    // first evaluation after crossing above it, so the first post-crossing check only primes the
+    // clock instead of computing a bogus dt.
+    Date_t lastEvalTime;
 };
 const auto getOpState = QueryLifespan::declareOpCtxDecoration<LoadSheddingOpState>();
 
@@ -237,11 +237,11 @@ Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
     const std::int32_t lowPct = gQueryMemoryLoadSheddingLowMarkPercent.loadRelaxed();
 
     // Steady-state fast path: below the low mark (or no sample yet) nothing is shed, so skip the
-    // clock read and probability calculation. Mark the dt baseline invalid (Date_t::max()) to
-    // record that we don't have a dt baseline yet. We'll only shed after the second check that
-    // passes this conditional.
+    // clock read and probability calculation. Mark the dt baseline invalid (Date_t{}) to record
+    // that we don't have a dt baseline yet. We'll only shed after the second check that passes this
+    // conditional.
     if (rss < 0 || memLimit <= 0 || rss <= memLimit * lowPct / 100) {
-        opState.lastEvalTime = Date_t::max();
+        opState.lastEvalTime = Date_t{};
         return Status::OK();
     }
 
@@ -262,7 +262,7 @@ Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
     if (!MONGO_unlikely(queryMemoryLoadSheddingAlwaysShed.shouldFail())) {
         // First check after crossing above the low mark (opState.lastEvalTime was left invalid by
         // the fast path): do not shed, just reset the clock. Exit early to avoid a negative dt.
-        if (opState.lastEvalTime == Date_t::max()) {
+        if (opState.lastEvalTime == Date_t{}) {
             opState.lastEvalTime = now;
             return Status::OK();
         }

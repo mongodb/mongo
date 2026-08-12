@@ -323,6 +323,49 @@ for (const engine of kEngines) {
                 dest.drop();
             }
         });
+
+        it("9. a find with a blocking sort is sheddable; an express _id find is not", function () {
+            // Shard-side find opts into shedding from inside the find planning paths, just past
+            // their express decision, rather than at the top of run(). A find with a
+            // blocking sort goes through the planner and accumulates tracked memory, so it must
+            // still be shed. An express _id point query must complete: it builds no
+            // OperationMemoryUsageTracker, so it was never a shed candidate either before or
+            // after that move.
+            setLowMark(db, 50);
+            setSignal(db, 90);
+            forceShed(db, true);
+            try {
+                assertEventuallyShed(
+                    () => coll.find().sort({val: 1, g: 1}).allowDiskUse(false).toArray(),
+                    "a blocking-sort find should still be shed",
+                );
+                assert.eq(1, coll.find({_id: 0}).itcount(), "an express _id find must not be shed");
+            } finally {
+                forceShed(db, false);
+                clearSignal(db);
+            }
+        });
+
+        it("10. a find over a view is sheddable", function () {
+            // A find over a view is rerouted through the aggregation system, so it never reaches
+            // the express decision that the opt-in hangs off. It stays a 'find' command
+            // throughout, which is what keeps it opted in.
+            setLowMark(db, 50);
+            setSignal(db, 90);
+            forceShed(db, true);
+            const viewName = jsTestName() + "_view";
+            assert.commandWorked(db.createView(viewName, coll.getName(), []));
+            try {
+                assertEventuallyShed(
+                    () => db[viewName].find().sort({val: 1, g: 1}).toArray(),
+                    "a blocking-sort find over a view should be shed",
+                );
+            } finally {
+                forceShed(db, false);
+                clearSignal(db);
+                db[viewName].drop();
+            }
+        });
     });
 }
 

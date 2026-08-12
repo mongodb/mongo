@@ -63,6 +63,10 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
     if (rankerResult.expressExecutor) {
         return {std::move(rankerResult.expressExecutor)};
     }
+
+    // Past this path's own express decision; see the matching call in getExecutorFind().
+    markShedEligibleIfFindCommand(opCtx);
+
     // If we replanned and the old plan and new plan are the same, update the counter.
     const auto replanningData = rankerResult.plannerParams->replanningData;
     if (replanningData && !rankerResult.solutions.empty()) {

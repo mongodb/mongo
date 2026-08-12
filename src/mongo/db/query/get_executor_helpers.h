@@ -109,4 +109,11 @@ void captureCardinalityEstimationMethodForQueryStats(
     const boost::optional<PlanExplainerData>& maybeExplainData,
     const QuerySolution* solution);
 
+/**
+ * Opts 'opCtx' into query-memory load shedding if it is running a find command. Used to mark find
+ * in the executor, so that it stays unmarked on the express fast path to avoid overhead. Keying off
+ * the command is what keeps the internal callers of getExecutorFind() ineligible.
+ */
+void markShedEligibleIfFindCommand(OperationContext* opCtx);
+
 }  // namespace mongo

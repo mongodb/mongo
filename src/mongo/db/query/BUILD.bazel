@@ -819,6 +819,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "query_test",
     srcs = [
+        "get_executor_shedding_eligibility_test.cpp",
         "index_hint_test.cpp",
         "lru_key_value_test.cpp",
         "map_reduce_output_format_test.cpp",
