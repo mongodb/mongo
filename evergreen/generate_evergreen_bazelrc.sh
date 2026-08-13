@@ -8,6 +8,11 @@ set -o verbose
 
 # Use the Evergreen temp directory to avoid filling up the disk.
 mkdir -p $TMPDIR
+
+# Everything below appends to .bazelrc.git with values that are deterministic
+# per checkout, so start from a clean slate. Task groups run this script once
+# per task on a shared workdir; without this the defines accumulate duplicates.
+rm -f .bazelrc.git
 if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
     mkdir -p Z:/b
     touch Z:/b/mci_path
@@ -34,6 +39,12 @@ else
     GIT_REV=$(git rev-parse HEAD)
     echo "common --define GIT_COMMIT_HASH=${GIT_REV}" >>.bazelrc.git
 fi
+
+# Version stamped into the message filter plugin binary, and used as its release
+# version when the artifact is imported into URP: YYYYMMDD.hhmmss.<githash>,
+# where the timestamp is the committer date of HEAD rendered in UTC.
+MFP_COMMIT_TIMESTAMP=$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y%m%d.%H%M%S HEAD)
+echo "common --define MFP_VERSION=${MFP_COMMIT_TIMESTAMP}.${GIT_REV}" >>.bazelrc.git
 
 # Size the Bazel server JVM heap as a fraction of the host's physical RAM.
 # Defaults to 0.5 for all Evergreen jobs; individual tasks may override via the
