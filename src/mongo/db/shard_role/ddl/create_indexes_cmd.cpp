@@ -16,7 +16,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/primary_driven/enabled.h"
@@ -53,7 +52,6 @@
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/exceptions.h"
@@ -63,7 +61,6 @@
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
-#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -360,60 +357,6 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         }
         throw;
     }
-}
-
-/**
- * An index build that failed with NamespaceNotFound normally lost a race with a drop, in which
- * case reporting success is correct. But moveCollection/unshardCollection commit by renaming a
- * new collection over the namespace (or, if this shard isn't the db primary, by dropping it here
- * with no local replacement at all), so it may instead have been replaced. Detects that case and
- * throws StaleConfig so the router retries against the collection's new owner.
- */
-void throwIfCollectionWasReplaced(OperationContext* opCtx,
-                                  const NamespaceString& ns,
-                                  const UUID& buildCollectionUUID) {
-    // A direct-to-shard caller has no router to retry, so keep reporting success for it.
-    const auto receivedShardVersion = OperationShardingState::get(opCtx).getShardVersion(ns);
-    if (!receivedShardVersion) {
-        return;
-    }
-
-    // kPretendUnsharded: placement is checked below, only once we know the collection differs.
-    const auto collection = acquireCollectionMaybeLockFree(
-        opCtx,
-        CollectionAcquisitionRequest(ns,
-                                     PlacementConcern::kPretendUnsharded,
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kRead));
-
-    bool shouldRetry;
-    if (collection.exists()) {
-        shouldRetry = collection.uuid() != buildCollectionUUID;
-    } else {
-        // Nothing local to compare (e.g. a non-primary donor loses every chunk to
-        // moveCollection): a genuine drop and a replacement look identical locally, so ask the
-        // CSRS directly. Only a genuine drop untracks ns there.
-        try {
-            Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns);
-            shouldRetry = true;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            shouldRetry = false;
-        }
-    }
-
-    if (!shouldRetry) {
-        return;
-    }
-
-    // The namespace now holds (or is tracked as belonging to) a different collection, so the
-    // router is stale by definition. No wanted version is given (this shard can't name the new
-    // owner), forcing a full refresh.
-    uasserted(StaleConfigInfo(ns,
-                              *receivedShardVersion,
-                              boost::none /* wantedVersion */,
-                              ShardingState::get(opCtx)->shardId()),
-              str::stream() << "Index build for " << ns.toStringForErrorMsg()
-                            << " lost a race with an operation that replaced the collection");
 }
 
 /**
@@ -854,19 +797,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
 
         LOGV2(20447, "Index build: completed", "buildUUID"_attr = buildUUID);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        // If the collection is dropped before the IndexBuildsCoordinator finishes, it returns
-        // NamespaceNotFound. That's not an error unless the namespace was replaced by a different
-        // collection (see throwIfCollectionWasReplaced).
-        LOGV2(13282200,
-              "Index build: lost UUID resolution, checking whether collection was dropped or "
-              "replaced",
-              "buildUUID"_attr = buildUUID,
-              logAttrs(ns),
-              "collectionUUID"_attr = *collectionUUID,
-              "exception"_attr = ex);
-        throwIfCollectionWasReplaced(opCtx, ns, *collectionUUID);
+        // If the collection is dropped after the initial checks in this function (before the
+        // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
+        // the task running the index build) may return NamespaceNotFound. This is not
+        // considered an error and the command should return success.
         LOGV2(20448,
-              "Index build: failed because collection was dropped",
+              "Index build: failed because collection dropped",
               "buildUUID"_attr = buildUUID,
               logAttrs(ns),
               "collectionUUID"_attr = *collectionUUID,
