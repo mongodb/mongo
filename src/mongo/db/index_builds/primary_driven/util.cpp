@@ -283,6 +283,14 @@ Status abort(OperationContext* opCtx,
     for (auto&& index : indexes) {
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
+        if (!entry) {
+            LOGV2(13343400,
+                  "Index build: index entry not found during abort, skipping",
+                  "index"_attr = index.getIndexName(),
+                  "buildUUID"_attr = buildUUID,
+                  "collectionUUID"_attr = collectionUUID);
+            continue;
+        }
 
         auto status = writableColl->getIndexCatalog()->dropIndexEntry(opCtx, writableColl, entry);
         if (!status.isOK()) {

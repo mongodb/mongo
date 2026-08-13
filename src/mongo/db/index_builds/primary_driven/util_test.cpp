@@ -11,6 +11,7 @@
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -399,6 +400,48 @@ TEST_F(UtilTest, AbortSkipsAlreadyAbortedBuild) {
 
     ASSERT_OK(abort(
         operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+}
+
+TEST_F(UtilTest, AbortDropsRemainingIndexesWhenOneWasAlreadyDropped) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a", "b"});
+    Status cause{ErrorCodes::IndexBuildAborted, "abort"};
+    const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_OK(
+        start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(Timestamp(1, 0));
+
+    // Drop the first index's catalog entry only.
+    {
+        auto opCtx = operationContext();
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, {ns.dbName(), collUUID}, AcquisitionPrerequisites::OperationType::kWrite),
+            LockMode::MODE_X);
+        CollectionWriter writer{opCtx, &coll};
+        WriteUnitOfWork wuow{opCtx};
+        auto* writableColl = writer.getWritableCollection(opCtx);
+        auto* entry = writableColl->getIndexCatalog()->getWritableEntryByName(
+            opCtx, indexes[0].getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT_TRUE(entry);
+        ASSERT_OK(writableColl->getIndexCatalog()->dropIndexEntry(opCtx, writableColl, entry));
+        wuow.commit();
+    }
+
+    ASSERT_OK(abort(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+
+    auto coll = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(operationContext(),
+                                                {ns.dbName(), collUUID},
+                                                AcquisitionPrerequisites::OperationType::kRead));
+    for (auto&& index : indexes) {
+        EXPECT_FALSE(coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+            operationContext(), index.getIndexName(), IndexCatalog::InclusionPolicy::kAll));
+    }
 }
 
 TEST_F(UtilTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
