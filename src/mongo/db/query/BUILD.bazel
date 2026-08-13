@@ -506,7 +506,7 @@ mongo_cc_library(
         "collection_query_info",
         "query_planner",
         ":max_estimated_scan_bytes_metrics",
-        "//src/mongo/db/query/plan_ranking:plan_ranker_method",
+        "//src/mongo/db/query/plan_ranking:plan_selection_strategy",
         "//src/mongo/s/query:sharding_helpers",
         "//src/mongo/s/query/exec:target_write_op",
     ],

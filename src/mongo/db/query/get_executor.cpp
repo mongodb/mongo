@@ -61,6 +61,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
@@ -312,7 +313,8 @@ public:
             } else {
                 planCacheCounters.incrementClassicSkippedCounter();
             }
-            return buildSingleSolutionPlan(std::move(solution), boost::none);
+            return buildSingleSolutionPlan(
+                std::move(solution), boost::none, PlanSelectionStrategy::kSinglePlan);
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -436,7 +438,8 @@ public:
                 // Only one possible plan. Build the stages from the solution.
                 result.solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
                 return buildSingleSolutionPlan(std::move(result.solutions[0]),
-                                               std::move(result.maybeExplainData));
+                                               std::move(result.maybeExplainData),
+                                               result.planSelectionStrategy);
             }
         }
 
@@ -508,7 +511,8 @@ protected:
      */
     virtual std::unique_ptr<ResultType> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
-        boost::optional<PlanExplainerData> maybeExplainData) = 0;
+        boost::optional<PlanExplainerData> maybeExplainData,
+        PlanSelectionStrategy planSelectionStrategy) = 0;
 
     /**
      * Either constructs a PlanStage tree from a cached plan (if exists in the plan cache), or
@@ -655,7 +659,8 @@ private:
                 nullptr,  // The solution is owned by the MultiPlanStage, so we pass a nullptr here
                           // to avoid confusion.
                 std::move(explainData),
-                std::move(classicExecState));
+                std::move(classicExecState),
+                rResult.planSelectionStrategy);
         return result;
     }
 
@@ -672,13 +677,15 @@ private:
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
+        boost::optional<PlanExplainerData> maybeExplainData,
+        PlanSelectionStrategy planSelectionStrategy) final {
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::SingleSolutionPassthroughPlanner>(
             makePlannerData(),
             std::move(solution),
             maybeExplainData.has_value() ? std::move(maybeExplainData.value())
-                                         : PlanExplainerData{});
+                                         : PlanExplainerData{},
+            planSelectionStrategy);
         return result;
     }
 
@@ -736,7 +743,8 @@ private:
             planRankingResult.maybeExplainData.has_value()
                 ? std::move(planRankingResult.maybeExplainData.value())
                 : PlanExplainerData{},
-            planRankingResult.needsWorksMeasuredForPlanCache);
+            planRankingResult.needsWorksMeasuredForPlanCache,
+            planRankingResult.planSelectionStrategy);
         return result;
     }
 
@@ -826,11 +834,12 @@ protected:
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
-        // TODO SERVER-92589: Support CBR with SBE plans
+        boost::optional<PlanExplainerData> maybeExplainData,
+        PlanSelectionStrategy planSelectionStrategy) final {
+        // TODO SERVER-92589: Support CBR with SBE plans.
         auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(
-            makePlannerData(), std::move(solution));
+            makePlannerData(), std::move(solution), planSelectionStrategy);
         return result;
     }
 
@@ -854,14 +863,19 @@ protected:
                  .getUseMultiplannerForSingleSolutions() &&
              !this->_cq->isSearchQuery())) {
             auto result = this->releaseResult();
-            result->runtimePlanner =
-                std::make_unique<crp_sbe::MultiPlanner>(this->makePlannerData(),
-                                                        std::move(planRankingResult.solutions),
-                                                        true /*shouldWriteToPlanCache*/);
+            result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
+                this->makePlannerData(),
+                std::move(planRankingResult.solutions),
+                true /*shouldWriteToPlanCache*/,
+                []() {
+                } /*incrementReplannedPlanIsCachedPlanCounterCb*/,
+                boost::none /*replanReason*/,
+                planRankingResult.planSelectionStrategy);
             return result;
         } else {
             return this->buildSingleSolutionPlan(std::move(planRankingResult.solutions[0]),
-                                                 std::move(planRankingResult.maybeExplainData));
+                                                 std::move(planRankingResult.maybeExplainData),
+                                                 planRankingResult.planSelectionStrategy);
         }
     }
 

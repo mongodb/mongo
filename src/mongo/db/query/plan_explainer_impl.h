@@ -13,6 +13,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -47,7 +48,8 @@ public:
                       boost::optional<size_t> cachedPlanHash,
                       boost::optional<std::string> replanReason,
                       boost::optional<PlanExplainerData> maybeExplainData,
-                      bool isExplain);
+                      bool isExplain,
+                      boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     bool isSbeExplainer() const final {
         return false;
@@ -55,13 +57,17 @@ public:
     bool areThereRejectedPlansToExplain() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
+    boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const final {
+        return _planSelectionStrategy;
+    }
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
-    std::vector<ExplainPlanEntry> getPlanEntries(const ExplainPolicy& policy,
-                                                 PlanStatsFormat format,
-                                                 PlanRankerMethod decidingPlanRanker) const final;
+    std::vector<ExplainPlanEntry> getPlanEntries(
+        const ExplainPolicy& policy,
+        PlanStatsFormat format,
+        PlanSelectionStrategy decidingPlanRanker) const final;
     std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
                                                      ExplainOptions::Verbosity) const;
 
@@ -92,12 +98,13 @@ private:
 
     std::vector<ExplainPlanEntry> _getPlanEntriesLegacy(const ExplainPolicy& policy) const;
     std::vector<ExplainPlanEntry> _getPlanEntriesV3(const ExplainPolicy& policy,
-                                                    PlanRankerMethod decidingPlanRanker) const;
+                                                    PlanSelectionStrategy decidingPlanRanker) const;
 
     PlanStage* const _root;
     boost::optional<size_t> _cachedPlanHash;
     boost::optional<std::string> _replanReason;
     PlanExplainerData _explainData;
+    boost::optional<PlanSelectionStrategy> _planSelectionStrategy;
 };
 
 /**

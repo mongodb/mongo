@@ -9,6 +9,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/logv2/log.h"
@@ -30,7 +31,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs,
     boost::optional<size_t> cachedPlanHash,
-    boost::optional<std::string> replanReason) {
+    boost::optional<std::string> replanReason,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
     auto expCtx = cq->getExpCtx();
     return make(expCtx->getOperationContext(),
                 std::move(ws),
@@ -44,7 +46,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                 yieldPolicy,
                 cachedPlanHash,
                 std::move(replanReason),
-                boost::none /* maybeExplainData */);
+                boost::none /* maybeExplainData */,
+                planSelectionStrategy);
 }
 
 
@@ -86,7 +89,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
     boost::optional<std::string> replanReason,
-    boost::optional<PlanExplainerData> maybeExplainData) {
+    boost::optional<PlanExplainerData> maybeExplainData,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
     auto execImpl = new PlanExecutorImpl(opCtx,
                                          std::move(ws),
                                          std::move(rootStage),
@@ -99,7 +103,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                                          yieldPolicy,
                                          cachedPlanHash,
                                          std::move(replanReason),
-                                         std::move(maybeExplainData));
+                                         std::move(maybeExplainData),
+                                         planSelectionStrategy);
     PlanExecutor::Deleter planDeleter(opCtx);
     return std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>(execImpl, std::move(planDeleter));
 }
@@ -121,7 +126,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
-    boost::optional<PlanExplainerData> maybeExplainData) {
+    boost::optional<PlanExplainerData> maybeExplainData,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
     auto&& [rootStage, data] = root;
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(4822860,
@@ -151,7 +157,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                                 usedJoinOpt,
                                 std::move(estimates),
                                 std::move(rejectedJoinPlans),
-                                std::move(maybeExplainData)),
+                                std::move(maybeExplainData),
+                                planSelectionStrategy),
             PlanExecutor::Deleter{opCtx}};
 }
 
@@ -165,7 +172,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
-    boost::optional<size_t> cachedPlanHash) {
+    boost::optional<size_t> cachedPlanHash,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(4822861,
                 5,
@@ -184,7 +192,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                                 std::move(remoteCursors),
                                 std::move(remoteExplains),
                                 nullptr /*classicRuntimePlannerStage*/,
-                                collections),
+                                collections,
+                                false /*usedJoinOpt*/,
+                                {} /*estimates*/,
+                                {} /*rejectedJoinPlans*/,
+                                boost::none /*maybeExplainData*/,
+                                planSelectionStrategy),
             PlanExecutor::Deleter{opCtx}};
 }
 

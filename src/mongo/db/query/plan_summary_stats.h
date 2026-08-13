@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -124,6 +125,11 @@ struct [[MONGO_MOD_PUBLIC]] PlanSummaryStats {
 
     // Was this plan recovered from the cache?
     bool fromPlanCache = false;
+
+    // Strategy that selected the winning plan; attributes per-strategy query latency
+    // (queryLatencies serverStatus).
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy;
+
     // Was a replan triggered during the execution of this query?
     boost::optional<std::string> replanReason;
 

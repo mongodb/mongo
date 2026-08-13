@@ -17,6 +17,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_settings/query_knob_overrides.h"
 #include "mongo/db/query/query_settings/query_settings_context_test_util.h"
@@ -297,7 +298,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesSingleSolution) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kQueryPlanner),
                                  PlanStatsFormat::kLegacy,
-                                 PlanRankerMethod::kNone);
+                                 PlanSelectionStrategy::kSinglePlan);
     ASSERT_EQ(entries.size(), 1u);
     ASSERT_STRING_CONTAINS(entries[0].planStatsTree.toString(), "COLLSCAN");
     // No execution stats are requested at queryPlanner verbosity.
@@ -313,7 +314,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesMultiPlanner) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kQueryPlanner),
                                  PlanStatsFormat::kLegacy,
-                                 PlanRankerMethod::kNone);
+                                 PlanSelectionStrategy::kSinglePlan);
     ASSERT_GTE(entries.size(), 2u);
 
     // The winner is the first entry (its position is the contract) and is byte-identical to the
@@ -332,7 +333,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesMultiPlannerExecStats) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kExecAllPlans),
                                  PlanStatsFormat::kLegacy,
-                                 PlanRankerMethod::kNone);
+                                 PlanSelectionStrategy::kSinglePlan);
     ASSERT_GTE(entries.size(), 2u);
     for (const auto& entry : entries) {
         ASSERT(entry.summary.has_value());
@@ -360,8 +361,8 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3MultiPlannerNodeGrouping) {
     auto& explainer = exec->getPlanExplainer();
 
     const auto policy = explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats);
-    auto entries =
-        explainer.getPlanEntries(policy, PlanStatsFormat::kV3, PlanRankerMethod::kMultiPlanner);
+    auto entries = explainer.getPlanEntries(
+        policy, PlanStatsFormat::kV3, PlanSelectionStrategy::kMultiPlanner);
     ASSERT_GTE(entries.size(), 2u);
 
     for (const auto& entry : entries) {
@@ -411,7 +412,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionFullBatch) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
                                  PlanStatsFormat::kV3,
-                                 PlanRankerMethod::kMultiPlanner);
+                                 PlanSelectionStrategy::kMultiPlanner);
     ASSERT_GTE(entries.size(), 2u);
 
     bool sawFullBatch = false;
@@ -444,7 +445,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionTrialEndedEarly) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
                                  PlanStatsFormat::kV3,
-                                 PlanRankerMethod::kMultiPlanner);
+                                 PlanSelectionStrategy::kMultiPlanner);
     ASSERT_GTE(entries.size(), 2u);
     ASSERT_EQ(entries[0].stopCondition, MultiPlannerStopCondition::kEof)
         << entries[0].planStatsTree;
@@ -467,7 +468,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionEof) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
                                  PlanStatsFormat::kV3,
-                                 PlanRankerMethod::kMultiPlanner);
+                                 PlanSelectionStrategy::kMultiPlanner);
     ASSERT_GTE(entries.size(), 2u);
     ASSERT_EQ(entries[0].stopCondition, MultiPlannerStopCondition::kEof)
         << entries[0].planStatsTree;
@@ -488,7 +489,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionExhaustedBudget) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
                                  PlanStatsFormat::kV3,
-                                 PlanRankerMethod::kMultiPlanner);
+                                 PlanSelectionStrategy::kMultiPlanner);
     ASSERT_GTE(entries.size(), 2u);
     for (const auto& entry : entries) {
         ASSERT_EQ(entry.stopCondition, MultiPlannerStopCondition::kExhaustedBudget)
@@ -505,7 +506,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3SingleSolutionSparseStatistics) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
                                  PlanStatsFormat::kV3,
-                                 PlanRankerMethod::kNone);
+                                 PlanSelectionStrategy::kSinglePlan);
     ASSERT_EQ(entries.size(), 1u);
     ASSERT_FALSE(entries[0].hasTrialStats);
 
@@ -524,15 +525,15 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3WinnerUsesTrialSnapshot) {
     auto& explainer = exec->getPlanExplainer();
 
     const auto policy = explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats);
-    auto before =
-        explainer.getPlanEntries(policy, PlanStatsFormat::kV3, PlanRankerMethod::kMultiPlanner);
+    auto before = explainer.getPlanEntries(
+        policy, PlanStatsFormat::kV3, PlanSelectionStrategy::kMultiPlanner);
 
     // Drain the executor: the live root's counters accumulate real-execution work.
     while (exec->getNext(nullptr, nullptr) != PlanExecutor::IS_EOF) {
     }
 
-    auto after =
-        explainer.getPlanEntries(policy, PlanStatsFormat::kV3, PlanRankerMethod::kMultiPlanner);
+    auto after = explainer.getPlanEntries(
+        policy, PlanStatsFormat::kV3, PlanSelectionStrategy::kMultiPlanner);
     ASSERT_EQ(before.size(), after.size());
     ASSERT_BSONOBJ_EQ(before[0].planStatsTree, after[0].planStatsTree);
 }
@@ -547,14 +548,14 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3WinnerUsesTrialSnapshotPureMultiPlanni
     auto& explainer = exec->getPlanExplainer();
 
     const auto policy = explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats);
-    auto before =
-        explainer.getPlanEntries(policy, PlanStatsFormat::kV3, PlanRankerMethod::kMultiPlanner);
+    auto before = explainer.getPlanEntries(
+        policy, PlanStatsFormat::kV3, PlanSelectionStrategy::kMultiPlanner);
 
     while (exec->getNext(nullptr, nullptr) != PlanExecutor::IS_EOF) {
     }
 
-    auto after =
-        explainer.getPlanEntries(policy, PlanStatsFormat::kV3, PlanRankerMethod::kMultiPlanner);
+    auto after = explainer.getPlanEntries(
+        policy, PlanStatsFormat::kV3, PlanSelectionStrategy::kMultiPlanner);
     ASSERT_EQ(before.size(), after.size());
     for (size_t i = 0; i < before.size(); ++i) {
         ASSERT_BSONOBJ_EQ(before[i].planStatsTree, after[i].planStatsTree);
@@ -574,7 +575,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3CostBasedRankerOrdering) {
     auto entries =
         explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
                                  PlanStatsFormat::kV3,
-                                 PlanRankerMethod::kCostBasedRanker);
+                                 PlanSelectionStrategy::kCostBasedRanker);
     ASSERT_GTE(entries.size(), 2u);
 
     boost::optional<double> previousCost;
@@ -612,8 +613,9 @@ TEST_F(PlanExplainerTest, LegacyAccessorsMatchPlanEntriesAcrossVerbosities) {
                                ExplainOptions::Verbosity::kExecStats,
                                ExplainOptions::Verbosity::kExecAllPlans,
                                ExplainOptions::Verbosity::kInternal}) {
-            auto entries = explainer.getPlanEntries(
-                explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanRankerMethod::kNone);
+            auto entries = explainer.getPlanEntries(explainPolicyFor(verbosity),
+                                                    PlanStatsFormat::kLegacy,
+                                                    PlanSelectionStrategy::kSinglePlan);
             ASSERT_GTE(entries.size(), 1u);
 
             auto&& [winningPlan, winningSummary] = explainer.getWinningPlanStats(verbosity);

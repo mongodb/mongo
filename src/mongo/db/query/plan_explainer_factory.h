@@ -10,6 +10,7 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/modules.h"
 
@@ -29,11 +30,13 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root,
  * TODO SERVER-132012: replace the flag by choosing an explain-specialized PlanExplainer subclass
  * here in the factory.
  */
-std::unique_ptr<PlanExplainer> make(PlanStage* root,
-                                    boost::optional<size_t> cachedPlanHash,
-                                    boost::optional<std::string> replanReason,
-                                    boost::optional<PlanExplainerData> maybeExplainData,
-                                    bool isExplain);
+std::unique_ptr<PlanExplainer> make(
+    PlanStage* root,
+    boost::optional<size_t> cachedPlanHash,
+    boost::optional<std::string> replanReason,
+    boost::optional<PlanExplainerData> maybeExplainData,
+    bool isExplain,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);
@@ -59,5 +62,6 @@ std::unique_ptr<PlanExplainer> make(
     bool usedJoinOpt = false,
     cost_based_ranker::EstimateMap estimates = {},
     std::vector<JoinOptPlan> rejectedPlans = {},
-    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
+    boost::optional<PlanExplainerData> maybeExplainData = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 }  // namespace mongo::plan_explainer_factory

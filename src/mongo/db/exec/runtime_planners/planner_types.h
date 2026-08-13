@@ -6,6 +6,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -127,5 +128,10 @@ struct PlanRankingResult {
     // If a plan was fetched from the plan cache, we need to know which engine to
     // use for trialing, so we call engine selection early and store the result here.
     boost::optional<EngineChoice> engineSelection;
+
+    // Strategy that produced this result, threaded onto the PlanExecutor's PlanExplainer for
+    // per-strategy diagnostics. Every producer sets it explicitly; kSinglePlan is the neutral
+    // value.
+    PlanSelectionStrategy planSelectionStrategy = PlanSelectionStrategy::kSinglePlan;
 };
 }  // namespace mongo

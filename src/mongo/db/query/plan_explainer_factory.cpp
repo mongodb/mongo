@@ -6,6 +6,7 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 
 #include <utility>
 
@@ -23,9 +24,14 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash,
                                     boost::optional<std::string> replanReason,
                                     boost::optional<PlanExplainerData> maybeExplainData,
-                                    bool isExplain) {
-    return std::make_unique<PlanExplainerImpl>(
-        root, cachedPlanHash, std::move(replanReason), std::move(maybeExplainData), isExplain);
+                                    bool isExplain,
+                                    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
+    return std::make_unique<PlanExplainerImpl>(root,
+                                               cachedPlanHash,
+                                               std::move(replanReason),
+                                               std::move(maybeExplainData),
+                                               isExplain,
+                                               planSelectionStrategy);
 }
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo) {
@@ -46,7 +52,8 @@ std::unique_ptr<PlanExplainer> make(
     bool usedJoinOpt,
     cost_based_ranker::EstimateMap estimates,
     std::vector<JoinOptPlan> rejectedPlans,
-    boost::optional<PlanExplainerData> maybeExplainData) {
+    boost::optional<PlanExplainerData> maybeExplainData,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
     if (!debugInfoSBE) {
         debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
             plan_cache_util::buildDebugInfo(nss, solution));
@@ -64,6 +71,7 @@ std::unique_ptr<PlanExplainer> make(
         usedJoinOpt,
         std::move(estimates),
         std::move(rejectedPlans),
-        std::move(maybeExplainData));
+        std::move(maybeExplainData),
+        planSelectionStrategy);
 }
 }  // namespace mongo::plan_explainer_factory

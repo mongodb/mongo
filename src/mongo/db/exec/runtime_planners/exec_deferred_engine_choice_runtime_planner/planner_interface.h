@@ -11,6 +11,7 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
@@ -28,7 +29,8 @@ std::vector<std::unique_ptr<QuerySolution>> makeQsnResult(std::unique_ptr<QueryS
  */
 class DeferredEngineChoicePlannerInterface : public PlannerInterface {
 public:
-    DeferredEngineChoicePlannerInterface(PlannerData plannerData);
+    DeferredEngineChoicePlannerInterface(PlannerData plannerData,
+                                         PlanSelectionStrategy planSelectionStrategy);
 
     OperationContext* opCtx() {
         return _plannerData.opCtx;
@@ -60,6 +62,17 @@ public:
         }
         return _plannerData.plannerParams->replanningData->replanReason;
     }
+    PlanSelectionStrategy planSelectionStrategy() const {
+        return _planSelectionStrategy;
+    }
+
+    /**
+     * For planners that only learn the strategy while planning (the sub-planner). Must be called
+     * before 'extractPlanRankingResult()'.
+     */
+    void setPlanSelectionStrategy(PlanSelectionStrategy planSelectionStrategy) {
+        _planSelectionStrategy = planSelectionStrategy;
+    }
 
 protected:
     std::unique_ptr<WorkingSet> extractWs() {
@@ -73,6 +86,10 @@ protected:
 
     stage_builder::PlanStageToQsnMap _planStageQsnMap;
     PlannerData _plannerData;
+
+private:
+    // Set by the constructing planner and reported on the extracted PlanRankingResult.
+    PlanSelectionStrategy _planSelectionStrategy;
 };
 
 /**
@@ -80,9 +97,11 @@ protected:
  */
 class SingleSolutionPassthroughPlanner final : public DeferredEngineChoicePlannerInterface {
 public:
-    SingleSolutionPassthroughPlanner(PlannerData plannerData,
-                                     std::unique_ptr<QuerySolution> querySolution,
-                                     boost::optional<PlanExplainerData> maybeExplainData = {});
+    SingleSolutionPassthroughPlanner(
+        PlannerData plannerData,
+        std::unique_ptr<QuerySolution> querySolution,
+        PlanSelectionStrategy planSelectionStrategy,
+        boost::optional<PlanExplainerData> maybeExplainData = boost::none);
 
     PlanRankingResult extractPlanRankingResult() override;
 
@@ -113,8 +132,9 @@ class MultiPlanner final : public DeferredEngineChoicePlannerInterface {
 public:
     MultiPlanner(PlannerData plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> solutions,
-                 bool addingCBRChosenPlanToPlanCache = false,
-                 boost::optional<PlanExplainerData> maybeExplainData = boost::none);
+                 bool addingCBRChosenPlanToPlanCache,
+                 boost::optional<PlanExplainerData> maybeExplainData,
+                 PlanSelectionStrategy planSelectionStrategy);
 
     /**
      * Returns the specific stats from the multi-planner stage.
@@ -139,6 +159,8 @@ private:
  */
 class SubPlanner final : public DeferredEngineChoicePlannerInterface {
 public:
+    // The strategy is not known at construction: only some branches are ranked, so it is read back
+    // from the SubplanStage once this constructor has planned them.
     SubPlanner(PlannerData plannerData);
 
     PlanRankingResult extractPlanRankingResult() override;

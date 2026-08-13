@@ -11,8 +11,8 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
@@ -77,9 +77,6 @@ StatusWith<PlanRankingResult> getBestMPPlan(
         return status;
     }
 
-    // MP selected the winning plan. Add it to the debug logs.
-    CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-
     PlanRankingResult out;
     auto soln = mp.extractQuerySolution();
     // TODO SERVER-117118 Reenable this assertion once we can decouple from multiplanner.
@@ -93,6 +90,8 @@ StatusWith<PlanRankingResult> getBestMPPlan(
         out.maybeExplainData->planRankerReason = reason;
     }
     out.execState = std::move(mp).extractExecState();
+    // The multi-planner chose the winner, record its selection strategy.
+    out.planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
     return out;
 }
 
@@ -182,8 +181,13 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const auto cbrCost = estimateCBRCost(query, solutions);
     tassert(11306808, "CBR cannot have 0 cost", approxGt(cbrCost, zeroCost));
 
-    auto mp = classic_runtime_planner::MultiPlanner(
-        std::move(plannerData), std::move(solutions), PlanExplainerData{});
+    // This MultiPlanner runs the trials; whether MP or CBR ends up choosing the winner is decided
+    // below and reported on the returned PlanRankingResult.
+    auto mp = classic_runtime_planner::MultiPlanner(std::move(plannerData),
+                                                    std::move(solutions),
+                                                    PlanExplainerData{},
+                                                    false /* addingCBRChosenPlanToPlanCache */,
+                                                    PlanSelectionStrategy::kMultiPlanner);
 
     auto trialConfig = mp.getTrialPhaseConfig();
     // These are the trial limits based on MP defaults or user-set requirements.

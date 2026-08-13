@@ -4,6 +4,7 @@
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 
 namespace mongo::exec_deferred_engine_choice {
@@ -11,8 +12,9 @@ namespace mongo::exec_deferred_engine_choice {
 MultiPlanner::MultiPlanner(PlannerData plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> solutions,
                            bool addingCBRChosenPlanToPlanCache,
-                           boost::optional<PlanExplainerData> maybeExplainData)
-    : DeferredEngineChoicePlannerInterface(std::move(plannerData)),
+                           boost::optional<PlanExplainerData> maybeExplainData,
+                           PlanSelectionStrategy planSelectionStrategy)
+    : DeferredEngineChoicePlannerInterface(std::move(plannerData), planSelectionStrategy),
       _maybeExplainData(std::move(maybeExplainData)) {
     plan_cache_util::CacheMode shouldCache = plannerParams()->replanningData.has_value()
         ? plannerParams()->replanningData->shouldCache
@@ -60,6 +62,7 @@ PlanRankingResult MultiPlanner::extractPlanRankingResult() {
                              .execState = SavedExecState{ClassicExecState{
                                  .workingSet = extractWs(), .root = std::move(_multiplanStage)}},
                              .plannerParams = extractPlannerParams(),
-                             .cachedPlanHash = cachedPlanHash()};
+                             .cachedPlanHash = cachedPlanHash(),
+                             .planSelectionStrategy = planSelectionStrategy()};
 }
 }  // namespace mongo::exec_deferred_engine_choice

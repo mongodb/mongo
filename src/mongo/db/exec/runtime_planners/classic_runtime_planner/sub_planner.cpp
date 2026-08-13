@@ -4,12 +4,15 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/get_executor_helpers.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 
 namespace mongo {
 
 namespace classic_runtime_planner {
 
-SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::move(plannerData)) {
+SubPlanner::SubPlanner(PlannerData plannerData)
+    // Provisional value only: 'doPlan()' replaces it with what the SubplanStage actually did.
+    : ClassicPlannerInterface(std::move(plannerData), PlanSelectionStrategy::kMultiPlanner) {
     SubplanStage::PlanSelectionCallbacks callbacks{
         // This callback is invoked on a per $or branch basis. The callback is constructed in the
         // "sometimes cache" mode. We currently do not support cached plan replanning for rooted $or
@@ -38,7 +41,13 @@ SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::m
 }
 
 Status SubPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
-    return _subplanStage->pickBestPlan(plannerParams(), planYieldPolicy);
+    auto status = _subplanStage->pickBestPlan(plannerParams(), planYieldPolicy);
+    if (!status.isOK()) {
+        return status;
+    }
+    // Only now is it known what strategy was used.
+    setPlanSelectionStrategy(_subplanStage->planSelectionStrategy());
+    return status;
 }
 
 std::unique_ptr<QuerySolution> SubPlanner::extractQuerySolution() {

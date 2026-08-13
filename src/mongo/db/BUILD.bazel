@@ -771,7 +771,7 @@ mongo_cc_library(
         "//src/mongo/db/query:common_query_enums_and_helpers",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/client_cursor:generic_cursor",
-        "//src/mongo/db/query/plan_ranking:plan_ranker_method",
+        "//src/mongo/db/query/plan_ranking:plan_selection_strategy",
         "//src/mongo/db/query/query_knobs:query_knob_configuration",
         "//src/mongo/db/query/query_settings",
         "//src/mongo/db/repl:local_oplog_info",

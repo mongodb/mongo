@@ -11,7 +11,7 @@
 #include "mongo/db/curop_bson_helpers.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_settings/query_settings.h"
@@ -394,7 +394,7 @@ void OpDebug::report(OperationContext* opCtx,
             break;
     }
 
-    pAttrs->add("planRanker", getPlanRankerMethodName(planRankerMethod));
+    pAttrs->add("planRanker", getPlanSelectionStrategyName(planSelectionStrategy));
 
     if (!errInfo.isOK()) {
         pAttrs->add("ok", 0);
@@ -696,7 +696,7 @@ void OpDebug::append(OperationContext* opCtx,
             break;
     }
 
-    b.append("planRanker", getPlanRankerMethodName(planRankerMethod));
+    b.append("planRanker", getPlanSelectionStrategyName(planSelectionStrategy));
 
     {
         BSONObjBuilder locks(b.subobjStart("locks"));
@@ -1113,7 +1113,7 @@ std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationConte
     });
 
     addIfNeeded("planRanker", [](auto field, auto args, auto& b) {
-        b.append("planRanker", getPlanRankerMethodName(args.op.planRankerMethod));
+        b.append("planRanker", getPlanSelectionStrategyName(args.op.planSelectionStrategy));
     });
 
     addIfNeeded("locks", [](auto field, auto args, auto& b) {
@@ -1323,6 +1323,10 @@ void OpDebug::setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats) {
 
     replanReason = std::move(planSummaryStats.replanReason);
     indexesUsed = std::move(planSummaryStats.indexesUsed);
+
+    if (planSummaryStats.planSelectionStrategy) {
+        planSelectionStrategy = planSummaryStats.planSelectionStrategy;
+    }
 }
 
 BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) {

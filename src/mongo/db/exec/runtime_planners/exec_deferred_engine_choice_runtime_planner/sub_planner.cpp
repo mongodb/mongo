@@ -4,12 +4,15 @@
 
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
 #include "mongo/db/query/get_executor_helpers.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 
 namespace mongo::exec_deferred_engine_choice {
 
 SubPlanner::SubPlanner(PlannerData plannerData)
-    : DeferredEngineChoicePlannerInterface(std::move(plannerData)) {
+    // Provisional value only: replaced below with what the SubplanStage actually did.
+    : DeferredEngineChoicePlannerInterface(std::move(plannerData),
+                                           PlanSelectionStrategy::kMultiPlanner) {
     SubplanStage::PlanSelectionCallbacks callbacks{
         // This callback is invoked on a per $or branch basis. The callback is constructed in the
         // "sometimes cache" mode. We currently do not support cached plan replanning for rooted $or
@@ -36,6 +39,8 @@ SubPlanner::SubPlanner(PlannerData plannerData)
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_subPlanStage.get()), yieldPolicy());
     uassertStatusOK(_subPlanStage->pickBestPlan(*plannerParams(), trialPeriodYieldPolicy.get()));
+    // Only now is it known which of the branches were ranked, and by what.
+    setPlanSelectionStrategy(_subPlanStage->planSelectionStrategy());
     incrementClassicSubplannerChoseWinningPlan();
 }
 
@@ -51,6 +56,7 @@ PlanRankingResult SubPlanner::extractPlanRankingResult() {
                              .execState = SavedExecState{ClassicExecState{
                                  .workingSet = extractWs(), .root = std::move(_subPlanStage)}},
                              .plannerParams = extractPlannerParams(),
-                             .cachedPlanHash = cachedPlanHash()};
+                             .cachedPlanHash = cachedPlanHash(),
+                             .planSelectionStrategy = planSelectionStrategy()};
 }
 }  // namespace mongo::exec_deferred_engine_choice

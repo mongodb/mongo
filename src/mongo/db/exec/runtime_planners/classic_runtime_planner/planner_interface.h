@@ -15,6 +15,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
@@ -30,9 +31,11 @@ namespace mongo::classic_runtime_planner {
  */
 class ClassicPlannerInterface : public PlannerInterface {
 public:
-    ClassicPlannerInterface(PlannerData plannerData);
+    ClassicPlannerInterface(PlannerData plannerData, PlanSelectionStrategy planSelectionStrategy);
 
-    ClassicPlannerInterface(PlannerData plannerData, PlanExplainerData explainData);
+    ClassicPlannerInterface(PlannerData plannerData,
+                            PlanExplainerData explainData,
+                            PlanSelectionStrategy planSelectionStrategy);
 
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform deletes.
@@ -80,6 +83,20 @@ public:
     PlanStage* getRoot() const;
 
 protected:
+    PlanSelectionStrategy planSelectionStrategy() const {
+        return _planSelectionStrategy;
+    }
+
+    /**
+     * For planners that only learn the strategy while planning (the sub-planner). Must be called
+     * before 'makeExecutor()'. The ordering is enforced by the existing planner state machine:
+     * callers must invoke it from 'doPlan()', which runs before 'plan()' advances '_state' to
+     * kInitialized, and 'makeExecutor()' asserts on that state.
+     */
+    void setPlanSelectionStrategy(PlanSelectionStrategy planSelectionStrategy) {
+        _planSelectionStrategy = planSelectionStrategy;
+    }
+
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);
 
     void setRoot(std::unique_ptr<PlanStage> root);
@@ -126,6 +143,8 @@ private:
     NamespaceString _nss;
     PlannerData _plannerData;
     PlanExplainerData _planExplainerData;
+
+    PlanSelectionStrategy _planSelectionStrategy;
 };
 
 /**
@@ -147,17 +166,21 @@ private:
 /**
  * Trivial planner that just creates a classic plan executor when there is only one QuerySolution
  * present.
+ * The planSelectionStrategy param is needed since a single-solution planner can be used for the
+ * winning plan of the cost-based ranker.
  */
 class SingleSolutionPassthroughPlanner final : public ClassicPlannerInterface {
 public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
-                                     PlanExplainerData explainData);
+                                     PlanExplainerData explainData,
+                                     PlanSelectionStrategy planSelectionStrategy);
 
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
                                      PlanExplainerData explainData,
-                                     ClassicExecState&& state);
+                                     ClassicExecState&& state,
+                                     PlanSelectionStrategy planSelectionStrategy);
 
     const QuerySolution* querySolution() const override;
 
@@ -196,10 +219,15 @@ private:
  */
 class MultiPlanner final : public ClassicPlannerInterface {
 public:
+    // 'planSelectionStrategy' comes from the ranking result and is not always kMultiPlanner: when
+    // this MultiPlanner is only measuring works for the plan cache,
+    // keep whatever strategy chose it - costBased when CBR ranked competing candidates, kSinglePlan
+    // when there was only one candidate to begin with.
     MultiPlanner(PlannerData plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> solutions,
                  PlanExplainerData explainData,
-                 bool addingCBRChosenPlanToPlanCache = false);
+                 bool addingCBRChosenPlanToPlanCache,
+                 PlanSelectionStrategy planSelectionStrategy);
 
     /**
      * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.

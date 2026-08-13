@@ -791,7 +791,7 @@ TEST(CurOpTest, AppendReportsUserAcquisitionAndLDAPOperationStatsAsDistinctObjec
     ASSERT_BSONOBJ_NE(bs.getObjectField("authorization"), bs.getObjectField("LDAPOperations"));
 }
 
-TEST(CurOpTest, PlanRankerMethodAppendedToProfilerOutput) {
+TEST(CurOpTest, PlanSelectionStrategyAppendedToProfilerOutput) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     SingleThreadedLockStats ls;
@@ -819,18 +819,24 @@ TEST(CurOpTest, PlanRankerMethodAppendedToProfilerOutput) {
         return boost::none;
     };
 
-    // 'kNone' (the default) should always emit "none" so readers can distinguish "no ranking
-    // occurred" from "field missing / old server".
+    // An unset strategy emits "none", and the field is always present so readers can distinguish
+    // "no plan was selected" from "field missing / old server".
     ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "none");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kSinglePlan;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "singlePlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
     ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "multiPlanning");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCostBasedRanker;
     ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "costBased");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "cachedPlan");
 }
 
-TEST(CurOpTest, PlanRankerMethodInSlowQueryLogReport) {
+TEST(CurOpTest, PlanSelectionStrategyInSlowQueryLogReport) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     SingleThreadedLockStats ls;
@@ -862,17 +868,23 @@ TEST(CurOpTest, PlanRankerMethodInSlowQueryLogReport) {
         return boost::none;
     };
 
-    // report() should always emit planRanker for all three values.
+    // report() should always emit planRanker for every strategy.
     ASSERT_EQ(getPlanRankerAttr().value_or(""), "none");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kSinglePlan;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "singlePlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
     ASSERT_EQ(getPlanRankerAttr().value_or(""), "multiPlanning");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCostBasedRanker;
     ASSERT_EQ(getPlanRankerAttr().value_or(""), "costBased");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "cachedPlan");
 }
 
-TEST(CurOpTest, PlanRankerMethodInProfileFilterAppendStaged) {
+TEST(CurOpTest, PlanSelectionStrategyInProfileFilterAppendStaged) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
@@ -901,11 +913,17 @@ TEST(CurOpTest, PlanRankerMethodInProfileFilterAppendStaged) {
     // appendStaged() is used for profile filter evaluation; planRanker must be accessible there.
     ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "none");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kSinglePlan;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "singlePlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
     ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "multiPlanning");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCostBasedRanker;
     ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "costBased");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "cachedPlan");
 }
 
 TEST(CurOpTest, ShouldUpdateMemoryStats) {

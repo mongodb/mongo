@@ -275,7 +275,11 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
         auto pipeline = makeSbeEligiblePipeline();
         auto pipelinePtr = hasGroupPipeline ? pipeline.get() : nullptr;
         auto multiplanner = std::make_unique<exec_deferred_engine_choice::MultiPlanner>(
-            std::move(plannerData), std::move(solutions));
+            std::move(plannerData),
+            std::move(solutions),
+            false /* addingCBRChosenPlanToPlanCache */,
+            boost::none /* maybeExplainData */,
+            PlanSelectionStrategy::kMultiPlanner);
         EngineSelectionPlanner planner(
             std::move(multiplanner), operationContext(), cq.get(), pipelinePtr, collections());
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =

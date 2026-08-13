@@ -22,6 +22,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/explain_policy.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -1044,12 +1045,14 @@ PlanExplainerImpl::PlanExplainerImpl(PlanStage* root,
                                      boost::optional<size_t> cachedPlanHash,
                                      boost::optional<std::string> replanReason,
                                      boost::optional<PlanExplainerData> maybeExplainData,
-                                     bool isExplain)
+                                     bool isExplain,
+                                     boost::optional<PlanSelectionStrategy> planSelectionStrategy)
     : _root{root},
       _cachedPlanHash(cachedPlanHash),
       _replanReason(std::move(replanReason)),
       _explainData(maybeExplainData.has_value() ? std::move(maybeExplainData.value())
-                                                : PlanExplainerData{}) {
+                                                : PlanExplainerData{}),
+      _planSelectionStrategy(planSelectionStrategy) {
     // On the pure-multiplanning path the MultiPlanStage stays in the execution tree and the
     // ranking strategies export no winner trial snapshot, so the live tree holds the only copy of
     // the trial statistics - and executing the query keeps mutating the winner's subtree.
@@ -1085,6 +1088,7 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->collectionScansNonTailable = 0;
 
     statsOut->replanReason = _replanReason;
+    statsOut->planSelectionStrategy = _planSelectionStrategy;
 
     PlanSummaryStatsVisitor visitor(*statsOut);
 
@@ -1217,7 +1221,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     // TODO SERVER-132033: route SBE/Express through getPlanEntries() as well,
     // then remove the legacy per-plan virtuals from the PlanExplainer interface.
     auto entries = getPlanEntries(
-        explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanRankerMethod::kNone);
+        explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
     tassert(13052905, "getPlanEntries() must return at least the winning plan", !entries.empty());
     auto& winner = entries.front();
     return {std::move(winner.planStatsTree), std::move(winner.summary)};
@@ -1247,7 +1251,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     // Thin wrapper over the shared per-plan enumerator: the entries after the winner, in
     // enumeration order (kLegacy). See the consolidation note on getWinningPlanStats().
     auto entries = getPlanEntries(
-        explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanRankerMethod::kNone);
+        explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
     std::vector<PlanStatsDetails> res;
     res.reserve(entries.size() - 1);
     for (size_t i = 1; i < entries.size(); ++i) {
@@ -1259,7 +1263,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
 std::vector<ExplainPlanEntry> PlanExplainerImpl::getPlanEntries(
     const ExplainPolicy& policy,
     PlanStatsFormat format,
-    PlanRankerMethod decidingPlanRanker) const {
+    PlanSelectionStrategy decidingPlanRanker) const {
     if (format == PlanStatsFormat::kLegacy) {
         return _getPlanEntriesLegacy(policy);
     }
@@ -1394,7 +1398,7 @@ void remapEstimatesForDisplay(const QuerySolutionNode* displayedRoot,
  * The winning plan is not part of 'candidates': it is emitted first, unconditionally, exactly as
  * chosen by the ranking machinery (never re-derived here). The plans after the winner are ordered
  * by the metric of the ranker that decided ('decidingPlanRanker', threaded from
- * OpDebug::planRankerMethod):
+ * PlanExplainer::getPlanSelectionStrategy()):
  *
  * - Multi-planner decided: ranked plans by their final ranking score descending - the adjusted
  *   score (trial score plus tie-breaking bonuses, i.e. PlanRankingDecision::candidateOrder) when
@@ -1409,10 +1413,10 @@ void remapEstimatesForDisplay(const QuerySolutionNode* displayedRoot,
  *
  * Ties everywhere are broken by enumeration order (stable sort).
  */
-void orderV3PlanCandidates(PlanRankerMethod decidingPlanRanker,
+void orderV3PlanCandidates(PlanSelectionStrategy decidingPlanRanker,
                            std::vector<NormalizedPlanInfo>& candidates) {
     switch (decidingPlanRanker) {
-        case PlanRankerMethod::kCostBasedRanker:
+        case PlanSelectionStrategy::kCostBasedRanker:
             std::stable_sort(candidates.begin(),
                              candidates.end(),
                              [](const NormalizedPlanInfo& lhs, const NormalizedPlanInfo& rhs) {
@@ -1423,7 +1427,7 @@ void orderV3PlanCandidates(PlanRankerMethod decidingPlanRanker,
                                  return *lhs.cost < *rhs.cost;
                              });
             return;
-        case PlanRankerMethod::kMultiPlanner: {
+        case PlanSelectionStrategy::kMultiPlanner: {
             // A plan that also carries a CBR cost still sorts by its score: the deciding metric.
             auto rankOf = [](const NormalizedPlanInfo& c) {
                 return (c.score || c.adjustedScore) ? 0 : (c.cost ? 1 : 2);
@@ -1449,7 +1453,8 @@ void orderV3PlanCandidates(PlanRankerMethod decidingPlanRanker,
                              });
             return;
         }
-        case PlanRankerMethod::kNone:
+        case PlanSelectionStrategy::kSinglePlan:
+        case PlanSelectionStrategy::kCachedPlan:
             // No ranking decision (single plan, cached plan): enumeration order.
             return;
     }
@@ -1502,7 +1507,7 @@ ExplainPlanEntry makeV3PlanEntry(const NormalizedPlanInfo& plan,
 }  // namespace
 
 std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
-    const ExplainPolicy& policy, PlanRankerMethod decidingPlanRanker) const {
+    const ExplainPolicy& policy, PlanSelectionStrategy decidingPlanRanker) const {
     // The winning (or sole) plan, always first - exactly as chosen by the ranking machinery.
     // Its tree must show trial statistics, not final-execution statistics: at execStats the
     // plan root has accumulated real-execution counters, and using them would make the

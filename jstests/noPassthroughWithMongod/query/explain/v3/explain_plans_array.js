@@ -449,8 +449,8 @@ describe("V3 queryPlanner.plans array", function () {
     it("single plan: one well-formed entry, no ranking statistics", function () {
         setPlanRankerConfig(db); // Defaults.
         const explain = explainFind({nonexistent: 1});
-        // A single candidate solution: no ranking took place, so the chosen ranker is "none".
-        assertChosenRanker(explain, ChosenRanker.kNone, PlanRankerReason.kSinglePlan);
+        // A single candidate solution: no ranking took place, so the chosen ranker is "singlePlan"
+        assertChosenRanker(explain, ChosenRanker.kSinglePlan, PlanRankerReason.kSinglePlan);
         const plans = getV3Plans(explain);
         assert.eq(plans.length, 1, "expected a single plan", {plans});
         assertWellFormedPlan(plans[0]);

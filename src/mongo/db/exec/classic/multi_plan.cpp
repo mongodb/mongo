@@ -493,8 +493,7 @@ Status MultiPlanStage::pickBestPlan() {
 
     // Increment the server status metric when MP genuinely chose the winner. Skip for CBR-chosen
     // plans (where MP is only used for plan-cache hydration) and for branch planners.
-    // Note: planRankerMethod is recorded by the plan ranking strategy or runtime planner at the
-    // point where it is known that MP selected the winner, not here.
+    // Note: planSelectionStrategy is decided by the plan ranking strategy, not here.
     if (!_shouldNotCollectMetrics && !_isBranchPlanner) {
         multiPlannerChoseWinningPlan.increment();
     }

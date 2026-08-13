@@ -8,8 +8,9 @@
 
 namespace mongo::exec_deferred_engine_choice {
 
-DeferredEngineChoicePlannerInterface::DeferredEngineChoicePlannerInterface(PlannerData plannerData)
-    : _plannerData(std::move(plannerData)) {}
+DeferredEngineChoicePlannerInterface::DeferredEngineChoicePlannerInterface(
+    PlannerData plannerData, PlanSelectionStrategy planSelectionStrategy)
+    : _plannerData(std::move(plannerData)), _planSelectionStrategy(planSelectionStrategy) {}
 
 std::unique_ptr<PlanStage> DeferredEngineChoicePlannerInterface::buildExecutableTree(
     const QuerySolution& qs) {
@@ -30,7 +31,8 @@ std::vector<std::unique_ptr<QuerySolution>> makeQsnResult(std::unique_ptr<QueryS
 
 PreComputedRankingResultPlanner::PreComputedRankingResultPlanner(PlannerData plannerData,
                                                                  PlanRankingResult result)
-    : DeferredEngineChoicePlannerInterface(std::move(plannerData)), _result(std::move(result)) {}
+    : DeferredEngineChoicePlannerInterface(std::move(plannerData), result.planSelectionStrategy),
+      _result(std::move(result)) {}
 
 PlanRankingResult PreComputedRankingResultPlanner::extractPlanRankingResult() {
     tassert(11282302,

@@ -1,12 +1,11 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/curop.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -18,11 +17,12 @@ namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.plan_ranker");
 
-// Exercises 'PlanRanker::rankPlans' directly, focusing on the unified single-solution short circuit
-// that decides whether a ranking strategy runs at all. The decision lives entirely in
-// 'PlanRanker::rankPlans' (see plan_ranker.cpp): a single solution skips ranking when CBR is
-// unavailable, when the solution is a count scan, or when the query is not an explain. Otherwise
-// the solution is ranked so that costing information can be displayed.
+// Exercises 'PlanRanker::rankPlans' directly, covering both the unified single-solution short
+// circuit that decides whether a ranking strategy runs at all, and the PlanSelectionStrategy that
+// the result reports. The short circuit lives entirely in 'PlanRanker::rankPlans' (see
+// plan_ranker.cpp): a single solution skips ranking when CBR is unavailable, when the solution is a
+// count scan, or when the query is not an explain. Otherwise the solution is ranked so that costing
+// information can be displayed.
 class PlanRankerTest : public plan_ranking::PlanRankingTestFixture {
 public:
     PlanRankerTest() : PlanRankingTestFixture(kNss) {}
@@ -49,10 +49,20 @@ public:
         return planRanker.rankPlans(
             opCtx, cq, plannerParams, yieldPolicy, collections, std::move(plannerData), isClassic);
     }
+
+    // A short circuited solution is returned untouched: no strategy ran, so there is no exec state
+    // and no explain data, and the default plan strategy kSinglePlan stands.
+    void assertNotRanked(const PlanRankingResult& result) {
+        ASSERT_EQ(result.solutions.size(), 1);
+        ASSERT_FALSE(result.execState);
+        ASSERT_FALSE(result.maybeExplainData.has_value());
+        ASSERT_EQ(result.planSelectionStrategy, PlanSelectionStrategy::kSinglePlan);
+    }
 };
 
 // Multiple candidate solutions are never short circuited; the strategy must run. With CBR disabled
-// the multiplanning strategy returns every solution for later runtime multiplanning.
+// the multiplanning strategy does not rank, it hands every solution downstream for later runtime
+// multiplanning, and reports itself as the strategy that will pick the winner.
 TEST_F(PlanRankerTest, MultipleSolutionsAreRanked) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
     createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
@@ -66,6 +76,7 @@ TEST_F(PlanRankerTest, MultipleSolutionsAreRanked) {
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 2);
     ASSERT_FALSE(status.getValue().execState);
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 // A single solution skips ranking when CBR is disabled: no costing or multiplanning is required, so
@@ -79,9 +90,7 @@ TEST_F(PlanRankerTest, SingleSolutionWithCbrDisabledIsNotRanked) {
 
     auto status = rankPlans(*cq, std::move(plannerData), /* isClassic */ true);
     ASSERT_OK(status.getStatus());
-    ASSERT_EQ(status.getValue().solutions.size(), 1);
-    ASSERT_FALSE(status.getValue().execState);
-    ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
+    assertNotRanked(status.getValue());
 }
 
 // canUseCBR also requires the classic engine. A single solution destined for SBE skips ranking even
@@ -95,9 +104,7 @@ TEST_F(PlanRankerTest, SingleSolutionForSbeIsNotRanked) {
 
     auto status = rankPlans(*cq, std::move(plannerData), /* isClassic */ false);
     ASSERT_OK(status.getStatus());
-    ASSERT_EQ(status.getValue().solutions.size(), 1);
-    ASSERT_FALSE(status.getValue().execState);
-    ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
+    assertNotRanked(status.getValue());
 }
 
 // With CBR available but the query not being an explain, a single solution skips ranking: there is
@@ -112,10 +119,7 @@ TEST_F(PlanRankerTest, SingleSolutionWithoutExplainIsNotRanked) {
 
     auto status = rankPlans(*cq, std::move(plannerData), /* isClassic */ true);
     ASSERT_OK(status.getStatus());
-    ASSERT_EQ(status.getValue().solutions.size(), 1);
-    // No strategy ran, so no execution state was produced.
-    ASSERT_FALSE(status.getValue().execState);
-    ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
+    assertNotRanked(status.getValue());
 }
 
 // With CBR available and the query being an explain, a single non-count solution is ranked so that
@@ -125,6 +129,7 @@ TEST_F(PlanRankerTest, SingleSolutionWithExplainIsCosted) {
     insertNDocuments(10);
     auto colls = getCollsAccessor();
 
+    unittest::ServerParameterGuard planRankerGuard{"internalQueryPlanRanker", "costBased"};
     unittest::ServerParameterGuard ceModeGuard{"internalQueryCBRCEMode", "heuristicCE"};
 
     // The fixture sets explain to kQueryPlanner by default.
@@ -139,18 +144,20 @@ TEST_F(PlanRankerTest, SingleSolutionWithExplainIsCosted) {
     // The strategy ran rather than being short circuited, so it produced costing estimates.
     ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
     ASSERT_FALSE(status.getValue().maybeExplainData->estimates.empty());
+    // A sole candidate must report kSinglePlan even when CBR costed it for the explain.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kSinglePlan);
 }
 
 // When CBR cannot estimate every plan (here because returnKey introduces an inestimable RETURN_KEY
 // node in each candidate) it returns all the solutions to be ranked downstream by the
-// multi-planner. In that case CBR did not decide the winner, so the operation must record
-// kMultiPlanner - previously nothing set planRankerMethod on this path and it was left at kNone.
+// multi-planner. The plan strategy result must report kMultiPlanner.
 TEST_F(PlanRankerTest, InestimableReturnKeyRecordsMultiPlanner) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
     createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
     insertNDocuments(10);
     auto colls = getCollsAccessor();
 
+    unittest::ServerParameterGuard planRankerGuard{"internalQueryPlanRanker", "costBased"};
     unittest::ServerParameterGuard ceModeGuard{"internalQueryCBRCEMode", "heuristicCE"};
 
     // 'a > 0' and 'b > 0' give two competing index scans, each wrapped in a RETURN_KEY node.
@@ -167,8 +174,7 @@ TEST_F(PlanRankerTest, InestimableReturnKeyRecordsMultiPlanner) {
     // CBR could not choose a single winner, so both solutions are handed off to the multi-planner.
     ASSERT_EQ(status.getValue().solutions.size(), 2);
     ASSERT_FALSE(status.getValue().needsWorksMeasuredForPlanCache);
-    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
-              PlanRankerMethod::kMultiPlanner);
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
     // The inestimable-node fallback is recorded on the explain data for rankerChoice.reason.
     ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
     ASSERT_TRUE(status.getValue().maybeExplainData->planRankerReason.has_value());
@@ -176,7 +182,7 @@ TEST_F(PlanRankerTest, InestimableReturnKeyRecordsMultiPlanner) {
               PlanRankerReason::kCBRInestimableNode);
 }
 
-// When CBR can estimate all plans and choose a single winner, the operation records itself as
+// When CBR can estimate all plans and choose a single winner, the result reports itself as
 // cost-based ranked - the counterpart to the inestimable fallback above.
 TEST_F(PlanRankerTest, EstimablePlansRecordCostBasedRanker) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
@@ -184,6 +190,7 @@ TEST_F(PlanRankerTest, EstimablePlansRecordCostBasedRanker) {
     insertNDocuments(10);
     auto colls = getCollsAccessor();
 
+    unittest::ServerParameterGuard planRankerGuard{"internalQueryPlanRanker", "costBased"};
     unittest::ServerParameterGuard ceModeGuard{"internalQueryCBRCEMode", "heuristicCE"};
 
     auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0));
@@ -195,8 +202,7 @@ TEST_F(PlanRankerTest, EstimablePlansRecordCostBasedRanker) {
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     ASSERT_TRUE(status.getValue().needsWorksMeasuredForPlanCache);
-    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
-              PlanRankerMethod::kCostBasedRanker);
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kCostBasedRanker);
     // Strict CBR (planRanker == kCostBased) is a configuration-fixed choice: the recorded reason
     // is the config provenance, kQueryPlanRankerKnob.
     ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
@@ -205,21 +211,24 @@ TEST_F(PlanRankerTest, EstimablePlansRecordCostBasedRanker) {
               PlanRankerReason::kQueryPlanRankerKnob);
 }
 
-// The single-solution short circuit runs no strategy: planRankerMethod stays kNone and no reason
-// is recorded (there is no explain data at all). Explain emission derives "singlePlan" for the
-// kNone case instead of reading a recorded reason.
-TEST_F(PlanRankerTest, ShortCircuitLeavesMethodNoneAndReasonUnset) {
+// A sole candidate reports kSinglePlan even when CBR cannot estimate it.
+TEST_F(PlanRankerTest, CostBasedRankingReportsSinglePlanForSoleInestimableCandidate) {
     insertNDocuments(10);
     auto colls = getCollsAccessor();
 
-    auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << 42 << "b" << 7));
-    plannerData.plannerParams = makePlannerParams(/* cbrEnabled */ false);
+    unittest::ServerParameterGuard planRankerGuard{"internalQueryPlanRanker", "costBased"};
+    unittest::ServerParameterGuard ceModeGuard{"internalQueryCBRCEMode", "heuristicCE"};
+
+    auto [cq, plannerData] = createCQAndPlannerData(
+        colls, BSON("a" << GT << 0), [](auto& findCmd) { findCmd.setReturnKey(true); });
+    plannerData.plannerParams = makePlannerParams(/* cbrEnabled */ true);
+    plannerData.plannerParams->mainCollectionInfo.collStats =
+        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(10), kNss);
 
     auto status = rankPlans(*cq, std::move(plannerData), /* isClassic */ true);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
-    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod, PlanRankerMethod::kNone);
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kSinglePlan);
 }
 
 }  // namespace

@@ -3,13 +3,15 @@
 
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 
 namespace mongo::classic_runtime_planner {
 
 CachedPlanner::CachedPlanner(PlannerData plannerData,
                              std::unique_ptr<CachedSolution> cachedSolution,
                              std::unique_ptr<QuerySolution> querySolution)
-    : ClassicPlannerInterface(std::move(plannerData)), _querySolution(std::move(querySolution)) {
+    : ClassicPlannerInterface(std::move(plannerData), PlanSelectionStrategy::kCachedPlan),
+      _querySolution(std::move(querySolution)) {
     auto root = std::make_unique<CachedPlanStage>(cq()->getExpCtxRaw(),
                                                   collections().getMainCollectionPtrOrAcquisition(),
                                                   ws(),
@@ -49,6 +51,7 @@ PlanRankingResult CachedPlanner::extractPlanRankingResult() {
         .plannerParams = extractPlannerParams(),
         .cachedPlanHash = cachedPlanHash(),
         .engineSelection = EngineChoice::kClassic,
+        .planSelectionStrategy = planSelectionStrategy(),
     };
 }
 }  // namespace mongo::classic_runtime_planner

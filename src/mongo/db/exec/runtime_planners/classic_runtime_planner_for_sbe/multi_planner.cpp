@@ -5,7 +5,7 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/logv2/log.h"
@@ -20,8 +20,9 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
                            bool shouldWriteToPlanCache,
                            const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb,
-                           boost::optional<std::string> replanReason)
-    : PlannerBase(std::move(plannerData)),
+                           boost::optional<std::string> replanReason,
+                           PlanSelectionStrategy planSelectionStrategy)
+    : PlannerBase(std::move(plannerData), planSelectionStrategy),
       _shouldWriteToPlanCache(shouldWriteToPlanCache),
       _incrementReplannedPlanIsCachedPlanCounterCb(incrementReplannedPlanIsCachedPlanCounterCb),
       _replanReason(replanReason) {
@@ -46,7 +47,6 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());
     uassertStatusOK(_multiPlanStage->runTrials(trialPeriodYieldPolicy.get()));
     uassertStatusOK(_multiPlanStage->pickBestPlan());
-    CurOp::get(opCtx())->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
 }
 
 const MultiPlanStats* MultiPlanner::getSpecificStats() const {
@@ -81,7 +81,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
                                            plannerOptions(),
                                            std::move(nss),
                                            nullptr /* querySolution */,
-                                           cachedPlanHash());
+                                           cachedPlanHash(),
+                                           boost::none /* replanReason */,
+                                           planSelectionStrategy());
     }
 
     // The winning plan did not reach EOF during the trial period, or we were otherwise unable

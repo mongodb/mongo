@@ -6,8 +6,8 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -78,8 +78,9 @@ TEST_F(CostBasedPlanRankingTest, MaxResultsOfOneDoesNotTripFullBatchAssertion) {
     auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
-              PlanRankerMethod::kCostBasedRanker);
+    // CBR picked the winner; the strategy is recorded on the result and carried by the runtime
+    // planner onto the PlanExecutor's PlanExplainer, which is what surfaces it in diagnostics.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kCostBasedRanker);
 }
 
 TEST_F(CostBasedPlanRankingTest, MaxResultsOfOneEarlyExitsWhenBatchFilled) {
@@ -99,8 +100,8 @@ TEST_F(CostBasedPlanRankingTest, MaxResultsOfOneEarlyExitsWhenBatchFilled) {
     auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    ASSERT_EQ(CurOp::get(operationContext())->debug().planRankerMethod,
-              PlanRankerMethod::kMultiPlanner);
+    // The multi-planner picked the winner, so the strategy must be recorded on the result.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 }  // namespace

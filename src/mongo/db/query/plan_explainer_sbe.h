@@ -14,6 +14,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
@@ -44,17 +45,19 @@ struct JoinOptPlan {
 
 class PlanExplainerSBEBase : public PlanExplainer {
 public:
-    PlanExplainerSBEBase(const sbe::PlanStage* root,
-                         const stage_builder::PlanStageData* data,
-                         const QuerySolution* solution,
-                         bool isMultiPlan,
-                         bool isCachedPlan,
-                         boost::optional<size_t> cachedPlanHash,
-                         std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-                         RemoteExplainVector* remoteExplains,
-                         bool usedJoinOpt = false,
-                         cost_based_ranker::EstimateMap estimates = {},
-                         std::vector<JoinOptPlan> rejectedPlans = {});
+    PlanExplainerSBEBase(
+        const sbe::PlanStage* root,
+        const stage_builder::PlanStageData* data,
+        const QuerySolution* solution,
+        bool isMultiPlan,
+        bool isCachedPlan,
+        boost::optional<size_t> cachedPlanHash,
+        std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+        RemoteExplainVector* remoteExplains,
+        bool usedJoinOpt = false,
+        cost_based_ranker::EstimateMap estimates = {},
+        std::vector<JoinOptPlan> rejectedPlans = {},
+        boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     bool isSbeExplainer() const final {
         return true;
@@ -68,6 +71,9 @@ public:
     bool matchesCachedPlan() const;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
+    boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const final {
+        return _planSelectionStrategy;
+    }
     void getSecondarySummaryStats(const NamespaceString& secondaryColl,
                                   PlanSummaryStats* statsOut) const override;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
@@ -114,6 +120,7 @@ protected:
     const bool _isMultiPlan{false};
     const bool _isFromPlanCache{false};
     const bool _usedJoinOpt{false};
+    const boost::optional<PlanSelectionStrategy> _planSelectionStrategy{boost::none};
     const boost::optional<size_t> _cachedPlanHash{boost::none};
     // Pre-computed debugging info so we don't necessarily have to collect them from QuerySolution.
     // All plans recovered from the same cached entry share the same debug info.
@@ -138,7 +145,8 @@ public:
         bool usedJoinOpt = false,
         cost_based_ranker::EstimateMap estimates = {},
         std::vector<JoinOptPlan> rejectedPlans = {},
-        boost::optional<PlanExplainerData> maybeExplainData = boost::none);
+        boost::optional<PlanExplainerData> maybeExplainData = boost::none,
+        boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(

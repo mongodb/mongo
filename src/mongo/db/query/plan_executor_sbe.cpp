@@ -13,6 +13,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_insert_listener.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_remote_cursor.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -57,7 +58,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  bool usedJoinOpt,
                                  cost_based_ranker::EstimateMap estimates,
                                  std::vector<JoinOptPlan> rejectedJoinPlans,
-                                 boost::optional<PlanExplainerData> maybeExplainData)
+                                 boost::optional<PlanExplainerData> maybeExplainData,
+                                 boost::optional<PlanSelectionStrategy> planSelectionStrategy)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
@@ -131,7 +133,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   usedJoinOpt,
                                                   std::move(estimates),
                                                   std::move(rejectedJoinPlans),
-                                                  std::move(maybeExplainData));
+                                                  std::move(maybeExplainData),
+                                                  planSelectionStrategy);
     _cursorType = _rootData.staticData->cursorType;
 
     if (_remoteCursors) {

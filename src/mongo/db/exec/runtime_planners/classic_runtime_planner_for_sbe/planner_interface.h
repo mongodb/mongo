@@ -12,6 +12,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -62,7 +63,7 @@ struct PlannerDataForSBE final : public PlannerData {
 
 class PlannerBase : public PlannerInterface {
 public:
-    PlannerBase(PlannerDataForSBE plannerData);
+    PlannerBase(PlannerDataForSBE plannerData, PlanSelectionStrategy planSelectionStrategy);
 
 protected:
     /**
@@ -145,9 +146,22 @@ protected:
         return std::move(_plannerData);
     }
 
+    PlanSelectionStrategy planSelectionStrategy() const {
+        return _planSelectionStrategy;
+    }
+
+    /**
+     * For planners that only learn the strategy while planning (the sub-planner). Must be called
+     * before 'makeExecutor()'.
+     */
+    void setPlanSelectionStrategy(PlanSelectionStrategy planSelectionStrategy) {
+        _planSelectionStrategy = planSelectionStrategy;
+    }
+
 
 private:
     PlannerDataForSBE _plannerData;
+    PlanSelectionStrategy _planSelectionStrategy;
 };
 
 /**
@@ -157,6 +171,7 @@ class SingleSolutionPassthroughPlanner final : public PlannerBase {
 public:
     SingleSolutionPassthroughPlanner(PlannerDataForSBE plannerData,
                                      std::unique_ptr<QuerySolution> solution,
+                                     PlanSelectionStrategy planSelectionStrategy,
                                      boost::optional<std::string> replanReason = boost::none);
 
     SingleSolutionPassthroughPlanner(
@@ -180,12 +195,12 @@ private:
 
 class MultiPlanner final : public PlannerBase {
 public:
-    MultiPlanner(
-        PlannerDataForSBE plannerData,
-        std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
-        bool shouldWriteToPlanCache,
-        const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb = []() {},
-        boost::optional<std::string> replanReason = boost::none);
+    MultiPlanner(PlannerDataForSBE plannerData,
+                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
+                 bool shouldWriteToPlanCache,
+                 const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb,
+                 boost::optional<std::string> replanReason,
+                 PlanSelectionStrategy planSelectionStrategy);
 
     /**
      * Picks the best plan given by the classic engine multiplanner and returns a plan executor. If
@@ -226,7 +241,9 @@ private:
 
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
     const bool _shouldWriteToPlanCache;
-    const std::function<void()>& _incrementReplannedPlanIsCachedPlanCounterCb;
+    // Held by value: this is invoked long after the constructor returns, so a reference to a
+    // caller's temporary would dangle.
+    const std::function<void()> _incrementReplannedPlanIsCachedPlanCounterCb;
     boost::optional<std::string> _replanReason;
 
     // The SBE plan is constructed from the callback we pass to the 'MultiPlanStage' so that it can

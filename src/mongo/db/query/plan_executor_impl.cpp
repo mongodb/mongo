@@ -24,6 +24,7 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_insert_listener.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/write_conflict_storm.h"
@@ -92,7 +93,8 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
                                    boost::optional<size_t> cachedPlanHash,
                                    boost::optional<std::string> replanReason,
-                                   boost::optional<PlanExplainerData> maybeExplainData)
+                                   boost::optional<PlanExplainerData> maybeExplainData,
+                                   boost::optional<PlanSelectionStrategy> planSelectionStrategy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
@@ -104,7 +106,8 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                        cachedPlanHash,
                                        std::move(replanReason),
                                        std::move(maybeExplainData),
-                                       _cq && _cq->getExplain().has_value() /* isExplain */)),
+                                       _cq && _cq->getExplain().has_value() /* isExplain */,
+                                       planSelectionStrategy)),
       _mustReturnOwnedBson(returnOwnedBson),
       _mustSetRecordIdMetadata(_cq && _cq->metadataDeps()[DocumentMetadataFields::kRecordId]),
       // Read value of 'operationResponseMaxMS' query knob once, here at construction, where the

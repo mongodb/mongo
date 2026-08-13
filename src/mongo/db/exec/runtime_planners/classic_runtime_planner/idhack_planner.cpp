@@ -7,12 +7,13 @@
 #include "mongo/db/exec/classic/shard_filter.h"
 #include "mongo/db/exec/classic/sort_key_generator.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 
 namespace mongo::classic_runtime_planner {
 
 IdHackPlanner::IdHackPlanner(PlannerData plannerData, const IndexCatalogEntry* entry)
-    : ClassicPlannerInterface(std::move(plannerData)) {
+    : ClassicPlannerInterface(std::move(plannerData), PlanSelectionStrategy::kSinglePlan) {
     auto collection = collections().getMainCollectionPtrOrAcquisition();
     std::unique_ptr<PlanStage> stage =
         std::make_unique<IDHackStage>(cq()->getExpCtxRaw(), cq(), ws(), collection, entry);
@@ -89,7 +90,8 @@ PlanRankingResult IdHackPlanner::extractPlanRankingResult() {
     return PlanRankingResult{.usedIdhack = true,
                              .execState = SavedExecState{ClassicExecState{.workingSet = extractWs(),
                                                                           .root = extractRoot()}},
-                             .plannerParams = extractPlannerParams()};
+                             .plannerParams = extractPlannerParams(),
+                             .planSelectionStrategy = planSelectionStrategy()};
 }
 
 const QuerySolution* IdHackPlanner::querySolution() const {

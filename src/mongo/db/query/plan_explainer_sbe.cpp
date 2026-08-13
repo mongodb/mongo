@@ -23,6 +23,7 @@
 #include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
@@ -573,7 +574,8 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     RemoteExplainVector* remoteExplains,
     bool usedJoinOpt,
     cost_based_ranker::EstimateMap estimates,
-    std::vector<JoinOptPlan> rejectedPlans)
+    std::vector<JoinOptPlan> rejectedPlans,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy)
     : PlanExplainer{solution},
       _root{root},
       _rootData{data},
@@ -581,6 +583,7 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
       _isMultiPlan{isMultiPlan},
       _isFromPlanCache{isCachedPlan},
       _usedJoinOpt{usedJoinOpt},
+      _planSelectionStrategy{planSelectionStrategy},
       _cachedPlanHash{cachedPlanHash},
       _debugInfo{debugInfo},
       _remoteExplains{remoteExplains},
@@ -598,6 +601,9 @@ std::string PlanExplainerSBEBase::getPlanSummary() const {
 
 void PlanExplainerSBEBase::getSummaryStats(PlanSummaryStats* statsOut) const {
     tassert(6466201, "statsOut should be a valid pointer", statsOut);
+
+    // Known at construction and independent of the exec tree, so report it even without a _root.
+    statsOut->planSelectionStrategy = _planSelectionStrategy;
 
     if (!_root) {
         return;
@@ -705,7 +711,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
     bool usedJoinOpt,
     cost_based_ranker::EstimateMap estimates,
     std::vector<JoinOptPlan> rejectedPlans,
-    boost::optional<PlanExplainerData> maybeExplainData)
+    boost::optional<PlanExplainerData> maybeExplainData,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy)
     : PlanExplainerSBEBase{root,
                            data,
                            solution,
@@ -716,7 +723,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            remoteExplains,
                            usedJoinOpt,
                            std::move(estimates),
-                           std::move(rejectedPlans)},
+                           std::move(rejectedPlans),
+                           planSelectionStrategy},
       _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
       // TODO SERVER-129170: Refactor to avoid copying on the explain path.
       _ceSamplingMetadata{maybeExplainData
@@ -734,7 +742,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                                              // legacy accessors (SBE V3 parity is
                                              // SERVER-132033), which need no construction-time
                                              // trial snapshot.
-                                             false /* isExplain */)
+                                             false /* isExplain */,
+                                             planSelectionStrategy)
               : nullptr} {
     if (_classicRuntimePlannerExplainer) {
         // 'solution' is always non-null when 'classicRuntimePlannerStage' is non-null

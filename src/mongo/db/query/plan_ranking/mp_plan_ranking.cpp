@@ -3,9 +3,8 @@
 
 #include "mongo/db/query/plan_ranking/mp_plan_ranking.h"
 
-#include "mongo/db/curop.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 
@@ -18,9 +17,11 @@ StatusWith<PlanRankingResult> MPPlanRankingStrategy::rankPlans(PlannerData& pd,
      * rather returns all enumerated plans. This will result in multi-planning being used
      * to select a winning plan at runtime.
      */
-    PlanRankingResult out{.solutions = std::move(rctx.solutions)};
+    const auto strategy = rctx.solutions.size() > 1 ? PlanSelectionStrategy::kMultiPlanner
+                                                    : PlanSelectionStrategy::kSinglePlan;
+    PlanRankingResult out{.solutions = std::move(rctx.solutions),
+                          .planSelectionStrategy = strategy};
     if (out.solutions.size() > 1) {
-        CurOp::get(pd.opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
         // Multi-planning was fixed by configuration (feature flag, knob, or a construction-time
         // overwrite), not decided at planning time. On explain queries record that provenance for
         // rankerChoice.reason; this strategy otherwise carries no explain data, so the carrier is

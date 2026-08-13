@@ -157,7 +157,8 @@ private:
                                                std::move(execState.sbeYieldPolicy),
                                                std::move(remoteCursors),
                                                std::move(remoteExplains),
-                                               _rankingResult.cachedPlanHash);
+                                               _rankingResult.cachedPlanHash,
+                                               _rankingResult.planSelectionStrategy);
         }
 
         auto sbeYieldPolicy =
@@ -200,7 +201,8 @@ private:
                                            std::move(remoteCursors),
                                            std::move(remoteExplains),
                                            extractMps(),
-                                           std::move(_rankingResult.maybeExplainData));
+                                           std::move(_rankingResult.maybeExplainData),
+                                           _rankingResult.planSelectionStrategy);
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeClassicExecutor(
@@ -271,7 +273,8 @@ private:
                 ? boost::make_optional<std::string>(
                       std::move(_rankingResult.plannerParams->replanningData->replanReason))
                 : boost::none,
-            std::move(_rankingResult.maybeExplainData));
+            std::move(_rankingResult.maybeExplainData),
+            _rankingResult.planSelectionStrategy);
     }
 
     void buildRejectedExecutableTreesForExplain(const QuerySolution* solution,

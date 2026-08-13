@@ -15,6 +15,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -158,6 +159,26 @@ public:
     }
 
     /**
+     * Returns the strategy that selected the winning plan. Only meaningful after pickBestPlan().
+     *
+     * A rooted $or is planned per branch, and different branches can be decided differently: CBR
+     * ranks a branch when it can estimate all of its candidates, the multi-planner ranks a branch
+     * whose candidates CBR could not estimate (or every branch, when the ranker is the
+     * multi-planner), a branch with a cache entry is tagged from the cache, and a branch with a
+     * sole solution is tagged directly. There is therefore no single strategy for the operation,
+     * so this reports the highest-precedence strategy used by any branch, ordered multi-planner
+     * over CBR over a cache hit over a lone candidate.
+     *
+     * When subplanning is abandoned for the whole-query fallback, the fallback's own choice is
+     * reported instead, because that is the plan being run.
+     *
+     * TODO SERVER-131818: revisit this once CBR fully supports rooted $or. Collapsing the branches
+     * by precedence is a best-effort approximation; we likely want to report the list of per-branch
+     * strategies rather than a single one.
+     */
+    PlanSelectionStrategy planSelectionStrategy() const;
+
+    /**
      * Returns the MultiPlan stage.
      */
     MultiPlanStage* multiPlannerStage() {
@@ -194,5 +215,17 @@ private:
 
     // Indicates whether the sub planner has fallen back to multi planning.
     bool _usesMultiplanning = false;
+
+    // Indicates that per-branch planning was abandoned and a whole query plan was chosen instead,
+    // which is then what 'planSelectionStrategy()' reports on. Set only once that plan exists.
+    bool _usesWholeQueryPlan = false;
+
+    // Indicates whether at least one $or branch had more than one candidate solution and was
+    // therefore ranked by the multi-planner.
+    bool _anyBranchMultiPlanned = false;
+
+    // Indicates whether CBR estimated all of the candidates of at least one $or branch and chose
+    // that branch's winner.
+    bool _anyBranchCostBasedRanked = false;
 };
 }  // namespace mongo

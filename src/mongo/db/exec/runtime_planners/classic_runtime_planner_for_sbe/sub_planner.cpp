@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/logv2/log.h"
 
@@ -10,7 +11,9 @@
 
 namespace mongo::classic_runtime_planner_for_sbe {
 
-SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(plannerData)) {
+SubPlanner::SubPlanner(PlannerDataForSBE plannerData)
+    // Provisional value only: replaced below with what the SubplanStage actually did.
+    : PlannerBase(std::move(plannerData), PlanSelectionStrategy::kMultiPlanner) {
     LOGV2_DEBUG(8542100, 5, "Using classic subplanner for SBE");
 
     _subplanStage =
@@ -25,6 +28,9 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(pl
     uassertStatusOK(_subplanStage->pickBestPlan(plannerParams(),
                                                 trialPeriodYieldPolicy.get(),
                                                 false /* shouldConstructClassicExecutableTree */));
+
+    // Only now is it known which of the branches were ranked, and by what.
+    setPlanSelectionStrategy(_subplanStage->planSelectionStrategy());
 
     _solution = extendSolutionWithPipeline(_subplanStage->extractBestWholeQuerySolution());
 }

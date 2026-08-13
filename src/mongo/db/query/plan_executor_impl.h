@@ -20,6 +20,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_insert_listener.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/restore_context.h"
@@ -134,7 +135,8 @@ public:
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
                      boost::optional<size_t> cachedPlanHash,
                      boost::optional<std::string> replanReason,
-                     boost::optional<PlanExplainerData> maybeExplainData);
+                     boost::optional<PlanExplainerData> maybeExplainData,
+                     boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     ~PlanExecutorImpl() override;
     CanonicalQuery* getCanonicalQuery() const final;

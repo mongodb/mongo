@@ -185,7 +185,7 @@ function testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking() {
     jsTest.log.info("Running testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking");
     const explain = coll.find({c: 1}).explain("allPlansExecution");
     // Only one candidate plan, so no ranking was needed.
-    assertChosenRanker(explain, ChosenRanker.kNone, PlanRankerReason.kSinglePlan);
+    assertChosenRanker(explain, ChosenRanker.kSinglePlan, PlanRankerReason.kSinglePlan);
     const rejectedPlans = getRejectedPlans(explain);
     assert.eq(rejectedPlans.length, 0, toJsonForLog(explain));
 }

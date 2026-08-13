@@ -6,6 +6,7 @@
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/unittest/framework.h"
@@ -135,6 +136,8 @@ TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_TRUE(status.getValue().execState);
+    // Assert that we recorded that the multi-planner picked the winner.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
@@ -168,6 +171,8 @@ TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_TRUE(status.getValue().execState);
+    // Assert that we recorded that the multi-planner picked the winner.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR) {
@@ -354,6 +359,9 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     ASSERT_EQ(stats->totalWorks, 23333);  // 10000 + 10000 + 3333
 
     ASSERT_TRUE(status.getValue().execState);
+    // CBR could not decide and the resumed multi-planner picked the winner, confirm that the
+    // strategy was recorded.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 TEST_F(CBRForNoMPResultsTest, MPPicksBlockingSortAndEOFs) {

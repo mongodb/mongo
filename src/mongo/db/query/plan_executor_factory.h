@@ -16,6 +16,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner.h"
@@ -61,7 +62,8 @@ namespace mongo::plan_executor_factory {
     NamespaceString nss = NamespaceString::kEmpty,
     std::unique_ptr<QuerySolution> qs = nullptr,
     boost::optional<size_t> cachedPlanHash = boost::none,
-    boost::optional<std::string> replanReason = boost::none);
+    boost::optional<std::string> replanReason = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * This overload is provided for executors that do not need a CanonicalQuery. For example, the
@@ -93,7 +95,8 @@ namespace mongo::plan_executor_factory {
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
     boost::optional<std::string> replanReason,
-    boost::optional<PlanExplainerData> maybeExplainData);
+    boost::optional<PlanExplainerData> maybeExplainData,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * Constructs a PlanExecutor for the query 'cq' which will execute the SBE plan 'root'. A yield
@@ -118,7 +121,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage = nullptr,
-    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
+    boost::optional<PlanExplainerData> maybeExplainData = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * Similar to the factory function above in that it also constructs an executor for the winning SBE
@@ -135,7 +139,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
-    boost::optional<size_t> cachedPlanHash = boost::none);
+    boost::optional<size_t> cachedPlanHash = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * Constructs a plan executor for executing the given 'pipeline'.

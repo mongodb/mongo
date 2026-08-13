@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -12,8 +13,9 @@ namespace mongo::classic_runtime_planner_for_sbe {
 SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
     PlannerDataForSBE plannerData,
     std::unique_ptr<QuerySolution> solution,
+    PlanSelectionStrategy planSelectionStrategy,
     boost::optional<std::string> replanReason)
-    : PlannerBase(std::move(plannerData)),
+    : PlannerBase(std::move(plannerData), planSelectionStrategy),
       _solution(extendSolutionWithPipelineIfNeeded(std::move(solution))),
       _sbePlanAndData(prepareSbePlanAndData(*_solution, std::move(replanReason))),
       _isFromPlanCache(false) {}
@@ -21,7 +23,7 @@ SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
 SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
     PlannerDataForSBE plannerData,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData)
-    : PlannerBase(std::move(plannerData)),
+    : PlannerBase(std::move(plannerData), PlanSelectionStrategy::kCachedPlan),
       _solution(nullptr),
       _sbePlanAndData(std::move(sbePlanAndData)),
       _isFromPlanCache(true) {}

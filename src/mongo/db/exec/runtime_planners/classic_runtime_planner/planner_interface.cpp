@@ -11,18 +11,23 @@
 #include "mongo/db/exec/classic/timeseries_upsert.h"
 #include "mongo/db/exec/classic/upsert_stage.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 
 namespace mongo::classic_runtime_planner {
 
-ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData)
-    : ClassicPlannerInterface(std::move(plannerData), PlanExplainerData{}) {}
+ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData,
+                                                 PlanSelectionStrategy planSelectionStrategy)
+    : ClassicPlannerInterface(std::move(plannerData), PlanExplainerData{}, planSelectionStrategy) {}
 
 ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData,
-                                                 PlanExplainerData explainData)
-    : _plannerData(std::move(plannerData)), _planExplainerData(std::move(explainData)) {
+                                                 PlanExplainerData explainData,
+                                                 PlanSelectionStrategy planSelectionStrategy)
+    : _plannerData(std::move(plannerData)),
+      _planExplainerData(std::move(explainData)),
+      _planSelectionStrategy(planSelectionStrategy) {
     if (collections().hasMainCollection()) {
         _nss = collections().getMainCollection()->ns();
     } else {
@@ -250,7 +255,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
                                        yieldPolicy(),
                                        cachedPlanHash(),
                                        replanReason(),
-                                       std::move(_planExplainerData));
+                                       std::move(_planExplainerData),
+                                       planSelectionStrategy());
 }
 
 std::unique_ptr<PlanStage> ClassicPlannerInterface::buildExecutableTree(const QuerySolution& qs) {

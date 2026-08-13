@@ -22,6 +22,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
@@ -73,7 +74,8 @@ public:
                     bool usedJoinOpt = false,
                     cost_based_ranker::EstimateMap estimates = {},
                     std::vector<JoinOptPlan> rejectedJoinPlans = {},
-                    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
+                    boost::optional<PlanExplainerData> maybeExplainData = boost::none,
+                    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();

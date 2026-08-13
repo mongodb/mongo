@@ -20,7 +20,7 @@
 #include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_params_diagnostic_printer.h"
@@ -172,6 +172,7 @@ StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
         return std::make_unique<SingleSolutionPassthroughPlanner>(
             makePlannerData(),
             std::move(rankerResult.solutions[0]),
+            rankerResult.planSelectionStrategy,
             std::move(rankerResult.maybeExplainData));
     }
 
@@ -181,7 +182,8 @@ StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
     return std::make_unique<MultiPlanner>(makePlannerData(),
                                           std::move(rankerResult.solutions),
                                           rankerResult.needsWorksMeasuredForPlanCache,
-                                          std::move(rankerResult.maybeExplainData));
+                                          std::move(rankerResult.maybeExplainData),
+                                          rankerResult.planSelectionStrategy);
 }
 }  // namespace
 
@@ -206,8 +208,10 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     };
     auto buildSingleSolutionPlanner = [&](std::unique_ptr<QuerySolution> solution,
                                           boost::optional<size_t> cachedPlanHash) {
-        return std::make_unique<SingleSolutionPassthroughPlanner>(makePlannerData(cachedPlanHash),
-                                                                  std::move(solution));
+        return std::make_unique<SingleSolutionPassthroughPlanner>(
+            makePlannerData(cachedPlanHash),
+            std::move(solution),
+            PlanSelectionStrategy::kSinglePlan);
     };
 
     const auto& mainColl = collections.getMainCollection();
@@ -319,10 +323,12 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         solutions[0]->indexFilterApplied = plannerParams->indexFiltersApplied;
         return buildSingleSolutionPlanner(std::move(solutions[0]), cachedPlanHash);
     }
-    // CBR is disabled; multiple candidate plans will be ranked by the classic multi-planner.
+    // CBR is disabled, so the classic multi-planner ranks the candidates. With a sole candidate it
+    // is only measuring work for the plan cache, so no ranking takes place.
+    const auto strategy = solutions.size() > 1 ? PlanSelectionStrategy::kMultiPlanner
+                                               : PlanSelectionStrategy::kSinglePlan;
     boost::optional<PlanExplainerData> maybeExplainData;
     if (solutions.size() > 1) {
-        CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
         // Mirrors MPPlanRankingStrategy on the non-deferred path; see the comment there.
         if (cq->getExplain()) {
             const auto reason = plannerParams->getPlanRankerReasonFromConfig();
@@ -335,7 +341,8 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     return std::make_unique<MultiPlanner>(makePlannerData(cachedPlanHash),
                                           std::move(solutions),
                                           false /* addingCBRChosenPlanToPlanCache */,
-                                          std::move(maybeExplainData));
+                                          std::move(maybeExplainData),
+                                          strategy);
 }
 
 PlanRankingResult planRanking(OperationContext* opCtx,

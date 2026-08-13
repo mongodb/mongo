@@ -8,8 +8,8 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner.h"
@@ -76,7 +76,13 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     }
 
     auto solutionsSize = solutions.size();  // Caching the value before moving it.
-    _multiPlanner.emplace(std::move(plannerData), std::move(solutions), PlanExplainerData{});
+    // This MultiPlanner runs the trials; whether MP or CBR ends up choosing the winner is decided
+    // below and reported on the returned PlanRankingResult.
+    _multiPlanner.emplace(std::move(plannerData),
+                          std::move(solutions),
+                          PlanExplainerData{},
+                          false /* addingCBRChosenPlanToPlanCache */,
+                          PlanSelectionStrategy::kMultiPlanner);
     // Cap the number of works per plan during this first trials phase so that the total works
     // across all plans does not exceed internalQueryPlanEvaluationWorks.
     auto trialsConfig = _multiPlanner->getTrialPhaseConfig();
@@ -260,9 +266,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPi
         return status;
     }
 
-    // MP selected the winning plan. Add it to the debug logs.
-    CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-
     PlanRankingResult result;
     result.solutions.push_back(_multiPlanner->extractQuerySolution());
     tassert(
@@ -273,6 +276,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPi
         result.maybeExplainData->planRankerReason = reason;
     }
     result.execState = std::move(*_multiPlanner).extractExecState();
+    // The multi-planner chose the winner, record its selection strategy.
+    result.planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
     return std::move(result);
 }
 }  // namespace plan_ranking

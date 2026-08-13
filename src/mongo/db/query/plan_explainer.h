@@ -10,8 +10,8 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/util/duration.h"
@@ -272,6 +272,14 @@ public:
                                           PlanSummaryStats* statsOut) const {}
 
     /**
+     * Returns the strategy that selected the winning plan, or boost::none for explainers that never
+     * ranked one. The explainer is the authoritative store: it lives for the cursor's lifetime.
+     */
+    virtual boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const {
+        return boost::none;
+    }
+
+    /**
      * Returns statistics that detail the winning plan selected by the multi-planner, or, if no
      * multi-planning has been performed, for the single plan selected by the QueryPlanner.
      *
@@ -312,14 +320,14 @@ public:
      * 'policy' and the node shape, winner-tree source, and candidate ordering are selected by
      * 'format' (see PlanStatsFormat).
      *
-     * 'decidingPlanRanker' names the ranker that chose the winning plan (the value recorded in
-     * OpDebug::planRankerMethod by the plan ranking strategies) and determines the kV3 ordering of
-     * the plans after the winner: the deciding ranker's metric is the primary sort key (root cost
-     * estimate ascending when the cost-based ranker decided; trial score descending, then cost-only
-     * plans by cost ascending, when the multi-planner decided), with enumeration order breaking
-     * ties. It must be threaded from that single write point, never inferred from which statistics
-     * are present. It is ignored in kLegacy format (enumeration order, exactly the legacy
-     * accessors' behavior); pass PlanRankerMethod::kNone when unknown (single plan, cached plan).
+     * 'decidingPlanRanker' names the ranker that chose the winning plan and determines the kV3
+     * ordering of the plans after the winner: the deciding ranker's metric is the primary sort key
+     * (root cost estimate ascending when the cost-based ranker decided; trial score descending,
+     * then cost-only plans by cost ascending, when the multi-planner decided), with enumeration
+     * order breaking ties. It must be passed explicitly, never inferred from which statistics are
+     * present; callers get it from getPlanSelectionStrategy(). It is ignored in kLegacy format
+     * (enumeration order, exactly the legacy accessors' behavior); pass
+     * PlanSelectionStrategy::kSinglePlan when unknown (single plan, cached plan).
      *
      * This is the accessor the V3 explain output builds its "plans[]" array
      * over. The default implementation returns no entries. Explainers whose per-plan V3
@@ -330,7 +338,7 @@ public:
     virtual std::vector<ExplainPlanEntry> getPlanEntries(
         const ExplainPolicy& policy,
         PlanStatsFormat format,
-        PlanRankerMethod decidingPlanRanker) const {
+        PlanSelectionStrategy decidingPlanRanker) const {
         return {};
     }
 

@@ -191,12 +191,14 @@ export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
  *   kCostBased     - the cost-based ranker (CBR) ranked the plan (it carries a cost estimate).
  *   kMultiPlanning - the multi-planner (MP) ranked the plan (no cost estimate). This includes the
  *                    case where CBR was engaged but could not cost the plans and fell back to MP.
- *   kNone          - no ranking was needed (e.g. a single candidate plan).
+ *   kSinglePlan    - no ranking was needed because there was a single candidate plan.
+ *   kCachedPlan    - no ranking was needed because the plan came from the plan cache.
  */
 export const ChosenRanker = {
     kMultiPlanning: "multiPlanning",
     kCostBased: "costBased",
-    kNone: "none",
+    kSinglePlan: "singlePlan",
+    kCachedPlan: "cachedPlan",
 };
 
 /**
@@ -300,7 +302,8 @@ export function assertChosenRanker(explain, chosenRanker, reason = undefined) {
                 winningPlan,
             });
             break;
-        case ChosenRanker.kNone:
+        case ChosenRanker.kSinglePlan:
+        case ChosenRanker.kCachedPlan:
             assert(getRejectedPlans(explain).length === 0, "Expected no rejected plans", {explain});
             break;
     }

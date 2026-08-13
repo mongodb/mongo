@@ -31,6 +31,10 @@ namespace mongo::classic_runtime_planner_for_sbe {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.collection");
+
+// Passed to every 'MultiPlanner' below. None of these tests replan, so it is never called.
+const std::function<void()> kNoopReplanCounterCb = []() {
+};
 const BSONObj kFindFilter = fromjson("{a: {$gte: 0}, b: {$gte: 0}}");
 const BSONObj kAddFieldsSpec = fromjson(R"({sum: {$add: ["$a", "$b"]}})");
 
@@ -419,7 +423,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
             solution->setRoot(std::move(root));
 
             auto [cq, plannerData] = createPlannerData();
-            SingleSolutionPassthroughPlanner planner{std::move(plannerData), std::move(solution)};
+            SingleSolutionPassthroughPlanner planner{
+                std::move(plannerData), std::move(solution), PlanSelectionStrategy::kSinglePlan};
             auto exec = planner.makeExecutor(std::move(cq));
             assertPlanExecutorReturnsCorrectSums({3, 4, 5}, exec.get());
         }
@@ -450,8 +455,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
         auto [solutions, expectedSums] =
             createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
         {
-            MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+            MultiPlanner planner{std::move(plannerData),
+                                 std::move(solutions),
+                                 true /*shouldWriteToCache*/,
+                                 kNoopReplanCounterCb,
+                                 boost::none /* replanReason */,
+                                 PlanSelectionStrategy::kMultiPlanner};
             auto exec = planner.makeExecutor(std::move(cq));
             assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
         }
@@ -483,8 +492,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
             auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
                 200 /*resultDocCount*/, plannerData.cq);
-            MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+            MultiPlanner planner{std::move(plannerData),
+                                 std::move(solutions),
+                                 true /*shouldWriteToCache*/,
+                                 kNoopReplanCounterCb,
+                                 boost::none /* replanReason */,
+                                 PlanSelectionStrategy::kMultiPlanner};
             auto exec = planner.makeExecutor(std::move(cq));
             ASSERT_TRUE(exec->getPlanExplainer().isSbeExplainer());
         }
@@ -495,8 +508,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
             auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
                 50 /*resultDocCount*/, plannerData.cq);
-            MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+            MultiPlanner planner{std::move(plannerData),
+                                 std::move(solutions),
+                                 true /*shouldWriteToCache*/,
+                                 kNoopReplanCounterCb,
+                                 boost::none /* replanReason */,
+                                 PlanSelectionStrategy::kMultiPlanner};
             auto exec = planner.makeExecutor(std::move(cq));
             ASSERT_FALSE(exec->getPlanExplainer().isSbeExplainer());
         }
@@ -576,8 +593,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnFailureMemo
     auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
         200 /*resultDocCount*/, plannerDataForCacheWrite.cq);
     {
-        MultiPlanner planner{
-            std::move(plannerDataForCacheWrite), std::move(solutions), true /*shouldWriteToCache*/};
+        MultiPlanner planner{std::move(plannerDataForCacheWrite),
+                             std::move(solutions),
+                             true /*shouldWriteToCache*/,
+                             kNoopReplanCounterCb,
+                             boost::none /* replanReason */,
+                             PlanSelectionStrategy::kMultiPlanner};
 
         auto exec = planner.makeExecutor(std::move(cqForCacheWrite));
         assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
@@ -637,8 +658,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
     auto [solutions, expectedSums] =
         createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
     {
-        MultiPlanner planner{
-            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+        MultiPlanner planner{std::move(plannerData),
+                             std::move(solutions),
+                             true /*shouldWriteToCache*/,
+                             kNoopReplanCounterCb,
+                             boost::none /* replanReason */,
+                             PlanSelectionStrategy::kMultiPlanner};
         auto exec = planner.makeExecutor(std::move(cq));
         assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
     }

@@ -4,12 +4,14 @@
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
 
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 
 namespace mongo::classic_runtime_planner_for_sbe {
 
-PlannerBase::PlannerBase(PlannerDataForSBE plannerData) : _plannerData(std::move(plannerData)) {}
+PlannerBase::PlannerBase(PlannerDataForSBE plannerData, PlanSelectionStrategy planSelectionStrategy)
+    : _plannerData(std::move(plannerData)), _planSelectionStrategy(planSelectionStrategy) {}
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlanExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery,
@@ -53,7 +55,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                        {} /* rejectedJoinPlans */,
                                        std::move(remoteCursors),
                                        std::move(remoteExplains),
-                                       std::move(classicRuntimePlannerStage));
+                                       std::move(classicRuntimePlannerStage),
+                                       boost::none /* maybeExplainData */,
+                                       planSelectionStrategy());
 }
 
 std::unique_ptr<QuerySolution> PlannerBase::extendSolutionWithPipeline(

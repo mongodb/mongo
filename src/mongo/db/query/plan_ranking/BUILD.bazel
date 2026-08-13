@@ -10,10 +10,10 @@ exports_files(
 )
 
 mongo_cc_library(
-    name = "plan_ranker_method",
+    name = "plan_selection_strategy",
     hdrs = [
-        "plan_ranker_method.h",
         "plan_ranker_reason.h",
+        "plan_selection_strategy.h",
     ],
     deps = [],
 )

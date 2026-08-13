@@ -528,7 +528,7 @@ try {
             qID: "6.3",
             cName: "20k",
             query: {c: 1},
-            chosenRanker: ChosenRanker.kNone,
+            chosenRanker: ChosenRanker.kSinglePlan,
             reason: PlanRankerReason.kSinglePlan,
         });
         // 'f1' and 'f2' have no values this large, so both index scans are empty and MP reaches EOF

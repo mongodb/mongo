@@ -10,8 +10,8 @@
 namespace mongo {
 
 /**
- * The reason why the deciding plan ranker (see PlanRankerMethod in plan_ranker_method.h, to which
- * this enum is a sibling) was chosen for a query. Recorded at the site where each ranking strategy
+ * The reason why the deciding plan ranker (see PlanSelectionStrategy in plan_selection_strategy.h,
+ * to which this enum is a sibling) was chosen for a query. Recorded at the site where each strategy
  * makes its decision and carried to explain generation.
  * The names are visible in the V3 explain 'queryPlanner.rankerChoice.reason' field and must stay
  * byte-equal to the JS 'PlanRankerReason' enum in jstests/libs/query/analyze_plan.js.
