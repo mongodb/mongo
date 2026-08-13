@@ -7,7 +7,6 @@
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/query/plan_cache_utils.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -15,7 +14,7 @@ const coll = db.sbe_uses_correct_plan_cache;
 const foreignCollName = "foreign";
 coll.drop();
 
-const expectedCacheVersion = sbePlanCacheEnabled(db) ? 2 : 1;
+const expectedCacheVersion = 1;
 
 // assertCacheUsage() and friends require the profiler.
 assert.commandWorked(db.setProfilingLevel(2));
@@ -131,15 +130,8 @@ assertCacheEntryIsCreatedAndUsed({
 
         const planCacheContents = coll.getPlanCache().list();
 
-        if (expectedCacheVersion == 1) {
-            // Ensure no plan cache entry was written.
-            assert.eq(planCacheContents.length, 0);
-        } else if (expectedCacheVersion == 2) {
-            // One entry should have been written.
-            assert.eq(planCacheContents.length, 1);
-        } else {
-            throw "Unknown cache version, test must be updated";
-        }
+        // Ensure no plan cache entry was written.
+        assert.eq(planCacheContents.length, 0);
     }
 
     // Now run the query without a hint and set up a cache entry

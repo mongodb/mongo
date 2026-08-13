@@ -59,18 +59,13 @@ import {
     isIdhackOrExpress,
     isIxscan,
 } from "jstests/libs/query/analyze_plan.js";
-import {
-    sbePlanCacheEnabled,
-    checkSbeRestrictedOrFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // Flag indicating if index filter commands are running through the query settings interface.
 let isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
 
 const coll = db[jsTestName()];
 coll.drop();
-
-const usingSbePlanCache = sbePlanCacheEnabled(db);
 
 // Setup the data so that plans will not tie given the indices and query
 // below. Tying plans will not be cached, and we need cached shapes in
@@ -456,15 +451,6 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     }
     let results = coll.aggregate(pipeline).toArray();
 
-    // Check details of the cached plan.
-    if (usingSbePlanCache) {
-        assert.eq(1, results.length, results);
-        planAfterSetFilter = planCacheEntryForPipeline(pipeline);
-        assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
-        // Check 'indexFilterSet' field in plan details - no index filters should be applied.
-        assert.eq(false, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
-    }
-
     // Ensure that despite an index filter being set on the foreign collection, we're still using
     // heuristics to select an INLJ plan. This can be proved by showing that the index being used is
     // the 'foreign_a_1' one, rather than 'foreign_a_1_c_1' specified in the index filter, as the
@@ -508,15 +494,6 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         // Re-run the pipeline.
         results = coll.aggregate(pipeline).toArray();
 
-        // Check details of the cached plan, when SBE plan cache is enabled.
-        if (usingSbePlanCache) {
-            assert.eq(1, results.length, results);
-            planAfterSetFilter = planCacheEntryForPipeline(pipeline);
-            assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
-            // Check 'indexFilterSet' field in plan details - an index filter should be applied.
-            assert.eq(true, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
-        }
-
         // Check that the inner side was still using the heuristics to select an INLJ plan, and the
         // outer side honoured the index filter.
         explain = coll.explain().aggregate(pipeline);
@@ -551,20 +528,5 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         assert.eq(queryA1, filters[0].query, filters);
         assert.eq(1, filters[0].indexes.length, filters);
         assert.eq(indexA1C1, filters[0].indexes[0], filters);
-
-        if (usingSbePlanCache) {
-            let planCacheEntry = planCacheEntryForPipeline(pipeline);
-            assert.neq(null, planCacheEntry, coll.getPlanCache().list());
-            assert.eq(true, planCacheEntry.indexFilterSet, planCacheEntry);
-
-            // Clear the index filter on the main collection and ensure that the plan is no longer
-            // in the cache.
-            assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: queryA1}));
-            filters = getFilters(coll);
-            assert.eq(0, filters.length, filters);
-
-            planCacheEntry = planCacheEntryForPipeline(pipeline);
-            assert.eq(null, planCacheEntry, coll.getPlanCache().list());
-        }
     }
 }

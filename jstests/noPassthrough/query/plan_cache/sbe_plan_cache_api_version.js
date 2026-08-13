@@ -3,7 +3,7 @@
  * aggregate command.
  */
 
-import {sbePlanCacheEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
@@ -12,7 +12,6 @@ const coll = db.coll;
 coll.drop();
 
 const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
-const isUsingSbePlanCache = sbePlanCacheEnabled(db);
 
 assert.commandWorked(
     coll.insert([
@@ -58,16 +57,9 @@ function assertPlanCacheEntryExists(cacheKey, properties = {}) {
     assert.eq(entries.length, 1, entries);
     const entry = entries[0];
 
-    if (isUsingSbePlanCache) {
-        // The version:"2" field indicates that this is an SBE plan cache entry.
-        assert.eq(entry.version, "2", entry);
-        assert.eq(entry.isActive, properties.isActive, entry);
-        assert.eq(entry.isPinned, properties.isPinned, entry);
-    } else {
-        // The version:"1" field indicates that this is an classic plan cache entry.
-        assert.eq(entry.version, "1", entry);
-        assert.eq(entry.isActive, properties.isActive, entry);
-    }
+    // The version:"1" field indicates that this is a classic plan cache entry.
+    assert.eq(entry.version, "1", entry);
+    assert.eq(entry.isActive, properties.isActive, entry);
 }
 
 const pipeline = [{$match: {a: 1, b: 1}}];
@@ -76,27 +68,6 @@ const pipeline = [{$match: {a: 1, b: 1}}];
 // executes the above pipeline with and without the API strict flag. Assert that the plan cache
 // keys for each of the two queries are different and two different plan cache entries have been
 // created.
-
-const sbeEngineTestcases = [
-    {
-        withApiVersion: {isActive: true, isPinned: true},
-        withApiStrict: {isActive: true, isPinned: true},
-        indexSpecs: [],
-    },
-    {
-        withApiVersion: {isActive: true, isPinned: true},
-        withApiStrict: {isActive: true, isPinned: true},
-        indexSpecs: [{keyPattern: {a: 1}, options: {name: "a_1"}}],
-    },
-    {
-        withApiVersion: {isActive: false, isPinned: false},
-        withApiStrict: {isActive: true, isPinned: true},
-        indexSpecs: [
-            {keyPattern: {a: 1}, options: {name: "a_1"}},
-            {keyPattern: {a: 1}, options: {name: "a_1_sparse", sparse: true}},
-        ],
-    },
-];
 
 const classicEngineTestcases = [
     {
@@ -118,7 +89,7 @@ const classicEngineTestcases = [
     },
 ];
 
-const testcases = isUsingSbePlanCache ? sbeEngineTestcases : classicEngineTestcases;
+const testcases = classicEngineTestcases;
 for (const testcase of testcases) {
     [true, false].forEach((runWithApiStrictFirst) => {
         assert.commandWorked(coll.dropIndexes());

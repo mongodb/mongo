@@ -5,7 +5,7 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeFullFeatureFlagEnabled, sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db[jsTest.name()];
 const otherColl = db[coll.getName() + "_other"];
@@ -170,36 +170,6 @@ runTestsExpectFailure(baseCollectionClusterTimeFind);
 runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
-
-// The deferred get_executor path does not support the SBE plan cache.
-if (
-    sbePlanCacheEnabled(db) &&
-    !FeatureFlagUtil.isPresentAndEnabled(db, "GetExecutorDeferredEngineChoice")
-) {
-    function verifyPlanCacheSize(query) {
-        coll.getPlanCache().clear();
-
-        query().toArray();
-        // It can take two executions of a query for a plan to get cached.
-        query().toArray();
-
-        const caches = coll.getPlanCache().list();
-        assert.eq(caches.length, 1, caches);
-        assert.eq(caches[0].cachedPlan.stages.includes("Date"), false, caches);
-    }
-
-    // Query with $$NOW will be cached.
-    verifyPlanCacheSize(projWithNow);
-    verifyPlanCacheSize(aggWithNow);
-
-    // $$NOW is not in SBE query.
-    verifyPlanCacheSize(fromViewWithNow);
-    verifyPlanCacheSize(withExprNow);
-
-    // $$NOW could not be pushed down into SBE.
-    verifyPlanCacheSize(baseCollectionNowAgg);
-    verifyPlanCacheSize(aggWithNowNotPushedDown);
-}
 
 {
     // Insert an doc with a future time.

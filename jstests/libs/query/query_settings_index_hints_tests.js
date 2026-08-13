@@ -1,28 +1,15 @@
 import {anyEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getCollectionName, getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {
-    getCollectionName,
-    getExplainCommand,
-    isTimeSeriesCollection,
-} from "jstests/libs/cmd_object_utils.js";
-import {
-    everyWinningPlan,
     formatQueryPlanner,
     getAggPlanStages,
-    getEngine,
     getLookupStageIndexStrategy,
     getPlanStages,
     getQueryPlanners,
     getWinningPlanFromExplain,
-    isAlwaysFalsePlan,
-    isEofPlan,
-    isIdhackOrExpress,
-    planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {
-    sbePlanCacheEnabled,
-    checkSbeRestrictedOrFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 /**
  * Class containing common test functions used in query_settings_index_application_* tests.
@@ -42,132 +29,6 @@ export class QuerySettingsIndexHintsTests {
         this.indexB = {b: 1};
         this.indexAB = {a: 1, b: 1};
         this.allIndexes = [this.indexA, this.indexB, this.indexAB];
-    }
-
-    static shouldCheckPlanCache(db, command, explain = null) {
-        if (!explain) {
-            // if the explain is not provided, we do need to retrieve it.
-            const explainCmd = getExplainCommand(command);
-            explain = assert.commandWorked(
-                db.runCommand(explainCmd),
-                `Failed running explain command ${toJsonForLog(
-                    explainCmd,
-                )} for checking the query settings plan cache check.`,
-            );
-        }
-
-        // We want to bail out immediately if the engine is not SBE.
-        // Single solution plans are not cached in classic, therefore do not perform plan cache
-        // checks for when the classic cache is used. Note that the classic cache is used
-        // by default for SBE, except when featureFlagSbeFull is on.
-        // TODO SERVER-90880: We can relax this check when we cache single-solution plans in the
-        // classic cache with SBE.
-        // TODO SERVER-13341: Relax this check to include the case where classic is being used.
-        if (getEngine(explain) !== "sbe") {
-            return false;
-        }
-
-        if (!sbePlanCacheEnabled(db)) {
-            return false;
-        }
-
-        const isIdhackQuery = everyWinningPlan(explain, (winningPlan) =>
-            isIdhackOrExpress(db, winningPlan),
-        );
-        const isMinMaxQuery = "min" in command || "max" in command;
-        const isTriviallyFalse = everyWinningPlan(
-            explain,
-            (winningPlan) => isEofPlan(db, winningPlan) || isAlwaysFalsePlan(winningPlan),
-        );
-        const {defaultReadPreference, defaultReadConcernLevel, networkErrorAndTxnOverrideConfig} =
-            TestData;
-        const performsSecondaryReads =
-            defaultReadPreference && defaultReadPreference.mode == "secondary";
-        const isInTxnPassthrough =
-            networkErrorAndTxnOverrideConfig &&
-            networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions;
-        const willRetryOnNetworkErrors =
-            networkErrorAndTxnOverrideConfig &&
-            networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
-
-        // If the collection used is a view, determine the underlying collection being used.
-        const collName = getCollectionName(db, command);
-        const collHasPartialIndexes = db[collName]
-            .getIndexes()
-            .some((idx) => idx.hasOwnProperty("partialFilterExpression"));
-        const isTimeSeriesColl = isTimeSeriesCollection(db, collName);
-
-        const res =
-            // TODO SERVER-94392: Relax this check when SBE plan cache supports partial indexes.
-            !collHasPartialIndexes &&
-            // Express or IDHACK optimized queries are not cached.
-            !isIdhackQuery &&
-            // Min/max queries are not cached.
-            !isMinMaxQuery &&
-            // Similarly, trivially false plans are not cached.
-            !isTriviallyFalse &&
-            // Subplans are cached differently from normal plans.
-            !planHasStage(db, explain, "OR") &&
-            // If query is executed on secondaries, do not assert the cache.
-            !performsSecondaryReads &&
-            // Do not check plan cache if causal consistency is enabled.
-            !db.getMongo().isCausalConsistency() &&
-            // $planCacheStats can not be run in transactions.
-            !isInTxnPassthrough &&
-            // Retrying on network errors most likely is related to stepdown, which does not go
-            // together with plan cache clear.
-            !willRetryOnNetworkErrors &&
-            // If read concern is explicitly set, avoid plan cache checks.
-            !defaultReadConcernLevel &&
-            // If the test is performing initial sync it may affect the plan cache by generating an
-            // additional entry.
-            !TestData.isRunningInitialSync &&
-            // If the test is running shard key analysis, it may affect the plan cache by generating
-            // and additional entry.
-            !TestData.isAnalyzingShardKey &&
-            // For timeseries collections with featureFlagSbeFull turned on, it is not possible to
-            // run the planCacheClear command because it is a view, so we cannot acquire lock.
-            !isTimeSeriesColl;
-        return res;
-    }
-
-    /**
-     * Asserts that after executing 'command' the most recent query plan from cache would have
-     * 'querySettings' set.
-     */
-    assertQuerySettingsInCacheForCommand(
-        command,
-        querySettings,
-        collOrViewName = this._qsutils._collName,
-        explainRes = null,
-    ) {
-        if (!QuerySettingsIndexHintsTests.shouldCheckPlanCache(this._db, command, explainRes)) {
-            return;
-        }
-
-        const collName = getCollectionName(this._db, command);
-
-        // Clear the plan cache before running any queries.
-        this._db[collName].getPlanCache().clear();
-
-        // Take the plan cache entries and ensure that they contain the 'settings'.
-        assert.commandWorked(
-            this._commandDb.runCommand(command),
-            `Failed to check the plan cache because the original command failed ${tojson(command)}`,
-        );
-        const planCacheStatsAfterRunningCmd = this._db[collName].getPlanCache().list();
-        assert.gte(
-            planCacheStatsAfterRunningCmd.length,
-            1,
-            "Expecting at least 1 entry in query plan cache",
-        );
-        planCacheStatsAfterRunningCmd.forEach((plan) =>
-            assert.docEq(
-                this._qsutils.wrapIndexHintsIntoArrayIfNeeded(querySettings),
-                plan.querySettings,
-                plan,
-            ),
-        );
     }
 
     assertIndexUse(cmd, expectedIndex, stagesExtractor, expectedStrategy) {
@@ -272,24 +133,6 @@ export class QuerySettingsIndexHintsTests {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertIndexScanStage(query, index, ns);
-                this.assertQuerySettingsInCacheForCommand(query, settings, ns.coll);
-            });
-        }
-    }
-
-    /**
-     * Ensure query plan cache contains query settings for the namespace 'ns'.
-     */
-    assertGraphLookupQuerySettingsInCache(querySettingsQuery, ns) {
-        const query = this._qsutils.withoutDollarDB(querySettingsQuery);
-        for (const allowedIndexes of [
-            [this.indexA, this.indexB],
-            [this.indexA, this.indexAB],
-            [this.indexAB, this.indexB],
-        ]) {
-            const settings = {indexHints: {ns, allowedIndexes}};
-            this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-                this.assertQuerySettingsInCacheForCommand(query, settings, ns.coll);
             });
         }
     }
@@ -303,7 +146,6 @@ export class QuerySettingsIndexHintsTests {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertLookupJoinStage(query, index, isSecondaryCollAView);
-                this.assertQuerySettingsInCacheForCommand(query, settings);
             });
         }
     }
@@ -332,7 +174,6 @@ export class QuerySettingsIndexHintsTests {
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertIndexScanStage(query, mainCollIndex, mainNs);
                 this.assertLookupJoinStage(query, secondaryCollIndex, isSecondaryCollAView);
-                this.assertQuerySettingsInCacheForCommand(query, settings, mainNs.coll);
             });
         }
     }
@@ -346,7 +187,6 @@ export class QuerySettingsIndexHintsTests {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertLookupPipelineStage(query, index);
-                this.assertQuerySettingsInCacheForCommand(query, settings);
             });
         }
     }
@@ -368,8 +208,6 @@ export class QuerySettingsIndexHintsTests {
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertIndexScanStage(query, mainCollIndex, mainNs);
                 this.assertLookupPipelineStage(query, secondaryCollIndex);
-                this.assertQuerySettingsInCacheForCommand(query, settings, mainNs.coll);
-                this.assertQuerySettingsInCacheForCommand(query, settings, secondaryNs.coll);
             });
         }
     }
@@ -391,8 +229,6 @@ export class QuerySettingsIndexHintsTests {
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertIndexScanStage(query, mainCollIndex, mainNs);
                 this.assertIndexScanStage(query, secondaryCollIndex, secondaryNs);
-                this.assertQuerySettingsInCacheForCommand(query, settings, mainNs.coll);
-                this.assertQuerySettingsInCacheForCommand(query, settings, secondaryNs.coll);
             });
         }
     }
@@ -419,7 +255,6 @@ export class QuerySettingsIndexHintsTests {
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalForwardSettings, () => {
             this.assertCollScanStage(query, ["forward"], ns);
-            this.assertQuerySettingsInCacheForCommand(query, naturalForwardSettings);
             additionalAssertions();
         });
 
@@ -430,7 +265,6 @@ export class QuerySettingsIndexHintsTests {
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalBackwardSettings, () => {
             this.assertCollScanStage(query, ["backward"], ns);
-            this.assertQuerySettingsInCacheForCommand(query, naturalBackwardSettings);
             additionalAssertions();
         });
 
@@ -443,7 +277,6 @@ export class QuerySettingsIndexHintsTests {
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalAnyDirectionSettings, () => {
             this.assertCollScanStage(query, ["forward", "backward"], ns);
-            this.assertQuerySettingsInCacheForCommand(query, naturalAnyDirectionSettings);
             additionalAssertions();
         });
     }
@@ -536,13 +369,6 @@ export class QuerySettingsIndexHintsTests {
                 const explain = assert.commandWorked(
                     this._commandDb.runCommand(explainCmd),
                     `Failed running ${tojson(explainCmd)} after setting query settings`,
-                );
-                this.assertQuerySettingsInCacheForCommand(
-                    query,
-                    explainCmd,
-                    settings,
-                    this._qsutils._collName,
-                    explain,
                 );
                 return explain;
             },

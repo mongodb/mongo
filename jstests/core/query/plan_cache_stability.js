@@ -31,7 +31,6 @@ import {
     getPlanCacheKeyFromExplain,
     getPlanCacheShapeHashFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 function groupBy(arr, keyFn) {
     let dict = {};
@@ -94,7 +93,6 @@ runTest({
 // Drop the index.
 assert.commandWorked(coll.dropIndex({x: 1}));
 const postDropExplain = coll.find(query).explain();
-const usesSbePlanCache = sbePlanCacheEnabled(db);
 runTest({
     explain0: initialExplain,
     explain1: postDropExplain,
@@ -105,20 +103,10 @@ runTest({
             "'planCacheShapeHash' shouldn't change accross catalog changes",
         );
 
-        if (usesSbePlanCache) {
-            // SBE's 'planCacheKey' encoding encodes "collection version" which will be increased
-            // after dropping an index.
-            assert.neq(
-                getPlanCacheKeyFromExplain(nodeExplain0),
-                getPlanCacheKeyFromExplain(nodeExplain1),
-                "'planCacheKey' should change accross catalog changes",
-            );
-        } else {
-            // The 'planCacheKey' should be the same as what it was before we dropped the index.
-            assert.eq(
-                getPlanCacheKeyFromExplain(nodeExplain0),
-                getPlanCacheKeyFromExplain(nodeExplain1),
-            );
-        }
+        // The 'planCacheKey' should be the same as what it was before we dropped the index.
+        assert.eq(
+            getPlanCacheKeyFromExplain(nodeExplain0),
+            getPlanCacheKeyFromExplain(nodeExplain1),
+        );
     },
 });

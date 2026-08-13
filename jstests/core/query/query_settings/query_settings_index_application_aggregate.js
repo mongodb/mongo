@@ -329,7 +329,6 @@ function testAggregateQuerySettingsApplicationWithGraphLookup(
     // TODO SERVER-88561: Ensure query settings index application for 'secondaryNs' after
     // 'indexesUsed' is added to the 'explain' command output for the $graphLookup operation.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
-    qstests.assertGraphLookupQuerySettingsInCache(aggregateCmd, secondaryNs);
 }
 
 function testAggregateQuerySettingsApplicationWithUnionWithPipeline(

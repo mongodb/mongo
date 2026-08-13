@@ -5,7 +5,7 @@
  * ]
  */
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/query/plan_cache_utils.js";
-import {sbePlanCacheEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -13,7 +13,6 @@ const coll = db.plan_cache_replan_unwind;
 coll.drop();
 
 const sbeEnabled = checkSbeFullyEnabled(db);
-const usingSbePlanCache = sbePlanCacheEnabled(db);
 
 assert.commandWorked(db.setProfilingLevel(2));
 
@@ -86,7 +85,7 @@ const aIndexPredicate = [{$match: {a: {$gte: 1097, $lt: 1100}, b: {$gte: 1, $lt:
 // should still replan, as $unwind should not affect replanning.
 const bIndexPredicate = [{$match: {a: {$gte: 1, $lt: 1100}, b: {$gte: 1029, $lt: 1032}}}];
 
-const expectedCacheEntryVersion = usingSbePlanCache ? 2 : 1;
+const expectedCacheEntryVersion = 1;
 
 // We add another stage, so $unwind is pushed down.
 const unwindSum = [{$unwind: "$arr"}, {$addFields: {sum: {$add: ["$a", "$b", "$arr"]}}}];

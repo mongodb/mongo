@@ -30,7 +30,6 @@ import {
     getPlanStages,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db.wildcard_cached_plans;
 
@@ -48,8 +47,6 @@ function getCacheEntryForQuery(query) {
     }
     return null;
 }
-
-const isUsingSbePlanCache = sbePlanCacheEnabled(db);
 
 for (const indexSpec of wildcardIndexes) {
     coll.drop();
@@ -81,32 +78,24 @@ for (const indexSpec of wildcardIndexes) {
     let cacheEntry = getCacheEntryForQuery(query);
     assert.neq(cacheEntry, null);
     assert.eq(cacheEntry.isActive, true);
-    if (!isUsingSbePlanCache) {
-        // Should be at least two plans: one using the {a: 1} index and the other using the b.$**
-        // index.
-        assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
+    // Should be at least two plans: one using the {a: 1} index and the other using the b.$**
+    // index.
+    assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
-        const ixscan = (function () {
-            const execStats = cacheEntry.creationExecStats;
-            if (!execStats) return null;
-            const elem = execStats[0];
-            if (!elem) return null;
-            if (!elem.executionStages) return null;
-            return getPlanStage(elem.executionStages, "IXSCAN");
-        })();
-        const expectedKeyPattern = {"$_path": 1, "b": 1};
-        if (indexSpec.keyPattern.other) {
-            expectedKeyPattern["other"] = 1;
-        }
-        assert.neq(null, ixscan, cacheEntry);
-        assert(bsonWoCompare(ixscan.keyPattern, expectedKeyPattern) === 0, ixscan);
-    } else {
-        assert(cacheEntry.hasOwnProperty("cachedPlan"), cacheEntry);
-        assert(cacheEntry.cachedPlan.hasOwnProperty("stages"), cacheEntry);
-        const sbePlan = cacheEntry.cachedPlan.stages;
-        // The SBE plan string should contain the name of the b.$** index.
-        assert(sbePlan.includes("b.$**_1"), cacheEntry);
+    const ixscan = (function () {
+        const execStats = cacheEntry.creationExecStats;
+        if (!execStats) return null;
+        const elem = execStats[0];
+        if (!elem) return null;
+        if (!elem.executionStages) return null;
+        return getPlanStage(elem.executionStages, "IXSCAN");
+    })();
+    const expectedKeyPattern = {"$_path": 1, "b": 1};
+    if (indexSpec.keyPattern.other) {
+        expectedKeyPattern["other"] = 1;
     }
+    assert.neq(null, ixscan, cacheEntry);
+    assert(bsonWoCompare(ixscan.keyPattern, expectedKeyPattern) === 0, ixscan);
 
     // Run the query again. This time it should use the cached plan. We should get the same result
     // as earlier.
@@ -126,13 +115,7 @@ for (const indexSpec of wildcardIndexes) {
     // There should only have been one solution for the above query, so it would get cached only by
     // the SBE plan cache.
     cacheEntry = getCacheEntryForQuery({a: 1, b: null});
-    if (isUsingSbePlanCache) {
-        assert.neq(cacheEntry, null);
-        assert.eq(cacheEntry.isActive, true, cacheEntry);
-        assert.eq(cacheEntry.isPinned, true, cacheEntry);
-    } else {
-        assert.eq(cacheEntry, null);
-    }
+    assert.eq(cacheEntry, null);
 
     // Check that indexability discriminators work with collations.
     {

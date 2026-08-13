@@ -28,10 +28,9 @@ import {
     getRejectedPlans,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
-const isUsingSbePlanCache = sbePlanCacheEnabled(db);
 const coll = db.explain_plan_cache;
 
 // Assert the winning plan is cached and rejected are not.
@@ -77,7 +76,7 @@ function collScanTest(explainMode) {
     for (let i = 0; i < 5; i++) {
         coll.find({a: 1, b: 1}).toArray();
     }
-    assertWinningPlanCacheStatus(coll.find({a: 2, b: 2}).explain(explainMode), isUsingSbePlanCache);
+    assertWinningPlanCacheStatus(coll.find({a: 2, b: 2}).explain(explainMode), false);
 }
 
 // Tests basic find and aggregations that share the same cache entries report isCached correctly.
@@ -122,7 +121,7 @@ function predicateTest(explainMode) {
     // When the query uses sub-planning the top-level query doesn't hit the plan cache.
     // This is not the case when the SBE plan cache is enabled.
     const explain = coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode);
-    assertWinningPlanCacheStatus(explain, isUsingSbePlanCache);
+    assertWinningPlanCacheStatus(explain, false);
 
     // Test with a contained OR. The query will be planned as a whole so we do expect it to hit the
     // cache.

@@ -207,15 +207,6 @@ export function checkSbeFullFeatureFlagEnabled(theDB) {
 }
 
 /**
- * Check if the SBE plan cache is enabled. The SBE plan cache is currently not in use;
- * queries always use the classic plan cache.
- * TODO SERVER-128637
- */
-export function sbePlanCacheEnabled(_theDB) {
-    return false;
-}
-
-/**
  * Check if SBE is fully enabled in the cluster. This implies that either 'featureFlagSbeFull' is
  * enabled, or the internalQueryFrameworkControl knob is set to 'trySbeEngine'.
  *
